@@ -226,6 +226,9 @@ export type Database = {
           imported_rows: number;
           analysis_prompt: string | null;
           analysis_summary: string | null;
+          processing_status: string;
+          processing_error: string | null;
+          processed_at: string | null;
           metadata_json: Json;
           created_by: string | null;
           created_at: string;
@@ -249,6 +252,9 @@ export type Database = {
           imported_rows?: number;
           analysis_prompt?: string | null;
           analysis_summary?: string | null;
+          processing_status?: string;
+          processing_error?: string | null;
+          processed_at?: string | null;
           metadata_json?: Json;
           created_by?: string | null;
           created_at?: string;
