@@ -24,7 +24,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="People"
-        title="Team visibility"
+        title="People"
         description="Track team roles, departments, status, contact details, and onboarding notes for operational accountability."
       />
 

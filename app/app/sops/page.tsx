@@ -70,7 +70,7 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="SOPs"
-        title="Standard operating procedures"
+        title="SOP Library"
         description="Draft, review, and maintain step-by-step operating procedures. Vaeroex-generated drafts remain clearly labeled for manager review."
       />
 

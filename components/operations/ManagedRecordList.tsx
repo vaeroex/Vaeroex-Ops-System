@@ -91,6 +91,7 @@ const sortOptions = [
   { value: "category", label: "Category" },
   { value: "last_updated", label: "Last updated" }
 ];
+const pageSizeOptions = ["5", "10", "25", "50"];
 
 function param(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
@@ -143,6 +144,29 @@ function listHref(returnPath: string, params: Record<string, string>) {
   return suffix ? `${returnPath}?${suffix}` : returnPath;
 }
 
+function listParams(searchParams?: ManagedRecordListProps["searchParams"]) {
+  return {
+    q: param(searchParams?.q),
+    folder: param(searchParams?.folder),
+    status: param(searchParams?.status),
+    owner: param(searchParams?.owner),
+    category: param(searchParams?.category),
+    sort: param(searchParams?.sort),
+    view: param(searchParams?.view),
+    date_from: param(searchParams?.date_from),
+    date_to: param(searchParams?.date_to)
+  };
+}
+
+function pageLimit(value: string, total: number) {
+  if (value === "all") {
+    return total;
+  }
+
+  const parsed = Number(value || 10);
+  return pageSizeOptions.includes(String(parsed)) ? parsed : 10;
+}
+
 function filteredRecords(records: ManagedRecord[], folders: ManagedRecordFolder[], searchParams?: ManagedRecordListProps["searchParams"]) {
   const query = param(searchParams?.q).toLowerCase().trim();
   const folder = param(searchParams?.folder);
@@ -150,10 +174,13 @@ function filteredRecords(records: ManagedRecord[], folders: ManagedRecordFolder[
   const owner = param(searchParams?.owner);
   const category = param(searchParams?.category);
   const view = param(searchParams?.view) || "active";
+  const dateFrom = param(searchParams?.date_from);
+  const dateTo = param(searchParams?.date_to);
 
   return records.filter((record) => {
     const isDeleted = Boolean(record.deletedAt);
     const isArchived = Boolean(record.archivedAt);
+    const recordDate = (record.updatedAt || record.createdAt).slice(0, 10);
 
     if (view === "active" && (isDeleted || isArchived)) return false;
     if (view === "archived" && (!isArchived || isDeleted)) return false;
@@ -163,6 +190,8 @@ function filteredRecords(records: ManagedRecord[], folders: ManagedRecordFolder[
     if (status && record.status !== status) return false;
     if (owner && record.owner !== owner) return false;
     if (category && record.category !== category) return false;
+    if (dateFrom && recordDate < dateFrom) return false;
+    if (dateTo && recordDate > dateTo) return false;
 
     if (!query) {
       return true;
@@ -465,6 +494,9 @@ export function ManagedRecordList({
 }: ManagedRecordListProps) {
   const sort = param(searchParams?.sort) || "newest";
   const visibleRecords = sortedRecords(filteredRecords(records, folders, searchParams), sort);
+  const limitValue = param(searchParams?.limit);
+  const visibleLimit = pageLimit(limitValue, visibleRecords.length);
+  const displayedRecords = visibleRecords.slice(0, visibleLimit);
   const returnPath = configuredReturnPath || `/app/${collection.replace("_", "-")}`;
   const activeFolders = folderOptions(folders);
   const statusOptions = uniqueOptions(records, "status");
@@ -472,6 +504,7 @@ export function ManagedRecordList({
   const categoryOptions = uniqueOptions(records, "category");
   const bulkFormId = `bulk-${collection}`;
   const activeFolder = param(searchParams?.folder);
+  const baseParams = listParams(searchParams);
 
   return (
     <div className="space-y-4">
@@ -535,6 +568,28 @@ export function ManagedRecordList({
                 <option value="deleted">Deleted</option>
                 <option value="all">All</option>
               </select>
+              <input
+                type="date"
+                name="date_from"
+                defaultValue={param(searchParams?.date_from)}
+                aria-label="Updated after"
+                className="rounded-lg border border-line px-3 py-2 text-sm"
+              />
+              <input
+                type="date"
+                name="date_to"
+                defaultValue={param(searchParams?.date_to)}
+                aria-label="Updated before"
+                className="rounded-lg border border-line px-3 py-2 text-sm"
+              />
+              <select name="limit" defaultValue={limitValue || "10"} className="rounded-lg border border-line px-3 py-2 text-sm">
+                {pageSizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    Show {option}
+                  </option>
+                ))}
+                <option value="all">View all</option>
+              </select>
               <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white md:col-span-2 xl:col-span-1">
                 Apply filters
               </button>
@@ -567,6 +622,29 @@ export function ManagedRecordList({
 
           {visibleRecords.length ? (
             <div className="rounded-lg border border-line bg-white">
+              <div className="flex flex-col gap-3 border-b border-line px-3 py-3 text-sm md:flex-row md:items-center md:justify-between">
+                <p className="text-muted">
+                  Showing <span className="font-semibold text-ink">{displayedRecords.length}</span> of{" "}
+                  <span className="font-semibold text-ink">{visibleRecords.length}</span> records
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {pageSizeOptions.map((option) => (
+                    <Link
+                      key={option}
+                      href={listHref(returnPath, { ...baseParams, limit: option }) as Route}
+                      className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${String(visibleLimit) === option && limitValue !== "all" ? "bg-vaeroex-blue text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                    >
+                      {option}
+                    </Link>
+                  ))}
+                  <Link
+                    href={listHref(returnPath, { ...baseParams, limit: "all" }) as Route}
+                    className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${limitValue === "all" ? "bg-vaeroex-blue text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                  >
+                    View All
+                  </Link>
+                </div>
+              </div>
               <div className="hidden border-b border-line bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted md:grid md:grid-cols-[32px_minmax(220px,1.5fr)_120px_120px_120px_140px_44px] md:gap-3">
                 <span />
                 <span>Title</span>
@@ -577,7 +655,7 @@ export function ManagedRecordList({
                 <span />
               </div>
               <div className="divide-y divide-line">
-                {visibleRecords.map((record) => {
+                {displayedRecords.map((record) => {
                   const isActive = activeRecordId === record.id;
 
                   return (
@@ -617,7 +695,9 @@ export function ManagedRecordList({
                                 <Link href={record.href} className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline">
                                   {isActive ? "Active selection" : record.selectLabel || "Select this record"}
                                 </Link>
-                              ) : null}
+                              ) : (
+                                <span className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue">View details</span>
+                              )}
                               <p className="mt-1 text-xs text-muted md:hidden">
                                 {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
                               </p>

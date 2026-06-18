@@ -109,7 +109,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Assets"
-        title="Equipment and readiness"
+        title="Assets"
         description="Track asset status, location, identifiers, inspection history, and equipment that needs attention."
       />
 

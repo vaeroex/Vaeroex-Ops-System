@@ -74,7 +74,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Tasks"
-        title="Follow-up accountability"
+        title="Tasks"
         description="Track work from manual entry, form submissions, issue logs, setup plans, and Vaeroex-reviewed recommendations."
       />
 

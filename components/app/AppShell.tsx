@@ -5,11 +5,12 @@ import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
+import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
-const navSections = [
+const baseNavSections = [
   {
-    label: "Dashboard",
+    label: "Home",
     items: [{ href: "/app", label: "Executive Dashboard" }]
   },
   {
@@ -17,37 +18,63 @@ const navSections = [
     items: [
       { href: "/app/tasks", label: "Tasks" },
       { href: "/app/checklists", label: "Checklists" },
-      { href: "/app/sops", label: "SOPs" },
       { href: "/app/issues", label: "Issues" },
-      { href: "/app/forms", label: "Forms" },
-      { href: "/app/form-submissions", label: "Form Submissions" },
       { href: "/app/assets", label: "Assets" },
       { href: "/app/people", label: "People" }
+    ]
+  },
+  {
+    label: "Sales & Customers",
+    items: [
+      { href: "/app/crm", label: "CRM" },
+      { href: "/app/forms", label: "Forms" },
+      { href: "/app/form-submissions", label: "Form Submissions" }
     ]
   },
   {
     label: "Data & Insights",
     items: [
       { href: "/app/kpis", label: "KPIs" },
-      { href: "/app/reports", label: "Reports" },
       { href: "/app/files", label: "Files" },
-      { href: "/app/agents", label: "Ask Vaeroex" }
+      { href: "/app/reports", label: "Reports" }
     ]
   },
   {
-    label: "Growth",
-    items: [{ href: "/app/crm", label: "CRM" }]
+    label: "Knowledge Base",
+    items: [
+      { href: "/app/sops", label: "SOPs" },
+      { href: "/app/workflows", label: "Workflows" }
+    ]
   },
   {
-    label: "Admin",
+    label: "Vaeroex",
+    items: [
+      { href: "/app/agents", label: "Ask Vaeroex" },
+      { href: "/app/agents", label: "Agent Hub" }
+    ]
+  },
+  {
+    label: "Account",
     items: [
       { href: "/app/account/subscription", label: "Subscription" },
       { href: "/app/support", label: "Support" },
-      { href: "/app/settings", label: "Settings" },
-      { href: "/app/admin", label: "Admin" }
+      { href: "/app/settings", label: "Settings" }
     ]
   }
 ] satisfies Array<{ label: string; items: Array<{ href: string; label: string }> }>;
+
+const adminNavSection = {
+  label: "Admin",
+  items: [
+    { href: "/app/admin", label: "Admin Dashboard" },
+    { href: "/app/admin/customers", label: "Customers" },
+    { href: "/app/admin/workspaces", label: "Workspaces" },
+    { href: "/app/admin/subscriptions", label: "Subscriptions" },
+    { href: "/app/admin/ai-usage", label: "AI Usage" },
+    { href: "/app/admin/support-requests", label: "Support Requests" },
+    { href: "/app/admin/audit-logs", label: "Audit Logs" }
+  ]
+} satisfies { label: string; items: Array<{ href: string; label: string }> };
 
 type AppShellProps = {
   children: ReactNode;
@@ -67,7 +94,7 @@ function NavSection({ label, items }: { label: string; items: Array<{ href: stri
       <div className="pb-2">
         {items.map((item) => (
           <Link
-            key={item.href}
+            key={`${item.href}-${item.label}`}
             href={item.href as Route}
             className="mx-2 block rounded-md px-3 py-2 text-sm text-blue-50 hover:bg-white/10"
           >
@@ -80,6 +107,8 @@ function NavSection({ label, items }: { label: string; items: Array<{ href: stri
 }
 
 export function AppShell({ children, profile, workspaces, activeWorkspace, membership }: AppShellProps) {
+  const navSections = isVaeroexAdminEmail(profile?.email) ? [...baseNavSections, adminNavSection] : baseNavSections;
+
   return (
     <div className="min-h-screen bg-slate-50 text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white lg:flex lg:flex-col">
@@ -139,7 +168,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
               <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">
                 {activeWorkspace?.name || "Setup required"}
               </p>
-              <h1 className="text-lg font-semibold">Accountability dashboard</h1>
+              <h1 className="text-lg font-semibold">Vaeroex Ops System</h1>
             </div>
             <div className="flex items-center gap-3">
               <Link
@@ -157,13 +186,18 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
 
         <nav className="border-b border-line bg-white px-4 py-2 lg:hidden">
           <div className="flex gap-2 overflow-x-auto">
-            {navSections.flatMap((section) =>
-              section.items.map((item) => (
-                <Link key={item.href} href={item.href as Route} className="whitespace-nowrap rounded-md bg-slate-100 px-3 py-2 text-sm">
-                  {item.label}
-                </Link>
-              ))
-            )}
+            {navSections.map((section) => (
+              <details key={section.label} className="shrink-0 rounded-md bg-slate-100 px-3 py-2">
+                <summary className="cursor-pointer list-none whitespace-nowrap text-sm font-semibold text-slate-700">{section.label}</summary>
+                <div className="mt-2 grid gap-1">
+                  {section.items.map((item) => (
+                    <Link key={`${section.label}-${item.label}`} href={item.href as Route} className="whitespace-nowrap rounded-md px-2 py-1 text-sm text-slate-700">
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              </details>
+            ))}
           </div>
         </nav>
 

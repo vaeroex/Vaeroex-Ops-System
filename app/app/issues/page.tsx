@@ -91,7 +91,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Issues"
-        title="Bottlenecks and breakdowns"
+        title="Issues"
         description="Log recurring problems, identify root causes, capture recommended fixes, and convert confirmed issues into accountable tasks."
       />
 

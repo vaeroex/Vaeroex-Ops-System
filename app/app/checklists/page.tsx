@@ -80,7 +80,7 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
     <div className="space-y-6">
       <PageHeader
         eyebrow="Checklists"
-        title="Readiness and recurring work"
+        title="Checklists"
         description="Create repeatable checklists, run them from the active workspace, and keep completion history visible for managers."
       />
 
