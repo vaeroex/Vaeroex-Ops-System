@@ -1,7 +1,9 @@
+import type { Route } from "next";
 import { createCrmLeadAction } from "@/app/app/operations/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
+import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
@@ -168,6 +170,14 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
         eyebrow="CRM"
         title="Lead pipeline"
         description="Track leads manually or import them later. The dashboard and reports use CRM records either way, so no spreadsheet is required to start."
+      />
+      <ModuleTabs
+        tabs={[
+          { label: "Pipeline", href: "/app/crm", active: !params?.status },
+          { label: "Leads", href: "/app/crm?view=active" as Route },
+          { label: "Follow-ups", href: "/app/tasks?category=Follow-up" as Route },
+          { label: "History", href: "/app/crm?sort=last_updated" as Route, active: params?.sort === "last_updated" }
+        ]}
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || leadResult.error?.message || historyResult.error?.message || folderResult.error?.message} />

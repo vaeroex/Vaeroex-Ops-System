@@ -1,8 +1,10 @@
+import type { Route } from "next";
 import type { ReactNode } from "react";
 import { generateReportAction } from "@/app/app/reports/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
+import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
@@ -335,6 +337,15 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         eyebrow="Reports"
         title="Operations reports"
         description="Generate daily, weekly, monthly, quarterly, yearly, and year-to-date summaries for the active workspace. Reports use the selected period, compare against the prior period where possible, and keep source data hidden unless admin debug mode is enabled."
+      />
+      <ModuleTabs
+        tabs={[
+          { label: "All Reports", href: "/app/reports", active: !params?.report_type },
+          { label: "Daily", href: "/app/reports?report_type=Daily" as Route, active: params?.report_type === "Daily" },
+          { label: "Weekly", href: "/app/reports?report_type=Weekly" as Route, active: params?.report_type === "Weekly" },
+          { label: "Monthly", href: "/app/reports?report_type=Monthly" as Route, active: params?.report_type === "Monthly" },
+          { label: "YTD", href: "/app/reports?report_type=Year%20to%20Date" as Route, active: params?.report_type === "Year to Date" }
+        ]}
       />
 
       <ErrorNotice message={params?.error || error?.message || folderResult.error?.message} />
