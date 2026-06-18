@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { convertSubmissionToTaskAction, createFormSubmissionAction } from "@/app/app/operations/actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -98,24 +99,10 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
 
       <ErrorNotice message={(params?.error as string | undefined) || formsError?.message || submissionsError?.message || folderResult.error?.message} />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <SectionCard title="All submissions" description="Recent submissions from the active workspace.">
-          <ManagedRecordList
-            collection="form_submissions"
-            records={managedSubmissions}
-            folders={folderResult.folders}
-            title="Submission records"
-            description="Submissions stay compact until a manager needs details or follow-up actions."
-            emptyTitle="No submissions yet"
-            emptyDescription="Capture a submission from a form detail page or add one here after creating a form."
-            returnPath="/app/form-submissions"
-            searchParams={params}
-          />
-        </SectionCard>
-
-        <SectionCard title="Add submission" description="Record an internal submission for an existing form.">
+      <section className="space-y-6">
+        <CreateDrawer title="Add submission" description="Record an internal submission for an existing form." triggerLabel="New Submission">
           {forms?.length ? (
-            <form action={createFormSubmissionAction} className="space-y-4">
+            <form action={createFormSubmissionAction} className="grid gap-4 lg:grid-cols-2">
               <input type="hidden" name="return_path" value="/app/form-submissions" />
               <label className="block text-sm font-medium">
                 Form
@@ -133,10 +120,16 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
               </label>
               <TextInput label="Submitter name" name="submitter_name" required />
               <TextInput label="Submitter email" name="submitter_email" type="email" />
-              <TextArea label="Submission summary" name="summary" required rows={4} />
               <SelectInput label="Priority" name="priority" defaultValue="Medium" options={priorityOptions} />
-              <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
-              <PrimaryButton>Save submission</PrimaryButton>
+              <div className="lg:col-span-2">
+                <TextArea label="Submission summary" name="summary" required rows={4} />
+              </div>
+              <div className="lg:col-span-2">
+                <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
+              </div>
+              <div className="lg:col-span-2">
+                <PrimaryButton>Save submission</PrimaryButton>
+              </div>
             </form>
           ) : (
             <EmptyState
@@ -149,7 +142,22 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
               }
             />
           )}
+        </CreateDrawer>
+
+        <SectionCard title="All submissions" description="Recent submissions from the active workspace.">
+          <ManagedRecordList
+            collection="form_submissions"
+            records={managedSubmissions}
+            folders={folderResult.folders}
+            title="Submission records"
+            description="Submissions stay compact until a manager needs details or follow-up actions."
+            emptyTitle="No submissions yet"
+            emptyDescription="Capture a submission from a form detail page or add one here after creating a form."
+            returnPath="/app/form-submissions"
+            searchParams={params}
+          />
         </SectionCard>
+
       </section>
     </div>
   );

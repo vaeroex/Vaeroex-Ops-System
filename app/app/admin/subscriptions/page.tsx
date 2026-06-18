@@ -1,4 +1,5 @@
 import { createManualSubscriptionAction, reviewActivationRequestAction, updateSubscriptionAction } from "@/app/app/admin/subscriptions/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { JsonPreview } from "@/components/operations/JsonPreview";
@@ -55,9 +56,9 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
         </form>
       </SectionCard>
 
-      <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-        <SectionCard title="Create manual activation">
-          <form action={createManualSubscriptionAction} className="space-y-4">
+      <section className="space-y-6">
+        <CreateDrawer title="Create manual activation" description="Use after confirming a Squarespace purchase or testing access for a verified account." triggerLabel="New Activation">
+          <form action={createManualSubscriptionAction} className="grid gap-4 lg:grid-cols-2">
             <label className="block text-sm font-medium">
               Customer email
               <input required name="customer_email" type="email" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
@@ -93,13 +94,15 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
               Squarespace order ID
               <input name="squarespace_order_id" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
             </label>
-            <label className="block text-sm font-medium">
+            <label className="block text-sm font-medium lg:col-span-2">
               Notes
               <textarea name="notes" rows={4} className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
             </label>
-            <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Save activation</button>
+            <div className="lg:col-span-2">
+              <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Save activation</button>
+            </div>
           </form>
-        </SectionCard>
+        </CreateDrawer>
 
         <SectionCard title="Customer subscriptions">
           <div className="space-y-4">

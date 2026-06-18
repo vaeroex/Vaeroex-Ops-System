@@ -1,4 +1,5 @@
 import { createTaskAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -95,7 +96,21 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         </article>
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <section className="space-y-6">
+        <CreateDrawer title="Create task" description="Use tasks for the next concrete action, not long notes." triggerLabel="New Task">
+          <form action={createTaskAction} className="grid gap-4 lg:grid-cols-2">
+            <TextInput label="Task title" name="title" required />
+            <TextArea label="Description" name="description" rows={4} />
+            <SelectInput label="Status" name="status" defaultValue="To Do" options={taskStatuses} />
+            <SelectInput label="Priority" name="priority" defaultValue="Medium" options={priorities} />
+            <TextInput label="Category" name="category" placeholder="Follow-up, safety, onboarding, customer" />
+            <TextInput label="Due date" name="due_date" type="date" />
+            <div className="lg:col-span-2">
+              <PrimaryButton>Create task</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
         <SectionCard title="Task board" description="All task data is scoped to the current workspace.">
           <ManagedRecordList
             collection="tasks"
@@ -109,17 +124,6 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           />
         </SectionCard>
 
-        <SectionCard title="Create task" description="Use tasks for the next concrete action, not long notes.">
-          <form action={createTaskAction} className="space-y-4">
-            <TextInput label="Task title" name="title" required />
-            <TextArea label="Description" name="description" rows={4} />
-            <SelectInput label="Status" name="status" defaultValue="To Do" options={taskStatuses} />
-            <SelectInput label="Priority" name="priority" defaultValue="Medium" options={priorities} />
-            <TextInput label="Category" name="category" placeholder="Follow-up, safety, onboarding, customer" />
-            <TextInput label="Due date" name="due_date" type="date" />
-            <PrimaryButton>Create task</PrimaryButton>
-          </form>
-        </SectionCard>
       </section>
     </div>
   );

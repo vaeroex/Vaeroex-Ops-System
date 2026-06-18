@@ -1,5 +1,6 @@
 import { convertIssueToTaskAction, createIssueAction } from "@/app/app/operations/actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -97,7 +98,23 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <section className="space-y-6">
+        <CreateDrawer title="Log issue" description="Capture enough detail for a manager to choose the next action." triggerLabel="New Issue">
+          <form action={createIssueAction} className="grid gap-4 lg:grid-cols-2">
+            <TextInput label="Issue title" name="title" required />
+            <TextInput label="Issue type" name="issue_type" placeholder="Process, customer, safety, equipment" />
+            <TextArea label="Description" name="description" rows={4} />
+            <SelectInput label="Severity" name="severity" defaultValue="Medium" options={issueSeverities} />
+            <SelectInput label="Status" name="status" defaultValue="Open" options={issueStatuses} />
+            <TextArea label="Root cause" name="root_cause" rows={3} />
+            <TextArea label="Recommended fix" name="recommended_fix" rows={3} />
+            <TextInput label="Due date" name="due_date" type="date" />
+            <div className="lg:col-span-2">
+              <PrimaryButton>Log issue</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
         <SectionCard title="Issue log" description="Open operational risks and improvement opportunities.">
           <ManagedRecordList
             collection="issues"
@@ -111,19 +128,6 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
           />
         </SectionCard>
 
-        <SectionCard title="Log issue" description="Capture enough detail for a manager to choose the next action.">
-          <form action={createIssueAction} className="space-y-4">
-            <TextInput label="Issue title" name="title" required />
-            <TextInput label="Issue type" name="issue_type" placeholder="Process, customer, safety, equipment" />
-            <TextArea label="Description" name="description" rows={4} />
-            <SelectInput label="Severity" name="severity" defaultValue="Medium" options={issueSeverities} />
-            <SelectInput label="Status" name="status" defaultValue="Open" options={issueStatuses} />
-            <TextArea label="Root cause" name="root_cause" rows={3} />
-            <TextArea label="Recommended fix" name="recommended_fix" rows={3} />
-            <TextInput label="Due date" name="due_date" type="date" />
-            <PrimaryButton>Log issue</PrimaryButton>
-          </form>
-        </SectionCard>
       </section>
     </div>
   );

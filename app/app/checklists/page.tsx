@@ -1,4 +1,5 @@
 import { createChecklistAction, runChecklistAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -86,56 +87,10 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
 
       <ErrorNotice message={(params?.error as string | undefined) || checklistsError?.message || runsError?.message || folderResult.error?.message} />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
-          <SectionCard title="Checklist library" description="Templates for recurring operational routines.">
-            <ManagedRecordList
-              collection="checklists"
-              records={managedChecklists}
-              folders={folderResult.folders}
-              title="Checklist records"
-              description="Collapse long item lists by default and organize templates into folders."
-              emptyTitle="No checklists yet"
-              emptyDescription="Create a recurring readiness, opening, closing, inspection, or manager review checklist."
-              searchParams={params}
-            />
-          </SectionCard>
-
-          <SectionCard title="Checklist runs" description="Recent completions and in-progress runs.">
-            {runs?.length ? (
-              <div className="overflow-auto">
-                <table className="w-full min-w-[680px] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-muted">
-                    <tr>
-                      <th className="py-2">Checklist</th>
-                      <th>Status</th>
-                      <th>Completed</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {runs.map((run) => (
-                      <tr key={run.id}>
-                        <td className="py-3 font-semibold">{checklistNameById.get(run.checklist_id) || "Checklist"}</td>
-                        <td>
-                          <StatusBadge value={run.status} />
-                        </td>
-                        <td className="text-muted">{run.completed_at ? new Date(run.completed_at).toLocaleString() : "Not completed"}</td>
-                        <td className="text-muted">{run.notes || "-"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <EmptyState title="No checklist runs" description="Run a checklist to start building completion history for this workspace." />
-            )}
-          </SectionCard>
-        </div>
-
-        <div className="space-y-6">
-          <SectionCard title="Create checklist" description="Add items one per line.">
-            <form action={createChecklistAction} className="space-y-4">
+      <section className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CreateDrawer title="Create checklist" description="Add items one per line." triggerLabel="New Checklist">
+            <form action={createChecklistAction} className="grid gap-4">
               <TextInput label="Checklist name" name="name" required />
               <TextInput label="Category" name="category" placeholder="Opening, safety, quality, manager review" />
               <SelectInput label="Frequency" name="frequency" options={checklistFrequencies} />
@@ -144,11 +99,11 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
               <TextArea label="Checklist items, one per line" name="items" rows={6} />
               <PrimaryButton>Create checklist</PrimaryButton>
             </form>
-          </SectionCard>
+          </CreateDrawer>
 
-          <SectionCard title="Run checklist" description="Record a quick run against an existing checklist.">
+          <CreateDrawer title="Run checklist" description="Record a quick run against an existing checklist." triggerLabel="Run Checklist">
             {checklists?.length ? (
-              <form action={runChecklistAction} className="space-y-4">
+              <form action={runChecklistAction} className="grid gap-4">
                 <label className="block text-sm font-medium">
                   Checklist
                   <select
@@ -171,8 +126,52 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
             ) : (
               <EmptyState title="Create a checklist first" description="Checklist runs need a checklist template." />
             )}
-          </SectionCard>
+          </CreateDrawer>
         </div>
+
+        <SectionCard title="Checklist library" description="Templates for recurring operational routines.">
+          <ManagedRecordList
+            collection="checklists"
+            records={managedChecklists}
+            folders={folderResult.folders}
+            title="Checklist records"
+            description="Collapse long item lists by default and organize templates into folders."
+            emptyTitle="No checklists yet"
+            emptyDescription="Create a recurring readiness, opening, closing, inspection, or manager review checklist."
+            searchParams={params}
+          />
+        </SectionCard>
+
+        <SectionCard title="Checklist runs" description="Recent completions and in-progress runs.">
+          {runs?.length ? (
+            <div>
+              <table className="w-full table-fixed text-left text-sm">
+                <thead className="text-xs uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="w-[45%] py-2">Checklist</th>
+                    <th>Status</th>
+                    <th className="hidden md:table-cell">Completed</th>
+                    <th className="hidden lg:table-cell">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-line">
+                  {runs.map((run) => (
+                    <tr key={run.id}>
+                      <td className="truncate py-3 pr-3 font-semibold">{checklistNameById.get(run.checklist_id) || "Checklist"}</td>
+                      <td>
+                        <StatusBadge value={run.status} />
+                      </td>
+                      <td className="hidden truncate text-muted md:table-cell">{run.completed_at ? new Date(run.completed_at).toLocaleString() : "Not completed"}</td>
+                      <td className="hidden truncate text-muted lg:table-cell">{run.notes || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <EmptyState title="No checklist runs" description="Run a checklist to start building completion history for this workspace." />
+          )}
+        </SectionCard>
       </section>
     </div>
   );

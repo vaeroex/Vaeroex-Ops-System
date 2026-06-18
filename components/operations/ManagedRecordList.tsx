@@ -524,7 +524,7 @@ export function ManagedRecordList({
         </form>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <div className="grid gap-4 2xl:grid-cols-[220px_minmax(0,1fr)]">
         <FolderQuickFilters folders={folders} records={records} activeFolder={activeFolder} returnPath={returnPath} />
 
         <div className="space-y-3">
@@ -645,7 +645,7 @@ export function ManagedRecordList({
                   </Link>
                 </div>
               </div>
-              <div className="hidden border-b border-line bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted md:grid md:grid-cols-[32px_minmax(220px,1.5fr)_120px_120px_120px_140px_44px] md:gap-3">
+              <div className="hidden border-b border-line bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted lg:grid lg:grid-cols-[32px_minmax(220px,1.5fr)_110px_110px_110px_120px_44px] lg:gap-3">
                 <span />
                 <span>Title</span>
                 <span>Status</span>
@@ -664,17 +664,17 @@ export function ManagedRecordList({
                       className={`px-3 py-2 transition ${isActive ? "bg-blue-50/80 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/70"}`}
                       aria-current={isActive ? "true" : undefined}
                     >
-                      <div className="grid gap-3 md:grid-cols-[32px_minmax(220px,1.5fr)_120px_120px_120px_140px_44px] md:items-center">
+                      <div className="grid gap-3 lg:grid-cols-[32px_minmax(220px,1.5fr)_110px_110px_110px_120px_44px] lg:items-center">
                         <input
                           form={bulkFormId}
                           type="checkbox"
                           name="record_id"
                           value={record.id}
-                          className="mt-1 h-4 w-4 rounded border-line text-vaeroex-blue md:mt-0"
+                          className="mt-1 h-4 w-4 rounded border-line text-vaeroex-blue lg:mt-0"
                           aria-label={`Select ${record.title}`}
                         />
-                        <details className="group min-w-0 md:contents">
-                          <summary className="cursor-pointer list-none md:col-start-2">
+                        <details className="group min-w-0 lg:contents">
+                          <summary className="cursor-pointer list-none lg:col-start-2">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-2">
                                 {record.href ? (
@@ -698,12 +698,12 @@ export function ManagedRecordList({
                               ) : (
                                 <span className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue">View details</span>
                               )}
-                              <p className="mt-1 text-xs text-muted md:hidden">
+                              <p className="mt-1 text-xs text-muted lg:hidden">
                                 {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
                               </p>
                             </div>
                           </summary>
-                          <div className="mt-3 space-y-3 rounded-lg border border-line bg-slate-50 p-3 md:col-span-7 md:col-start-1">
+                          <div className="mt-3 space-y-3 rounded-lg border border-line bg-slate-50 p-3 lg:col-span-7 lg:col-start-1">
                             <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
                               <div>
                                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
@@ -735,11 +735,11 @@ export function ManagedRecordList({
                           {record.children ? <div className="rounded-md bg-white p-3">{record.children}</div> : null}
                           </div>
                         </details>
-                        {record.inlineActions ? <div className="md:col-span-6 md:col-start-2">{record.inlineActions}</div> : null}
-                        <div className="hidden md:block">{record.status ? <StatusBadge value={record.status} /> : <span className="text-sm text-muted">-</span>}</div>
-                        <div className="hidden truncate text-sm text-slate-700 md:block">{record.owner || "-"}</div>
-                        <div className="hidden md:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>
-                        <div className="hidden text-sm text-muted md:block">{readableDate(record.updatedAt || record.createdAt)}</div>
+                        {record.inlineActions ? <div className="lg:col-span-6 lg:col-start-2">{record.inlineActions}</div> : null}
+                        <div className="hidden lg:block">{record.status ? <StatusBadge value={record.status} /> : <span className="text-sm text-muted">-</span>}</div>
+                        <div className="hidden truncate text-sm text-slate-700 lg:block">{record.owner || "-"}</div>
+                        <div className="hidden lg:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>
+                        <div className="hidden text-sm text-muted lg:block">{readableDate(record.updatedAt || record.createdAt)}</div>
                         <RecordActionsMenu collection={collection} record={record} activeFolders={activeFolders} returnPath={returnPath} />
                       </div>
                     </article>

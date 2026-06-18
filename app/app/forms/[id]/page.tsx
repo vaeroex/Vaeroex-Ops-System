@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { convertSubmissionToTaskAction, createFormSubmissionAction } from "@/app/app/operations/actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { TextArea, TextInput, SelectInput, PrimaryButton } from "@/components/operations/FormControls";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -49,7 +50,29 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
       {query?.error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{query.error}</div> : null}
       {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error.message}</div> : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <section className="space-y-6">
+        <CreateDrawer title="Submit form" description="Capture an operational submission for manager review." triggerLabel="New Submission">
+          <form action={createFormSubmissionAction} className="grid gap-4 lg:grid-cols-2">
+            <input type="hidden" name="form_id" value={form.id} />
+            <TextInput label="Submitter name" name="submitter_name" required />
+            <TextInput label="Submitter email" name="submitter_email" type="email" />
+            <div className="lg:col-span-2">
+              <TextArea label="Submission summary" name="summary" required rows={4} />
+            </div>
+            <SelectInput label="Priority" name="priority" defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
+            <div className="lg:col-span-2">
+              <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
+            </div>
+            <div className="lg:col-span-2">
+              <PrimaryButton>Save submission</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
+        <SectionCard title="Form schema">
+          <ReadableData value={form.schema_json} empty="No fields saved." />
+        </SectionCard>
+
         <SectionCard title="Submissions" description="Vaeroex summaries are drafts until a manager confirms the follow-up.">
           {submissions?.length ? (
             <div className="space-y-4">
@@ -81,22 +104,6 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
           )}
         </SectionCard>
 
-        <div className="space-y-6">
-          <SectionCard title="Submit form" description="Capture an operational submission for manager review.">
-            <form action={createFormSubmissionAction} className="space-y-4">
-              <input type="hidden" name="form_id" value={form.id} />
-              <TextInput label="Submitter name" name="submitter_name" required />
-              <TextInput label="Submitter email" name="submitter_email" type="email" />
-              <TextArea label="Submission summary" name="summary" required rows={4} />
-              <SelectInput label="Priority" name="priority" defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
-              <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
-              <PrimaryButton>Save submission</PrimaryButton>
-            </form>
-          </SectionCard>
-          <SectionCard title="Form schema">
-            <ReadableData value={form.schema_json} empty="No fields saved." />
-          </SectionCard>
-        </div>
       </section>
     </div>
   );

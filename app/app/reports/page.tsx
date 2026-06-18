@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import type { ReactNode } from "react";
 import { generateReportAction } from "@/app/app/reports/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -362,10 +363,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         <MetricCard label="Checklist completions" value={checklistCompletionCount.count ?? 0} note={`${sopCount.count ?? 0} SOPs available for reference.`} />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <div className="space-y-6">
-          <SectionCard title="Generate report" description="Choose a reporting period and Vaeroex will summarize the matching workspace activity.">
-            <form action={generateReportAction} className="space-y-4">
+      <section className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CreateDrawer title="Generate report" description="Choose a reporting period and Vaeroex will summarize the matching workspace activity." triggerLabel="Generate Report">
+            <form action={generateReportAction} className="grid gap-4">
               <label className="block text-sm font-medium">
                 Workspace
                 <input
@@ -383,10 +384,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </p>
               <PrimaryButton>Generate report</PrimaryButton>
             </form>
-          </SectionCard>
+          </CreateDrawer>
 
-          <SectionCard title="Filter saved reports" description="Narrow report history without changing workspace access.">
-            <form method="get" className="space-y-4">
+          <CreateDrawer title="Filter saved reports" description="Narrow report history without changing workspace access." triggerLabel="Open Filters">
+            <form method="get" className="grid gap-4">
               <label className="block text-sm font-medium">
                 Workspace
                 <input
@@ -407,7 +408,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               {debugMode ? <input type="hidden" name="debug" value="1" /> : null}
               <PrimaryButton>Apply filters</PrimaryButton>
             </form>
-          </SectionCard>
+          </CreateDrawer>
         </div>
 
         <SectionCard title="Report history" description="Customer-ready summaries for the active workspace.">

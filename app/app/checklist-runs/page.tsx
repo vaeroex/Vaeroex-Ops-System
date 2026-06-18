@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { runChecklistAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea } from "@/components/operations/FormControls";
@@ -86,24 +87,10 @@ export default async function ChecklistRunsPage({ searchParams }: ChecklistRunsP
 
       <ErrorNotice message={(params?.error as string | undefined) || checklistsError?.message || runsError?.message || folderResult.error?.message} />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <SectionCard title="Runs" description="All checklist run records for this workspace.">
-          <ManagedRecordList
-            collection="checklist_runs"
-            records={managedRuns}
-            folders={folderResult.folders}
-            title="Checklist run records"
-            description="Review completion history without expanding every response by default."
-            emptyTitle="No checklist runs yet"
-            emptyDescription="Run a checklist to create completion history and manager visibility."
-            returnPath="/app/checklist-runs"
-            searchParams={params}
-          />
-        </SectionCard>
-
-        <SectionCard title="Record run" description="Save a run against an existing checklist.">
+      <section className="space-y-6">
+        <CreateDrawer title="Record run" description="Save a run against an existing checklist." triggerLabel="New Run">
           {checklists?.length ? (
-            <form action={runChecklistAction} className="space-y-4">
+            <form action={runChecklistAction} className="grid gap-4 lg:grid-cols-2">
               <input type="hidden" name="return_path" value="/app/checklist-runs" />
               <label className="block text-sm font-medium">
                 Checklist
@@ -120,9 +107,15 @@ export default async function ChecklistRunsPage({ searchParams }: ChecklistRunsP
                 </select>
               </label>
               <SelectInput label="Status" name="status" defaultValue="Complete" options={runStatuses} />
-              <TextArea label="Responses or completed items, one per line" name="responses" rows={5} />
-              <TextArea label="Notes" name="notes" rows={4} />
-              <PrimaryButton>Save run</PrimaryButton>
+              <div className="lg:col-span-2">
+                <TextArea label="Responses or completed items, one per line" name="responses" rows={5} />
+              </div>
+              <div className="lg:col-span-2">
+                <TextArea label="Notes" name="notes" rows={4} />
+              </div>
+              <div className="lg:col-span-2">
+                <PrimaryButton>Save run</PrimaryButton>
+              </div>
             </form>
           ) : (
             <EmptyState
@@ -135,7 +128,22 @@ export default async function ChecklistRunsPage({ searchParams }: ChecklistRunsP
               }
             />
           )}
+        </CreateDrawer>
+
+        <SectionCard title="Runs" description="All checklist run records for this workspace.">
+          <ManagedRecordList
+            collection="checklist_runs"
+            records={managedRuns}
+            folders={folderResult.folders}
+            title="Checklist run records"
+            description="Review completion history without expanding every response by default."
+            emptyTitle="No checklist runs yet"
+            emptyDescription="Run a checklist to create completion history and manager visibility."
+            returnPath="/app/checklist-runs"
+            searchParams={params}
+          />
         </SectionCard>
+
       </section>
     </div>
   );
