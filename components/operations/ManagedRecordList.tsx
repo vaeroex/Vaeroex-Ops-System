@@ -375,14 +375,103 @@ function FolderQuickFilters({
   );
 }
 
+const menuItemClass = "block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50";
+
+function RecordEditForm({
+  collection,
+  record,
+  returnPath
+}: {
+  collection: ManagedRecordCollection;
+  record: ManagedRecord;
+  returnPath: string;
+}) {
+  if (!record.editFields?.length) {
+    return <p className="text-sm text-muted">This record does not have editable fields configured yet.</p>;
+  }
+
+  return (
+    <form action={updateManagedRecordAction} className="grid gap-4 sm:grid-cols-2">
+      <input type="hidden" name="collection" value={collection} />
+      <input type="hidden" name="record_id" value={record.id} />
+      <input type="hidden" name="return_path" value={returnPath} />
+      {record.editFields.map((field) => (
+        <label key={field.name} className={`block text-sm font-medium ${field.type === "textarea" || field.type === "lines" ? "sm:col-span-2" : ""}`}>
+          {field.label}
+          {fieldInput(field, record.editValues?.[field.name])}
+        </label>
+      ))}
+      <div className="sm:col-span-2">
+        <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Save changes</button>
+      </div>
+    </form>
+  );
+}
+
+function RecordDetailContent({
+  record,
+  folders
+}: {
+  record: ManagedRecord;
+  folders: ManagedRecordFolder[];
+}) {
+  return (
+    <>
+      <div className="grid gap-3 text-sm sm:grid-cols-2">
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
+          <p className="mt-1 text-ink">{record.type || "Record"}</p>
+        </div>
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status</p>
+          <div className="mt-1">{record.status ? <StatusBadge value={record.status} /> : <span className="text-ink">Not set</span>}</div>
+        </div>
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Owner</p>
+          <p className="mt-1 text-ink">{record.owner || "No owner"}</p>
+        </div>
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Category</p>
+          <p className="mt-1 text-ink">{record.category || "Uncategorized"}</p>
+        </div>
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folder</p>
+          <p className="mt-1 text-ink">{getFolderName(folders, record.folderId)}</p>
+        </div>
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Created</p>
+          <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
+        </div>
+        <div className="rounded-lg border border-line bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
+          <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
+        </div>
+      </div>
+      {record.meta?.length ? (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {record.meta.map((item) => (
+            <div key={item.label} className="rounded-lg border border-line bg-white p-3 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
+              <div className="mt-1 text-ink">{item.value || "Not set"}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+      {record.children ? <div className="rounded-lg border border-line bg-white p-4">{record.children}</div> : null}
+    </>
+  );
+}
+
 function RecordActionsMenu({
   collection,
   record,
+  folders,
   activeFolders,
   returnPath
 }: {
   collection: ManagedRecordCollection;
   record: ManagedRecord;
+  folders: ManagedRecordFolder[];
   activeFolders: ManagedRecordFolder[];
   returnPath: string;
 }) {
@@ -396,34 +485,31 @@ function RecordActionsMenu({
       </summary>
       <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-line bg-white p-3 shadow-lg">
         <div className="space-y-2">
-          {record.href ? (
-            <Link href={record.href} className="block rounded-md px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-              View
-            </Link>
+          <RecordDetailDrawer
+            title={record.title}
+            description={record.preview || record.type}
+            triggerLabel="View"
+            triggerClassName={menuItemClass}
+          >
+            <RecordDetailContent record={record} folders={folders} />
+          </RecordDetailDrawer>
+
+          {record.editFields?.length ? (
+            <RecordDetailDrawer
+              title={record.title}
+              description="Edit this record. Changes are saved only inside the current workspace."
+              eyebrow="Edit record"
+              triggerLabel="Edit"
+              triggerClassName={menuItemClass}
+            >
+              <RecordEditForm collection={collection} record={record} returnPath={returnPath} />
+            </RecordDetailDrawer>
           ) : null}
 
           {record.quickActions ? (
             <details className="rounded-md border border-line bg-slate-50 p-2">
               <summary className="cursor-pointer text-sm font-semibold text-slate-700">File or module actions</summary>
               <div className="mt-2 flex flex-wrap gap-2">{record.quickActions}</div>
-            </details>
-          ) : null}
-
-          {record.editFields?.length ? (
-            <details className="rounded-md border border-line bg-slate-50 p-2">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-700">Edit</summary>
-              <form action={updateManagedRecordAction} className="mt-3 grid gap-3">
-                <input type="hidden" name="collection" value={collection} />
-                <input type="hidden" name="record_id" value={record.id} />
-                <input type="hidden" name="return_path" value={returnPath} />
-                {record.editFields.map((field) => (
-                  <label key={field.name} className="block text-sm font-medium">
-                    {field.label}
-                    {fieldInput(field, record.editValues?.[field.name])}
-                  </label>
-                ))}
-                <button className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">Save changes</button>
-              </form>
             </details>
           ) : null}
 
@@ -449,7 +535,7 @@ function RecordActionsMenu({
             <input type="hidden" name="record_id" value={record.id} />
             <input type="hidden" name="record_action" value={record.archivedAt ? "restore" : "archive"} />
             <input type="hidden" name="return_path" value={returnPath} />
-            <button className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <button className={menuItemClass}>
               {record.archivedAt ? "Restore" : "Archive"}
             </button>
           </form>
@@ -459,7 +545,7 @@ function RecordActionsMenu({
             <input type="hidden" name="record_id" value={record.id} />
             <input type="hidden" name="record_action" value="duplicate" />
             <input type="hidden" name="return_path" value={returnPath} />
-            <button className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <button className={menuItemClass}>
               Duplicate
             </button>
           </form>
@@ -700,52 +786,22 @@ export function ManagedRecordList({
                           </p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <RecordDetailDrawer title={record.title} description={record.preview || record.type}>
-                              <div className="grid gap-3 text-sm sm:grid-cols-2">
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
-                                  <p className="mt-1 text-ink">{record.type || "Record"}</p>
-                                </div>
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status</p>
-                                  <div className="mt-1">{record.status ? <StatusBadge value={record.status} /> : <span className="text-ink">Not set</span>}</div>
-                                </div>
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Owner</p>
-                                  <p className="mt-1 text-ink">{record.owner || "No owner"}</p>
-                                </div>
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Category</p>
-                                  <p className="mt-1 text-ink">{record.category || "Uncategorized"}</p>
-                                </div>
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folder</p>
-                                  <p className="mt-1 text-ink">{getFolderName(folders, record.folderId)}</p>
-                                </div>
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Created</p>
-                                  <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
-                                </div>
-                                <div className="rounded-lg border border-line bg-slate-50 p-3">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
-                                  <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
-                                </div>
-                              </div>
-                              {record.meta?.length ? (
-                                <div className="grid gap-2 sm:grid-cols-2">
-                                  {record.meta.map((item) => (
-                                    <div key={item.label} className="rounded-lg border border-line bg-white p-3 text-sm">
-                                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
-                                      <div className="mt-1 text-ink">{item.value || "Not set"}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : null}
-                              {record.children ? <div className="rounded-lg border border-line bg-white p-4">{record.children}</div> : null}
+                              <RecordDetailContent record={record} folders={folders} />
                               <div className="rounded-lg border border-line bg-slate-50 p-3">
                                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Actions</p>
-                                <RecordActionsMenu collection={collection} record={record} activeFolders={activeFolders} returnPath={returnPath} />
+                                <RecordActionsMenu collection={collection} record={record} folders={folders} activeFolders={activeFolders} returnPath={returnPath} />
                               </div>
                             </RecordDetailDrawer>
+                            {record.editFields?.length ? (
+                              <RecordDetailDrawer
+                                title={record.title}
+                                description="Edit this record. Changes are saved only inside the current workspace."
+                                eyebrow="Edit record"
+                                triggerLabel="Edit"
+                              >
+                                <RecordEditForm collection={collection} record={record} returnPath={returnPath} />
+                              </RecordDetailDrawer>
+                            ) : null}
                             {record.href ? (
                               <Link href={record.href} className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline">
                                 {isActive ? "Active selection" : record.selectLabel || "Select this record"}
@@ -761,7 +817,7 @@ export function ManagedRecordList({
                         <div className="hidden truncate text-sm text-slate-700 lg:block">{record.owner || "-"}</div>
                         <div className="hidden lg:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>
                         <div className="hidden text-sm text-muted lg:block">{readableDate(record.updatedAt || record.createdAt)}</div>
-                        <RecordActionsMenu collection={collection} record={record} activeFolders={activeFolders} returnPath={returnPath} />
+                        <RecordActionsMenu collection={collection} record={record} folders={folders} activeFolders={activeFolders} returnPath={returnPath} />
                       </div>
                     </article>
                   );

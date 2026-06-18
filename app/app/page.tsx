@@ -585,6 +585,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     !crmLeads.length ? "Add a CRM lead manually, or import a lead list later when one is available." : "",
     !reports.length ? "Generate a report for this period so the management summary is saved." : ""
   ].filter(Boolean);
+  const hasWorkspaceData = Boolean(kpis.length || tasks.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
 
   return (
     <div className="space-y-6">
@@ -616,33 +617,37 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm font-semibold text-ink">Start from scratch</p>
+          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve existing systems" : "Start from scratch"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Add KPIs, CRM leads, tasks, checklists, and SOPs directly in Vaeroex. The dashboard and reports work as soon as records are created.
+            {hasWorkspaceData
+              ? "Your workspace already has activity. Focus on improving existing KPIs, CRM records, tasks, checklists, SOPs, and reports instead of creating duplicate systems."
+              : "Add KPIs, CRM leads, tasks, checklists, and SOPs directly in Vaeroex. The dashboard and reports work as soon as records are created."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/kpis" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
-              Add KPI
+              {kpis.length ? "Review KPIs" : "Add KPI"}
             </Link>
             <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Add CRM lead
+              {crmLeads.length ? "Review CRM" : "Add CRM lead"}
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Add task
+              {tasks.length ? "Review tasks" : "Add task"}
             </Link>
           </div>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm font-semibold text-ink">Import existing data</p>
+          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Turn data into action" : "Import existing data"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
-            Upload CSV or XLSX files when you already have data to bring in. Vaeroex stages mappings for review before saving anything to history.
+            {hasWorkspaceData
+              ? "Use recent files, imports, reports, and Vaeroex findings to update existing dashboards, assign follow-up work, and keep reports current."
+              : "Upload CSV or XLSX files when you already have data to bring in. Vaeroex stages mappings for review before saving anything to history."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
-              Upload files
+              {files.length ? "Review files" : "Upload files"}
             </Link>
             <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Generate report
+              {reports.length ? "Review reports" : "Generate report"}
             </Link>
           </div>
         </article>
