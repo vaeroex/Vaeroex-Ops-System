@@ -60,6 +60,7 @@ export type ManagedRecord = {
   preview?: string | null;
   href?: Route;
   meta?: Array<{ label: string; value: ReactNode }>;
+  quickActions?: ReactNode;
   editFields?: ManagedRecordEditField[];
   editValues?: Record<string, string | number | boolean | null | undefined>;
   children?: ReactNode;
@@ -412,6 +413,7 @@ export function ManagedRecordList({
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2 border-t border-line pt-4">
+                {record.quickActions ? <div className="flex flex-wrap gap-2">{record.quickActions}</div> : null}
                 {record.href ? (
                   <Link href={record.href} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
                     Open

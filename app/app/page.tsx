@@ -531,6 +531,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const checklistFailures = checklistRuns.filter((run) => isChecklistFailure(run) && inIsoRange(run.created_at, range.start, range.end));
   const sopUpdates = sops.filter((sop) => inIsoRange(sop.updated_at || sop.created_at, range.start, range.end));
   const recentFiles = files.filter((file) => inIsoRange(file.created_at, range.start, range.end));
+  const fileAnalyses = files.filter((file) => Boolean(file.analysis_summary)).slice(0, 6);
   const recentImports = imports.filter((item) => inIsoRange(item.imported_at || item.created_at, range.start, range.end));
   const pendingImports = imports.filter((item) => item.status === "needs_review" || item.status === "extracted");
   const leadsCreated = crmLeads.filter((lead) => inIsoRange(lead.created_at, range.start, range.end));
@@ -701,7 +702,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         </SectionCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
+      <section className="grid gap-4 xl:grid-cols-4">
         <SectionCard title="Files" description="Uploads and approved imports feeding business memory.">
           <SimpleList
             items={recentFiles.slice(0, 5)}
@@ -712,6 +713,19 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                 <p className="mt-1 text-xs text-muted">
                   {file.file_extension.toUpperCase()} · {file.import_status.replace(/_/g, " ")} · {file.imported_rows} rows
                 </p>
+              </div>
+            )}
+          />
+        </SectionCard>
+
+        <SectionCard title="File insights" description="Latest Vaeroex file analyses saved to workspace memory.">
+          <SimpleList
+            items={fileAnalyses}
+            empty="No file analyses saved yet."
+            render={(file: FileUploadRow) => (
+              <div key={file.id} className="rounded-lg border border-line p-3">
+                <p className="text-sm font-semibold">{file.display_name}</p>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-muted">{file.analysis_summary}</p>
               </div>
             )}
           />
