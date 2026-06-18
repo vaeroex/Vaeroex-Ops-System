@@ -373,15 +373,8 @@ function FileActionCenter({
     return (
       <>
         <Link href={`/app/files?file=${file.id}`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
-          View File Details
+          Select {file.display_name}
         </Link>
-        {canImport ? <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" /> : null}
-        {canAnalyze ? (
-          <form action={createReportFromFileAction}>
-            <input type="hidden" name="file_id" value={file.id} />
-            <ActionButton pendingLabel="Creating report...">Create Report from File</ActionButton>
-          </form>
-        ) : null}
       </>
     );
   }
@@ -391,9 +384,10 @@ function FileActionCenter({
       <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-base font-semibold text-ink">File actions for {file.display_name}</h3>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
+            <h3 className="mt-1 text-base font-semibold text-ink">{file.display_name}</h3>
             <p className="mt-1 text-sm leading-6 text-muted">
-              Analyze the file, stage imports for review, create a report, attach it to an existing report, or inspect details.
+              Analyze {file.display_name}, stage imports for review, create a report, attach it to an existing report, or inspect details.
             </p>
             <p className="mt-2 text-xs font-semibold text-slate-700">{support.title}</p>
             <p className="mt-1 text-xs leading-5 text-slate-600">{support.body}</p>
@@ -405,7 +399,7 @@ function FileActionCenter({
       <section className="rounded-lg border border-line bg-white p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
-            <h4 className="text-sm font-semibold text-ink">Analyze with Vaeroex</h4>
+            <h4 className="text-sm font-semibold text-ink">Analyze {file.display_name} with Vaeroex</h4>
             <p className="mt-1 text-xs leading-5 text-muted">
               Ask a question about this file. CSV/XLSX files use parsed rows, PDF/DOCX files use extracted readable text, and images use OCR plus visual analysis.
             </p>
@@ -435,7 +429,7 @@ function FileActionCenter({
                 ))}
               </div>
             </div>
-            <ActionButton tone="primary" pendingLabel="Analyzing...">Analyze with Vaeroex</ActionButton>
+            <ActionButton tone="primary" pendingLabel={`Analyzing ${file.display_name}...`}>Analyze {file.display_name}</ActionButton>
           </form>
         ) : (
           <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
@@ -445,14 +439,14 @@ function FileActionCenter({
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">
-        <h4 className="text-sm font-semibold text-ink">Import data after review</h4>
+        <h4 className="text-sm font-semibold text-ink">Import data from {file.display_name} after review</h4>
         <p className="mt-1 text-xs leading-5 text-muted">
           These actions extract rows and show a mapping review first. Nothing is saved to KPI, CRM, or operations history until you approve it.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" />
-          <ImportActionForm file={file} importType="crm" label="Import as CRM Leads" />
-          <ImportActionForm file={file} importType="metrics" label="Import as Operational Metrics" />
+          <ImportActionForm file={file} importType="kpi" label={`Import ${file.display_name} as KPI Data`} />
+          <ImportActionForm file={file} importType="crm" label={`Import ${file.display_name} as CRM Leads`} />
+          <ImportActionForm file={file} importType="metrics" label={`Import ${file.display_name} as Operational Metrics`} />
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
@@ -463,14 +457,14 @@ function FileActionCenter({
 
       <section className="grid gap-4 lg:grid-cols-2">
         <div className="space-y-3 rounded-lg border border-line bg-white p-4">
-          <h4 className="text-sm font-semibold text-ink">Create Report from File</h4>
+          <h4 className="text-sm font-semibold text-ink">Create Report from {file.display_name}</h4>
           {canAnalyze ? (
             <form action={createReportFromFileAction} className="space-y-3">
               <input type="hidden" name="file_id" value={file.id} />
               <TextInput label="Report title" name="report_title" defaultValue={`File Report - ${file.display_name}`} />
               <TextInput label="Report type" name="report_type" defaultValue="File Review" />
               <TextArea label="Report focus" name="report_focus" rows={3} placeholder="Optional: what should this report focus on?" />
-              <ActionButton tone="primary" pendingLabel="Creating report...">Create Report from File</ActionButton>
+              <ActionButton tone="primary" pendingLabel={`Creating report from ${file.display_name}...`}>Create Report from {file.display_name}</ActionButton>
             </form>
           ) : (
             <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
@@ -481,7 +475,7 @@ function FileActionCenter({
 
         <form action={attachFileToReportAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
           <input type="hidden" name="file_id" value={file.id} />
-          <h4 className="text-sm font-semibold text-ink">Attach to Existing Report</h4>
+          <h4 className="text-sm font-semibold text-ink">Attach {file.display_name} to Existing Report</h4>
           <label className="block text-sm font-medium">
             Report
             <select
@@ -541,6 +535,65 @@ function FileActionCenter({
           </p>
         ) : null}
       </details>
+    </div>
+  );
+}
+
+function DisabledActionPill({ children }: { children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="rounded-lg border border-line bg-slate-100 px-3 py-2 text-sm font-semibold text-muted opacity-70"
+    >
+      {children}
+    </button>
+  );
+}
+
+function NoSelectedFilePanel() {
+  return (
+    <div className="rounded-lg border border-dashed border-line bg-white p-4">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
+          <h3 className="mt-1 text-base font-semibold text-ink">No file selected.</h3>
+          <p className="mt-2 text-sm leading-6 text-muted">
+            Select a file from the library below before analyzing, importing, creating a report, or attaching it to an existing report.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <DisabledActionPill>Analyze</DisabledActionPill>
+          <DisabledActionPill>Import</DisabledActionPill>
+          <DisabledActionPill>Create Report</DisabledActionPill>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SelectedFileBanner({ file }: { file: FileUploadRow }) {
+  return (
+    <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-3 md:grid-cols-3">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
+            <p className="mt-1 break-words text-sm font-semibold text-ink">{file.display_name}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{fileStatusLabel(file)}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Actions</p>
+            <p className="mt-1 text-sm text-slate-700">Analyze, import, create report, attach, or view details.</p>
+          </div>
+        </div>
+        <Link href="/app/files" className="rounded-lg border border-line bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+          Change Selection
+        </Link>
+      </div>
     </div>
   );
 }
@@ -713,13 +766,11 @@ function FolderSelect({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }
 function FileDetails({
   file,
   imports,
-  importRows,
-  reports
+  importRows
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   importRows: FileImportDataRow[];
-  reports: Pick<ReportRow, "id" | "title" | "report_type" | "created_at">[];
 }) {
   const lines = analysisLines(file.analysis_summary);
   const hasCleanAnalysis = Boolean(latestAnalysisResult(file));
@@ -729,7 +780,6 @@ function FileDetails({
 
   return (
     <div className="space-y-5">
-      <FileActionCenter file={file} reports={reports} />
       {file.processing_error ? (
         <section className="rounded-lg border border-red-200 bg-red-50 p-4">
           <h4 className="text-sm font-semibold text-red-900">Could not process this file</h4>
@@ -779,7 +829,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   const spreadsheetCount = files.filter(isSpreadsheet).length;
   const analyzedCount = files.filter((file) => Boolean(file.analysis_summary)).length;
   const pendingReviewCount = imports.filter((item) => item.status === "needs_review" || item.status === "extracted").length;
-  const selectedFile = files.find((file) => file.id === params?.file) || files[0] || null;
+  const selectedFile = params?.file ? files.find((file) => file.id === params.file) || null : null;
   const errorMessage = cleanNoticeMessage(
     params?.error || fileResult.error?.message || folderResult.error?.message || importResult.error?.message || importRowResult.error?.message || reportResult.error?.message,
     "Vaeroex could not complete that file action. Please try again."
@@ -803,6 +853,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       archivedAt: management.archivedAt,
       deletedAt: management.deletedAt,
       preview: shortPreview(file.analysis_summary, `${file.original_name} · ${fileSizeLabel(file.file_size_bytes)}`),
+      href: `/app/files?file=${file.id}` as Route,
+      selectLabel: "Select file",
       meta: [
         { label: "Original name", value: file.original_name },
         { label: "Processing", value: fileStatusLabel(file) },
@@ -818,7 +870,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         import_type: file.import_type,
         analysis_summary: file.analysis_summary
       },
-      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} reports={reports} />
+      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} />
     };
   });
 
@@ -864,11 +916,16 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         </article>
       </section>
 
-      {selectedFile ? (
-        <SectionCard title="Selected file actions" description="Choose what to do next with the uploaded file. Imports always go to review before anything is saved.">
-          <FileActionCenter file={selectedFile} reports={reports} />
-        </SectionCard>
-      ) : null}
+      <SectionCard title="Selected file actions" description="Choose what to do next with the uploaded file. Imports always go to review before anything is saved.">
+        {selectedFile ? (
+          <div className="space-y-4">
+            <SelectedFileBanner file={selectedFile} />
+            <FileActionCenter file={selectedFile} reports={reports} />
+          </div>
+        ) : (
+          <NoSelectedFilePanel />
+        )}
+      </SectionCard>
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
@@ -915,6 +972,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
             emptyDescription="Upload a CSV, XLSX, PDF, image, or DOCX file to start building a workspace file library."
             returnPath="/app/files"
             searchParams={params}
+            activeRecordId={selectedFile?.id}
           />
         </SectionCard>
       </section>
