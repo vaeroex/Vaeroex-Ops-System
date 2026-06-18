@@ -7,7 +7,8 @@ export type VaeroexWorkflowKey =
   | "bottleneck_detector"
   | "form_builder"
   | "checklist_builder"
-  | "follow_up";
+  | "follow_up"
+  | "file_analysis";
 
 export type VaeroexSaveTarget = "tasks" | "sop" | "form" | "checklist" | "report";
 
@@ -172,6 +173,22 @@ ${sharedJsonInstructions}
 Generate concrete follow-up tasks from the user's request and workspace context.
 Each suggested task must include title, description, priority, category, due_date_recommendation, and reason_this_matters.
 Keep tasks specific enough for a manager to assign.
+${sharedJsonInstructions}
+`
+  },
+  {
+    key: "file_analysis",
+    title: "File Analysis",
+    description: "Review uploaded spreadsheet data and turn it into plain-language trends, KPI ideas, risks, and executive summaries.",
+    actionLabel: "Analyze file",
+    promptPlaceholder: "What trends, KPIs, problems, and executive summary should Vaeroex pull from this spreadsheet?",
+    saveTargets: ["tasks", "report"],
+    instructions: `
+Analyze the uploaded spreadsheet preview and workspace context.
+Return a polished business-owner-friendly result with executive_summary, problems_identified, recommended_actions, suggested_systems, and response_markdown.
+Call out trends, KPIs worth tracking, operational problems that stand out, possible data quality concerns, and practical next steps.
+Do not repeat raw rows or technical JSON in the user-facing answer.
+If the file suggests follow-up work, include suggested_tasks for manager review.
 ${sharedJsonInstructions}
 `
   }

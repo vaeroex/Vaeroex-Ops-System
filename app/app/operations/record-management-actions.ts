@@ -21,6 +21,7 @@ type ManagedCollection =
   | "ai_agent_runs"
   | "assets"
   | "asset_checks"
+  | "files"
   | "support_requests";
 
 type FieldKind = "text" | "requiredText" | "textarea" | "select" | "date" | "number" | "checkbox" | "lines";
@@ -132,6 +133,16 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
     fields: [
       { name: "status", kind: "select", maxLength: 80 },
       { name: "notes", kind: "textarea", maxLength: 1000 }
+    ]
+  },
+  files: {
+    table: "file_uploads",
+    path: "/app/files",
+    titleField: "display_name",
+    fields: [
+      { name: "display_name", kind: "requiredText", maxLength: 180 },
+      { name: "import_type", kind: "text", maxLength: 40 },
+      { name: "analysis_summary", kind: "textarea", maxLength: 5000 }
     ]
   },
   sops: {
@@ -342,6 +353,14 @@ function parsedFieldValue(field: EditableField, formData: FormData, path: Route 
   return value || null;
 }
 
+function revalidateRelatedPaths(collection: ManagedCollection, path: Route | string) {
+  revalidatePath(path);
+
+  if (collection === "kpis" || collection === "files") {
+    revalidatePath("/app/reports");
+  }
+}
+
 export async function createRecordFolderAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
@@ -439,8 +458,7 @@ export async function updateManagedRecordAction(formData: FormData) {
     redirectWithError(path, error.message);
   }
 
-  revalidatePath(path);
-  if (collection === "kpis") revalidatePath("/app/reports");
+  revalidateRelatedPaths(collection, path);
   redirectWithMessage(path, "Record updated.");
 }
 
@@ -489,8 +507,7 @@ export async function manageRecordAction(formData: FormData) {
       redirectWithError(path, insertResult.error.message);
     }
 
-    revalidatePath(path);
-    if (collection === "kpis") revalidatePath("/app/reports");
+    revalidateRelatedPaths(collection, path);
     redirectWithMessage(path, "Record duplicated.");
   }
 
@@ -519,8 +536,7 @@ export async function manageRecordAction(formData: FormData) {
     redirectWithError(path, error.message);
   }
 
-  revalidatePath(path);
-  if (collection === "kpis") revalidatePath("/app/reports");
+  revalidateRelatedPaths(collection, path);
   redirectWithMessage(path, action === "delete" ? "Record deleted." : "Record updated.");
 }
 
@@ -562,7 +578,6 @@ export async function bulkManageRecordsAction(formData: FormData) {
     redirectWithError(path, error.message);
   }
 
-  revalidatePath(path);
-  if (collection === "kpis") revalidatePath("/app/reports");
+  revalidateRelatedPaths(collection, path);
   redirectWithMessage(path, `${ids.length} record${ids.length === 1 ? "" : "s"} updated.`);
 }

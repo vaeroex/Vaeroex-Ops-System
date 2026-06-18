@@ -32,7 +32,20 @@ type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const REPORT_TYPES = ["Operations Summary", "Accountability Review", "Bottleneck Review", "Readiness Snapshot", "Executive Summary"];
-const BASE_CATEGORIES = ["All", "Tasks", "Checklists", "SOPs", "Issues", "Forms", "Assets", "KPIs", "Vaeroex insights"];
+const BASE_CATEGORIES = [
+  "All",
+  "Tasks",
+  "Checklists",
+  "SOPs",
+  "Issues",
+  "Forms",
+  "Assets",
+  "KPIs",
+  "Files",
+  "CRM",
+  "Operational metrics",
+  "Vaeroex insights"
+];
 const reportEditFields: ManagedRecordEditField[] = [
   { name: "title", label: "Title", required: true },
   { name: "report_type", label: "Report type" },
