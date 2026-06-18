@@ -1,0 +1,16 @@
+export function ModuleLoading() {
+  return (
+    <div className="space-y-6">
+      <div className="h-36 animate-pulse rounded-lg bg-slate-200" />
+      <div className="grid gap-4 md:grid-cols-3">
+        <div className="h-28 animate-pulse rounded-lg bg-slate-200" />
+        <div className="h-28 animate-pulse rounded-lg bg-slate-200" />
+        <div className="h-28 animate-pulse rounded-lg bg-slate-200" />
+      </div>
+      <div className="grid gap-6 xl:grid-cols-[1fr_380px]">
+        <div className="h-96 animate-pulse rounded-lg bg-slate-200" />
+        <div className="h-96 animate-pulse rounded-lg bg-slate-200" />
+      </div>
+    </div>
+  );
+}
