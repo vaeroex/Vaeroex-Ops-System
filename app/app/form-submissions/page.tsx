@@ -4,20 +4,29 @@ import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
-import { JsonPreview } from "@/components/operations/JsonPreview";
+import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { ReadableData } from "@/components/operations/ReadableData";
 import { SectionCard } from "@/components/operations/SectionCard";
-import { StatusBadge } from "@/components/operations/StatusBadge";
+import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type FormSubmissionsPageProps = {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const priorityOptions = ["Low", "Medium", "High", "Urgent"];
+const submissionEditFields: ManagedRecordEditField[] = [
+  { name: "submitter_name", label: "Submitter name" },
+  { name: "submitter_email", label: "Submitter email" },
+  { name: "ai_detected_priority", label: "Priority", type: "select", options: priorityOptions },
+  { name: "ai_summary", label: "Summary", type: "textarea", rows: 5 }
+];
 
 export default async function FormSubmissionsPage({ searchParams }: FormSubmissionsPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [{ data: forms, error: formsError }, { data: submissions, error: submissionsError }] = await Promise.all([
+  const [{ data: forms, error: formsError }, { data: submissions, error: submissionsError }, folderResult] = await Promise.all([
     supabase
       .from("forms")
       .select("*")
@@ -27,9 +36,52 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       .from("form_submissions")
       .select("*")
       .eq("workspace_id", workspaceId)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
+    getRecordFolders(supabase, workspaceId, "form_submissions")
   ]);
   const formNameById = new Map((forms || []).map((form) => [form.id, form.name]));
+  const managedSubmissions = (submissions || []).map((submission) => {
+    const management = managedValues(submission);
+    const formName = formNameById.get(submission.form_id) || "Form";
+
+    return {
+      id: submission.id,
+      title: submission.submitter_name || "Unnamed submitter",
+      type: formName,
+      status: submission.ai_detected_priority || "Medium",
+      owner: submission.submitter_email || "No email",
+      category: formName,
+      createdAt: submission.created_at,
+      updatedAt: management.updatedAt || submission.created_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(submission.ai_summary, "No Vaeroex summary draft yet."),
+      meta: [
+        { label: "Form", value: formName },
+        { label: "Submitter email", value: submission.submitter_email || "No email" }
+      ],
+      editFields: submissionEditFields,
+      editValues: {
+        submitter_name: submission.submitter_name,
+        submitter_email: submission.submitter_email,
+        ai_detected_priority: submission.ai_detected_priority,
+        ai_summary: submission.ai_summary
+      },
+      children: (
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-muted">{submission.ai_summary || "No Vaeroex summary draft yet."}</p>
+          <ReadableData value={submission.data_json} empty="No submission details saved." />
+          <form action={convertSubmissionToTaskAction}>
+            <input type="hidden" name="return_path" value="/app/form-submissions" />
+            <input type="hidden" name="form_id" value={submission.form_id} />
+            <input type="hidden" name="submission_id" value={submission.id} />
+            <ConfirmSubmitButton message="Create a follow-up task from this submission?">Create follow-up task</ConfirmSubmitButton>
+          </form>
+        </div>
+      )
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -44,42 +96,21 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
         }
       />
 
-      <ErrorNotice message={params?.error || formsError?.message || submissionsError?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || formsError?.message || submissionsError?.message || folderResult.error?.message} />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <SectionCard title="All submissions" description="Recent submissions from the active workspace.">
-          {submissions?.length ? (
-            <div className="space-y-4">
-              {submissions.map((submission) => (
-                <article key={submission.id} className="rounded-lg border border-line p-4">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="font-semibold">{submission.submitter_name || "Unnamed submitter"}</p>
-                      <p className="mt-1 text-xs text-muted">
-                        {formNameById.get(submission.form_id) || "Form"} · {submission.submitter_email || "No email"} ·{" "}
-                        {new Date(submission.created_at).toLocaleString()}
-                      </p>
-                    </div>
-                    <StatusBadge value={submission.ai_detected_priority || "Medium"} />
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-muted">{submission.ai_summary || "No Vaeroex summary draft yet."}</p>
-                  <div className="mt-4">
-                    <JsonPreview value={submission.data_json} />
-                  </div>
-                  <form action={convertSubmissionToTaskAction} className="mt-4">
-                    <input type="hidden" name="return_path" value="/app/form-submissions" />
-                    <input type="hidden" name="form_id" value={submission.form_id} />
-                    <input type="hidden" name="submission_id" value={submission.id} />
-                    <ConfirmSubmitButton message="Create a follow-up task from this submission?">
-                      Create follow-up task
-                    </ConfirmSubmitButton>
-                  </form>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="No submissions yet" description="Capture a submission from a form detail page or add one here after creating a form." />
-          )}
+          <ManagedRecordList
+            collection="form_submissions"
+            records={managedSubmissions}
+            folders={folderResult.folders}
+            title="Submission records"
+            description="Submissions stay compact until a manager needs details or follow-up actions."
+            emptyTitle="No submissions yet"
+            emptyDescription="Capture a submission from a form detail page or add one here after creating a form."
+            returnPath="/app/form-submissions"
+            searchParams={params}
+          />
         </SectionCard>
 
         <SectionCard title="Add submission" description="Record an internal submission for an existing form.">
@@ -103,7 +134,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
               <TextInput label="Submitter name" name="submitter_name" required />
               <TextInput label="Submitter email" name="submitter_email" type="email" />
               <TextArea label="Submission summary" name="summary" required rows={4} />
-              <SelectInput label="Priority" name="priority" defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
+              <SelectInput label="Priority" name="priority" defaultValue="Medium" options={priorityOptions} />
               <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
               <PrimaryButton>Save submission</PrimaryButton>
             </form>

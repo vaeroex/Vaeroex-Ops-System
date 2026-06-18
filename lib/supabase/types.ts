@@ -185,6 +185,30 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["workflow_maps"]["Insert"]>;
         Relationships: [];
       };
+      record_folders: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          collection_type: string;
+          name: string;
+          created_by: string | null;
+          archived_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          collection_type: string;
+          name: string;
+          created_by?: string | null;
+          archived_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["record_folders"]["Insert"]>;
+        Relationships: [];
+      };
       forms: {
         Row: {
           id: string;

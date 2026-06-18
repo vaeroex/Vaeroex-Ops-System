@@ -1,10 +1,11 @@
-import { createKpiAction, deleteKpiAction, updateKpiAction } from "@/app/app/operations/actions";
-import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { createKpiAction } from "@/app/app/operations/actions";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
+import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import type { Database } from "@/lib/supabase/types";
 
@@ -36,6 +37,16 @@ const numberFormatter = new Intl.NumberFormat("en-US", {
 });
 
 const chartColors = ["#2563eb", "#059669", "#dc2626", "#7c3aed", "#ea580c", "#0891b2", "#be123c"];
+const kpiEditFields: ManagedRecordEditField[] = [
+  { name: "name", label: "Name", required: true },
+  { name: "category", label: "Category" },
+  { name: "target", label: "Target", type: "number" },
+  { name: "actual_value", label: "Actual Value", type: "number" },
+  { name: "metric_date", label: "Date", type: "date" },
+  { name: "owner", label: "Owner" },
+  { name: "source", label: "Source" },
+  { name: "notes", label: "Notes", type: "textarea", rows: 4 }
+];
 
 function lower(value: string | null | undefined) {
   return (value || "").toLowerCase();
@@ -600,7 +611,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const { supabase, workspaceId } = await requireWorkspacePage();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [kpiResult, completedTasksResult, openTasksResult] = await Promise.all([
+  const [kpiResult, completedTasksResult, openTasksResult, folderResult] = await Promise.all([
     supabase
       .from("kpis")
       .select("*")
@@ -608,7 +619,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "Done"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done")
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
+    getRecordFolders(supabase, workspaceId, "kpis")
   ]);
 
   const kpis = (kpiResult.data || []) as KpiRow[];
@@ -662,6 +674,50 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const trendRows = primaryMetric ? getTrendRows(kpis, primaryMetric) : [];
   const selectedTrends = buildTrends(kpis, selectedMetrics);
   const hasComparison = selectedMetrics.length > 1;
+  const managedKpis = kpis.map((kpi) => {
+    const management = managedValues(kpi);
+    const tone = metricTone(kpi.actual_value, kpi.target);
+
+    return {
+      id: kpi.id,
+      title: kpi.name,
+      type: "KPI",
+      status: statusLabel(tone),
+      owner: kpi.owner || "Unassigned",
+      category: kpi.category || "General",
+      createdAt: kpi.created_at,
+      updatedAt: management.updatedAt || kpi.updated_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(kpi.notes, `${formatNumericValue(kpi.actual_value, kpi.name)} recorded for ${kpi.metric_date}.`),
+      meta: [
+        { label: "Date", value: kpi.metric_date },
+        { label: "Actual", value: formatNumericValue(kpi.actual_value, kpi.name) },
+        { label: "Target", value: kpi.target === null ? "No target" : formatNumericValue(kpi.target, kpi.name) },
+        { label: "Source", value: kpi.source || "Manual" }
+      ],
+      editFields: kpiEditFields,
+      editValues: {
+        name: kpi.name,
+        category: kpi.category,
+        target: kpi.target,
+        actual_value: kpi.actual_value,
+        metric_date: kpi.metric_date,
+        owner: kpi.owner,
+        source: kpi.source,
+        notes: kpi.notes
+      },
+      children: (
+        <div className="space-y-2 text-sm leading-6 text-muted">
+          <p>{kpi.notes || "No notes."}</p>
+          <p>
+            <span className="font-semibold text-ink">Current status:</span> {statusLabel(tone)}
+          </p>
+        </div>
+      )
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -672,7 +728,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       />
 
       <ErrorNotice
-        message={params?.error || kpiResult.error?.message || completedTasksResult.error?.message || openTasksResult.error?.message}
+        message={params?.error || kpiResult.error?.message || completedTasksResult.error?.message || openTasksResult.error?.message || folderResult.error?.message}
       />
       <SuccessNotice message={params?.message} />
 
@@ -728,88 +784,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
       <section className="grid gap-6 xl:grid-cols-[1fr_400px]">
         <SectionCard title="KPI log" description="Each metric is scoped to the current workspace and can use its own target.">
-          {kpis.length ? (
-            <div className="overflow-hidden rounded-lg border border-line">
-              <div className="hidden grid-cols-[1.4fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] gap-3 border-b border-line bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-muted lg:grid">
-                <span>KPI</span>
-                <span>Date</span>
-                <span>Actual</span>
-                <span>Target</span>
-                <span>Owner</span>
-                <span>Status</span>
-              </div>
-              <div className="divide-y divide-line">
-                {kpis.map((kpi) => {
-                  const tone = metricTone(kpi.actual_value, kpi.target);
-
-                  return (
-                    <article key={kpi.id} className="bg-white p-4">
-                      <div className="grid gap-3 lg:grid-cols-[1.4fr_0.8fr_0.7fr_0.7fr_0.8fr_0.8fr] lg:items-center">
-                        <div>
-                          <p className="font-semibold">{kpi.name}</p>
-                          <p className="mt-1 text-sm text-muted">{kpi.category || "General"}</p>
-                        </div>
-                        <p className="text-sm text-muted">{kpi.metric_date}</p>
-                        <p className="text-sm font-semibold">
-                          {kpi.actual_value === null ? "Not set" : formatNumericValue(kpi.actual_value, kpi.name)}
-                        </p>
-                        <p className="text-sm font-semibold">{kpi.target === null ? "No target" : formatNumericValue(kpi.target, kpi.name)}</p>
-                        <p className="text-sm text-muted">{kpi.owner || "Unassigned"}</p>
-                        <KpiStatusBadge tone={tone} />
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted">
-                        <span className="rounded-full bg-slate-100 px-2.5 py-1">Source: {kpi.source || "Manual"}</span>
-                        {kpi.notes ? <span className="rounded-full bg-slate-100 px-2.5 py-1">Notes saved</span> : null}
-                      </div>
-                      {kpi.notes ? <p className="mt-3 text-sm leading-6 text-muted">{kpi.notes}</p> : null}
-
-                      <div className="mt-4 flex flex-col gap-3">
-                        <form action={deleteKpiAction}>
-                          <input type="hidden" name="kpi_id" value={kpi.id} />
-                          <ConfirmSubmitButton
-                            message={`Delete KPI record for ${kpi.name}? This cannot be undone.`}
-                            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700"
-                          >
-                            Delete KPI
-                          </ConfirmSubmitButton>
-                        </form>
-                      </div>
-
-                      <details className="mt-3 rounded-lg border border-line bg-slate-50 p-4">
-                        <summary className="inline-flex cursor-pointer rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold text-ink">
-                          Edit KPI
-                        </summary>
-                        <form action={updateKpiAction} className="mt-4 space-y-4">
-                          <input type="hidden" name="kpi_id" value={kpi.id} />
-                          <TextInput label="Name" name="name" defaultValue={kpi.name} required />
-                          <TextInput label="Category" name="category" defaultValue={kpi.category} />
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <TextInput label="Target" name="target" type="number" step="0.01" defaultValue={kpi.target} />
-                            <TextInput label="Actual Value" name="actual_value" type="number" step="0.01" defaultValue={kpi.actual_value} />
-                          </div>
-                          <TextInput label="Date" name="metric_date" type="date" defaultValue={kpi.metric_date} />
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            <TextInput label="Owner" name="owner" defaultValue={kpi.owner} />
-                            <TextInput label="Source" name="source" defaultValue={kpi.source} />
-                          </div>
-                          <TextArea label="Notes" name="notes" rows={3} defaultValue={kpi.notes} />
-                          <div className="flex flex-wrap gap-2">
-                            <PrimaryButton>Save changes</PrimaryButton>
-                          </div>
-                        </form>
-                      </details>
-                    </article>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <EmptyState
-              title="No KPIs yet"
-              description="Create your first KPI for revenue, leads, conversion rate, task completion, or any custom metric your team reviews."
-            />
-          )}
+          <ManagedRecordList
+            collection="kpis"
+            records={managedKpis}
+            folders={folderResult.folders}
+            title="KPI records"
+            description="KPI rows can be edited, grouped, duplicated, archived, soft-deleted, or moved in bulk."
+            emptyTitle="No KPIs yet"
+            emptyDescription="Create your first KPI for revenue, leads, conversion rate, task completion, or any custom metric your team reviews."
+            searchParams={params}
+          />
         </SectionCard>
 
         <SectionCard title="Create KPI" description="Use one metric per row so trends stay easy to review.">
