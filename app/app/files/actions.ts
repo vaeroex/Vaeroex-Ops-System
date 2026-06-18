@@ -101,20 +101,67 @@ function text(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function cleanNoticeMessage(message: string, fallback: string) {
+  const trimmed = message.trim();
+
+  if (!trimmed || trimmed === "NEXT_REDIRECT" || trimmed.includes("NEXT_REDIRECT;")) {
+    return fallback;
+  }
+
+  return trimmed;
+}
+
 function redirectWithError(message: string): never {
-  redirect(`${FILES_PATH}?error=${encodeURIComponent(message)}` as Route);
+  redirect(`${FILES_PATH}?error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."))}` as Route);
 }
 
 function redirectWithFileError(message: string, fileId?: string): never {
-  redirect(`${FILES_PATH}?${fileId ? `file=${encodeURIComponent(fileId)}&` : ""}error=${encodeURIComponent(message)}` as Route);
+  redirect(
+    `${FILES_PATH}?${fileId ? `file=${encodeURIComponent(fileId)}&` : ""}error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not process this file. Please try again."))}` as Route
+  );
 }
 
 function redirectWithMessage(message: string, fileId?: string): never {
-  redirect(`${FILES_PATH}?${fileId ? `file=${encodeURIComponent(fileId)}&` : ""}message=${encodeURIComponent(message)}` as Route);
+  redirect(`${FILES_PATH}?${fileId ? `file=${encodeURIComponent(fileId)}&` : ""}message=${encodeURIComponent(cleanNoticeMessage(message, "Done."))}` as Route);
 }
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isNextRedirectError(error: unknown) {
+  if (error instanceof Error && error.message === "NEXT_REDIRECT") {
+    return true;
+  }
+
+  if (isRecord(error) && typeof error.digest === "string") {
+    return error.digest.startsWith("NEXT_REDIRECT");
+  }
+
+  return false;
+}
+
+function actionErrorMessage(error: unknown, fallback: string) {
+  if (isNextRedirectError(error)) {
+    throw error;
+  }
+
+  const message = error instanceof Error ? error.message : "";
+  return cleanNoticeMessage(message || fallback, fallback);
+}
+
+function fileActionErrorMessage(error: unknown, fallback: string, file: Pick<FileUploadRow, "file_extension">) {
+  const message = actionErrorMessage(error, fallback);
+
+  if (
+    file.file_extension === "pdf" &&
+    /extract|readable text|pdf|file_data|unsupported file|invalid file|could not read/i.test(message) &&
+    !/api key|connected|rate limit|temporarily busy|usage limit/i.test(message)
+  ) {
+    return unsupportedFileContentMessage(file);
+  }
+
+  return message;
 }
 
 function str(value: unknown, fallback = "") {
@@ -147,7 +194,7 @@ function canExtractFileContent(file: Pick<FileUploadRow, "file_extension">) {
 
 function unsupportedFileContentMessage(file: Pick<FileUploadRow, "file_extension">) {
   if (file.file_extension === "pdf") {
-    return "No readable text could be extracted from this PDF. It may be scanned, image-based, locked, corrupted, or encoded without a selectable text layer.";
+    return "Vaeroex could not extract readable text from this PDF. It may be scanned, image-based, locked, corrupted, or encoded without a selectable text layer.";
   }
 
   if (file.file_extension === "docx") {
@@ -1440,7 +1487,7 @@ export async function importFileAction(formData: FormData) {
   try {
     rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The spreadsheet could not be read.";
+    const message = actionErrorMessage(error, "The spreadsheet could not be read.");
 
     await supabase
       .from("file_uploads")
@@ -1680,7 +1727,7 @@ export async function saveExtractedImportAction(formData: FormData) {
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Imported data could not be saved.";
+    const message = actionErrorMessage(error, "Imported data could not be saved.");
 
     await supabase
       .from("file_imports")
@@ -1737,7 +1784,7 @@ export async function createReportFromFileAction(formData: FormData) {
       rowLimit: MAX_REPORT_ROWS
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Vaeroex could not create a report from this file.";
+    const message = fileActionErrorMessage(error, "Vaeroex could not create a report from this file.", file);
 
     await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
     redirectWithFileError(message, file.id);
@@ -1780,26 +1827,34 @@ export async function createReportFromFileAction(formData: FormData) {
     report_focus: reportFocus || null
   } satisfies Json;
 
-  const { error } = await supabase.from("reports").insert({
-    workspace_id: workspaceId,
-    report_type: reportType,
-    title: reportTitle,
-    date_range_start: file.created_at.slice(0, 10),
-    date_range_end: new Date().toISOString().slice(0, 10),
-    body_markdown: bodyMarkdown,
-    source_data_json: sourceData,
-    created_by: user.id
-  });
+  const { data: report, error } = await supabase
+    .from("reports")
+    .insert({
+      workspace_id: workspaceId,
+      report_type: reportType,
+      title: reportTitle,
+      date_range_start: file.created_at.slice(0, 10),
+      date_range_end: new Date().toISOString().slice(0, 10),
+      body_markdown: bodyMarkdown,
+      source_data_json: sourceData,
+      created_by: user.id
+    })
+    .select("id,title")
+    .single();
 
-  if (error) {
-    await updateFileProcessingStatus({ supabase, file, status: "failed", error: error.message });
-    redirectWithFileError(error.message, file.id);
+  if (error || !report) {
+    const message = error?.message || "Report could not be created from this file.";
+
+    await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
+    redirectWithFileError(message, file.id);
   }
 
   revalidatePath(FILES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/reports");
-  redirectWithMessage("Report created from extracted file content. Review the findings in Reports.", file.id);
+  redirect(
+    `/app/reports?message=${encodeURIComponent("Report created from extracted file content.")}&q=${encodeURIComponent(report.title)}` as Route
+  );
 }
 
 export async function attachFileToReportAction(formData: FormData) {
@@ -1906,7 +1961,7 @@ export async function analyzeFileAction(formData: FormData) {
 
     redirectWithMessage(`Vaeroex analyzed ${contentLabel}. Review the summary below or create a report from this file.`, file.id);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Vaeroex could not analyze the file.";
+    const message = fileActionErrorMessage(error, "Vaeroex could not analyze the file.", file);
 
     await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
     await supabase.from("ai_agent_runs").insert({

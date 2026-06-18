@@ -90,6 +90,16 @@ const fileEditFields: ManagedRecordEditField[] = [
   { name: "analysis_summary", label: "Analysis summary", type: "textarea", rows: 5 }
 ];
 
+function cleanNoticeMessage(message: string | null | undefined, fallback: string) {
+  const trimmed = (message || "").trim();
+
+  if (!trimmed || trimmed === "NEXT_REDIRECT" || trimmed.includes("NEXT_REDIRECT;")) {
+    return trimmed ? fallback : null;
+  }
+
+  return trimmed;
+}
+
 function SuccessNotice({ message }: { message?: string | null }) {
   if (!message) {
     return null;
@@ -768,6 +778,11 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   const analyzedCount = files.filter((file) => Boolean(file.analysis_summary)).length;
   const pendingReviewCount = imports.filter((item) => item.status === "needs_review" || item.status === "extracted").length;
   const selectedFile = files.find((file) => file.id === params?.file) || files[0] || null;
+  const errorMessage = cleanNoticeMessage(
+    params?.error || fileResult.error?.message || folderResult.error?.message || importResult.error?.message || importRowResult.error?.message || reportResult.error?.message,
+    "Vaeroex could not complete that file action. Please try again."
+  );
+  const successMessage = cleanNoticeMessage(params?.message, "File action completed.");
   const managedFiles = files.map((file) => {
     const management = managedValues(file);
     const fileImports = importsForFile(imports, file.id);
@@ -813,10 +828,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         description="Use files when you already have existing data to bring into Vaeroex. This is optional: KPIs, CRM leads, tasks, checklists, SOPs, and reports can also be created manually."
       />
 
-      <ErrorNotice
-        message={params?.error || fileResult.error?.message || folderResult.error?.message || importResult.error?.message || importRowResult.error?.message || reportResult.error?.message}
-      />
-      <SuccessNotice message={params?.message} />
+      <ErrorNotice message={errorMessage} />
+      <SuccessNotice message={successMessage} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
