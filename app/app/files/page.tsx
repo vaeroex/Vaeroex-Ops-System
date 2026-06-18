@@ -34,6 +34,7 @@ type FilesPageProps = {
     category?: string;
     sort?: string;
     view?: string;
+    section?: string;
   }>;
 };
 
@@ -1150,15 +1151,18 @@ function AnalysisHistory({
   runs,
   files,
   reports,
-  selectedFileId
+  selectedFileId,
+  showAll = false
 }: {
   runs: VaeroexRunRow[];
   files: FileUploadRow[];
   reports: ReportRow[];
   selectedFileId?: string | null;
+  showAll?: boolean;
 }) {
   const fileById = new Map(files.map((file) => [file.id, file]));
   const visibleRuns = selectedFileId ? runs.filter((run) => runFileId(run) === selectedFileId) : runs;
+  const displayedRuns = showAll ? visibleRuns : visibleRuns.slice(0, 8);
 
   if (!visibleRuns.length) {
     return (
@@ -1173,7 +1177,21 @@ function AnalysisHistory({
 
   return (
     <div id="analysis-history" className="space-y-3">
-      {visibleRuns.map((run) => {
+      <div className="flex flex-col gap-2 rounded-lg border border-line bg-white p-3 text-sm md:flex-row md:items-center md:justify-between">
+        <p className="text-muted">
+          Showing <span className="font-semibold text-ink">{displayedRuns.length}</span> of{" "}
+          <span className="font-semibold text-ink">{visibleRuns.length}</span> analyses
+        </p>
+        {!showAll && visibleRuns.length > displayedRuns.length ? (
+          <Link
+            href={selectedFileId ? (`/app/files?file=${selectedFileId}&section=all-analyses#analysis-history` as Route) : "/app/files?section=all-analyses#analysis-history"}
+            className="text-sm font-semibold text-vaeroex-blue"
+          >
+            View All
+          </Link>
+        ) : null}
+      </div>
+      {displayedRuns.map((run) => {
         const fileId = runFileId(run);
         const file = fileById.get(fileId);
         const result = displayAnalysisOutput(run.output_json);
@@ -1409,17 +1427,30 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Files"
-        title="Files and imports"
-        description="Use files when you already have existing data to bring into Vaeroex. This is optional: KPIs, CRM leads, tasks, checklists, SOPs, and reports can also be created manually."
+        title="Files & Imports"
+        description="Upload, select, analyze, import, review, and turn file findings into reports or follow-up work. Files are optional: you can still create KPIs, CRM leads, tasks, checklists, SOPs, and reports manually."
       />
       <ModuleTabs
         tabs={[
           { label: "All Files", href: "/app/files", active: !params?.status && !params?.folder },
-          { label: "Imports", href: "/app/files?status=Imported" as Route, active: params?.status === "Imported" },
           { label: "Analyses", href: "/app/files?status=Ready" as Route, active: params?.status === "Ready" },
+          { label: "Imports", href: "/app/files?status=Imported" as Route, active: params?.status === "Imported" },
+          { label: "Reports From Files", href: "/app/reports?report_type=File%20Review" as Route },
           { label: "Folders", href: "/app/files?folder=unfiled" as Route, active: Boolean(params?.folder) }
         ]}
       />
+
+      <section className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">File workflow</p>
+        <ol className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-3 xl:grid-cols-6">
+          {["Upload file", "Select file", "Analyze or import", "Review results", "Create report/KPI/task", "Dashboard updates"].map((step, index) => (
+            <li key={step} className="flex items-center gap-2 rounded-md bg-white px-3 py-2">
+              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-vaeroex-blue text-xs font-semibold text-white">{index + 1}</span>
+              <span>{step}</span>
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <ErrorNotice message={errorMessage} />
       <SuccessNotice message={successMessage} />
@@ -1513,7 +1544,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         title="Analysis history"
         description={selectedFile ? `Saved Vaeroex analysis runs for ${selectedFile.display_name}.` : "Recent file analyses saved for this workspace."}
       >
-        <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={selectedFile?.id} />
+        <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={selectedFile?.id} showAll={params?.section === "all-analyses"} />
       </SectionCard>
     </div>
   );

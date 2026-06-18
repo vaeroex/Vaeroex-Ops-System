@@ -168,7 +168,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="CRM"
-        title="Lead pipeline"
+        title="CRM Pipeline"
         description="Track leads manually or import them later. The dashboard and reports use CRM records either way, so no spreadsheet is required to start."
       />
       <ModuleTabs
@@ -176,6 +176,9 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
           { label: "Pipeline", href: "/app/crm", active: !params?.status },
           { label: "Leads", href: "/app/crm?view=active" as Route },
           { label: "Follow-ups", href: "/app/tasks?category=Follow-up" as Route },
+          { label: "Won", href: "/app/crm?status=Converted" as Route, active: params?.status === "Converted" },
+          { label: "Lost", href: "/app/crm?status=Lost" as Route, active: params?.status === "Lost" },
+          { label: "Import History", href: "/app/files?status=Imported" as Route },
           { label: "History", href: "/app/crm?sort=last_updated" as Route, active: params?.sort === "last_updated" }
         ]}
       />

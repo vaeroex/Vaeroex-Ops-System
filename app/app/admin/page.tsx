@@ -40,7 +40,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Internal admin"
-        title="Vaeroex admin"
+        title="Vaeroex Admin"
         description="Review customers, workspaces, subscriptions, support requests, Vaeroex usage, recent errors, and audit history from one internal area."
       />
       <ErrorNotice message={params?.error} />

@@ -335,7 +335,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Reports"
-        title="Operations reports"
+        title="Reports"
         description="Generate daily, weekly, monthly, quarterly, yearly, and year-to-date summaries for the active workspace. Reports use the selected period, compare against the prior period where possible, and keep source data hidden unless admin debug mode is enabled."
       />
       <ModuleTabs
@@ -344,7 +344,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           { label: "Daily", href: "/app/reports?report_type=Daily" as Route, active: params?.report_type === "Daily" },
           { label: "Weekly", href: "/app/reports?report_type=Weekly" as Route, active: params?.report_type === "Weekly" },
           { label: "Monthly", href: "/app/reports?report_type=Monthly" as Route, active: params?.report_type === "Monthly" },
-          { label: "YTD", href: "/app/reports?report_type=Year%20to%20Date" as Route, active: params?.report_type === "Year to Date" }
+          { label: "Quarterly", href: "/app/reports?report_type=Quarterly" as Route, active: params?.report_type === "Quarterly" },
+          { label: "Yearly", href: "/app/reports?report_type=Yearly" as Route, active: params?.report_type === "Yearly" },
+          { label: "YTD", href: "/app/reports?report_type=Year%20to%20Date" as Route, active: params?.report_type === "Year to Date" },
+          { label: "File Reports", href: "/app/reports?report_type=File%20Review" as Route, active: params?.report_type === "File Review" },
+          { label: "Vaeroex Reports", href: "/app/reports?category=Vaeroex%20insights" as Route, active: params?.category === "Vaeroex insights" }
         ]}
       />
 

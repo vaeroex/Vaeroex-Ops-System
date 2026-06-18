@@ -12,7 +12,7 @@ import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import type { Database } from "@/lib/supabase/types";
 
 type KpisPageProps = {
-  searchParams?: Promise<{ error?: string; message?: string; metric?: string | string[] }>;
+  searchParams?: Promise<{ error?: string; message?: string; metric?: string | string[]; section?: string; sort?: string }>;
 };
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
@@ -868,15 +868,17 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="KPIs"
-        title="KPI dashboard"
+        title="KPI Dashboard"
         description="Track practical business metrics by workspace, compare actual results to targets, and keep owners accountable."
       />
       <ModuleTabs
         tabs={[
-          { label: "Dashboard", href: "/app/kpis", active: !params?.metric },
-          { label: "Records", href: "/app/kpis?view=active" as Route },
+          { label: "Overview", href: "/app/kpis", active: !params?.metric && !params?.section },
+          { label: "Charts", href: "/app/kpis?section=charts" as Route, active: params?.section === "charts" },
           { label: "Comparisons", href: "/app/kpis?metric=compare" as Route, active: params?.metric === "compare" },
-          { label: "Imports", href: "/app/files?status=Imported" as Route }
+          { label: "History", href: "/app/kpis?sort=last_updated" as Route, active: params?.sort === "last_updated" },
+          { label: "Imports", href: "/app/files?status=Imported" as Route },
+          { label: "Settings", href: "/app/kpis?section=settings" as Route, active: params?.section === "settings" }
         ]}
       />
 
