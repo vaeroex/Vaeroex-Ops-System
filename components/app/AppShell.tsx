@@ -41,24 +41,17 @@ const baseNavSections = [
   },
   {
     label: "Knowledge Base",
-    items: [
-      { href: "/app/sops", label: "SOPs" },
-      { href: "/app/workflows", label: "Workflows" }
-    ]
+    items: [{ href: "/app/sops", label: "SOPs" }]
   },
   {
     label: "Vaeroex",
-    items: [
-      { href: "/app/agents", label: "Ask Vaeroex" },
-      { href: "/app/agents", label: "Agent Hub" }
-    ]
+    items: [{ href: "/app/agents", label: "Ask Vaeroex" }]
   },
   {
     label: "Account",
     items: [
       { href: "/app/account/subscription", label: "Subscription" },
-      { href: "/app/support", label: "Support" },
-      { href: "/app/settings", label: "Settings" }
+      { href: "/app/support", label: "Support" }
     ]
   }
 ] satisfies Array<{ label: string; items: Array<{ href: string; label: string }> }>;
