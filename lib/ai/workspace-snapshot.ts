@@ -21,7 +21,13 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     people,
     sops,
     reports,
-    vaeroexRuns
+    vaeroexRuns,
+    fileCount,
+    crmLeadCount,
+    operationalMetricCount,
+    recentFiles,
+    recentCrmLeads,
+    recentOperationalMetrics
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
@@ -94,7 +100,28 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .select("id,agent_type,status,output_json,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
-      .limit(5)
+      .limit(5),
+    supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase
+      .from("file_uploads")
+      .select("id,display_name,file_extension,import_type,import_status,imported_rows,analysis_summary,created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("crm_leads")
+      .select("id,lead_name,company,status,estimated_value,owner,created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("operational_metrics")
+      .select("id,metric_name,category,value,metric_date,owner,created_at")
+      .eq("workspace_id", workspaceId)
+      .order("metric_date", { ascending: false })
+      .limit(10)
   ]);
 
   return {
@@ -105,7 +132,10 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       overdue_tasks: overdueTasks.count ?? 0,
       open_issues: openIssues.count ?? 0,
       flagged_assets: flaggedAssets.count ?? 0,
-      form_submissions: submissions.count ?? 0
+      form_submissions: submissions.count ?? 0,
+      uploaded_files: fileCount.count ?? 0,
+      crm_leads: crmLeadCount.count ?? 0,
+      operational_metrics: operationalMetricCount.count ?? 0
     },
     recent_tasks: recentTasks.data ?? [],
     recent_issues: recentIssues.data ?? [],
@@ -117,6 +147,9 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     people: people.data ?? [],
     sops: sops.data ?? [],
     reports: reports.data ?? [],
-    recent_vaeroex_results: vaeroexRuns.data ?? []
+    recent_vaeroex_results: vaeroexRuns.data ?? [],
+    files: recentFiles.data ?? [],
+    crm_leads: recentCrmLeads.data ?? [],
+    operational_metrics: recentOperationalMetrics.data ?? []
   };
 }

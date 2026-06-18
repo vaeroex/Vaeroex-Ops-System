@@ -18,6 +18,7 @@ const navItems = [
   { href: "/app/tasks", label: "Tasks" },
   { href: "/app/issues", label: "Issues" },
   { href: "/app/assets", label: "Assets" },
+  { href: "/app/files", label: "Files" },
   { href: "/app/people", label: "People" },
   { href: "/app/sops", label: "SOPs" },
   { href: "/app/kpis", label: "KPIs" },

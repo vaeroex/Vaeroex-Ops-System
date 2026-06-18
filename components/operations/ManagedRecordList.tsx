@@ -26,6 +26,7 @@ export type ManagedRecordCollection =
   | "ai_agent_runs"
   | "assets"
   | "asset_checks"
+  | "files"
   | "support_requests";
 
 export type ManagedRecordFolder = {
