@@ -7,6 +7,7 @@ import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -158,6 +159,14 @@ function rangeForPeriod(period: DashboardPeriod, today = new Date()): DateRange 
 
 function lower(value: string | null | undefined) {
   return (value || "").toLowerCase();
+}
+
+function workspaceStatusLabel(workspace: Database["public"]["Tables"]["workspaces"]["Row"] | null) {
+  if (!workspace) return "Setup required";
+  if (workspace.subscription_status === "demo") return "Demo workspace";
+  if (!workspace.subscription_required || workspace.manually_unlocked || ["active", "trialing"].includes(workspace.subscription_status)) return "Active";
+  if (workspace.subscription_status === "manual_review") return "Pending activation";
+  return "Subscription required";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -694,6 +703,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const period = isDashboardPeriod(params?.period) ? params.period : "Weekly";
   const range = rangeForPeriod(period);
   const { supabase, context, workspaceId } = await requireWorkspacePage();
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+  const canUseAdminOnboardingTools = isVaeroexAdminUser(user);
+  const currentWorkspaceStatus = workspaceStatusLabel(context.activeWorkspace);
 
   const [
     kpiResult,
@@ -957,9 +971,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       <OnboardingChecklist
         workspaceId={workspaceId}
         items={onboardingItems}
+        adminControls={canUseAdminOnboardingTools}
+        workspaceStatus={currentWorkspaceStatus}
         demoWorkspaceForm={
           <form action={createDemoWorkspaceAction}>
-            <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Explore Demo Workspace</button>
+            <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Create demo workspace</button>
           </form>
         }
       />
