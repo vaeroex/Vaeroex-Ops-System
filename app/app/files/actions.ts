@@ -1466,8 +1466,7 @@ export async function uploadFileAction(formData: FormData) {
       ? "File uploaded. Next: analyze it with Vaeroex, import rows for review, or create a report from the spreadsheet."
       : storedExtension === "pdf" || storedExtension === "docx"
         ? "File uploaded. Next: analyze it with Vaeroex or create a report from extracted document text."
-        : "File uploaded. Next: analyze it with Vaeroex for image text, visible issues, KPIs, and recommendations.",
-    data.id
+        : "File uploaded. Next: analyze it with Vaeroex for image text, visible issues, KPIs, and recommendations."
   );
 }
 

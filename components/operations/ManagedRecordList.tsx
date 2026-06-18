@@ -60,6 +60,7 @@ export type ManagedRecord = {
   deletedAt?: string | null;
   preview?: string | null;
   href?: Route;
+  selectLabel?: string;
   meta?: Array<{ label: string; value: ReactNode }>;
   quickActions?: ReactNode;
   editFields?: ManagedRecordEditField[];
@@ -77,6 +78,7 @@ type ManagedRecordListProps = {
   emptyDescription: string;
   returnPath?: string;
   searchParams?: Record<string, string | string[] | undefined>;
+  activeRecordId?: string | null;
 };
 
 const sortOptions = [
@@ -457,7 +459,8 @@ export function ManagedRecordList({
   emptyTitle,
   emptyDescription,
   returnPath: configuredReturnPath,
-  searchParams
+  searchParams,
+  activeRecordId
 }: ManagedRecordListProps) {
   const sort = param(searchParams?.sort) || "newest";
   const visibleRecords = sortedRecords(filteredRecords(records, folders, searchParams), sort);
@@ -573,73 +576,93 @@ export function ManagedRecordList({
                 <span />
               </div>
               <div className="divide-y divide-line">
-                {visibleRecords.map((record) => (
-                  <article key={record.id} className="px-3 py-2">
-                    <div className="grid gap-3 md:grid-cols-[32px_minmax(220px,1.5fr)_120px_120px_120px_140px_44px] md:items-center">
-                      <input
-                        form={bulkFormId}
-                        type="checkbox"
-                        name="record_id"
-                        value={record.id}
-                        className="mt-1 h-4 w-4 rounded border-line text-vaeroex-blue md:mt-0"
-                        aria-label={`Select ${record.title}`}
-                      />
-                      <details className="group min-w-0 md:contents">
-                        <summary className="cursor-pointer list-none md:col-start-2">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="truncate text-sm font-semibold text-ink">{record.title}</h3>
-                              {record.archivedAt ? <StatusBadge value="Archived" /> : null}
-                              {record.deletedAt ? <StatusBadge value="Deleted" /> : null}
+                {visibleRecords.map((record) => {
+                  const isActive = activeRecordId === record.id;
+
+                  return (
+                    <article
+                      key={record.id}
+                      className={`px-3 py-2 transition ${isActive ? "bg-blue-50/80 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/70"}`}
+                      aria-current={isActive ? "true" : undefined}
+                    >
+                      <div className="grid gap-3 md:grid-cols-[32px_minmax(220px,1.5fr)_120px_120px_120px_140px_44px] md:items-center">
+                        <input
+                          form={bulkFormId}
+                          type="checkbox"
+                          name="record_id"
+                          value={record.id}
+                          className="mt-1 h-4 w-4 rounded border-line text-vaeroex-blue md:mt-0"
+                          aria-label={`Select ${record.title}`}
+                        />
+                        <details className="group min-w-0 md:contents">
+                          <summary className="cursor-pointer list-none md:col-start-2">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-2">
+                                {record.href ? (
+                                  <Link href={record.href} className="truncate text-sm font-semibold text-ink hover:text-vaeroex-blue">
+                                    {record.title}
+                                  </Link>
+                                ) : (
+                                  <h3 className="truncate text-sm font-semibold text-ink">{record.title}</h3>
+                                )}
+                                {isActive ? <StatusBadge value="Selected" /> : null}
+                                {record.archivedAt ? <StatusBadge value="Archived" /> : null}
+                                {record.deletedAt ? <StatusBadge value="Deleted" /> : null}
+                              </div>
+                              <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted">
+                                {record.preview || record.type || "No preview available."}
+                              </p>
+                              {record.href ? (
+                                <Link href={record.href} className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline">
+                                  {isActive ? "Active selection" : record.selectLabel || "Select this record"}
+                                </Link>
+                              ) : null}
+                              <p className="mt-1 text-xs text-muted md:hidden">
+                                {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
+                              </p>
                             </div>
-                            <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted">
-                              {record.preview || record.type || "No preview available."}
-                            </p>
-                            <p className="mt-1 text-xs text-muted md:hidden">
-                              {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
-                            </p>
+                          </summary>
+                          <div className="mt-3 space-y-3 rounded-lg border border-line bg-slate-50 p-3 md:col-span-7 md:col-start-1">
+                            <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
+                                <p className="mt-1 text-ink">{record.type || "Record"}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folder</p>
+                                <p className="mt-1 text-ink">{getFolderName(folders, record.folderId)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Created</p>
+                                <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
+                              </div>
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
+                                <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
+                              </div>
+                            </div>
+                            {record.meta?.length ? (
+                              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+                                {record.meta.map((item) => (
+                                  <div key={item.label} className="rounded-md bg-white p-3 text-sm">
+                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
+                                    <div className="mt-1 text-ink">{item.value || "Not set"}</div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                            {record.children ? <div className="rounded-md bg-white p-3">{record.children}</div> : null}
                           </div>
-                        </summary>
-                        <div className="mt-3 space-y-3 rounded-lg border border-line bg-slate-50 p-3 md:col-span-7 md:col-start-1">
-                          <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
-                              <p className="mt-1 text-ink">{record.type || "Record"}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folder</p>
-                              <p className="mt-1 text-ink">{getFolderName(folders, record.folderId)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Created</p>
-                              <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
-                            </div>
-                            <div>
-                              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
-                              <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
-                            </div>
-                          </div>
-                          {record.meta?.length ? (
-                            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                              {record.meta.map((item) => (
-                                <div key={item.label} className="rounded-md bg-white p-3 text-sm">
-                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
-                                  <div className="mt-1 text-ink">{item.value || "Not set"}</div>
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                          {record.children ? <div className="rounded-md bg-white p-3">{record.children}</div> : null}
-                        </div>
-                      </details>
-                      <div className="hidden md:block">{record.status ? <StatusBadge value={record.status} /> : <span className="text-sm text-muted">-</span>}</div>
-                      <div className="hidden truncate text-sm text-slate-700 md:block">{record.owner || "-"}</div>
-                      <div className="hidden md:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>
-                      <div className="hidden text-sm text-muted md:block">{readableDate(record.updatedAt || record.createdAt)}</div>
-                      <RecordActionsMenu collection={collection} record={record} activeFolders={activeFolders} returnPath={returnPath} />
-                    </div>
-                  </article>
-                ))}
+                        </details>
+                        <div className="hidden md:block">{record.status ? <StatusBadge value={record.status} /> : <span className="text-sm text-muted">-</span>}</div>
+                        <div className="hidden truncate text-sm text-slate-700 md:block">{record.owner || "-"}</div>
+                        <div className="hidden md:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>
+                        <div className="hidden text-sm text-muted md:block">{readableDate(record.updatedAt || record.createdAt)}</div>
+                        <RecordActionsMenu collection={collection} record={record} activeFolders={activeFolders} returnPath={returnPath} />
+                      </div>
+                    </article>
+                  );
+                })}
               </div>
             </div>
           ) : (
