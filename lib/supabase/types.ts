@@ -339,6 +339,40 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["tasks"]["Insert"]>;
         Relationships: [];
       };
+      kpis: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          name: string;
+          category: string | null;
+          target: number | null;
+          actual_value: number | null;
+          metric_date: string;
+          owner: string | null;
+          notes: string | null;
+          source: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          name: string;
+          category?: string | null;
+          target?: number | null;
+          actual_value?: number | null;
+          metric_date?: string;
+          owner?: string | null;
+          notes?: string | null;
+          source?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["kpis"]["Insert"]>;
+        Relationships: [];
+      };
       issues: {
         Row: {
           id: string;

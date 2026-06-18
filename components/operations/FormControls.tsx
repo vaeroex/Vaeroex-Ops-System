@@ -6,7 +6,9 @@ export function TextInput({
   type = "text",
   required = false,
   defaultValue,
-  placeholder
+  placeholder,
+  step,
+  min
 }: {
   label: string;
   name: string;
@@ -14,6 +16,8 @@ export function TextInput({
   required?: boolean;
   defaultValue?: string | number | null;
   placeholder?: string;
+  step?: string;
+  min?: string;
 }) {
   return (
     <label className="block text-sm font-medium">
@@ -24,6 +28,8 @@ export function TextInput({
         required={required}
         defaultValue={defaultValue ?? ""}
         placeholder={placeholder}
+        step={step}
+        min={min}
         className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
       />
     </label>
@@ -63,7 +69,7 @@ export function TextArea({
 export function SelectInput({
   label,
   name,
-  options,
+  options: options,
   defaultValue,
   required = false
 }: {

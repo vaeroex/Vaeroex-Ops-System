@@ -60,6 +60,30 @@ function returnPath(formData: FormData, fallback: string) {
   return value.startsWith("/app") ? value : fallback;
 }
 
+function optionalNumber(path: string, label: string, value: string) {
+  if (!value) {
+    return null;
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isFinite(parsed)) {
+    redirectWithError(path, `${label} must be a valid number.`);
+  }
+
+  return parsed;
+}
+
+function metricDateOrToday(path: string, value: string) {
+  const metricDate = value || new Date().toISOString().slice(0, 10);
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(metricDate)) {
+    redirectWithError(path, "Date must use the YYYY-MM-DD format.");
+  }
+
+  return metricDate;
+}
+
 async function requireWorkspace(path: string) {
   const supabase = await createSupabaseServerClient();
 
@@ -334,6 +358,42 @@ export async function updateTaskStatusAction(formData: FormData) {
 
   revalidatePath(path);
   redirectWithMessage(path, "Task status updated.");
+}
+
+export async function createKpiAction(formData: FormData) {
+  const path = "/app/kpis";
+  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const name = text(formData, "name");
+  const category = text(formData, "category");
+  const owner = text(formData, "owner");
+  const notes = text(formData, "notes");
+  const source = text(formData, "source");
+
+  requireValue(path, "KPI name", name);
+  validateLength(path, "Category", category, 100);
+  validateLength(path, "Owner", owner, 120);
+  validateLength(path, "Notes", notes, 1500);
+  validateLength(path, "Source", source, 160);
+
+  const { error } = await supabase.from("kpis").insert({
+    workspace_id: workspaceId,
+    name,
+    category,
+    target: optionalNumber(path, "Target", text(formData, "target")),
+    actual_value: optionalNumber(path, "Actual value", text(formData, "actual_value")),
+    metric_date: metricDateOrToday(path, text(formData, "metric_date")),
+    owner,
+    notes,
+    source,
+    created_by: user.id
+  });
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  revalidatePath(path);
+  redirectWithMessage(path, "KPI saved.");
 }
 
 export async function createIssueAction(formData: FormData) {

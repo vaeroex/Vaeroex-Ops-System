@@ -24,6 +24,7 @@ type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FormSubmissionRow = Database["public"]["Tables"]["form_submissions"]["Row"];
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
+type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
@@ -286,7 +287,7 @@ async function fetchReportSource(
   range: DateRange,
   category: string
 ) {
-  const [tasks, issues, checklistRuns, sops, submissions, assets, vaeroexRuns] = await Promise.all([
+  const [tasks, issues, checklistRuns, sops, submissions, assets, kpis, vaeroexRuns] = await Promise.all([
     supabase
       .from("tasks")
       .select("id,title,description,status,priority,category,due_date,created_at,updated_at")
@@ -324,6 +325,12 @@ async function fetchReportSource(
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
+      .from("kpis")
+      .select("id,name,category,target,actual_value,metric_date,owner,source,notes,created_at,updated_at")
+      .eq("workspace_id", workspaceId)
+      .order("metric_date", { ascending: false })
+      .limit(300),
+    supabase
       .from("ai_agent_runs")
       .select("id,agent_type,input_json,output_json,status,error_message,created_at")
       .eq("workspace_id", workspaceId)
@@ -339,6 +346,7 @@ async function fetchReportSource(
   const sopRows = ((sops.data ?? []) as SopRow[]).filter((sop) => matchesCategory(category, sop, "SOPs"));
   const submissionRows = ((submissions.data ?? []) as FormSubmissionRow[]).filter(() => matchesCategory(category, {}, "Forms"));
   const assetRows = ((assets.data ?? []) as AssetRow[]).filter(() => matchesCategory(category, {}, "Assets"));
+  const kpiRows = ((kpis.data ?? []) as KpiRow[]).filter((kpi) => matchesCategory(category, kpi, "KPIs"));
   const runRows = ((vaeroexRuns.data ?? []) as VaeroexRunRow[]).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
 
   const completedTasks = taskRows.filter((task) => task.status === "Done" && inIsoRange(task.updated_at || task.created_at, range));
@@ -356,6 +364,7 @@ async function fetchReportSource(
   const newSops = sopRows.filter((sop) => inIsoRange(sop.created_at, range));
   const formSubmissions = submissionRows.filter((submission) => inIsoRange(submission.created_at, range));
   const flaggedAssets = assetRows.filter((asset) => asset.status !== "Ready");
+  const recordedKpis = kpiRows.filter((kpi) => kpi.metric_date >= range.startDate && kpi.metric_date <= range.endDate);
   const vaeroexInsights = runRows.filter((run) => run.status === "completed" && inIsoRange(run.created_at, range));
 
   return {
@@ -371,6 +380,7 @@ async function fetchReportSource(
       form_submissions: formSubmissions.length,
       sops_created: newSops.length,
       flagged_assets: flaggedAssets.length,
+      kpis_recorded: recordedKpis.length,
       vaeroex_insights: vaeroexInsights.length
     },
     items: {
@@ -382,11 +392,13 @@ async function fetchReportSource(
       sops_created: newSops.slice(0, 8).map((sop) => `${sop.title}${sop.status ? ` (${sop.status})` : ""}`),
       form_submissions: formSubmissions.slice(0, 8).map((submission) => submission.ai_summary || submission.submitter_name || "Form submission"),
       flagged_assets: flaggedAssets.slice(0, 8).map((asset) => `${asset.asset_name}${asset.status ? ` (${asset.status})` : ""}`),
+      kpis_recorded: recordedKpis
+        .slice(0, 8)
+        .map((kpi) => `${kpi.name}: ${kpi.actual_value ?? "not set"}${kpi.target !== null ? ` vs target ${kpi.target}` : ""}`),
       vaeroex_insights: vaeroexInsights.map(insightText).filter(Boolean).slice(0, 5)
     },
     future_sources: {
       crm_leads: "CRM/leads will be included here when that module is added.",
-      kpi_metrics: "KPI and metrics tables will be included here when added.",
       uploaded_files: "Uploaded file summaries will be included here when file intake is added."
     }
   };
@@ -461,6 +473,7 @@ ${summary}
 - New issues: ${trendPhrase(current.counts.new_issues, previous.counts.new_issues)} vs ${previousLabel}
 - Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)} vs ${previousLabel}
 - SOP updates: ${trendPhrase(current.counts.sops_created, previous.counts.sops_created)} vs ${previousLabel}
+- KPIs recorded: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)} vs ${previousLabel}
 
 ## Completed Work
 ${readableList(
@@ -479,12 +492,14 @@ ${readableList(current.items.open_issues, "No open issues are currently listed f
 ${readableList(current.items.overdue_tasks, "No overdue tasks were found for this period.")}
 
 ## KPI Trends
+- KPI records added: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)}
+${readableList(current.items.kpis_recorded, "No KPI records were found for this period.")}
 - Completed tasks: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
 - Open tasks now: ${current.counts.open_tasks}
 - Open issues now: ${current.counts.open_issues}
 - Checklist exceptions: ${trendPhrase(current.counts.checklist_exceptions, previous.counts.checklist_exceptions)}
 - Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)}
-- CRM/leads, KPI tables, and uploaded file metrics will appear here when those modules are added.
+- CRM/leads and uploaded file metrics will appear here when those modules are added.
 
 ## Operational Risks
 ${readableList(risks, "No major operational risks were found in the selected period.")}

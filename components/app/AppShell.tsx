@@ -20,6 +20,7 @@ const navItems = [
   { href: "/app/assets", label: "Assets" },
   { href: "/app/people", label: "People" },
   { href: "/app/sops", label: "SOPs" },
+  { href: "/app/kpis", label: "KPIs" },
   { href: "/app/reports", label: "Reports" },
   { href: "/app/agents", label: "Ask Vaeroex" },
   { href: "/app/account/subscription", label: "Subscription" },
