@@ -1,5 +1,8 @@
 import Link from "next/link";
+import type { Route } from "next";
 import type { ReactNode } from "react";
+import { createDemoWorkspaceAction } from "@/app/app/demo/actions";
+import { OnboardingChecklist, type OnboardingChecklistItem } from "@/components/app/OnboardingChecklist";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -8,13 +11,14 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type DashboardPageProps = {
-  searchParams?: Promise<{ period?: string }>;
+  searchParams?: Promise<{ period?: string; error?: string; message?: string }>;
 };
 
 type DashboardPeriod = "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly" | "Year to Date";
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
+type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
 type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
@@ -41,6 +45,14 @@ type MetricTrend = {
   previous: number | null;
   change: number | null;
   changePercent: number | null;
+};
+type DashboardAlert = {
+  id: string;
+  severity: "High" | "Medium" | "Low";
+  title: string;
+  why: string;
+  action: string;
+  href: string;
 };
 
 const PERIODS: DashboardPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
@@ -456,6 +468,227 @@ function SimpleList<T extends { id: string }>({
   return <div className="space-y-3">{items.map((item) => render(item))}</div>;
 }
 
+function isOlderThan(value: string | null | undefined, days: number) {
+  if (!value) {
+    return false;
+  }
+
+  return new Date(value).getTime() < Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
+function severityTone(severity: DashboardAlert["severity"]) {
+  if (severity === "High") return "border-red-200 bg-red-50 text-red-700";
+  if (severity === "Medium") return "border-amber-200 bg-amber-50 text-amber-900";
+  return "border-blue-100 bg-blue-50 text-blue-800";
+}
+
+function latestKpisByName(kpis: KpiRow[]) {
+  const latest = new Map<string, KpiRow>();
+
+  for (const row of kpis) {
+    if (!latest.has(row.name)) {
+      latest.set(row.name, row);
+    }
+  }
+
+  return [...latest.values()];
+}
+
+function buildSmartAlerts({
+  overdueTasks,
+  unassignedTasks,
+  belowTargetKpis,
+  crmLeadsWithoutFollowup,
+  staleSops,
+  oldIssues,
+  unanalyzedFiles,
+  hasCurrentReport,
+  checklistsWithoutRecentRuns
+}: {
+  overdueTasks: TaskRow[];
+  unassignedTasks: TaskRow[];
+  belowTargetKpis: KpiRow[];
+  crmLeadsWithoutFollowup: CrmLeadRow[];
+  staleSops: SopRow[];
+  oldIssues: IssueRow[];
+  unanalyzedFiles: FileUploadRow[];
+  hasCurrentReport: boolean;
+  checklistsWithoutRecentRuns: ChecklistRow[];
+}) {
+  return [
+    overdueTasks.length
+      ? {
+          id: "overdue-tasks",
+          severity: "High",
+          title: `${overdueTasks.length} overdue task${overdueTasks.length === 1 ? "" : "s"}`,
+          why: "Overdue work usually means ownership, capacity, or handoff problems need review.",
+          action: "Review overdue tasks",
+          href: "/app/tasks"
+        }
+      : null,
+    unassignedTasks.length
+      ? {
+          id: "unassigned-tasks",
+          severity: "Medium",
+          title: `${unassignedTasks.length} task${unassignedTasks.length === 1 ? "" : "s"} without an owner`,
+          why: "Tasks without clear ownership are easy to miss even when the team is busy.",
+          action: "Assign owners",
+          href: "/app/tasks"
+        }
+      : null,
+    belowTargetKpis.length
+      ? {
+          id: "kpis-below-target",
+          severity: "High",
+          title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} below target`,
+          why: "Below-target metrics should be reviewed against recent tasks, CRM activity, and operational issues.",
+          action: "Review KPIs",
+          href: "/app/kpis"
+        }
+      : null,
+    crmLeadsWithoutFollowup.length
+      ? {
+          id: "crm-followup",
+          severity: "Medium",
+          title: `${crmLeadsWithoutFollowup.length} CRM lead${crmLeadsWithoutFollowup.length === 1 ? "" : "s"} need follow-up review`,
+          why: "Leads without recent activity or next-step notes can quietly stall revenue.",
+          action: "Review CRM",
+          href: "/app/crm"
+        }
+      : null,
+    staleSops.length
+      ? {
+          id: "stale-sops",
+          severity: "Low",
+          title: `${staleSops.length} SOP${staleSops.length === 1 ? "" : "s"} may need review`,
+          why: "Procedures that have not been touched recently can drift away from how the team actually works.",
+          action: "Review SOPs",
+          href: "/app/sops"
+        }
+      : null,
+    oldIssues.length
+      ? {
+          id: "old-issues",
+          severity: "High",
+          title: `${oldIssues.length} issue${oldIssues.length === 1 ? "" : "s"} open too long`,
+          why: "Long-running issues often signal process breakdowns that need a manager decision.",
+          action: "Review issues",
+          href: "/app/issues"
+        }
+      : null,
+    unanalyzedFiles.length
+      ? {
+          id: "unanalyzed-files",
+          severity: "Medium",
+          title: `${unanalyzedFiles.length} uploaded file${unanalyzedFiles.length === 1 ? "" : "s"} not analyzed`,
+          why: "Uploaded files should either feed historical memory or produce clear findings for reports.",
+          action: "Analyze files",
+          href: "/app/files"
+        }
+      : null,
+    !hasCurrentReport
+      ? {
+          id: "missing-report",
+          severity: "Low",
+          title: "No report generated for this period",
+          why: "A saved report gives the owner a clean management summary and a record of decisions.",
+          action: "Generate report",
+          href: "/app/reports"
+        }
+      : null,
+    checklistsWithoutRecentRuns.length
+      ? {
+          id: "checklist-runs",
+          severity: "Medium",
+          title: `${checklistsWithoutRecentRuns.length} checklist${checklistsWithoutRecentRuns.length === 1 ? "" : "s"} have no recent run`,
+          why: "Checklists only create accountability when they are actually completed and reviewed.",
+          action: "Run checklists",
+          href: "/app/checklists"
+        }
+      : null
+  ].filter(Boolean) as DashboardAlert[];
+}
+
+function ExecutiveBriefingCard({
+  period,
+  whatChanged,
+  improved,
+  declined,
+  attention,
+  recommendation
+}: {
+  period: DashboardPeriod;
+  whatChanged: string;
+  improved: string;
+  declined: string;
+  attention: string;
+  recommendation: string;
+}) {
+  return (
+    <section className="rounded-lg border border-line bg-white p-5 shadow-panel">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Executive briefing</p>
+          <h2 className="mt-2 text-2xl font-semibold text-ink">What changed and what to do next</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+            A {period.toLowerCase()} owner-ready readout from KPIs, CRM, tasks, issues, files, checklists, SOPs, reports, and Vaeroex insights.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">Create Task</Link>
+          <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Generate Report</Link>
+          <Link href="/app/issues" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Review Issues</Link>
+          <Link href="/app/kpis" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Review KPIs</Link>
+        </div>
+      </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-5">
+        {[
+          ["What changed", whatChanged],
+          ["Improved", improved],
+          ["Declined", declined],
+          ["Needs attention", attention],
+          ["Vaeroex recommends", recommendation]
+        ].map(([label, value]) => (
+          <article key={label} className="rounded-lg border border-line bg-slate-50 p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SmartAlerts({ alerts }: { alerts: DashboardAlert[] }) {
+  if (!alerts.length) {
+    return (
+      <section className="rounded-lg border border-emerald-100 bg-emerald-50 p-5 text-emerald-800">
+        <p className="text-sm font-semibold">No urgent alerts right now.</p>
+        <p className="mt-1 text-sm leading-6">Vaeroex did not find overdue work, stale reviews, or missing reports that need immediate attention.</p>
+      </section>
+    );
+  }
+
+  return (
+    <SectionCard title="Smart alerts" description="In-app alerts from the current workspace. Start here when deciding what needs attention.">
+      <div className="grid gap-3 lg:grid-cols-3">
+        {alerts.slice(0, 6).map((alert) => (
+          <article key={alert.id} className={`rounded-lg border p-4 ${severityTone(alert.severity)}`}>
+            <div className="flex items-start justify-between gap-3">
+              <p className="text-sm font-semibold">{alert.title}</p>
+              <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold">{alert.severity}</span>
+            </div>
+            <p className="mt-2 text-sm leading-6 opacity-90">{alert.why}</p>
+            <Link href={alert.href as Route} className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-ink">
+              {alert.action}
+            </Link>
+          </article>
+        ))}
+      </div>
+    </SectionCard>
+  );
+}
+
 export default async function AppDashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const period = isDashboardPeriod(params?.period) ? params.period : "Weekly";
@@ -466,6 +699,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiResult,
     taskResult,
     issueResult,
+    checklistResult,
     checklistRunResult,
     sopResult,
     fileResult,
@@ -485,6 +719,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       .limit(500),
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(500),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
+    supabase.from("checklists").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
@@ -499,6 +734,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const kpis = (kpiResult.data || []) as KpiRow[];
   const tasks = (taskResult.data || []) as TaskRow[];
   const issues = (issueResult.data || []) as IssueRow[];
+  const checklists = (checklistResult.data || []) as ChecklistRow[];
   const checklistRuns = (checklistRunResult.data || []) as ChecklistRunRow[];
   const sops = (sopResult.data || []) as SopRow[];
   const files = (fileResult.data || []) as FileUploadRow[];
@@ -512,6 +748,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiResult.error,
     taskResult.error,
     issueResult.error,
+    checklistResult.error,
     checklistRunResult.error,
     sopResult.error,
     fileResult.error,
@@ -585,6 +822,105 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     !crmLeads.length ? "Add a CRM lead manually, or import a lead list later when one is available." : "",
     !reports.length ? "Generate a report for this period so the management summary is saved." : ""
   ].filter(Boolean);
+  const latestKpiRows = latestKpisByName(kpis);
+  const belowTargetKpis = latestKpiRows.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
+  const unassignedTasks = openTasks.filter((task) => !task.assigned_to);
+  const crmLeadsWithoutFollowup = crmLeads.filter((lead) => !isConvertedStatus(lead.status) && (!lead.last_activity_at || isOlderThan(lead.last_activity_at, 30)));
+  const staleSops = sops.filter((sop) => isOlderThan(sop.updated_at || sop.created_at, 90));
+  const oldIssues = openIssues.filter((issue) => isOlderThan(issue.created_at, 14));
+  const unanalyzedFiles = files.filter((file) => !file.analysis_summary && !file.archived_at && !file.deleted_at);
+  const hasCurrentReport = reports.some((report) =>
+    report.date_range_start && report.date_range_end
+      ? report.date_range_start <= range.endDate && report.date_range_end >= range.startDate
+      : inIsoRange(report.created_at, range.start, range.end)
+  );
+  const recentRunChecklistIds = new Set(checklistRuns.filter((run) => inIsoRange(run.created_at, range.start, range.end)).map((run) => run.checklist_id));
+  const checklistsWithoutRecentRuns = checklists.filter((checklist) => !recentRunChecklistIds.has(checklist.id));
+  const smartAlerts = buildSmartAlerts({
+    overdueTasks,
+    unassignedTasks,
+    belowTargetKpis,
+    crmLeadsWithoutFollowup,
+    staleSops,
+    oldIssues,
+    unanalyzedFiles,
+    hasCurrentReport,
+    checklistsWithoutRecentRuns
+  });
+  const onboardingItems: OnboardingChecklistItem[] = [
+    {
+      id: "profile",
+      title: "Complete business profile",
+      helpText: "Confirm workspace name, contact, team size, and business details so Vaeroex recommendations have the right context.",
+      href: "/app/setup",
+      completed: Boolean(context.activeWorkspace?.primary_contact_email || context.activeWorkspace?.size)
+    },
+    {
+      id: "business-type",
+      title: "Choose business type",
+      helpText: "Business type helps Vaeroex suggest practical workflows, KPIs, reports, and operating rhythms.",
+      href: "/app/setup",
+      completed: Boolean(context.activeWorkspace?.industry)
+    },
+    {
+      id: "kpi",
+      title: "Add first KPI",
+      helpText: "Start with one number the owner cares about, such as revenue, leads, jobs completed, or customer issues.",
+      href: "/app/kpis",
+      completed: Boolean(kpis.length)
+    },
+    {
+      id: "crm",
+      title: "Add first CRM lead",
+      helpText: "A single lead is enough to make the dashboard and reports start reflecting sales follow-up.",
+      href: "/app/crm",
+      completed: Boolean(crmLeads.length)
+    },
+    {
+      id: "file",
+      title: "Upload first file",
+      helpText: "Optional: upload CSV, XLSX, PDF, DOCX, PNG, or JPG when you already have business data to analyze.",
+      href: "/app/files",
+      completed: Boolean(files.length),
+      optional: true
+    },
+    {
+      id: "task",
+      title: "Create first task",
+      helpText: "Create one accountable next action with a priority and due date.",
+      href: "/app/tasks",
+      completed: Boolean(tasks.length)
+    },
+    {
+      id: "vaeroex",
+      title: "Run first Vaeroex analysis",
+      helpText: "Ask Vaeroex what needs attention using the records already in this workspace.",
+      href: "/app/agents",
+      completed: vaeroexRuns.some((run) => run.status === "completed")
+    },
+    {
+      id: "report",
+      title: "Generate first report",
+      helpText: "Save a clean management summary so the owner can see what changed and what to do next.",
+      href: "/app/reports",
+      completed: Boolean(reports.length)
+    }
+  ];
+  const briefing = {
+    whatChanged: recentImports.length
+      ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} updated workspace history.`
+      : leadsCreated.length
+        ? `${leadsCreated.length} CRM lead${leadsCreated.length === 1 ? "" : "s"} were created this period.`
+        : "No major new data changes were found for this period yet.",
+    improved: positiveTrends[0]
+      ? `${positiveTrends[0].name} improved ${percentLabel(positiveTrends[0].changePercent)} compared with the previous period.`
+      : "No positive KPI movement is visible yet.",
+    declined: negativeTrends[0]
+      ? `${negativeTrends[0].name} declined ${percentLabel(negativeTrends[0].changePercent)} compared with the previous period.`
+      : "No declining KPI trend is visible yet.",
+    attention: smartAlerts[0]?.title || risks[0] || "No urgent attention area was detected.",
+    recommendation: recommendedActions[0] || "Keep adding real records, then generate a report after the next management review."
+  };
   const hasWorkspaceData = Boolean(kpis.length || tasks.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
 
   return (
@@ -594,6 +930,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         title={context.activeWorkspace?.name ?? "Vaeroex executive dashboard"}
         description={`A ${period.toLowerCase()} view of KPI history, tasks, issues, files, CRM activity, reports, and Vaeroex recommendations.`}
       />
+
+      {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{params.message}</div> : null}
+      {params?.error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{params.error}</div> : null}
 
       {errors.length ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -614,6 +953,27 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </Link>
         ))}
       </section>
+
+      <OnboardingChecklist
+        workspaceId={workspaceId}
+        items={onboardingItems}
+        demoWorkspaceForm={
+          <form action={createDemoWorkspaceAction}>
+            <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Explore Demo Workspace</button>
+          </form>
+        }
+      />
+
+      <ExecutiveBriefingCard
+        period={period}
+        whatChanged={briefing.whatChanged}
+        improved={briefing.improved}
+        declined={briefing.declined}
+        attention={briefing.attention}
+        recommendation={briefing.recommendation}
+      />
+
+      <SmartAlerts alerts={smartAlerts} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
