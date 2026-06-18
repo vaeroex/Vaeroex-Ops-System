@@ -1,4 +1,5 @@
 import { createSopAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -76,7 +77,28 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
+      <section className="space-y-6">
+        <CreateDrawer title="Create SOP" description="Start with a practical draft that managers can review." triggerLabel="New SOP">
+          <form action={createSopAction} className="grid gap-4 lg:grid-cols-2">
+            <TextInput label="Title" name="title" required />
+            <TextInput label="Department" name="department" />
+            <TextInput label="Category" name="category" />
+            <SelectInput label="Status" name="status" defaultValue="Draft" options={sopStatuses} />
+            <TextInput label="Version" name="version" type="number" defaultValue={1} />
+            <div className="lg:col-span-2">
+              <TextArea
+                label="Procedure"
+                name="body_markdown"
+                rows={8}
+                placeholder={"Purpose\nScope\nSteps\nQuality checks\nEscalation path"}
+              />
+            </div>
+            <div className="lg:col-span-2">
+              <PrimaryButton>Create SOP</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
         <SectionCard title="SOP library" description="Versioned procedures for repeatable work.">
           <ManagedRecordList
             collection="sops"
@@ -90,22 +112,6 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
           />
         </SectionCard>
 
-        <SectionCard title="Create SOP" description="Start with a practical draft that managers can review.">
-          <form action={createSopAction} className="space-y-4">
-            <TextInput label="Title" name="title" required />
-            <TextInput label="Department" name="department" />
-            <TextInput label="Category" name="category" />
-            <SelectInput label="Status" name="status" defaultValue="Draft" options={sopStatuses} />
-            <TextInput label="Version" name="version" type="number" defaultValue={1} />
-            <TextArea
-              label="Procedure"
-              name="body_markdown"
-              rows={10}
-              placeholder={"Purpose\nScope\nSteps\nQuality checks\nEscalation path"}
-            />
-            <PrimaryButton>Create SOP</PrimaryButton>
-          </form>
-        </SectionCard>
       </section>
     </div>
   );

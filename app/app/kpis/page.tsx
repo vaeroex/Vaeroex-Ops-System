@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import { createKpiAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -937,7 +938,25 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         )}
       </SectionCard>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_400px]">
+      <section className="space-y-6">
+        <CreateDrawer title="Create KPI" description="Use one metric per row so trends stay easy to review." triggerLabel="New KPI">
+          <form action={createKpiAction} className="grid gap-4 lg:grid-cols-2">
+            <TextInput label="Name" name="name" placeholder="Revenue, Leads, Conversion Rate" required />
+            <TextInput label="Category" name="category" placeholder="Sales, Operations, Finance" />
+            <TextInput label="Target" name="target" type="number" step="0.01" />
+            <TextInput label="Actual Value" name="actual_value" type="number" step="0.01" />
+            <TextInput label="Date" name="metric_date" type="date" defaultValue={today} />
+            <TextInput label="Owner" name="owner" placeholder="Manager or department" />
+            <TextInput label="Source" name="source" placeholder="POS, CRM, spreadsheet, manual" />
+            <div className="lg:col-span-2">
+              <TextArea label="Notes" name="notes" rows={4} />
+            </div>
+            <div className="lg:col-span-2">
+              <PrimaryButton>Save KPI</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
         <SectionCard title="KPI log" description="Each metric is scoped to the current workspace and can use its own target.">
           <ManagedRecordList
             collection="kpis"
@@ -951,21 +970,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           />
         </SectionCard>
 
-        <SectionCard title="Create KPI" description="Use one metric per row so trends stay easy to review.">
-          <form action={createKpiAction} className="space-y-4">
-            <TextInput label="Name" name="name" placeholder="Revenue, Leads, Conversion Rate" required />
-            <TextInput label="Category" name="category" placeholder="Sales, Operations, Finance" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextInput label="Target" name="target" type="number" step="0.01" />
-              <TextInput label="Actual Value" name="actual_value" type="number" step="0.01" />
-            </div>
-            <TextInput label="Date" name="metric_date" type="date" defaultValue={today} />
-            <TextInput label="Owner" name="owner" placeholder="Manager or department" />
-            <TextInput label="Source" name="source" placeholder="POS, CRM, spreadsheet, manual" />
-            <TextArea label="Notes" name="notes" rows={4} />
-            <PrimaryButton>Save KPI</PrimaryButton>
-          </form>
-        </SectionCard>
       </section>
     </div>
   );

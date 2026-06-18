@@ -10,6 +10,7 @@ import {
   uploadFileAction
 } from "@/app/app/files/actions";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -1490,10 +1491,10 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         )}
       </SectionCard>
 
-      <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
-        <div className="space-y-6">
-          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX files can be imported after review. PDF/DOCX files can be analyzed from extracted text, and PNG/JPG files can be analyzed with OCR and visual context.">
-            <form action={uploadFileAction} encType="multipart/form-data" className="space-y-4">
+      <section className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <CreateDrawer title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX imports always go through review before saving." triggerLabel="Upload File">
+            <form action={uploadFileAction} encType="multipart/form-data" className="grid gap-4">
               <label className="block text-sm font-medium">
                 File
                 <input
@@ -1511,17 +1512,18 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
               </p>
               <ActionButton tone="primary" pendingLabel="Uploading file...">Upload file</ActionButton>
             </form>
-          </SectionCard>
+          </CreateDrawer>
 
-          <SectionCard title="Default folders" description="Use these starter folders or create custom folders in the file list.">
-            <div className="flex flex-wrap gap-2">
+          <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Default folders</summary>
+            <div className="mt-3 flex flex-wrap gap-2">
               {DEFAULT_FILE_FOLDERS.map((folder) => (
                 <span key={folder} className="rounded-full border border-line bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700">
                   {folder}
                 </span>
               ))}
             </div>
-          </SectionCard>
+          </details>
         </div>
 
         <SectionCard title="File library" description="Files are collapsed by default and can be renamed, moved, duplicated, archived, deleted, searched, filtered, and managed in bulk.">

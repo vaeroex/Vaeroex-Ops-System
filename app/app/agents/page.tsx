@@ -799,41 +799,39 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <SuccessNotice message={params?.saved as string | undefined} />
       <ComplianceNotice />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="space-y-6">
-          <SectionCard title="Ask Vaeroex" description="Use chat for a general operations question. The run is saved for review.">
-            <form action={runVaeroexAction} className="space-y-4">
-              <input type="hidden" name="workflow_key" value="ask_vaeroex" />
-              <TextArea
-                label="Question"
-                name="user_prompt"
-                required
-                rows={6}
-                placeholder="Ask about missed follow-ups, ownership gaps, handoffs, SOPs, forms, checklists, reporting, or next actions."
-              />
-              <PrimaryButton>Ask Vaeroex</PrimaryButton>
-            </form>
-          </SectionCard>
+      <section className="space-y-6">
+        <SectionCard title="Ask Vaeroex" description="Use chat for a general operations question. The run is saved for review.">
+          <form action={runVaeroexAction} className="space-y-4">
+            <input type="hidden" name="workflow_key" value="ask_vaeroex" />
+            <TextArea
+              label="Question"
+              name="user_prompt"
+              required
+              rows={5}
+              placeholder="Ask about missed follow-ups, ownership gaps, handoffs, SOPs, forms, checklists, reporting, or next actions."
+            />
+            <PrimaryButton>Ask Vaeroex</PrimaryButton>
+          </form>
+        </SectionCard>
 
-          {selectedRun ? (
-            <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
-          ) : (
-            <SectionCard title="Vaeroex answer" description="Your next Vaeroex response will appear here.">
-              <EmptyState title="No Vaeroex answer yet" description="Ask Vaeroex a question above or run one of the tools below." />
-            </SectionCard>
-          )}
-
-          <SectionCard
-            title="Vaeroex workflows"
-            description="Each workflow uses the active workspace context and saves the output as a draft result first."
-          >
-            <div className="grid gap-4 lg:grid-cols-2">
-              {workflows.map((workflow) => (
-                <WorkflowCard key={workflow.key} workflowKey={workflow.key} />
-              ))}
-            </div>
+        {selectedRun ? (
+          <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
+        ) : (
+          <SectionCard title="Vaeroex answer" description="Your next Vaeroex response will appear here.">
+            <EmptyState title="No Vaeroex answer yet" description="Ask Vaeroex a question above or run one of the tools below." />
           </SectionCard>
-        </div>
+        )}
+
+        <SectionCard
+          title="Vaeroex workflows"
+          description="Each workflow uses the active workspace context and saves the output as a draft result first."
+        >
+          <div className="grid gap-4 lg:grid-cols-2">
+            {workflows.map((workflow) => (
+              <WorkflowCard key={workflow.key} workflowKey={workflow.key} />
+            ))}
+          </div>
+        </SectionCard>
 
         <SectionCard title="Run history" description="Recent Vaeroex results for this workspace.">
           <ManagedRecordList

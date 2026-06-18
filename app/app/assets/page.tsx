@@ -1,4 +1,5 @@
 import { createAssetAction, createAssetCheckAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -115,39 +116,10 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
 
       <ErrorNotice message={(params?.error as string | undefined) || assetsError?.message || checksError?.message || assetFolders.error?.message || checkFolders.error?.message} />
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
-        <div className="space-y-6">
-          <SectionCard title="Asset register" description="Current equipment and operational assets for this workspace.">
-            <ManagedRecordList
-              collection="assets"
-              records={managedAssets}
-              folders={assetFolders.folders}
-              title="Asset records"
-              description="Track readiness and organize equipment without a long open table."
-              emptyTitle="No assets yet"
-              emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked operational assets."
-              searchParams={params}
-            />
-          </SectionCard>
-
-          <SectionCard title="Recent asset checks" description="Status checks submitted by workspace members.">
-            <ManagedRecordList
-              collection="asset_checks"
-              records={managedChecks}
-              folders={checkFolders.folders}
-              title="Asset check records"
-              description="Recent checks can also be archived, moved, duplicated, or deleted."
-              emptyTitle="No asset checks"
-              emptyDescription="Run a quick asset check to document readiness or needed repairs."
-              returnPath="/app/assets"
-              searchParams={params}
-            />
-          </SectionCard>
-        </div>
-
-        <div className="space-y-6">
-          <SectionCard title="Add asset" description="Create a new tracked item.">
-            <form action={createAssetAction} className="space-y-4">
+      <section className="space-y-6">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <CreateDrawer title="Add asset" description="Create a new tracked item." triggerLabel="New Asset">
+            <form action={createAssetAction} className="grid gap-4">
               <TextInput label="Asset name" name="asset_name" required />
               <TextInput label="Asset type" name="asset_type" placeholder="Vehicle, equipment, kit, device" />
               <TextInput label="Identifier" name="identifier" placeholder="Serial, unit number, license" />
@@ -156,11 +128,11 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
               <TextArea label="Notes" name="notes" rows={3} />
               <PrimaryButton>Add asset</PrimaryButton>
             </form>
-          </SectionCard>
+          </CreateDrawer>
 
-          <SectionCard title="Add asset check" description="Record current readiness.">
+          <CreateDrawer title="Add asset check" description="Record current readiness." triggerLabel="New Check">
             {assets?.length ? (
-              <form action={createAssetCheckAction} className="space-y-4">
+              <form action={createAssetCheckAction} className="grid gap-4">
                 <label className="block text-sm font-medium">
                   Asset
                   <select
@@ -182,8 +154,35 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
             ) : (
               <EmptyState title="Add an asset first" description="Asset checks need a tracked asset." />
             )}
-          </SectionCard>
+          </CreateDrawer>
         </div>
+
+        <SectionCard title="Asset register" description="Current equipment and operational assets for this workspace.">
+          <ManagedRecordList
+            collection="assets"
+            records={managedAssets}
+            folders={assetFolders.folders}
+            title="Asset records"
+            description="Track readiness and organize equipment without a long open table."
+            emptyTitle="No assets yet"
+            emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked operational assets."
+            searchParams={params}
+          />
+        </SectionCard>
+
+        <SectionCard title="Recent asset checks" description="Status checks submitted by workspace members.">
+          <ManagedRecordList
+            collection="asset_checks"
+            records={managedChecks}
+            folders={checkFolders.folders}
+            title="Asset check records"
+            description="Recent checks can also be archived, moved, duplicated, or deleted."
+            emptyTitle="No asset checks"
+            emptyDescription="Run a quick asset check to document readiness or needed repairs."
+            returnPath="/app/assets"
+            searchParams={params}
+          />
+        </SectionCard>
       </section>
     </div>
   );

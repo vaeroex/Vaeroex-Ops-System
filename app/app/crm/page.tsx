@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import { createCrmLeadAction } from "@/app/app/operations/actions";
+import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -193,7 +194,25 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
         <MetricCard label="Pipeline value" value={formatMoney(pipelineValue)} note="Estimated value for open leads." />
       </section>
 
-      <section className="grid gap-6 xl:grid-cols-[1fr_400px]">
+      <section className="space-y-6">
+        <CreateDrawer title="Create lead" description="Add one lead at a time. Imported spreadsheets are optional." triggerLabel="New Lead">
+          <form action={createCrmLeadAction} className="grid gap-4 lg:grid-cols-2">
+            <TextInput label="Lead name" name="lead_name" placeholder="Customer or contact name" required />
+            <TextInput label="Company" name="company" placeholder="Business name" />
+            <TextInput label="Email" name="email" type="email" />
+            <TextInput label="Phone" name="phone" />
+            <SelectInput label="Status" name="status" defaultValue="New" options={LEAD_STATUSES} />
+            <TextInput label="Estimated value" name="estimated_value" type="number" step="0.01" min="0" />
+            <TextInput label="Owner" name="owner" placeholder="Manager or sales owner" />
+            <div className="lg:col-span-2">
+              <TextArea label="Notes" name="notes" rows={5} placeholder="Next step, customer need, quote notes, or follow-up details" />
+            </div>
+            <div className="lg:col-span-2">
+              <PrimaryButton>Save lead</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
         <SectionCard title="CRM records" description="Leads are collapsed by default and can be searched, edited, archived, duplicated, grouped, or moved in bulk.">
           <ManagedRecordList
             collection="crm_leads"
@@ -208,21 +227,6 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
           />
         </SectionCard>
 
-        <SectionCard title="Create lead" description="Add one lead at a time. Imported spreadsheets are optional.">
-          <form action={createCrmLeadAction} className="space-y-4">
-            <TextInput label="Lead name" name="lead_name" placeholder="Customer or contact name" required />
-            <TextInput label="Company" name="company" placeholder="Business name" />
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextInput label="Email" name="email" type="email" />
-              <TextInput label="Phone" name="phone" />
-            </div>
-            <SelectInput label="Status" name="status" defaultValue="New" options={LEAD_STATUSES} />
-            <TextInput label="Estimated value" name="estimated_value" type="number" step="0.01" min="0" />
-            <TextInput label="Owner" name="owner" placeholder="Manager or sales owner" />
-            <TextArea label="Notes" name="notes" rows={5} placeholder="Next step, customer need, quote notes, or follow-up details" />
-            <PrimaryButton>Save lead</PrimaryButton>
-          </form>
-        </SectionCard>
       </section>
     </div>
   );
