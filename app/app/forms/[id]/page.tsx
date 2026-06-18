@@ -4,8 +4,8 @@ import { convertSubmissionToTaskAction, createFormSubmissionAction } from "@/app
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { TextArea, TextInput, SelectInput, PrimaryButton } from "@/components/operations/FormControls";
-import { JsonPreview } from "@/components/operations/JsonPreview";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { ReadableData } from "@/components/operations/ReadableData";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -64,7 +64,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
                   </div>
                   <p className="mt-3 text-sm leading-6 text-muted">{submission.ai_summary || "No summary generated yet."}</p>
                   <div className="mt-4">
-                    <JsonPreview value={submission.data_json} />
+                    <ReadableData value={submission.data_json} empty="No submission details saved." />
                   </div>
                   <form action={convertSubmissionToTaskAction} className="mt-4">
                     <input type="hidden" name="form_id" value={form.id} />
@@ -94,7 +94,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
             </form>
           </SectionCard>
           <SectionCard title="Form schema">
-            <JsonPreview value={form.schema_json} />
+            <ReadableData value={form.schema_json} empty="No fields saved." />
           </SectionCard>
         </div>
       </section>

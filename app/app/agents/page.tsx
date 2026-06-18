@@ -6,16 +6,18 @@ import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
+import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { VAEROEX_WORKFLOWS, getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
+import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type VaeroexHubPageProps = {
-  searchParams?: Promise<{ error?: string; run?: string; saved?: string; debug?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
 type JsonRecord = Record<string, unknown>;
@@ -35,6 +37,10 @@ const saveDestinations: Record<string, { label: string; href: Route }> = {
   checklist: { label: "Checklists", href: "/app/checklists" },
   report: { label: "Reports", href: "/app/reports" }
 };
+const vaeroexRunEditFields: ManagedRecordEditField[] = [
+  { name: "status", label: "Status", type: "select", options: ["queued", "running", "completed", "failed"] },
+  { name: "error_message", label: "Error message", type: "textarea", rows: 4 }
+];
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -734,17 +740,52 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const { data: runs, error } = await supabase
-    .from("ai_agent_runs")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("created_at", { ascending: false })
-    .limit(30);
+  const [{ data: runs, error }, folderResult] = await Promise.all([
+    supabase
+      .from("ai_agent_runs")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(30),
+    getRecordFolders(supabase, workspaceId, "ai_agent_runs")
+  ]);
   const selectedRun = runs?.find((run) => run.id === params?.run) ?? runs?.[0] ?? null;
   const selectedOutput = selectedRun ? asRecord(selectedRun.output_json) : {};
   const workflows = VAEROEX_WORKFLOWS.filter((workflow) => workflow.key !== "ask_vaeroex");
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
+  const managedRuns = (runs || []).map((run) => {
+    const management = managedValues(run);
+    const output = asRecord(run.output_json);
+    const display = displayOutput(output);
+    const sections = businessSections(display);
+
+    return {
+      id: run.id,
+      title: resultTitle(display, vaeroexResultLabel(run.agent_type)),
+      type: vaeroexResultLabel(run.agent_type),
+      status: run.status,
+      owner: run.created_by ? "Workspace" : "Vaeroex",
+      category: run.agent_type,
+      createdAt: run.created_at,
+      updatedAt: management.updatedAt || run.created_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(sections.executiveSummary || run.error_message, "No output yet."),
+      href: `/app/agents?run=${run.id}` as Route,
+      meta: [
+        { label: "Workflow", value: vaeroexResultLabel(run.agent_type) },
+        { label: "Status", value: run.status }
+      ],
+      editFields: vaeroexRunEditFields,
+      editValues: {
+        status: run.status,
+        error_message: run.error_message
+      },
+      children: run.status === "completed" ? <BusinessResult output={display} /> : <ErrorNotice message={run.error_message || "This run has not completed yet."} />
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -754,8 +795,8 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         description="Ask questions, generate operational drafts, review saved Vaeroex results, and confirm before anything is added to tasks, SOPs, forms, checklists, or reports."
       />
 
-      <ErrorNotice message={params?.error || error?.message} />
-      <SuccessNotice message={params?.saved} />
+      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
+      <SuccessNotice message={params?.saved as string | undefined} />
       <ComplianceNotice />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
@@ -795,29 +836,17 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         </div>
 
         <SectionCard title="Run history" description="Recent Vaeroex results for this workspace.">
-          {runs?.length ? (
-            <div className="space-y-3">
-              {runs.map((run) => (
-                <Link
-                  key={run.id}
-                  href={{ pathname: "/app/agents", query: { run: run.id } }}
-                  className={`block rounded-lg border p-3 text-sm ${
-                    selectedRun?.id === run.id ? "border-vaeroex-blue bg-vaeroex-soft" : "border-line bg-white"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{vaeroexResultLabel(run.agent_type)}</p>
-                      <p className="mt-1 text-xs text-muted">{new Date(run.created_at).toLocaleString()}</p>
-                    </div>
-                    <StatusBadge value={run.status} />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="No Vaeroex results yet" description="Ask Vaeroex or run a workflow to create the first saved result." />
-          )}
+          <ManagedRecordList
+            collection="ai_agent_runs"
+            records={managedRuns}
+            folders={folderResult.folders}
+            title="Vaeroex result records"
+            description="Organize previous Vaeroex outputs without showing raw structured data to normal users."
+            emptyTitle="No Vaeroex results yet"
+            emptyDescription="Ask Vaeroex or run a workflow to create the first saved result."
+            returnPath="/app/agents"
+            searchParams={params}
+          />
         </SectionCard>
       </section>
     </div>

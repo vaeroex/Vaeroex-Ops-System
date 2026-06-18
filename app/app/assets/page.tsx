@@ -2,19 +2,34 @@ import { createAssetAction, createAssetCheckAction } from "@/app/app/operations/
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
+import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
-import { StatusBadge } from "@/components/operations/StatusBadge";
+import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type AssetsPageProps = {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const assetStatuses = ["Ready", "Needs attention", "Out of service", "Missing"];
+const assetEditFields: ManagedRecordEditField[] = [
+  { name: "asset_name", label: "Asset name", required: true },
+  { name: "asset_type", label: "Asset type" },
+  { name: "identifier", label: "Identifier" },
+  { name: "location", label: "Location" },
+  { name: "status", label: "Status", type: "select", options: assetStatuses },
+  { name: "notes", label: "Notes", type: "textarea", rows: 4 }
+];
+const assetCheckEditFields: ManagedRecordEditField[] = [
+  { name: "status", label: "Status", type: "select", options: assetStatuses },
+  { name: "notes", label: "Notes", type: "textarea", rows: 4 }
+];
 
 export default async function AssetsPage({ searchParams }: AssetsPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [{ data: assets, error: assetsError }, { data: checks, error: checksError }] = await Promise.all([
+  const [{ data: assets, error: assetsError }, { data: checks, error: checksError }, assetFolders, checkFolders] = await Promise.all([
     supabase
       .from("assets")
       .select("*")
@@ -25,9 +40,70 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
-      .limit(12)
+      .limit(12),
+    getRecordFolders(supabase, workspaceId, "assets"),
+    getRecordFolders(supabase, workspaceId, "asset_checks")
   ]);
   const assetNameById = new Map((assets || []).map((asset) => [asset.id, asset.asset_name]));
+  const managedAssets = (assets || []).map((asset) => {
+    const management = managedValues(asset);
+
+    return {
+      id: asset.id,
+      title: asset.asset_name,
+      type: asset.asset_type || "Asset",
+      status: asset.status,
+      owner: asset.assigned_to ? "Assigned" : "Unassigned",
+      category: asset.location || "No location",
+      createdAt: asset.created_at,
+      updatedAt: management.updatedAt || asset.updated_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(asset.notes, "No notes."),
+      meta: [
+        { label: "Identifier", value: asset.identifier || "Not set" },
+        { label: "Location", value: asset.location || "Not set" },
+        { label: "Last check", value: asset.last_checked_at ? new Date(asset.last_checked_at).toLocaleDateString() : "Never" }
+      ],
+      editFields: assetEditFields,
+      editValues: {
+        asset_name: asset.asset_name,
+        asset_type: asset.asset_type,
+        identifier: asset.identifier,
+        location: asset.location,
+        status: asset.status,
+        notes: asset.notes
+      },
+      children: <p className="text-sm leading-6 text-muted">{asset.notes || "No notes."}</p>
+    };
+  });
+  const managedChecks = (checks || []).map((check) => {
+    const management = managedValues(check);
+    const assetName = assetNameById.get(check.asset_id) || "Asset";
+
+    return {
+      id: check.id,
+      title: assetName,
+      type: "Asset check",
+      status: check.status,
+      owner: check.checked_by ? "Checked" : "Unassigned",
+      category: assetName,
+      createdAt: check.created_at,
+      updatedAt: management.updatedAt || check.created_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(check.notes, "No notes."),
+      meta: [{ label: "Asset", value: assetName }],
+      editFields: assetCheckEditFields,
+      editValues: {
+        status: check.status,
+        notes: check.notes
+      },
+      children: <p className="text-sm leading-6 text-muted">{check.notes || "No notes."}</p>
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -37,67 +113,35 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
         description="Track asset status, location, identifiers, inspection history, and equipment that needs attention."
       />
 
-      <ErrorNotice message={params?.error || assetsError?.message || checksError?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || assetsError?.message || checksError?.message || assetFolders.error?.message || checkFolders.error?.message} />
 
       <section className="grid gap-6 xl:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <SectionCard title="Asset register" description="Current equipment and operational assets for this workspace.">
-            {assets?.length ? (
-              <div className="overflow-auto">
-                <table className="w-full min-w-[760px] text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-muted">
-                    <tr>
-                      <th className="py-2">Asset</th>
-                      <th>Type</th>
-                      <th>Identifier</th>
-                      <th>Location</th>
-                      <th>Status</th>
-                      <th>Last check</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-line">
-                    {assets.map((asset) => (
-                      <tr key={asset.id}>
-                        <td className="py-3">
-                          <p className="font-semibold">{asset.asset_name}</p>
-                          <p className="text-xs text-muted">{asset.notes || "No notes."}</p>
-                        </td>
-                        <td>{asset.asset_type || "-"}</td>
-                        <td>{asset.identifier || "-"}</td>
-                        <td>{asset.location || "-"}</td>
-                        <td>
-                          <StatusBadge value={asset.status} />
-                        </td>
-                        <td className="text-muted">{asset.last_checked_at ? new Date(asset.last_checked_at).toLocaleDateString() : "Never"}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <EmptyState title="No assets yet" description="Add equipment, vehicles, kits, devices, rooms, or other tracked operational assets." />
-            )}
+            <ManagedRecordList
+              collection="assets"
+              records={managedAssets}
+              folders={assetFolders.folders}
+              title="Asset records"
+              description="Track readiness and organize equipment without a long open table."
+              emptyTitle="No assets yet"
+              emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked operational assets."
+              searchParams={params}
+            />
           </SectionCard>
 
           <SectionCard title="Recent asset checks" description="Status checks submitted by workspace members.">
-            {checks?.length ? (
-              <div className="space-y-3">
-                {checks.map((check) => (
-                  <article key={check.id} className="rounded-lg border border-line p-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{assetNameById.get(check.asset_id) || "Asset"}</p>
-                        <p className="mt-1 text-xs text-muted">{new Date(check.created_at).toLocaleString()}</p>
-                      </div>
-                      <StatusBadge value={check.status} />
-                    </div>
-                    <p className="mt-3 text-sm leading-6 text-muted">{check.notes || "No notes."}</p>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <EmptyState title="No asset checks" description="Run a quick asset check to document readiness or needed repairs." />
-            )}
+            <ManagedRecordList
+              collection="asset_checks"
+              records={managedChecks}
+              folders={checkFolders.folders}
+              title="Asset check records"
+              description="Recent checks can also be archived, moved, duplicated, or deleted."
+              emptyTitle="No asset checks"
+              emptyDescription="Run a quick asset check to document readiness or needed repairs."
+              returnPath="/app/assets"
+              searchParams={params}
+            />
           </SectionCard>
         </div>
 
@@ -108,7 +152,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
               <TextInput label="Asset type" name="asset_type" placeholder="Vehicle, equipment, kit, device" />
               <TextInput label="Identifier" name="identifier" placeholder="Serial, unit number, license" />
               <TextInput label="Location" name="location" />
-              <SelectInput label="Status" name="status" defaultValue="Ready" options={["Ready", "Needs attention", "Out of service", "Missing"]} />
+              <SelectInput label="Status" name="status" defaultValue="Ready" options={assetStatuses} />
               <TextArea label="Notes" name="notes" rows={3} />
               <PrimaryButton>Add asset</PrimaryButton>
             </form>
@@ -131,7 +175,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
                     ))}
                   </select>
                 </label>
-                <SelectInput label="Status" name="status" defaultValue="Ready" options={["Ready", "Needs attention", "Out of service", "Missing"]} />
+                <SelectInput label="Status" name="status" defaultValue="Ready" options={assetStatuses} />
                 <TextArea label="Notes" name="notes" rows={4} />
                 <PrimaryButton>Save check</PrimaryButton>
               </form>

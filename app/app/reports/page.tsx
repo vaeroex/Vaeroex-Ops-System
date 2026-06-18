@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { generateReportAction } from "@/app/app/reports/actions";
-import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextInput } from "@/components/operations/FormControls";
+import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -18,6 +19,12 @@ type ReportsPageProps = {
     start?: string;
     end?: string;
     debug?: string;
+    q?: string;
+    folder?: string;
+    status?: string;
+    owner?: string;
+    sort?: string;
+    view?: string;
   }>;
 };
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -25,7 +32,14 @@ type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const REPORT_TYPES = ["Operations Summary", "Accountability Review", "Bottleneck Review", "Readiness Snapshot", "Executive Summary"];
-const BASE_CATEGORIES = ["All", "Tasks", "Checklists", "SOPs", "Issues", "Forms", "Assets", "Vaeroex insights"];
+const BASE_CATEGORIES = ["All", "Tasks", "Checklists", "SOPs", "Issues", "Forms", "Assets", "KPIs", "Vaeroex insights"];
+const reportEditFields: ManagedRecordEditField[] = [
+  { name: "title", label: "Title", required: true },
+  { name: "report_type", label: "Report type" },
+  { name: "date_range_start", label: "Date range start", type: "date" },
+  { name: "date_range_end", label: "Date range end", type: "date" },
+  { name: "body_markdown", label: "Report body", type: "textarea", rows: 12 }
+];
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
@@ -233,7 +247,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     taskCategories,
     issueCategories,
     checklistCategories,
-    sopCategories
+    sopCategories,
+    folderResult
   ] = await Promise.all([
     reportQuery,
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
@@ -249,7 +264,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     supabase.from("tasks").select("category").eq("workspace_id", workspaceId),
     supabase.from("issues").select("issue_type").eq("workspace_id", workspaceId),
     supabase.from("checklists").select("category").eq("workspace_id", workspaceId),
-    supabase.from("sops").select("category").eq("workspace_id", workspaceId)
+    supabase.from("sops").select("category").eq("workspace_id", workspaceId),
+    getRecordFolders(supabase, workspaceId, "reports")
   ]);
 
   const dynamicCategories = uniqueOptions([
@@ -260,6 +276,45 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   ]);
   const categoryOptions = Array.from(new Set([...BASE_CATEGORIES, ...dynamicCategories]));
   const reports = ((rawReports || []) as ReportRow[]).filter((report) => reportMatchesCategory(report, filterCategory));
+  const managedReports = reports.map((report) => {
+    const management = managedValues(report);
+
+    return {
+      id: report.id,
+      title: report.title,
+      type: report.report_type,
+      status: report.report_type,
+      owner: report.created_by ? "Workspace" : "Vaeroex",
+      category: sourceCategory(report.source_data_json),
+      createdAt: report.created_at,
+      updatedAt: management.updatedAt || report.created_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(report.body_markdown, "No report body yet."),
+      meta: [
+        { label: "Date range", value: reportDateLabel(report) },
+        { label: "Completed tasks", value: numberFromSource(report.source_data_json, "completed_tasks") },
+        { label: "Checklist completions", value: numberFromSource(report.source_data_json, "checklist_completions") },
+        { label: "Open issues", value: numberFromSource(report.source_data_json, "open_issues") },
+        { label: "Overdue tasks", value: numberFromSource(report.source_data_json, "overdue_tasks") }
+      ],
+      editFields: reportEditFields,
+      editValues: {
+        title: report.title,
+        report_type: report.report_type,
+        date_range_start: report.date_range_start,
+        date_range_end: report.date_range_end,
+        body_markdown: report.body_markdown
+      },
+      children: (
+        <div className="space-y-4">
+          <ReportBody body={report.body_markdown} />
+          <AdminDebugData enabled={canViewDebug && debugMode} value={report.source_data_json} />
+        </div>
+      )
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -269,7 +324,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         description="Generate daily, weekly, monthly, quarterly, yearly, and year-to-date summaries for the active workspace. Reports use the selected period, compare against the prior period where possible, and keep source data hidden unless admin debug mode is enabled."
       />
 
-      <ErrorNotice message={params?.error || error?.message} />
+      <ErrorNotice message={params?.error || error?.message || folderResult.error?.message} />
       <SuccessNotice message={params?.message} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -328,55 +383,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </div>
 
         <SectionCard title="Report history" description="Customer-ready summaries for the active workspace.">
-          {reports.length ? (
-            <div className="space-y-5">
-              {reports.map((report) => (
-                <article key={report.id} className="rounded-lg border border-line bg-white p-5">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div>
-                      <p className="text-lg font-semibold">{report.title}</p>
-                      <p className="mt-1 text-xs text-muted">
-                        {report.report_type} · {reportDateLabel(report)} · Created {new Date(report.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                    <span className="w-fit rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-                      Generated by Vaeroex
-                    </span>
-                  </div>
-
-                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs text-muted">Completed tasks</p>
-                      <p className="mt-1 text-xl font-semibold">{numberFromSource(report.source_data_json, "completed_tasks")}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs text-muted">Checklist completions</p>
-                      <p className="mt-1 text-xl font-semibold">{numberFromSource(report.source_data_json, "checklist_completions")}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs text-muted">Open issues</p>
-                      <p className="mt-1 text-xl font-semibold">{numberFromSource(report.source_data_json, "open_issues")}</p>
-                    </div>
-                    <div className="rounded-lg bg-slate-50 p-3">
-                      <p className="text-xs text-muted">Overdue tasks</p>
-                      <p className="mt-1 text-xl font-semibold">{numberFromSource(report.source_data_json, "overdue_tasks")}</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-5">
-                    <ReportBody body={report.body_markdown} />
-                  </div>
-
-                  <AdminDebugData enabled={canViewDebug && debugMode} value={report.source_data_json} />
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState
-              title="No reports match these filters"
-              description="Generate a period report or adjust the filters to review saved summaries for this workspace."
-            />
-          )}
+          <ManagedRecordList
+            collection="reports"
+            records={managedReports}
+            folders={folderResult.folders}
+            title="Report records"
+            description="Saved reports are collapsed by default and can be grouped, archived, duplicated, or edited."
+            emptyTitle="No reports match these filters"
+            emptyDescription="Generate a period report or adjust the filters to review saved summaries for this workspace."
+            searchParams={params}
+          />
         </SectionCard>
       </section>
     </div>

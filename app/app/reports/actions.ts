@@ -29,6 +29,7 @@ type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS: ReportPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
+const reportNumberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -261,6 +262,97 @@ function trendPhrase(current: number, previous: number) {
   return `${current} (${diff > 0 ? "up" : "down"} ${Math.abs(diff)})`;
 }
 
+function formatKpiNumber(value: number) {
+  return reportNumberFormatter.format(value);
+}
+
+function groupKpisByName(kpis: KpiRow[]) {
+  return kpis.reduce<Record<string, KpiRow[]>>((groups, kpi) => {
+    groups[kpi.name] = groups[kpi.name] || [];
+    groups[kpi.name].push(kpi);
+    return groups;
+  }, {});
+}
+
+function kpiMovementRows(kpis: KpiRow[], endDate: string) {
+  return Object.entries(groupKpisByName(kpis))
+    .map(([name, rows]) => {
+      const values = rows
+        .filter((row) => row.actual_value !== null && row.metric_date <= endDate)
+        .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`))
+        .slice(-12);
+      const first = values[0];
+      const latest = values[values.length - 1];
+      const previous = values[values.length - 2];
+      const deltas = values.slice(1).map((row, index) => Math.abs((row.actual_value as number) - (values[index].actual_value as number)));
+      const firstValue = first?.actual_value as number | undefined;
+      const latestValue = latest?.actual_value as number | undefined;
+      const change = firstValue !== undefined && latestValue !== undefined ? latestValue - firstValue : null;
+      const changePercent =
+        firstValue !== undefined && latestValue !== undefined && firstValue !== 0
+          ? ((latestValue - firstValue) / Math.abs(firstValue)) * 100
+          : null;
+      const volatility = deltas.length ? deltas.reduce((sum, value) => sum + value, 0) / deltas.length : null;
+
+      return {
+        name,
+        first,
+        latest,
+        previous,
+        count: values.length,
+        change,
+        changePercent,
+        volatility
+      };
+    })
+    .filter((trend) => trend.count >= 2 && trend.latest);
+}
+
+function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
+  const trends = kpiMovementRows(kpis, range.endDate);
+
+  if (!trends.length) {
+    return [];
+  }
+
+  const improving = [...trends]
+    .filter((trend) => trend.changePercent !== null)
+    .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))[0];
+  const declining = [...trends]
+    .filter((trend) => (trend.changePercent ?? 0) < 0)
+    .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))[0];
+  const volatile = [...trends]
+    .filter((trend) => trend.volatility !== null)
+    .sort((a, b) => (b.volatility ?? 0) - (a.volatility ?? 0))[0];
+  const revenue = trends.find((trend) => normalizeCategory(trend.name).includes("revenue") || normalizeCategory(trend.name).includes("sales"));
+  const leads = trends.find((trend) => normalizeCategory(trend.name).includes("lead"));
+  const observations = [
+    improving && improving.changePercent !== null
+      ? `${improving.name} is improving fastest at ${formatKpiNumber(improving.changePercent)}% across its latest ${improving.count} entries.`
+      : "",
+    declining && declining.changePercent !== null
+      ? `${declining.name} is declining most at ${formatKpiNumber(Math.abs(declining.changePercent))}%.`
+      : "",
+    volatile && volatile.volatility !== null
+      ? `${volatile.name} is the most volatile, averaging ${formatKpiNumber(volatile.volatility)} points of movement between entries.`
+      : ""
+  ].filter(Boolean);
+
+  if (revenue && leads && revenue.change !== null && leads.change !== null) {
+    if (leads.change > 0 && revenue.change < 0) {
+      observations.push("Leads are rising while revenue is falling, which may point to conversion, pricing, or follow-up issues.");
+    } else if (leads.change < 0 && revenue.change > 0) {
+      observations.push("Revenue is rising while leads are falling, which may mean larger deals are offsetting a weaker pipeline.");
+    } else if (leads.change > 0 && revenue.change > 0) {
+      observations.push("Leads and revenue are both rising, which suggests pipeline volume and sales results are currently aligned.");
+    } else if (leads.change < 0 && revenue.change < 0) {
+      observations.push("Leads and revenue are both falling, which should be reviewed before the next management meeting.");
+    }
+  }
+
+  return observations;
+}
+
 function comparisonLabel(period: ReportPeriod) {
   if (period === "Daily") return "yesterday";
   if (period === "Weekly") return "last week";
@@ -365,6 +457,7 @@ async function fetchReportSource(
   const formSubmissions = submissionRows.filter((submission) => inIsoRange(submission.created_at, range));
   const flaggedAssets = assetRows.filter((asset) => asset.status !== "Ready");
   const recordedKpis = kpiRows.filter((kpi) => kpi.metric_date >= range.startDate && kpi.metric_date <= range.endDate);
+  const kpiTrendObservations = buildKpiTrendObservations(kpiRows, range);
   const vaeroexInsights = runRows.filter((run) => run.status === "completed" && inIsoRange(run.created_at, range));
 
   return {
@@ -395,6 +488,7 @@ async function fetchReportSource(
       kpis_recorded: recordedKpis
         .slice(0, 8)
         .map((kpi) => `${kpi.name}: ${kpi.actual_value ?? "not set"}${kpi.target !== null ? ` vs target ${kpi.target}` : ""}`),
+      kpi_trend_observations: kpiTrendObservations,
       vaeroex_insights: vaeroexInsights.map(insightText).filter(Boolean).slice(0, 5)
     },
     future_sources: {
@@ -494,6 +588,8 @@ ${readableList(current.items.overdue_tasks, "No overdue tasks were found for thi
 ## KPI Trends
 - KPI records added: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)}
 ${readableList(current.items.kpis_recorded, "No KPI records were found for this period.")}
+- KPI comparison observations:
+${readableList(current.items.kpi_trend_observations, "No KPI trend observations were available yet. Add at least two dated values for a KPI to unlock comparisons.")}
 - Completed tasks: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
 - Open tasks now: ${current.counts.open_tasks}
 - Open issues now: ${current.counts.open_issues}
