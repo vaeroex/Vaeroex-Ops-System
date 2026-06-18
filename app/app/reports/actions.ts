@@ -601,7 +601,7 @@ function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>
     source.counts.checklist_exceptions ? "Review incomplete checklist runs and update the checklist or accountability process where needed." : "",
     source.counts.flagged_assets ? "Confirm asset readiness and document any maintenance or replacement decisions." : "",
     source.counts.pending_imports ? "Review pending file mappings and save approved data so dashboards and reports use the latest numbers." : "",
-    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, CRM leads, or operational metrics." : "",
+    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, CRM leads, or operational metrics. Manual records can be added any time without imports." : "",
     source.counts.sops_created === 0 ? "Pick one repeated workflow from this period and turn it into an SOP draft." : ""
   ].filter(Boolean);
 
@@ -635,7 +635,7 @@ function buildReportBody({
     `${current.counts.checklist_completions} checklist run${current.counts.checklist_completions === 1 ? "" : "s"}, and ` +
     `${current.counts.sops_created} SOP update${current.counts.sops_created === 1 ? "" : "s"} during this period. ` +
     `${current.counts.uploaded_files} file${current.counts.uploaded_files === 1 ? "" : "s"} were uploaded and ` +
-    `${current.counts.imported_file_rows} spreadsheet row${current.counts.imported_file_rows === 1 ? "" : "s"} were imported. ` +
+    `${current.counts.imported_file_rows} spreadsheet row${current.counts.imported_file_rows === 1 ? "" : "s"} were imported where useful. ` +
     `${current.counts.open_issues} open issue${current.counts.open_issues === 1 ? "" : "s"} and ` +
     `${current.counts.overdue_tasks} overdue task${current.counts.overdue_tasks === 1 ? "" : "s"} need attention.`;
 
@@ -694,7 +694,7 @@ ${readableList(current.items.kpi_trend_observations, "No KPI trend observations 
 - Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)}
 - Data extractions waiting for review: ${current.counts.pending_imports}
 - Imported spreadsheet rows: ${trendPhrase(current.counts.imported_file_rows, previous.counts.imported_file_rows)}
-- CRM leads imported: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)}
+- CRM leads added: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)}
 - CRM lead history changes: ${trendPhrase(current.counts.crm_lead_changes, previous.counts.crm_lead_changes)}
 - File analyses completed: ${trendPhrase(current.counts.file_analyses, previous.counts.file_analyses)}
 ${readableList(

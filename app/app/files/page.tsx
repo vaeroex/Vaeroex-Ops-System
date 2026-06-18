@@ -9,9 +9,10 @@ import {
   uploadFileAction
 } from "@/app/app/files/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
+import { TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
@@ -189,22 +190,20 @@ function reportLabel(report: Pick<ReportRow, "title" | "report_type" | "created_
 function ActionButton({
   children,
   tone = "default",
-  disabled = false
+  disabled = false,
+  pendingLabel = "Working..."
 }: {
   children: ReactNode;
   tone?: "default" | "primary";
   disabled?: boolean;
+  pendingLabel?: string;
 }) {
   const classes =
     tone === "primary"
       ? "rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
       : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50";
 
-  return (
-    <button disabled={disabled} className={classes}>
-      {children}
-    </button>
-  );
+  return <PendingSubmitButton disabled={disabled} className={classes} pendingLabel={pendingLabel}>{children}</PendingSubmitButton>;
 }
 
 function ImportActionForm({ file, importType, label }: { file: FileUploadRow; importType: ImportType; label: string }) {
@@ -214,7 +213,7 @@ function ImportActionForm({ file, importType, label }: { file: FileUploadRow; im
     <form action={importFileAction}>
       <input type="hidden" name="file_id" value={file.id} />
       <input type="hidden" name="import_type" value={importType} />
-      <ActionButton disabled={!canImport}>{label}</ActionButton>
+      <ActionButton disabled={!canImport} pendingLabel="Extracting rows...">{label}</ActionButton>
     </form>
   );
 }
@@ -239,7 +238,7 @@ function FileActionCenter({
         <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" />
         <form action={createReportFromFileAction}>
           <input type="hidden" name="file_id" value={file.id} />
-          <ActionButton>Create Report from File</ActionButton>
+          <ActionButton disabled={!canImport} pendingLabel="Creating report...">Create Report from File</ActionButton>
         </form>
       </>
     );
@@ -254,6 +253,11 @@ function FileActionCenter({
             <p className="mt-1 text-sm leading-6 text-muted">
               Analyze the file, stage imports for review, create a report, attach it to an existing report, or inspect details.
             </p>
+            {!canImport ? (
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                File analysis currently supports CSV and XLSX content. This file can be stored and attached as a reference, and you can still add KPIs or CRM records manually.
+              </p>
+            ) : null}
           </div>
           <span className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-700">{fileStatusLabel(file)}</span>
         </div>
@@ -263,7 +267,9 @@ function FileActionCenter({
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <h4 className="text-sm font-semibold text-ink">Analyze with Vaeroex</h4>
-            <p className="mt-1 text-xs leading-5 text-muted">Ask a question about this file. Spreadsheet files include row previews; other files include file details and workspace context.</p>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Ask a question about this file. CSV and XLSX files include parsed row content so Vaeroex can identify trends, risks, KPIs, and recommendations.
+            </p>
           </div>
         </div>
         <form action={analyzeFileAction} className="mt-4 space-y-3">
@@ -282,6 +288,7 @@ function FileActionCenter({
                   key={prompt}
                   name="suggested_prompt"
                   value={prompt}
+                  disabled={!canImport}
                   className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue"
                 >
                   {prompt}
@@ -289,7 +296,8 @@ function FileActionCenter({
               ))}
             </div>
           </div>
-          <PrimaryButton>Analyze with Vaeroex</PrimaryButton>
+          <ActionButton tone="primary" disabled={!canImport} pendingLabel="Analyzing file...">Analyze with Vaeroex</ActionButton>
+          {!canImport ? <p className="text-xs leading-5 text-muted">Upload CSV or XLSX only when you want Vaeroex to read file contents. Manual KPI and CRM entry works without files.</p> : null}
         </form>
       </section>
 
@@ -305,7 +313,7 @@ function FileActionCenter({
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            CSV and XLSX files can be imported into structured records. This file can still be analyzed, reported on, attached, and organized.
+            CSV and XLSX files can be imported into structured records. This file can still be attached to reports and organized in the file library.
           </p>
         ) : null}
       </section>
@@ -317,7 +325,8 @@ function FileActionCenter({
           <TextInput label="Report title" name="report_title" defaultValue={`File Report - ${file.display_name}`} />
           <TextInput label="Report type" name="report_type" defaultValue="File Review" />
           <TextArea label="Report focus" name="report_focus" rows={3} placeholder="Optional: what should this report focus on?" />
-          <PrimaryButton>Create Report from File</PrimaryButton>
+          <ActionButton tone="primary" disabled={!canImport} pendingLabel="Creating report...">Create Report from File</ActionButton>
+          {!canImport ? <p className="text-xs leading-5 text-muted">Reports from file contents currently require a CSV or XLSX spreadsheet.</p> : null}
         </form>
 
         <form action={attachFileToReportAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
@@ -339,7 +348,7 @@ function FileActionCenter({
               ))}
             </select>
           </label>
-          <ActionButton tone="primary" disabled={!reports.length}>Attach to Existing Report</ActionButton>
+          <ActionButton tone="primary" disabled={!reports.length} pendingLabel="Attaching file...">Attach to Existing Report</ActionButton>
           {!reports.length ? <p className="text-xs leading-5 text-muted">Create a report first, then attach files to it.</p> : null}
         </form>
       </section>
@@ -372,6 +381,11 @@ function FileActionCenter({
             <p className="mt-1 text-ink">{file.imported_rows}</p>
           </div>
         </div>
+        {!canImport ? (
+          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
+            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support spreadsheet rows only.
+          </p>
+        ) : null}
       </details>
     </div>
   );
@@ -474,7 +488,7 @@ function MappingReview({
         </div>
       </div>
 
-      <PrimaryButton>Save approved data</PrimaryButton>
+      <ActionButton tone="primary" pendingLabel="Saving approved data...">Save approved data</ActionButton>
     </form>
   );
 }
@@ -644,8 +658,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Files"
-        title="Files and business memory"
-        description="Upload workspace files, extract spreadsheet data for review, save approved rows into KPI, CRM, and operations history, and ask Vaeroex for plain-language trend analysis."
+        title="Files and imports"
+        description="Use files when you already have existing data to bring into Vaeroex. This is optional: KPIs, CRM leads, tasks, checklists, SOPs, and reports can also be created manually."
       />
 
       <ErrorNotice
@@ -659,7 +673,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           <p className="mt-2 text-3xl font-semibold">{files.length}</p>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm text-muted">Spreadsheets</p>
+          <p className="text-sm text-muted">Import-ready files</p>
           <p className="mt-2 text-3xl font-semibold">{spreadsheetCount}</p>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
@@ -684,7 +698,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. Spreadsheet imports use CSV or XLSX with column names in the first row.">
+          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV and XLSX imports use column names in the first row and always go to review before saving.">
             <form action={uploadFileAction} encType="multipart/form-data" className="space-y-4">
               <label className="block text-sm font-medium">
                 File
@@ -701,7 +715,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
               <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
                 Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
               </p>
-              <PrimaryButton>Upload file</PrimaryButton>
+              <ActionButton tone="primary" pendingLabel="Uploading file...">Upload file</ActionButton>
             </form>
           </SectionCard>
 

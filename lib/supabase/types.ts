@@ -333,6 +333,7 @@ export type Database = {
         Row: {
           id: string;
           workspace_id: string;
+          folder_id: string | null;
           source_file_id: string | null;
           import_id: string | null;
           import_row_id: string | null;
@@ -355,6 +356,7 @@ export type Database = {
         Insert: {
           id?: string;
           workspace_id: string;
+          folder_id?: string | null;
           source_file_id?: string | null;
           import_id?: string | null;
           import_row_id?: string | null;
