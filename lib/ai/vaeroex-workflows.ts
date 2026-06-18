@@ -42,9 +42,31 @@ Use this root shape whenever possible:
   "form": null,
   "checklist": null,
   "report": null,
+  "recommendation_categories": [
+    "Improve Existing",
+    "Fill Missing Data",
+    "Review Stale Items",
+    "Convert Insight Into Action",
+    "Operational Risk",
+    "Dashboard / KPI Improvement",
+    "CRM / Revenue Improvement",
+    "SOP / Process Improvement",
+    "File / Report Follow-up"
+  ],
   "save_recommendations": ["Records the user may confirm and save"]
 }
 Every output that could become a record must be a draft for manager review. Do not imply it has already been saved.
+`;
+
+const workspaceAwareInstructions = `
+Workspace-aware recommendation rules:
+- First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
+- Do not recommend creating a module that already exists in Vaeroex. Built-in modules include Executive Dashboard, KPI Dashboard, CRM Pipeline, Tasks, Issues, Checklists, SOP Library, Reports, Files, Forms, Assets, People, and Vaeroex Results.
+- If a module exists, recommend improving, completing, reviewing, converting, assigning, or using the existing module.
+- Never say "Create KPI Dashboard", "Create CRM", "Create task tracking", "Create SOPs", "Create reports", or "Upload files" as generic advice.
+- Prefer recommendations like "add weekly revenue and conversion KPIs to the existing KPI Dashboard", "add lead source and next-follow-up to the existing CRM Pipeline", or "assign owners and review cadence to existing SOPs".
+- Every recommendation should mention what exists, what is missing or stale, why it matters, and the next practical action.
+- Classify recommendations into the recommendation_categories listed in the JSON shape.
 `;
 
 export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
@@ -58,6 +80,7 @@ export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
     instructions: `
 Answer the user's operations question using the workspace context when it helps.
 If useful, include suggested_tasks. Keep the answer practical and direct.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -73,6 +96,7 @@ Generate an operations audit using the structure from the Vaeroex system prompt.
 Include current operational problems, bottlenecks, accountability gaps, recommended systems, suggested forms, suggested checklists, suggested SOPs, dashboard metrics, and a 30-day action plan.
 Return a report draft in report with title, report_type, body_markdown, and date range if available.
 Include suggested_tasks for the highest-priority next actions.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -87,6 +111,8 @@ ${sharedJsonInstructions}
 Generate an SOP draft using the full SOP structure from the Vaeroex system prompt.
 Return the SOP in sop with title, department, category, body_markdown, and version.
 Include suggested_tasks only when follow-up work is needed before approval.
+Use existing SOP records from workspace_context.sops to avoid duplicating procedure names or recommending a new SOP Library.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -101,6 +127,7 @@ ${sharedJsonInstructions}
 Generate a weekly operations report using the report structure from the Vaeroex system prompt.
 Return the report in report with title, report_type, body_markdown, date_range_start, and date_range_end when inferable.
 Include suggested_tasks for the most important next actions.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -115,6 +142,7 @@ ${sharedJsonInstructions}
 Generate a concise daily operations summary.
 Return the summary as a report draft in report with report_type "Daily Summary".
 Include blockers, open work, risks, and suggested manager actions.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -130,6 +158,8 @@ Analyze workspace context for bottlenecks and repeated operational failures.
 Return bottlenecks as an array with name, evidence, impact, root_cause, recommended_system, and priority.
 Return a report draft when the analysis is substantial.
 Include suggested_tasks for fixes that should be assigned.
+Recommend using or improving existing tasks, issues, checklists, SOPs, reports, KPIs, files, and CRM records before suggesting new structures.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -145,6 +175,8 @@ Generate a form draft using the form structure from the Vaeroex system prompt.
 Return the form in form with name, description, form_type, fields, required_fields, suggested_follow_up_actions, and suggested_dashboard_metrics.
 Each field must include label, key, type, and required.
 Include suggested_tasks only when rollout or review work is needed.
+Review workspace_context.forms before recommending a new form so you can suggest improving an existing form when appropriate.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -159,6 +191,8 @@ ${sharedJsonInstructions}
 Generate a checklist draft using the checklist structure from the Vaeroex system prompt.
 Return the checklist in checklist with name, description, category, frequency, assigned_role, items, completion_standard, missed_standard, and escalation_rules.
 Include suggested_tasks only when rollout or review work is needed.
+Review workspace_context.checklists and checklist_runs before recommending a new checklist so you can suggest improving or running an existing checklist when appropriate.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -173,6 +207,8 @@ ${sharedJsonInstructions}
 Generate concrete follow-up tasks from the user's request and workspace context.
 Each suggested task must include title, description, priority, category, due_date_recommendation, and reason_this_matters.
 Keep tasks specific enough for a manager to assign.
+Use existing tasks, issues, file analyses, reports, CRM records, KPIs, and SOPs as evidence for the follow-up tasks.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   },
@@ -193,6 +229,8 @@ Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, operatio
 Do not repeat raw rows, long document excerpts, or technical JSON in the user-facing answer.
 For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Operational Issues, Recommended Actions, Source File.
 If the file suggests follow-up work, include suggested_tasks for manager review.
+If the file suggests KPIs, tasks, reports, or CRM records, reference existing Vaeroex modules and records first. Say "add these KPI records to the existing KPI Dashboard", "attach this analysis to an existing report", "convert these recommendations into tasks", or "update existing CRM records" when workspace context supports it.
+${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
   }

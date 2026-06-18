@@ -5,11 +5,20 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 type RecordDetailDrawerProps = {
   title: string;
   description?: string | null;
+  eyebrow?: string;
   triggerLabel?: string;
+  triggerClassName?: string;
   children: ReactNode;
 };
 
-export function RecordDetailDrawer({ title, description, triggerLabel = "View details", children }: RecordDetailDrawerProps) {
+export function RecordDetailDrawer({
+  title,
+  description,
+  eyebrow = "Record details",
+  triggerLabel = "View details",
+  triggerClassName = "mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline",
+  children
+}: RecordDetailDrawerProps) {
   const [open, setOpen] = useState(false);
   const titleId = useId();
 
@@ -38,7 +47,7 @@ export function RecordDetailDrawer({ title, description, triggerLabel = "View de
     <>
       <button
         type="button"
-        className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline"
+        className={triggerClassName}
         onClick={() => setOpen(true)}
       >
         {triggerLabel}
@@ -55,7 +64,7 @@ export function RecordDetailDrawer({ title, description, triggerLabel = "View de
             <header className="sticky top-0 z-10 border-b border-line bg-white px-5 py-4">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Record details</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">{eyebrow}</p>
                   <h2 id={titleId} className="mt-1 truncate text-xl font-semibold text-ink">
                     {title}
                   </h2>
