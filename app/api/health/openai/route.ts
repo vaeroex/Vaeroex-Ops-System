@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
+import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { getVaeroexOpenAIRuntimeStatus } from "@/lib/ai/vaeroex-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -42,7 +42,7 @@ export async function GET() {
     );
   }
 
-  if (!isVaeroexAdminEmail(user.email)) {
+  if (!isVaeroexAdminUser(user)) {
     return NextResponse.json(
       {
         ok: false,
