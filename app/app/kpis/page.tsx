@@ -221,6 +221,12 @@ function getTrendRows(kpis: KpiRow[], metricName: string) {
     .slice(-12);
 }
 
+function getMetricHistoryRows(kpis: KpiRow[], metricName: string) {
+  return kpis
+    .filter((kpi) => kpi.name === metricName)
+    .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`));
+}
+
 function buildTrends(kpis: KpiRow[], metricNames: string[]) {
   return metricNames.map((name, index) => {
     const rows = getTrendRows(kpis, name);
@@ -284,6 +290,142 @@ function TrendSummaryCard({ label, value, detail }: { label: string; value: stri
       <p className="mt-2 text-xl font-semibold text-ink">{value}</p>
       <p className="mt-2 text-xs leading-5 text-muted">{detail}</p>
     </article>
+  );
+}
+
+function dateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function startOfWeek(date: Date) {
+  const day = date.getUTCDay();
+  return startOfDay(addDays(date, -((day + 6) % 7)));
+}
+
+function startOfMonth(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
+function startOfQuarter(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1));
+}
+
+function startOfYear(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+}
+
+function comparisonRange(label: string, currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date) {
+  return {
+    label,
+    currentStart: dateOnly(startOfDay(currentStart)),
+    currentEnd: dateOnly(startOfDay(currentEnd)),
+    previousStart: dateOnly(startOfDay(previousStart)),
+    previousEnd: dateOnly(startOfDay(previousEnd))
+  };
+}
+
+function periodComparisonRanges(today = new Date()) {
+  const currentDay = startOfDay(today);
+  const currentWeekStart = startOfWeek(currentDay);
+  const currentMonthStart = startOfMonth(currentDay);
+  const currentQuarterStart = startOfQuarter(currentDay);
+  const currentYearStart = startOfYear(currentDay);
+  const previousYearSameDay = new Date(Date.UTC(currentDay.getUTCFullYear() - 1, currentDay.getUTCMonth(), currentDay.getUTCDate()));
+
+  return [
+    comparisonRange("Day over Day", currentDay, currentDay, addDays(currentDay, -1), addDays(currentDay, -1)),
+    comparisonRange("Week over Week", currentWeekStart, currentDay, addDays(currentWeekStart, -7), addDays(currentDay, -7)),
+    comparisonRange("Month over Month", currentMonthStart, currentDay, new Date(Date.UTC(currentDay.getUTCFullYear(), currentDay.getUTCMonth() - 1, 1)), new Date(Date.UTC(currentDay.getUTCFullYear(), currentDay.getUTCMonth() - 1, currentDay.getUTCDate()))),
+    comparisonRange("Quarter over Quarter", currentQuarterStart, currentDay, new Date(Date.UTC(currentQuarterStart.getUTCFullYear(), currentQuarterStart.getUTCMonth() - 3, 1)), new Date(Date.UTC(currentDay.getUTCFullYear(), currentDay.getUTCMonth() - 3, currentDay.getUTCDate()))),
+    comparisonRange("Year over Year", currentYearStart, currentDay, startOfYear(previousYearSameDay), previousYearSameDay),
+    comparisonRange("Year to Date", currentYearStart, currentDay, startOfYear(previousYearSameDay), previousYearSameDay)
+  ];
+}
+
+function aggregateRows(rows: KpiRow[], metricName: string, startDate: string, endDate: string) {
+  const values = rows
+    .filter((row) => row.metric_date >= startDate && row.metric_date <= endDate && row.actual_value !== null)
+    .map((row) => row.actual_value as number);
+
+  if (!values.length) {
+    return null;
+  }
+
+  const label = lower(metricName);
+  const total = values.reduce((sum, value) => sum + value, 0);
+
+  if (label.includes("rate") || label.includes("conversion") || label.includes("utilization")) {
+    return total / values.length;
+  }
+
+  return total;
+}
+
+function comparisonRows(rows: KpiRow[], metricName: string) {
+  return periodComparisonRanges().map((range) => {
+    const current = aggregateRows(rows, metricName, range.currentStart, range.currentEnd);
+    const previous = aggregateRows(rows, metricName, range.previousStart, range.previousEnd);
+    const change = current !== null && previous !== null ? current - previous : null;
+    const changePercent = change !== null && previous !== null && previous !== 0 ? (change / Math.abs(previous)) * 100 : null;
+
+    return {
+      ...range,
+      current,
+      previous,
+      change,
+      changePercent
+    };
+  });
+}
+
+function PeriodComparisonTable({ rows, metricName }: { rows: KpiRow[]; metricName: string }) {
+  const comparisons = comparisonRows(rows, metricName);
+
+  return (
+    <div className="overflow-hidden rounded-lg border border-line bg-white">
+      <div className="border-b border-line px-4 py-3">
+        <p className="text-sm font-semibold text-ink">Period comparisons</p>
+        <p className="mt-1 text-xs leading-5 text-muted">Aggregated movement for this KPI across common management reporting windows.</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-muted">
+            <tr>
+              <th className="px-4 py-3">Period</th>
+              <th className="px-4 py-3">Current</th>
+              <th className="px-4 py-3">Previous</th>
+              <th className="px-4 py-3">Change</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparisons.map((item) => (
+              <tr key={item.label} className="border-t border-line">
+                <td className="px-4 py-3 font-medium text-ink">{item.label}</td>
+                <td className="px-4 py-3 text-muted">{formatNumericValue(item.current, metricName, "No data")}</td>
+                <td className="px-4 py-3 text-muted">{formatNumericValue(item.previous, metricName, "No data")}</td>
+                <td className="px-4 py-3 text-muted">
+                  {item.change === null
+                    ? "Needs history"
+                    : `${item.change > 0 ? "+" : ""}${formatNumericValue(item.change, metricName)}${
+                        item.changePercent === null ? "" : ` (${numberFormatter.format(item.changePercent)}%)`
+                      }`}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 
@@ -589,7 +731,8 @@ function TrendAnalysis({ rows, metricName }: { rows: KpiRow[]; metricName: strin
         <TrendSummaryCard label="Target Hit Rate" value={targetHitRate(rows)} detail="Share of records that met or beat target" />
       </div>
 
-      <TrendChart rows={rows} metricName={metricName} />
+      <TrendChart rows={rows.slice(-12)} metricName={metricName} />
+      <PeriodComparisonTable rows={rows} metricName={metricName} />
 
       <div className="rounded-lg border border-line bg-slate-50 p-4">
         <p className="text-sm font-semibold text-ink">Management readout</p>
@@ -671,7 +814,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const metricNames = getMetricNames(kpis);
   const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
-  const trendRows = primaryMetric ? getTrendRows(kpis, primaryMetric) : [];
+  const trendRows = primaryMetric ? getMetricHistoryRows(kpis, primaryMetric) : [];
   const selectedTrends = buildTrends(kpis, selectedMetrics);
   const hasComparison = selectedMetrics.length > 1;
   const managedKpis = kpis.map((kpi) => {

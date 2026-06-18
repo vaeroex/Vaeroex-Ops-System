@@ -23,10 +23,14 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     reports,
     vaeroexRuns,
     fileCount,
+    kpiCount,
     crmLeadCount,
     operationalMetricCount,
+    recentKpis,
+    recentFileImports,
     recentFiles,
     recentCrmLeads,
+    recentCrmLeadHistory,
     recentOperationalMetrics
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
@@ -102,8 +106,21 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .order("created_at", { ascending: false })
       .limit(5),
     supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase
+      .from("kpis")
+      .select("id,name,category,target,actual_value,metric_date,owner,source,source_file_id,import_id,created_at")
+      .eq("workspace_id", workspaceId)
+      .order("metric_date", { ascending: false })
+      .limit(30),
+    supabase
+      .from("file_imports")
+      .select("id,file_upload_id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(20),
     supabase
       .from("file_uploads")
       .select("id,display_name,file_extension,import_type,import_status,imported_rows,analysis_summary,created_at")
@@ -112,13 +129,19 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .limit(10),
     supabase
       .from("crm_leads")
-      .select("id,lead_name,company,status,estimated_value,owner,created_at")
+      .select("id,lead_name,company,status,estimated_value,owner,source_file_id,import_id,last_activity_at,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
+      .from("crm_lead_history")
+      .select("id,lead_id,event_type,status,estimated_value,owner,source_file_id,import_id,created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
       .from("operational_metrics")
-      .select("id,metric_name,category,value,metric_date,owner,created_at")
+      .select("id,metric_name,category,value,metric_date,owner,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
       .limit(10)
@@ -134,6 +157,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       flagged_assets: flaggedAssets.count ?? 0,
       form_submissions: submissions.count ?? 0,
       uploaded_files: fileCount.count ?? 0,
+      kpi_history_records: kpiCount.count ?? 0,
       crm_leads: crmLeadCount.count ?? 0,
       operational_metrics: operationalMetricCount.count ?? 0
     },
@@ -148,8 +172,11 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     sops: sops.data ?? [],
     reports: reports.data ?? [],
     recent_vaeroex_results: vaeroexRuns.data ?? [],
+    kpi_history: recentKpis.data ?? [],
+    file_import_history: recentFileImports.data ?? [],
     files: recentFiles.data ?? [],
     crm_leads: recentCrmLeads.data ?? [],
+    crm_lead_history: recentCrmLeadHistory.data ?? [],
     operational_metrics: recentOperationalMetrics.data ?? []
   };
 }

@@ -26,8 +26,13 @@ export default async function AppDashboardPage() {
     openIssues,
     assetsNeedingAttention,
     checklistRuns,
+    kpiHistory,
+    importedFiles,
+    crmLeads,
+    operationalMetrics,
     recentTasks,
     recentIssues,
+    recentImports,
     reports,
     vaeroexRuns
   ] = await Promise.all([
@@ -37,8 +42,18 @@ export default async function AppDashboardPage() {
     supabase?.from("issues").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Closed"),
     supabase?.from("assets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Ready"),
     supabase?.from("checklist_runs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase?.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase?.from("file_imports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "completed"),
+    supabase?.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase?.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase?.from("tasks").select("id,title,status,priority,due_date").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(5),
     supabase?.from("issues").select("id,title,severity,status,recommended_fix").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(5),
+    supabase
+      ?.from("file_imports")
+      .select("id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(5),
     supabase?.from("reports").select("title, created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(1),
     supabase?.from("ai_agent_runs").select("output_json, created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(1)
   ]);
@@ -49,7 +64,11 @@ export default async function AppDashboardPage() {
     { label: "New form submissions", value: submissions?.count ?? 0 },
     { label: "Open issues", value: openIssues?.count ?? 0 },
     { label: "Assets needing attention", value: assetsNeedingAttention?.count ?? 0 },
-    { label: "Recent checklist completions", value: checklistRuns?.count ?? 0 }
+    { label: "Recent checklist completions", value: checklistRuns?.count ?? 0 },
+    { label: "KPI history records", value: kpiHistory?.count ?? 0 },
+    { label: "Completed imports", value: importedFiles?.count ?? 0 },
+    { label: "CRM leads", value: crmLeads?.count ?? 0 },
+    { label: "Operational metrics", value: operationalMetrics?.count ?? 0 }
   ];
 
   return (
@@ -98,6 +117,37 @@ export default async function AppDashboardPage() {
           <p className="mt-4 text-sm text-muted">
             Latest report: {reports?.data?.[0]?.title || "No report generated yet"}
           </p>
+        </SectionCard>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <SectionCard title="Business memory" description="Imported files feed KPI history, CRM leads, operational metrics, reports, and future Vaeroex analysis.">
+          <div className="space-y-3">
+            {recentImports?.data?.length ? (
+              recentImports.data.map((item) => (
+                <div key={item.id} className="rounded-lg border border-line p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold capitalize">{item.import_type.replace(/_/g, " ")}</p>
+                    <StatusBadge value={item.status === "completed" ? "Saved" : item.status} />
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-muted">
+                    {item.rows_imported} of {item.rows_total} rows saved
+                    {item.imported_at ? ` on ${new Date(item.imported_at).toLocaleDateString()}` : "."}
+                  </p>
+                </div>
+              ))
+            ) : (
+              <EmptyState title="No imported history yet" description="Upload a spreadsheet in Files, review the mappings, and save approved rows into business history." />
+            )}
+          </div>
+        </SectionCard>
+        <SectionCard title="Trend readiness" description="More dated KPI and operational metric records give Vaeroex better comparisons over time.">
+          <div className="space-y-3 text-sm leading-6 text-muted">
+            <p>KPI records: {kpiHistory?.count ?? 0}</p>
+            <p>Operational metric records: {operationalMetrics?.count ?? 0}</p>
+            <p>CRM leads with history: {crmLeads?.count ?? 0}</p>
+            <p>Completed file imports: {importedFiles?.count ?? 0}</p>
+          </div>
         </SectionCard>
       </section>
 

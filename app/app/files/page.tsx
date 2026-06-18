@@ -1,4 +1,4 @@
-import { analyzeFileAction, importFileAction, uploadFileAction } from "@/app/app/files/actions";
+import { analyzeFileAction, importFileAction, saveExtractedImportAction, uploadFileAction } from "@/app/app/files/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -24,7 +24,11 @@ type FilesPageProps = {
 };
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
+type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
+type FileImportDataRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
 type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
+type ImportType = "kpi" | "crm" | "metrics";
+type JsonRecord = Record<string, unknown>;
 
 const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Operations"];
 const IMPORT_TYPES = [
@@ -32,6 +36,36 @@ const IMPORT_TYPES = [
   { value: "crm", label: "CRM leads" },
   { value: "metrics", label: "Operational metrics" }
 ];
+const IMPORT_FIELDS: Record<ImportType, Array<{ key: string; label: string; required?: boolean }>> = {
+  kpi: [
+    { key: "name", label: "KPI name", required: true },
+    { key: "category", label: "Category" },
+    { key: "target", label: "Target" },
+    { key: "actual_value", label: "Actual value", required: true },
+    { key: "metric_date", label: "Date" },
+    { key: "owner", label: "Owner" },
+    { key: "notes", label: "Notes" },
+    { key: "source", label: "Source" }
+  ],
+  crm: [
+    { key: "lead_name", label: "Lead name", required: true },
+    { key: "company", label: "Company" },
+    { key: "email", label: "Email" },
+    { key: "phone", label: "Phone" },
+    { key: "status", label: "Status" },
+    { key: "estimated_value", label: "Estimated value" },
+    { key: "owner", label: "Owner" },
+    { key: "notes", label: "Notes" }
+  ],
+  metrics: [
+    { key: "metric_name", label: "Metric name", required: true },
+    { key: "category", label: "Category" },
+    { key: "value", label: "Value", required: true },
+    { key: "metric_date", label: "Date" },
+    { key: "owner", label: "Owner" },
+    { key: "notes", label: "Notes" }
+  ]
+};
 const fileEditFields: ManagedRecordEditField[] = [
   { name: "display_name", label: "File name", required: true },
   { name: "import_type", label: "Import type", type: "select", options: ["none", "kpi", "crm", "metrics"] },
@@ -63,6 +97,7 @@ function fileStatusLabel(file: FileUploadRow) {
   if (file.archived_at) return "Archived";
   if (file.import_status === "imported") return "Imported";
   if (file.import_status === "failed") return "Import failed";
+  if (file.import_status === "extracted") return "Needs review";
   if (file.import_status === "ready") return "Ready to import";
   return "Stored";
 }
@@ -84,6 +119,175 @@ function analysisLines(value: string | null) {
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function importTypeLabel(value: string) {
+  return IMPORT_TYPES.find((type) => type.value === value)?.label || value;
+}
+
+function importStatusLabel(value: string) {
+  if (value === "needs_review" || value === "extracted") return "Needs review";
+  if (value === "completed") return "Saved";
+  if (value === "failed") return "Failed";
+  return value || "Staged";
+}
+
+function mappingValue(mappingJson: unknown, key: string) {
+  if (!isRecord(mappingJson)) {
+    return "";
+  }
+
+  const value = mappingJson[key];
+  return typeof value === "string" ? value : "";
+}
+
+function rowValues(row: FileImportDataRow) {
+  return isRecord(row.data_json) ? row.data_json : {};
+}
+
+function columnsForRows(rows: FileImportDataRow[]) {
+  return Array.from(
+    new Set(
+      rows.flatMap((row) => Object.keys(rowValues(row))).filter(Boolean)
+    )
+  );
+}
+
+function rowsForImport(rows: FileImportDataRow[], importId: string) {
+  return rows.filter((row) => row.import_id === importId).sort((a, b) => a.row_number - b.row_number);
+}
+
+function importsForFile(imports: FileImportRow[], fileId: string) {
+  return imports.filter((item) => item.file_upload_id === fileId);
+}
+
+function asImportType(value: string): ImportType {
+  if (value === "crm" || value === "metrics") {
+    return value;
+  }
+
+  return "kpi";
+}
+
+function MappingReview({
+  file,
+  importRecord,
+  rows
+}: {
+  file: FileUploadRow;
+  importRecord: FileImportRow;
+  rows: FileImportDataRow[];
+}) {
+  const importType = asImportType(importRecord.import_type);
+  const fields = IMPORT_FIELDS[importType];
+  const columns = columnsForRows(rows);
+  const previewRows = rows.slice(0, 5);
+
+  if (!rows.length) {
+    return (
+      <div className="rounded-lg border border-line bg-white p-4 text-sm leading-6 text-muted">
+        No extracted rows are available for this import. Extract the spreadsheet again before saving records.
+      </div>
+    );
+  }
+
+  return (
+    <form action={saveExtractedImportAction} className="space-y-4 rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+      <input type="hidden" name="file_id" value={file.id} />
+      <input type="hidden" name="import_id" value={importRecord.id} />
+      <input type="hidden" name="import_type" value={importType} />
+      <div>
+        <p className="text-sm font-semibold text-ink">Review extracted data before saving</p>
+        <p className="mt-1 text-xs leading-5 text-muted">
+          Vaeroex found {importRecord.rows_total} row{importRecord.rows_total === 1 ? "" : "s"} for {importTypeLabel(importType)}. Nothing is added to your dashboards until you approve these mappings.
+        </p>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2">
+        {fields.map((field) => (
+          <label key={field.key} className="block text-sm font-medium">
+            {field.label}
+            {field.required ? <span className="text-red-600"> *</span> : null}
+            <select
+              name={`map_${field.key}`}
+              defaultValue={mappingValue(importRecord.mapping_json, field.key)}
+              className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue"
+            >
+              <option value="">Do not import</option>
+              {columns.map((column) => (
+                <option key={column} value={column}>
+                  {column}
+                </option>
+              ))}
+            </select>
+          </label>
+        ))}
+      </div>
+
+      <div className="overflow-hidden rounded-lg border border-line bg-white">
+        <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">Preview rows</div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-xs">
+            <thead className="bg-slate-50 text-muted">
+              <tr>
+                <th className="px-3 py-2">Row</th>
+                {columns.slice(0, 6).map((column) => (
+                  <th key={column} className="px-3 py-2">
+                    {column}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {previewRows.map((row) => {
+                const values = rowValues(row);
+
+                return (
+                  <tr key={row.id} className="border-t border-line">
+                    <td className="px-3 py-2 font-medium">{row.row_number}</td>
+                    {columns.slice(0, 6).map((column) => (
+                      <td key={column} className="max-w-[180px] truncate px-3 py-2 text-muted">
+                        {String(values[column] ?? "")}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <PrimaryButton>Save approved data</PrimaryButton>
+    </form>
+  );
+}
+
+function ImportHistory({ imports }: { imports: FileImportRow[] }) {
+  if (!imports.length) {
+    return null;
+  }
+
+  return (
+    <section className="rounded-lg border border-line bg-white p-4">
+      <h4 className="text-sm font-semibold text-ink">Import history</h4>
+      <div className="mt-3 space-y-2">
+        {imports.slice(0, 5).map((item) => (
+          <div key={item.id} className="grid gap-2 rounded-lg border border-line bg-slate-50 p-3 text-xs text-muted md:grid-cols-[1fr_auto_auto]">
+            <p className="font-semibold text-ink">{importTypeLabel(item.import_type)}</p>
+            <p>{importStatusLabel(item.status)}</p>
+            <p>
+              {item.rows_imported} / {item.rows_total} row{item.rows_total === 1 ? "" : "s"}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 async function ensureDefaultFileFolders(supabase: Awaited<ReturnType<typeof requireWorkspacePage>>["supabase"], workspaceId: string, userId?: string) {
@@ -142,9 +346,20 @@ function ImportTypeSelect() {
   );
 }
 
-function FileDetails({ file }: { file: FileUploadRow }) {
+function FileDetails({
+  file,
+  imports,
+  importRows
+}: {
+  file: FileUploadRow;
+  imports: FileImportRow[];
+  importRows: FileImportDataRow[];
+}) {
   const canImport = isSpreadsheet(file);
   const lines = analysisLines(file.analysis_summary);
+  const latestImport = imports[0];
+  const latestImportRows = latestImport ? rowsForImport(importRows, latestImport.id) : [];
+  const needsReview = latestImport && (latestImport.status === "needs_review" || latestImport.status === "extracted");
 
   return (
     <div className="space-y-5">
@@ -168,13 +383,13 @@ function FileDetails({ file }: { file: FileUploadRow }) {
           <form action={importFileAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
             <input type="hidden" name="file_id" value={file.id} />
             <div>
-              <p className="text-sm font-semibold text-ink">Import spreadsheet rows</p>
+              <p className="text-sm font-semibold text-ink">Extract spreadsheet rows</p>
               <p className="mt-1 text-xs leading-5 text-muted">
-                Vaeroex will read the first row as column names and create workspace records from the matching rows.
+                Vaeroex will read the first row as column names, suggest mappings, and stage rows for your review before anything is saved.
               </p>
             </div>
             <ImportTypeSelect />
-            <PrimaryButton>Import rows</PrimaryButton>
+            <PrimaryButton>Extract for review</PrimaryButton>
           </form>
 
           <form action={analyzeFileAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
@@ -196,9 +411,12 @@ function FileDetails({ file }: { file: FileUploadRow }) {
         </div>
       ) : (
         <div className="rounded-lg border border-line bg-white p-4 text-sm leading-6 text-muted">
-          This file is stored in the workspace. Spreadsheet import and Vaeroex file analysis are available for CSV and XLSX files.
+          This file is stored in the workspace. Spreadsheet extraction, import history, and Vaeroex trend analysis are available for CSV and XLSX files.
         </div>
       )}
+
+      {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
+      <ImportHistory imports={imports} />
 
       {lines.length ? (
         <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
@@ -223,17 +441,24 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
   await ensureDefaultFileFolders(supabase, workspaceId, user?.id);
 
-  const [fileResult, folderResult] = await Promise.all([
+  const [fileResult, folderResult, importResult, importRowResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-    getRecordFolders(supabase, workspaceId, "files")
+    getRecordFolders(supabase, workspaceId, "files"),
+    supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("file_import_rows").select("*").eq("workspace_id", workspaceId).order("row_number", { ascending: true }).limit(2000)
   ]);
   const files = (fileResult.data || []) as FileUploadRow[];
+  const imports = (importResult.data || []) as FileImportRow[];
+  const importRows = (importRowResult.data || []) as FileImportDataRow[];
   const folderOptions = folderResult.folders;
   const importedRows = files.reduce((sum, file) => sum + file.imported_rows, 0);
   const spreadsheetCount = files.filter(isSpreadsheet).length;
   const analyzedCount = files.filter((file) => Boolean(file.analysis_summary)).length;
+  const pendingReviewCount = imports.filter((item) => item.status === "needs_review" || item.status === "extracted").length;
   const managedFiles = files.map((file) => {
     const management = managedValues(file);
+    const fileImports = importsForFile(imports, file.id);
+    const fileImportRows = importRows.filter((row) => row.file_upload_id === file.id);
 
     return {
       id: file.id,
@@ -252,6 +477,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         { label: "Original name", value: file.original_name },
         { label: "Import status", value: fileStatusLabel(file) },
         { label: "Rows imported", value: file.imported_rows },
+        { label: "Extractions", value: fileImports.length },
         { label: "File size", value: fileSizeLabel(file.file_size_bytes) }
       ],
       editFields: fileEditFields,
@@ -260,7 +486,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         import_type: file.import_type,
         analysis_summary: file.analysis_summary
       },
-      children: <FileDetails file={file} />
+      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} />
     };
   });
 
@@ -268,14 +494,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Files"
-        title="Files and data import"
-        description="Upload workspace files, organize them into folders, import spreadsheet rows into KPIs, CRM leads, and operational metrics, and ask Vaeroex for a plain-language file analysis."
+        title="Files and business memory"
+        description="Upload workspace files, extract spreadsheet data for review, save approved rows into KPI, CRM, and operations history, and ask Vaeroex for plain-language trend analysis."
       />
 
-      <ErrorNotice message={params?.error || fileResult.error?.message || folderResult.error?.message} />
+      <ErrorNotice message={params?.error || fileResult.error?.message || folderResult.error?.message || importResult.error?.message || importRowResult.error?.message} />
       <SuccessNotice message={params?.message} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
           <p className="text-sm text-muted">Files stored</p>
           <p className="mt-2 text-3xl font-semibold">{files.length}</p>
@@ -287,6 +513,10 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
           <p className="text-sm text-muted">Rows imported</p>
           <p className="mt-2 text-3xl font-semibold">{importedRows}</p>
+        </article>
+        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+          <p className="text-sm text-muted">Pending review</p>
+          <p className="mt-2 text-3xl font-semibold">{pendingReviewCount}</p>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
           <p className="text-sm text-muted">Vaeroex analyses</p>

@@ -186,7 +186,8 @@ ${sharedJsonInstructions}
     instructions: `
 Analyze the uploaded spreadsheet preview and workspace context.
 Return a polished business-owner-friendly result with executive_summary, problems_identified, recommended_actions, suggested_systems, and response_markdown.
-Call out trends, KPIs worth tracking, operational problems that stand out, possible data quality concerns, and practical next steps.
+Compare the new file against prior KPI history, file imports, CRM lead history, and operational metrics when those are available.
+Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, operational problems that stand out, possible data quality concerns, and practical next steps.
 Do not repeat raw rows or technical JSON in the user-facing answer.
 If the file suggests follow-up work, include suggested_tasks for manager review.
 ${sharedJsonInstructions}

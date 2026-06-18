@@ -27,7 +27,9 @@ type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
+type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
+type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
@@ -382,7 +384,7 @@ async function fetchReportSource(
   range: DateRange,
   category: string
 ) {
-  const [tasks, issues, checklistRuns, sops, submissions, assets, kpis, vaeroexRuns, files, crmLeads, operationalMetrics] = await Promise.all([
+  const [tasks, issues, checklistRuns, sops, submissions, assets, kpis, vaeroexRuns, files, fileImports, crmLeads, crmLeadHistory, operationalMetrics] = await Promise.all([
     supabase
       .from("tasks")
       .select("id,title,description,status,priority,category,due_date,created_at,updated_at")
@@ -421,7 +423,7 @@ async function fetchReportSource(
       .limit(300),
     supabase
       .from("kpis")
-      .select("id,name,category,target,actual_value,metric_date,owner,source,notes,created_at,updated_at")
+      .select("id,name,category,target,actual_value,metric_date,owner,source,notes,source_file_id,import_id,created_at,updated_at")
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
       .limit(300),
@@ -438,14 +440,26 @@ async function fetchReportSource(
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
+      .from("file_imports")
+      .select("id,file_upload_id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(300),
+    supabase
       .from("crm_leads")
-      .select("id,lead_name,company,status,estimated_value,owner,notes,created_at,updated_at")
+      .select("id,lead_name,company,status,estimated_value,owner,notes,source_file_id,import_id,last_activity_at,created_at,updated_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(300),
+    supabase
+      .from("crm_lead_history")
+      .select("id,lead_id,event_type,status,estimated_value,owner,notes,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
       .from("operational_metrics")
-      .select("id,metric_name,category,value,metric_date,owner,notes,created_at,updated_at")
+      .select("id,metric_name,category,value,metric_date,owner,notes,source_file_id,import_id,created_at,updated_at")
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
       .limit(300)
@@ -462,7 +476,9 @@ async function fetchReportSource(
   const kpiRows = ((kpis.data ?? []) as KpiRow[]).filter((kpi) => matchesCategory(category, kpi, "KPIs"));
   const runRows = ((vaeroexRuns.data ?? []) as VaeroexRunRow[]).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
   const fileRows = ((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
+  const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "CRM"));
+  const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "CRM"));
   const operationalMetricRows = ((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter((metric) =>
     matchesCategory(category, metric, "Operational metrics")
   );
@@ -487,11 +503,15 @@ async function fetchReportSource(
   const vaeroexInsights = runRows.filter((run) => run.status === "completed" && inIsoRange(run.created_at, range));
   const uploadedFiles = fileRows.filter((file) => inIsoRange(file.created_at, range));
   const importedFiles = fileRows.filter((file) => file.import_status === "imported" && inIsoRange(file.updated_at || file.created_at, range));
+  const completedImports = fileImportRows.filter((item) => item.status === "completed" && inIsoRange(item.imported_at || item.created_at, range));
+  const pendingImports = fileImportRows.filter((item) => item.status === "needs_review" || item.status === "extracted");
   const analyzedFiles = fileRows.filter((file) => Boolean(file.analysis_summary) && inIsoRange(file.updated_at || file.created_at, range));
   const newCrmLeads = crmLeadRows.filter((lead) => inIsoRange(lead.created_at, range));
+  const crmLeadChanges = crmLeadHistoryRows.filter((item) => inIsoRange(item.created_at, range));
   const recordedOperationalMetrics = operationalMetricRows.filter(
     (metric) => metric.metric_date >= range.startDate && metric.metric_date <= range.endDate
   );
+  const sourceLinkedKpis = recordedKpis.filter((kpi) => Boolean(kpi.source_file_id || kpi.import_id));
 
   return {
     counts: {
@@ -510,8 +530,12 @@ async function fetchReportSource(
       vaeroex_insights: vaeroexInsights.length,
       uploaded_files: uploadedFiles.length,
       imported_files: importedFiles.length,
-      imported_file_rows: importedFiles.reduce((sum, file) => sum + file.imported_rows, 0),
+      completed_imports: completedImports.length,
+      pending_imports: pendingImports.length,
+      imported_file_rows: completedImports.reduce((sum, item) => sum + item.rows_imported, 0),
+      source_linked_kpis: sourceLinkedKpis.length,
       crm_leads: newCrmLeads.length,
+      crm_lead_changes: crmLeadChanges.length,
       operational_metrics: recordedOperationalMetrics.length,
       file_analyses: analyzedFiles.length
     },
@@ -533,10 +557,19 @@ async function fetchReportSource(
         .slice(0, 8)
         .map((file) => `${file.display_name} (${file.file_extension.toUpperCase()}, ${file.import_status.replace(/_/g, " ")})`),
       imported_files: importedFiles.slice(0, 8).map((file) => `${file.display_name}: ${file.imported_rows} imported row${file.imported_rows === 1 ? "" : "s"}`),
+      completed_imports: completedImports
+        .slice(0, 8)
+        .map((item) => `${item.import_type}: ${item.rows_imported} of ${item.rows_total} row${item.rows_total === 1 ? "" : "s"} saved`),
+      pending_imports: pendingImports
+        .slice(0, 8)
+        .map((item) => `${item.import_type}: ${item.rows_total} row${item.rows_total === 1 ? "" : "s"} waiting for review`),
       file_insights: analyzedFiles.map((file) => `${file.display_name}: ${file.analysis_summary || ""}`).filter(Boolean).slice(0, 5),
       crm_leads: newCrmLeads
         .slice(0, 8)
         .map((lead) => `${lead.lead_name}${lead.company ? ` at ${lead.company}` : ""}${lead.status ? ` (${lead.status})` : ""}`),
+      crm_lead_changes: crmLeadChanges
+        .slice(0, 8)
+        .map((item) => `${item.event_type} lead activity${item.status ? ` (${item.status})` : ""}${item.estimated_value !== null ? ` valued at ${item.estimated_value}` : ""}`),
       operational_metrics: recordedOperationalMetrics
         .slice(0, 8)
         .map((metric) => `${metric.metric_name}: ${metric.value ?? "not set"}${metric.category ? ` (${metric.category})` : ""}`)
@@ -552,6 +585,7 @@ function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
       ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.`
       : "",
     source.counts.flagged_assets ? `${source.counts.flagged_assets} asset${source.counts.flagged_assets === 1 ? "" : "s"} are not marked ready.` : "",
+    source.counts.pending_imports ? `${source.counts.pending_imports} data extraction${source.counts.pending_imports === 1 ? "" : "s"} are waiting for mapping review.` : "",
     source.counts.imported_files && source.counts.kpis_recorded === 0 && source.counts.operational_metrics === 0
       ? "Files were imported, but no KPI or operational metric records were found in the selected period."
       : ""
@@ -566,6 +600,7 @@ function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>
     source.counts.open_issues ? "Review open issues by severity and convert unresolved items into dated follow-up tasks." : "",
     source.counts.checklist_exceptions ? "Review incomplete checklist runs and update the checklist or accountability process where needed." : "",
     source.counts.flagged_assets ? "Confirm asset readiness and document any maintenance or replacement decisions." : "",
+    source.counts.pending_imports ? "Review pending file mappings and save approved data so dashboards and reports use the latest numbers." : "",
     source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, CRM leads, or operational metrics." : "",
     source.counts.sops_created === 0 ? "Pick one repeated workflow from this period and turn it into an SOP draft." : ""
   ].filter(Boolean);
@@ -621,6 +656,7 @@ ${summary}
 - SOP updates: ${trendPhrase(current.counts.sops_created, previous.counts.sops_created)} vs ${previousLabel}
 - KPIs recorded: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)} vs ${previousLabel}
 - Uploaded files: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)} vs ${previousLabel}
+- Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)} vs ${previousLabel}
 - CRM leads: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)} vs ${previousLabel}
 
 ## Completed Work
@@ -641,6 +677,7 @@ ${readableList(current.items.overdue_tasks, "No overdue tasks were found for thi
 
 ## KPI Trends
 - KPI records added: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)}
+- KPI records from imported files: ${trendPhrase(current.counts.source_linked_kpis, previous.counts.source_linked_kpis)}
 ${readableList(current.items.kpis_recorded, "No KPI records were found for this period.")}
 - KPI comparison observations:
 ${readableList(current.items.kpi_trend_observations, "No KPI trend observations were available yet. Add at least two dated values for a KPI to unlock comparisons.")}
@@ -653,15 +690,21 @@ ${readableList(current.items.kpi_trend_observations, "No KPI trend observations 
 
 ## Uploaded Files and Imported Data
 - Files uploaded: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)}
-- Spreadsheet imports: ${trendPhrase(current.counts.imported_files, previous.counts.imported_files)}
+- Files marked imported: ${trendPhrase(current.counts.imported_files, previous.counts.imported_files)}
+- Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)}
+- Data extractions waiting for review: ${current.counts.pending_imports}
 - Imported spreadsheet rows: ${trendPhrase(current.counts.imported_file_rows, previous.counts.imported_file_rows)}
 - CRM leads imported: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)}
+- CRM lead history changes: ${trendPhrase(current.counts.crm_lead_changes, previous.counts.crm_lead_changes)}
 - File analyses completed: ${trendPhrase(current.counts.file_analyses, previous.counts.file_analyses)}
 ${readableList(
   [
     ...current.items.uploaded_files.map((item) => `File uploaded: ${item}`),
+    ...current.items.completed_imports.map((item) => `Completed import: ${item}`),
+    ...current.items.pending_imports.map((item) => `Pending review: ${item}`),
     ...current.items.imported_files.map((item) => `Import completed: ${item}`),
     ...current.items.crm_leads.map((item) => `CRM lead: ${item}`),
+    ...current.items.crm_lead_changes.map((item) => `CRM history: ${item}`),
     ...current.items.operational_metrics.map((item) => `Operational metric: ${item}`)
   ],
   "No uploaded files, spreadsheet imports, CRM leads, or operational metrics were found in this period."
