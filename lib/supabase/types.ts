@@ -713,6 +713,9 @@ export type Database = {
           assigned_to: string | null;
           last_checked_at: string | null;
           notes: string | null;
+          folder_id: string | null;
+          archived_at: string | null;
+          deleted_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -783,6 +786,9 @@ export type Database = {
           status?: string;
           start_date?: string | null;
           notes?: string | null;
+          folder_id?: string | null;
+          archived_at?: string | null;
+          deleted_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

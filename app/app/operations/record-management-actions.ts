@@ -23,6 +23,7 @@ type ManagedCollection =
   | "asset_checks"
   | "crm_leads"
   | "files"
+  | "people"
   | "support_requests";
 
 type FieldKind = "text" | "requiredText" | "textarea" | "select" | "date" | "number" | "checkbox" | "lines";
@@ -210,6 +211,21 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "notes", kind: "textarea", maxLength: 2000 }
     ]
   },
+  people: {
+    table: "people",
+    path: "/app/people",
+    titleField: "full_name",
+    fields: [
+      { name: "full_name", kind: "requiredText", maxLength: 180 },
+      { name: "email", kind: "text", maxLength: 220 },
+      { name: "phone", kind: "text", maxLength: 80 },
+      { name: "role_title", kind: "text", maxLength: 140 },
+      { name: "department", kind: "text", maxLength: 140 },
+      { name: "status", kind: "select", maxLength: 80 },
+      { name: "start_date", kind: "date" },
+      { name: "notes", kind: "textarea", maxLength: 2000 }
+    ]
+  },
   support_requests: {
     table: "support_requests",
     path: "/app/admin/support-requests",
@@ -255,6 +271,24 @@ function redirectWithError(path: Route | string, message: string): never {
 
 function redirectWithMessage(path: Route | string, message: string): never {
   redirect(`${path}?message=${encodeURIComponent(message)}` as Route);
+}
+
+function friendlyMutationError(message: string | undefined, fallback: string) {
+  const normalized = (message || "").toLowerCase();
+
+  if (normalized.includes("row-level security") || normalized.includes("permission denied")) {
+    return "You do not have permission to manage this record in the current workspace.";
+  }
+
+  if (normalized.includes("does not exist") && normalized.includes("column")) {
+    return "This record type is missing the latest management fields. Apply the newest Supabase migration, then try again.";
+  }
+
+  if (normalized.includes("0 rows") || normalized.includes("no rows")) {
+    return "Vaeroex could not find a matching record in this workspace.";
+  }
+
+  return fallback;
 }
 
 function dbClient(supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>) {
@@ -468,11 +502,17 @@ export async function updateManagedRecordAction(formData: FormData) {
   const query = dbClient(supabase).from(config.table).update(update) as {
     eq: (column: string, value: string) => unknown;
   };
-  const scopedQuery = query.eq("id", recordId) as { eq: (column: string, value: string) => { error: { message: string } | null } };
-  const { error } = scopedQuery.eq("workspace_id", workspaceId);
+  const scopedQuery = query.eq("id", recordId) as {
+    eq: (column: string, value: string) => {
+      select: (columns: string) => {
+        single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+      };
+    };
+  };
+  const { data, error } = await scopedQuery.eq("workspace_id", workspaceId).select("id").single();
 
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error || !data) {
+    redirectWithError(path, friendlyMutationError(error?.message, "Record could not be updated. Refresh and try again."));
   }
 
   if (collection === "crm_leads") {
@@ -567,15 +607,21 @@ export async function manageRecordAction(formData: FormData) {
   const updateQuery = dbClient(supabase).from(config.table).update(update) as {
     eq: (column: string, value: string) => unknown;
   };
-  const scopedQuery = updateQuery.eq("id", recordId) as { eq: (column: string, value: string) => { error: { message: string } | null } };
-  const { error } = scopedQuery.eq("workspace_id", workspaceId);
+  const scopedQuery = updateQuery.eq("id", recordId) as {
+    eq: (column: string, value: string) => {
+      select: (columns: string) => {
+        single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+      };
+    };
+  };
+  const { data, error } = await scopedQuery.eq("workspace_id", workspaceId).select("id").single();
 
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error || !data) {
+    redirectWithError(path, friendlyMutationError(error?.message, "Record could not be changed. Refresh and try again."));
   }
 
   revalidateRelatedPaths(collection, path);
-  redirectWithMessage(path, action === "delete" ? "Record deleted." : "Record updated.");
+  redirectWithMessage(path, action === "delete" ? "Record deleted and removed from active records." : action === "archive" ? "Record archived and removed from active records." : "Record updated.");
 }
 
 export async function bulkManageRecordsAction(formData: FormData) {
@@ -609,13 +655,18 @@ export async function bulkManageRecordsAction(formData: FormData) {
   const query = dbClient(supabase).from(config.table).update(update) as {
     in: (column: string, values: string[]) => unknown;
   };
-  const idQuery = query.in("id", ids) as { eq: (column: string, value: string) => { error: { message: string } | null } };
-  const { error } = idQuery.eq("workspace_id", workspaceId);
+  const idQuery = query.in("id", ids) as {
+    eq: (column: string, value: string) => {
+      select: (columns: string) => Promise<{ data: Array<{ id: string }> | null; error: { message: string } | null }>;
+    };
+  };
+  const { data, error } = await idQuery.eq("workspace_id", workspaceId).select("id");
 
-  if (error) {
-    redirectWithError(path, error.message);
+  if (error || !data?.length) {
+    redirectWithError(path, friendlyMutationError(error?.message, "Selected records could not be changed. Refresh and try again."));
   }
 
   revalidateRelatedPaths(collection, path);
-  redirectWithMessage(path, `${ids.length} record${ids.length === 1 ? "" : "s"} updated.`);
+  const actionLabel = action === "delete" ? "deleted and removed from active records" : action === "archive" ? "archived and removed from active records" : "updated";
+  redirectWithMessage(path, `${data.length} record${data.length === 1 ? "" : "s"} ${actionLabel}.`);
 }
