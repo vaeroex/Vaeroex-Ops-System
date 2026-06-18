@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
 import type { SubscriptionAccessResult, SubscriptionStatus } from "@/lib/billing/types";
 import type { Database } from "@/lib/supabase/types";
 
@@ -63,6 +64,18 @@ export async function getSubscriptionStatus({
   workspaceId?: string | null;
 }): Promise<SubscriptionAccessResult> {
   const normalizedEmail = normalizeEmail(email);
+
+  if (isVaeroexAdminEmail(normalizedEmail)) {
+    return {
+      allowed: true,
+      reason: "Vaeroex admin account bypassed the Squarespace subscription check.",
+      status: "manual_review",
+      plan_slug: null,
+      plan: null,
+      source: "admin"
+    };
+  }
+
   const [{ data: workspace }, { data: subscriptions }] = await Promise.all([
     workspaceId
       ? supabase
@@ -119,11 +132,19 @@ export async function getSubscriptionStatus({
   if (activeSubscription) {
     return {
       allowed: true,
-      reason: "Active Squarespace subscription found.",
+      reason: activeSubscription.manually_activated
+        ? "Manual activation found."
+        : activeSubscription.status === "demo"
+          ? "Demo access found."
+          : "Active Squarespace subscription found.",
       status: activeSubscription.status as SubscriptionStatus,
       plan_slug: activeSubscription.plan_slug,
       plan: getSubscriptionPlan(activeSubscription),
-      source: activeSubscription.manually_activated ? "manual" : "subscription"
+      source: activeSubscription.manually_activated
+        ? "manual"
+        : activeSubscription.status === "demo"
+          ? "demo"
+          : "subscription"
     };
   }
 

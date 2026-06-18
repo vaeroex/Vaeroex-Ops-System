@@ -1,14 +1,8 @@
 import { redirect } from "next/navigation";
 import type { Route } from "next";
+import { getVaeroexAdminEmails } from "@/lib/admin/admin-emails";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-
-function adminEmails() {
-  return String(process.env.VAEROEX_ADMIN_EMAILS || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
-}
 
 export async function getVaeroexAdminAccess() {
   const supabase = await createSupabaseServerClient();
@@ -31,7 +25,7 @@ export async function getVaeroexAdminAccess() {
   }
 
   const email = String(user.email || "").toLowerCase();
-  const allowedEmails = adminEmails();
+  const allowedEmails = getVaeroexAdminEmails();
 
   if (!allowedEmails.length) {
     return { allowed: false, error: "Set VAEROEX_ADMIN_EMAILS before using internal admin tools.", supabase, admin, user };

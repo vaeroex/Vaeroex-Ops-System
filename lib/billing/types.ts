@@ -22,7 +22,7 @@ export type SubscriptionAccessResult = {
     slug: string;
     features_json: Json;
   }) | null;
-  source: "subscription" | "workspace" | "demo" | "manual" | "trial" | "missing";
+  source: "subscription" | "workspace" | "demo" | "manual" | "trial" | "admin" | "missing";
 };
 
 export type UsageSnapshot = {
