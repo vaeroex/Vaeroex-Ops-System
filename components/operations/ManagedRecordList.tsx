@@ -26,6 +26,7 @@ export type ManagedRecordCollection =
   | "ai_agent_runs"
   | "assets"
   | "asset_checks"
+  | "crm_leads"
   | "files"
   | "support_requests";
 

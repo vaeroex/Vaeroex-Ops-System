@@ -21,6 +21,7 @@ type ManagedCollection =
   | "ai_agent_runs"
   | "assets"
   | "asset_checks"
+  | "crm_leads"
   | "files"
   | "support_requests";
 
@@ -194,6 +195,21 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "source", kind: "text", maxLength: 160 }
     ]
   },
+  crm_leads: {
+    table: "crm_leads",
+    path: "/app/crm",
+    titleField: "lead_name",
+    fields: [
+      { name: "lead_name", kind: "requiredText", maxLength: 180 },
+      { name: "company", kind: "text", maxLength: 180 },
+      { name: "email", kind: "text", maxLength: 220 },
+      { name: "phone", kind: "text", maxLength: 80 },
+      { name: "status", kind: "select", maxLength: 80 },
+      { name: "estimated_value", kind: "number" },
+      { name: "owner", kind: "text", maxLength: 120 },
+      { name: "notes", kind: "textarea", maxLength: 2000 }
+    ]
+  },
   support_requests: {
     table: "support_requests",
     path: "/app/admin/support-requests",
@@ -356,7 +372,8 @@ function parsedFieldValue(field: EditableField, formData: FormData, path: Route 
 function revalidateRelatedPaths(collection: ManagedCollection, path: Route | string) {
   revalidatePath(path);
 
-  if (collection === "kpis" || collection === "files") {
+  if (collection === "kpis" || collection === "files" || collection === "crm_leads") {
+    revalidatePath("/app");
     revalidatePath("/app/reports");
   }
 }
@@ -440,7 +457,7 @@ export async function updateManagedRecordAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
-  const { supabase, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId } = await requireWorkspace(path);
   const recordId = text(formData, "record_id");
   const update: Record<string, unknown> = {};
 
@@ -456,6 +473,27 @@ export async function updateManagedRecordAction(formData: FormData) {
 
   if (error) {
     redirectWithError(path, error.message);
+  }
+
+  if (collection === "crm_leads") {
+    const { error: historyError } = await supabase.from("crm_lead_history").insert({
+      workspace_id: workspaceId,
+      lead_id: recordId,
+      event_type: "updated",
+      status: typeof update.status === "string" ? update.status : null,
+      estimated_value: typeof update.estimated_value === "number" ? update.estimated_value : null,
+      owner: typeof update.owner === "string" ? update.owner : null,
+      notes: typeof update.notes === "string" ? update.notes : null,
+      raw_data_json: {
+        source: "manual_edit",
+        fields_changed: Object.keys(update)
+      } satisfies Json,
+      created_by: user.id
+    });
+
+    if (historyError) {
+      redirectWithError(path, historyError.message);
+    }
   }
 
   revalidateRelatedPaths(collection, path);

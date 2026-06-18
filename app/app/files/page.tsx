@@ -255,7 +255,7 @@ function FileActionCenter({
             </p>
             {!canImport ? (
               <p className="mt-2 text-xs leading-5 text-slate-600">
-                Content extraction currently supports CSV and XLSX files. This file can be stored and attached as a reference, but Vaeroex will not analyze its contents yet.
+                File analysis currently supports CSV and XLSX content. This file can be stored and attached as a reference, and you can still add KPIs or CRM records manually.
               </p>
             ) : null}
           </div>
@@ -297,7 +297,7 @@ function FileActionCenter({
             </div>
           </div>
           <ActionButton tone="primary" disabled={!canImport} pendingLabel="Analyzing file...">Analyze with Vaeroex</ActionButton>
-          {!canImport ? <p className="text-xs leading-5 text-muted">Upload CSV or XLSX when you want Vaeroex to read file contents.</p> : null}
+          {!canImport ? <p className="text-xs leading-5 text-muted">Upload CSV or XLSX only when you want Vaeroex to read file contents. Manual KPI and CRM entry works without files.</p> : null}
         </form>
       </section>
 
@@ -658,8 +658,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Files"
-        title="Files and business memory"
-        description="Upload workspace files, extract spreadsheet data for review, save approved rows into KPI, CRM, and operations history, and ask Vaeroex for plain-language trend analysis."
+        title="Files and imports"
+        description="Use files when you already have existing data to bring into Vaeroex. This is optional: KPIs, CRM leads, tasks, checklists, SOPs, and reports can also be created manually."
       />
 
       <ErrorNotice
@@ -673,7 +673,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           <p className="mt-2 text-3xl font-semibold">{files.length}</p>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm text-muted">Spreadsheets</p>
+          <p className="text-sm text-muted">Import-ready files</p>
           <p className="mt-2 text-3xl font-semibold">{spreadsheetCount}</p>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
@@ -698,7 +698,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. Spreadsheet imports use CSV or XLSX with column names in the first row.">
+          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV and XLSX imports use column names in the first row and always go to review before saving.">
             <form action={uploadFileAction} encType="multipart/form-data" className="space-y-4">
               <label className="block text-sm font-medium">
                 File

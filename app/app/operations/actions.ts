@@ -471,6 +471,75 @@ export async function deleteKpiAction(formData: FormData) {
   redirectWithMessage(path, "KPI deleted.");
 }
 
+export async function createCrmLeadAction(formData: FormData) {
+  const path = "/app/crm";
+  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const leadName = text(formData, "lead_name");
+  const company = text(formData, "company");
+  const email = text(formData, "email");
+  const phone = text(formData, "phone");
+  const status = text(formData, "status") || "New";
+  const owner = text(formData, "owner");
+  const notes = text(formData, "notes");
+  const estimatedValue = optionalNumber(path, "Estimated value", text(formData, "estimated_value"));
+
+  requireValue(path, "Lead name", leadName, 180);
+  validateLength(path, "Company", company, 180);
+  validateLength(path, "Email", email, 220);
+  validateLength(path, "Phone", phone, 80);
+  validateLength(path, "Status", status, 80);
+  validateLength(path, "Owner", owner, 120);
+  validateLength(path, "Notes", notes, 2000);
+
+  const rawData = {
+    source: "manual_entry",
+    entered_from: "crm_module"
+  } satisfies Json;
+  const { data, error } = await supabase
+    .from("crm_leads")
+    .insert({
+      workspace_id: workspaceId,
+      lead_name: leadName,
+      company,
+      email,
+      phone,
+      status,
+      estimated_value: estimatedValue,
+      owner,
+      notes,
+      raw_data_json: rawData,
+      last_activity_at: new Date().toISOString(),
+      created_by: user.id
+    })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    redirectWithError(path, error?.message || "CRM lead could not be saved.");
+  }
+
+  const { error: historyError } = await supabase.from("crm_lead_history").insert({
+    workspace_id: workspaceId,
+    lead_id: data.id,
+    event_type: "created",
+    status,
+    estimated_value: estimatedValue,
+    owner,
+    notes,
+    raw_data_json: rawData,
+    created_by: user.id
+  });
+
+  if (historyError) {
+    redirectWithError(path, historyError.message);
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app");
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "CRM lead saved.");
+}
+
 export async function createIssueAction(formData: FormData) {
   const path = "/app/issues";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
