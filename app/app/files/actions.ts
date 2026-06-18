@@ -9,6 +9,7 @@ import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
+import { cleanExtractedText, extractDocxText, extractPdfText } from "@/lib/imports/document-text";
 import { parseSpreadsheetRows, previewRows, type ImportCellValue, type ImportRow } from "@/lib/imports/spreadsheets";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -21,6 +22,18 @@ type JsonRecord = Record<string, unknown>;
 type JsonObject = { [key: string]: Json | undefined };
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type ImportMapping = Record<string, string>;
+type FileContentKind = "spreadsheet" | "pdf_text" | "docx_text" | "unsupported";
+type FileContentExtraction = {
+  supported: boolean;
+  kind: FileContentKind;
+  rows: ImportRow[];
+  preview: Json;
+  rowText: string;
+  columns: string[];
+  textContent: string;
+  textPreview: string;
+  contentNote: string;
+};
 type ImportField = {
   key: string;
   label: string;
@@ -33,6 +46,8 @@ const STORAGE_BUCKET = "workspace-files";
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_ANALYSIS_ROWS = 60;
 const MAX_REPORT_ROWS = 100;
+const MAX_EXTRACTED_TEXT_CHARS = 18_000;
+const MAX_TEXT_PREVIEW_CHARS = 4_000;
 const ALLOWED_EXTENSIONS = ["csv", "xlsx", "pdf", "png", "jpg", "jpeg", "docx"];
 const MIME_BY_EXTENSION: Record<string, string> = {
   csv: "text/csv",
@@ -116,20 +131,32 @@ function isSpreadsheet(file: Pick<FileUploadRow, "file_extension">) {
   return file.file_extension === "csv" || file.file_extension === "xlsx";
 }
 
+function isTextDocument(file: Pick<FileUploadRow, "file_extension">) {
+  return file.file_extension === "pdf" || file.file_extension === "docx";
+}
+
+function isImageFile(file: Pick<FileUploadRow, "file_extension">) {
+  return file.file_extension === "png" || file.file_extension === "jpg" || file.file_extension === "jpeg";
+}
+
+function canExtractFileContent(file: Pick<FileUploadRow, "file_extension">) {
+  return isSpreadsheet(file) || isTextDocument(file);
+}
+
 function unsupportedFileContentMessage(file: Pick<FileUploadRow, "file_extension">) {
   if (file.file_extension === "pdf") {
-    return "PDF text extraction is not supported yet. Upload a CSV or XLSX file when you want Vaeroex to analyze file contents. You can still attach this PDF to reports as a reference.";
+    return "No readable text could be extracted from this PDF. If it is scanned or image-based, image/OCR analysis is coming soon. Upload CSV/XLSX for data import or a text-based PDF for analysis.";
   }
 
   if (file.file_extension === "docx") {
-    return "DOCX text extraction is not supported yet. Upload a CSV or XLSX file when you want Vaeroex to analyze file contents. You can still store and attach this document as a reference.";
+    return "No readable text could be extracted from this DOCX file. Upload a document with selectable text, or upload CSV/XLSX for data import.";
   }
 
-  if (file.file_extension === "png" || file.file_extension === "jpg") {
-    return "Image text extraction is not supported yet. Upload a CSV or XLSX file when you want Vaeroex to analyze file contents. You can still store and attach this image as a reference.";
+  if (isImageFile(file)) {
+    return "Image analysis is coming soon. PNG and JPG files can be stored and attached to reports, but Vaeroex cannot read image contents yet.";
   }
 
-  return "This file type cannot be analyzed yet. Upload a CSV or XLSX file for content analysis.";
+  return "This file type cannot be analyzed yet. Upload CSV/XLSX for data import, or text-based PDF/DOCX files for analysis.";
 }
 
 function safeFileName(value: string) {
@@ -617,7 +644,7 @@ function summarizeVaeroexOutput(outputJson: Json) {
   }
 
   const problems = asArray(output.problems_identified).map((item) => (typeof item === "string" ? item : JSON.stringify(item)));
-  return problems.slice(0, 4).join("\n") || "Vaeroex completed the spreadsheet analysis.";
+  return problems.slice(0, 4).join("\n") || "Vaeroex completed the file analysis.";
 }
 
 function spreadsheetRowsAsText(rows: ImportRow[], limit: number) {
@@ -638,7 +665,21 @@ function fileContentStatus(file: FileUploadRow) {
   if (isSpreadsheet(file)) {
     return {
       supported: true,
-      label: "CSV/XLSX content extraction supported"
+      label: "CSV/XLSX rows can be parsed, analyzed, and imported after review."
+    };
+  }
+
+  if (file.file_extension === "pdf") {
+    return {
+      supported: true,
+      label: "Text-based PDF extraction is supported for analysis and report creation."
+    };
+  }
+
+  if (file.file_extension === "docx") {
+    return {
+      supported: true,
+      label: "DOCX text extraction is supported for analysis and report creation."
     };
   }
 
@@ -648,33 +689,98 @@ function fileContentStatus(file: FileUploadRow) {
   };
 }
 
-async function extractSpreadsheetContent(file: FileUploadRow, rowLimit: number) {
-  if (!isSpreadsheet(file)) {
-    return {
-      supported: false,
-      rows: [] as ImportRow[],
-      preview: [] as Json,
-      rowText: "",
-      columns: [] as string[],
-      contentNote: unsupportedFileContentMessage(file)
-    };
+function clippedExtractedText(value: string) {
+  return cleanExtractedText(value).slice(0, MAX_EXTRACTED_TEXT_CHARS);
+}
+
+function textPreview(value: string) {
+  return cleanExtractedText(value).slice(0, MAX_TEXT_PREVIEW_CHARS);
+}
+
+function emptyUnsupportedExtraction(file: FileUploadRow): FileContentExtraction {
+  return {
+    supported: false,
+    kind: "unsupported",
+    rows: [],
+    preview: [] as Json,
+    rowText: "",
+    columns: [],
+    textContent: "",
+    textPreview: "",
+    contentNote: unsupportedFileContentMessage(file)
+  };
+}
+
+function spreadsheetExtraction(rows: ImportRow[], rowLimit: number): FileContentExtraction {
+  const rowText = spreadsheetRowsAsText(rows, rowLimit);
+
+  return {
+    supported: true,
+    kind: "spreadsheet",
+    rows,
+    preview: previewRows(rows, rowLimit) as Json,
+    rowText,
+    columns: importHeaders(rows),
+    textContent: rowText,
+    textPreview: textPreview(rowText),
+    contentNote: `Vaeroex parsed ${rows.length} spreadsheet row${rows.length === 1 ? "" : "s"} from the file.`
+  };
+}
+
+function textDocumentExtraction(file: FileUploadRow, kind: "pdf_text" | "docx_text", textContent: string): FileContentExtraction {
+  const clippedText = clippedExtractedText(textContent);
+  const label = kind === "pdf_text" ? "PDF" : "DOCX";
+
+  if (!clippedText) {
+    throw new Error(unsupportedFileContentMessage(file));
+  }
+
+  return {
+    supported: true,
+    kind,
+    rows: [],
+    preview: {
+      text_preview: textPreview(clippedText),
+      character_count: clippedText.length
+    } as Json,
+    rowText: "",
+    columns: [],
+    textContent: clippedText,
+    textPreview: textPreview(clippedText),
+    contentNote: `Vaeroex extracted ${clippedText.length} character${clippedText.length === 1 ? "" : "s"} of readable text from this ${label} file.`
+  };
+}
+
+function hasExtractedContent(extraction: FileContentExtraction) {
+  return extraction.rows.length > 0 || extraction.textContent.trim().length > 0;
+}
+
+async function extractFileContent(file: FileUploadRow, rowLimit: number): Promise<FileContentExtraction> {
+  if (!canExtractFileContent(file)) {
+    return emptyUnsupportedExtraction(file);
   }
 
   const buffer = await downloadFileBuffer(file);
+
+  if (!isSpreadsheet(file)) {
+    if (file.file_extension === "pdf") {
+      return textDocumentExtraction(file, "pdf_text", extractPdfText(buffer));
+    }
+
+    if (file.file_extension === "docx") {
+      return textDocumentExtraction(file, "docx_text", extractDocxText(buffer));
+    }
+
+    return emptyUnsupportedExtraction(file);
+  }
+
   const rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
 
   if (!rows.length) {
     throw new Error("No data rows were found in the spreadsheet. Make sure the first row contains column names.");
   }
 
-  return {
-    supported: true,
-    rows,
-    preview: previewRows(rows, rowLimit) as Json,
-    rowText: spreadsheetRowsAsText(rows, rowLimit),
-    columns: importHeaders(rows),
-    contentNote: `Vaeroex parsed ${rows.length} spreadsheet row${rows.length === 1 ? "" : "s"} from the file.`
-  };
+  return spreadsheetExtraction(rows, rowLimit);
 }
 
 function readableList(value: unknown) {
@@ -714,10 +820,19 @@ function vaeroexReportMarkdown(outputJson: Json, fallback: string) {
   return `# File Report
 
 ## Executive Summary
-${summary || "Vaeroex reviewed the uploaded spreadsheet and prepared a practical operations summary."}
+${summary || "Vaeroex reviewed the uploaded file and prepared a practical operations summary."}
 
-## Problems Identified
+## Extracted Findings
 ${problems.length ? problems.map((item) => `- ${item}`).join("\n") : "- No specific problems were identified from the available rows."}
+
+## KPIs Found
+${systems.length ? systems.map((item) => `- ${item}`).join("\n") : "- Review this file for metrics that should be tracked in the KPI dashboard."}
+
+## Risks
+${problems.length ? problems.map((item) => `- ${item}`).join("\n") : "- No clear operational risks were found in the extracted content."}
+
+## Operational Issues
+${problems.length ? problems.map((item) => `- ${item}`).join("\n") : "- No specific operational issues were found in the extracted content."}
 
 ## Recommended Actions
 ${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the findings and decide which actions should be assigned."}
@@ -726,20 +841,63 @@ ${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the
 ${systems.length ? systems.map((item) => `- ${item}`).join("\n") : "- Track the key metrics from this file in the KPI dashboard and reports."}`;
 }
 
+function ensureFileReportSections(body: string, file: FileUploadRow, extraction: FileContentExtraction) {
+  let report = body.trim();
+  const preview = extraction.textPreview || extraction.rowText || "No preview text was available.";
+  const sections = [
+    {
+      heading: "Extracted Findings",
+      body: "- Vaeroex used extracted file content to create this report. Review the report body above for the detailed findings."
+    },
+    {
+      heading: "KPIs Found",
+      body: "- Review the report body for metrics, counts, revenue, lead, cost, quality, staffing, or operational measures worth tracking."
+    },
+    {
+      heading: "Risks",
+      body: "- Review the report body for customer, staffing, revenue, follow-up, quality, or process risks."
+    },
+    {
+      heading: "Operational Issues",
+      body: "- Review the report body for bottlenecks, missing ownership, unclear follow-up, delays, or repeated process gaps."
+    },
+    {
+      heading: "Recommended Actions",
+      body: "- Assign the highest-priority follow-ups and save approved metrics into Vaeroex history when useful."
+    },
+    {
+      heading: "Source File",
+      body: `- ${file.display_name} (${file.file_extension.toUpperCase()})\n- Content used: ${extraction.contentNote}\n- Preview: ${preview.slice(0, 800)}`
+    }
+  ];
+
+  if (!/^#\s+/m.test(report)) {
+    report = `# File Report - ${file.display_name}\n\n${report}`;
+  }
+
+  for (const section of sections) {
+    const pattern = new RegExp(`^#{2,3}\\s+${section.heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`, "im");
+
+    if (!pattern.test(report)) {
+      report += `\n\n## ${section.heading}\n${section.body}`;
+    }
+  }
+
+  return report;
+}
+
 function fileReportBody({
   file,
   importRows,
   analysisSummary,
   prompt,
-  parsedRows,
-  parsedRowText
+  extraction
 }: {
   file: FileUploadRow;
   importRows: Array<Pick<Database["public"]["Tables"]["file_imports"]["Row"], "import_type" | "status" | "rows_total" | "rows_imported" | "extraction_summary" | "created_at" | "imported_at">>;
   analysisSummary: string | null;
   prompt?: string;
-  parsedRows?: ImportRow[];
-  parsedRowText?: string;
+  extraction: FileContentExtraction;
 }) {
   const imports = importRows.length
     ? importRows
@@ -747,8 +905,9 @@ function fileReportBody({
         .join("\n")
     : "- No imports have been saved from this file yet.";
   const contentStatus = fileContentStatus(file);
-  const rowCount = parsedRows?.length ?? 0;
-  const columns = parsedRows?.length ? importHeaders(parsedRows).slice(0, 12).join(", ") : "No spreadsheet columns parsed.";
+  const rowCount = extraction.rows.length;
+  const columns = extraction.columns.length ? extraction.columns.slice(0, 12).join(", ") : "No spreadsheet columns parsed.";
+  const contentPreview = extraction.rowText || extraction.textPreview || "No extracted content preview was available.";
 
   return `# File Report - ${file.display_name}
 
@@ -757,8 +916,21 @@ ${analysisSummary || "Vaeroex reviewed this file and prepared a report from the 
 
 ## File Content Used
 - Content support: ${contentStatus.label}
+- Extraction result: ${extraction.contentNote}
 - Parsed rows: ${rowCount}
 - Columns detected: ${columns}
+
+## Extracted Findings
+- Vaeroex reviewed the extracted content shown in the preview below and used it with workspace context to prepare this report.
+
+## KPIs Found
+- Review the extracted content for metrics that should be saved into KPI history, CRM history, or operational metrics.
+
+## Risks
+- Confirm any high-impact findings before assigning work or changing records.
+
+## Operational Issues
+- Look for repeated delays, missed follow-up, unclear ownership, missing checklists, or untracked metrics.
 
 ## File Details
 - Original name: ${file.original_name}
@@ -774,7 +946,7 @@ ${prompt || file.analysis_prompt || "Review this file for findings, trends, KPIs
 ${imports}
 
 ## File Data Preview
-${parsedRowText || "No spreadsheet row content was available for this report."}
+${contentPreview}
 
 ## Recommended Next Actions
 - Review the findings before saving or assigning any recommended work.
@@ -800,10 +972,14 @@ async function runFileVaeroexAnalysis({
   rowLimit: number;
 }) {
   const workflow = getVaeroexWorkflow("file_analysis");
-  const extraction = await extractSpreadsheetContent(file, rowLimit);
+  const extraction = await extractFileContent(file, rowLimit);
 
   if (!extraction.supported) {
     throw new Error(extraction.contentNote);
+  }
+
+  if (!hasExtractedContent(extraction)) {
+    throw new Error(unsupportedFileContentMessage(file));
   }
 
   const [workspaceSnapshot, fileImports, fileReports] = await Promise.all([
@@ -828,16 +1004,20 @@ async function runFileVaeroexAnalysis({
       name: file.display_name,
       original_name: file.original_name,
       extension: file.file_extension,
+      content_kind: extraction.kind,
       rows_detected: extraction.rows.length,
       columns_detected: extraction.columns,
+      characters_extracted: extraction.textContent.length,
       metadata: file.metadata_json,
       analysis_summary: file.analysis_summary,
       content_note: extraction.contentNote
     },
     import_history: fileImports.data ?? [],
     related_reports: fileReports.data ?? [],
-    spreadsheet_preview: extraction.preview,
-    spreadsheet_row_text: extraction.rowText
+    spreadsheet_preview: extraction.kind === "spreadsheet" ? extraction.preview : [],
+    spreadsheet_row_text: extraction.kind === "spreadsheet" ? extraction.rowText : "",
+    extracted_text: extraction.textContent,
+    extracted_text_preview: extraction.textPreview
   } satisfies Json;
   const inputJson = {
     workflow: workflow.key,
@@ -899,8 +1079,19 @@ async function runFileVaeroexAnalysis({
         latest_analysis_run_id: data.id,
         latest_analysis_at: new Date().toISOString(),
         latest_analysis_prompt: prompt,
+        latest_analysis_content_kind: extraction.kind,
         latest_analysis_rows_detected: extraction.rows.length,
-        latest_analysis_preview: extraction.preview
+        latest_analysis_characters_detected: extraction.textContent.length,
+        latest_analysis_preview: extraction.preview,
+        latest_text_extraction: {
+          kind: extraction.kind,
+          extracted_at: new Date().toISOString(),
+          rows_detected: extraction.rows.length,
+          columns_detected: extraction.columns,
+          character_count: extraction.textContent.length,
+          preview: extraction.textPreview,
+          extracted_text: extraction.textContent
+        }
       } satisfies Json
     })
     .eq("id", file.id)
@@ -934,6 +1125,7 @@ export async function uploadFileAction(formData: FormData) {
     redirectWithError("Supported file types are CSV, XLSX, PDF, PNG, JPG, and DOCX.");
   }
 
+  const storedExtension = extension === "jpeg" ? "jpg" : extension;
   const folderId = await validateFolder(workspaceId, text(formData, "folder_id"));
   const buffer = Buffer.from(await uploadedFile.arrayBuffer());
   const safeName = safeFileName(uploadedFile.name);
@@ -956,7 +1148,7 @@ export async function uploadFileAction(formData: FormData) {
       folder_id: folderId,
       original_name: uploadedFile.name,
       display_name: displayName,
-      file_extension: extension === "jpeg" ? "jpg" : extension,
+      file_extension: storedExtension,
       mime_type: mimeType,
       file_size_bytes: uploadedFile.size,
       storage_bucket: STORAGE_BUCKET,
@@ -965,7 +1157,14 @@ export async function uploadFileAction(formData: FormData) {
       metadata_json: {
         upload_method: "files_module",
         can_import: extension === "csv" || extension === "xlsx",
-        supported_import_types: extension === "csv" || extension === "xlsx" ? ["kpi", "crm", "metrics"] : []
+        can_analyze: storedExtension === "csv" || storedExtension === "xlsx" || storedExtension === "pdf" || storedExtension === "docx",
+        supported_import_types: extension === "csv" || extension === "xlsx" ? ["kpi", "crm", "metrics"] : [],
+        extraction_support:
+          storedExtension === "csv" || storedExtension === "xlsx"
+            ? "Spreadsheet rows can be parsed, analyzed, and imported after review."
+            : storedExtension === "pdf" || storedExtension === "docx"
+              ? "Text can be extracted for analysis and report creation when the document contains readable text."
+              : "Image analysis is coming soon. The file can be stored and attached to reports."
       },
       created_by: user.id
     })
@@ -979,9 +1178,11 @@ export async function uploadFileAction(formData: FormData) {
   revalidatePath(FILES_PATH);
   revalidatePath("/app/reports");
   redirectWithMessage(
-    extension === "csv" || extension === "xlsx"
+    storedExtension === "csv" || storedExtension === "xlsx"
       ? "File uploaded. Next: analyze it with Vaeroex, import rows for review, or create a report from the spreadsheet."
-      : "File uploaded. This file is stored as a reference; content extraction currently supports CSV and XLSX files.",
+      : storedExtension === "pdf" || storedExtension === "docx"
+        ? "File uploaded. Next: analyze it with Vaeroex or create a report from extracted document text."
+        : "File uploaded. Image analysis is coming soon, so this file is stored for organization and report attachments.",
     data.id
   );
 }
@@ -1237,10 +1438,6 @@ export async function createReportFromFileAction(formData: FormData) {
   const reportType = text(formData, "report_type") || "File Review";
   const reportFocus = text(formData, "report_focus");
 
-  if (!isSpreadsheet(file)) {
-    redirectWithFileError(unsupportedFileContentMessage(file), file.id);
-  }
-
   const { data: importRows, error: importError } = await supabase
     .from("file_imports")
     .select("import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
@@ -1264,7 +1461,7 @@ export async function createReportFromFileAction(formData: FormData) {
       file,
       prompt:
         reportFocus ||
-        "Create a customer-ready operations report from this spreadsheet. Include findings, trends, KPIs, risks, recommendations, and practical next actions.",
+        "Create a customer-ready operations report from this uploaded file. Include an executive summary, extracted findings, KPIs found, risks, operational issues, recommendations, and practical next actions.",
       rowLimit: MAX_REPORT_ROWS
     });
   } catch (error) {
@@ -1276,10 +1473,9 @@ export async function createReportFromFileAction(formData: FormData) {
     importRows: importRows || [],
     analysisSummary: analysis.summary,
     prompt: reportFocus,
-    parsedRows: analysis.extraction.rows,
-    parsedRowText: analysis.extraction.rowText
+    extraction: analysis.extraction
   });
-  const bodyMarkdown = vaeroexReportMarkdown(analysis.outputJson, fallbackBody);
+  const bodyMarkdown = ensureFileReportSections(vaeroexReportMarkdown(analysis.outputJson, fallbackBody), file, analysis.extraction);
   const sourceData = {
     generated_from: "file",
     file: {
@@ -1298,9 +1494,12 @@ export async function createReportFromFileAction(formData: FormData) {
     vaeroex_output: analysis.outputJson,
     extracted_content: {
       supported: analysis.extraction.supported,
+      content_kind: analysis.extraction.kind,
       rows_detected: analysis.extraction.rows.length,
       columns_detected: analysis.extraction.columns,
-      preview_rows: analysis.extraction.preview
+      characters_detected: analysis.extraction.textContent.length,
+      preview_rows: analysis.extraction.kind === "spreadsheet" ? analysis.extraction.preview : [],
+      text_preview: analysis.extraction.textPreview
     },
     import_history: importRows || [],
     report_focus: reportFocus || null
@@ -1324,7 +1523,7 @@ export async function createReportFromFileAction(formData: FormData) {
   revalidatePath(FILES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/reports");
-  redirectWithMessage("Report created from parsed spreadsheet content. Review the findings in Reports.", file.id);
+  redirectWithMessage("Report created from extracted file content. Review the findings in Reports.", file.id);
 }
 
 export async function attachFileToReportAction(formData: FormData) {
@@ -1390,7 +1589,7 @@ export async function analyzeFileAction(formData: FormData) {
   const prompt =
     text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
-    "Review this spreadsheet and explain trends, useful KPIs, operational problems, and an executive summary.";
+    "Review this file and explain trends, useful KPIs, operational problems, risks, recommended actions, and an executive summary.";
 
   const workflow = getVaeroexWorkflow("file_analysis");
   let inputJson: Json = {
@@ -1405,10 +1604,6 @@ export async function analyzeFileAction(formData: FormData) {
     },
     workspace_snapshot: {}
   } satisfies Json;
-
-  if (!isSpreadsheet(file)) {
-    redirectWithFileError(unsupportedFileContentMessage(file), file.id);
-  }
 
   try {
     const result = await runFileVaeroexAnalysis({
@@ -1426,7 +1621,12 @@ export async function analyzeFileAction(formData: FormData) {
     revalidatePath("/app");
     revalidatePath("/app/agents");
     revalidatePath("/app/reports");
-    redirectWithMessage(`Vaeroex analyzed ${result.extraction.rows.length} spreadsheet row${result.extraction.rows.length === 1 ? "" : "s"}. Review the summary below or create a report from this file.`, file.id);
+    const contentLabel =
+      result.extraction.kind === "spreadsheet"
+        ? `${result.extraction.rows.length} spreadsheet row${result.extraction.rows.length === 1 ? "" : "s"}`
+        : `${result.extraction.textContent.length} character${result.extraction.textContent.length === 1 ? "" : "s"} of document text`;
+
+    redirectWithMessage(`Vaeroex analyzed ${contentLabel}. Review the summary below or create a report from this file.`, file.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Vaeroex could not analyze the file.";
 
