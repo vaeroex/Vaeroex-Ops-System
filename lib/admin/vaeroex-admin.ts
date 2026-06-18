@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import type { Route } from "next";
-import { getVaeroexAdminEmails } from "@/lib/admin/admin-emails";
+import { getVaeroexAdminEmails, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -24,14 +24,14 @@ export async function getVaeroexAdminAccess() {
     return { allowed: false, error: "Supabase service role is not configured.", supabase, admin: null, user };
   }
 
-  const email = String(user.email || "").toLowerCase();
   const allowedEmails = getVaeroexAdminEmails();
+  const allowedByUserFlag = isVaeroexAdminUser(user);
 
-  if (!allowedEmails.length) {
+  if (!allowedEmails.length && !allowedByUserFlag) {
     return { allowed: false, error: "Set VAEROEX_ADMIN_EMAILS before using internal admin tools.", supabase, admin, user };
   }
 
-  if (!email || !allowedEmails.includes(email)) {
+  if (!allowedByUserFlag) {
     return { allowed: false, error: "Vaeroex admin access is required.", supabase, admin, user };
   }
 
