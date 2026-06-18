@@ -124,6 +124,53 @@ function isSpreadsheet(file: FileUploadRow) {
   return file.file_extension === "csv" || file.file_extension === "xlsx";
 }
 
+function isTextAnalyzableDocument(file: FileUploadRow) {
+  return file.file_extension === "pdf" || file.file_extension === "docx";
+}
+
+function isImageFile(file: FileUploadRow) {
+  return file.file_extension === "png" || file.file_extension === "jpg" || file.file_extension === "jpeg";
+}
+
+function canAnalyzeFile(file: FileUploadRow) {
+  return isSpreadsheet(file) || isTextAnalyzableDocument(file);
+}
+
+function fileSupportNotice(file: FileUploadRow) {
+  if (isSpreadsheet(file)) {
+    return {
+      title: "Spreadsheet ready",
+      body: "CSV and XLSX files can be analyzed, imported after review, and used to create reports from parsed rows."
+    };
+  }
+
+  if (file.file_extension === "pdf") {
+    return {
+      title: "PDF text extraction ready",
+      body: "Vaeroex can analyze and report on text-based PDFs. If a PDF is scanned or image-only, Vaeroex will show a clear extraction error instead of creating an empty report."
+    };
+  }
+
+  if (file.file_extension === "docx") {
+    return {
+      title: "DOCX text extraction ready",
+      body: "Vaeroex can extract readable text from DOCX files for analysis and report creation."
+    };
+  }
+
+  if (isImageFile(file)) {
+    return {
+      title: "Image analysis coming soon",
+      body: "PNG and JPG files can be stored, organized, and attached to reports, but Vaeroex cannot read image contents yet."
+    };
+  }
+
+  return {
+    title: "Stored reference file",
+    body: "This file can be stored and attached to reports, but content analysis is not available for this file type yet."
+  };
+}
+
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -209,11 +256,15 @@ function ActionButton({
 function ImportActionForm({ file, importType, label }: { file: FileUploadRow; importType: ImportType; label: string }) {
   const canImport = isSpreadsheet(file);
 
+  if (!canImport) {
+    return null;
+  }
+
   return (
     <form action={importFileAction}>
       <input type="hidden" name="file_id" value={file.id} />
       <input type="hidden" name="import_type" value={importType} />
-      <ActionButton disabled={!canImport} pendingLabel="Extracting rows...">{label}</ActionButton>
+      <ActionButton pendingLabel="Importing...">{label}</ActionButton>
     </form>
   );
 }
@@ -228,6 +279,8 @@ function FileActionCenter({
   compact?: boolean;
 }) {
   const canImport = isSpreadsheet(file);
+  const canAnalyze = canAnalyzeFile(file);
+  const support = fileSupportNotice(file);
 
   if (compact) {
     return (
@@ -235,11 +288,13 @@ function FileActionCenter({
         <Link href={`/app/files?file=${file.id}`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
           View File Details
         </Link>
-        <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" />
-        <form action={createReportFromFileAction}>
-          <input type="hidden" name="file_id" value={file.id} />
-          <ActionButton disabled={!canImport} pendingLabel="Creating report...">Create Report from File</ActionButton>
-        </form>
+        {canImport ? <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" /> : null}
+        {canAnalyze ? (
+          <form action={createReportFromFileAction}>
+            <input type="hidden" name="file_id" value={file.id} />
+            <ActionButton pendingLabel="Creating report...">Create Report from File</ActionButton>
+          </form>
+        ) : null}
       </>
     );
   }
@@ -253,11 +308,8 @@ function FileActionCenter({
             <p className="mt-1 text-sm leading-6 text-muted">
               Analyze the file, stage imports for review, create a report, attach it to an existing report, or inspect details.
             </p>
-            {!canImport ? (
-              <p className="mt-2 text-xs leading-5 text-slate-600">
-                File analysis currently supports CSV and XLSX content. This file can be stored and attached as a reference, and you can still add KPIs or CRM records manually.
-              </p>
-            ) : null}
+            <p className="mt-2 text-xs font-semibold text-slate-700">{support.title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-600">{support.body}</p>
           </div>
           <span className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-700">{fileStatusLabel(file)}</span>
         </div>
@@ -268,37 +320,41 @@ function FileActionCenter({
           <div>
             <h4 className="text-sm font-semibold text-ink">Analyze with Vaeroex</h4>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Ask a question about this file. CSV and XLSX files include parsed row content so Vaeroex can identify trends, risks, KPIs, and recommendations.
+              Ask a question about this file. CSV/XLSX files use parsed rows, and PDF/DOCX files use extracted readable text.
             </p>
           </div>
         </div>
-        <form action={analyzeFileAction} className="mt-4 space-y-3">
-          <input type="hidden" name="file_id" value={file.id} />
-          <TextArea
-            label="Question for Vaeroex"
-            name="analysis_prompt"
-            rows={4}
-            defaultValue={file.analysis_prompt || "What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary."}
-          />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Suggested prompts</p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {SUGGESTED_PROMPTS.map((prompt) => (
-                <button
-                  key={prompt}
-                  name="suggested_prompt"
-                  value={prompt}
-                  disabled={!canImport}
-                  className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue"
-                >
-                  {prompt}
-                </button>
-              ))}
+        {canAnalyze ? (
+          <form action={analyzeFileAction} className="mt-4 space-y-3">
+            <input type="hidden" name="file_id" value={file.id} />
+            <TextArea
+              label="Question for Vaeroex"
+              name="analysis_prompt"
+              rows={4}
+              defaultValue={file.analysis_prompt || "What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary."}
+            />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">Suggested prompts</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {SUGGESTED_PROMPTS.map((prompt) => (
+                  <button
+                    key={prompt}
+                    name="suggested_prompt"
+                    value={prompt}
+                    className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue"
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-          <ActionButton tone="primary" disabled={!canImport} pendingLabel="Analyzing file...">Analyze with Vaeroex</ActionButton>
-          {!canImport ? <p className="text-xs leading-5 text-muted">Upload CSV or XLSX only when you want Vaeroex to read file contents. Manual KPI and CRM entry works without files.</p> : null}
-        </form>
+            <ActionButton tone="primary" pendingLabel="Analyzing...">Analyze with Vaeroex</ActionButton>
+          </form>
+        ) : (
+          <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
+            {support.body} Upload CSV/XLSX for data import, or text-based PDF/DOCX files for analysis and report creation.
+          </p>
+        )}
       </section>
 
       <section className="rounded-lg border border-line bg-white p-4">
@@ -313,21 +369,28 @@ function FileActionCenter({
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            CSV and XLSX files can be imported into structured records. This file can still be attached to reports and organized in the file library.
+            CSV and XLSX files can be imported into structured KPI, CRM, or operational metric records. This file can still be analyzed when supported, attached to reports, and organized in the file library.
           </p>
         ) : null}
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <form action={createReportFromFileAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
-          <input type="hidden" name="file_id" value={file.id} />
+        <div className="space-y-3 rounded-lg border border-line bg-white p-4">
           <h4 className="text-sm font-semibold text-ink">Create Report from File</h4>
-          <TextInput label="Report title" name="report_title" defaultValue={`File Report - ${file.display_name}`} />
-          <TextInput label="Report type" name="report_type" defaultValue="File Review" />
-          <TextArea label="Report focus" name="report_focus" rows={3} placeholder="Optional: what should this report focus on?" />
-          <ActionButton tone="primary" disabled={!canImport} pendingLabel="Creating report...">Create Report from File</ActionButton>
-          {!canImport ? <p className="text-xs leading-5 text-muted">Reports from file contents currently require a CSV or XLSX spreadsheet.</p> : null}
-        </form>
+          {canAnalyze ? (
+            <form action={createReportFromFileAction} className="space-y-3">
+              <input type="hidden" name="file_id" value={file.id} />
+              <TextInput label="Report title" name="report_title" defaultValue={`File Report - ${file.display_name}`} />
+              <TextInput label="Report type" name="report_type" defaultValue="File Review" />
+              <TextArea label="Report focus" name="report_focus" rows={3} placeholder="Optional: what should this report focus on?" />
+              <ActionButton tone="primary" pendingLabel="Creating report...">Create Report from File</ActionButton>
+            </form>
+          ) : (
+            <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
+              {support.body} Vaeroex will not create a file-content report until it can read real file content.
+            </p>
+          )}
+        </div>
 
         <form action={attachFileToReportAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
           <input type="hidden" name="file_id" value={file.id} />
@@ -383,7 +446,7 @@ function FileActionCenter({
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support spreadsheet rows only.
+            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support CSV/XLSX rows only. PDF and DOCX analysis uses extracted text instead of imported rows.
           </p>
         ) : null}
       </details>
@@ -698,7 +761,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV and XLSX imports use column names in the first row and always go to review before saving.">
+          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX files can be imported after review. Text-based PDF/DOCX files can be analyzed and used for reports.">
             <form action={uploadFileAction} encType="multipart/form-data" className="space-y-4">
               <label className="block text-sm font-medium">
                 File

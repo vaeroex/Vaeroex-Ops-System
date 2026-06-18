@@ -179,16 +179,17 @@ ${sharedJsonInstructions}
   {
     key: "file_analysis",
     title: "File Analysis",
-    description: "Review uploaded spreadsheet data and turn it into plain-language trends, KPI ideas, risks, and executive summaries.",
+    description: "Review uploaded file content and turn it into plain-language trends, KPI ideas, risks, and executive summaries.",
     actionLabel: "Analyze file",
-    promptPlaceholder: "What trends, KPIs, problems, and executive summary should Vaeroex pull from this spreadsheet?",
+    promptPlaceholder: "What trends, KPIs, problems, and executive summary should Vaeroex pull from this file?",
     saveTargets: ["tasks", "report"],
     instructions: `
-Analyze the uploaded spreadsheet preview and workspace context.
-Return a polished business-owner-friendly result with executive_summary, problems_identified, recommended_actions, suggested_systems, and response_markdown.
+Analyze the uploaded file content and workspace context. The file may be parsed spreadsheet rows, extracted PDF text, or extracted DOCX text.
+Return a polished business-owner-friendly result with executive_summary, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, suggested_systems, and response_markdown.
 Compare the new file against prior KPI history, file imports, CRM lead history, and operational metrics when those are available.
 Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, operational problems that stand out, possible data quality concerns, and practical next steps.
-Do not repeat raw rows or technical JSON in the user-facing answer.
+Do not repeat raw rows, long document excerpts, or technical JSON in the user-facing answer.
+For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Operational Issues, Recommended Actions, Source File.
 If the file suggests follow-up work, include suggested_tasks for manager review.
 ${sharedJsonInstructions}
 `
