@@ -11,6 +11,7 @@ import {
 } from "@/app/app/operations/record-management-actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { EmptyState } from "@/components/operations/EmptyState";
+import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 
 export type ManagedRecordCollection =
@@ -28,6 +29,7 @@ export type ManagedRecordCollection =
   | "asset_checks"
   | "crm_leads"
   | "files"
+  | "people"
   | "support_requests";
 
 export type ManagedRecordFolder = {
@@ -505,6 +507,8 @@ export function ManagedRecordList({
   const bulkFormId = `bulk-${collection}`;
   const activeFolder = param(searchParams?.folder);
   const baseParams = listParams(searchParams);
+  const successMessage = param(searchParams?.message);
+  const errorMessage = param(searchParams?.error);
 
   return (
     <div className="space-y-4">
@@ -523,6 +527,11 @@ export function ManagedRecordList({
           <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
         </form>
       </div>
+
+      {successMessage ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{successMessage}</div>
+      ) : null}
+      {errorMessage ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</div> : null}
 
       <div className="grid gap-4 2xl:grid-cols-[220px_minmax(0,1fr)]">
         <FolderQuickFilters folders={folders} records={records} activeFolder={activeFolder} returnPath={returnPath} />
@@ -673,68 +682,80 @@ export function ManagedRecordList({
                           className="mt-1 h-4 w-4 rounded border-line text-vaeroex-blue lg:mt-0"
                           aria-label={`Select ${record.title}`}
                         />
-                        <details className="group min-w-0 lg:contents">
-                          <summary className="cursor-pointer list-none lg:col-start-2">
-                            <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-2">
-                                {record.href ? (
-                                  <Link href={record.href} className="truncate text-sm font-semibold text-ink hover:text-vaeroex-blue">
-                                    {record.title}
-                                  </Link>
-                                ) : (
-                                  <h3 className="truncate text-sm font-semibold text-ink">{record.title}</h3>
-                                )}
-                                {isActive ? <StatusBadge value="Selected" /> : null}
-                                {record.archivedAt ? <StatusBadge value="Archived" /> : null}
-                                {record.deletedAt ? <StatusBadge value="Deleted" /> : null}
-                              </div>
-                              <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted">
-                                {record.preview || record.type || "No preview available."}
-                              </p>
-                              {record.href ? (
-                                <Link href={record.href} className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline">
-                                  {isActive ? "Active selection" : record.selectLabel || "Select this record"}
-                                </Link>
-                              ) : (
-                                <span className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue">View details</span>
-                              )}
-                              <p className="mt-1 text-xs text-muted lg:hidden">
-                                {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
-                              </p>
-                            </div>
-                          </summary>
-                          <div className="mt-3 space-y-3 rounded-lg border border-line bg-slate-50 p-3 lg:col-span-7 lg:col-start-1">
-                            <div className="grid gap-3 text-sm md:grid-cols-2 xl:grid-cols-4">
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
-                                <p className="mt-1 text-ink">{record.type || "Record"}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folder</p>
-                                <p className="mt-1 text-ink">{getFolderName(folders, record.folderId)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Created</p>
-                                <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
-                              </div>
-                              <div>
-                                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
-                                <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
-                              </div>
-                            </div>
-                            {record.meta?.length ? (
-                              <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-                                {record.meta.map((item) => (
-                                  <div key={item.label} className="rounded-md bg-white p-3 text-sm">
-                                    <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
-                                    <div className="mt-1 text-ink">{item.value || "Not set"}</div>
-                                  </div>
-                                ))}
-                              </div>
-                            ) : null}
-                          {record.children ? <div className="rounded-md bg-white p-3">{record.children}</div> : null}
+                        <div className="min-w-0 lg:col-start-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {record.href ? (
+                              <Link href={record.href} className="truncate text-sm font-semibold text-ink hover:text-vaeroex-blue">
+                                {record.title}
+                              </Link>
+                            ) : (
+                              <h3 className="truncate text-sm font-semibold text-ink">{record.title}</h3>
+                            )}
+                            {isActive ? <StatusBadge value="Selected" /> : null}
+                            {record.archivedAt ? <StatusBadge value="Archived" /> : null}
+                            {record.deletedAt ? <StatusBadge value="Deleted" /> : null}
                           </div>
-                        </details>
+                          <p className="mt-1 line-clamp-1 text-xs leading-5 text-muted">
+                            {record.preview || record.type || "No preview available."}
+                          </p>
+                          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <RecordDetailDrawer title={record.title} description={record.preview || record.type}>
+                              <div className="grid gap-3 text-sm sm:grid-cols-2">
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Type</p>
+                                  <p className="mt-1 text-ink">{record.type || "Record"}</p>
+                                </div>
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status</p>
+                                  <div className="mt-1">{record.status ? <StatusBadge value={record.status} /> : <span className="text-ink">Not set</span>}</div>
+                                </div>
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Owner</p>
+                                  <p className="mt-1 text-ink">{record.owner || "No owner"}</p>
+                                </div>
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Category</p>
+                                  <p className="mt-1 text-ink">{record.category || "Uncategorized"}</p>
+                                </div>
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folder</p>
+                                  <p className="mt-1 text-ink">{getFolderName(folders, record.folderId)}</p>
+                                </div>
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Created</p>
+                                  <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
+                                </div>
+                                <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                  <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
+                                  <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
+                                </div>
+                              </div>
+                              {record.meta?.length ? (
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                  {record.meta.map((item) => (
+                                    <div key={item.label} className="rounded-lg border border-line bg-white p-3 text-sm">
+                                      <p className="text-xs font-semibold uppercase tracking-wide text-muted">{item.label}</p>
+                                      <div className="mt-1 text-ink">{item.value || "Not set"}</div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : null}
+                              {record.children ? <div className="rounded-lg border border-line bg-white p-4">{record.children}</div> : null}
+                              <div className="rounded-lg border border-line bg-slate-50 p-3">
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Actions</p>
+                                <RecordActionsMenu collection={collection} record={record} activeFolders={activeFolders} returnPath={returnPath} />
+                              </div>
+                            </RecordDetailDrawer>
+                            {record.href ? (
+                              <Link href={record.href} className="mt-1 inline-flex text-xs font-semibold text-vaeroex-blue hover:underline">
+                                {isActive ? "Active selection" : record.selectLabel || "Select this record"}
+                              </Link>
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-xs text-muted lg:hidden">
+                            {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
+                          </p>
+                        </div>
                         {record.inlineActions ? <div className="lg:col-span-6 lg:col-start-2">{record.inlineActions}</div> : null}
                         <div className="hidden lg:block">{record.status ? <StatusBadge value={record.status} /> : <span className="text-sm text-muted">-</span>}</div>
                         <div className="hidden truncate text-sm text-slate-700 lg:block">{record.owner || "-"}</div>

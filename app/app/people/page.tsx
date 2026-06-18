@@ -1,25 +1,75 @@
 import { createPersonAction } from "@/app/app/operations/actions";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
-import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
+import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
-import { StatusBadge } from "@/components/operations/StatusBadge";
+import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type PeoplePageProps = {
-  searchParams?: Promise<{ error?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
+
+const peopleStatuses = ["active", "onboarding", "inactive"];
+const personEditFields: ManagedRecordEditField[] = [
+  { name: "full_name", label: "Full name", required: true },
+  { name: "email", label: "Email" },
+  { name: "phone", label: "Phone" },
+  { name: "role_title", label: "Role title" },
+  { name: "department", label: "Department" },
+  { name: "status", label: "Status", type: "select", options: peopleStatuses },
+  { name: "start_date", label: "Start date", type: "date" },
+  { name: "notes", label: "Notes", type: "textarea", rows: 4 }
+];
 
 export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const { data: people, error } = await supabase
-    .from("people")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .order("full_name", { ascending: true });
+  const [{ data: people, error }, folderResult] = await Promise.all([
+    supabase
+      .from("people")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("full_name", { ascending: true }),
+    getRecordFolders(supabase, workspaceId, "people")
+  ]);
+  const managedPeople = (people || []).map((person) => {
+    const management = managedValues(person);
+
+    return {
+      id: person.id,
+      title: person.full_name,
+      type: person.role_title || "Person",
+      status: person.status,
+      owner: person.department || "General",
+      category: person.role_title || "Team",
+      createdAt: person.created_at,
+      updatedAt: management.updatedAt || person.updated_at,
+      folderId: management.folderId,
+      archivedAt: management.archivedAt,
+      deletedAt: management.deletedAt,
+      preview: shortPreview(person.notes, person.email || person.phone || "No notes yet."),
+      meta: [
+        { label: "Email", value: person.email || "No email" },
+        { label: "Phone", value: person.phone || "No phone" },
+        { label: "Start date", value: person.start_date || "Not set" }
+      ],
+      editFields: personEditFields,
+      editValues: {
+        full_name: person.full_name,
+        email: person.email,
+        phone: person.phone,
+        role_title: person.role_title,
+        department: person.department,
+        status: person.status,
+        start_date: person.start_date,
+        notes: person.notes
+      },
+      children: <p className="text-sm leading-6 text-muted">{person.notes || "No notes yet."}</p>
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -29,7 +79,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
         description="Track team roles, departments, status, contact details, and onboarding notes for operational accountability."
       />
 
-      <ErrorNotice message={params?.error || error?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
       <section className="space-y-6">
         <CreateDrawer title="Add person" description="This directory is separate from workspace login permissions." triggerLabel="New Person">
@@ -39,7 +89,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
             <TextInput label="Phone" name="phone" />
             <TextInput label="Role title" name="role_title" />
             <TextInput label="Department" name="department" />
-            <SelectInput label="Status" name="status" defaultValue="active" options={["active", "onboarding", "inactive"]} />
+            <SelectInput label="Status" name="status" defaultValue="active" options={peopleStatuses} />
             <TextInput label="Start date" name="start_date" type="date" />
             <div className="lg:col-span-2">
               <TextArea label="Notes" name="notes" rows={4} />
@@ -51,43 +101,18 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
         </CreateDrawer>
 
         <SectionCard title="People directory" description="Operational contacts for the current workspace.">
-          {people?.length ? (
-            <div>
-              <table className="w-full table-fixed text-left text-sm">
-                <thead className="text-xs uppercase tracking-wide text-muted">
-                  <tr>
-                    <th className="w-[42%] py-2 sm:w-[30%]">Name</th>
-                    <th className="hidden sm:table-cell">Role</th>
-                    <th className="hidden md:table-cell">Department</th>
-                    <th className="hidden lg:table-cell">Email</th>
-                    <th className="hidden xl:table-cell">Phone</th>
-                    <th className="w-[32%] sm:w-auto">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-line">
-                  {people.map((person) => (
-                    <tr key={person.id}>
-                      <td className="min-w-0 py-3 pr-3">
-                        <p className="truncate font-semibold">{person.full_name}</p>
-                        <p className="text-xs text-muted">Started {person.start_date || "not set"}</p>
-                      </td>
-                      <td className="hidden truncate pr-3 sm:table-cell">{person.role_title || "-"}</td>
-                      <td className="hidden truncate pr-3 md:table-cell">{person.department || "-"}</td>
-                      <td className="hidden truncate pr-3 lg:table-cell">{person.email || "-"}</td>
-                      <td className="hidden truncate pr-3 xl:table-cell">{person.phone || "-"}</td>
-                      <td>
-                        <StatusBadge value={person.status} />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <EmptyState title="No people yet" description="Add team members, contractors, managers, or operational contacts." />
-          )}
+          <ManagedRecordList
+            collection="people"
+            records={managedPeople}
+            folders={folderResult.folders}
+            title="People records"
+            description="Keep team contacts compact, searchable, and easy to manage without exposing long notes by default."
+            emptyTitle="No people yet"
+            emptyDescription="Add team members, contractors, managers, or operational contacts."
+            returnPath="/app/people"
+            searchParams={params}
+          />
         </SectionCard>
-
       </section>
     </div>
   );
