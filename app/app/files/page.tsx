@@ -1,4 +1,13 @@
-import { analyzeFileAction, importFileAction, saveExtractedImportAction, uploadFileAction } from "@/app/app/files/actions";
+import Link from "next/link";
+import type { ReactNode } from "react";
+import {
+  analyzeFileAction,
+  attachFileToReportAction,
+  createReportFromFileAction,
+  importFileAction,
+  saveExtractedImportAction,
+  uploadFileAction
+} from "@/app/app/files/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
@@ -27,6 +36,7 @@ type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
 type FileImportDataRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
 type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
+type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type ImportType = "kpi" | "crm" | "metrics";
 type JsonRecord = Record<string, unknown>;
 
@@ -35,6 +45,13 @@ const IMPORT_TYPES = [
   { value: "kpi", label: "KPI data" },
   { value: "crm", label: "CRM leads" },
   { value: "metrics", label: "Operational metrics" }
+];
+const SUGGESTED_PROMPTS = [
+  "What trends do you see?",
+  "What KPIs should I track?",
+  "What problems stand out?",
+  "Create an executive summary.",
+  "Create recommended actions."
 ];
 const IMPORT_FIELDS: Record<ImportType, Array<{ key: string; label: string; required?: boolean }>> = {
   kpi: [
@@ -163,6 +180,201 @@ function rowsForImport(rows: FileImportDataRow[], importId: string) {
 
 function importsForFile(imports: FileImportRow[], fileId: string) {
   return imports.filter((item) => item.file_upload_id === fileId);
+}
+
+function reportLabel(report: Pick<ReportRow, "title" | "report_type" | "created_at">) {
+  return `${report.title} · ${report.report_type} · ${formatDate(report.created_at)}`;
+}
+
+function ActionButton({
+  children,
+  tone = "default",
+  disabled = false
+}: {
+  children: ReactNode;
+  tone?: "default" | "primary";
+  disabled?: boolean;
+}) {
+  const classes =
+    tone === "primary"
+      ? "rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
+      : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50";
+
+  return (
+    <button disabled={disabled} className={classes}>
+      {children}
+    </button>
+  );
+}
+
+function ImportActionForm({ file, importType, label }: { file: FileUploadRow; importType: ImportType; label: string }) {
+  const canImport = isSpreadsheet(file);
+
+  return (
+    <form action={importFileAction}>
+      <input type="hidden" name="file_id" value={file.id} />
+      <input type="hidden" name="import_type" value={importType} />
+      <ActionButton disabled={!canImport}>{label}</ActionButton>
+    </form>
+  );
+}
+
+function FileActionCenter({
+  file,
+  reports,
+  compact = false
+}: {
+  file: FileUploadRow;
+  reports: Pick<ReportRow, "id" | "title" | "report_type" | "created_at">[];
+  compact?: boolean;
+}) {
+  const canImport = isSpreadsheet(file);
+
+  if (compact) {
+    return (
+      <>
+        <Link href={`/app/files?file=${file.id}`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
+          View File Details
+        </Link>
+        <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" />
+        <form action={createReportFromFileAction}>
+          <input type="hidden" name="file_id" value={file.id} />
+          <ActionButton>Create Report from File</ActionButton>
+        </form>
+      </>
+    );
+  }
+
+  return (
+    <div id={`file-${file.id}-actions`} className="space-y-5">
+      <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h3 className="text-base font-semibold text-ink">File actions for {file.display_name}</h3>
+            <p className="mt-1 text-sm leading-6 text-muted">
+              Analyze the file, stage imports for review, create a report, attach it to an existing report, or inspect details.
+            </p>
+          </div>
+          <span className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-700">{fileStatusLabel(file)}</span>
+        </div>
+      </div>
+
+      <section className="rounded-lg border border-line bg-white p-4">
+        <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Analyze with Vaeroex</h4>
+            <p className="mt-1 text-xs leading-5 text-muted">Ask a question about this file. Spreadsheet files include row previews; other files include file details and workspace context.</p>
+          </div>
+        </div>
+        <form action={analyzeFileAction} className="mt-4 space-y-3">
+          <input type="hidden" name="file_id" value={file.id} />
+          <TextArea
+            label="Question for Vaeroex"
+            name="analysis_prompt"
+            rows={4}
+            defaultValue={file.analysis_prompt || "What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary."}
+          />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Suggested prompts</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  name="suggested_prompt"
+                  value={prompt}
+                  className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+          <PrimaryButton>Analyze with Vaeroex</PrimaryButton>
+        </form>
+      </section>
+
+      <section className="rounded-lg border border-line bg-white p-4">
+        <h4 className="text-sm font-semibold text-ink">Import data after review</h4>
+        <p className="mt-1 text-xs leading-5 text-muted">
+          These actions extract rows and show a mapping review first. Nothing is saved to KPI, CRM, or operations history until you approve it.
+        </p>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <ImportActionForm file={file} importType="kpi" label="Import as KPI Data" />
+          <ImportActionForm file={file} importType="crm" label="Import as CRM Leads" />
+          <ImportActionForm file={file} importType="metrics" label="Import as Operational Metrics" />
+        </div>
+        {!canImport ? (
+          <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
+            CSV and XLSX files can be imported into structured records. This file can still be analyzed, reported on, attached, and organized.
+          </p>
+        ) : null}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <form action={createReportFromFileAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
+          <input type="hidden" name="file_id" value={file.id} />
+          <h4 className="text-sm font-semibold text-ink">Create Report from File</h4>
+          <TextInput label="Report title" name="report_title" defaultValue={`File Report - ${file.display_name}`} />
+          <TextInput label="Report type" name="report_type" defaultValue="File Review" />
+          <TextArea label="Report focus" name="report_focus" rows={3} placeholder="Optional: what should this report focus on?" />
+          <PrimaryButton>Create Report from File</PrimaryButton>
+        </form>
+
+        <form action={attachFileToReportAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
+          <input type="hidden" name="file_id" value={file.id} />
+          <h4 className="text-sm font-semibold text-ink">Attach to Existing Report</h4>
+          <label className="block text-sm font-medium">
+            Report
+            <select
+              name="report_id"
+              required
+              disabled={!reports.length}
+              className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue disabled:bg-slate-50 disabled:text-muted"
+            >
+              <option value="">Choose report...</option>
+              {reports.map((report) => (
+                <option key={report.id} value={report.id}>
+                  {reportLabel(report)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <ActionButton tone="primary" disabled={!reports.length}>Attach to Existing Report</ActionButton>
+          {!reports.length ? <p className="text-xs leading-5 text-muted">Create a report first, then attach files to it.</p> : null}
+        </form>
+      </section>
+
+      <details className="rounded-lg border border-line bg-white p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-ink">View File Details</summary>
+        <div className="mt-4 grid gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Original name</p>
+            <p className="mt-1 break-words text-ink">{file.original_name}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">File type</p>
+            <p className="mt-1 text-ink">{file.file_extension.toUpperCase()}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Uploaded</p>
+            <p className="mt-1 text-ink">{formatDate(file.created_at)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Size</p>
+            <p className="mt-1 text-ink">{fileSizeLabel(file.file_size_bytes)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Import status</p>
+            <p className="mt-1 text-ink">{fileStatusLabel(file)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Rows imported</p>
+            <p className="mt-1 text-ink">{file.imported_rows}</p>
+          </div>
+        </div>
+      </details>
+    </div>
+  );
 }
 
 function asImportType(value: string): ImportType {
@@ -330,32 +542,17 @@ function FolderSelect({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }
   );
 }
 
-function ImportTypeSelect() {
-  return (
-    <label className="block text-sm font-medium">
-      Import as
-      <select name="import_type" required className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue">
-        <option value="">Choose...</option>
-        {IMPORT_TYPES.map((type) => (
-          <option key={type.value} value={type.value}>
-            {type.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
 function FileDetails({
   file,
   imports,
-  importRows
+  importRows,
+  reports
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   importRows: FileImportDataRow[];
+  reports: Pick<ReportRow, "id" | "title" | "report_type" | "created_at">[];
 }) {
-  const canImport = isSpreadsheet(file);
   const lines = analysisLines(file.analysis_summary);
   const latestImport = imports[0];
   const latestImportRows = latestImport ? rowsForImport(importRows, latestImport.id) : [];
@@ -363,58 +560,7 @@ function FileDetails({
 
   return (
     <div className="space-y-5">
-      <div className="grid gap-3 text-sm md:grid-cols-3">
-        <div className="rounded-lg border border-line bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">File type</p>
-          <p className="mt-1 font-medium text-ink">{file.file_extension.toUpperCase()}</p>
-        </div>
-        <div className="rounded-lg border border-line bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Size</p>
-          <p className="mt-1 font-medium text-ink">{fileSizeLabel(file.file_size_bytes)}</p>
-        </div>
-        <div className="rounded-lg border border-line bg-white p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Uploaded</p>
-          <p className="mt-1 font-medium text-ink">{formatDate(file.created_at)}</p>
-        </div>
-      </div>
-
-      {canImport ? (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <form action={importFileAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
-            <input type="hidden" name="file_id" value={file.id} />
-            <div>
-              <p className="text-sm font-semibold text-ink">Extract spreadsheet rows</p>
-              <p className="mt-1 text-xs leading-5 text-muted">
-                Vaeroex will read the first row as column names, suggest mappings, and stage rows for your review before anything is saved.
-              </p>
-            </div>
-            <ImportTypeSelect />
-            <PrimaryButton>Extract for review</PrimaryButton>
-          </form>
-
-          <form action={analyzeFileAction} className="space-y-3 rounded-lg border border-line bg-white p-4">
-            <input type="hidden" name="file_id" value={file.id} />
-            <div>
-              <p className="text-sm font-semibold text-ink">Ask Vaeroex about this file</p>
-              <p className="mt-1 text-xs leading-5 text-muted">
-                Use this for trends, KPIs to track, problems that stand out, and executive summaries.
-              </p>
-            </div>
-            <TextArea
-              label="Question"
-              name="analysis_prompt"
-              rows={4}
-              defaultValue="What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary."
-            />
-            <PrimaryButton>Analyze file</PrimaryButton>
-          </form>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-line bg-white p-4 text-sm leading-6 text-muted">
-          This file is stored in the workspace. Spreadsheet extraction, import history, and Vaeroex trend analysis are available for CSV and XLSX files.
-        </div>
-      )}
-
+      <FileActionCenter file={file} reports={reports} />
       {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
       <ImportHistory imports={imports} />
 
@@ -441,20 +587,23 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
   await ensureDefaultFileFolders(supabase, workspaceId, user?.id);
 
-  const [fileResult, folderResult, importResult, importRowResult] = await Promise.all([
+  const [fileResult, folderResult, importResult, importRowResult, reportResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("file_import_rows").select("*").eq("workspace_id", workspaceId).order("row_number", { ascending: true }).limit(2000)
+    supabase.from("file_import_rows").select("*").eq("workspace_id", workspaceId).order("row_number", { ascending: true }).limit(2000),
+    supabase.from("reports").select("id,title,report_type,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(50)
   ]);
   const files = (fileResult.data || []) as FileUploadRow[];
   const imports = (importResult.data || []) as FileImportRow[];
   const importRows = (importRowResult.data || []) as FileImportDataRow[];
+  const reports = (reportResult.data || []) as ReportRow[];
   const folderOptions = folderResult.folders;
   const importedRows = files.reduce((sum, file) => sum + file.imported_rows, 0);
   const spreadsheetCount = files.filter(isSpreadsheet).length;
   const analyzedCount = files.filter((file) => Boolean(file.analysis_summary)).length;
   const pendingReviewCount = imports.filter((item) => item.status === "needs_review" || item.status === "extracted").length;
+  const selectedFile = files.find((file) => file.id === params?.file) || files[0] || null;
   const managedFiles = files.map((file) => {
     const management = managedValues(file);
     const fileImports = importsForFile(imports, file.id);
@@ -480,13 +629,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         { label: "Extractions", value: fileImports.length },
         { label: "File size", value: fileSizeLabel(file.file_size_bytes) }
       ],
+      quickActions: <FileActionCenter file={file} reports={reports} compact />,
       editFields: fileEditFields,
       editValues: {
         display_name: file.display_name,
         import_type: file.import_type,
         analysis_summary: file.analysis_summary
       },
-      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} />
+      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} reports={reports} />
     };
   });
 
@@ -498,7 +648,9 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         description="Upload workspace files, extract spreadsheet data for review, save approved rows into KPI, CRM, and operations history, and ask Vaeroex for plain-language trend analysis."
       />
 
-      <ErrorNotice message={params?.error || fileResult.error?.message || folderResult.error?.message || importResult.error?.message || importRowResult.error?.message} />
+      <ErrorNotice
+        message={params?.error || fileResult.error?.message || folderResult.error?.message || importResult.error?.message || importRowResult.error?.message || reportResult.error?.message}
+      />
       <SuccessNotice message={params?.message} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
@@ -523,6 +675,12 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           <p className="mt-2 text-3xl font-semibold">{analyzedCount}</p>
         </article>
       </section>
+
+      {selectedFile ? (
+        <SectionCard title="Selected file actions" description="Choose what to do next with the uploaded file. Imports always go to review before anything is saved.">
+          <FileActionCenter file={selectedFile} reports={reports} />
+        </SectionCard>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">

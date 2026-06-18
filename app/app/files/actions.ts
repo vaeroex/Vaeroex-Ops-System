@@ -597,6 +597,47 @@ function summarizeVaeroexOutput(outputJson: Json) {
   return problems.slice(0, 4).join("\n") || "Vaeroex completed the spreadsheet analysis.";
 }
 
+function fileReportBody({
+  file,
+  importRows,
+  analysisSummary,
+  prompt
+}: {
+  file: FileUploadRow;
+  importRows: Array<Pick<Database["public"]["Tables"]["file_imports"]["Row"], "import_type" | "status" | "rows_total" | "rows_imported" | "extraction_summary" | "created_at" | "imported_at">>;
+  analysisSummary: string | null;
+  prompt?: string;
+}) {
+  const imports = importRows.length
+    ? importRows
+        .map((item) => `- ${item.import_type}: ${item.rows_imported} of ${item.rows_total} rows saved (${item.status})`)
+        .join("\n")
+    : "- No imports have been saved from this file yet.";
+
+  return `# File Report - ${file.display_name}
+
+## Executive Summary
+${analysisSummary || "This file is stored in Vaeroex and is ready for review, analysis, import, or attachment to an operations report."}
+
+## File Details
+- Original name: ${file.original_name}
+- File type: ${file.file_extension.toUpperCase()}
+- Import status: ${file.import_status.replace(/_/g, " ")}
+- Imported rows: ${file.imported_rows}
+- Uploaded: ${file.created_at}
+
+## Analysis Question
+${prompt || file.analysis_prompt || "No specific file question was provided."}
+
+## Import History
+${imports}
+
+## Recommended Next Actions
+- Review file mappings before saving spreadsheet data into KPIs, CRM leads, or operational metrics.
+- Use the saved analysis and imported history in the next management report.
+- Confirm any Vaeroex recommendations before creating or changing operational records.`;
+}
+
 export async function uploadFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const uploadedFile = formData.get("file");
@@ -906,16 +947,133 @@ export async function saveExtractedImportAction(formData: FormData) {
   redirectWithMessage(`${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved to history.`, file.id);
 }
 
+export async function createReportFromFileAction(formData: FormData) {
+  const { supabase, user, workspaceId } = await requireWorkspace();
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const reportTitle = text(formData, "report_title") || `File Report - ${file.display_name}`;
+  const reportType = text(formData, "report_type") || "File Review";
+  const reportFocus = text(formData, "report_focus");
+  const { data: importRows, error: importError } = await supabase
+    .from("file_imports")
+    .select("import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
+    .eq("workspace_id", workspaceId)
+    .eq("file_upload_id", file.id)
+    .order("created_at", { ascending: false })
+    .limit(20);
+
+  if (importError) {
+    redirectWithError(importError.message);
+  }
+
+  const bodyMarkdown = fileReportBody({
+    file,
+    importRows: importRows || [],
+    analysisSummary: file.analysis_summary,
+    prompt: reportFocus
+  });
+  const sourceData = {
+    generated_from: "file",
+    file: {
+      id: file.id,
+      display_name: file.display_name,
+      original_name: file.original_name,
+      file_extension: file.file_extension,
+      import_type: file.import_type,
+      import_status: file.import_status,
+      imported_rows: file.imported_rows,
+      analysis_summary: file.analysis_summary,
+      analysis_prompt: file.analysis_prompt,
+      metadata_json: file.metadata_json
+    },
+    import_history: importRows || [],
+    report_focus: reportFocus || null
+  } satisfies Json;
+
+  const { error } = await supabase.from("reports").insert({
+    workspace_id: workspaceId,
+    report_type: reportType,
+    title: reportTitle,
+    date_range_start: file.created_at.slice(0, 10),
+    date_range_end: new Date().toISOString().slice(0, 10),
+    body_markdown: bodyMarkdown,
+    source_data_json: sourceData,
+    created_by: user.id
+  });
+
+  if (error) {
+    redirectWithError(error.message);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/reports");
+  redirectWithMessage("Report created from file.", file.id);
+}
+
+export async function attachFileToReportAction(formData: FormData) {
+  const { supabase, workspaceId } = await requireWorkspace();
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const reportId = text(formData, "report_id");
+
+  if (!reportId) {
+    redirectWithError("Choose a report before attaching this file.");
+  }
+
+  const { data: report, error: reportError } = await supabase
+    .from("reports")
+    .select("*")
+    .eq("id", reportId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (reportError || !report) {
+    redirectWithError(reportError?.message || "Report not found for this workspace.");
+  }
+
+  const sourceData = (isRecord(report.source_data_json) ? report.source_data_json : {}) as JsonObject;
+  const existingFiles = Array.isArray(sourceData.attached_files) ? sourceData.attached_files.filter(isRecord).map((item) => item as JsonObject) : [];
+  const attachment = {
+    id: file.id,
+    display_name: file.display_name,
+    original_name: file.original_name,
+    file_extension: file.file_extension,
+    import_status: file.import_status,
+    imported_rows: file.imported_rows,
+    analysis_summary: file.analysis_summary,
+    attached_at: new Date().toISOString()
+  } satisfies JsonObject;
+  const withoutDuplicate = existingFiles.filter((item) => item.id !== file.id);
+  const bodyNote = `\n\n## Attached File\n- ${file.display_name} (${file.file_extension.toUpperCase()})\n- Import status: ${file.import_status.replace(/_/g, " ")}\n- Imported rows: ${file.imported_rows}\n${file.analysis_summary ? `- Latest Vaeroex analysis: ${file.analysis_summary.split("\n")[0]}` : "- Latest Vaeroex analysis: Not completed yet."}`;
+
+  const { error } = await supabase
+    .from("reports")
+    .update({
+      source_data_json: {
+        ...sourceData,
+        attached_files: [attachment, ...withoutDuplicate].slice(0, 20)
+      } satisfies Json,
+      body_markdown: `${report.body_markdown || ""}${bodyNote}`
+    })
+    .eq("id", report.id)
+    .eq("workspace_id", workspaceId);
+
+  if (error) {
+    redirectWithError(error.message);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/reports");
+  redirectWithMessage("File attached to report.", file.id);
+}
+
 export async function analyzeFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const prompt =
+    text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
     "Review this spreadsheet and explain trends, useful KPIs, operational problems, and an executive summary.";
-
-  if (!isSpreadsheet(file)) {
-    redirectWithError("Vaeroex can analyze CSV and XLSX files right now.");
-  }
 
   const workflow = getVaeroexWorkflow("file_analysis");
   let inputJson: Json = {
@@ -932,15 +1090,28 @@ export async function analyzeFileAction(formData: FormData) {
   } satisfies Json;
 
   try {
-    const buffer = await downloadFileBuffer(file);
-    const rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
-    const [workspaceSnapshot, fileImports] = await Promise.all([
+    let rows: ImportRow[] = [];
+    let contentNote = "File content was not parsed. Vaeroex can review the file metadata, prior imports, saved analysis, and workspace context.";
+
+    if (isSpreadsheet(file)) {
+      const buffer = await downloadFileBuffer(file);
+      rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
+      contentNote = "Spreadsheet rows were parsed for preview and trend analysis.";
+    }
+
+    const [workspaceSnapshot, fileImports, fileReports] = await Promise.all([
       buildWorkspaceSnapshot(supabase, workspaceId),
       supabase
         .from("file_imports")
         .select("id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
         .eq("workspace_id", workspaceId)
         .eq("file_upload_id", file.id)
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("reports")
+        .select("id,title,report_type,created_at,source_data_json")
+        .eq("workspace_id", workspaceId)
         .order("created_at", { ascending: false })
         .limit(10)
     ]);
@@ -950,10 +1121,13 @@ export async function analyzeFileAction(formData: FormData) {
         name: file.display_name,
         extension: file.file_extension,
         rows_detected: rows.length,
-        metadata: file.metadata_json
+        metadata: file.metadata_json,
+        analysis_summary: file.analysis_summary,
+        content_note: contentNote
       },
       import_history: fileImports.data ?? [],
-      spreadsheet_preview: previewRows(rows, 30)
+      related_reports: fileReports.data ?? [],
+      spreadsheet_preview: rows.length ? previewRows(rows, 30) : []
     } satisfies Json;
     inputJson = {
       workflow: workflow.key,
@@ -1014,13 +1188,15 @@ export async function analyzeFileAction(formData: FormData) {
         metadata_json: {
           ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
           latest_analysis_run_id: data.id,
-          latest_analysis_at: new Date().toISOString()
+          latest_analysis_at: new Date().toISOString(),
+          latest_analysis_prompt: prompt
         } satisfies Json
       })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
 
     revalidatePath(FILES_PATH);
+    revalidatePath("/app");
     revalidatePath("/app/agents");
     revalidatePath("/app/reports");
     redirectWithMessage("Vaeroex file analysis completed.", file.id);
