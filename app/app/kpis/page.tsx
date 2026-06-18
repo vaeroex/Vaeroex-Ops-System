@@ -1,8 +1,10 @@
+import type { Route } from "next";
 import { createKpiAction } from "@/app/app/operations/actions";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
+import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
@@ -868,6 +870,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         eyebrow="KPIs"
         title="KPI dashboard"
         description="Track practical business metrics by workspace, compare actual results to targets, and keep owners accountable."
+      />
+      <ModuleTabs
+        tabs={[
+          { label: "Dashboard", href: "/app/kpis", active: !params?.metric },
+          { label: "Records", href: "/app/kpis?view=active" as Route },
+          { label: "Comparisons", href: "/app/kpis?metric=compare" as Route, active: params?.metric === "compare" },
+          { label: "Imports", href: "/app/files?status=Imported" as Route }
+        ]}
       />
 
       <ErrorNotice

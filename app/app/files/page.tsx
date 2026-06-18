@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import type { ReactNode } from "react";
 import {
   analyzeFileAction,
@@ -11,6 +12,7 @@ import {
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
+import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -826,6 +828,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         eyebrow="Files"
         title="Files and imports"
         description="Use files when you already have existing data to bring into Vaeroex. This is optional: KPIs, CRM leads, tasks, checklists, SOPs, and reports can also be created manually."
+      />
+      <ModuleTabs
+        tabs={[
+          { label: "All Files", href: "/app/files", active: !params?.status && !params?.folder },
+          { label: "Imports", href: "/app/files?status=Imported" as Route, active: params?.status === "Imported" },
+          { label: "Analyses", href: "/app/files?status=Ready" as Route, active: params?.status === "Ready" },
+          { label: "Folders", href: "/app/files?folder=unfiled" as Route, active: Boolean(params?.folder) }
+        ]}
       />
 
       <ErrorNotice message={errorMessage} />
