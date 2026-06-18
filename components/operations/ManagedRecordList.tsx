@@ -61,6 +61,7 @@ export type ManagedRecord = {
   preview?: string | null;
   href?: Route;
   selectLabel?: string;
+  inlineActions?: ReactNode;
   meta?: Array<{ label: string; value: ReactNode }>;
   quickActions?: ReactNode;
   editFields?: ManagedRecordEditField[];
@@ -651,9 +652,10 @@ export function ManagedRecordList({
                                 ))}
                               </div>
                             ) : null}
-                            {record.children ? <div className="rounded-md bg-white p-3">{record.children}</div> : null}
+                          {record.children ? <div className="rounded-md bg-white p-3">{record.children}</div> : null}
                           </div>
                         </details>
+                        {record.inlineActions ? <div className="md:col-span-6 md:col-start-2">{record.inlineActions}</div> : null}
                         <div className="hidden md:block">{record.status ? <StatusBadge value={record.status} /> : <span className="text-sm text-muted">-</span>}</div>
                         <div className="hidden truncate text-sm text-slate-700 md:block">{record.owner || "-"}</div>
                         <div className="hidden md:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>

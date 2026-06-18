@@ -148,6 +148,15 @@ function lower(value: string | null | undefined) {
   return (value || "").toLowerCase();
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function isFileGeneratedReport(report: ReportRow) {
+  const source = isRecord(report.source_data_json) ? report.source_data_json : {};
+  return source.generated_from === "file" || isRecord(source.file) || Array.isArray(source.attached_files);
+}
+
 function inIsoRange(value: string | null, rangeStart: Date, rangeEnd: Date) {
   if (!value) {
     return false;
@@ -534,6 +543,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const fileAnalyses = files.filter((file) => Boolean(file.analysis_summary)).slice(0, 6);
   const recentImports = imports.filter((item) => inIsoRange(item.imported_at || item.created_at, range.start, range.end));
   const pendingImports = imports.filter((item) => item.status === "needs_review" || item.status === "extracted");
+  const fileGeneratedReports = reports.filter(isFileGeneratedReport);
   const leadsCreated = crmLeads.filter((lead) => inIsoRange(lead.created_at, range.start, range.end));
   const leadsConverted = crmLeads.filter((lead) => isConvertedStatus(lead.status) && inIsoRange(lead.updated_at || lead.created_at, range.start, range.end));
   const leadHistoryChanges = crmHistory.filter((item) => inIsoRange(item.created_at, range.start, range.end));
@@ -740,6 +750,16 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       <section className="grid gap-4 xl:grid-cols-4">
         <SectionCard title="Files" description="Uploads and approved imports feeding business memory.">
+          <div className="mb-3 grid gap-2 text-xs text-muted sm:grid-cols-2">
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="font-semibold text-ink">{fileAnalyses.length}</p>
+              <p>Recent file analyses</p>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3">
+              <p className="font-semibold text-ink">{fileGeneratedReports.length}</p>
+              <p>Reports created from files</p>
+            </div>
+          </div>
           <SimpleList
             items={recentFiles.slice(0, 5)}
             empty="No files uploaded in this period."

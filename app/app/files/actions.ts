@@ -784,6 +784,11 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
   const risks = outputList(output, "risks").concat(outputList(output, "operational_risks"));
   const issues = outputList(output, "operational_issues").concat(outputList(output, "problems_identified"));
   const actions = outputList(output, "recommended_actions").concat(outputList(output, "suggested_tasks"));
+  const opportunities = outputList(output, "opportunities").concat(outputList(output, "business_opportunities"));
+  const suggestedTasks = outputList(output, "suggested_tasks").concat(outputList(output, "follow_up_tasks")).concat(outputList(output, "tasks"));
+  const suggestedReports = outputList(output, "suggested_reports").concat(outputList(output, "reports"));
+  const suggestedKpiRecords = outputList(output, "suggested_kpi_records").concat(kpis);
+  const suggestedCrmRecords = outputList(output, "suggested_crm_records").concat(outputList(output, "crm_records")).concat(outputList(output, "crm_leads"));
 
   return {
     source_file_name: file.display_name,
@@ -796,8 +801,28 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
     risks: risks.slice(0, 8),
     operational_issues: issues.slice(0, 8),
     recommended_actions: actions.slice(0, 8),
+    opportunities: opportunities.slice(0, 8),
+    suggested_tasks: suggestedTasks.slice(0, 8),
+    suggested_reports: suggestedReports.slice(0, 8),
+    suggested_kpi_records: suggestedKpiRecords.slice(0, 8),
+    suggested_crm_records: suggestedCrmRecords.slice(0, 8),
     response_markdown: str(output.response_markdown, summary)
   } satisfies JsonRecord;
+}
+
+function cleanAnalysisInsightCount(result: JsonRecord) {
+  return [
+    ...asArray(result.extracted_findings),
+    ...asArray(result.kpis_found),
+    ...asArray(result.risks),
+    ...asArray(result.operational_issues),
+    ...asArray(result.recommended_actions),
+    ...asArray(result.opportunities),
+    ...asArray(result.suggested_tasks),
+    ...asArray(result.suggested_reports),
+    ...asArray(result.suggested_kpi_records),
+    ...asArray(result.suggested_crm_records)
+  ].length;
 }
 
 function hasMeaningfulModelContent(outputJson: Json) {
@@ -1350,6 +1375,7 @@ async function runFileVaeroexAnalysis({
       metadata_json: {
         ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
         latest_analysis_run_id: data.id,
+        latest_analysis_status: "completed",
         latest_analysis_at: new Date().toISOString(),
         latest_analysis_prompt: prompt,
         latest_analysis_content_kind: finalExtraction.kind,
@@ -1376,6 +1402,7 @@ async function runFileVaeroexAnalysis({
     workflow,
     inputJson,
     outputJson,
+    cleanResult,
     summary,
     extraction: finalExtraction,
     runId: data.id
@@ -1807,12 +1834,13 @@ export async function createReportFromFileAction(formData: FormData) {
       import_type: file.import_type,
       import_status: file.import_status,
       imported_rows: file.imported_rows,
-      analysis_summary: file.analysis_summary,
-      analysis_prompt: file.analysis_prompt,
+      analysis_summary: analysis.summary,
+      analysis_prompt: reportFocus || file.analysis_prompt,
       metadata_json: file.metadata_json
     },
     vaeroex_analysis_run_id: analysis.runId,
     vaeroex_output: analysis.outputJson,
+    vaeroex_analysis_result: analysis.cleanResult,
     extracted_content: {
       supported: analysis.extraction.supported,
       content_kind: analysis.extraction.kind,
@@ -1852,7 +1880,7 @@ export async function createReportFromFileAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/reports");
   redirect(
-    `/app/reports?message=${encodeURIComponent("Report created from extracted file content.")}&q=${encodeURIComponent(report.title)}` as Route
+    `/app/reports?message=${encodeURIComponent(`Report created from Vaeroex analysis of ${file.display_name}.`)}&q=${encodeURIComponent(report.title)}` as Route
   );
 }
 
@@ -1951,18 +1979,32 @@ export async function analyzeFileAction(formData: FormData) {
     revalidatePath("/app");
     revalidatePath("/app/agents");
     revalidatePath("/app/reports");
-    const contentLabel =
-      result.extraction.kind === "spreadsheet"
-        ? `${result.extraction.rows.length} spreadsheet row${result.extraction.rows.length === 1 ? "" : "s"}`
-        : result.extraction.kind === "image_vision"
-          ? "the uploaded image and any readable text Vaeroex could identify"
-          : `${result.extraction.textContent.length} character${result.extraction.textContent.length === 1 ? "" : "s"} of document text`;
+    const insightCount = cleanAnalysisInsightCount(result.cleanResult);
+    const limitedContent = result.extraction.kind !== "spreadsheet" && result.extraction.kind !== "image_vision" && result.extraction.textContent.length < 250;
+    const message = insightCount
+      ? `Analysis complete. Vaeroex found ${insightCount} key insight${insightCount === 1 ? "" : "s"} from ${file.display_name}.`
+      : limitedContent
+        ? "Analysis complete, but only limited text was found. Results may be incomplete."
+        : "Analysis complete. Review the Vaeroex result below and choose what to do next.";
 
-    redirectWithMessage(`Vaeroex analyzed ${contentLabel}. Review the summary below or create a report from this file.`, file.id);
+    redirectWithMessage(message, file.id);
   } catch (error) {
     const message = fileActionErrorMessage(error, "Vaeroex could not analyze the file.", file);
 
     await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
+    await supabase
+      .from("file_uploads")
+      .update({
+        metadata_json: {
+          ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
+          latest_analysis_status: "failed",
+          latest_analysis_at: new Date().toISOString(),
+          latest_analysis_prompt: prompt,
+          latest_analysis_error: message
+        } satisfies Json
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
     await supabase.from("ai_agent_runs").insert({
       workspace_id: workspaceId,
       agent_type: workflow.key,
