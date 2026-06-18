@@ -25,7 +25,7 @@ type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const REPORT_TYPES = ["Operations Summary", "Accountability Review", "Bottleneck Review", "Readiness Snapshot", "Executive Summary"];
-const BASE_CATEGORIES = ["All", "Tasks", "Checklists", "SOPs", "Issues", "Forms", "Assets", "Vaeroex insights"];
+const BASE_CATEGORIES = ["All", "Tasks", "Checklists", "SOPs", "Issues", "Forms", "Assets", "KPIs", "Vaeroex insights"];
 
 function todayDate() {
   return new Date().toISOString().slice(0, 10);

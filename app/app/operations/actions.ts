@@ -396,6 +396,81 @@ export async function createKpiAction(formData: FormData) {
   redirectWithMessage(path, "KPI saved.");
 }
 
+export async function updateKpiAction(formData: FormData) {
+  const path = "/app/kpis";
+  const { supabase, workspaceId } = await requireWorkspace(path);
+  const kpiId = text(formData, "kpi_id");
+  const name = text(formData, "name");
+  const category = text(formData, "category");
+  const owner = text(formData, "owner");
+  const notes = text(formData, "notes");
+  const source = text(formData, "source");
+
+  requireValue(path, "KPI", kpiId, 80);
+  requireValue(path, "KPI name", name);
+  validateLength(path, "Category", category, 100);
+  validateLength(path, "Owner", owner, 120);
+  validateLength(path, "Notes", notes, 1500);
+  validateLength(path, "Source", source, 160);
+
+  const { data, error } = await supabase
+    .from("kpis")
+    .update({
+      name,
+      category,
+      target: optionalNumber(path, "Target", text(formData, "target")),
+      actual_value: optionalNumber(path, "Actual value", text(formData, "actual_value")),
+      metric_date: metricDateOrToday(path, text(formData, "metric_date")),
+      owner,
+      notes,
+      source
+    })
+    .eq("id", kpiId)
+    .eq("workspace_id", workspaceId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  if (!data) {
+    redirectWithError(path, "KPI not found, or you do not have permission to edit it.");
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "KPI updated.");
+}
+
+export async function deleteKpiAction(formData: FormData) {
+  const path = "/app/kpis";
+  const { supabase, workspaceId } = await requireWorkspace(path);
+  const kpiId = text(formData, "kpi_id");
+
+  requireValue(path, "KPI", kpiId, 80);
+
+  const { data, error } = await supabase
+    .from("kpis")
+    .delete()
+    .eq("id", kpiId)
+    .eq("workspace_id", workspaceId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  if (!data) {
+    redirectWithError(path, "KPI not found, or you do not have permission to delete it.");
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "KPI deleted.");
+}
+
 export async function createIssueAction(formData: FormData) {
   const path = "/app/issues";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
