@@ -200,6 +200,74 @@ function businessSections(output: JsonRecord) {
   };
 }
 
+function inferRelatedModule(text: string) {
+  const normalized = text.toLowerCase();
+
+  if (normalized.includes("kpi") || normalized.includes("metric") || normalized.includes("revenue")) return "KPIs";
+  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "CRM";
+  if (normalized.includes("sop") || normalized.includes("procedure")) return "SOPs";
+  if (normalized.includes("checklist")) return "Checklists";
+  if (normalized.includes("report")) return "Reports";
+  if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Files";
+  if (normalized.includes("issue") || normalized.includes("risk")) return "Issues";
+  return "Tasks";
+}
+
+function moduleHref(moduleName: string): Route {
+  const normalized = moduleName.toLowerCase();
+
+  if (normalized.includes("kpi")) return "/app/kpis";
+  if (normalized.includes("crm")) return "/app/crm";
+  if (normalized.includes("sop")) return "/app/sops";
+  if (normalized.includes("checklist")) return "/app/checklists";
+  if (normalized.includes("report")) return "/app/reports";
+  if (normalized.includes("file")) return "/app/files";
+  if (normalized.includes("issue")) return "/app/issues";
+  if (normalized.includes("form")) return "/app/forms";
+  return "/app/tasks";
+}
+
+function getActionableRecommendations(output: JsonRecord) {
+  const candidates = [
+    ...asArray(output.recommendations),
+    ...asArray(output.recommended_actions),
+    ...asArray(output.suggested_tasks),
+    ...asArray(output.follow_up_tasks),
+    ...asArray(output.thirty_day_action_plan),
+    ...asArray(output.manager_actions)
+  ];
+
+  return candidates.slice(0, 6).map((item, index) => {
+    const record = asRecord(item);
+    const title =
+      str(record.title) ||
+      str(record.action) ||
+      str(record.name) ||
+      (typeof item === "string" ? item : `Recommendation ${index + 1}`);
+    const why =
+      str(record.why_it_matters) ||
+      str(record.reason_this_matters) ||
+      str(record.impact) ||
+      str(record.description) ||
+      "This recommendation can improve accountability, visibility, or follow-through.";
+    const relatedModule = str(record.related_module) || str(record.module) || inferRelatedModule(`${title} ${why} ${str(record.category)}`);
+
+    return {
+      id: `${title}-${index}`,
+      title,
+      priority: str(record.priority, "Medium"),
+      owner: str(record.suggested_owner) || str(record.owner) || str(record.assigned_role, "Manager"),
+      dueDate:
+        str(record.suggested_due_date) ||
+        str(record.recommended_due_date) ||
+        str(record.due_date) ||
+        str(record.due_date_recommendation, "Next management review"),
+      why,
+      relatedModule
+    };
+  });
+}
+
 function savedRecords(output: JsonRecord) {
   return asArray(output.saved_records).filter(isRecord);
 }
@@ -357,6 +425,63 @@ function ResultList({ title, items }: { title: string; items: string[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+function RecommendationActionCards({ recommendations }: { recommendations: ReturnType<typeof getActionableRecommendations> }) {
+  if (!recommendations.length) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-white p-4">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h4 className="text-sm font-semibold">Actionable Recommendations</h4>
+          <p className="mt-1 text-sm leading-6 text-muted">
+            Vaeroex drafts are not saved until you confirm. Use these actions to turn insight into workspace records.
+          </p>
+        </div>
+        <Link href="/app/agents" className="text-xs font-semibold text-muted underline">
+          Dismiss for now
+        </Link>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        {recommendations.map((recommendation) => (
+          <article key={recommendation.id} className="rounded-lg border border-line bg-slate-50 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-ink">{recommendation.title}</p>
+                <p className="mt-1 text-xs text-muted">{recommendation.relatedModule}</p>
+              </div>
+              <StatusBadge value={recommendation.priority} />
+            </div>
+            <dl className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2">
+              <div>
+                <dt className="font-semibold text-ink">Suggested owner</dt>
+                <dd className="mt-1">{recommendation.owner}</dd>
+              </div>
+              <div>
+                <dt className="font-semibold text-ink">Suggested due date</dt>
+                <dd className="mt-1">{recommendation.dueDate}</dd>
+              </div>
+            </dl>
+            <p className="mt-3 text-sm leading-6 text-slate-700">{recommendation.why}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create Task</Link>
+              <Link href="/app/sops" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Create SOP</Link>
+              <Link href="/app/checklists" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Create Checklist</Link>
+              <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Create KPI</Link>
+              <Link href="/app/crm" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">CRM Follow-Up</Link>
+              <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
+                Open {recommendation.relatedModule}
+              </Link>
+              <Link href="/app/reports" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Add to Report</Link>
+            </div>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
@@ -577,6 +702,7 @@ function BusinessResult({ output }: { output: JsonRecord }) {
   const checklists = getChecklistDrafts(visibleOutput);
   const sops = getSopDrafts(visibleOutput);
   const reports = getReportDrafts(visibleOutput);
+  const recommendations = getActionableRecommendations(visibleOutput);
   const detail = cleanReadableText(visibleOutput.response_markdown);
 
   return (
@@ -591,6 +717,8 @@ function BusinessResult({ output }: { output: JsonRecord }) {
         <ResultList title="Recommended Actions" items={sections.actions} />
         <ResultList title="Suggested Systems" items={sections.systems} />
       </div>
+
+      <RecommendationActionCards recommendations={recommendations} />
 
       <TaskDraftSection tasks={tasks} />
       <ChecklistDraftSection checklists={checklists} />

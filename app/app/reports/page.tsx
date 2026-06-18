@@ -8,6 +8,7 @@ import { ManagedRecordList, type ManagedRecordEditField } from "@/components/ope
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -325,6 +326,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       },
       children: (
         <div className="space-y-4">
+          <ReportExportActions
+            title={report.title}
+            reportType={report.report_type}
+            dateRange={reportDateLabel(report)}
+            body={report.body_markdown || ""}
+          />
           <ReportBody body={report.body_markdown} />
           <AdminDebugData enabled={canViewDebug && debugMode} value={report.source_data_json} />
         </div>

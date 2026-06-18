@@ -99,8 +99,17 @@ function NavSection({ label, items }: { label: string; items: Array<{ href: stri
   );
 }
 
+function workspaceAccessLabel(workspace: Workspace | null) {
+  if (!workspace) return "Setup required";
+  if (workspace.subscription_status === "demo") return "Demo workspace";
+  if (!workspace.subscription_required || workspace.manually_unlocked || ["active", "trialing"].includes(workspace.subscription_status)) return "Active";
+  if (workspace.subscription_status === "manual_review") return "Pending activation";
+  return "Subscription required";
+}
+
 export function AppShell({ children, profile, workspaces, activeWorkspace, membership }: AppShellProps) {
   const navSections = isVaeroexAdminEmail(profile?.email) ? [...baseNavSections, adminNavSection] : baseNavSections;
+  const accessLabel = workspaceAccessLabel(activeWorkspace);
 
   return (
     <div className="min-h-screen bg-slate-50 text-ink">
@@ -134,6 +143,9 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
           <p className="mt-2 text-xs text-blue-100">
             Role: <span className="font-semibold text-white">{membership?.role || "setup pending"}</span>
           </p>
+          <p className="mt-2 text-xs text-blue-100">
+            Status: <span className="font-semibold text-white">{accessLabel}</span>
+          </p>
           {workspaces.length > 1 ? (
             <button className="mt-3 w-full rounded-md border border-white/10 px-2 py-1.5 text-xs text-blue-50">
               Switch workspace
@@ -159,7 +171,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">
-                {activeWorkspace?.name || "Setup required"}
+                {activeWorkspace?.name || "Setup required"} · {accessLabel}
               </p>
               <h1 className="text-lg font-semibold">Vaeroex Ops System</h1>
             </div>

@@ -35,7 +35,20 @@ Use this root shape whenever possible:
       "description": "What should be done",
       "priority": "Low | Medium | High | Urgent",
       "category": "Category",
-      "due_date_recommendation": "Short recommendation"
+      "suggested_owner": "Role or person who should own it",
+      "due_date_recommendation": "Short recommendation",
+      "reason_this_matters": "Why this action matters",
+      "related_module": "Tasks | KPIs | CRM | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
+    }
+  ],
+  "recommended_actions": [
+    {
+      "title": "Action title",
+      "priority": "Low | Medium | High | Urgent",
+      "suggested_owner": "Role or person who should own it",
+      "suggested_due_date": "Specific date or timing",
+      "why_it_matters": "Business reason in plain language",
+      "related_module": "Tasks | KPIs | CRM | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
     }
   ],
   "sop": null,
@@ -56,6 +69,7 @@ Use this root shape whenever possible:
   "save_recommendations": ["Records the user may confirm and save"]
 }
 Every output that could become a record must be a draft for manager review. Do not imply it has already been saved.
+Every recommendation must be actionable. Include title, priority, suggested owner, suggested due date, why it matters, and related module.
 `;
 
 const workspaceAwareInstructions = `
