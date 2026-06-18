@@ -15,8 +15,17 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
+type FileImportRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
 type ImportType = "kpi" | "crm" | "metrics";
 type JsonRecord = Record<string, unknown>;
+type JsonObject = { [key: string]: Json | undefined };
+type ImportMapping = Record<string, string>;
+type ImportField = {
+  key: string;
+  label: string;
+  required?: boolean;
+  candidates: string[];
+};
 
 const FILES_PATH = "/app/files";
 const STORAGE_BUCKET = "workspace-files";
@@ -30,6 +39,41 @@ const MIME_BY_EXTENSION: Record<string, string> = {
   jpg: "image/jpeg",
   jpeg: "image/jpeg",
   docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+};
+const IMPORT_FIELDS: Record<ImportType, ImportField[]> = {
+  kpi: [
+    { key: "name", label: "KPI name", required: true, candidates: ["name", "kpi", "kpi name", "metric", "metric name", "metric_name"] },
+    { key: "category", label: "Category", candidates: ["category", "type", "department"] },
+    { key: "target", label: "Target", candidates: ["target", "goal"] },
+    {
+      key: "actual_value",
+      label: "Actual value",
+      required: true,
+      candidates: ["actual value", "actual_value", "actual", "value", "result", "amount", "total", "count"]
+    },
+    { key: "metric_date", label: "Date", candidates: ["date", "metric date", "metric_date", "day", "period"] },
+    { key: "owner", label: "Owner", candidates: ["owner", "assigned", "manager"] },
+    { key: "notes", label: "Notes", candidates: ["notes", "description", "comment", "comments"] },
+    { key: "source", label: "Source", candidates: ["source"] }
+  ],
+  crm: [
+    { key: "lead_name", label: "Lead name", required: true, candidates: ["lead", "lead name", "lead_name", "contact", "name", "customer", "client"] },
+    { key: "company", label: "Company", candidates: ["company", "business", "organization"] },
+    { key: "email", label: "Email", candidates: ["email", "email address", "email_address"] },
+    { key: "phone", label: "Phone", candidates: ["phone", "phone number", "phone_number", "mobile"] },
+    { key: "status", label: "Status", candidates: ["status", "stage"] },
+    { key: "estimated_value", label: "Estimated value", candidates: ["estimated value", "estimated_value", "value", "deal value", "deal_value", "revenue"] },
+    { key: "owner", label: "Owner", candidates: ["owner", "sales owner", "manager", "assigned"] },
+    { key: "notes", label: "Notes", candidates: ["notes", "description", "comment", "comments"] }
+  ],
+  metrics: [
+    { key: "metric_name", label: "Metric name", required: true, candidates: ["metric", "metric name", "metric_name", "name", "kpi", "measure"] },
+    { key: "category", label: "Category", candidates: ["category", "type", "department"] },
+    { key: "value", label: "Value", required: true, candidates: ["value", "actual", "actual value", "actual_value", "result", "amount", "total", "count"] },
+    { key: "metric_date", label: "Date", candidates: ["date", "metric date", "metric_date", "day", "period"] },
+    { key: "owner", label: "Owner", candidates: ["owner", "manager", "assigned"] },
+    { key: "notes", label: "Notes", candidates: ["notes", "description", "comment", "comments"] }
+  ]
 };
 
 function text(formData: FormData, key: string) {
@@ -187,13 +231,59 @@ function cell(row: ImportRow, candidates: string[]) {
   return match?.[1] ?? null;
 }
 
-function cellText(row: ImportRow, candidates: string[], fallback = "") {
-  const value = cell(row, candidates);
+function importHeaders(rows: ImportRow[]) {
+  return Object.keys(rows[0] || {}).filter(Boolean);
+}
+
+function inferMapping(importType: ImportType, rows: ImportRow[]) {
+  const headers = importHeaders(rows);
+
+  return IMPORT_FIELDS[importType].reduce<ImportMapping>((mapping, field) => {
+    const normalizedCandidates = field.candidates.map(normalizeKey);
+    const exact = headers.find((header) => normalizedCandidates.includes(normalizeKey(header)));
+    const loose = headers.find((header) => normalizedCandidates.some((candidate) => normalizeKey(header).includes(candidate)));
+    const matchedHeader = exact || loose;
+
+    if (matchedHeader) {
+      mapping[field.key] = matchedHeader;
+    }
+
+    return mapping;
+  }, {});
+}
+
+function mappingFromForm(formData: FormData, importType: ImportType, fallback: Json) {
+  const storedMapping = isRecord(fallback) ? fallback : {};
+
+  return IMPORT_FIELDS[importType].reduce<ImportMapping>((mapping, field) => {
+    const storedValue = storedMapping[field.key];
+    const value = text(formData, `map_${field.key}`) || (typeof storedValue === "string" ? storedValue : "");
+
+    if (value) {
+      mapping[field.key] = value;
+    }
+
+    return mapping;
+  }, {});
+}
+
+function mappedCell(row: ImportRow, mapping: ImportMapping, field: ImportField) {
+  const mappedHeader = mapping[field.key];
+
+  if (mappedHeader && Object.prototype.hasOwnProperty.call(row, mappedHeader)) {
+    return row[mappedHeader];
+  }
+
+  return cell(row, field.candidates);
+}
+
+function mappedText(row: ImportRow, mapping: ImportMapping, field: ImportField, fallback = "") {
+  const value = mappedCell(row, mapping, field);
   return value === null || value === undefined ? fallback : String(value).trim();
 }
 
-function cellNumber(row: ImportRow, candidates: string[]) {
-  const value = cell(row, candidates);
+function mappedNumber(row: ImportRow, mapping: ImportMapping, field: ImportField) {
+  const value = mappedCell(row, mapping, field);
 
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
@@ -203,8 +293,8 @@ function cellNumber(row: ImportRow, candidates: string[]) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function cellDate(row: ImportRow, candidates: string[]) {
-  const value = cell(row, candidates);
+function mappedDate(row: ImportRow, mapping: ImportMapping, field: ImportField) {
+  const value = mappedCell(row, mapping, field);
 
   if (typeof value === "number") {
     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
@@ -226,57 +316,273 @@ function rowJson(row: ImportRow) {
   return row as Record<string, ImportCellValue> as Json;
 }
 
-function buildKpiRecords(rows: ImportRow[], workspaceId: string, userId: string, sourceFile: FileUploadRow) {
-  return rows
-    .map((row) => ({
-      workspace_id: workspaceId,
-      name: cellText(row, ["name", "kpi", "kpi name", "metric", "metric name", "metric_name"]),
-      category: cellText(row, ["category", "type", "department"], "Imported"),
-      target: cellNumber(row, ["target", "goal"]),
-      actual_value: cellNumber(row, ["actual value", "actual_value", "actual", "value", "result", "amount", "total", "count"]),
-      metric_date: cellDate(row, ["date", "metric date", "metric_date", "day", "period"]),
-      owner: cellText(row, ["owner", "assigned", "manager"]),
-      notes: cellText(row, ["notes", "description", "comment", "comments"]),
-      source: cellText(row, ["source"], `Uploaded file: ${sourceFile.display_name}`),
-      created_by: userId
-    }))
-    .filter((row) => row.name);
+function jsonToImportRow(value: Json): ImportRow {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return Object.entries(value).reduce<ImportRow>((row, [key, cellValue]) => {
+    if (typeof cellValue === "string" || typeof cellValue === "number" || cellValue === null) {
+      row[key] = cellValue;
+    } else if (cellValue === undefined) {
+      row[key] = null;
+    } else {
+      row[key] = JSON.stringify(cellValue);
+    }
+
+    return row;
+  }, {});
 }
 
-function buildCrmLeadRecords(rows: ImportRow[], workspaceId: string, userId: string, sourceFile: FileUploadRow) {
-  return rows
-    .map((row) => ({
-      workspace_id: workspaceId,
-      source_file_id: sourceFile.id,
-      lead_name: cellText(row, ["lead", "lead name", "lead_name", "contact", "name", "customer", "client"]),
-      company: cellText(row, ["company", "business", "organization"]),
-      email: cellText(row, ["email", "email address", "email_address"]),
-      phone: cellText(row, ["phone", "phone number", "phone_number", "mobile"]),
-      status: cellText(row, ["status", "stage"], "New"),
-      estimated_value: cellNumber(row, ["estimated value", "estimated_value", "value", "deal value", "deal_value", "revenue"]),
-      owner: cellText(row, ["owner", "sales owner", "manager", "assigned"]),
-      notes: cellText(row, ["notes", "description", "comment", "comments"]),
-      raw_data_json: rowJson(row),
-      created_by: userId
-    }))
-    .filter((row) => row.lead_name);
+function mappedRowJson(row: ImportRow, mapping: ImportMapping, importType: ImportType) {
+  return IMPORT_FIELDS[importType].reduce<JsonRecord>((mapped, field) => {
+    const value = mappedCell(row, mapping, field);
+
+    if (value !== null && value !== undefined && String(value).trim() !== "") {
+      mapped[field.key] = value;
+    }
+
+    return mapped;
+  }, {}) as Json;
 }
 
-function buildOperationalMetricRecords(rows: ImportRow[], workspaceId: string, userId: string, sourceFile: FileUploadRow) {
-  return rows
-    .map((row) => ({
+function extractionSummary(importType: ImportType, rows: ImportRow[], mapping: ImportMapping) {
+  const mappedRequired = IMPORT_FIELDS[importType].filter((field) => field.required && mapping[field.key]).length;
+  const requiredCount = IMPORT_FIELDS[importType].filter((field) => field.required).length;
+  const mappedCount = Object.keys(mapping).length;
+  const importLabel = importType === "kpi" ? "KPI history" : importType === "crm" ? "CRM leads" : "operational metrics";
+
+  return `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} for ${importLabel}. ${mappedCount} column${mappedCount === 1 ? "" : "s"} were mapped, including ${mappedRequired} of ${requiredCount} required field${requiredCount === 1 ? "" : "s"}. Review the mappings before saving.`;
+}
+
+function field(importType: ImportType, key: string) {
+  const match = IMPORT_FIELDS[importType].find((candidate) => candidate.key === key);
+
+  if (!match) {
+    throw new Error(`Import field "${key}" is not configured.`);
+  }
+
+  return match;
+}
+
+function buildKpiRecords(
+  importRows: Pick<FileImportRow, "id" | "data_json">[],
+  workspaceId: string,
+  userId: string,
+  sourceFile: FileUploadRow,
+  importId: string,
+  mapping: ImportMapping
+) {
+  return importRows
+    .map((importRow) => {
+      const row = jsonToImportRow(importRow.data_json);
+
+      return {
+        importRowId: importRow.id,
+        record: {
+          workspace_id: workspaceId,
+          source_file_id: sourceFile.id,
+          import_id: importId,
+          import_row_id: importRow.id,
+          name: mappedText(row, mapping, field("kpi", "name")),
+          category: mappedText(row, mapping, field("kpi", "category"), "Imported"),
+          target: mappedNumber(row, mapping, field("kpi", "target")),
+          actual_value: mappedNumber(row, mapping, field("kpi", "actual_value")),
+          metric_date: mappedDate(row, mapping, field("kpi", "metric_date")),
+          owner: mappedText(row, mapping, field("kpi", "owner")),
+          notes: mappedText(row, mapping, field("kpi", "notes")),
+          source: mappedText(row, mapping, field("kpi", "source"), `Uploaded file: ${sourceFile.display_name}`),
+          raw_data_json: rowJson(row),
+          created_by: userId
+        }
+      };
+    })
+    .filter(({ record }) => record.name && record.actual_value !== null);
+}
+
+function buildCrmLeadRecords(
+  importRows: Pick<FileImportRow, "id" | "data_json">[],
+  workspaceId: string,
+  userId: string,
+  sourceFile: FileUploadRow,
+  importId: string,
+  mapping: ImportMapping
+) {
+  return importRows
+    .map((importRow) => {
+      const row = jsonToImportRow(importRow.data_json);
+
+      return {
+        importRowId: importRow.id,
+        record: {
+          workspace_id: workspaceId,
+          source_file_id: sourceFile.id,
+          import_id: importId,
+          import_row_id: importRow.id,
+          lead_name: mappedText(row, mapping, field("crm", "lead_name")),
+          company: mappedText(row, mapping, field("crm", "company")),
+          email: mappedText(row, mapping, field("crm", "email")),
+          phone: mappedText(row, mapping, field("crm", "phone")),
+          status: mappedText(row, mapping, field("crm", "status"), "New"),
+          estimated_value: mappedNumber(row, mapping, field("crm", "estimated_value")),
+          owner: mappedText(row, mapping, field("crm", "owner")),
+          notes: mappedText(row, mapping, field("crm", "notes")),
+          raw_data_json: rowJson(row),
+          last_activity_at: new Date().toISOString(),
+          created_by: userId
+        }
+      };
+    })
+    .filter(({ record }) => record.lead_name);
+}
+
+function buildOperationalMetricRecords(
+  importRows: Pick<FileImportRow, "id" | "data_json">[],
+  workspaceId: string,
+  userId: string,
+  sourceFile: FileUploadRow,
+  importId: string,
+  mapping: ImportMapping
+) {
+  return importRows
+    .map((importRow) => {
+      const row = jsonToImportRow(importRow.data_json);
+
+      return {
+        importRowId: importRow.id,
+        record: {
+          workspace_id: workspaceId,
+          source_file_id: sourceFile.id,
+          import_id: importId,
+          import_row_id: importRow.id,
+          metric_name: mappedText(row, mapping, field("metrics", "metric_name")),
+          category: mappedText(row, mapping, field("metrics", "category"), "Operations"),
+          value: mappedNumber(row, mapping, field("metrics", "value")),
+          metric_date: mappedDate(row, mapping, field("metrics", "metric_date")),
+          owner: mappedText(row, mapping, field("metrics", "owner")),
+          notes: mappedText(row, mapping, field("metrics", "notes")),
+          raw_data_json: rowJson(row),
+          created_by: userId
+        }
+      };
+    })
+    .filter(({ record }) => record.metric_name && record.value !== null);
+}
+
+async function saveCrmLeadRows({
+  supabase,
+  rows,
+  workspaceId,
+  userId,
+  sourceFile,
+  importId
+}: {
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
+  rows: ReturnType<typeof buildCrmLeadRecords>;
+  workspaceId: string;
+  userId: string;
+  sourceFile: FileUploadRow;
+  importId: string;
+}) {
+  if (!supabase) {
+    throw new Error("Supabase is not configured.");
+  }
+
+  let savedCount = 0;
+
+  for (const row of rows) {
+    const email = row.record.email.trim();
+    let existingLeadId: string | null = null;
+
+    if (email) {
+      const { data, error } = await supabase
+        .from("crm_leads")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("email", email)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      existingLeadId = data?.id ?? null;
+    }
+
+    if (!existingLeadId && row.record.company) {
+      const { data, error } = await supabase
+        .from("crm_leads")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("lead_name", row.record.lead_name)
+        .eq("company", row.record.company)
+        .is("deleted_at", null)
+        .maybeSingle();
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      existingLeadId = data?.id ?? null;
+    }
+
+    const eventType = existingLeadId ? "updated" : "created";
+    const leadResult = existingLeadId
+      ? await supabase
+          .from("crm_leads")
+          .update({
+            source_file_id: sourceFile.id,
+            import_id: importId,
+            import_row_id: row.importRowId,
+            lead_name: row.record.lead_name,
+            company: row.record.company || null,
+            email: row.record.email || null,
+            phone: row.record.phone || null,
+            status: row.record.status || "New",
+            estimated_value: row.record.estimated_value,
+            owner: row.record.owner || null,
+            notes: row.record.notes || null,
+            raw_data_json: row.record.raw_data_json,
+            last_activity_at: row.record.last_activity_at
+          })
+          .eq("id", existingLeadId)
+          .eq("workspace_id", workspaceId)
+          .select("id")
+          .single()
+      : await supabase
+          .from("crm_leads")
+          .insert(row.record)
+          .select("id")
+          .single();
+
+    if (leadResult.error || !leadResult.data) {
+      throw new Error(leadResult.error?.message || "CRM lead could not be saved.");
+    }
+
+    const { error: historyError } = await supabase.from("crm_lead_history").insert({
       workspace_id: workspaceId,
+      lead_id: leadResult.data.id,
       source_file_id: sourceFile.id,
-      metric_name: cellText(row, ["metric", "metric name", "metric_name", "name", "kpi", "measure"]),
-      category: cellText(row, ["category", "type", "department"], "Operations"),
-      value: cellNumber(row, ["value", "actual", "actual value", "actual_value", "result", "amount", "total", "count"]),
-      metric_date: cellDate(row, ["date", "metric date", "metric_date", "day", "period"]),
-      owner: cellText(row, ["owner", "manager", "assigned"]),
-      notes: cellText(row, ["notes", "description", "comment", "comments"]),
-      raw_data_json: rowJson(row),
+      import_id: importId,
+      import_row_id: row.importRowId,
+      event_type: eventType,
+      status: row.record.status || "New",
+      estimated_value: row.record.estimated_value,
+      owner: row.record.owner || null,
+      notes: row.record.notes || null,
+      raw_data_json: row.record.raw_data_json,
       created_by: userId
-    }))
-    .filter((row) => row.metric_name);
+    });
+
+    if (historyError) {
+      throw new Error(historyError.message);
+    }
+
+    savedCount += 1;
+  }
+
+  return savedCount;
 }
 
 function summarizeVaeroexOutput(outputJson: Json) {
@@ -380,14 +686,19 @@ export async function importFileAction(formData: FormData) {
     redirectWithError("No data rows were found. Make sure the first row contains column names.");
   }
 
+  const mapping = inferMapping(importType, rows);
+  const summary = extractionSummary(importType, rows, mapping);
   const { data: importRecord, error: importError } = await supabase
     .from("file_imports")
     .insert({
       workspace_id: workspaceId,
       file_upload_id: file.id,
       import_type: importType,
+      status: "needs_review",
       rows_total: rows.length,
       rows_imported: 0,
+      mapping_json: mapping,
+      extraction_summary: summary,
       created_by: user.id
     })
     .select("id")
@@ -404,7 +715,8 @@ export async function importFileAction(formData: FormData) {
     import_type: importType,
     row_number: index + 1,
     data_json: rowJson(row),
-    status: "imported"
+    mapped_data_json: mappedRowJson(row, mapping, importType),
+    status: "staged"
   }));
   const importRowsResult = await supabase.from("file_import_rows").insert(importRows);
 
@@ -412,55 +724,20 @@ export async function importFileAction(formData: FormData) {
     redirectWithError(importRowsResult.error.message);
   }
 
-  let importedRowCount = 0;
-  let insertResult: { error: { message: string } | null };
-
-  if (importType === "kpi") {
-    const targetRows = buildKpiRecords(rows, workspaceId, user.id, file);
-    importedRowCount = targetRows.length;
-    insertResult = importedRowCount ? await supabase.from("kpis").insert(targetRows) : { error: null };
-  } else if (importType === "crm") {
-    const targetRows = buildCrmLeadRecords(rows, workspaceId, user.id, file);
-    importedRowCount = targetRows.length;
-    insertResult = importedRowCount ? await supabase.from("crm_leads").insert(targetRows) : { error: null };
-  } else {
-    const targetRows = buildOperationalMetricRecords(rows, workspaceId, user.id, file);
-    importedRowCount = targetRows.length;
-    insertResult = importedRowCount ? await supabase.from("operational_metrics").insert(targetRows) : { error: null };
-  }
-
-  if (!importedRowCount) {
-    await supabase.from("file_imports").update({ status: "failed" }).eq("id", importRecord.id).eq("workspace_id", workspaceId);
-    await supabase.from("file_uploads").update({ import_status: "failed" }).eq("id", file.id).eq("workspace_id", workspaceId);
-    redirectWithError("No rows matched the selected import type. Check that the spreadsheet has recognizable column names.");
-  }
-
-  if (insertResult.error) {
-    await supabase.from("file_imports").update({ status: "failed", errors_json: [{ message: insertResult.error.message }] }).eq("id", importRecord.id);
-    await supabase.from("file_uploads").update({ import_status: "failed" }).eq("id", file.id).eq("workspace_id", workspaceId);
-    redirectWithError(insertResult.error.message);
-  }
-
-  await supabase
-    .from("file_imports")
-    .update({ rows_imported: importedRowCount })
-    .eq("id", importRecord.id)
-    .eq("workspace_id", workspaceId);
-
   await supabase
     .from("file_uploads")
     .update({
       import_type: importType,
-      import_status: "imported",
-      imported_rows: importedRowCount,
+      import_status: "extracted",
       metadata_json: {
         ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
-        last_import: {
+        latest_extraction: {
           import_id: importRecord.id,
           import_type: importType,
           rows_total: rows.length,
-          rows_imported: importedRowCount,
-          imported_at: new Date().toISOString()
+          mapping,
+          extracted_at: new Date().toISOString(),
+          summary
         },
         preview_rows: previewRows(rows, 5)
       } satisfies Json
@@ -471,7 +748,162 @@ export async function importFileAction(formData: FormData) {
   revalidatePath(FILES_PATH);
   revalidatePath("/app/kpis");
   revalidatePath("/app/reports");
-  redirectWithMessage(`${importedRowCount} row${importedRowCount === 1 ? "" : "s"} imported.`, file.id);
+  redirectWithMessage("Data extracted. Review the mappings before saving records.", file.id);
+}
+
+function appendImportHistory(metadataJson: Json, entry: JsonObject) {
+  const metadata = (isRecord(metadataJson) ? metadataJson : {}) as JsonObject;
+  const history = Array.isArray(metadata.import_history)
+    ? metadata.import_history.filter(isRecord).map((item) => item as JsonObject)
+    : [];
+
+  return {
+    ...metadata,
+    last_import: entry,
+    import_history: [entry, ...history].slice(0, 20)
+  } satisfies JsonObject;
+}
+
+export async function saveExtractedImportAction(formData: FormData) {
+  const { supabase, user, workspaceId } = await requireWorkspace();
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const importId = text(formData, "import_id");
+
+  if (!importId) {
+    redirectWithError("Choose an extracted import to save.");
+  }
+
+  const { data: importRecord, error: importError } = await supabase
+    .from("file_imports")
+    .select("*")
+    .eq("id", importId)
+    .eq("workspace_id", workspaceId)
+    .eq("file_upload_id", file.id)
+    .maybeSingle();
+
+  if (importError || !importRecord) {
+    redirectWithError(importError?.message || "Extraction not found for this workspace.");
+  }
+
+  const importType = validImportType(text(formData, "import_type") || importRecord.import_type);
+  const mapping = mappingFromForm(formData, importType, importRecord.mapping_json);
+  const { data: stagedRows, error: rowsError } = await supabase
+    .from("file_import_rows")
+    .select("id,data_json,row_number")
+    .eq("workspace_id", workspaceId)
+    .eq("file_upload_id", file.id)
+    .eq("import_id", importId)
+    .order("row_number", { ascending: true })
+    .limit(1000);
+
+  if (rowsError) {
+    redirectWithError(rowsError.message);
+  }
+
+  if (!stagedRows?.length) {
+    redirectWithError("No extracted rows were found to save.");
+  }
+
+  let importedRowCount = 0;
+
+  try {
+    if (importType === "kpi") {
+      const targetRows = buildKpiRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
+      importedRowCount = targetRows.length;
+
+      if (targetRows.length) {
+        const { error } = await supabase.from("kpis").insert(targetRows.map((row) => row.record));
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+    } else if (importType === "crm") {
+      const targetRows = buildCrmLeadRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
+      importedRowCount = await saveCrmLeadRows({
+        supabase,
+        rows: targetRows,
+        workspaceId,
+        userId: user.id,
+        sourceFile: file,
+        importId
+      });
+    } else {
+      const targetRows = buildOperationalMetricRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
+      importedRowCount = targetRows.length;
+
+      if (targetRows.length) {
+        const { error } = await supabase.from("operational_metrics").insert(targetRows.map((row) => row.record));
+
+        if (error) {
+          throw new Error(error.message);
+        }
+      }
+    }
+
+    if (!importedRowCount) {
+      throw new Error("No rows matched the selected mappings. Check the required fields and try again.");
+    }
+
+    const importedAt = new Date().toISOString();
+    const importEntry = {
+      import_id: importId,
+      import_type: importType,
+      rows_total: importRecord.rows_total,
+      rows_imported: importedRowCount,
+      imported_at: importedAt,
+      source_file_id: file.id
+    } satisfies JsonObject;
+
+    await supabase
+      .from("file_import_rows")
+      .update({
+        status: "imported"
+      })
+      .eq("workspace_id", workspaceId)
+      .eq("import_id", importId);
+
+    await supabase
+      .from("file_imports")
+      .update({
+        status: "completed",
+        rows_imported: importedRowCount,
+        mapping_json: mapping,
+        reviewed_at: importedAt,
+        imported_at: importedAt,
+        extraction_summary: extractionSummary(importType, stagedRows.map((row) => jsonToImportRow(row.data_json)), mapping)
+      })
+      .eq("id", importId)
+      .eq("workspace_id", workspaceId);
+
+    await supabase
+      .from("file_uploads")
+      .update({
+        import_type: importType,
+        import_status: "imported",
+        imported_rows: file.imported_rows + importedRowCount,
+        metadata_json: appendImportHistory(file.metadata_json, importEntry)
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Imported data could not be saved.";
+
+    await supabase
+      .from("file_imports")
+      .update({ status: "failed", errors_json: [{ message }] })
+      .eq("id", importId)
+      .eq("workspace_id", workspaceId);
+
+    await supabase.from("file_uploads").update({ import_status: "failed" }).eq("id", file.id).eq("workspace_id", workspaceId);
+    redirectWithError(message);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/reports");
+  redirectWithMessage(`${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved to history.`, file.id);
 }
 
 export async function analyzeFileAction(formData: FormData) {
@@ -502,14 +934,25 @@ export async function analyzeFileAction(formData: FormData) {
   try {
     const buffer = await downloadFileBuffer(file);
     const rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
-    const workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
+    const [workspaceSnapshot, fileImports] = await Promise.all([
+      buildWorkspaceSnapshot(supabase, workspaceId),
+      supabase
+        .from("file_imports")
+        .select("id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
+        .eq("workspace_id", workspaceId)
+        .eq("file_upload_id", file.id)
+        .order("created_at", { ascending: false })
+        .limit(10)
+    ]);
     const extraInputs = {
       file: {
         id: file.id,
         name: file.display_name,
         extension: file.file_extension,
-        rows_detected: rows.length
+        rows_detected: rows.length,
+        metadata: file.metadata_json
       },
+      import_history: fileImports.data ?? [],
       spreadsheet_preview: previewRows(rows, 30)
     } satisfies Json;
     inputJson = {

@@ -268,7 +268,11 @@ export type Database = {
           status: string;
           rows_total: number;
           rows_imported: number;
+          mapping_json: Json;
+          extraction_summary: string | null;
           errors_json: Json;
+          reviewed_at: string | null;
+          imported_at: string | null;
           created_by: string | null;
           created_at: string;
         };
@@ -280,7 +284,11 @@ export type Database = {
           status?: string;
           rows_total?: number;
           rows_imported?: number;
+          mapping_json?: Json;
+          extraction_summary?: string | null;
           errors_json?: Json;
+          reviewed_at?: string | null;
+          imported_at?: string | null;
           created_by?: string | null;
           created_at?: string;
         };
@@ -296,7 +304,11 @@ export type Database = {
           import_type: string;
           row_number: number;
           data_json: Json;
+          mapped_data_json: Json;
+          validation_errors_json: Json;
           status: string;
+          imported_record_type: string | null;
+          imported_record_id: string | null;
           created_at: string;
         };
         Insert: {
@@ -307,7 +319,11 @@ export type Database = {
           import_type: string;
           row_number: number;
           data_json?: Json;
+          mapped_data_json?: Json;
+          validation_errors_json?: Json;
           status?: string;
+          imported_record_type?: string | null;
+          imported_record_id?: string | null;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["file_import_rows"]["Insert"]>;
@@ -318,6 +334,8 @@ export type Database = {
           id: string;
           workspace_id: string;
           source_file_id: string | null;
+          import_id: string | null;
+          import_row_id: string | null;
           lead_name: string;
           company: string | null;
           email: string | null;
@@ -327,6 +345,7 @@ export type Database = {
           owner: string | null;
           notes: string | null;
           raw_data_json: Json;
+          last_activity_at: string | null;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -337,6 +356,8 @@ export type Database = {
           id?: string;
           workspace_id: string;
           source_file_id?: string | null;
+          import_id?: string | null;
+          import_row_id?: string | null;
           lead_name: string;
           company?: string | null;
           email?: string | null;
@@ -346,6 +367,7 @@ export type Database = {
           owner?: string | null;
           notes?: string | null;
           raw_data_json?: Json;
+          last_activity_at?: string | null;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -355,11 +377,49 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["crm_leads"]["Insert"]>;
         Relationships: [];
       };
+      crm_lead_history: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          lead_id: string;
+          source_file_id: string | null;
+          import_id: string | null;
+          import_row_id: string | null;
+          event_type: string;
+          status: string | null;
+          estimated_value: number | null;
+          owner: string | null;
+          notes: string | null;
+          raw_data_json: Json;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          lead_id: string;
+          source_file_id?: string | null;
+          import_id?: string | null;
+          import_row_id?: string | null;
+          event_type?: string;
+          status?: string | null;
+          estimated_value?: number | null;
+          owner?: string | null;
+          notes?: string | null;
+          raw_data_json?: Json;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["crm_lead_history"]["Insert"]>;
+        Relationships: [];
+      };
       operational_metrics: {
         Row: {
           id: string;
           workspace_id: string;
           source_file_id: string | null;
+          import_id: string | null;
+          import_row_id: string | null;
           metric_name: string;
           category: string | null;
           value: number | null;
@@ -377,6 +437,8 @@ export type Database = {
           id?: string;
           workspace_id: string;
           source_file_id?: string | null;
+          import_id?: string | null;
+          import_row_id?: string | null;
           metric_name: string;
           category?: string | null;
           value?: number | null;
@@ -551,6 +613,7 @@ export type Database = {
         Row: {
           id: string;
           workspace_id: string;
+          folder_id: string | null;
           name: string;
           category: string | null;
           target: number | null;
@@ -559,13 +622,20 @@ export type Database = {
           owner: string | null;
           notes: string | null;
           source: string | null;
+          source_file_id: string | null;
+          import_id: string | null;
+          import_row_id: string | null;
+          raw_data_json: Json;
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
           workspace_id: string;
+          folder_id?: string | null;
           name: string;
           category?: string | null;
           target?: number | null;
@@ -574,9 +644,15 @@ export type Database = {
           owner?: string | null;
           notes?: string | null;
           source?: string | null;
+          source_file_id?: string | null;
+          import_id?: string | null;
+          import_row_id?: string | null;
+          raw_data_json?: Json;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["kpis"]["Insert"]>;
         Relationships: [];
