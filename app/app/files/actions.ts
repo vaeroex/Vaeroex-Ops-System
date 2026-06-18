@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { runVaeroexCompletion } from "@/lib/ai/vaeroex-client";
+import { runVaeroexCompletion, type VaeroexFileAttachment } from "@/lib/ai/vaeroex-client";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
@@ -22,7 +22,7 @@ type JsonRecord = Record<string, unknown>;
 type JsonObject = { [key: string]: Json | undefined };
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type ImportMapping = Record<string, string>;
-type FileContentKind = "spreadsheet" | "pdf_text" | "docx_text" | "unsupported";
+type FileContentKind = "spreadsheet" | "pdf_text" | "docx_text" | "image_vision" | "unsupported";
 type FileContentExtraction = {
   supported: boolean;
   kind: FileContentKind;
@@ -33,6 +33,8 @@ type FileContentExtraction = {
   textContent: string;
   textPreview: string;
   contentNote: string;
+  extractionFailureReason?: string;
+  fileAttachment?: VaeroexFileAttachment;
 };
 type ImportField = {
   key: string;
@@ -140,12 +142,12 @@ function isImageFile(file: Pick<FileUploadRow, "file_extension">) {
 }
 
 function canExtractFileContent(file: Pick<FileUploadRow, "file_extension">) {
-  return isSpreadsheet(file) || isTextDocument(file);
+  return isSpreadsheet(file) || isTextDocument(file) || isImageFile(file);
 }
 
 function unsupportedFileContentMessage(file: Pick<FileUploadRow, "file_extension">) {
   if (file.file_extension === "pdf") {
-    return "No readable text could be extracted from this PDF. If it is scanned or image-based, image/OCR analysis is coming soon. Upload CSV/XLSX for data import or a text-based PDF for analysis.";
+    return "No readable text could be extracted from this PDF. It may be scanned, image-based, locked, corrupted, or encoded without a selectable text layer.";
   }
 
   if (file.file_extension === "docx") {
@@ -153,7 +155,7 @@ function unsupportedFileContentMessage(file: Pick<FileUploadRow, "file_extension
   }
 
   if (isImageFile(file)) {
-    return "Image analysis is coming soon. PNG and JPG files can be stored and attached to reports, but Vaeroex cannot read image contents yet.";
+    return "Vaeroex could not read this image. Make sure it is a clear PNG or JPG with readable text or visible business context, then try again.";
   }
 
   return "This file type cannot be analyzed yet. Upload CSV/XLSX for data import, or text-based PDF/DOCX files for analysis.";
@@ -269,6 +271,28 @@ async function downloadFileBuffer(file: FileUploadRow) {
   }
 
   return Buffer.from(await data.arrayBuffer());
+}
+
+async function updateFileProcessingStatus({
+  supabase,
+  file,
+  status,
+  error
+}: {
+  supabase: SupabaseServerClient;
+  file: FileUploadRow;
+  status: "uploaded" | "processing" | "ready" | "failed";
+  error?: string | null;
+}) {
+  await supabase
+    .from("file_uploads")
+    .update({
+      processing_status: status,
+      processing_error: error || null,
+      processed_at: status === "ready" || status === "failed" ? new Date().toISOString() : null
+    })
+    .eq("id", file.id)
+    .eq("workspace_id", file.workspace_id);
 }
 
 function normalizeKey(value: string) {
@@ -643,8 +667,106 @@ function summarizeVaeroexOutput(outputJson: Json) {
     return summary.replace(/^#+\s*/gm, "").split("\n").map((line) => line.trim()).filter(Boolean).slice(0, 4).join("\n");
   }
 
-  const problems = asArray(output.problems_identified).map((item) => (typeof item === "string" ? item : JSON.stringify(item)));
+  const problems = asArray(output.problems_identified).map((item) => {
+    if (typeof item === "string") {
+      return item;
+    }
+
+    if (isRecord(item)) {
+      return (
+        str(item.title) ||
+        str(item.name) ||
+        str(item.description) ||
+        Object.values(item)
+          .filter((value) => typeof value === "string" || typeof value === "number")
+          .map(String)
+          .join(" - ")
+      );
+    }
+
+    return String(item);
+  });
   return problems.slice(0, 4).join("\n") || "Vaeroex completed the file analysis.";
+}
+
+function outputList(output: JsonRecord, key: string) {
+  return asArray(output[key])
+    .map((item) => {
+      if (typeof item === "string") {
+        return item;
+      }
+
+      if (isRecord(item)) {
+        return (
+          str(item.title) ||
+          str(item.name) ||
+          str(item.metric) ||
+          str(item.description) ||
+          str(item.recommendation) ||
+          Object.values(item)
+            .filter((value) => typeof value === "string" || typeof value === "number")
+            .map(String)
+            .join(" - ")
+        );
+      }
+
+      return String(item);
+    })
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function extractedTextFromOutput(outputJson: Json) {
+  const output = isRecord(outputJson) ? outputJson : {};
+  const candidates = [
+    output.extracted_text,
+    output.ocr_text,
+    output.document_text,
+    output.file_text,
+    isRecord(output.extraction) ? output.extraction.text : null
+  ];
+
+  return cleanExtractedText(candidates.find((value) => typeof value === "string" && value.trim()) as string | undefined || "");
+}
+
+function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: FileContentExtraction) {
+  const output = isRecord(outputJson) ? outputJson : {};
+  const summary = str(output.executive_summary) || str(output.summary) || summarizeVaeroexOutput(outputJson);
+  const findings = outputList(output, "extracted_findings").concat(outputList(output, "findings")).concat(outputList(output, "problems_identified"));
+  const kpis = outputList(output, "kpis_found").concat(outputList(output, "recommended_kpis")).concat(outputList(output, "suggested_metrics"));
+  const risks = outputList(output, "risks").concat(outputList(output, "operational_risks"));
+  const issues = outputList(output, "operational_issues").concat(outputList(output, "problems_identified"));
+  const actions = outputList(output, "recommended_actions").concat(outputList(output, "suggested_tasks"));
+
+  return {
+    source_file_name: file.display_name,
+    content_kind: extraction.kind,
+    extraction_status: "ready",
+    extraction_note: extraction.contentNote,
+    executive_summary: summary,
+    extracted_findings: findings.slice(0, 8),
+    kpis_found: kpis.slice(0, 8),
+    risks: risks.slice(0, 8),
+    operational_issues: issues.slice(0, 8),
+    recommended_actions: actions.slice(0, 8),
+    response_markdown: str(output.response_markdown, summary)
+  } satisfies JsonRecord;
+}
+
+function hasMeaningfulModelContent(outputJson: Json) {
+  const output = isRecord(outputJson) ? outputJson : {};
+  const directLists = [
+    "extracted_findings",
+    "findings",
+    "kpis_found",
+    "recommended_kpis",
+    "risks",
+    "operational_risks",
+    "operational_issues",
+    "recommended_actions"
+  ];
+
+  return directLists.some((key) => asArray(output[key]).length > 0) || str(output.response_markdown).length > 120 || str(output.executive_summary).length > 80;
 }
 
 function spreadsheetRowsAsText(rows: ImportRow[], limit: number) {
@@ -683,6 +805,13 @@ function fileContentStatus(file: FileUploadRow) {
     };
   }
 
+  if (isImageFile(file)) {
+    return {
+      supported: true,
+      label: "PNG/JPG OCR and image analysis are supported through Vaeroex."
+    };
+  }
+
   return {
     supported: false,
     label: unsupportedFileContentMessage(file)
@@ -707,7 +836,18 @@ function emptyUnsupportedExtraction(file: FileUploadRow): FileContentExtraction 
     columns: [],
     textContent: "",
     textPreview: "",
-    contentNote: unsupportedFileContentMessage(file)
+    contentNote: unsupportedFileContentMessage(file),
+    extractionFailureReason: unsupportedFileContentMessage(file)
+  };
+}
+
+function fileAttachment(file: FileUploadRow, buffer: Buffer, inputType: "image" | "file"): VaeroexFileAttachment {
+  return {
+    inputType,
+    fileName: file.original_name,
+    mimeType: file.mime_type,
+    base64Data: buffer.toString("base64"),
+    detail: inputType === "image" ? "auto" : undefined
   };
 }
 
@@ -752,7 +892,7 @@ function textDocumentExtraction(file: FileUploadRow, kind: "pdf_text" | "docx_te
 }
 
 function hasExtractedContent(extraction: FileContentExtraction) {
-  return extraction.rows.length > 0 || extraction.textContent.trim().length > 0;
+  return extraction.rows.length > 0 || extraction.textContent.trim().length > 0 || Boolean(extraction.fileAttachment);
 }
 
 async function extractFileContent(file: FileUploadRow, rowLimit: number): Promise<FileContentExtraction> {
@@ -764,11 +904,51 @@ async function extractFileContent(file: FileUploadRow, rowLimit: number): Promis
 
   if (!isSpreadsheet(file)) {
     if (file.file_extension === "pdf") {
-      return textDocumentExtraction(file, "pdf_text", extractPdfText(buffer));
+      const extractedText = extractPdfText(buffer);
+
+      if (cleanExtractedText(extractedText)) {
+        return textDocumentExtraction(file, "pdf_text", extractedText);
+      }
+
+      return {
+        supported: true,
+        kind: "pdf_text",
+        rows: [],
+        preview: {
+          text_preview: "",
+          extraction_method: "openai_pdf_file_input"
+        } as Json,
+        rowText: "",
+        columns: [],
+        textContent: "",
+        textPreview: "",
+        contentNote: "Local PDF text extraction did not find readable text. Vaeroex will inspect the PDF file directly.",
+        extractionFailureReason:
+          "No selectable text layer was found by local extraction. The PDF may be scanned, image-based, or encoded in a way the local parser cannot read.",
+        fileAttachment: fileAttachment(file, buffer, "file")
+      };
     }
 
     if (file.file_extension === "docx") {
       return textDocumentExtraction(file, "docx_text", extractDocxText(buffer));
+    }
+
+    if (isImageFile(file)) {
+      return {
+        supported: true,
+        kind: "image_vision",
+        rows: [],
+        preview: {
+          text_preview: "",
+          extraction_method: "openai_image_vision"
+        } as Json,
+        rowText: "",
+        columns: [],
+        textContent: "",
+        textPreview: "",
+        contentNote: "Vaeroex will inspect this image for readable text, visual business context, risks, KPIs, and recommended actions.",
+        fileAttachment: fileAttachment(file, buffer, "image")
+      };
     }
 
     return emptyUnsupportedExtraction(file);
@@ -791,7 +971,15 @@ function readableList(value: unknown) {
       }
 
       if (isRecord(item)) {
-        return str(item.title) || str(item.name) || str(item.description) || JSON.stringify(item);
+        return (
+          str(item.title) ||
+          str(item.name) ||
+          str(item.description) ||
+          Object.values(item)
+            .filter((value) => typeof value === "string" || typeof value === "number")
+            .map(String)
+            .join(" - ")
+        );
       }
 
       return String(item);
@@ -809,11 +997,14 @@ function vaeroexReportMarkdown(outputJson: Json, fallback: string) {
   }
 
   const summary = str(output.executive_summary) || str(output.summary);
-  const problems = readableList(output.problems_identified);
+  const findings = readableList(output.extracted_findings).concat(readableList(output.findings)).concat(readableList(output.problems_identified));
+  const kpis = readableList(output.kpis_found).concat(readableList(output.recommended_kpis)).concat(readableList(output.suggested_metrics));
+  const risks = readableList(output.risks).concat(readableList(output.operational_risks));
+  const issues = readableList(output.operational_issues).concat(readableList(output.problems_identified));
   const actions = readableList(output.recommended_actions);
   const systems = readableList(output.suggested_systems);
 
-  if (!summary && !problems.length && !actions.length && !systems.length) {
+  if (!summary && !findings.length && !kpis.length && !risks.length && !issues.length && !actions.length && !systems.length) {
     return fallback;
   }
 
@@ -823,16 +1014,16 @@ function vaeroexReportMarkdown(outputJson: Json, fallback: string) {
 ${summary || "Vaeroex reviewed the uploaded file and prepared a practical operations summary."}
 
 ## Extracted Findings
-${problems.length ? problems.map((item) => `- ${item}`).join("\n") : "- No specific problems were identified from the available rows."}
+${findings.length ? findings.map((item) => `- ${item}`).join("\n") : "- No specific findings were identified from the extracted content."}
 
 ## KPIs Found
-${systems.length ? systems.map((item) => `- ${item}`).join("\n") : "- Review this file for metrics that should be tracked in the KPI dashboard."}
+${kpis.length ? kpis.map((item) => `- ${item}`).join("\n") : "- Review this file for metrics that should be tracked in the KPI dashboard."}
 
 ## Risks
-${problems.length ? problems.map((item) => `- ${item}`).join("\n") : "- No clear operational risks were found in the extracted content."}
+${risks.length ? risks.map((item) => `- ${item}`).join("\n") : "- No clear operational risks were found in the extracted content."}
 
 ## Operational Issues
-${problems.length ? problems.map((item) => `- ${item}`).join("\n") : "- No specific operational issues were found in the extracted content."}
+${issues.length ? issues.map((item) => `- ${item}`).join("\n") : "- No specific operational issues were found in the extracted content."}
 
 ## Recommended Actions
 ${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the findings and decide which actions should be assigned."}
@@ -972,6 +1163,7 @@ async function runFileVaeroexAnalysis({
   rowLimit: number;
 }) {
   const workflow = getVaeroexWorkflow("file_analysis");
+  await updateFileProcessingStatus({ supabase, file, status: "processing" });
   const extraction = await extractFileContent(file, rowLimit);
 
   if (!extraction.supported) {
@@ -1008,9 +1200,11 @@ async function runFileVaeroexAnalysis({
       rows_detected: extraction.rows.length,
       columns_detected: extraction.columns,
       characters_extracted: extraction.textContent.length,
+      attachment_analysis: Boolean(extraction.fileAttachment),
       metadata: file.metadata_json,
       analysis_summary: file.analysis_summary,
-      content_note: extraction.contentNote
+      content_note: extraction.contentNote,
+      extraction_failure_reason: extraction.extractionFailureReason || null
     },
     import_history: fileImports.data ?? [],
     related_reports: fileReports.data ?? [],
@@ -1041,9 +1235,38 @@ async function runFileVaeroexAnalysis({
     workflow,
     userPrompt: prompt,
     workspaceSnapshot,
-    extraInputs
+    extraInputs,
+    fileAttachment: extraction.fileAttachment
   });
+  const outputExtractedText = extractedTextFromOutput(outputJson);
+  const finalTextContent = extraction.textContent || outputExtractedText;
+  const finalExtraction = {
+    ...extraction,
+    textContent: finalTextContent,
+    textPreview: textPreview(finalTextContent) || extraction.textPreview,
+    preview:
+      extraction.kind === "spreadsheet"
+        ? extraction.preview
+        : ({
+            text_preview: textPreview(finalTextContent) || extraction.textPreview,
+            character_count: finalTextContent.length,
+            extraction_method: extraction.fileAttachment ? "vaeroex_multimodal" : extraction.kind
+          } as Json),
+    contentNote:
+      finalTextContent && extraction.fileAttachment
+        ? `Vaeroex extracted readable content using ${extraction.kind === "image_vision" ? "image analysis" : "direct file analysis"}.`
+        : extraction.contentNote
+  } satisfies FileContentExtraction;
   const summary = summarizeVaeroexOutput(outputJson);
+  const cleanResult = cleanAnalysisResult(outputJson, file, finalExtraction);
+
+  if (extraction.fileAttachment && !finalTextContent && !hasMeaningfulModelContent(outputJson)) {
+    throw new Error(
+      finalExtraction.extractionFailureReason ||
+        `Vaeroex could not extract readable content from ${file.display_name}. The file may be scanned, blurry, locked, corrupted, or unsupported.`
+    );
+  }
+
   const { data, error } = await supabase
     .from("ai_agent_runs")
     .insert({
@@ -1074,23 +1297,28 @@ async function runFileVaeroexAnalysis({
     .update({
       analysis_prompt: prompt,
       analysis_summary: summary,
+      processing_status: "ready",
+      processing_error: null,
+      processed_at: new Date().toISOString(),
       metadata_json: {
         ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
         latest_analysis_run_id: data.id,
         latest_analysis_at: new Date().toISOString(),
         latest_analysis_prompt: prompt,
-        latest_analysis_content_kind: extraction.kind,
-        latest_analysis_rows_detected: extraction.rows.length,
-        latest_analysis_characters_detected: extraction.textContent.length,
-        latest_analysis_preview: extraction.preview,
+        latest_analysis_content_kind: finalExtraction.kind,
+        latest_analysis_rows_detected: finalExtraction.rows.length,
+        latest_analysis_characters_detected: finalExtraction.textContent.length,
+        latest_analysis_preview: finalExtraction.preview,
+        latest_analysis_output: cleanResult,
         latest_text_extraction: {
-          kind: extraction.kind,
+          kind: finalExtraction.kind,
           extracted_at: new Date().toISOString(),
-          rows_detected: extraction.rows.length,
-          columns_detected: extraction.columns,
-          character_count: extraction.textContent.length,
-          preview: extraction.textPreview,
-          extracted_text: extraction.textContent
+          rows_detected: finalExtraction.rows.length,
+          columns_detected: finalExtraction.columns,
+          character_count: finalExtraction.textContent.length,
+          preview: finalExtraction.textPreview,
+          extracted_text: finalExtraction.textContent,
+          extraction_note: finalExtraction.contentNote
         }
       } satisfies Json
     })
@@ -1102,7 +1330,7 @@ async function runFileVaeroexAnalysis({
     inputJson,
     outputJson,
     summary,
-    extraction,
+    extraction: finalExtraction,
     runId: data.id
   };
 }
@@ -1154,17 +1382,26 @@ export async function uploadFileAction(formData: FormData) {
       storage_bucket: STORAGE_BUCKET,
       storage_path: storagePath,
       import_status: extension === "csv" || extension === "xlsx" ? "ready" : "not_imported",
+      processing_status: "uploaded",
+      processing_error: null,
+      processed_at: null,
       metadata_json: {
         upload_method: "files_module",
         can_import: extension === "csv" || extension === "xlsx",
-        can_analyze: storedExtension === "csv" || storedExtension === "xlsx" || storedExtension === "pdf" || storedExtension === "docx",
+        can_analyze:
+          storedExtension === "csv" ||
+          storedExtension === "xlsx" ||
+          storedExtension === "pdf" ||
+          storedExtension === "docx" ||
+          storedExtension === "png" ||
+          storedExtension === "jpg",
         supported_import_types: extension === "csv" || extension === "xlsx" ? ["kpi", "crm", "metrics"] : [],
         extraction_support:
           storedExtension === "csv" || storedExtension === "xlsx"
             ? "Spreadsheet rows can be parsed, analyzed, and imported after review."
             : storedExtension === "pdf" || storedExtension === "docx"
               ? "Text can be extracted for analysis and report creation when the document contains readable text."
-              : "Image analysis is coming soon. The file can be stored and attached to reports."
+              : "Image OCR and visual analysis are supported through Vaeroex."
       },
       created_by: user.id
     })
@@ -1182,7 +1419,7 @@ export async function uploadFileAction(formData: FormData) {
       ? "File uploaded. Next: analyze it with Vaeroex, import rows for review, or create a report from the spreadsheet."
       : storedExtension === "pdf" || storedExtension === "docx"
         ? "File uploaded. Next: analyze it with Vaeroex or create a report from extracted document text."
-        : "File uploaded. Image analysis is coming soon, so this file is stored for organization and report attachments.",
+        : "File uploaded. Next: analyze it with Vaeroex for image text, visible issues, KPIs, and recommendations.",
     data.id
   );
 }
@@ -1196,18 +1433,34 @@ export async function importFileAction(formData: FormData) {
     redirectWithFileError("Only CSV and XLSX files can be imported into KPI, CRM, or operations history.", file.id);
   }
 
+  await updateFileProcessingStatus({ supabase, file, status: "processing" });
   const buffer = await downloadFileBuffer(file);
   let rows: ImportRow[] = [];
 
   try {
     rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
   } catch (error) {
-    await supabase.from("file_uploads").update({ import_status: "failed" }).eq("id", file.id).eq("workspace_id", workspaceId);
-    redirectWithFileError(error instanceof Error ? error.message : "The spreadsheet could not be read.", file.id);
+    const message = error instanceof Error ? error.message : "The spreadsheet could not be read.";
+
+    await supabase
+      .from("file_uploads")
+      .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+    redirectWithFileError(message, file.id);
   }
 
   if (!rows.length) {
-    await supabase.from("file_uploads").update({ import_status: "failed" }).eq("id", file.id).eq("workspace_id", workspaceId);
+    await supabase
+      .from("file_uploads")
+      .update({
+        import_status: "failed",
+        processing_status: "failed",
+        processing_error: "No data rows were found. Make sure the first row contains column names.",
+        processed_at: new Date().toISOString()
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
     redirectWithFileError("No data rows were found. Make sure the first row contains column names.", file.id);
   }
 
@@ -1230,6 +1483,12 @@ export async function importFileAction(formData: FormData) {
     .single();
 
   if (importError || !importRecord) {
+    await updateFileProcessingStatus({
+      supabase,
+      file,
+      status: "failed",
+      error: importError?.message || "Import record could not be created."
+    });
     redirectWithFileError(importError?.message || "Import record could not be created.", file.id);
   }
 
@@ -1246,6 +1505,7 @@ export async function importFileAction(formData: FormData) {
   const importRowsResult = await supabase.from("file_import_rows").insert(importRows);
 
   if (importRowsResult.error) {
+    await updateFileProcessingStatus({ supabase, file, status: "failed", error: importRowsResult.error.message });
     redirectWithFileError(importRowsResult.error.message, file.id);
   }
 
@@ -1254,6 +1514,9 @@ export async function importFileAction(formData: FormData) {
     .update({
       import_type: importType,
       import_status: "extracted",
+      processing_status: "ready",
+      processing_error: null,
+      processed_at: new Date().toISOString(),
       metadata_json: {
         ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
         latest_extraction: {
@@ -1332,6 +1595,8 @@ export async function saveExtractedImportAction(formData: FormData) {
   let importedRowCount = 0;
 
   try {
+    await updateFileProcessingStatus({ supabase, file, status: "processing" });
+
     if (importType === "kpi") {
       const targetRows = buildKpiRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
       importedRowCount = targetRows.length;
@@ -1407,6 +1672,9 @@ export async function saveExtractedImportAction(formData: FormData) {
         import_type: importType,
         import_status: "imported",
         imported_rows: file.imported_rows + importedRowCount,
+        processing_status: "ready",
+        processing_error: null,
+        processed_at: new Date().toISOString(),
         metadata_json: appendImportHistory(file.metadata_json, importEntry)
       })
       .eq("id", file.id)
@@ -1420,7 +1688,11 @@ export async function saveExtractedImportAction(formData: FormData) {
       .eq("id", importId)
       .eq("workspace_id", workspaceId);
 
-    await supabase.from("file_uploads").update({ import_status: "failed" }).eq("id", file.id).eq("workspace_id", workspaceId);
+    await supabase
+      .from("file_uploads")
+      .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
     redirectWithFileError(message, file.id);
   }
 
@@ -1465,7 +1737,10 @@ export async function createReportFromFileAction(formData: FormData) {
       rowLimit: MAX_REPORT_ROWS
     });
   } catch (error) {
-    redirectWithFileError(error instanceof Error ? error.message : "Vaeroex could not create a report from this file.", file.id);
+    const message = error instanceof Error ? error.message : "Vaeroex could not create a report from this file.";
+
+    await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
+    redirectWithFileError(message, file.id);
   }
 
   const fallbackBody = fileReportBody({
@@ -1517,6 +1792,7 @@ export async function createReportFromFileAction(formData: FormData) {
   });
 
   if (error) {
+    await updateFileProcessingStatus({ supabase, file, status: "failed", error: error.message });
     redirectWithFileError(error.message, file.id);
   }
 
@@ -1624,12 +1900,15 @@ export async function analyzeFileAction(formData: FormData) {
     const contentLabel =
       result.extraction.kind === "spreadsheet"
         ? `${result.extraction.rows.length} spreadsheet row${result.extraction.rows.length === 1 ? "" : "s"}`
-        : `${result.extraction.textContent.length} character${result.extraction.textContent.length === 1 ? "" : "s"} of document text`;
+        : result.extraction.kind === "image_vision"
+          ? "the uploaded image and any readable text Vaeroex could identify"
+          : `${result.extraction.textContent.length} character${result.extraction.textContent.length === 1 ? "" : "s"} of document text`;
 
     redirectWithMessage(`Vaeroex analyzed ${contentLabel}. Review the summary below or create a report from this file.`, file.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Vaeroex could not analyze the file.";
 
+    await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
     await supabase.from("ai_agent_runs").insert({
       workspace_id: workspaceId,
       agent_type: workflow.key,

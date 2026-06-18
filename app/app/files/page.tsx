@@ -111,13 +111,18 @@ function fileSizeLabel(bytes: number) {
 }
 
 function fileStatusLabel(file: FileUploadRow) {
+  const processingStatus = file.processing_status || "uploaded";
+
   if (file.deleted_at) return "Deleted";
   if (file.archived_at) return "Archived";
+  if (processingStatus === "processing") return "Processing";
+  if (processingStatus === "failed") return "Failed";
+  if (processingStatus === "ready") return "Ready";
   if (file.import_status === "imported") return "Imported";
   if (file.import_status === "failed") return "Import failed";
   if (file.import_status === "extracted") return "Needs review";
   if (file.import_status === "ready") return "Ready to import";
-  return "Stored";
+  return "Uploaded";
 }
 
 function isSpreadsheet(file: FileUploadRow) {
@@ -133,7 +138,7 @@ function isImageFile(file: FileUploadRow) {
 }
 
 function canAnalyzeFile(file: FileUploadRow) {
-  return isSpreadsheet(file) || isTextAnalyzableDocument(file);
+  return isSpreadsheet(file) || isTextAnalyzableDocument(file) || isImageFile(file);
 }
 
 function fileSupportNotice(file: FileUploadRow) {
@@ -160,8 +165,8 @@ function fileSupportNotice(file: FileUploadRow) {
 
   if (isImageFile(file)) {
     return {
-      title: "Image analysis coming soon",
-      body: "PNG and JPG files can be stored, organized, and attached to reports, but Vaeroex cannot read image contents yet."
+      title: "Image OCR and analysis ready",
+      body: "Vaeroex can analyze PNG and JPG files for readable text, visible issues, KPIs, risks, and recommended actions."
     };
   }
 
@@ -228,6 +233,76 @@ function rowsForImport(rows: FileImportDataRow[], importId: string) {
 
 function importsForFile(imports: FileImportRow[], fileId: string) {
   return imports.filter((item) => item.file_upload_id === fileId);
+}
+
+function stringValue(value: unknown, fallback = "") {
+  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function stringList(value: unknown) {
+  return Array.isArray(value) ? value.map((item) => stringValue(item)).filter(Boolean) : [];
+}
+
+function latestAnalysisResult(file: FileUploadRow) {
+  if (!isRecord(file.metadata_json)) {
+    return null;
+  }
+
+  const result = file.metadata_json.latest_analysis_output;
+  return isRecord(result) ? result : null;
+}
+
+function AnalysisSection({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+  return (
+    <section className="rounded-lg border border-line bg-slate-50 p-4">
+      <h5 className="text-sm font-semibold text-ink">{title}</h5>
+      <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
+        {items.length ? (
+          items.map((item, index) => (
+            <div key={`${title}-${index}-${item}`} className="flex gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
+              <p>{item}</p>
+            </div>
+          ))
+        ) : (
+          <p className="text-muted">{empty}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function AnalysisResultCard({ file }: { file: FileUploadRow }) {
+  const result = latestAnalysisResult(file);
+
+  if (!result) {
+    return null;
+  }
+
+  const summary = stringValue(result.executive_summary, file.analysis_summary || "Vaeroex analyzed this file and prepared recommendations.");
+
+  return (
+    <section className="rounded-lg border border-blue-100 bg-white p-4 shadow-panel">
+      <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Latest Vaeroex analysis</p>
+        <h4 className="mt-2 text-base font-semibold text-ink">Clean analysis result</h4>
+        <p className="mt-2 text-sm leading-6 text-slate-700">{summary}</p>
+        <p className="mt-3 text-xs leading-5 text-muted">
+          Source file: {stringValue(result.source_file_name, file.display_name)} · Status: {fileStatusLabel(file)}
+        </p>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <AnalysisSection title="Extracted Findings" items={stringList(result.extracted_findings)} empty="No specific findings were saved from this analysis." />
+        <AnalysisSection title="KPIs Found" items={stringList(result.kpis_found)} empty="No KPI suggestions were found yet." />
+        <AnalysisSection title="Risks" items={stringList(result.risks)} empty="No clear risks were identified." />
+        <AnalysisSection title="Operational Issues" items={stringList(result.operational_issues)} empty="No operational issues were identified." />
+        <div className="lg:col-span-2">
+          <AnalysisSection title="Recommended Actions" items={stringList(result.recommended_actions)} empty="No recommended actions were returned." />
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function reportLabel(report: Pick<ReportRow, "title" | "report_type" | "created_at">) {
@@ -320,7 +395,7 @@ function FileActionCenter({
           <div>
             <h4 className="text-sm font-semibold text-ink">Analyze with Vaeroex</h4>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Ask a question about this file. CSV/XLSX files use parsed rows, and PDF/DOCX files use extracted readable text.
+              Ask a question about this file. CSV/XLSX files use parsed rows, PDF/DOCX files use extracted readable text, and images use OCR plus visual analysis.
             </p>
           </div>
         </div>
@@ -352,7 +427,7 @@ function FileActionCenter({
           </form>
         ) : (
           <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            {support.body} Upload CSV/XLSX for data import, or text-based PDF/DOCX files for analysis and report creation.
+            {support.body} Upload CSV/XLSX, text-based PDF/DOCX, PNG, or JPG files for analysis and report creation.
           </p>
         )}
       </section>
@@ -369,7 +444,7 @@ function FileActionCenter({
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            CSV and XLSX files can be imported into structured KPI, CRM, or operational metric records. This file can still be analyzed when supported, attached to reports, and organized in the file library.
+            CSV and XLSX files can be imported into structured KPI, CRM, or operational metric records. PDF, DOCX, PNG, and JPG files can still be analyzed, attached to reports, and organized in the file library.
           </p>
         ) : null}
       </section>
@@ -440,13 +515,17 @@ function FileActionCenter({
             <p className="mt-1 text-ink">{fileStatusLabel(file)}</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Processing status</p>
+            <p className="mt-1 text-ink">{(file.processing_status || "uploaded").replace(/_/g, " ")}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Rows imported</p>
             <p className="mt-1 text-ink">{file.imported_rows}</p>
           </div>
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support CSV/XLSX rows only. PDF and DOCX analysis uses extracted text instead of imported rows.
+            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support CSV/XLSX rows only. PDF/DOCX analysis uses extracted text, and image analysis uses OCR plus visual context.
           </p>
         ) : null}
       </details>
@@ -631,6 +710,7 @@ function FileDetails({
   reports: Pick<ReportRow, "id" | "title" | "report_type" | "created_at">[];
 }) {
   const lines = analysisLines(file.analysis_summary);
+  const hasCleanAnalysis = Boolean(latestAnalysisResult(file));
   const latestImport = imports[0];
   const latestImportRows = latestImport ? rowsForImport(importRows, latestImport.id) : [];
   const needsReview = latestImport && (latestImport.status === "needs_review" || latestImport.status === "extracted");
@@ -638,10 +718,17 @@ function FileDetails({
   return (
     <div className="space-y-5">
       <FileActionCenter file={file} reports={reports} />
+      {file.processing_error ? (
+        <section className="rounded-lg border border-red-200 bg-red-50 p-4">
+          <h4 className="text-sm font-semibold text-red-900">Could not process this file</h4>
+          <p className="mt-2 text-sm leading-6 text-red-800">{file.processing_error}</p>
+        </section>
+      ) : null}
+      <AnalysisResultCard file={file} />
       {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
       <ImportHistory imports={imports} />
 
-      {lines.length ? (
+      {lines.length && !hasCleanAnalysis ? (
         <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
           <h4 className="text-sm font-semibold text-ink">Latest Vaeroex analysis</h4>
           <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
@@ -701,7 +788,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       preview: shortPreview(file.analysis_summary, `${file.original_name} · ${fileSizeLabel(file.file_size_bytes)}`),
       meta: [
         { label: "Original name", value: file.original_name },
-        { label: "Import status", value: fileStatusLabel(file) },
+        { label: "Processing", value: fileStatusLabel(file) },
+        { label: "Import status", value: importStatusLabel(file.import_status) },
         { label: "Rows imported", value: file.imported_rows },
         { label: "Extractions", value: fileImports.length },
         { label: "File size", value: fileSizeLabel(file.file_size_bytes) }
@@ -761,7 +849,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="space-y-6">
-          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX files can be imported after review. Text-based PDF/DOCX files can be analyzed and used for reports.">
+          <SectionCard title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX files can be imported after review. PDF/DOCX files can be analyzed from extracted text, and PNG/JPG files can be analyzed with OCR and visual context.">
             <form action={uploadFileAction} encType="multipart/form-data" className="space-y-4">
               <label className="block text-sm font-medium">
                 File

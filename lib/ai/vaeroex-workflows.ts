@@ -184,8 +184,10 @@ ${sharedJsonInstructions}
     promptPlaceholder: "What trends, KPIs, problems, and executive summary should Vaeroex pull from this file?",
     saveTargets: ["tasks", "report"],
     instructions: `
-Analyze the uploaded file content and workspace context. The file may be parsed spreadsheet rows, extracted PDF text, or extracted DOCX text.
-Return a polished business-owner-friendly result with executive_summary, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, suggested_systems, and response_markdown.
+Analyze the uploaded file content and workspace context. The file may be parsed spreadsheet rows, extracted PDF text, extracted DOCX text, a PDF file attached directly for document reading, or a PNG/JPG image attached for OCR and visual analysis.
+Return a polished business-owner-friendly result with executive_summary, extracted_text, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, suggested_systems, and response_markdown.
+For images, perform OCR when readable text is visible and also describe relevant visual business context, visible problems, risks, or operational clues.
+For PDFs attached directly, extract readable text when possible and explain clearly if the PDF appears scanned, image-based, locked, corrupted, or otherwise unreadable.
 Compare the new file against prior KPI history, file imports, CRM lead history, and operational metrics when those are available.
 Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, operational problems that stand out, possible data quality concerns, and practical next steps.
 Do not repeat raw rows, long document excerpts, or technical JSON in the user-facing answer.

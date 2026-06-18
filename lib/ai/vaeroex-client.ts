@@ -9,6 +9,15 @@ type RunVaeroexRequest = {
   userPrompt: string;
   workspaceSnapshot: Json;
   extraInputs?: Json;
+  fileAttachment?: VaeroexFileAttachment;
+};
+
+export type VaeroexFileAttachment = {
+  inputType: "image" | "file";
+  fileName: string;
+  mimeType: string;
+  base64Data: string;
+  detail?: "auto" | "low" | "high";
 };
 
 type ResponsesApiResponse = {
@@ -211,6 +220,63 @@ function extractResponsesContent(payload: ResponsesApiResponse) {
   return "";
 }
 
+function fileDataUrl(attachment: VaeroexFileAttachment) {
+  return `data:${attachment.mimeType};base64,${attachment.base64Data}`;
+}
+
+function buildUserContent({
+  workflow,
+  userPrompt,
+  workspaceSnapshot,
+  extraInputs,
+  fileAttachment
+}: RunVaeroexRequest) {
+  const textInput = JSON.stringify(
+    {
+      workflow: workflow.key,
+      user_request: userPrompt || workflow.promptPlaceholder,
+      extra_inputs: extraInputs,
+      workspace_context: workspaceSnapshot,
+      attached_file: fileAttachment
+        ? {
+            input_type: fileAttachment.inputType,
+            file_name: fileAttachment.fileName,
+            mime_type: fileAttachment.mimeType
+          }
+        : null
+    },
+    null,
+    2
+  );
+
+  if (!fileAttachment) {
+    return textInput;
+  }
+
+  const content: JsonRecord[] = [
+    {
+      type: "input_text",
+      text: textInput
+    }
+  ];
+
+  if (fileAttachment.inputType === "image") {
+    content.push({
+      type: "input_image",
+      image_url: fileDataUrl(fileAttachment),
+      detail: fileAttachment.detail || "auto"
+    });
+  } else {
+    content.push({
+      type: "input_file",
+      filename: fileAttachment.fileName,
+      file_data: fileDataUrl(fileAttachment)
+    });
+  }
+
+  return content;
+}
+
 export function getVaeroexOpenAIRuntimeStatus() {
   const env = openAIEnvDiagnostics();
 
@@ -228,7 +294,8 @@ export async function runVaeroexCompletion({
   workflow,
   userPrompt,
   workspaceSnapshot,
-  extraInputs = {}
+  extraInputs = {},
+  fileAttachment
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     throw new Error("Vaeroex prompt is not configured.");
@@ -275,16 +342,7 @@ export async function runVaeroexCompletion({
         },
         {
           role: "user",
-          content: JSON.stringify(
-            {
-              workflow: workflow.key,
-              user_request: userPrompt || workflow.promptPlaceholder,
-              extra_inputs: extraInputs,
-              workspace_context: workspaceSnapshot
-            },
-            null,
-            2
-          )
+          content: buildUserContent({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment })
         }
       ]
     })
