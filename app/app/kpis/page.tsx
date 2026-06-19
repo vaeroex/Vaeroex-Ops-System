@@ -1,4 +1,5 @@
 import type { Route } from "next";
+import Link from "next/link";
 import { createKpiAction } from "@/app/app/operations/actions";
 import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
@@ -9,6 +10,7 @@ import { ManagedRecordList, type ManagedRecordEditField } from "@/components/ope
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import type { Database } from "@/lib/supabase/types";
@@ -780,10 +782,25 @@ function AlertRuleList({ rules }: { rules: KpiAlertRuleRow[] }) {
 
 export default async function KpisPage({ searchParams }: KpisPageProps) {
   const params = await searchParams;
-  const { supabase, workspaceId } = await requireWorkspacePage();
+  const { supabase, context, workspaceId } = await requireWorkspacePage();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [kpiResult, completedTasksResult, openTasksResult, folderResult, peopleResult, alertRulesResult, shareResult] = await Promise.all([
+  const [
+    kpiResult,
+    completedTasksResult,
+    openTasksResult,
+    folderResult,
+    peopleResult,
+    alertRulesResult,
+    shareResult,
+    taskResult,
+    issueResult,
+    checklistRunResult,
+    crmResult,
+    fileResult,
+    reportResult,
+    notificationResult
+  ] = await Promise.all([
     supabase
       .from("kpis")
       .select("*")
@@ -795,7 +812,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("kpi_alert_rules").select("*").eq("workspace_id", workspaceId).eq("is_active", true).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false })
+    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
+    supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50)
   ]);
 
   const kpis = (kpiResult.data || []) as KpiRow[];
@@ -807,6 +831,31 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const conversionRate = findLatestMetric(kpis, ["conversion"]);
   const completedTasks = completedTasksResult.count || 0;
   const openTasks = openTasksResult.count || 0;
+  const intelligence = buildPrestigeIntelligence({
+    workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
+    isDemoWorkspace: false,
+    periodLabel: "KPIs",
+    range: { startDate: today, endDate: today, previousStartDate: today, previousEndDate: today },
+    kpis,
+    tasks: taskResult.data || [],
+    issues: issueResult.data || [],
+    assets: [],
+    checklists: [],
+    checklistRuns: checklistRunResult.data || [],
+    sops: [],
+    files: fileResult.data || [],
+    imports: [],
+    crmLeads: crmResult.data || [],
+    reports: reportResult.data || [],
+    vaeroexRuns: [],
+    operationalMetrics: [],
+    notifications: notificationResult.data || [],
+    assignments: [],
+    shares,
+    people: [],
+    decisions: [],
+    recommendationOutcomes: []
+  });
 
   const metricCards = [
     {
@@ -937,7 +986,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           folderResult.error?.message ||
           peopleResult.error?.message ||
           alertRulesResult.error?.message ||
-          shareResult.error?.message
+          shareResult.error?.message ||
+          taskResult.error?.message ||
+          issueResult.error?.message ||
+          checklistRunResult.error?.message ||
+          crmResult.error?.message ||
+          fileResult.error?.message ||
+          reportResult.error?.message ||
+          notificationResult.error?.message
         }
       />
       <SuccessNotice message={params?.message} />
@@ -951,6 +1007,34 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       <section className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
         <KpiAlertRulePanel kpiNames={metricNames} people={people} />
         <AlertRuleList rules={alertRules} />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <SectionCard title="Benchmark comparisons" description="Vaeroex compares this workspace against default operating standards, not anonymous customer data.">
+          <div className="grid gap-3 md:grid-cols-2">
+            {intelligence.benchmarkMode.map((item) => (
+              <article key={item.title} className="rounded-lg border border-line bg-white p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold text-ink">{item.title}</p>
+                  <KpiStatusBadge tone={item.status === "On track" ? "green" : item.status === "Needs attention" ? "yellow" : "neutral"} />
+                </div>
+                <p className="mt-2 text-sm leading-6 text-muted">{item.evidence}</p>
+                <p className="mt-2 text-xs leading-5 text-muted">{item.recommendedAction}</p>
+              </article>
+            ))}
+          </div>
+        </SectionCard>
+        <SectionCard title="KPI risk and data quality" description={`Data Quality Score: ${intelligence.dataQuality.score}/100.`}>
+          <div className="space-y-3">
+            {intelligence.dataQuality.gaps.slice(0, 6).map((gap) => (
+              <Link key={gap.id} href={gap.href} className="block rounded-lg border border-line bg-white p-3 text-sm">
+                <span className="font-semibold text-ink">{gap.title}</span>
+                <span className="mt-1 block text-xs leading-5 text-muted">{gap.why}</span>
+              </Link>
+            ))}
+            {!intelligence.dataQuality.gaps.length ? <p className="text-sm leading-6 text-muted">No major KPI data gaps found.</p> : null}
+          </div>
+        </SectionCard>
       </section>
 
       <SectionCard title="Trend analysis" description="Select one or more KPIs to review movement, target performance, and comparison notes.">

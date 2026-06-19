@@ -13,7 +13,9 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
+import { createBusinessReviewPackageAction } from "@/app/app/intelligence/actions";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import {
   REPORT_QUARTER_MONTH_OPTIONS,
@@ -672,7 +674,20 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     peopleResult,
     shareResult,
     preferenceResult,
-    scheduledRunResult
+    scheduledRunResult,
+    kpiResult,
+    taskResult,
+    issueResult,
+    checklistRunResult,
+    sopResult,
+    fileResult,
+    importResult,
+    crmResult,
+    vaeroexRunResult,
+    notificationResult,
+    assignmentResult,
+    decisionResult,
+    recommendationOutcomeResult
   ] = await Promise.all([
     reportQuery,
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
@@ -704,13 +719,62 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("run_date", { ascending: false })
-      .limit(20)
+      .limit(20),
+    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(300),
+    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
+    supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(100),
+    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(50),
+    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
+    supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
+    supabase
+      .from("vaeroex_recommendation_outcomes")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(40)
   ]);
   const people = (peopleResult.data || []) as TeamPersonOption[];
   const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
   const shares = (shareResult.data || []) as ShareRow[];
   const preferences = (preferenceResult.data || []) as ReportSubscriptionPreferenceRow[];
   const scheduledRuns = (scheduledRunResult.data || []) as ScheduledReportRunRow[];
+  const reportIntelligence = buildPrestigeIntelligence({
+    workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
+    isDemoWorkspace: false,
+    periodLabel: "Reports",
+    range: {
+      startDate: filterStart || todayDate(),
+      endDate: filterEnd || todayDate(),
+      previousStartDate: filterStart || todayDate(),
+      previousEndDate: filterEnd || todayDate()
+    },
+    kpis: kpiResult.data || [],
+    tasks: taskResult.data || [],
+    issues: issueResult.data || [],
+    assets: [],
+    checklists: [],
+    checklistRuns: checklistRunResult.data || [],
+    sops: sopResult.data || [],
+    files: fileResult.data || [],
+    imports: importResult.data || [],
+    crmLeads: crmResult.data || [],
+    reports: (rawReports || []) as ReportRow[],
+    vaeroexRuns: vaeroexRunResult.data || [],
+    operationalMetrics: [],
+    notifications: notificationResult.data || [],
+    assignments: assignmentResult.data || [],
+    shares,
+    people: [],
+    decisions: decisionResult.data || [],
+    recommendationOutcomes: recommendationOutcomeResult.data || []
+  });
 
   const dynamicCategories = uniqueOptions([
     ...(taskCategories.data || []).map((row) => row.category),
@@ -818,7 +882,20 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           peopleResult.error?.message ||
           shareResult.error?.message ||
           preferenceResult.error?.message ||
-          scheduledRunResult.error?.message
+          scheduledRunResult.error?.message ||
+          kpiResult.error?.message ||
+          taskResult.error?.message ||
+          issueResult.error?.message ||
+          checklistRunResult.error?.message ||
+          sopResult.error?.message ||
+          fileResult.error?.message ||
+          importResult.error?.message ||
+          crmResult.error?.message ||
+          vaeroexRunResult.error?.message ||
+          notificationResult.error?.message ||
+          assignmentResult.error?.message ||
+          decisionResult.error?.message ||
+          recommendationOutcomeResult.error?.message
         }
       />
       <SuccessNotice message={params?.message} />
@@ -831,6 +908,54 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       </section>
 
       <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} canRunNow={canRunScheduledReports} />
+
+      <SectionCard title="Business Review Package" description="Prepare a board, owner, bank, investor, franchise, monthly, or quarterly review package from the same workspace data Vaeroex uses for reports.">
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="grid gap-3 md:grid-cols-2">
+            {reportIntelligence.businessReviewPackage.sections.map((section) => (
+              <article key={section.title} className="rounded-lg border border-line bg-white p-4">
+                <p className="text-sm font-semibold text-ink">{section.title}</p>
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                  {section.lines.slice(0, 3).map((line) => (
+                    <li key={line} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-line bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-ink">Recommendation outcomes</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                {reportIntelligence.recommendationTracking.outcomeNotes.map((note) => (
+                  <p key={note}>{note}</p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border border-line bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-ink">Decisions and outcomes</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                {reportIntelligence.decisions.outcomeNotes.length ? (
+                  reportIntelligence.decisions.outcomeNotes.map((note) => <p key={note}>{note}</p>)
+                ) : (
+                  <p>No decisions logged yet.</p>
+                )}
+              </div>
+            </div>
+            <form action={createBusinessReviewPackageAction}>
+              <input type="hidden" name="return_path" value="/app/reports" />
+              <input type="hidden" name="title" value={reportIntelligence.businessReviewPackage.title} />
+              <input type="hidden" name="body_markdown" value={reportIntelligence.businessReviewPackage.body} />
+              <input type="hidden" name="date_range_start" value={filterStart || todayDate()} />
+              <input type="hidden" name="date_range_end" value={filterEnd || todayDate()} />
+              <ConfirmSubmitButton message="Save this Business Review Package to Reports?">Prepare Business Review Package</ConfirmSubmitButton>
+            </form>
+          </div>
+        </div>
+      </SectionCard>
 
       <section className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-2">

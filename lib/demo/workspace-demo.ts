@@ -51,7 +51,7 @@ type DemoMetricRow = {
   note: string;
 };
 
-const DEMO_VERSION = "ytd-sales-demo-2026-01";
+const DEMO_VERSION = "ytd-sales-demo-2026-02-prestige";
 const DEMO_SOURCE = "Vaeroex YTD Demo";
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
@@ -481,6 +481,8 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
 
 async function clearDemoWorkspaceData(supabase: AppSupabaseClient, workspaceId: string) {
   const tables = [
+    "vaeroex_recommendation_outcomes",
+    "business_decisions",
     "file_import_rows",
     "file_imports",
     "file_uploads",
@@ -507,15 +509,17 @@ async function clearDemoWorkspaceData(supabase: AppSupabaseClient, workspaceId: 
 }
 
 async function shouldRebuildDemoWorkspace(supabase: AppSupabaseClient, workspaceId: string, expectedKpiRows: number) {
-  const { count, error } = await supabase
-    .from("kpis")
-    .select("id", { count: "exact", head: true })
-    .eq("workspace_id", workspaceId)
-    .eq("source", DEMO_SOURCE);
+  const [kpis, decisions, recommendations] = await Promise.all([
+    supabase.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("source", DEMO_SOURCE),
+    supabase.from("business_decisions").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("vaeroex_recommendation_outcomes").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
+  ]);
 
-  throwIfError(error, "Demo version check");
+  throwIfError(kpis.error, "Demo version check");
+  throwIfError(decisions.error, "Demo decision check");
+  throwIfError(recommendations.error, "Demo recommendation check");
 
-  return (count ?? 0) < expectedKpiRows;
+  return (kpis.count ?? 0) < expectedKpiRows || (decisions.count ?? 0) < 3 || (recommendations.count ?? 0) < 4;
 }
 
 async function seedKpis(supabase: AppSupabaseClient, workspaceId: string, user: DemoUser, timeline: ReturnType<typeof currentTimeline>) {
@@ -1274,6 +1278,132 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
   throwIfError(result.error, "Demo Vaeroex insight");
 }
 
+async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, workspaceId: string, user: DemoUser) {
+  const year = todayUtc().getUTCFullYear();
+  const decisionResult = await supabase.from("business_decisions").insert([
+    {
+      workspace_id: workspaceId,
+      title: "Change weekly lead follow-up process",
+      reason: "Conversion dropped in March even though lead volume stayed healthy.",
+      expected_outcome: "Improve conversion rate from 18% toward the 25% target and reduce proposal-stage stalls.",
+      related_kpi: "Conversion Rate",
+      owner: "Morgan Lee",
+      review_date: dateForMonth(year, 4, 15),
+      status: "reviewed",
+      outcome_summary: "May conversion improved to 29% after weekly proposal review and required next-contact dates.",
+      created_by: user.id,
+      created_at: isoForMonth(year, 3, 5)
+    },
+    {
+      workspace_id: workspaceId,
+      title: "Add response-time escalation owner",
+      reason: "Average response time rose to 32 hours during the March dip.",
+      expected_outcome: "Bring response time back under the 24-hour target.",
+      related_kpi: "Average Response Time",
+      owner: "Taylor Smith",
+      review_date: dateForMonth(year, 4, 20),
+      status: "reviewed",
+      outcome_summary: "Response time improved to 18 hours in May after daily ownership was added.",
+      created_by: user.id,
+      created_at: isoForMonth(year, 3, 12)
+    },
+    {
+      workspace_id: workspaceId,
+      title: "Require monthly SOP and checklist recovery review",
+      reason: "Checklist completion fell to 78% and SOP review completion fell to 62% in March.",
+      expected_outcome: "Raise checklist completion above 95% and keep SOP review completion near 100%.",
+      related_kpi: "Checklist Completion Rate",
+      owner: "Jamie Brooks",
+      review_date: dateFromNow(14),
+      status: "in_progress",
+      outcome_summary: "May recovered, but the current month is mixed and still needs review.",
+      created_by: user.id,
+      created_at: isoForMonth(year, 4, 8)
+    }
+  ]);
+  throwIfError(decisionResult.error, "Demo business decisions");
+
+  const recommendationResult = await supabase.from("vaeroex_recommendation_outcomes").insert([
+    {
+      workspace_id: workspaceId,
+      title: "Update customer follow-up SOP",
+      source_type: "prestige_demo",
+      source_title: "March Performance Dip Review",
+      evidence: "March conversion dropped to 18% while lead volume stayed healthy.",
+      related_module: "SOPs",
+      related_kpi: "Conversion Rate",
+      expected_outcome: "Improve follow-up discipline and conversion recovery.",
+      created_action_type: "sop_review",
+      owner: "Operations Manager",
+      priority: "High",
+      review_date: dateForMonth(year, 4, 20),
+      status: "outcome_measured",
+      outcome_summary: "Follow-up completion improved, conversion rose to 29%, and response time improved after the SOP update.",
+      metadata_json: { demo: true, demo_version: DEMO_VERSION, worked: true } satisfies Json,
+      created_by: user.id,
+      created_at: isoForMonth(year, 3, 10)
+    },
+    {
+      workspace_id: workspaceId,
+      title: "Create CRM follow-up task list",
+      source_type: "prestige_demo",
+      source_title: "Vaeroex YTD Demo Operations Audit",
+      evidence: "Proposal-stage leads stalled after response time increased.",
+      related_module: "CRM",
+      related_kpi: "Conversion Rate",
+      expected_outcome: "Prevent lost pipeline by giving every open proposal an owner and next date.",
+      created_action_type: "task",
+      owner: "Sales Manager",
+      priority: "High",
+      review_date: dateFromNow(10),
+      status: "in_progress",
+      outcome_summary: "Open proposals are being reviewed weekly; outcome measurement is scheduled.",
+      metadata_json: { demo: true, demo_version: DEMO_VERSION, approval_queue: true } satisfies Json,
+      created_by: user.id,
+      created_at: isoForMonth(year, 4, 3)
+    },
+    {
+      workspace_id: workspaceId,
+      title: "Run checklist compliance recovery review",
+      source_type: "prestige_demo",
+      source_title: "April Recovery Plan",
+      evidence: "Checklist completion dropped below target during March and April.",
+      related_module: "Checklists",
+      related_kpi: "Checklist Completion Rate",
+      expected_outcome: "Return checklist completion to 95% or better.",
+      created_action_type: "checklist_review",
+      owner: "Operations Manager",
+      priority: "Medium",
+      review_date: dateForMonth(year, 4, 28),
+      status: "outcome_measured",
+      outcome_summary: "Checklist completion recovered to 97% in May after manager review cadence was restored.",
+      metadata_json: { demo: true, demo_version: DEMO_VERSION, worked: true } satisfies Json,
+      created_by: user.id,
+      created_at: isoForMonth(year, 3, 18)
+    },
+    {
+      workspace_id: workspaceId,
+      title: "Create current-month KPI review",
+      source_type: "prestige_demo",
+      source_title: "Current month mixed signal",
+      evidence: "Revenue is above target, but conversion, response time, overdue tasks, and checklist completion still need attention.",
+      related_module: "KPIs",
+      related_kpi: "Revenue",
+      expected_outcome: "Confirm next-month targets and assign owners before drift repeats.",
+      created_action_type: "task",
+      owner: "Owner",
+      priority: "Medium",
+      review_date: dateFromNow(7),
+      status: "suggested",
+      outcome_summary: "Waiting for leadership review.",
+      metadata_json: { demo: true, demo_version: DEMO_VERSION, approval_queue: true } satisfies Json,
+      created_by: user.id,
+      created_at: isoFromNow(-1)
+    }
+  ]);
+  throwIfError(recommendationResult.error, "Demo recommendation outcomes");
+}
+
 async function seedYtdDemoWorkspace(supabase: AppSupabaseClient, workspaceId: string, user: DemoUser, timeline: ReturnType<typeof currentTimeline>) {
   await seedKpis(supabase, workspaceId, user, timeline);
   await seedOperationalMetrics(supabase, workspaceId, user, timeline);
@@ -1283,6 +1413,7 @@ async function seedYtdDemoWorkspace(supabase: AppSupabaseClient, workspaceId: st
   await seedSopsAndChecklists(supabase, workspaceId, user, timeline);
   await seedFilesAndReports(supabase, workspaceId, user, timeline);
   await seedVaeroexInsight(supabase, workspaceId, user);
+  await seedPrestigeIntelligenceExamples(supabase, workspaceId, user);
 }
 
 export async function ensureDemoWorkspacePopulated(
