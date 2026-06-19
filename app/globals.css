@@ -8,10 +8,29 @@
 
 body {
   margin: 0;
-  background: #f6f8fb;
-  color: #0c1220;
+  background: #f8fafc;
+  color: #0f172a;
+  text-rendering: geometricPrecision;
 }
 
 * {
   box-sizing: border-box;
+}
+
+::selection {
+  background: #2563eb;
+  color: #ffffff;
+}
+
+button,
+a,
+select,
+input,
+textarea {
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
 }

@@ -9,7 +9,7 @@ import {
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
 import { OnboardingChecklist, type OnboardingChecklistItem } from "@/components/app/OnboardingChecklist";
-import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
+import { BusinessHealthHero, PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -330,9 +330,9 @@ function readableOutput(run: VaeroexRunRow) {
 
 function StatCard({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone?: string }) {
   return (
-    <article className={`rounded-lg border p-4 shadow-panel ${tone || "border-line bg-white text-ink"}`}>
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-2 text-2xl font-semibold">{value}</p>
+    <article className={`rounded-lg border p-4 shadow-panel ${tone || "border-line/80 bg-white text-ink"}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-75">{label}</p>
+      <p className="mt-2 text-3xl font-semibold tracking-normal">{value}</p>
       <p className="mt-2 text-xs leading-5 opacity-80">{detail}</p>
     </article>
   );
@@ -376,8 +376,8 @@ function LineChart({ title, rows, color = "#2563eb" }: { title: string; rows: Kp
   const points = chartRows.map((row, index) => `${xFor(index)},${yFor(row.actual_value as number)}`).join(" ");
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-white">
-      <div className="border-b border-line px-4 py-3">
+    <div className="overflow-hidden rounded-lg border border-line/80 bg-white shadow-panel">
+      <div className="border-b border-line bg-slate-50/80 px-4 py-3">
         <p className="text-sm font-semibold text-ink">{title}</p>
         <p className="mt-1 text-xs text-muted">Last {chartRows.length} historical values</p>
       </div>
@@ -433,8 +433,8 @@ function MultiKpiComparison({ trends }: { trends: MetricTrend[] }) {
   const yFor = (value: number) => paddingTop + (1 - value / 100) * plotHeight;
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-white">
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line px-4 py-3">
+    <div className="overflow-hidden rounded-lg border border-line/80 bg-white shadow-panel">
+      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-line bg-slate-50/80 px-4 py-3">
         <div>
           <p className="text-sm font-semibold text-ink">Multi-KPI comparison</p>
           <p className="mt-1 text-xs leading-5 text-muted">Indexed trend lines compare different metric types without mixing units.</p>
@@ -658,20 +658,20 @@ function ExecutiveBriefingCard({
   recommendation: string;
 }) {
   return (
-    <section className="rounded-lg border border-line bg-white p-5 shadow-panel">
+    <section className="rounded-lg border border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Executive briefing</p>
-          <h2 className="mt-2 text-2xl font-semibold text-ink">What changed and what to do next</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">Executive briefing</p>
+          <h2 className="mt-2 text-2xl font-semibold text-white">What changed and what to do next</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">
             A {period.toLowerCase()} owner-ready readout from KPIs, CRM, tasks, issues, files, checklists, SOPs, reports, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">Create Task</Link>
-          <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Generate Report</Link>
-          <Link href="/app/issues" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Review Issues</Link>
-          <Link href="/app/kpis" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Review KPIs</Link>
+          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500">Create Task</Link>
+          <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">Generate Report</Link>
+          <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">Review Issues</Link>
+          <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">Review KPIs</Link>
         </div>
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-5">
@@ -682,9 +682,9 @@ function ExecutiveBriefingCard({
           ["Needs attention", attention],
           ["Vaeroex recommends", recommendation]
         ].map(([label, value]) => (
-          <article key={label} className="rounded-lg border border-line bg-slate-50 p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-700">{value}</p>
+          <article key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">{label}</p>
+            <p className="mt-2 text-sm leading-6 text-blue-50">{value}</p>
           </article>
         ))}
       </div>
@@ -706,19 +706,39 @@ function SmartAlerts({ alerts }: { alerts: DashboardAlert[] }) {
     <SectionCard title="Smart alerts" description="In-app alerts from the current workspace. Start here when deciding what needs attention.">
       <div className="grid gap-3 lg:grid-cols-3">
         {alerts.slice(0, 6).map((alert) => (
-          <article key={alert.id} className={`rounded-lg border p-4 ${severityTone(alert.severity)}`}>
+          <article key={alert.id} className={`rounded-lg border p-4 shadow-sm ${severityTone(alert.severity)}`}>
             <div className="flex items-start justify-between gap-3">
               <p className="text-sm font-semibold">{alert.title}</p>
               <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold">{alert.severity}</span>
             </div>
             <p className="mt-2 text-sm leading-6 opacity-90">{alert.why}</p>
-            <Link href={alert.href as Route} className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-ink">
+            <Link href={alert.href as Route} className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:border-vaeroex-blue hover:text-vaeroex-blue">
               {alert.action}
             </Link>
           </article>
         ))}
       </div>
     </SectionCard>
+  );
+}
+
+function PeriodSelector({ period }: { period: DashboardPeriod }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {PERIODS.map((item) => (
+        <Link
+          key={item}
+          href={`/app?period=${encodeURIComponent(item)}`}
+          className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+            item === period
+              ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
+              : "border border-line bg-white text-slate-700 hover:border-vaeroex-blue hover:text-vaeroex-blue"
+          }`}
+        >
+          {item}
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -1316,6 +1336,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         eyebrow="Executive Dashboard"
         title={context.activeWorkspace?.name ?? "Vaeroex executive dashboard"}
         description={`A ${period.toLowerCase()} view of KPI history, tasks, issues, files, CRM activity, reports, and Vaeroex recommendations.`}
+        actions={<PeriodSelector period={period} />}
       />
 
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{params.message}</div> : null}
@@ -1331,19 +1352,18 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       {isViewingDemoWorkspace ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
 
-      <section className="flex flex-wrap gap-2 rounded-lg border border-line bg-white p-3 shadow-panel">
-        {PERIODS.map((item) => (
-          <Link
-            key={item}
-            href={`/app?period=${encodeURIComponent(item)}`}
-            className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-              item === period ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50 text-slate-700 hover:border-vaeroex-blue"
-            }`}
-          >
-            {item}
-          </Link>
-        ))}
-      </section>
+      <BusinessHealthHero intelligence={prestigeIntelligence} periodLabel={period} />
+
+      <SmartAlerts alerts={smartAlerts} />
+
+      <ExecutiveBriefingCard
+        period={period}
+        whatChanged={briefing.whatChanged}
+        improved={briefing.improved}
+        declined={briefing.declined}
+        attention={briefing.attention}
+        recommendation={briefing.recommendation}
+      />
 
       <OnboardingChecklist
         workspaceId={workspaceId}
@@ -1359,23 +1379,13 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         }
       />
 
-      <ExecutiveBriefingCard
-        period={period}
-        whatChanged={briefing.whatChanged}
-        improved={briefing.improved}
-        declined={briefing.declined}
-        attention={briefing.attention}
-        recommendation={briefing.recommendation}
-      />
-
-      <SmartAlerts alerts={smartAlerts} />
-
       <PrestigeOperationsPanel
         intelligence={prestigeIntelligence}
         returnPath="/app"
         dateRangeStart={range.startDate}
         dateRangeEnd={range.endDate}
         isDemoWorkspace={isViewingDemoWorkspace}
+        showHealthHero={false}
       />
 
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
