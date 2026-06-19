@@ -98,15 +98,24 @@ function NotificationBadge({ count, light = false }: { count: number; light?: bo
 
 function workspaceAccessLabel(workspace: Workspace | null) {
   if (!workspace) return "Setup required";
-  if (workspace.subscription_status === "demo") return "Demo workspace";
+  if (workspace.subscription_status === "demo") return "Demo Workspace";
   if (!workspace.subscription_required || workspace.manually_unlocked || ["active", "trialing"].includes(workspace.subscription_status)) return "Active";
   if (workspace.subscription_status === "manual_review") return "Pending activation";
   return "Subscription required";
 }
 
-export function AppShell({ children, profile, workspaces, activeWorkspace, membership, notificationUnreadCount = 0 }: AppShellProps) {
+function workspaceStatusTone(label: string) {
+  if (label === "Active") return "border-emerald-300/30 bg-emerald-400/15 text-emerald-100";
+  if (label === "Demo Workspace") return "border-vaeroex-accent/40 bg-vaeroex-accent/15 text-vaeroex-accent";
+  if (label === "Pending activation") return "border-amber-300/30 bg-amber-300/15 text-amber-100";
+  return "border-red-300/30 bg-red-400/15 text-red-100";
+}
+
+export function AppShell({ children, profile, workspaces, activeWorkspace, notificationUnreadCount = 0 }: AppShellProps) {
   const navSections = isVaeroexAdminEmail(profile?.email) ? [...baseNavSections, adminNavSection] : baseNavSections;
   const accessLabel = workspaceAccessLabel(activeWorkspace);
+  const isDemoWorkspace = activeWorkspace?.subscription_status === "demo";
+  const workspaceDisplayName = isDemoWorkspace ? "Demo Workspace" : activeWorkspace?.name || "Setup required";
 
   return (
     <div className="min-h-screen bg-[#f8fafc] text-ink">
@@ -116,12 +125,22 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
           <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Operations Intelligence Platform</span>
         </Link>
 
-        <form action={selectWorkspaceAction} className="mt-7 rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm shadow-black/10">
-          <p className="text-xs uppercase tracking-[0.18em] text-vaeroex-silver">Workspace</p>
+        <form action={selectWorkspaceAction} className="mt-5 rounded-lg border border-white/10 bg-white/[0.055] p-3 shadow-sm shadow-black/10">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-white">{workspaceDisplayName}</p>
+              {isDemoWorkspace && activeWorkspace?.name ? (
+                <p className="mt-0.5 truncate text-xs text-vaeroex-silver">{activeWorkspace.name}</p>
+              ) : null}
+            </div>
+            <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${workspaceStatusTone(accessLabel)}`}>
+              {isDemoWorkspace ? "Sample Business Environment" : accessLabel}
+            </span>
+          </div>
           <select
             name="workspace_id"
             aria-label="Workspace switcher"
-            className="mt-2 w-full rounded-md border border-white/10 bg-slate-950 px-2 py-2 text-sm text-white outline-none focus:border-vaeroex-blue"
+            className="mt-3 w-full rounded-md border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs font-semibold text-white outline-none focus:border-vaeroex-blue"
             defaultValue={activeWorkspace?.id || ""}
           >
             {workspaces.length ? (
@@ -134,15 +153,9 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
               <option value="">No workspace yet</option>
             )}
           </select>
-          <p className="mt-2 text-xs text-vaeroex-silver">
-            Role: <span className="font-semibold text-white">{membership?.role || "setup pending"}</span>
-          </p>
-          <p className="mt-2 text-xs text-vaeroex-silver">
-            Status: <span className="font-semibold text-white">{accessLabel}</span>
-          </p>
           {workspaces.length > 1 ? (
-            <button className="mt-3 w-full rounded-md border border-white/10 px-2 py-1.5 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-              Switch workspace
+            <button className="mt-2 w-full rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+              Switch Workspace
             </button>
           ) : null}
         </form>
