@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { createSupportRequestAction } from "@/app/support/actions";
 import { PublicFooter } from "@/components/legal/PublicFooter";
+import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 
@@ -13,6 +14,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
 
   return (
     <main className="min-h-screen bg-slate-50 text-ink">
+      <PublicSiteHeader />
       <section className="mx-auto max-w-3xl px-6 py-10">
       <div className="rounded-lg border border-line bg-white p-7 shadow-panel">
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
