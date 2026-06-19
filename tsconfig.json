@@ -26,9 +26,7 @@
   "exclude": [
     "node_modules",
     "outputs",
-    "**/* 2.ts",
-    "**/* 2.tsx",
-    "**/* 3.ts",
-    "**/* 3.tsx"
+    "**/* ?.ts",
+    "**/* ?.tsx"
   ]
 }
