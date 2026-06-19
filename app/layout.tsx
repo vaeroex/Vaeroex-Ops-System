@@ -3,8 +3,23 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Vaeroex",
-  description: "An Operations Intelligence Platform for visibility, accountability, execution, and business decision support.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vaeroex.com"),
+  title: "Vaeroex — Operations Intelligence Platform",
+  description: "Build the structure your growth depends on. Vaeroex helps growing businesses improve visibility, accountability, and execution through operational intelligence.",
+  openGraph: {
+    title: "Vaeroex — Operations Intelligence Platform",
+    description: "Build the structure your growth depends on. Vaeroex helps growing businesses improve visibility, accountability, and execution through operational intelligence.",
+    siteName: "Vaeroex",
+    type: "website",
+    images: [
+      {
+        url: "/brand/vaeroex-logo-full.png",
+        width: 1200,
+        height: 630,
+        alt: "Vaeroex"
+      }
+    ]
+  },
   icons: {
     apple: "/apple-touch-icon.png",
     icon: "/favicon.png"

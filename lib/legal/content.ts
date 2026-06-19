@@ -36,7 +36,8 @@ export const legalLinks: Array<{ href: Route; label: string }> = [
   { href: "/trust", label: "Trust Center" },
   { href: "/acceptable-use", label: "Acceptable Use" },
   { href: "/refund-policy", label: "Refund Policy" },
-  { href: "/support", label: "Contact" }
+  { href: "/ai-disclaimer", label: "AI Disclaimer" },
+  { href: "/contact", label: "Contact" }
 ];
 
 // Attorney review recommended before commercial launch.

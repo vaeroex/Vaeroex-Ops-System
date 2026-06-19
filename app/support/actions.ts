@@ -16,7 +16,7 @@ function uuidOrNull(value: string) {
 
 function redirectBack(formData: FormData, key: "message" | "error", message: string): never {
   const returnPath = text(formData, "return_path") || "/support";
-  const safePath = returnPath.startsWith("/support") || returnPath.startsWith("/app/support") ? returnPath : "/support";
+  const safePath = ["/support", "/app/support", "/contact", "/demo"].some((path) => returnPath.startsWith(path)) ? returnPath : "/support";
   redirect(`${safePath}?${key}=${encodeURIComponent(message)}` as Route);
 }
 
@@ -31,6 +31,12 @@ export async function createSupportRequestAction(formData: FormData) {
   const workspaceInput = text(formData, "workspace");
   const workspaceIdInput = text(formData, "workspace_id");
   const pageModule = text(formData, "page_module");
+  const company = text(formData, "company");
+  const role = text(formData, "role");
+  const businessType = text(formData, "business_type");
+  const teamSize = text(formData, "team_size");
+  const improvementGoal = text(formData, "improvement_goal");
+  const preferredContactMethod = text(formData, "preferred_contact_method");
 
   if (!name || !email || !issueType || !message) {
     redirectBack(formData, "error", "Name, email, issue type, and message are required.");
@@ -67,6 +73,12 @@ export async function createSupportRequestAction(formData: FormData) {
   const workspaceReference = workspaceInput || workspaceIdInput;
   const contextLines = [
     pageModule ? `Page/module: ${pageModule}` : "",
+    company ? `Company: ${company}` : "",
+    role ? `Role: ${role}` : "",
+    businessType ? `Business type: ${businessType}` : "",
+    teamSize ? `Team size: ${teamSize}` : "",
+    improvementGoal ? `Trying to improve: ${improvementGoal}` : "",
+    preferredContactMethod ? `Preferred contact method: ${preferredContactMethod}` : "",
     workspaceReference && !workspaceId ? `Workspace reference: ${workspaceReference}` : "",
     workspaceInput && !uuidOrNull(workspaceInput) ? `Workspace: ${workspaceInput}` : ""
   ].filter(Boolean);
@@ -92,5 +104,12 @@ export async function createSupportRequestAction(formData: FormData) {
     redirectBack(formData, "error", error.message);
   }
 
-  redirectBack(formData, "message", "Support request received. Vaeroex will review it.");
+  const successMessage =
+    issueType === "Demo request"
+      ? "Demo request received. Vaeroex will review it."
+      : issueType === "Contact request"
+        ? "Contact request received. Vaeroex will review it."
+        : "Support request received. Vaeroex will review it.";
+
+  redirectBack(formData, "message", successMessage);
 }

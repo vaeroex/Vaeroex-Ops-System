@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { PublicFooter } from "@/components/legal/PublicFooter";
+import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { trustSections } from "@/lib/legal/content";
 
 export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
@@ -44,14 +45,7 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
 
   return (
     <main className="min-h-screen bg-slate-50 text-ink">
-      <nav className="border-b border-slate-800 bg-vaeroex-navy px-6 py-4 text-white">
-        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
-          <Link href="/" className="text-lg font-semibold">Vaeroex</Link>
-          <Link href="/support" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold">
-            Contact Support
-          </Link>
-        </div>
-      </nav>
+      <PublicSiteHeader />
       <section className="mx-auto max-w-6xl px-6 py-10">{content}</section>
       <PublicFooter />
     </main>
