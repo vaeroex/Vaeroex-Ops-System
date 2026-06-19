@@ -4,7 +4,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Vaeroex Ops System",
-  description: "A practical operations system for forms, checklists, SOPs, tasks, reports, and Vaeroex recommendations."
+  description: "A practical operations system for forms, checklists, SOPs, tasks, reports, and Vaeroex recommendations.",
+  icons: {
+    apple: "/apple-touch-icon.png",
+    icon: "/favicon.png"
+  }
 };
 
 const themeScript = `

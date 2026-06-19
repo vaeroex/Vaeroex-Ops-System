@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 
 type ReportExportActionsProps = {
   title: string;
@@ -19,7 +20,7 @@ function safeFileName(value: string) {
 
 export function ReportExportActions({ title, reportType, body, dateRange }: ReportExportActionsProps) {
   const [message, setMessage] = useState("");
-  const reportText = `# ${title}\n\n${reportType}\n${dateRange}\n\n${body || "No report body yet."}`;
+  const reportText = `![Vaeroex logo](/brand/vaeroex-logo-full.png)\n\n# ${title}\n\nVaeroex Executive Report\n${reportType}\n${dateRange}\n\n${body || "No report body yet."}`;
 
   async function copyReport() {
     await navigator.clipboard.writeText(reportText);
@@ -50,9 +51,14 @@ export function ReportExportActions({ title, reportType, body, dateRange }: Repo
   return (
     <div className="rounded-lg border border-line bg-white p-4">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-sm font-semibold text-ink">Professional report actions</p>
-          <p className="mt-1 text-xs leading-5 text-muted">Export, print, copy, or share this report for internal review.</p>
+        <div className="flex items-center gap-3">
+          <span className="grid h-12 w-14 place-items-center rounded-lg border border-line bg-vaeroex-navy">
+            <VaeroexLogo variant="symbol" size="sm" />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-ink">Vaeroex executive report actions</p>
+            <p className="mt-1 text-xs leading-5 text-muted">Export, print, copy, or share this branded report for internal review.</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={printReport} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">

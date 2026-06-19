@@ -1,7 +1,9 @@
+import { VaeroexLoading } from "@/components/brand/VaeroexLoading";
+
 export default function VaeroexHubLoading() {
   return (
     <div className="space-y-4">
-      <div className="h-36 animate-pulse rounded-lg bg-slate-200" />
+      <VaeroexLoading label="Opening Ask Vaeroex" />
       <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
         <div className="h-96 animate-pulse rounded-lg bg-slate-200" />
         <div className="h-96 animate-pulse rounded-lg bg-slate-200" />

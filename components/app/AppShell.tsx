@@ -5,6 +5,7 @@ import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { AppNavigation } from "@/components/app/AppNavigation";
 import { ThemeControls } from "@/components/app/ThemeControls";
 import { ToastRegion } from "@/components/app/ToastRegion";
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
@@ -110,12 +111,9 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
   return (
     <div className="min-h-screen bg-[#f8fafc] text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
-        <Link href="/app" className="flex items-center gap-3">
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-vaeroex-blue text-sm font-bold shadow-sm shadow-blue-950/30">V</span>
-          <span>
-            <span className="block text-sm font-semibold tracking-wide">Vaeroex</span>
-            <span className="block text-xs text-vaeroex-silver">Executive Ops System</span>
-          </span>
+        <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
+          <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Executive Ops System</span>
         </Link>
 
         <form action={selectWorkspaceAction} className="mt-7 rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm shadow-black/10">
@@ -161,11 +159,16 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
       <div className="lg:pl-72">
         <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-4 py-3 text-white shadow-command lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
-                {activeWorkspace?.name || "Setup required"} · {accessLabel}
-              </p>
-              <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Command Center</h1>
+            <div className="flex items-center gap-3">
+              <span className="grid h-11 w-11 place-items-center rounded-lg border border-white/15 bg-white/10 shadow-sm shadow-black/10">
+                <VaeroexLogo variant="symbol" size="xs" />
+              </span>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
+                  {activeWorkspace?.name || "Setup required"} · {accessLabel}
+                </p>
+                <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Command Center</h1>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <Link
