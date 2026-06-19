@@ -13,7 +13,7 @@ export function VaeroexLoading({ label = "Loading Vaeroex workspace" }: VaeroexL
         </span>
         <div>
           <p className="text-sm font-semibold text-ink">{label}</p>
-          <p className="mt-1 text-xs text-muted">Preparing the command center.</p>
+          <p className="mt-1 text-xs text-muted">Preparing your intelligence workspace.</p>
         </div>
       </div>
       <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-vaeroex-soft">

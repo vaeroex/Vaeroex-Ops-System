@@ -99,8 +99,8 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Checklists"
-        title="Checklists"
+        eyebrow="Execution"
+        title="Execution checklists"
         description="Create repeatable checklists, run them from the active workspace, and keep completion history visible for managers."
       />
 
@@ -153,7 +153,7 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
           </CreateDrawer>
         </div>
 
-        <SectionCard title="Checklist library" description="Templates for recurring operational routines.">
+        <SectionCard title="Checklist library" description="Repeatable routines that make completion visible.">
           <ManagedRecordList
             collection="checklists"
             records={managedChecklists}

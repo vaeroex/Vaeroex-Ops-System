@@ -136,7 +136,7 @@ export function BusinessHealthHero({
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4 sm:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Monthly change</p>
             <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.label}</p>
-            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, CRM movement, tasks, issues, files, and reports before calling a trend.</p>
+            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, CRM movement, follow-ups, issues, files, and reports before calling a trend.</p>
           </article>
         </div>
       </div>
@@ -188,8 +188,8 @@ function ActionButtons({
         <input type="hidden" name="due_date" value={item.dueDate} />
         <input type="hidden" name="related_module" value={item.relatedModule} />
         <input type="hidden" name="expected_outcome" value={item.action} />
-        <ConfirmSubmitButton message={`Create a task for "${item.title}"?`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-          Create task
+        <ConfirmSubmitButton message={`Create a follow-up for "${item.title}"?`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
+          Create follow-up
         </ConfirmSubmitButton>
       </form>
       <Link href={item.href} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
@@ -357,7 +357,7 @@ export function PrestigeOperationsPanel({
           </div>
         </SectionCard>
 
-        <SectionCard title="Profit Leak Detector" description="Revenue and opportunity leakage signals from CRM, KPIs, tasks, issues, checklists, SOPs, and files.">
+        <SectionCard title="Profit Leak Detector" description="Revenue and opportunity leakage signals from CRM, KPIs, follow-ups, issues, checklists, SOPs, and files.">
           <div className="space-y-3">
             {intelligence.profitLeaks.length ? (
               intelligence.profitLeaks.map((item) => (
@@ -368,7 +368,7 @@ export function PrestigeOperationsPanel({
                 </ActionCard>
               ))
             ) : (
-              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep CRM follow-ups, KPI targets, and task ownership current.</p>
+              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep CRM follow-ups, KPI targets, and ownership records current.</p>
             )}
           </div>
         </SectionCard>
@@ -415,7 +415,7 @@ export function PrestigeOperationsPanel({
                   <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">{card.score}/100</span>
                 </div>
                 <p className="mt-2 text-xs leading-5">{card.explanation}</p>
-                <p className="mt-2 text-xs">Open tasks: {card.openTasks} · Overdue: {card.overdueTasks} · Issues: {card.openIssues}</p>
+                <p className="mt-2 text-xs">Open follow-ups: {card.openTasks} · Overdue: {card.overdueTasks} · Issues: {card.openIssues}</p>
               </article>
             ))}
           </div>
@@ -495,7 +495,7 @@ export function PrestigeOperationsPanel({
           </div>
         </SectionCard>
 
-        <SectionCard title="Operations Autopilot approval queue" description="Vaeroex suggests actions, but a human must approve before anything is saved.">
+        <SectionCard title="Vaeroex recommendation queue" description="Vaeroex suggests actions, but a human must approve before anything is saved.">
           <div className="grid gap-3 lg:grid-cols-2">
             {intelligence.recommendationTracking.approvalQueue.slice(0, 6).map((item) => (
               <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} />
@@ -512,7 +512,7 @@ export function PrestigeOperationsPanel({
         <SectionCard title="Weekly Management Meeting Mode">
           <MiniList items={intelligence.meetingMode.agenda} empty="No agenda available." />
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create tasks</Link>
+            <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create follow-ups</Link>
             <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold">Generate weekly report</Link>
           </div>
         </SectionCard>

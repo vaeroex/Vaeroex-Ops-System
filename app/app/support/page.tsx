@@ -23,7 +23,7 @@ export default async function AppSupportPage({ searchParams }: AppSupportPagePro
       <PageHeader
         eyebrow="Support"
         title="Contact Vaeroex support"
-        description="Send access, subscription, workspace, or Vaeroex result questions to the internal support queue."
+        description="Send access, subscription, workspace, visibility, accountability, execution, or Vaeroex result questions to the support queue."
       />
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
       <ErrorNotice message={params?.error} />

@@ -27,7 +27,7 @@ export default async function AccountSubscriptionPage() {
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Subscription access" description="Vaeroex Ops System access is connected to your Squarespace subscription email.">
+      <SectionCard title="Subscription access" description="Vaeroex access is connected to your Squarespace subscription email.">
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-line p-4">
             <p className="text-sm text-muted">Status</p>

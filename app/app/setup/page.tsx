@@ -37,10 +37,10 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     <div className="space-y-6">
       <section className="rounded-lg border border-line bg-white p-6 shadow-panel">
         <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Setup wizard</p>
-        <h2 className="mt-2 text-2xl font-semibold">Create your operations workspace</h2>
+        <h2 className="mt-2 text-2xl font-semibold">Create your operations intelligence workspace</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-          Answer a few setup questions, choose a starter template, and generate a reusable operations system.
-          Vaeroex will be available later for audits, SOP drafts, weekly reports, and suggested next actions.
+          Answer a few setup questions, choose a business profile, and build the first layer of visibility, accountability, and execution structure.
+          Vaeroex will then help surface risks, decisions, reports, and suggested next actions.
         </p>
       </section>
       <ComplianceNotice />

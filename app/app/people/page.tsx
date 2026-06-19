@@ -127,7 +127,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       <PageHeader
         eyebrow="People"
         title="People"
-        description="Add team members so reports, tasks, alerts, and recommendations can be assigned or shared with the right people. These operational roles do not grant app admin access."
+        description="Add team members so reports, follow-ups, alerts, and Vaeroex insights can be assigned or shared with the right people. These workspace roles do not grant app admin access."
       />
 
       <ErrorNotice
@@ -170,7 +170,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
           </div>
         </SectionCard>
 
-        <SectionCard title="Role-Based Briefings" description="Different operating summaries for owners, directors, managers, supervisors, coordinators, staff, and viewers.">
+        <SectionCard title="Role-Based Briefings" description="Different accountability summaries for owners, directors, managers, supervisors, coordinators, staff, and viewers.">
           <div className="grid gap-3 lg:grid-cols-3">
             {intelligence.roleBriefings.map((briefing) => (
               <article key={briefing.role} className="rounded-lg border border-line bg-white p-4">

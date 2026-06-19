@@ -23,7 +23,7 @@ function slugify(valueToSlug: string) {
 function fieldSchemaFor(formName: string): Json {
   return [
     { label: "Submitted by", type: "text", required: true },
-    { label: "Operational details", type: "long_text", required: true },
+    { label: "Business details", type: "long_text", required: true },
     { label: "Priority", type: "priority", required: true },
     { label: "Suggested follow-up date", type: "date", required: false },
     { label: "Manager notes", type: "long_text", required: false }
@@ -36,9 +36,9 @@ function fieldSchemaFor(formName: string): Json {
 function checklistItemsFor(name: string): Json {
   return [
     `Confirm ${name.toLowerCase()} owner`,
-    "Review open tasks or blockers",
+    "Review open follow-ups or blockers",
     "Log missed or failed items",
-    "Create follow-up task when needed",
+    "Create follow-up record when needed",
     "Submit for manager review"
   ] as Json;
 }
@@ -48,7 +48,7 @@ function workflowStepsFor(name: string): Json {
     { order: 1, title: "Trigger", description: `Identify when ${name.toLowerCase()} starts.` },
     { order: 2, title: "Assign owner", description: "Assign one accountable owner and backup reviewer." },
     { order: 3, title: "Complete work", description: "Track required fields, checklist items, and blockers." },
-    { order: 4, title: "Manager review", description: "Review exceptions and create follow-up tasks." }
+    { order: 4, title: "Manager review", description: "Review exceptions and create follow-up records." }
   ] as Json;
 }
 
@@ -56,7 +56,7 @@ function sopBody(title: string) {
   return `# ${title}
 
 ## Purpose
-Create a repeatable process with clear ownership, required information, and manager review.
+Create a repeatable process with clear ownership, required information, and review points.
 
 ## When to Use This SOP
 Use this draft when the related workflow starts or when a bottleneck is reported.
@@ -68,12 +68,12 @@ Assign one process owner and one manager reviewer.
 1. Capture the request or issue.
 2. Assign an owner and due date.
 3. Complete the checklist or workflow steps.
-4. Log blockers, missed items, or follow-up tasks.
+4. Log blockers, missed items, or follow-up records.
 5. Submit for manager review.
 
 ## Quality Checks
 - Required fields are complete.
-- Follow-up task exists when needed.
+- Follow-up record exists when needed.
 - Manager review is logged.
 
 ## Escalation Rules
@@ -85,19 +85,19 @@ The process is complete when the owner logs the outcome and the manager confirms
 
 function buildVaeroexAuditSummary(companyName: string, mainProblem: string) {
   return {
-    title: "Vaeroex Operations Audit",
+    title: "Vaeroex Operations Intelligence Review",
     generated_by: "Vaeroex",
-    business_summary: `${companyName} needs a clear operating system for repeatable work, ownership, and manager review.`,
-    current_operational_problems: [mainProblem || "Operational priorities need to be clarified during setup."],
+    business_summary: `${companyName} needs clear visibility, accountability, and execution structure for repeatable growth.`,
+    current_operational_problems: [mainProblem || "Visibility and execution priorities need to be clarified during setup."],
     main_bottlenecks: ["Unclear ownership", "Missed follow-ups", "No weekly manager review cadence"],
-    accountability_gaps: ["Tasks need assigned owners, due dates, and completion standards."],
-    recommended_systems_to_build: ["Forms", "Checklists", "SOPs", "Task owner review", "Weekly operations report"],
-    suggested_dashboard_metrics: ["Open tasks", "Overdue tasks", "Open issues", "Assets needing attention"],
+    accountability_gaps: ["Follow-ups need assigned owners, due dates, and completion standards."],
+    recommended_systems_to_build: ["Forms", "Checklists", "SOPs", "Follow-up owner review", "Weekly intelligence report"],
+    suggested_dashboard_metrics: ["Open follow-ups", "Overdue follow-ups", "Open risks", "Assets needing attention"],
     thirty_day_action_plan: [
       "Week 1: Finalize forms and checklists.",
       "Week 2: Assign owners and run checklist reviews.",
       "Week 3: Convert repeated issues into SOP drafts.",
-      "Week 4: Generate weekly operations report and refine next actions."
+      "Week 4: Generate weekly intelligence report and refine next actions."
     ]
   };
 }
@@ -139,7 +139,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
   });
 
   if (workspaceLimit.reached) {
-    redirect("/billing-required?reason=You%E2%80%99ve%20reached%20the%20limit%20for%20your%20current%20Vaeroex%20Ops%20System%20plan.");
+    redirect("/billing-required?reason=You%E2%80%99ve%20reached%20the%20limit%20for%20your%20current%20Vaeroex%20plan.");
   }
 
   const businessName = value(formData, "business_name");
@@ -246,7 +246,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       template.forms.map((name, index) => ({
         workspace_id: workspaceId,
         name,
-        description: `${name} generated from the ${template.name} starter template.`,
+        description: `${name} generated from the ${template.name} business profile.`,
         form_type: index === 0 ? "intake" : index === 1 ? "completion" : "follow-up",
         schema_json: fieldSchemaFor(name),
         is_public: index === 0,
@@ -258,8 +258,8 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       template.checklists.map((name, index) => ({
         workspace_id: workspaceId,
         name,
-        description: `${name} generated from the ${template.name} starter template.`,
-        category: index === 2 ? "Manager review" : "Operations",
+        description: `${name} generated from the ${template.name} business profile.`,
+        category: index === 2 ? "Manager review" : "Execution",
         frequency: index === 0 ? "Daily" : index === 1 ? "Per job" : "Weekly",
         items_json: checklistItemsFor(name),
         assigned_role: index === 1 ? "Staff" : "Manager",
@@ -270,9 +270,9 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       template.workflows.map((name) => ({
         workspace_id: workspaceId,
         name,
-        description: `${name} starter workflow generated during setup.`,
-        department: "Operations",
-        trigger_event: "New request or operational event",
+        description: `${name} workflow generated during setup.`,
+        department: "Execution",
+        trigger_event: "New request or business event",
         steps_json: workflowStepsFor(name),
         owner_role: "Manager",
         status: "draft",
@@ -283,7 +283,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       template.workflows.map((name) => ({
         workspace_id: workspaceId,
         title: `${name} SOP`,
-        department: "Operations",
+        department: "Execution",
         category: "Starter SOP",
         body_markdown: sopBody(`${name} SOP`),
         status: "Draft",
@@ -302,7 +302,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       ].map((issueType) => ({
         workspace_id: workspaceId,
         title: issueType,
-        description: `${issueType} category created during setup for manager review.`,
+        description: `${issueType} category created during setup for visibility and manager review.`,
         issue_type: issueType,
         severity: issueType === "Missed follow-up" ? "High" : "Medium",
         status: "Open",
@@ -313,11 +313,11 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     ),
     supabase.from("tasks").insert(
       [
-        ["Customize starter forms", "Review generated forms and adjust required fields.", "High"],
+        ["Review starter forms", "Review generated forms and adjust required fields.", "High"],
         ["Assign checklist owners", "Choose who completes each checklist and how often.", "High"],
         ["Review issue categories", "Confirm the first issue categories match your business.", "Medium"],
-        ["Review SOP drafts", "Turn starter SOPs into active operating procedures.", "Medium"],
-        ["Run Vaeroex audit", "Ask Vaeroex to review real workspace data after setup.", "Medium"]
+        ["Review SOP drafts", "Turn starter SOPs into active working procedures.", "Medium"],
+        ["Run Vaeroex review", "Ask Vaeroex to review real workspace data after setup.", "Medium"]
       ].map(([title, description, priority]) => ({
         workspace_id: workspaceId,
         title,
@@ -331,12 +331,12 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       }))
     ),
     supabase.from("assets").insert(
-      (template.assetExamples || ["Operations asset", "Manager device", "Supply bin", "Vehicle", "Checklist station"])
+      (template.assetExamples || ["Tracked asset", "Manager device", "Supply bin", "Vehicle", "Checklist station"])
         .slice(0, 5)
         .map((assetName, index) => ({
           workspace_id: workspaceId,
           asset_name: assetName,
-          asset_type: index === 0 ? "Primary asset" : "Operations asset",
+          asset_type: index === 0 ? "Primary asset" : "Tracked asset",
           identifier: `ASSET-${String(index + 1).padStart(3, "0")}`,
           location: "Main location",
           status: index === 1 ? "Needs review" : "Ready",
@@ -346,11 +346,11 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     ),
     supabase.from("reports").insert({
       workspace_id: workspaceId,
-      report_type: "Weekly Operations Report",
-      title: "Weekly Operations Report - Generated by Vaeroex",
+      report_type: "Weekly Intelligence Report",
+      title: "Weekly Intelligence Report - Generated by Vaeroex",
       date_range_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       date_range_end: new Date().toISOString().slice(0, 10),
-      body_markdown: `# Weekly Operations Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\n${auditSummary.business_summary}\n\n## Recommended Next Actions\n- Customize starter forms.\n- Assign checklist owners.\n- Review issue categories.\n- Run Vaeroex audit after real data is added.`,
+      body_markdown: `# Weekly Intelligence Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\n${auditSummary.business_summary}\n\n## Recommended Next Actions\n- Review starter forms.\n- Assign checklist owners.\n- Review issue categories.\n- Run Vaeroex review after real data is added.`,
       source_data_json: { generatedFrom: "setup", template: template.name } satisfies Json,
       created_by: user.id
     }),

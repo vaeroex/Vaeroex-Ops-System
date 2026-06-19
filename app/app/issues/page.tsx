@@ -101,7 +101,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
           </p>
           <form action={convertIssueToTaskAction} className="pt-2">
             <input type="hidden" name="issue_id" value={issue.id} />
-            <ConfirmSubmitButton message="Create a task to resolve this issue?">Create resolution task</ConfirmSubmitButton>
+            <ConfirmSubmitButton message="Create a follow-up to resolve this issue?">Create resolution follow-up</ConfirmSubmitButton>
           </form>
           <AssignmentPanel
             sourceType="issue"
@@ -123,9 +123,9 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Issues"
-        title="Issues"
-        description="Log recurring problems, identify root causes, capture recommended fixes, and convert confirmed issues into accountable tasks."
+        eyebrow="Visibility"
+        title="Risks & Issues"
+        description="Log recurring problems, identify root causes, capture recommended fixes, and convert confirmed risks into accountable follow-ups."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
@@ -151,7 +151,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="Issue log" description="Open operational risks and improvement opportunities.">
+        <SectionCard title="Risk and issue log" description="Open risks, blockers, and improvement opportunities.">
           <ManagedRecordList
             collection="issues"
             records={managedIssues}

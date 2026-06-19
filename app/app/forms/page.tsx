@@ -37,10 +37,10 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     return {
       id: form.id,
       title: form.name,
-      type: form.form_type || "Operations form",
+      type: form.form_type || "Visibility form",
       status: form.is_public ? "Public" : "Private",
       owner: form.created_by ? "Workspace" : "Unassigned",
-      category: form.form_type || "operations",
+      category: form.form_type || "visibility",
       createdAt: form.created_at,
       updatedAt: management.updatedAt || form.updated_at,
       folderId: management.folderId,
@@ -66,8 +66,8 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Forms"
-        title="Operations forms"
-        description="Create intake, job completion, issue, shift handoff, and follow-up forms. Submissions can become follow-up tasks after manager review."
+        title="Visibility forms"
+        description="Create intake, completion, issue, shift handoff, and follow-up forms. Submissions can become accountable follow-ups after manager review."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
@@ -84,7 +84,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <TextArea
                 label="Fields, one per line"
                 name="fields"
-                placeholder={"Submitted by\nOperational details\nPriority\nFollow-up date"}
+                placeholder={"Submitted by\nBusiness details\nPriority\nFollow-up date"}
                 rows={5}
               />
             </div>
@@ -106,7 +106,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
             title="Form records"
             description="Forms stay collapsed until you need to inspect fields or open the detail page."
             emptyTitle="No forms yet"
-            emptyDescription="Create your first form to collect operational data and follow-up needs."
+            emptyDescription="Create your first form to collect visibility data and follow-up needs."
             searchParams={params}
           />
         </SectionCard>

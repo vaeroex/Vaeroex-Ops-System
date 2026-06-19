@@ -13,10 +13,10 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-10 text-ink">
       <section className="mx-auto max-w-3xl rounded-lg border border-line bg-white p-7 shadow-panel">
-        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex Ops System</Link>
+        <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Send workspace access, billing, setup, or operations questions to Vaeroex for review.
+          Send workspace access, billing, setup, visibility, accountability, or execution questions to Vaeroex for review.
         </p>
         {params?.message ? <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
         <div className="mt-5">

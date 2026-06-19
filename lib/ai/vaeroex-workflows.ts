@@ -36,14 +36,14 @@ Use this root shape whenever possible:
   "response_markdown": "Readable draft or answer for the user",
   "suggested_tasks": [
     {
-      "title": "Task title",
+      "title": "Follow-up title",
       "description": "What should be done",
       "priority": "Low | Medium | High | Urgent",
       "category": "Category",
       "suggested_owner": "Role or person who should own it",
       "due_date_recommendation": "Short recommendation",
       "reason_this_matters": "Why this action matters",
-      "related_module": "Tasks | KPIs | CRM | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
+      "related_module": "Follow-ups | KPIs | CRM | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
     }
   ],
   "recommended_actions": [
@@ -53,7 +53,7 @@ Use this root shape whenever possible:
       "suggested_owner": "Role or person who should own it",
       "suggested_due_date": "Specific date or timing",
       "why_it_matters": "Business reason in plain language",
-      "related_module": "Tasks | KPIs | CRM | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
+      "related_module": "Follow-ups | KPIs | CRM | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
     }
   ],
   "sop": null,
@@ -65,7 +65,7 @@ Use this root shape whenever possible:
     "Fill Missing Data",
     "Review Stale Items",
     "Convert Insight Into Action",
-    "Operational Risk",
+    "Business Risk",
     "Dashboard / KPI Improvement",
     "CRM / Revenue Improvement",
     "SOP / Process Improvement",
@@ -80,9 +80,9 @@ Every recommendation must be actionable. Include title, priority, suggested owne
 const workspaceAwareInstructions = `
 Workspace-aware recommendation rules:
 - First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
-- Do not recommend creating a module that already exists in Vaeroex. Built-in modules include Executive Dashboard, KPI Dashboard, CRM Pipeline, Tasks, Issues, Checklists, SOP Library, Reports, Files, Forms, Assets, People, and Vaeroex Results.
+- Do not recommend creating a module that already exists in Vaeroex. Built-in modules include Executive Dashboard, KPI Dashboard, CRM Pipeline, Follow-up Ownership, Issues, Checklists, SOP Library, Reports, Files, Forms, Assets, People, and Vaeroex Results.
 - If a module exists, recommend improving, completing, reviewing, converting, assigning, or using the existing module.
-- Never say "Create KPI Dashboard", "Create CRM", "Create task tracking", "Create SOPs", "Create reports", or "Upload files" as generic advice.
+- Never say "Create KPI Dashboard", "Create CRM", "Create follow-up tracking", "Create SOPs", "Create reports", or "Upload files" as generic advice.
 - Prefer recommendations like "add weekly revenue and conversion KPIs to the existing KPI Dashboard", "add lead source and next-follow-up to the existing CRM Pipeline", or "assign owners and review cadence to existing SOPs".
 - Every recommendation should mention what exists, what is missing or stale, why it matters, and the next practical action.
 - Classify recommendations into the recommendation_categories listed in the JSON shape.
@@ -92,12 +92,12 @@ export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
   {
     key: "ask_vaeroex",
     title: "Ask Vaeroex",
-    description: "Ask Vaeroex about operations, follow-up, accountability, SOPs, forms, checklists, reports, and next actions.",
+    description: "Ask Vaeroex about visibility, accountability, execution, SOPs, forms, checklists, reports, and next actions.",
     actionLabel: "Ask Vaeroex",
-    promptPlaceholder: "What operational problem should Vaeroex help you think through?",
+    promptPlaceholder: "What visibility gap, accountability issue, or execution priority should Vaeroex help you think through?",
     saveTargets: ["tasks"],
     instructions: `
-Answer the user's operations question using the workspace context when it helps.
+Answer the user's business question using the workspace context when it helps.
 If useful, include suggested_tasks. Keep the answer practical and direct.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
@@ -105,14 +105,14 @@ ${sharedJsonInstructions}
   },
   {
     key: "operations_audit",
-    title: "Operations Audit",
+    title: "Operations Intelligence Review",
     description: "Review workspace activity and identify bottlenecks, gaps, risks, and systems to build next.",
     actionLabel: "Run audit",
     promptPlaceholder: "Optional focus area, such as missed follow-ups, handoffs, equipment, or manager visibility.",
     saveTargets: ["tasks", "report"],
     instructions: `
-Generate an operations audit using the structure from the Vaeroex system prompt.
-Include current operational problems, bottlenecks, accountability gaps, recommended systems, suggested forms, suggested checklists, suggested SOPs, dashboard metrics, and a 30-day action plan.
+Generate an operations intelligence review using the structure from the Vaeroex system prompt.
+Include current visibility gaps, bottlenecks, accountability gaps, recommended systems, suggested forms, suggested checklists, suggested SOPs, dashboard metrics, and a 30-day action plan.
 Return a report draft in report with title, report_type, body_markdown, and date range if available.
 Include suggested_tasks for the highest-priority next actions.
 ${workspaceAwareInstructions}
@@ -122,7 +122,7 @@ ${sharedJsonInstructions}
   {
     key: "sop_generator",
     title: "SOP Generator",
-    description: "Draft a standard operating procedure from a process, issue, checklist, or workflow description.",
+    description: "Draft a standard procedure from a process, issue, checklist, or workflow description.",
     actionLabel: "Draft SOP",
     promptPlaceholder: "Which process should Vaeroex turn into an SOP?",
     saveTargets: ["sop", "tasks"],
@@ -138,12 +138,12 @@ ${sharedJsonInstructions}
   {
     key: "weekly_report",
     title: "Weekly Report",
-    description: "Draft a weekly operations report from tasks, issues, assets, forms, checklist runs, and recent Vaeroex results.",
+    description: "Draft a weekly intelligence report from follow-ups, issues, assets, forms, checklist runs, and recent Vaeroex results.",
     actionLabel: "Draft weekly report",
     promptPlaceholder: "Optional reporting focus or date range notes.",
     saveTargets: ["report", "tasks"],
     instructions: `
-Generate a weekly operations report using the report structure from the Vaeroex system prompt.
+Generate a weekly intelligence report using the report structure from the Vaeroex system prompt.
 Return the report in report with title, report_type, body_markdown, date_range_start, and date_range_end when inferable.
 Include suggested_tasks for the most important next actions.
 ${workspaceAwareInstructions}
@@ -153,12 +153,12 @@ ${sharedJsonInstructions}
   {
     key: "daily_summary",
     title: "Daily Summary",
-    description: "Summarize today's operational activity, risks, open work, and recommended manager actions.",
+    description: "Summarize today's business activity, risks, open follow-ups, and recommended manager actions.",
     actionLabel: "Draft daily summary",
     promptPlaceholder: "Optional shift, team, location, or day-specific notes.",
     saveTargets: ["report", "tasks"],
     instructions: `
-Generate a concise daily operations summary.
+Generate a concise daily intelligence summary.
 Return the summary as a report draft in report with report_type "Daily Summary".
 Include blockers, open work, risks, and suggested manager actions.
 ${workspaceAwareInstructions}
@@ -173,11 +173,11 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional area to inspect, such as dispatch, intake, onboarding, customer follow-up, or assets.",
     saveTargets: ["tasks", "report"],
     instructions: `
-Analyze workspace context for bottlenecks and repeated operational failures.
+Analyze workspace context for bottlenecks and repeated execution failures.
 Return bottlenecks as an array with name, evidence, impact, root_cause, recommended_system, and priority.
 Return a report draft when the analysis is substantial.
 Include suggested_tasks for fixes that should be assigned.
-Recommend using or improving existing tasks, issues, checklists, SOPs, reports, KPIs, files, and CRM records before suggesting new structures.
+Recommend using or improving existing follow-ups, issues, checklists, SOPs, reports, KPIs, files, and CRM records before suggesting new structures.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -185,7 +185,7 @@ ${sharedJsonInstructions}
   {
     key: "form_builder",
     title: "Form Builder",
-    description: "Draft an operational form with recommended fields, required fields, follow-up rules, and dashboard metrics.",
+    description: "Draft a visibility form with recommended fields, required fields, follow-up rules, and dashboard metrics.",
     actionLabel: "Draft form",
     promptPlaceholder: "What should this form collect?",
     saveTargets: ["form", "tasks"],
@@ -218,15 +218,15 @@ ${sharedJsonInstructions}
   {
     key: "follow_up",
     title: "Follow-Up",
-    description: "Turn submissions, issues, audit notes, or loose operational concerns into accountable next steps.",
+    description: "Turn submissions, issues, review notes, or loose business concerns into accountable next steps.",
     actionLabel: "Draft follow-ups",
     promptPlaceholder: "What needs follow-up?",
     saveTargets: ["tasks"],
     instructions: `
-Generate concrete follow-up tasks from the user's request and workspace context.
-Each suggested task must include title, description, priority, category, due_date_recommendation, and reason_this_matters.
-Keep tasks specific enough for a manager to assign.
-Use existing tasks, issues, file analyses, reports, CRM records, KPIs, and SOPs as evidence for the follow-up tasks.
+Generate concrete follow-ups from the user's request and workspace context.
+Each suggested follow-up must include title, description, priority, category, due_date_recommendation, and reason_this_matters.
+Keep follow-ups specific enough for a manager to assign.
+Use existing follow-ups, issues, file reviews, reports, CRM records, KPIs, and SOPs as evidence for the follow-ups.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -241,14 +241,14 @@ ${sharedJsonInstructions}
     instructions: `
 Analyze the uploaded file content and workspace context. The file may be parsed spreadsheet rows, extracted PDF text, extracted DOCX text, a PDF file attached directly for document reading, or a PNG/JPG image attached for OCR and visual analysis.
 Return a polished business-owner-friendly result with executive_summary, extracted_text, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, suggested_systems, and response_markdown.
-For images, perform OCR when readable text is visible and also describe relevant visual business context, visible problems, risks, or operational clues.
+For images, perform OCR when readable text is visible and also describe relevant visual business context, visible problems, risks, or execution clues.
 For PDFs attached directly, extract readable text when possible and explain clearly if the PDF appears scanned, image-based, locked, corrupted, or otherwise unreadable.
-Compare the new file against prior KPI history, file imports, CRM lead history, and operational metrics when those are available.
-Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, operational problems that stand out, possible data quality concerns, and practical next steps.
+Compare the new file against prior KPI history, file imports, CRM lead history, and business metrics when those are available.
+Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, visibility gaps that stand out, possible data quality concerns, and practical next steps.
 Do not repeat raw rows, long document excerpts, or technical JSON in the user-facing answer.
-For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Operational Issues, Recommended Actions, Source File.
+For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Issues, Recommended Actions, Source File.
 If the file suggests follow-up work, include suggested_tasks for manager review.
-If the file suggests KPIs, tasks, reports, or CRM records, reference existing Vaeroex modules and records first. Say "add these KPI records to the existing KPI Dashboard", "attach this analysis to an existing report", "convert these recommendations into tasks", or "update existing CRM records" when workspace context supports it.
+If the file suggests KPIs, follow-ups, reports, or CRM records, reference existing Vaeroex modules and records first. Say "add these KPI records to the existing KPI Dashboard", "attach this review to an existing report", "convert these recommendations into follow-ups", or "update existing CRM records" when workspace context supports it.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -256,12 +256,12 @@ ${sharedJsonInstructions}
   {
     key: "ceo_mode",
     title: "If I Were the CEO",
-    description: "Executive language for what the owner should do next across revenue, risk, accountability, customer experience, operations, and execution.",
+    description: "Executive language for what the owner should do next across revenue, risk, accountability, customer experience, visibility, and execution.",
     actionLabel: "Ask CEO view",
     promptPlaceholder: "Optional context, such as this week, this month, or a weak KPI.",
     saveTargets: ["tasks", "report"],
     instructions: `
-Answer as Vaeroex in executive language. Prioritize revenue, risk, team accountability, customer experience, operations, process health, and execution.
+Answer as Vaeroex in executive language. Prioritize revenue, risk, team accountability, customer experience, visibility, process health, and execution.
 Return only the few actions an owner should seriously consider this week.
 Include suggested_tasks for actions the user may approve.
 ${workspaceAwareInstructions}
@@ -276,7 +276,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional focus area, such as this week, Sales, Operations, or Customer Service.",
     saveTargets: ["tasks"],
     instructions: `
-Scan workspace KPIs, CRM, tasks, issues, reports, SOPs, files, alerts, assignments, and checklist completion.
+Scan workspace KPIs, CRM, follow-ups, issues, reports, SOPs, files, alerts, assignments, and checklist completion.
 Return only the top 3-5 priorities. Each priority must include title, why it matters, evidence, recommended owner, recommended due date, and suggested action.
 Do not return a long generic list.
 ${workspaceAwareInstructions}
@@ -291,7 +291,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional planning horizon, such as next month or next quarter.",
     saveTargets: ["tasks", "report"],
     instructions: `
-Analyze declining KPIs, overdue work, repeated issues, stale SOPs, CRM weakness, checklist misses, and open risks.
+Analyze declining KPIs, overdue follow-ups, repeated issues, stale SOPs, CRM weakness, checklist misses, and open risks.
 Return predicted risks, why each may happen, evidence, prevention action, suggested owner, and suggested due date.
 Include suggested_tasks for prevention actions.
 ${workspaceAwareInstructions}
@@ -306,8 +306,8 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional team or department focus.",
     saveTargets: ["tasks", "report"],
     instructions: `
-Generate an operations meeting workflow with these sections: KPI review, CRM pipeline review, open issues, overdue tasks, checklist compliance, SOP review, department risks, Vaeroex recommendations, decisions needed, and assignments for next week.
-Do not build video or chat. This is an operations meeting agenda and follow-up workflow.
+Generate a weekly execution meeting workflow with these sections: KPI review, CRM pipeline review, open issues, overdue follow-ups, checklist compliance, SOP review, department risks, Vaeroex recommendations, decisions needed, and assignments for next week.
+Do not build video or chat. This is a leadership meeting agenda and follow-up workflow.
 Include a report draft and suggested_tasks.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
@@ -321,7 +321,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Use case, such as board meeting, owner review, or quarterly review.",
     saveTargets: ["report", "tasks"],
     instructions: `
-Prepare a polished Business Review Package with executive summary, KPI trends, revenue and lead trends, operational risks, corrective actions, progress since last period, open decisions, completed actions, and recommended next steps.
+Prepare a polished Business Review Package with executive summary, KPI trends, revenue and lead trends, business risks, corrective actions, progress since last period, open decisions, completed actions, and recommended next steps.
 Do not expose public links. Keep it authenticated and customer-ready.
 Return a report draft in report with title, report_type, body_markdown, and date range if inferable.
 ${workspaceAwareInstructions}

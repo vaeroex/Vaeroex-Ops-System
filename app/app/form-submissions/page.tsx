@@ -77,7 +77,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
             <input type="hidden" name="return_path" value="/app/form-submissions" />
             <input type="hidden" name="form_id" value={submission.form_id} />
             <input type="hidden" name="submission_id" value={submission.id} />
-            <ConfirmSubmitButton message="Create a follow-up task from this submission?">Create follow-up task</ConfirmSubmitButton>
+            <ConfirmSubmitButton message="Create a follow-up from this submission?">Create follow-up</ConfirmSubmitButton>
           </form>
         </div>
       )
@@ -89,7 +89,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       <PageHeader
         eyebrow="Form submissions"
         title="Submission inbox"
-        description="Review operational submissions across every form, inspect Vaeroex summary drafts, and create follow-up tasks when a manager confirms the next action."
+        description="Review business submissions across every form, inspect Vaeroex summary drafts, and create follow-ups when a manager confirms the next action."
         actions={
           <Link href="/app/forms" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Manage forms

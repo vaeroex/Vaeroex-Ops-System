@@ -479,8 +479,8 @@ async function fetchReportSource(
   const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "CRM"));
   const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "CRM"));
-  const operationalMetricRows = ((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter((metric) =>
-    matchesCategory(category, metric, "Operational metrics")
+  const operationalMetricRows = ((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter(
+    (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
 
   const completedTasks = taskRows.filter((task) => task.status === "Done" && inIsoRange(task.updated_at || task.created_at, range));
@@ -579,7 +579,7 @@ async function fetchReportSource(
 
 function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} overdue task${source.counts.overdue_tasks === 1 ? "" : "s"} need owner follow-up.` : "",
+    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} overdue follow-up${source.counts.overdue_tasks === 1 ? "" : "s"} need owner attention.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} remain unresolved.` : "",
     source.counts.checklist_exceptions
       ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.`
@@ -587,21 +587,21 @@ function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
     source.counts.flagged_assets ? `${source.counts.flagged_assets} asset${source.counts.flagged_assets === 1 ? "" : "s"} are not marked ready.` : "",
     source.counts.pending_imports ? `${source.counts.pending_imports} data extraction${source.counts.pending_imports === 1 ? "" : "s"} are waiting for mapping review.` : "",
     source.counts.imported_files && source.counts.kpis_recorded === 0 && source.counts.operational_metrics === 0
-      ? "Files were imported, but no KPI or operational metric records were found in the selected period."
+      ? "Files were imported, but no KPI or business metric records were found in the selected period."
       : ""
   ].filter(Boolean);
 
-  return risks.length ? risks : ["No major operational risks were found in the selected period."];
+  return risks.length ? risks : ["No major business risks were found in the selected period."];
 }
 
 function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const actions = [
-    source.counts.overdue_tasks ? "Assign an owner and next step for each overdue task before the next management review." : "",
-    source.counts.open_issues ? "Review open issues by severity and convert unresolved items into dated follow-up tasks." : "",
+    source.counts.overdue_tasks ? "Assign an owner and next step for each overdue follow-up before the next management review." : "",
+    source.counts.open_issues ? "Review open issues by severity and convert unresolved items into dated follow-ups." : "",
     source.counts.checklist_exceptions ? "Review incomplete checklist runs and update the checklist or accountability process where needed." : "",
     source.counts.flagged_assets ? "Confirm asset readiness and document any maintenance or replacement decisions." : "",
     source.counts.pending_imports ? "Review pending file mappings and save approved data so dashboards and reports use the latest numbers." : "",
-    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, CRM leads, or operational metrics. Manual records can be added any time without imports." : "",
+    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, CRM leads, or business metrics. Manual records can be added any time without imports." : "",
     source.counts.sops_created === 0 ? "Pick one repeated workflow from this period and turn it into an SOP draft." : ""
   ].filter(Boolean);
 
@@ -631,13 +631,13 @@ function buildReportBody({
   const risks = riskItems(current);
   const nextActions = recommendedActions(current);
   const summary =
-    `${workspaceName} completed ${current.counts.completed_tasks} task${current.counts.completed_tasks === 1 ? "" : "s"}, ` +
+    `${workspaceName} completed ${current.counts.completed_tasks} follow-up${current.counts.completed_tasks === 1 ? "" : "s"}, ` +
     `${current.counts.checklist_completions} checklist run${current.counts.checklist_completions === 1 ? "" : "s"}, and ` +
     `${current.counts.sops_created} SOP update${current.counts.sops_created === 1 ? "" : "s"} during this period. ` +
     `${current.counts.uploaded_files} file${current.counts.uploaded_files === 1 ? "" : "s"} were uploaded and ` +
     `${current.counts.imported_file_rows} spreadsheet row${current.counts.imported_file_rows === 1 ? "" : "s"} were imported where useful. ` +
     `${current.counts.open_issues} open issue${current.counts.open_issues === 1 ? "" : "s"} and ` +
-    `${current.counts.overdue_tasks} overdue task${current.counts.overdue_tasks === 1 ? "" : "s"} need attention.`;
+    `${current.counts.overdue_tasks} overdue follow-up${current.counts.overdue_tasks === 1 ? "" : "s"} need attention.`;
 
   return `# ${period} ${reportType} - Generated by Vaeroex
 
@@ -649,7 +649,7 @@ Category: ${category || "All"}
 ${summary}
 
 ## Trend Comparison
-- Completed tasks: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
+- Completed follow-ups: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
 - Checklist completions: ${trendPhrase(current.counts.checklist_completions, previous.counts.checklist_completions)} vs ${previousLabel}
 - New issues: ${trendPhrase(current.counts.new_issues, previous.counts.new_issues)} vs ${previousLabel}
 - Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)} vs ${previousLabel}
@@ -662,18 +662,18 @@ ${summary}
 ## Completed Work
 ${readableList(
   [
-    ...current.items.completed_tasks.map((item) => `Task completed: ${item}`),
+    ...current.items.completed_tasks.map((item) => `Follow-up completed: ${item}`),
     ...current.items.checklist_completions.map((item) => `Checklist completed: ${item}`),
     ...current.items.sops_created.map((item) => `SOP updated: ${item}`)
   ],
-  "No completed tasks, checklist completions, or SOP updates were found in this period."
+  "No completed follow-ups, checklist completions, or SOP updates were found in this period."
 )}
 
 ## Open Issues
 ${readableList(current.items.open_issues, "No open issues are currently listed for this filter.")}
 
-## Overdue Tasks
-${readableList(current.items.overdue_tasks, "No overdue tasks were found for this period.")}
+## Overdue Follow-ups
+${readableList(current.items.overdue_tasks, "No overdue follow-ups were found for this period.")}
 
 ## KPI Trends
 - KPI records added: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)}
@@ -681,12 +681,12 @@ ${readableList(current.items.overdue_tasks, "No overdue tasks were found for thi
 ${readableList(current.items.kpis_recorded, "No KPI records were found for this period.")}
 - KPI comparison observations:
 ${readableList(current.items.kpi_trend_observations, "No KPI trend observations were available yet. Add at least two dated values for a KPI to unlock comparisons.")}
-- Completed tasks: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
-- Open tasks now: ${current.counts.open_tasks}
+- Completed follow-ups: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
+- Open follow-ups now: ${current.counts.open_tasks}
 - Open issues now: ${current.counts.open_issues}
 - Checklist exceptions: ${trendPhrase(current.counts.checklist_exceptions, previous.counts.checklist_exceptions)}
 - Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)}
-- Operational metrics recorded: ${trendPhrase(current.counts.operational_metrics, previous.counts.operational_metrics)}
+- Business metrics recorded: ${trendPhrase(current.counts.operational_metrics, previous.counts.operational_metrics)}
 
 ## Uploaded Files and Imported Data
 - Files uploaded: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)}
@@ -705,16 +705,16 @@ ${readableList(
     ...current.items.imported_files.map((item) => `Import completed: ${item}`),
     ...current.items.crm_leads.map((item) => `CRM lead: ${item}`),
     ...current.items.crm_lead_changes.map((item) => `CRM history: ${item}`),
-    ...current.items.operational_metrics.map((item) => `Operational metric: ${item}`)
+    ...current.items.operational_metrics.map((item) => `Business metric: ${item}`)
   ],
-  "No uploaded files, spreadsheet imports, CRM leads, or operational metrics were found in this period."
+  "No uploaded files, spreadsheet imports, CRM leads, or business metrics were found in this period."
 )}
 
 ## File Insights
-${readableList(current.items.file_insights, "No Vaeroex file analyses were saved during this period.")}
+${readableList(current.items.file_insights, "No Vaeroex file reviews were saved during this period.")}
 
-## Operational Risks
-${readableList(risks, "No major operational risks were found in the selected period.")}
+## Risks
+${readableList(risks, "No major business risks were found in the selected period.")}
 
 ## Recommended Next Actions
 ${readableList(nextActions, "Keep the current operating cadence and review trends again in the next report.")}
@@ -729,7 +729,7 @@ export async function generateReportAction(formData: FormData) {
   const { supabase, user, workspace, workspaceId } = await requireWorkspace();
   const periodValue = text(formData, "report_period");
   const period = isReportPeriod(periodValue) ? periodValue : "Weekly";
-  const reportType = text(formData, "report_type") || "Operations Summary";
+  const reportType = text(formData, "report_type") || "Intelligence Summary";
   const category = text(formData, "category") || "All";
   const anchorDate = text(formData, "anchor_date");
   const currentRange = getPeriodRange(period, anchorDate);

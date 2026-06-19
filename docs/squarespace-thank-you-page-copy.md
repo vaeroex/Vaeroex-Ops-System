@@ -2,11 +2,11 @@
 
 ## Headline
 
-Your Vaeroex Ops System subscription is active.
+Your Vaeroex subscription is active.
 
 ## Body
 
-Next, create your Vaeroex Ops System account using the same email you used at checkout. This helps us connect your subscription to your workspace.
+Next, create your Vaeroex account using the same email you used at checkout. This helps us connect your subscription to your Operations Intelligence workspace.
 
 ## Button
 

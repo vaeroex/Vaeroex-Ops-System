@@ -13,11 +13,11 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     title: "Workflow Builder",
     whatItWillDo: [
       "Map repeatable business processes from trigger to completion.",
-      "Assign owners, handoffs, review points, forms, checklists, and follow-up tasks.",
+      "Assign owners, handoffs, review points, forms, checklists, and follow-ups.",
       "Connect workflow steps to reports so managers can see where work gets stuck."
     ],
     whyItMatters:
-      "Many small teams know the work, but the steps live in heads, texts, spreadsheets, and side conversations. A workflow builder will turn that into a visible operating system.",
+      "Many small teams know the work, but the steps live in heads, texts, spreadsheets, and side conversations. A workflow builder will turn that into visible business structure.",
     futureCapability: [
       "Visual workflow maps",
       "Step ownership and due dates",
@@ -28,7 +28,7 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
   settings: {
     title: "Workspace Settings",
     whatItWillDo: [
-      "Manage workspace profile, business details, and default operating preferences.",
+      "Manage workspace profile, business details, and default workspace preferences.",
       "Review member roles and workspace access settings.",
       "Control compliance reminders and future integration settings."
     ],
@@ -62,8 +62,8 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
 const defaultCopy: ComingSoonCopy = {
   title: "Module Coming Soon",
   whatItWillDo: [
-    "Extend Vaeroex Ops System with a focused business operations capability.",
-    "Use workspace-safe records and clear owner-friendly workflows.",
+      "Extend Vaeroex with a focused business intelligence capability.",
+      "Use workspace-safe records and clear owner-friendly workflows.",
     "Connect future records to dashboard, reports, and Vaeroex context when appropriate."
   ],
   whyItMatters:

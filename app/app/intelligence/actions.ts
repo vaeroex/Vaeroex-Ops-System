@@ -76,7 +76,7 @@ async function requireWorkspace(path: string) {
 
 function requireLiveWorkspace(path: string, workspace: { name?: string | null; subscription_status?: string | null }) {
   if (isDemoWorkspaceRecord(workspace)) {
-    redirectWithMessage(path, "Demo Workspace is preview-only for prestige actions. Copy the pattern to your real workspace before saving live work.");
+    redirectWithMessage(path, "Demo Workspace is preview-only for Vaeroex recommendations. Copy the pattern to your real workspace before saving live work.");
   }
 }
 
@@ -120,7 +120,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
   const description = text(formData, "description") || text(formData, "evidence") || "Review this Vaeroex recommendation and confirm next action.";
   const priority = text(formData, "priority") || "Medium";
   const dueDate = nullableText(formData, "due_date");
-  const relatedModule = text(formData, "related_module") || "Tasks";
+  const relatedModule = text(formData, "related_module") || "Follow-ups";
   const owner = nullableText(formData, "owner");
   const { data: task, error: taskError } = await supabase
     .from("tasks")
@@ -141,7 +141,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
     .single();
 
   if (taskError || !task) {
-    redirectWithError(path, taskError?.message || "Task could not be created.");
+    redirectWithError(path, taskError?.message || "Follow-up could not be created.");
   }
 
   const { error } = await supabase.from("vaeroex_recommendation_outcomes").insert({
@@ -170,7 +170,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
 
   revalidatePath("/app");
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Recommendation accepted and task created.");
+  redirectWithMessage(path, "Recommendation accepted and follow-up created.");
 }
 
 export async function dismissPrestigeRecommendationAction(formData: FormData) {
@@ -247,7 +247,7 @@ export async function createBusinessReviewPackageAction(formData: FormData) {
     date_range_end: nullableText(formData, "date_range_end"),
     body_markdown: body,
     source_data_json: {
-      generated_from: "prestige_operations_intelligence",
+      generated_from: "operations_intelligence",
       package_type: text(formData, "package_type") || "Leadership Review"
     } satisfies Json,
     created_by: user.id

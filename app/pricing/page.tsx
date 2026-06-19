@@ -7,12 +7,12 @@ const outcomes = [
   "Executive Briefings",
   "Profit Leak Detection",
   "Business Memory",
-  "Accountability",
+  "Accountability Signals",
   "KPI Tracking",
   "Reports",
   "CRM",
   "SOPs",
-  "Vaeroex Operations Advisor"
+  "Decision Support"
 ];
 
 export default function PricingPage() {
@@ -20,14 +20,14 @@ export default function PricingPage() {
     <main className="min-h-screen bg-slate-50 px-6 py-10 text-ink">
       <section className="mx-auto max-w-5xl">
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">
-          Vaeroex Ops System
+          Vaeroex
         </Link>
         <div className="mt-8 grid gap-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Everything included</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight">One operating system for your business.</h1>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight">Operations intelligence for growing businesses.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-              Vaeroex combines operations, accountability, KPI tracking, reporting, CRM, files, and executive intelligence in one subscription.
+              Build the structure your growth depends on. Vaeroex brings visibility, accountability, and execution support into one subscription.
               Checkout is handled securely on Squarespace.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
@@ -45,22 +45,22 @@ export default function PricingPage() {
             <h2 className="mt-2 text-3xl font-semibold">{VAEROEX_PLAN_NAME}</h2>
             <p className="mt-2 text-lg font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
             <p className="mt-3 text-sm leading-6 text-muted">
-              Everything included for small business operations. Squarespace remains the source of truth for checkout, billing, discounts, and subscription status.
+              Everything included for operational clarity, business intelligence, accountability, and decision support. Squarespace remains the source of truth for checkout, billing, discounts, and subscription status.
             </p>
             <div className="mt-5 rounded-lg border border-line bg-slate-50 p-4">
               <p className="text-sm font-semibold">Included usage</p>
               <ul className="mt-2 space-y-2 text-sm text-muted">
                 <li>1 workspace included</li>
                 <li>10 users included</li>
-                <li>Generous Vaeroex usage for daily operations</li>
-                <li>All modules and executive features included</li>
+                <li>Generous Vaeroex usage for decision support</li>
+                <li>All visibility, accountability, and execution tools included</li>
               </ul>
             </div>
           </article>
         </div>
 
         <section className="mt-8 rounded-lg border border-line bg-white p-6 shadow-panel">
-          <h2 className="text-xl font-semibold">Built to help owners see what matters</h2>
+          <h2 className="text-xl font-semibold">Built to help owners see what matters and act on it</h2>
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
             {outcomes.map((outcome) => (
               <div key={outcome} className="rounded-lg border border-line bg-slate-50 p-3 text-sm font-semibold">
@@ -71,7 +71,7 @@ export default function PricingPage() {
         </section>
 
         <section className="mt-6 rounded-lg border border-line bg-white p-6 shadow-panel">
-          <h2 className="text-xl font-semibold">Included modules</h2>
+          <h2 className="text-xl font-semibold">Included platform capabilities</h2>
           <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {VAEROEX_PLAN_FEATURES.map((feature) => (
               <div key={feature} className="rounded-lg border border-line px-3 py-2 text-sm text-muted">

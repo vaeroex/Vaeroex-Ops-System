@@ -111,7 +111,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
       <PageHeader
         eyebrow="Assets"
         title="Assets"
-        description="Track asset status, location, identifiers, inspection history, and equipment that needs attention."
+        description="Keep visibility into asset status, location, identifiers, inspection history, and equipment that needs attention."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || assetsError?.message || checksError?.message || assetFolders.error?.message || checkFolders.error?.message} />
@@ -157,7 +157,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
           </CreateDrawer>
         </div>
 
-        <SectionCard title="Asset register" description="Current equipment and operational assets for this workspace.">
+        <SectionCard title="Asset register" description="Current equipment and tracked assets for this workspace.">
           <ManagedRecordList
             collection="assets"
             records={managedAssets}
@@ -165,7 +165,7 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
             title="Asset records"
             description="Track readiness and organize equipment without a long open table."
             emptyTitle="No assets yet"
-            emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked operational assets."
+            emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked business assets."
             searchParams={params}
           />
         </SectionCard>

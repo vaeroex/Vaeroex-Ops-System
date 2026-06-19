@@ -13,12 +13,12 @@ export const VAEROEX_PLAN_LIMITS = {
 } satisfies PlanLimits;
 
 export const VAEROEX_PLAN_FEATURES = [
-  "Executive Dashboard",
+  "Executive Visibility Dashboard",
   "CRM",
   "KPIs",
   "Reports",
   "SOPs",
-  "Tasks",
+  "Follow-up Ownership",
   "Issues",
   "Checklists",
   "Files",
@@ -29,7 +29,7 @@ export const VAEROEX_PLAN_FEATURES = [
   "Report Scheduling",
   "Report Sharing",
   "KPI Alerts",
-  "Vaeroex AI",
+  "Vaeroex Intelligence",
   "Business Health Score",
   "Business Memory",
   "Profit Leak Detector",

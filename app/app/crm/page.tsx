@@ -169,7 +169,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
     <div className="space-y-6">
       <PageHeader
         eyebrow="CRM"
-        title="CRM Pipeline"
+        title="CRM Visibility"
         description="Track leads manually or import them later. The dashboard and reports use CRM records either way, so no spreadsheet is required to start."
       />
       <ModuleTabs
@@ -219,9 +219,9 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
             records={managedLeads}
             folders={folderResult.folders}
             title="Lead records"
-            description="Manual and imported leads live together so reports and Vaeroex context have one customer pipeline."
+            description="Manual and imported leads live together so reports and Vaeroex context have one customer pipeline view."
             emptyTitle="No CRM leads yet"
-            emptyDescription="Create a lead manually to start tracking pipeline activity without using a spreadsheet."
+            emptyDescription="Create a lead manually to start seeing pipeline activity without using a spreadsheet."
             returnPath="/app/crm"
             searchParams={params}
           />

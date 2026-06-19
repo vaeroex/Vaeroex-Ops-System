@@ -12,14 +12,14 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
     <main className="min-h-screen bg-slate-50 px-6 py-10 text-ink">
       <section className="mx-auto max-w-3xl rounded-lg border border-line bg-white p-7 shadow-panel">
         <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Subscription required</p>
-        <h1 className="mt-2 text-3xl font-semibold">Your Vaeroex Ops System subscription is required to access this workspace.</h1>
+        <h1 className="mt-2 text-3xl font-semibold">Your Vaeroex subscription is required to access this workspace.</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
           {params?.reason || "Use the same email you used during Squarespace checkout, or request manual activation if access does not unlock automatically."}
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="https://www.vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            View Vaeroex Subscription
+            View Vaeroex subscription
           </Link>
           <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             I already purchased
