@@ -10,6 +10,7 @@ import {
   uploadFileAction
 } from "@/app/app/files/actions";
 import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -1450,6 +1451,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         title="Files & Imports"
         description="Upload, select, analyze, import, review, and turn file findings into reports or follow-up work. Files are optional: you can still create KPIs, CRM leads, follow-ups, checklists, SOPs, and reports manually."
       />
+      <LegalSafetyNotice tone="sensitive" compact />
       <ModuleTabs
         tabs={[
           { label: "All Files", href: "/app/files", active: !params?.status && !params?.folder },

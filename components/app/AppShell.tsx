@@ -8,6 +8,7 @@ import { ToastRegion } from "@/components/app/ToastRegion";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
+import { legalLinks } from "@/lib/legal/content";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
@@ -57,6 +58,7 @@ const baseNavSections = [
     items: [
       { href: "/app/settings", label: "Settings" },
       { href: "/app/account/subscription", label: "Subscription" },
+      { href: "/app/help", label: "Help Center" },
       { href: "/app/support", label: "Support" }
     ]
   }
@@ -212,6 +214,19 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
         <main className="mx-auto w-full max-w-[1480px] space-y-5 p-4 lg:p-6">
           <ComplianceNotice compact />
           {children}
+          <footer className="flex flex-col gap-2 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
+            <p>Vaeroex helps teams build visibility, accountability, and execution.</p>
+            <nav className="flex flex-wrap gap-3" aria-label="In-app help and legal links">
+              <Link href="/app/help" className="font-semibold hover:text-vaeroex-blue">Help Center</Link>
+              <Link href="/app/help/trust" className="font-semibold hover:text-vaeroex-blue">Trust Center</Link>
+              {legalLinks.slice(0, 2).map((link) => (
+                <Link key={link.href} href={link.href} className="font-semibold hover:text-vaeroex-blue">
+                  {link.label}
+                </Link>
+              ))}
+              <Link href="/app/support" className="font-semibold hover:text-vaeroex-blue">Support</Link>
+            </nav>
+          </footer>
         </main>
       </div>
       <ToastRegion />

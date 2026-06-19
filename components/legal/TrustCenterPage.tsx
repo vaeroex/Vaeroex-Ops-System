@@ -1,0 +1,59 @@
+import Link from "next/link";
+import { PublicFooter } from "@/components/legal/PublicFooter";
+import { trustSections } from "@/lib/legal/content";
+
+export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
+  const content = (
+    <div className="space-y-6">
+      <section className="rounded-lg border border-vaeroex-silver/80 bg-white p-6 shadow-panel">
+        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Trust Center</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Built for workspace-scoped operations intelligence.</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+          Vaeroex is designed to help businesses create visibility, accountability, and execution while keeping customer data responsibilities clear.
+          This page avoids unsupported compliance claims and explains the current trust posture in plain English.
+        </p>
+      </section>
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {trustSections.map(([title, body]) => (
+          <article key={title} className="rounded-lg border border-line bg-white p-5 shadow-panel">
+            <h2 className="text-base font-semibold text-ink">{title}</h2>
+            <p className="mt-2 text-sm leading-6 text-muted">{body}</p>
+          </article>
+        ))}
+      </section>
+
+      <section className="rounded-lg border border-line bg-white p-5 shadow-panel">
+        <h2 className="text-base font-semibold">Important trust notes</h2>
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
+          <li>Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR compliance certification, or enterprise compliance certification.</li>
+          <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and data they enter.</li>
+          <li>Vaeroex outputs require human review before customers rely on recommendations or save generated records.</li>
+          <li>Security, privacy, or trust questions can be submitted through support.</li>
+        </ul>
+        <Link href={inApp ? "/app/support" : "/support"} className="mt-4 inline-flex rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+          Contact Support
+        </Link>
+      </section>
+    </div>
+  );
+
+  if (inApp) {
+    return content;
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 text-ink">
+      <nav className="border-b border-slate-800 bg-vaeroex-navy px-6 py-4 text-white">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
+          <Link href="/" className="text-lg font-semibold">Vaeroex</Link>
+          <Link href="/support" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold">
+            Contact Support
+          </Link>
+        </div>
+      </nav>
+      <section className="mx-auto max-w-6xl px-6 py-10">{content}</section>
+      <PublicFooter />
+    </main>
+  );
+}

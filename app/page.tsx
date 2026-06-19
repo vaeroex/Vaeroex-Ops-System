@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
+import { PublicFooter } from "@/components/legal/PublicFooter";
 
 const pillars = [
   ["Visibility", "See performance, risks, files, follow-ups, and decisions in one business view."],
@@ -136,6 +137,7 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+      <PublicFooter />
     </main>
   );
 }

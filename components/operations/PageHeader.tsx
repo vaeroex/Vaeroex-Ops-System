@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ContextualHelp } from "@/components/help/ContextualHelp";
 
 type PageHeaderProps = {
   eyebrow: string;
@@ -16,7 +17,10 @@ export function PageHeader({ eyebrow, title, description, actions }: PageHeaderP
           <h2 className="mt-2 text-2xl font-semibold tracking-normal text-ink">{title}</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{description}</p>
         </div>
-        {actions ? <div className="flex flex-wrap gap-2 lg:justify-end">{actions}</div> : null}
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          <ContextualHelp title={title} eyebrow={eyebrow} />
+          {actions}
+        </div>
       </div>
     </section>
   );

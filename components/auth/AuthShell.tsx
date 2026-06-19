@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
+import { legalLinks } from "@/lib/legal/content";
 
 type AuthShellProps = {
   title: string;
@@ -42,6 +43,13 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
             <p className="mt-2 text-sm leading-6 text-slate-600">{subtitle}</p>
           </div>
           {children}
+          <nav className="mt-6 flex flex-wrap gap-3 border-t border-line pt-4 text-xs text-muted" aria-label="Authentication legal links">
+            {legalLinks.slice(0, 5).map((link) => (
+              <Link key={link.href} href={link.href} className="font-semibold hover:text-vaeroex-blue">
+                {link.label}
+              </Link>
+            ))}
+          </nav>
         </section>
       </div>
     </main>
