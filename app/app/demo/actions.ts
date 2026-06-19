@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { ensureDemoWorkspacePopulated, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -105,7 +106,7 @@ async function createDemoWorkspaceShell(supabase: SupabaseServerClient, user: Si
       primary_contact_email: user.email,
       created_by: user.id,
       subscription_status: "demo",
-      plan_slug: "growth",
+      plan_slug: VAEROEX_PLAN_SLUG,
       subscription_required: false,
       manually_unlocked: true
     })

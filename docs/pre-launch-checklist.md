@@ -78,8 +78,8 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
   - Verify: Customer can access setup/app after activation.
   - Status: Source verified; needs live admin test.
 
-- [ ] Change plan.
-  - Expected: Admin can change customer plan between Starter, Growth, and Pro.
+- [ ] Confirm Vaeroex subscription access.
+  - Expected: Admin can activate, deactivate, or manually unlock the single Vaeroex subscription.
   - Verify: Customer usage limits reflect the updated plan.
   - Status: Source verified; needs live admin test.
 

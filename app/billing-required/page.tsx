@@ -19,10 +19,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
 
         <div className="mt-6 flex flex-wrap gap-3">
           <Link href="https://www.vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            View Plans
-          </Link>
-          <Link href="https://www.vaeroex.com/pricing" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            Upgrade Plan
+            View Vaeroex Subscription
           </Link>
           <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             I already purchased
@@ -59,12 +56,8 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
             <input name="company" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue" />
           </label>
           <label className="block text-sm font-medium">
-            Plan purchased
-            <select name="plan_purchased" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue">
-              <option>Starter Operations System</option>
-              <option>Growth Operations System</option>
-              <option>Pro Operations System</option>
-            </select>
+            Subscription purchased
+            <input name="plan_purchased" defaultValue="Vaeroex" className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue" />
           </label>
           <label className="block text-sm font-medium md:col-span-2">
             Order number if available

@@ -60,11 +60,11 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
   - Status: Source verified; needs browser test.
 
 - [ ] Customer creates form.
-  - Expected: `/app/forms` creates a tenant-scoped form and enforces plan limits.
+  - Expected: `/app/forms` creates a tenant-scoped form as an included Vaeroex feature.
   - Status: Source verified; needs browser test.
 
 - [ ] Customer creates checklist.
-  - Expected: `/app/checklists` creates a tenant-scoped checklist and enforces plan limits.
+  - Expected: `/app/checklists` creates a tenant-scoped checklist as an included Vaeroex feature.
   - Status: Source verified; needs browser test.
 
 - [ ] Customer runs Vaeroex audit.

@@ -84,7 +84,7 @@ Phase 6 is now implemented in the scaffold:
 - Billing-required page with manual activation request flow
 - Account subscription page with status, plan, usage, upgrade, and contact links
 - Owner/admin subscription management page for manual activations, status changes, notes, requests, and event payload review
-- Squarespace webhook endpoint that stores order events and maps product names/SKUs to Vaeroex plans
+- Squarespace webhook endpoint that stores order events and maps product names/SKUs to the Vaeroex plan
 - Plan limits for workspaces, users, forms, checklists, and monthly Vaeroex runs
 - Pricing page buttons that link to Squarespace checkout URLs
 - Squarespace setup docs and thank-you page copy
@@ -157,15 +157,9 @@ NEXT_PUBLIC_APP_URL=
 VAEROEX_ADMIN_EMAILS=
 SQUARESPACE_API_KEY=
 SQUARESPACE_WEBHOOK_SECRET=
-SQUARESPACE_STARTER_PRODUCT_ID=
-SQUARESPACE_STARTER_SKU=
-SQUARESPACE_GROWTH_PRODUCT_ID=
-SQUARESPACE_GROWTH_SKU=
-SQUARESPACE_PRO_PRODUCT_ID=
-SQUARESPACE_PRO_SKU=
-NEXT_PUBLIC_SQUARESPACE_STARTER_CHECKOUT_URL=
-NEXT_PUBLIC_SQUARESPACE_GROWTH_CHECKOUT_URL=
-NEXT_PUBLIC_SQUARESPACE_PRO_CHECKOUT_URL=
+SQUARESPACE_VAEROEX_PRODUCT_ID=
+SQUARESPACE_VAEROEX_SKU=
+NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL=
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must only be used in server-side code. Never expose it to the browser.
@@ -181,11 +175,11 @@ VAEROEX_ADMIN_EMAILS=owner@vaeroex.com,admin@vaeroex.com
 
 Vaeroex Ops System does not run its own checkout flow yet. Squarespace handles the storefront, checkout, payment collection, taxes, customer purchase flow, and subscription billing.
 
-The Vaeroex app handles account login, workspace creation, product access, plan limits, and subscription status checks. Customers should create their Vaeroex app account with the same email address they used during Squarespace checkout so the app can match their purchase to `customer_subscriptions`.
+The Vaeroex app handles account login, workspace creation, product access, usage limits, and subscription status checks. Customers should create their Vaeroex app account with the same email address they used during Squarespace checkout so the app can match their purchase to `customer_subscriptions`.
 
-For early customers, confirm the purchase in Squarespace and use `/app/admin/subscriptions` to manually activate the customer email, assign a plan, set the status, and add notes. Manual activations unlock app access without requiring webhook credentials.
+For early customers, confirm the purchase in Squarespace and use `/app/admin/subscriptions` to manually activate the customer email, assign the Vaeroex plan, set the status, and add notes. Manual activations unlock app access without requiring webhook credentials.
 
-For automated access, configure Squarespace order webhooks to send events to `/api/squarespace/webhook`. The app stores incoming payloads in `subscription_events`, maps known Squarespace product names, product IDs, or SKUs to the internal `starter`, `growth`, and `pro` plans, and creates or updates `customer_subscriptions` when the payload is clear. Unclear payloads are retained for manual review.
+For automated access, configure Squarespace order webhooks to send events to `/api/squarespace/webhook`. The app stores incoming payloads in `subscription_events`, maps known Squarespace product names, product IDs, or SKUs to the single internal `vaeroex` plan, and creates or updates `customer_subscriptions` when the payload is clear. Unclear payloads are retained for manual review.
 
 The app remains usable when Squarespace webhook credentials are not configured. Customers without active, demo, or manually unlocked access are sent to `/billing-required`.
 
@@ -298,7 +292,7 @@ Each seeded workspace includes:
 - 5 people
 - 1 weekly report
 - 4 Vaeroex results
-- Demo subscription access on the Pro Operations System plan
+- Demo subscription access on the Vaeroex plan
 - 1 support request
 
 ## Demo Credentials

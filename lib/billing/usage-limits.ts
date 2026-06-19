@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
+import { normalizePlanLimits } from "@/lib/billing/plans";
 import type { UsageSnapshot } from "@/lib/billing/types";
 import type { Database } from "@/lib/supabase/types";
 
@@ -79,7 +80,7 @@ export async function isUsageLimitReached({
   limit: "workspaces" | "users" | "forms" | "checklists" | "ai_runs_this_month";
 }) {
   const { subscription, usage } = await getSubscriptionUsageStatus({ supabase, userId, email, workspaceId });
-  const plan = subscription.plan;
+  const plan = normalizePlanLimits(subscription.plan);
 
   if (!plan) {
     return {

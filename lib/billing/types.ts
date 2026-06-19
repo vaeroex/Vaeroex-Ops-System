@@ -2,7 +2,7 @@ import type { Json } from "@/lib/supabase/types";
 
 export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "expired" | "manual_review" | "demo";
 
-export type PlanSlug = "starter" | "growth" | "pro";
+export type PlanSlug = "vaeroex";
 
 export type PlanLimits = {
   max_workspaces: number | null;

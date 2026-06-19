@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
 import { mapSquarespaceProductToPlan } from "@/lib/billing/squarespace-plan-map";
+import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import type { Json } from "@/lib/supabase/types";
 
 function text(formData: FormData, key: string) {
@@ -18,7 +19,7 @@ async function requireSubscriptionAdmin() {
 export async function createManualSubscriptionAction(formData: FormData) {
   const { admin, user } = await requireSubscriptionAdmin();
   const email = text(formData, "customer_email").toLowerCase();
-  const planSlug = text(formData, "plan_slug") || mapSquarespaceProductToPlan(text(formData, "plan_purchased")) || "starter";
+  const planSlug = normalizePlanSlug(text(formData, "plan_slug") || mapSquarespaceProductToPlan(text(formData, "plan_purchased"))) || VAEROEX_PLAN_SLUG;
   const status = text(formData, "status") || "active";
   const workspaceId = text(formData, "workspace_id") || null;
 
@@ -78,7 +79,7 @@ export async function updateSubscriptionAction(formData: FormData) {
   const { admin } = await requireSubscriptionAdmin();
   const id = text(formData, "subscription_id");
   const status = text(formData, "status") || "manual_review";
-  const planSlug = text(formData, "plan_slug") || "starter";
+  const planSlug = normalizePlanSlug(text(formData, "plan_slug")) || VAEROEX_PLAN_SLUG;
 
   if (!id) {
     redirect("/app/admin/subscriptions?error=Subscription is required.");

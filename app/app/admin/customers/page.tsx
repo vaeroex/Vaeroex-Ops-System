@@ -4,6 +4,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { displayPlanName } from "@/lib/billing/plans";
 
 type AdminCustomersPageProps = {
   searchParams?: Promise<{ q?: string; error?: string }>;
@@ -87,7 +88,7 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold">{subscription.customer_email}</p>
-                    <p className="mt-1 text-sm text-muted">{subscription.customer_name || "No name"} · {subscription.plan_slug || "No plan"}</p>
+                    <p className="mt-1 text-sm text-muted">{subscription.customer_name || "No name"} · {displayPlanName(subscription.plan_slug)}</p>
                   </div>
                   <StatusBadge value={subscription.status} />
                 </div>
@@ -112,7 +113,7 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge value={workspace.subscription_status} />
-                  <StatusBadge value={workspace.plan_slug} />
+                  <StatusBadge value={displayPlanName(workspace.plan_slug)} />
                 </div>
               </div>
             </article>

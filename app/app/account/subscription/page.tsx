@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { displayPlanName, displaySubscriptionStatus, normalizePlanLimits, VAEROEX_PLAN_LIMITS } from "@/lib/billing/plans";
 import { getSubscriptionUsageStatus } from "@/lib/billing/usage-limits";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -22,6 +23,7 @@ export default async function AccountSubscriptionPage() {
     email: user?.email,
     workspaceId: context.activeWorkspace?.id
   });
+  const limits = normalizePlanLimits(subscription.plan) || (subscription.allowed ? VAEROEX_PLAN_LIMITS : null);
 
   return (
     <div className="space-y-6">
@@ -30,12 +32,12 @@ export default async function AccountSubscriptionPage() {
           <div className="rounded-lg border border-line p-4">
             <p className="text-sm text-muted">Status</p>
             <div className="mt-2">
-              <StatusBadge value={subscription.status} />
+              <StatusBadge value={displaySubscriptionStatus(subscription.status, subscription.source)} />
             </div>
           </div>
           <div className="rounded-lg border border-line p-4">
             <p className="text-sm text-muted">Plan</p>
-            <p className="mt-2 text-lg font-semibold">{subscription.plan?.name || subscription.plan_slug || "No plan found"}</p>
+            <p className="mt-2 text-lg font-semibold">{subscription.allowed ? displayPlanName(subscription.plan_slug || subscription.plan?.slug || "vaeroex") : "Subscription required"}</p>
           </div>
           <div className="rounded-lg border border-line p-4">
             <p className="text-sm text-muted">Access</p>
@@ -45,7 +47,7 @@ export default async function AccountSubscriptionPage() {
         <p className="mt-4 text-sm leading-6 text-muted">{subscription.reason}</p>
         <div className="mt-5 flex flex-wrap gap-3">
           <Link href="https://www.vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            Upgrade Plan
+            View Vaeroex Subscription
           </Link>
           <Link href="/billing-required#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             I already purchased
@@ -56,14 +58,12 @@ export default async function AccountSubscriptionPage() {
         </div>
       </SectionCard>
 
-      <SectionCard title="Current usage" description="Usage is checked against the active Vaeroex plan limits.">
-        <div className="grid gap-4 md:grid-cols-5">
+      <SectionCard title="Current usage" description="Usage is checked against active Vaeroex access limits. All product features are included.">
+        <div className="grid gap-4 md:grid-cols-3">
           {[
-            ["Workspaces", usage.workspaces, subscription.plan?.max_workspaces],
-            ["Users", usage.users, subscription.plan?.max_users],
-            ["Forms", usage.forms, subscription.plan?.max_forms],
-            ["Checklists", usage.checklists, subscription.plan?.max_checklists],
-            ["Vaeroex runs this month", usage.ai_runs_this_month, subscription.plan?.max_ai_runs_per_month]
+            ["Workspaces", usage.workspaces, limits?.max_workspaces],
+            ["Users", usage.users, limits?.max_users],
+            ["Vaeroex runs this month", usage.ai_runs_this_month, limits?.max_ai_runs_per_month]
           ].map(([label, current, limit]) => (
             <div key={String(label)} className="rounded-lg border border-line p-4">
               <p className="text-sm text-muted">{label}</p>

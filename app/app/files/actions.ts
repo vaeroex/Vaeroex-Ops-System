@@ -1300,7 +1300,7 @@ async function runFileVaeroexAnalysis({
   });
 
   if (limit.reached) {
-    throw new Error("You’ve reached the limit for your current Vaeroex Ops System plan.");
+    throw new Error("You’ve reached the monthly Vaeroex usage limit for this workspace.");
   }
 
   const outputJson = await runVaeroexCompletion({
