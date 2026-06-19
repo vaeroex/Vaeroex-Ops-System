@@ -1,0 +1,38 @@
+name: Vaeroex CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - kpi-management-ready
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: TypeScript check
+        run: pnpm typecheck
+
+      - name: Production build
+        run: pnpm build
+
+      - name: Security regression check
+        run: pnpm security:check
