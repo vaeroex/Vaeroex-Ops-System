@@ -36,7 +36,8 @@ export async function createSupportRequestAction(formData: FormData) {
   }
 
   let userId: string | null = null;
-  let workspaceId = uuidOrNull(workspaceIdInput) || uuidOrNull(workspaceInput);
+  let workspaceId: string | null = null;
+  const requestedWorkspaceId = uuidOrNull(workspaceIdInput) || uuidOrNull(workspaceInput);
 
   if (supabase) {
     const {
@@ -44,15 +45,30 @@ export async function createSupportRequestAction(formData: FormData) {
     } = await supabase.auth.getUser();
     userId = user?.id ?? null;
 
-    if (!workspaceId && user) {
+    if (user && requestedWorkspaceId) {
+      const { data: membership } = await supabase
+        .from("workspace_members")
+        .select("workspace_id")
+        .eq("workspace_id", requestedWorkspaceId)
+        .eq("user_id", user.id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      workspaceId = membership?.workspace_id ?? null;
+    }
+
+    if (!workspaceId && user && !requestedWorkspaceId) {
       const context = await getWorkspaceContext();
       workspaceId = context.activeWorkspace?.id ?? null;
     }
   }
 
-  const fullMessage = workspaceInput && !uuidOrNull(workspaceInput)
-    ? `Workspace: ${workspaceInput}\n\n${message}`
-    : message;
+  const workspaceReference = workspaceInput || workspaceIdInput;
+  const fullMessage = workspaceReference && !workspaceId
+    ? `Workspace reference: ${workspaceReference}\n\n${message}`
+    : workspaceInput && !uuidOrNull(workspaceInput)
+      ? `Workspace: ${workspaceInput}\n\n${message}`
+      : message;
   const client = admin || supabase;
 
   if (!client) {

@@ -382,6 +382,17 @@ Phase 5:
 
 Vercel supports Next.js projects and automatically uses the framework build settings. For Next.js, Vercel checks `package.json` for the `build` script and uses it as the Build Command; otherwise it falls back to `next build`. See the official Vercel docs for [Next.js](https://vercel.com/docs/frameworks/full-stack/nextjs), [build configuration](https://vercel.com/docs/builds/configure-a-build), and [environment variables](https://vercel.com/docs/environment-variables).
 
+Before publishing or merging a deployment branch, run:
+
+```bash
+pnpm typecheck
+pnpm build
+pnpm security:check
+git diff --check
+```
+
+The security check verifies core workspace isolation, admin-route guardrails, RLS migration coverage, private file storage policy markers, and server-secret client exposure patterns. Keep `/docs/security/*` updated whenever a route, table, storage bucket, or admin capability is added.
+
 1. Push this project to GitHub, GitLab, or Bitbucket.
 2. Create a Vercel project from the repository.
 3. Use these project settings:
