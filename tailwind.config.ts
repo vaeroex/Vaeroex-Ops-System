@@ -9,17 +9,18 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#0c1220",
-        line: "#d8e1ec",
-        muted: "#637084",
+        ink: "#0f172a",
+        line: "#d7e0ec",
+        muted: "#334155",
         vaeroex: {
-          blue: "#0b5fff",
-          navy: "#07172d",
+          blue: "#2563eb",
+          navy: "#0f172a",
           soft: "#eaf2ff"
         }
       },
       boxShadow: {
-        panel: "0 18px 55px rgba(8, 23, 45, 0.08)"
+        panel: "0 16px 42px rgba(15, 23, 42, 0.08)",
+        command: "0 22px 70px rgba(15, 23, 42, 0.16)"
       }
     }
   },

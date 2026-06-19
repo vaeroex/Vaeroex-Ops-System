@@ -22,6 +22,7 @@ type PrestigeOperationsPanelProps = {
   dateRangeEnd?: string;
   compact?: boolean;
   isDemoWorkspace?: boolean;
+  showHealthHero?: boolean;
 };
 
 const decisionStatuses = ["open", "in_progress", "reviewed", "completed", "dismissed"];
@@ -36,6 +37,99 @@ function priorityTone(priority: string) {
   if (priority === "Urgent" || priority === "High") return "border-red-200 bg-red-50 text-red-700";
   if (priority === "Medium") return "border-amber-200 bg-amber-50 text-amber-900";
   return "border-blue-100 bg-blue-50 text-blue-800";
+}
+
+function scoreLabel(score: number) {
+  if (score >= 90) return "Excellent";
+  if (score >= 80) return "Strong";
+  if (score >= 70) return "Stable";
+  if (score >= 60) return "Watch";
+  return "At risk";
+}
+
+function riskLevel(score: number) {
+  if (score >= 85) return "Low";
+  if (score >= 70) return "Moderate";
+  return "High";
+}
+
+function trendSummary(categories: PrestigeIntelligence["businessHealth"]["categories"]) {
+  const upward = categories.filter((category) => category.trend === "up").length;
+  const downward = categories.filter((category) => category.trend === "down").length;
+
+  if (upward > downward) return { icon: "↑", label: "Improving", detail: `+${upward - downward} positive signal${upward - downward === 1 ? "" : "s"}` };
+  if (downward > upward) return { icon: "↓", label: "Declining", detail: `${downward - upward} risk signal${downward - upward === 1 ? "" : "s"}` };
+  return { icon: "→", label: "Holding steady", detail: "No major directional change" };
+}
+
+function keyFocusArea(intelligence: PrestigeIntelligence) {
+  const firstPriority = intelligence.focusPriorities[0]?.relatedModule;
+  const weakestCategory = [...intelligence.businessHealth.categories].sort((a, b) => a.score - b.score)[0]?.name;
+  return firstPriority || weakestCategory || "Operating rhythm";
+}
+
+export function BusinessHealthHero({
+  intelligence,
+  periodLabel = "current period"
+}: {
+  intelligence: PrestigeIntelligence;
+  periodLabel?: string;
+}) {
+  const health = intelligence.businessHealth;
+  const trend = trendSummary(health.categories);
+  const focus = keyFocusArea(intelligence);
+  const risk = riskLevel(health.score);
+  const progressWidth = `${Math.max(4, Math.min(100, health.score))}%`;
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-800 bg-vaeroex-navy text-white shadow-command">
+      <div className="grid gap-0 xl:grid-cols-[0.95fr_1.05fr]">
+        <div className="border-b border-white/10 p-6 xl:border-b-0 xl:border-r">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">Business Health</p>
+          <div className="mt-5 flex flex-wrap items-end gap-4">
+            <p className="text-7xl font-semibold leading-none tracking-normal">
+              {health.score}
+              <span className="ml-1 text-2xl text-blue-200">/100</span>
+            </p>
+            <div className="pb-2">
+              <p className="text-xl font-semibold">{scoreLabel(health.score)}</p>
+              <p className="mt-1 text-sm text-blue-100">Vaeroex operating score</p>
+            </div>
+          </div>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
+            <div className="h-full rounded-full bg-vaeroex-blue" style={{ width: progressWidth }} />
+          </div>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-blue-50">{health.explanation}</p>
+          {health.dataQualityWarning ? (
+            <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">{health.dataQualityWarning}</p>
+          ) : null}
+        </div>
+
+        <div className="grid gap-3 p-6 sm:grid-cols-2">
+          <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Trend direction</p>
+            <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.label}</p>
+            <p className="mt-1 text-sm text-blue-100">{trend.detail} in the {periodLabel.toLowerCase()} view.</p>
+          </article>
+          <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Risk level</p>
+            <p className="mt-3 text-2xl font-semibold">{risk}</p>
+            <p className="mt-1 text-sm text-blue-100">Based on current health score, open risks, and data confidence.</p>
+          </article>
+          <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Primary focus</p>
+            <p className="mt-3 text-2xl font-semibold">{focus}</p>
+            <p className="mt-1 text-sm text-blue-100">Start here before adding more work to the team.</p>
+          </article>
+          <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Week-over-week signal</p>
+            <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.detail}</p>
+            <p className="mt-1 text-sm text-blue-100">Vaeroex uses the visible workspace history and current period filters.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  );
 }
 
 function DemoPreviewNotice() {
@@ -186,7 +280,8 @@ export function PrestigeOperationsPanel({
   dateRangeStart,
   dateRangeEnd,
   compact = false,
-  isDemoWorkspace = false
+  isDemoWorkspace = false,
+  showHealthHero = true
 }: PrestigeOperationsPanelProps) {
   const health = intelligence.businessHealth;
 
@@ -217,33 +312,27 @@ export function PrestigeOperationsPanel({
     <div className="space-y-6">
       {isDemoWorkspace ? <DemoPreviewNotice /> : null}
 
-      <section className="grid gap-4 xl:grid-cols-[.85fr_1.15fr]">
-        <SectionCard title="Business Health Score" description="A workspace-wide operating score built from KPIs, tasks, issues, CRM, reports, SOPs, checklists, files, alerts, assignments, and team data.">
-          <div className={`rounded-lg border p-5 ${scoreTone(health.score)}`}>
-            <p className="text-sm font-semibold">Business Health Score</p>
-            <p className="mt-2 text-6xl font-semibold">{health.score}<span className="text-2xl">/100</span></p>
-            <p className="mt-4 text-sm leading-6">{health.explanation}</p>
-            {health.dataQualityWarning ? <p className="mt-3 rounded-lg bg-white/70 p-3 text-xs leading-5">{health.dataQualityWarning}</p> : null}
-          </div>
-        </SectionCard>
+      {showHealthHero ? <BusinessHealthHero intelligence={intelligence} /> : null}
 
-        <SectionCard title="Health breakdown" description="Each category explains what improved, what declined, and what to do next.">
-          <div className="grid gap-3 md:grid-cols-2">
-            {health.categories.map((category) => (
-              <article key={category.name} className={`rounded-lg border p-4 ${scoreTone(category.score)}`}>
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold">{category.name}</p>
-                  <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">{category.score}/100</span>
-                </div>
-                <p className="mt-2 text-sm leading-6">{category.explanation}</p>
-                <p className="mt-2 text-xs leading-5"><strong>Improved:</strong> {category.improved}</p>
-                <p className="mt-1 text-xs leading-5"><strong>Declined:</strong> {category.declined}</p>
-                <p className="mt-1 text-xs leading-5"><strong>Next:</strong> {category.nextAction}</p>
-              </article>
-            ))}
-          </div>
-        </SectionCard>
-      </section>
+      <SectionCard title="Health breakdown" description="Each category explains what improved, what declined, and what to do next.">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          {health.categories.map((category) => (
+            <article key={category.name} className={`rounded-lg border p-4 ${scoreTone(category.score)}`}>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold">{category.name}</p>
+                <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold">{category.score}/100</span>
+              </div>
+              <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white/70">
+                <div className="h-full rounded-full bg-vaeroex-blue" style={{ width: `${Math.max(4, Math.min(100, category.score))}%` }} />
+              </div>
+              <p className="mt-3 text-sm leading-6">{category.explanation}</p>
+              <p className="mt-2 text-xs leading-5"><strong>Improved:</strong> {category.improved}</p>
+              <p className="mt-1 text-xs leading-5"><strong>Declined:</strong> {category.declined}</p>
+              <p className="mt-1 text-xs leading-5"><strong>Next:</strong> {category.nextAction}</p>
+            </article>
+          ))}
+        </div>
+      </SectionCard>
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_.95fr]">
         <SectionCard title="What should I focus on this week?" description="Vaeroex limits this to the top priorities that are tied to visible evidence.">

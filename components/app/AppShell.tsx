@@ -1,8 +1,8 @@
 import Link from "next/link";
-import type { Route } from "next";
 import type { ReactNode } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
+import { AppNavigation } from "@/components/app/AppNavigation";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
@@ -87,40 +87,9 @@ function NotificationBadge({ count, light = false }: { count: number; light?: bo
   }
 
   return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${light ? "bg-white text-vaeroex-blue" : "bg-vaeroex-blue text-white"}`}>
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${light ? "bg-white text-vaeroex-blue" : "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"}`}>
       {count > 99 ? "99+" : count}
     </span>
-  );
-}
-
-function NavSection({
-  label,
-  items,
-  notificationUnreadCount
-}: {
-  label: string;
-  items: Array<{ href: string; label: string }>;
-  notificationUnreadCount: number;
-}) {
-  return (
-    <details open className="group rounded-lg border border-white/10 bg-white/[0.03]">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-100">
-        {label}
-        <span className="text-blue-200 transition group-open:rotate-90">&gt;</span>
-      </summary>
-      <div className="pb-2">
-        {items.map((item) => (
-          <Link
-            key={`${item.href}-${item.label}`}
-            href={item.href as Route}
-            className="mx-2 flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-blue-50 hover:bg-white/10"
-          >
-            <span>{item.label}</span>
-            {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} light /> : null}
-          </Link>
-        ))}
-      </div>
-    </details>
   );
 }
 
@@ -137,22 +106,22 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
   const accessLabel = workspaceAccessLabel(activeWorkspace);
 
   return (
-    <div className="min-h-screen bg-slate-50 text-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white lg:flex lg:flex-col">
+    <div className="min-h-screen bg-[#f8fafc] text-ink">
+      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-lg bg-vaeroex-blue text-sm font-bold">V</span>
+          <span className="grid h-10 w-10 place-items-center rounded-lg bg-vaeroex-blue text-sm font-bold shadow-sm shadow-blue-950/30">V</span>
           <span>
-            <span className="block text-sm font-semibold">Vaeroex</span>
-            <span className="block text-xs text-blue-100">Ops System</span>
+            <span className="block text-sm font-semibold tracking-wide">Vaeroex</span>
+            <span className="block text-xs text-blue-100">Executive Ops System</span>
           </span>
         </Link>
 
-        <form action={selectWorkspaceAction} className="mt-7 rounded-lg border border-white/10 bg-white/5 p-3">
-          <p className="text-xs uppercase tracking-wide text-blue-100">Workspace</p>
+        <form action={selectWorkspaceAction} className="mt-7 rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm shadow-black/10">
+          <p className="text-xs uppercase tracking-[0.18em] text-blue-100">Workspace</p>
           <select
             name="workspace_id"
             aria-label="Workspace switcher"
-            className="mt-2 w-full rounded-md border border-white/10 bg-vaeroex-navy px-2 py-2 text-sm text-white"
+            className="mt-2 w-full rounded-md border border-white/10 bg-slate-950 px-2 py-2 text-sm text-white outline-none focus:border-vaeroex-blue"
             defaultValue={activeWorkspace?.id || ""}
           >
             {workspaces.length ? (
@@ -172,49 +141,45 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
             Status: <span className="font-semibold text-white">{accessLabel}</span>
           </p>
           {workspaces.length > 1 ? (
-            <button className="mt-3 w-full rounded-md border border-white/10 px-2 py-1.5 text-xs text-blue-50">
+            <button className="mt-3 w-full rounded-md border border-white/10 px-2 py-1.5 text-xs font-semibold text-blue-50 hover:border-vaeroex-blue hover:bg-vaeroex-blue">
               Switch workspace
             </button>
           ) : null}
         </form>
 
-        <nav className="mt-5 flex flex-1 flex-col gap-2 overflow-auto pr-1">
-          {navSections.map((section) => (
-            <NavSection key={section.label} label={section.label} items={section.items} notificationUnreadCount={notificationUnreadCount} />
-          ))}
-        </nav>
+        <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} />
 
         <form action={signOutAction} className="mt-5">
-          <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm text-blue-50 hover:bg-white/10">
+          <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-blue-50 hover:border-vaeroex-blue hover:bg-white/10">
             Sign out
           </button>
         </form>
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-10 border-b border-line bg-white/95 px-4 py-3 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-4 py-3 text-white shadow-command lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">
                 {activeWorkspace?.name || "Setup required"} · {accessLabel}
               </p>
-              <h1 className="text-lg font-semibold">Vaeroex Ops System</h1>
+              <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Command Center</h1>
             </div>
             <div className="flex items-center gap-3">
               <Link
                 href="/app/agents"
-                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white"
+                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-500"
               >
                 Ask Vaeroex
               </Link>
               <Link
                 href="/app/notifications"
-                className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:border-vaeroex-blue hover:bg-white/15"
               >
                 <span>Notifications</span>
                 <NotificationBadge count={notificationUnreadCount} />
               </Link>
-              <div className="rounded-full border border-line bg-white px-3 py-2 text-sm">
+              <div className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-blue-50">
                 {profile?.full_name || profile?.email || "User"}
               </div>
             </div>
@@ -222,21 +187,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
         </header>
 
         <nav className="border-b border-line bg-white px-4 py-2 lg:hidden">
-          <div className="flex gap-2 overflow-x-auto">
-            {navSections.map((section) => (
-              <details key={section.label} className="shrink-0 rounded-md bg-slate-100 px-3 py-2">
-                <summary className="cursor-pointer list-none whitespace-nowrap text-sm font-semibold text-slate-700">{section.label}</summary>
-                <div className="mt-2 grid gap-1">
-                  {section.items.map((item) => (
-                    <Link key={`${section.label}-${item.label}`} href={item.href as Route} className="flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-2 py-1 text-sm text-slate-700">
-                      <span>{item.label}</span>
-                      {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} /> : null}
-                    </Link>
-                  ))}
-                </div>
-              </details>
-            ))}
-          </div>
+          <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} mobile />
         </nav>
 
         <main className="mx-auto w-full max-w-[1480px] space-y-5 p-4 lg:p-6">
