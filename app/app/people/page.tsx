@@ -6,6 +6,7 @@ import { ManagedRecordList, type ManagedRecordEditField } from "@/components/ope
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
+import { OPERATIONAL_ROLES, TEAM_DEPARTMENTS } from "@/lib/team/options";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type PeoplePageProps = {
@@ -17,8 +18,8 @@ const personEditFields: ManagedRecordEditField[] = [
   { name: "full_name", label: "Full name", required: true },
   { name: "email", label: "Email" },
   { name: "phone", label: "Phone" },
-  { name: "role_title", label: "Role title" },
-  { name: "department", label: "Department" },
+  { name: "role_title", label: "Role", type: "select", options: OPERATIONAL_ROLES },
+  { name: "department", label: "Department", type: "select", options: TEAM_DEPARTMENTS },
   { name: "status", label: "Status", type: "select", options: peopleStatuses },
   { name: "start_date", label: "Start date", type: "date" },
   { name: "notes", label: "Notes", type: "textarea", rows: 4 }
@@ -76,19 +77,19 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       <PageHeader
         eyebrow="People"
         title="People"
-        description="Track team roles, departments, status, contact details, and onboarding notes for operational accountability."
+        description="Add team members so reports, tasks, alerts, and recommendations can be assigned or shared with the right people. These operational roles do not grant app admin access."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
       <section className="space-y-6">
-        <CreateDrawer title="Add person" description="This directory is separate from workspace login permissions." triggerLabel="New Person">
+        <CreateDrawer title="Add person" description="This directory is separate from workspace login permissions. Multiple people can share the same role." triggerLabel="New Person">
           <form action={createPersonAction} className="grid gap-4 lg:grid-cols-2">
             <TextInput label="Full name" name="full_name" required />
             <TextInput label="Email" name="email" type="email" />
             <TextInput label="Phone" name="phone" />
-            <TextInput label="Role title" name="role_title" />
-            <TextInput label="Department" name="department" />
+            <SelectInput label="Role" name="role_title" options={OPERATIONAL_ROLES} />
+            <SelectInput label="Department" name="department" options={TEAM_DEPARTMENTS} />
             <SelectInput label="Status" name="status" defaultValue="active" options={peopleStatuses} />
             <TextInput label="Start date" name="start_date" type="date" />
             <div className="lg:col-span-2">

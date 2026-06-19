@@ -1,4 +1,5 @@
 import { convertIssueToTaskAction, createIssueAction } from "@/app/app/operations/actions";
+import { AssignmentPanel, AssignmentTargetFields, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -23,29 +24,43 @@ const issueEditFields: ManagedRecordEditField[] = [
   { name: "status", label: "Status", type: "select", options: issueStatuses },
   { name: "root_cause", label: "Root cause", type: "textarea", rows: 3 },
   { name: "recommended_fix", label: "Recommended fix", type: "textarea", rows: 3 },
+  { name: "assigned_role", label: "Assigned role" },
+  { name: "assigned_department", label: "Assigned department" },
   { name: "due_date", label: "Due date", type: "date" }
 ];
+
+function ownerLabel(issue: { assigned_person_id?: string | null; assigned_role?: string | null; assigned_department?: string | null; assigned_to?: string | null }, peopleById: Map<string, string>) {
+  if (issue.assigned_person_id) return peopleById.get(issue.assigned_person_id) || "Assigned person";
+  if (issue.assigned_role) return issue.assigned_role;
+  if (issue.assigned_department) return issue.assigned_department;
+  if (issue.assigned_to) return "App user";
+  return "Unassigned";
+}
 
 export default async function IssuesPage({ searchParams }: IssuesPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [{ data: issues, error }, folderResult] = await Promise.all([
+  const [{ data: issues, error }, folderResult, peopleResult] = await Promise.all([
     supabase
       .from("issues")
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
-    getRecordFolders(supabase, workspaceId, "issues")
+    getRecordFolders(supabase, workspaceId, "issues"),
+    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
   ]);
+  const people = (peopleResult.data || []) as TeamPersonOption[];
+  const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
   const managedIssues = (issues || []).map((issue) => {
     const management = managedValues(issue);
+    const owner = ownerLabel(issue, peopleById);
 
     return {
       id: issue.id,
       title: issue.title,
       type: issue.issue_type || "Issue",
       status: issue.status,
-      owner: issue.assigned_to ? "Assigned" : "Unassigned",
+      owner,
       category: issue.severity,
       createdAt: issue.created_at,
       updatedAt: management.updatedAt || issue.updated_at,
@@ -54,6 +69,9 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
       deletedAt: management.deletedAt,
       preview: shortPreview(issue.description, "No description."),
       meta: [
+        { label: "Assigned to", value: owner },
+        { label: "Role", value: issue.assigned_role || "Not set" },
+        { label: "Department", value: issue.assigned_department || "Not set" },
         { label: "Severity", value: issue.severity },
         { label: "Due date", value: issue.due_date || "Not set" },
         { label: "Root cause", value: issue.root_cause || "Not documented" },
@@ -68,6 +86,8 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
         status: issue.status,
         root_cause: issue.root_cause,
         recommended_fix: issue.recommended_fix,
+        assigned_role: issue.assigned_role,
+        assigned_department: issue.assigned_department,
         due_date: issue.due_date
       },
       children: (
@@ -83,6 +103,18 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
             <input type="hidden" name="issue_id" value={issue.id} />
             <ConfirmSubmitButton message="Create a task to resolve this issue?">Create resolution task</ConfirmSubmitButton>
           </form>
+          <AssignmentPanel
+            sourceType="issue"
+            sourceId={issue.id}
+            sourceTitle={issue.title}
+            relatedModule="Issues"
+            returnPath="/app/issues"
+            actionHref="/app/issues"
+            people={people}
+            defaultTitle={`Resolve issue: ${issue.title}`}
+            defaultDescription={issue.recommended_fix || issue.description || ""}
+            defaultRole={issue.assigned_role || "Manager"}
+          />
         </div>
       )
     };
@@ -96,7 +128,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
         description="Log recurring problems, identify root causes, capture recommended fixes, and convert confirmed issues into accountable tasks."
       />
 
-      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
 
       <section className="space-y-6">
         <CreateDrawer title="Log issue" description="Capture enough detail for a manager to choose the next action." triggerLabel="New Issue">
@@ -109,6 +141,10 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
             <TextArea label="Root cause" name="root_cause" rows={3} />
             <TextArea label="Recommended fix" name="recommended_fix" rows={3} />
             <TextInput label="Due date" name="due_date" type="date" />
+            <div className="lg:col-span-2">
+              <p className="mb-2 text-sm font-medium">Assignment</p>
+              <AssignmentTargetFields people={people} defaultRole="Manager" />
+            </div>
             <div className="lg:col-span-2">
               <PrimaryButton>Log issue</PrimaryButton>
             </div>

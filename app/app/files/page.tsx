@@ -9,6 +9,7 @@ import {
   saveExtractedImportAction,
   uploadFileAction
 } from "@/app/app/files/actions";
+import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -476,10 +477,12 @@ function AnalysisSection({ title, items, empty }: { title: string; items: string
 
 function FileAnalysisResult({
   file,
-  latestRun
+  latestRun,
+  people
 }: {
   file: FileUploadRow;
   latestRun?: VaeroexRunRow | null;
+  people: TeamPersonOption[];
 }) {
   const metadataResult = latestAnalysisResult(file);
   const runResult = latestRun?.status === "completed" ? displayAnalysisOutput(latestRun.output_json) : null;
@@ -545,6 +548,17 @@ function FileAnalysisResult({
         <div className="lg:col-span-2">
           <AnalysisSection title="Suggested CRM Records" items={sections.crmRecords} empty="No CRM records were suggested from this file." />
         </div>
+      </div>
+      <div className="mt-4">
+        <ShareRecordPanel
+          sourceType="file_analysis"
+          sourceId={latestRun?.id || file.id}
+          sourceTitle={`${file.display_name} analysis`}
+          relatedModule="Files"
+          returnPath={`/app/files?file=${file.id}`}
+          actionHref={`/app/files?file=${file.id}#analysis-result`}
+          people={people}
+        />
       </div>
     </section>
   );
@@ -1299,12 +1313,14 @@ function FileDetails({
   file,
   imports,
   importRows,
-  latestRun
+  latestRun,
+  people
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   importRows: FileImportDataRow[];
   latestRun?: VaeroexRunRow | null;
+  people: TeamPersonOption[];
 }) {
   const lines = analysisLines(file.analysis_summary);
   const hasCleanAnalysis = Boolean(latestAnalysisResult(file) || latestRun?.status === "completed");
@@ -1314,7 +1330,7 @@ function FileDetails({
 
   return (
     <div className="space-y-5">
-      <FileAnalysisResult file={file} latestRun={latestRun} />
+      <FileAnalysisResult file={file} latestRun={latestRun} people={people} />
       {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
       <ImportHistory imports={imports} />
 
@@ -1341,7 +1357,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
   await ensureDefaultFileFolders(supabase, workspaceId, user?.id);
 
-  const [fileResult, folderResult, importResult, importRowResult, reportResult, analysisRunResult] = await Promise.all([
+  const [fileResult, folderResult, importResult, importRowResult, reportResult, analysisRunResult, peopleResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
@@ -1353,13 +1369,15 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       .eq("workspace_id", workspaceId)
       .eq("agent_type", "file_analysis")
       .order("created_at", { ascending: false })
-      .limit(120)
+      .limit(120),
+    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
   ]);
   const files = (fileResult.data || []) as FileUploadRow[];
   const imports = (importResult.data || []) as FileImportRow[];
   const importRows = (importRowResult.data || []) as FileImportDataRow[];
   const reports = (reportResult.data || []) as ReportRow[];
   const analysisRuns = (analysisRunResult.data || []) as VaeroexRunRow[];
+  const people = (peopleResult.data || []) as TeamPersonOption[];
   const folderOptions = folderResult.folders;
   const importedRows = files.reduce((sum, file) => sum + file.imported_rows, 0);
   const spreadsheetCount = files.filter(isSpreadsheet).length;
@@ -1374,7 +1392,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       importResult.error?.message ||
       importRowResult.error?.message ||
       reportResult.error?.message ||
-      analysisRunResult.error?.message,
+      analysisRunResult.error?.message ||
+      peopleResult.error?.message,
     "Vaeroex could not complete that file action. Please try again."
   );
   const successMessage = cleanNoticeMessage(params?.message, "File action completed.");
@@ -1420,7 +1439,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         import_type: file.import_type,
         analysis_summary: file.analysis_summary
       },
-      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} latestRun={fileAnalysisRuns[0]} />
+      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} latestRun={fileAnalysisRuns[0]} people={people} />
     };
   });
 
@@ -1483,7 +1502,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         {selectedFile ? (
           <div className="space-y-4">
             <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} />
-            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} />
+            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} people={people} />
             <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} />
           </div>
         ) : (

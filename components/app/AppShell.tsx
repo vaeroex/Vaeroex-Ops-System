@@ -11,7 +11,10 @@ import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 const baseNavSections = [
   {
     label: "Home",
-    items: [{ href: "/app", label: "Executive Dashboard" }]
+    items: [
+      { href: "/app", label: "Executive Dashboard" },
+      { href: "/app/notifications", label: "Notifications" }
+    ]
   },
   {
     label: "Operations",
@@ -181,6 +184,12 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
                 className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white"
               >
                 Ask Vaeroex
+              </Link>
+              <Link
+                href="/app/notifications"
+                className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold"
+              >
+                Notifications
               </Link>
               <div className="rounded-full border border-line bg-white px-3 py-2 text-sm">
                 {profile?.full_name || profile?.email || "User"}

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
+import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -429,7 +431,17 @@ function ResultList({ title, items }: { title: string; items: string[] }) {
   );
 }
 
-function RecommendationActionCards({ recommendations }: { recommendations: ReturnType<typeof getActionableRecommendations> }) {
+function RecommendationActionCards({
+  recommendations,
+  runId,
+  runTitle,
+  people
+}: {
+  recommendations: ReturnType<typeof getActionableRecommendations>;
+  runId: string;
+  runTitle: string;
+  people: TeamPersonOption[];
+}) {
   if (!recommendations.length) {
     return null;
   }
@@ -470,15 +482,46 @@ function RecommendationActionCards({ recommendations }: { recommendations: Retur
             <p className="mt-3 text-sm leading-6 text-slate-700">{recommendation.why}</p>
             <div className="mt-4 flex flex-wrap gap-2">
               <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create Task</Link>
-              <Link href="/app/sops" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Create SOP</Link>
-              <Link href="/app/checklists" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Create Checklist</Link>
-              <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Create KPI</Link>
-              <Link href="/app/crm" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">CRM Follow-Up</Link>
               <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
                 Open {recommendation.relatedModule}
               </Link>
               <Link href="/app/reports" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Add to Report</Link>
+              <form action={dismissRecommendationAction}>
+                <input type="hidden" name="return_path" value={`/app/agents?run=${runId}`} />
+                <input type="hidden" name="source_type" value="vaeroex_recommendation" />
+                <input type="hidden" name="source_id" value={runId} />
+                <input type="hidden" name="source_title" value={runTitle} />
+                <input type="hidden" name="assignment_title" value={recommendation.title} />
+                <button className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Dismiss</button>
+              </form>
             </div>
+            <details className="mt-4 rounded-lg border border-line bg-white p-3">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-700">Assign or share this recommendation</summary>
+              <div className="mt-3 grid gap-3">
+                <AssignmentPanel
+                  sourceType="vaeroex_recommendation"
+                  sourceId={runId}
+                  sourceTitle={recommendation.title}
+                  relatedModule={recommendation.relatedModule}
+                  returnPath={`/app/agents?run=${runId}`}
+                  actionHref={`/app/agents?run=${runId}`}
+                  people={people}
+                  defaultTitle={recommendation.title}
+                  defaultDescription={recommendation.why}
+                  defaultRole={recommendation.owner}
+                  compact
+                />
+                <ShareRecordPanel
+                  sourceType="vaeroex_recommendation"
+                  sourceId={runId}
+                  sourceTitle={recommendation.title}
+                  relatedModule={recommendation.relatedModule}
+                  returnPath={`/app/agents?run=${runId}`}
+                  actionHref={`/app/agents?run=${runId}`}
+                  people={people}
+                />
+              </div>
+            </details>
           </article>
         ))}
       </div>
@@ -694,7 +737,7 @@ function ReportDraftSection({ reports }: { reports: ReturnType<typeof getReportD
   );
 }
 
-function BusinessResult({ output }: { output: JsonRecord }) {
+function BusinessResult({ output, runId, runTitle, people }: { output: JsonRecord; runId: string; runTitle: string; people: TeamPersonOption[] }) {
   const visibleOutput = displayOutput(output);
   const sections = businessSections(visibleOutput);
   const tasks = getTaskDrafts(visibleOutput);
@@ -718,7 +761,7 @@ function BusinessResult({ output }: { output: JsonRecord }) {
         <ResultList title="Suggested Systems" items={sections.systems} />
       </div>
 
-      <RecommendationActionCards recommendations={recommendations} />
+      <RecommendationActionCards recommendations={recommendations} runId={runId} runTitle={runTitle} people={people} />
 
       <TaskDraftSection tasks={tasks} />
       <ChecklistDraftSection checklists={checklists} />
@@ -783,19 +826,24 @@ function SelectedResult({
   run,
   output,
   canViewDebug,
-  debugMode
+  debugMode,
+  people
 }: {
   run: { id: string; agent_type: string; status: string; created_at: string; error_message: string | null; output_json: Json };
   output: JsonRecord;
   canViewDebug: boolean;
   debugMode: boolean;
+  people: TeamPersonOption[];
 }) {
+  const display = displayOutput(output);
+  const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
+
   return (
     <SectionCard title="Vaeroex answer" description="Review the draft. Nothing is saved into operations modules until you confirm.">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <h3 className="text-xl font-semibold">{resultTitle(displayOutput(output), vaeroexResultLabel(run.agent_type))}</h3>
+            <h3 className="text-xl font-semibold">{title}</h3>
             <p className="mt-1 text-xs text-muted">
               {vaeroexResultLabel(run.agent_type)} - {new Date(run.created_at).toLocaleString()}
             </p>
@@ -804,7 +852,7 @@ function SelectedResult({
         </div>
 
         {run.error_message ? <ErrorNotice message={run.error_message} /> : null}
-        {run.status === "completed" ? <BusinessResult output={output} /> : null}
+        {run.status === "completed" ? <BusinessResult output={output} runId={run.id} runTitle={title} people={people} /> : null}
 
         {run.status === "completed" ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -868,15 +916,17 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const [{ data: runs, error }, folderResult] = await Promise.all([
+  const [{ data: runs, error }, folderResult, peopleResult] = await Promise.all([
     supabase
       .from("ai_agent_runs")
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(30),
-    getRecordFolders(supabase, workspaceId, "ai_agent_runs")
+    getRecordFolders(supabase, workspaceId, "ai_agent_runs"),
+    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
   ]);
+  const people = (peopleResult.data || []) as TeamPersonOption[];
   const selectedRun = runs?.find((run) => run.id === params?.run) ?? runs?.[0] ?? null;
   const selectedOutput = selectedRun ? asRecord(selectedRun.output_json) : {};
   const workflows = VAEROEX_WORKFLOWS.filter((workflow) => workflow.key !== "ask_vaeroex");
@@ -911,7 +961,12 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         status: run.status,
         error_message: run.error_message
       },
-      children: run.status === "completed" ? <BusinessResult output={display} /> : <ErrorNotice message={run.error_message || "This run has not completed yet."} />
+      children:
+        run.status === "completed" ? (
+          <BusinessResult output={display} runId={run.id} runTitle={resultTitle(display, vaeroexResultLabel(run.agent_type))} people={people} />
+        ) : (
+          <ErrorNotice message={run.error_message || "This run has not completed yet."} />
+        )
     };
   });
 
@@ -923,7 +978,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         description="Ask questions, generate operational drafts, review saved Vaeroex results, and confirm before anything is added to tasks, SOPs, forms, checklists, or reports."
       />
 
-      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
       <SuccessNotice message={params?.saved as string | undefined} />
       <ComplianceNotice />
 
@@ -943,7 +998,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         </SectionCard>
 
         {selectedRun ? (
-          <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
+          <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} people={people} />
         ) : (
           <SectionCard title="Vaeroex answer" description="Your next Vaeroex response will appear here.">
             <EmptyState title="No Vaeroex answer yet" description="Ask Vaeroex a question above or run one of the tools below." />

@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import { createKpiAction } from "@/app/app/operations/actions";
+import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -17,6 +18,8 @@ type KpisPageProps = {
 };
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
+type KpiAlertRuleRow = Database["public"]["Tables"]["kpi_alert_rules"]["Row"];
+type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
 type KpiTrend = {
   name: string;
@@ -752,12 +755,35 @@ function TrendAnalysis({ rows, metricName }: { rows: KpiRow[]; metricName: strin
   );
 }
 
+function AlertRuleList({ rules }: { rules: KpiAlertRuleRow[] }) {
+  if (!rules.length) {
+    return <p className="rounded-lg border border-dashed border-line bg-slate-50 p-3 text-sm text-muted">No KPI alert rules yet.</p>;
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-white p-4">
+      <h4 className="text-sm font-semibold text-ink">Active alert rules</h4>
+      <div className="mt-3 space-y-2">
+        {rules.slice(0, 8).map((rule) => (
+          <div key={rule.id} className="grid gap-2 rounded-lg bg-slate-50 p-3 text-sm md:grid-cols-[1fr_auto_auto]">
+            <span className="font-medium">{rule.kpi_name}</span>
+            <span className="text-muted capitalize">{rule.condition_type.replace(/_/g, " ")}</span>
+            <span className="text-muted">
+              {rule.recipient_scope === "role" ? rule.role : rule.recipient_scope === "department" ? rule.department : rule.recipient_scope}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default async function KpisPage({ searchParams }: KpisPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
   const today = new Date().toISOString().slice(0, 10);
 
-  const [kpiResult, completedTasksResult, openTasksResult, folderResult] = await Promise.all([
+  const [kpiResult, completedTasksResult, openTasksResult, folderResult, peopleResult, alertRulesResult, shareResult] = await Promise.all([
     supabase
       .from("kpis")
       .select("*")
@@ -766,10 +792,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       .order("created_at", { ascending: false }),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "Done"),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
-    getRecordFolders(supabase, workspaceId, "kpis")
+    getRecordFolders(supabase, workspaceId, "kpis"),
+    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
+    supabase.from("kpi_alert_rules").select("*").eq("workspace_id", workspaceId).eq("is_active", true).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false })
   ]);
 
   const kpis = (kpiResult.data || []) as KpiRow[];
+  const people = (peopleResult.data || []) as TeamPersonOption[];
+  const alertRules = (alertRulesResult.data || []) as KpiAlertRuleRow[];
+  const shares = (shareResult.data || []) as ShareRow[];
   const revenue = findLatestMetric(kpis, ["revenue", "sales"]);
   const leads = findLatestMetric(kpis, ["lead"]);
   const conversionRate = findLatestMetric(kpis, ["conversion"]);
@@ -823,6 +855,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const managedKpis = kpis.map((kpi) => {
     const management = managedValues(kpi);
     const tone = metricTone(kpi.actual_value, kpi.target);
+    const kpiShares = shares.filter((share) => share.source_id === kpi.id);
+    const matchingAlertRules = alertRules.filter((rule) => rule.kpi_name === kpi.name);
 
     return {
       id: kpi.id,
@@ -841,7 +875,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         { label: "Date", value: kpi.metric_date },
         { label: "Actual", value: formatNumericValue(kpi.actual_value, kpi.name) },
         { label: "Target", value: kpi.target === null ? "No target" : formatNumericValue(kpi.target, kpi.name) },
-        { label: "Source", value: kpi.source || "Manual" }
+        { label: "Source", value: kpi.source || "Manual" },
+        { label: "Shares", value: kpiShares.length ? `${kpiShares.length} share record${kpiShares.length === 1 ? "" : "s"}` : "Not shared" },
+        { label: "Alert rules", value: matchingAlertRules.length ? matchingAlertRules.length : "None" }
       ],
       editFields: kpiEditFields,
       editValues: {
@@ -855,11 +891,20 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         notes: kpi.notes
       },
       children: (
-        <div className="space-y-2 text-sm leading-6 text-muted">
+        <div className="space-y-4 text-sm leading-6 text-muted">
           <p>{kpi.notes || "No notes."}</p>
           <p>
             <span className="font-semibold text-ink">Current status:</span> {statusLabel(tone)}
           </p>
+          <ShareRecordPanel
+            sourceType="kpi"
+            sourceId={kpi.id}
+            sourceTitle={kpi.name}
+            relatedModule="KPIs"
+            returnPath="/app/kpis"
+            actionHref="/app/kpis"
+            people={people}
+          />
         </div>
       )
     };
@@ -884,7 +929,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       />
 
       <ErrorNotice
-        message={params?.error || kpiResult.error?.message || completedTasksResult.error?.message || openTasksResult.error?.message || folderResult.error?.message}
+        message={
+          params?.error ||
+          kpiResult.error?.message ||
+          completedTasksResult.error?.message ||
+          openTasksResult.error?.message ||
+          folderResult.error?.message ||
+          peopleResult.error?.message ||
+          alertRulesResult.error?.message ||
+          shareResult.error?.message
+        }
       />
       <SuccessNotice message={params?.message} />
 
@@ -892,6 +946,11 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         {metricCards.map((card) => (
           <MetricCard key={card.label} {...card} />
         ))}
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
+        <KpiAlertRulePanel kpiNames={metricNames} people={people} />
+        <AlertRuleList rules={alertRules} />
       </section>
 
       <SectionCard title="Trend analysis" description="Select one or more KPIs to review movement, target performance, and comparison notes.">

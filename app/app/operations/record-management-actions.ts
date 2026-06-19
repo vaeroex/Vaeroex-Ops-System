@@ -83,6 +83,10 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
     fields: [
       { name: "status", kind: "select", maxLength: 80 },
       { name: "completed_at", kind: "date" },
+      { name: "due_date", kind: "date" },
+      { name: "priority", kind: "select", maxLength: 40 },
+      { name: "assigned_role", kind: "text", maxLength: 120 },
+      { name: "assigned_department", kind: "text", maxLength: 140 },
       { name: "notes", kind: "textarea", maxLength: 1000 },
       { name: "responses_json", kind: "lines", maxLength: 6000 }
     ]
@@ -97,6 +101,8 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "status", kind: "select", maxLength: 80 },
       { name: "priority", kind: "select", maxLength: 80 },
       { name: "category", kind: "text", maxLength: 120 },
+      { name: "assigned_role", kind: "text", maxLength: 120 },
+      { name: "assigned_department", kind: "text", maxLength: 140 },
       { name: "due_date", kind: "date" }
     ]
   },
@@ -112,6 +118,8 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "status", kind: "select", maxLength: 80 },
       { name: "root_cause", kind: "textarea", maxLength: 2000 },
       { name: "recommended_fix", kind: "textarea", maxLength: 2000 },
+      { name: "assigned_role", kind: "text", maxLength: 120 },
+      { name: "assigned_department", kind: "text", maxLength: 140 },
       { name: "due_date", kind: "date" }
     ]
   },

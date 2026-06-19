@@ -299,6 +299,11 @@ export async function runChecklistAction(formData: FormData) {
     workspace_id: workspaceId,
     checklist_id: checklistId,
     assigned_to: user.id,
+    assigned_person_id: text(formData, "person_id") || null,
+    assigned_role: text(formData, "role") || null,
+    assigned_department: text(formData, "department") || null,
+    due_date: text(formData, "due_date") || null,
+    priority: text(formData, "priority") || "Medium",
     status,
     responses_json: lines(text(formData, "responses")) as Json,
     notes: text(formData, "notes"),
@@ -329,6 +334,9 @@ export async function createTaskAction(formData: FormData) {
     status: text(formData, "status") || "To Do",
     priority: text(formData, "priority") || "Medium",
     category: text(formData, "category"),
+    assigned_person_id: text(formData, "person_id") || null,
+    assigned_role: text(formData, "role") || null,
+    assigned_department: text(formData, "department") || null,
     due_date: text(formData, "due_date") || null,
     created_by: user.id
   });
@@ -557,6 +565,9 @@ export async function createIssueAction(formData: FormData) {
     status: text(formData, "status") || "Open",
     root_cause: text(formData, "root_cause"),
     recommended_fix: text(formData, "recommended_fix"),
+    assigned_person_id: text(formData, "person_id") || null,
+    assigned_role: text(formData, "role") || null,
+    assigned_department: text(formData, "department") || null,
     due_date: text(formData, "due_date") || null,
     created_by: user.id
   });
@@ -592,6 +603,10 @@ export async function convertIssueToTaskAction(formData: FormData) {
     status: "To Do",
     priority: issue.severity === "High" ? "High" : issue.severity === "Urgent" ? "Urgent" : "Medium",
     category: "Issue resolution",
+    assigned_person_id: issue.assigned_person_id,
+    assigned_role: issue.assigned_role,
+    assigned_department: issue.assigned_department,
+    due_date: issue.due_date,
     related_type: "issue",
     related_id: issue.id,
     created_by: user.id

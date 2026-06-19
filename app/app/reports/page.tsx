@@ -1,6 +1,7 @@
 import type { Route } from "next";
 import type { ReactNode } from "react";
 import { generateReportAction } from "@/app/app/reports/actions";
+import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextInput } from "@/components/operations/FormControls";
@@ -32,6 +33,7 @@ type ReportsPageProps = {
   }>;
 };
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
+type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
@@ -227,6 +229,38 @@ function uniqueOptions(values: Array<string | null | undefined>) {
   return Array.from(new Set(values.map((value) => str(value)).filter(Boolean))).sort((a, b) => a.localeCompare(b));
 }
 
+function shareRecipient(share: ShareRow, peopleById: Map<string, string>) {
+  if (share.share_scope === "person") return peopleById.get(share.person_id || "") || "Person";
+  if (share.share_scope === "role") return share.role || "Role";
+  if (share.share_scope === "department") return share.department || "Department";
+  return "Entire workspace";
+}
+
+function scheduleLabel(value: string) {
+  return value.replace(/_/g, " ");
+}
+
+function ShareHistory({ shares, peopleById }: { shares: ShareRow[]; peopleById: Map<string, string> }) {
+  if (!shares.length) {
+    return <p className="rounded-lg border border-dashed border-line bg-slate-50 p-3 text-sm text-muted">This report has not been shared yet.</p>;
+  }
+
+  return (
+    <div className="rounded-lg border border-line bg-white p-4">
+      <h4 className="text-sm font-semibold text-ink">Distribution history</h4>
+      <div className="mt-3 space-y-2">
+        {shares.map((share) => (
+          <div key={share.id} className="grid gap-2 rounded-lg bg-slate-50 p-3 text-sm md:grid-cols-[1fr_auto_auto]">
+            <span className="font-medium">{shareRecipient(share, peopleById)}</span>
+            <span className="text-muted capitalize">{scheduleLabel(share.distribution_schedule)}</span>
+            <span className="text-muted">{share.last_shared_at ? new Date(share.last_shared_at).toLocaleDateString() : "Not sent"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const params = await searchParams;
   const { supabase, context, workspaceId } = await requireWorkspacePage();
@@ -265,7 +299,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     issueCategories,
     checklistCategories,
     sopCategories,
-    folderResult
+    folderResult,
+    peopleResult,
+    shareResult
   ] = await Promise.all([
     reportQuery,
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
@@ -282,8 +318,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     supabase.from("issues").select("issue_type").eq("workspace_id", workspaceId),
     supabase.from("checklists").select("category").eq("workspace_id", workspaceId),
     supabase.from("sops").select("category").eq("workspace_id", workspaceId),
-    getRecordFolders(supabase, workspaceId, "reports")
+    getRecordFolders(supabase, workspaceId, "reports"),
+    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
+    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "report").is("deleted_at", null).order("created_at", { ascending: false })
   ]);
+  const people = (peopleResult.data || []) as TeamPersonOption[];
+  const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
+  const shares = (shareResult.data || []) as ShareRow[];
 
   const dynamicCategories = uniqueOptions([
     ...(taskCategories.data || []).map((row) => row.category),
@@ -295,6 +336,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const reports = ((rawReports || []) as ReportRow[]).filter((report) => reportMatchesCategory(report, filterCategory));
   const managedReports = reports.map((report) => {
     const management = managedValues(report);
+    const reportShares = shares.filter((share) => share.source_id === report.id);
 
     return {
       id: report.id,
@@ -314,7 +356,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         { label: "Completed tasks", value: numberFromSource(report.source_data_json, "completed_tasks") },
         { label: "Checklist completions", value: numberFromSource(report.source_data_json, "checklist_completions") },
         { label: "Open issues", value: numberFromSource(report.source_data_json, "open_issues") },
-        { label: "Overdue tasks", value: numberFromSource(report.source_data_json, "overdue_tasks") }
+        { label: "Overdue tasks", value: numberFromSource(report.source_data_json, "overdue_tasks") },
+        { label: "Shared with", value: reportShares.length ? `${reportShares.length} recipient record${reportShares.length === 1 ? "" : "s"}` : "Not shared" }
       ],
       editFields: reportEditFields,
       editValues: {
@@ -333,6 +376,27 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             body={report.body_markdown || ""}
           />
           <ReportBody body={report.body_markdown} />
+          <ShareRecordPanel
+            sourceType="report"
+            sourceId={report.id}
+            sourceTitle={report.title}
+            relatedModule="Reports"
+            returnPath="/app/reports"
+            actionHref="/app/reports"
+            people={people}
+          />
+          <AssignmentPanel
+            sourceType="report"
+            sourceId={report.id}
+            sourceTitle={report.title}
+            relatedModule="Reports"
+            defaultTitle={`Follow up: ${report.title}`}
+            defaultRole="Manager"
+            returnPath="/app/reports"
+            actionHref="/app/reports"
+            people={people}
+          />
+          <ShareHistory shares={reportShares} peopleById={peopleById} />
           <AdminDebugData enabled={canViewDebug && debugMode} value={report.source_data_json} />
         </div>
       )
@@ -360,7 +424,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         ]}
       />
 
-      <ErrorNotice message={params?.error || error?.message || folderResult.error?.message} />
+      <ErrorNotice message={params?.error || error?.message || folderResult.error?.message || peopleResult.error?.message || shareResult.error?.message} />
       <SuccessNotice message={params?.message} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
