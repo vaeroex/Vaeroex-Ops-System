@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -704,10 +705,6 @@ function SmartAlerts({ alerts }: { alerts: DashboardAlert[] }) {
   );
 }
 
-function isDemoWorkspace(workspace: Database["public"]["Tables"]["workspaces"]["Row"] | null) {
-  return Boolean(workspace && (workspace.subscription_status === "demo" || workspace.name === "Vaeroex Demo Workspace"));
-}
-
 function DemoActionButton({ children, tone = "secondary" }: { children: ReactNode; tone?: "primary" | "secondary" | "danger" }) {
   const className =
     tone === "primary"
@@ -790,11 +787,21 @@ function DemoWorkspaceBanner({
     reports: number;
     sops: number;
     files: number;
+    fileAnalyses: number;
+    assets: number;
+    checklists: number;
     alerts: number;
     insights: number;
   };
   canUseAdminTools: boolean;
 }) {
+  const summaryItems = [
+    ["Demo KPIs", counts.kpis],
+    ["Demo Leads", counts.crm],
+    ["Demo Tasks", counts.tasks],
+    ["Demo Reports", counts.reports],
+    ["Demo Issues", counts.issues]
+  ];
   const countItems = [
     ["KPIs", counts.kpis],
     ["CRM leads", counts.crm],
@@ -803,16 +810,19 @@ function DemoWorkspaceBanner({
     ["Reports", counts.reports],
     ["SOPs", counts.sops],
     ["Files", counts.files],
+    ["File analyses", counts.fileAnalyses],
+    ["Assets", counts.assets],
+    ["Checklists", counts.checklists],
     ["Alerts", counts.alerts],
     ["Vaeroex insights", counts.insights]
   ];
 
   return (
-    <section className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-blue-950 shadow-panel">
+    <section className="rounded-lg border-2 border-blue-300 bg-blue-50 p-5 text-blue-950 shadow-panel">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wide">Demo Workspace</p>
-          <h2 className="mt-2 text-xl font-semibold">You are viewing sample business data.</h2>
+          <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
+          <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
             This workspace is safe for testing. It includes demo KPIs, CRM records, tasks, issues, reports, SOPs, files, alerts, and Vaeroex insights.
           </p>
@@ -828,7 +838,18 @@ function DemoWorkspaceBanner({
           </form>
         </div>
       </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-9">
+      <div className="mt-5 rounded-lg border border-blue-200 bg-white/80 p-4">
+        <p className="text-sm font-semibold">Demo Dashboard Summary</p>
+        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          {summaryItems.map(([label, value]) => (
+            <div key={label} className="rounded-lg bg-blue-50 p-3">
+              <p className="text-2xl font-semibold">{value}</p>
+              <p className="mt-1 text-xs leading-4">{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
         {countItems.map(([label, value]) => (
           <div key={label} className="rounded-lg bg-white/80 p-3">
             <p className="text-lg font-semibold">{value}</p>
@@ -851,8 +872,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const canUseAdminOnboardingTools = isVaeroexAdminUser(user);
   const adminDetectionSource = isVaeroexAdminEmail(user?.email) ? "VAEROEX_ADMIN_EMAILS" : "Supabase user metadata";
   const currentWorkspaceStatus = workspaceStatusLabel(context.activeWorkspace);
-  const isViewingDemoWorkspace = isDemoWorkspace(context.activeWorkspace);
-  const demoWorkspace = context.workspaces.find(isDemoWorkspace) ?? null;
+  const isViewingDemoWorkspace = isDemoWorkspaceRecord(context.activeWorkspace);
+  const demoWorkspace = context.workspaces.find(isDemoWorkspaceRecord) ?? null;
+
+  if (isViewingDemoWorkspace && user) {
+    await ensureDemoWorkspacePopulated(supabase, workspaceId, user);
+  }
 
   const [
     kpiResult,
@@ -918,6 +943,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     vaeroexRunResult.error,
     metricResult.error
   ].filter(Boolean);
+  const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
   const names = metricNames(kpis);
   const revenueMetric = latestMetric(kpis, ["revenue", "sales"])?.name || names.find((name) => lower(name).includes("revenue")) || "Revenue";
@@ -1007,15 +1033,18 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     checklistsWithoutRecentRuns
   });
   const demoCounts = {
-    kpis: kpis.length,
-    crm: crmLeads.length,
-    tasks: openTasks.length,
-    issues: openIssues.length,
-    reports: reports.length,
-    sops: sops.length,
-    files: files.length,
+    kpis: demoWorkspaceCounts?.kpis ?? kpis.length,
+    crm: demoWorkspaceCounts?.crmLeads ?? crmLeads.length,
+    tasks: demoWorkspaceCounts?.tasks ?? openTasks.length,
+    issues: demoWorkspaceCounts?.issues ?? openIssues.length,
+    reports: demoWorkspaceCounts?.reports ?? reports.length,
+    sops: demoWorkspaceCounts?.sops ?? sops.length,
+    files: demoWorkspaceCounts?.files ?? files.length,
+    fileAnalyses: demoWorkspaceCounts?.fileAnalyses ?? fileAnalyses.length,
+    assets: demoWorkspaceCounts?.assets ?? 0,
+    checklists: demoWorkspaceCounts?.checklists ?? checklists.length,
     alerts: smartAlerts.length,
-    insights: vaeroexRuns.filter((run) => run.status === "completed").length
+    insights: demoWorkspaceCounts?.vaeroexInsights ?? vaeroexRuns.filter((run) => run.status === "completed").length
   };
   const onboardingItems: OnboardingChecklistItem[] = [
     {

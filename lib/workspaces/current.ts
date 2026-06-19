@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
@@ -14,6 +15,8 @@ export type WorkspaceContext = {
 
 export async function getWorkspaceContext(preferredWorkspaceId?: string | null): Promise<WorkspaceContext> {
   const supabase = await createSupabaseServerClient();
+  const effectivePreferredWorkspaceId =
+    preferredWorkspaceId === undefined ? (await cookies()).get("vaeroex_workspace_id")?.value ?? null : preferredWorkspaceId;
 
   if (!supabase) {
     return {
@@ -52,10 +55,10 @@ export async function getWorkspaceContext(preferredWorkspaceId?: string | null):
     .map((row) => (Array.isArray(row.workspaces) ? row.workspaces[0] : row.workspaces))
     .filter((workspace): workspace is Workspace => Boolean(workspace));
   const activeWorkspace =
-    workspaces.find((workspace) => workspace.id === preferredWorkspaceId) ?? workspaces[0] ?? null;
+    workspaces.find((workspace) => workspace.id === effectivePreferredWorkspaceId) ?? workspaces[0] ?? null;
   const membership =
     rows.find((row) => row.workspace_id === activeWorkspace?.id) ??
-    rows.find((row) => row.workspace_id === preferredWorkspaceId) ??
+    rows.find((row) => row.workspace_id === effectivePreferredWorkspaceId) ??
     null;
 
   return {

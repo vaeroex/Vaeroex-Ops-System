@@ -133,7 +133,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
             {workspaces.length ? (
               workspaces.map((workspace) => (
                 <option key={workspace.id} value={workspace.id}>
-                  {workspace.name}
+                  {workspace.name}{workspace.subscription_status === "demo" ? " (Demo)" : ""}
                 </option>
               ))
             ) : (
