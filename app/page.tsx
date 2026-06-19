@@ -19,10 +19,10 @@ export default function HomePage() {
             <span>Vaeroex Ops System</span>
           </Link>
           <div className="flex items-center gap-2">
-            <Link href="/login" className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">
+            <Link href="/login" className="rounded-lg border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">
               Log in
             </Link>
-            <Link href="/signup" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">
+            <Link href="/signup" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Create account
             </Link>
           </div>
@@ -39,10 +39,10 @@ export default function HomePage() {
             Vaeroex Ops System brings KPIs, tasks, issues, CRM, files, SOPs, reports, and Vaeroex recommendations into a modern operations headquarters for businesses with 3-50 employees.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link href="/signup" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 hover:bg-blue-700">
+            <Link href="/signup" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-900/20 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Start with Vaeroex
             </Link>
-            <Link href="/login" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
+            <Link href="/login" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-accent hover:text-vaeroex-blue">
               Log in
             </Link>
           </div>
@@ -56,7 +56,7 @@ export default function HomePage() {
           <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
             <div>
               <p className="text-sm font-semibold">Command center preview</p>
-              <p className="mt-1 text-xs text-blue-100">Business health and accountability</p>
+              <p className="mt-1 text-xs text-vaeroex-silver">Business health and accountability</p>
             </div>
             <span className="rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-semibold text-emerald-100">Ready</span>
           </div>
@@ -67,14 +67,14 @@ export default function HomePage() {
               ["Focus", "Sales"]
             ].map(([label, value]) => (
               <div key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-3">
-                <p className="text-xs text-blue-100">{label}</p>
+                <p className="text-xs text-vaeroex-silver">{label}</p>
                 <p className="mt-2 text-2xl font-semibold">{value}</p>
               </div>
             ))}
           </div>
           <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.06] p-4">
             <p className="text-sm font-semibold">Latest Vaeroex recommendation</p>
-            <p className="mt-2 text-sm leading-6 text-blue-100">
+            <p className="mt-2 text-sm leading-6 text-slate-100">
               Turn repeat follow-up misses into a checklist, owner review, and weekly report before they become customer issues.
             </p>
           </div>

@@ -45,7 +45,7 @@ export function AnalysisProgressSubmit({
         {pending ? pendingLabel : children}
       </button>
       {pending ? (
-        <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-3">
+        <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Analysis progress</p>
           <ol className="mt-3 grid gap-2 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
             {steps.map((step, index) => (

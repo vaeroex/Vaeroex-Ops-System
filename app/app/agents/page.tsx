@@ -417,8 +417,8 @@ function SaveButtons({ runId, workflowKey, output }: { runId: string; workflowKe
 
 function ResultList({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="rounded-lg border border-line bg-white p-4">
-      <h4 className="text-sm font-semibold">{title}</h4>
+    <div className="rounded-lg border border-vaeroex-silver bg-white p-4 shadow-sm">
+      <h4 className="text-sm font-semibold text-vaeroex-navy">{title}</h4>
       <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
         {items.map((item) => (
           <li key={item} className="flex gap-2">
@@ -750,8 +750,8 @@ function BusinessResult({ output, runId, runTitle, people }: { output: JsonRecor
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-blue-100 bg-vaeroex-soft p-4">
-        <p className="text-sm font-semibold text-vaeroex-navy">Executive Summary</p>
+      <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Executive Summary</p>
         <p className="mt-2 text-sm leading-6 text-vaeroex-navy">{sections.executiveSummary}</p>
       </div>
 
@@ -839,7 +839,7 @@ function SelectedResult({
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
 
   return (
-    <SectionCard title="Vaeroex answer" description="Review the draft. Nothing is saved into operations modules until you confirm.">
+    <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into operations modules until you confirm.">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -890,9 +890,9 @@ function WorkflowCard({ workflowKey }: { workflowKey: string }) {
   const workflow = getVaeroexWorkflow(workflowKey);
 
   return (
-    <article className="rounded-lg border border-line bg-white p-4">
+    <article className="rounded-lg border border-vaeroex-silver bg-white p-4 shadow-sm hover:border-vaeroex-accent">
       <div>
-        <h3 className="font-semibold">{workflow.title}</h3>
+        <h3 className="font-semibold text-vaeroex-navy">{workflow.title}</h3>
         <p className="mt-2 text-sm leading-6 text-muted">{workflow.description}</p>
       </div>
       <form action={runVaeroexAction} className="mt-4 space-y-3">
@@ -975,16 +975,36 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
     <div className="space-y-6">
       <PageHeader
         eyebrow="Ask Vaeroex"
-        title="Vaeroex Hub"
-        description="Ask questions, generate operational drafts, review saved Vaeroex results, and confirm before anything is added to tasks, SOPs, forms, checklists, or reports."
+        title="Your Executive Operations Advisor"
+        description="Ask Vaeroex for business health analysis, risks, focus priorities, action plans, and boardroom-ready recommendations before saving anything into operations records."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
       <SuccessNotice message={params?.saved as string | undefined} />
       <ComplianceNotice />
 
+      <section className="rounded-lg border border-vaeroex-navy bg-vaeroex-navy p-5 text-white shadow-command">
+        <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-end">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-silver">Executive Intelligence</p>
+            <h2 className="mt-3 text-3xl font-semibold">Ask Vaeroex what deserves leadership attention.</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-100">
+              Vaeroex reviews the active workspace and returns consulting-style recommendations tied to priorities, risks, accountability, and next actions.
+            </p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-3">
+            {["Focus priorities", "Risk summary", "Action plan"].map((item) => (
+              <div key={item} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">{item}</p>
+                <p className="mt-2 text-sm text-slate-100">Prepared from workspace context</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="space-y-6">
-        <SectionCard title="Ask Vaeroex" description="Use chat for a general operations question. The run is saved for review.">
+        <SectionCard title="Ask Vaeroex for an executive recommendation" description="Use this for a direct operations question. The response is saved for review and shown as a clean business recommendation.">
           <div className="mb-4 flex flex-wrap gap-2">
             {[
               "If I were the CEO, what would I do?",
@@ -996,7 +1016,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
               <Link
                 key={prompt}
                 href={`/app/agents?prompt=${encodeURIComponent(prompt)}` as Route}
-                className="rounded-full border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
+                className="rounded-full border border-vaeroex-silver bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent hover:text-vaeroex-blue"
               >
                 {prompt}
               </Link>

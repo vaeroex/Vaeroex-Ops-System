@@ -75,10 +75,10 @@ function TabLink({ label, value, active, count }: { label: string; value: Notifi
     <Link
       href={viewHref(value)}
       className={`rounded-lg px-3 py-2 text-sm font-semibold ${
-        active ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50 text-slate-700 hover:border-vaeroex-blue"
+        active ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50 text-slate-700 hover:border-vaeroex-accent"
       }`}
     >
-      {label} <span className={active ? "text-blue-100" : "text-muted"}>{count}</span>
+      {label} <span className={active ? "text-vaeroex-silver" : "text-muted"}>{count}</span>
     </Link>
   );
 }
@@ -94,8 +94,8 @@ function NotificationCard({ notification, returnPath }: { notification: Notifica
       <input type="hidden" name="action_href" value={safeActionHref(notification.action_href)} />
       <button
         type="submit"
-        className={`block w-full rounded-lg border p-4 text-left shadow-panel transition hover:border-vaeroex-blue hover:bg-blue-50/50 ${
-          isUnread ? "border-blue-200 bg-blue-50/70" : isArchived ? "border-slate-200 bg-slate-50" : "border-line bg-white"
+        className={`block w-full rounded-lg border p-4 text-left shadow-panel transition hover:border-vaeroex-accent hover:bg-vaeroex-soft ${
+          isUnread ? "border-vaeroex-accent/50 bg-vaeroex-soft" : isArchived ? "border-slate-200 bg-slate-50" : "border-line bg-white"
         }`}
         aria-label={`Open notification: ${notification.title}`}
       >

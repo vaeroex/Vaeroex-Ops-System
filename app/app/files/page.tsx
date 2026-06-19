@@ -514,8 +514,8 @@ function FileAnalysisResult({
   }
 
   return (
-    <section id="analysis-result" className="rounded-lg border border-blue-100 bg-white p-4 shadow-panel">
-      <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+    <section id="analysis-result" className="rounded-lg border border-vaeroex-accent/40 bg-white p-4 shadow-panel">
+      <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Latest Vaeroex analysis</p>
@@ -582,7 +582,7 @@ function ActionButton({
   const classes =
     tone === "primary"
       ? "rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50";
+      : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent disabled:cursor-not-allowed disabled:opacity-50";
 
   return <PendingSubmitButton disabled={disabled} className={classes} pendingLabel={pendingLabel}>{children}</PendingSubmitButton>;
 }
@@ -599,7 +599,7 @@ function ProgressActionButton({
   const className =
     tone === "primary"
       ? "rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-      : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50";
+      : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
     <AnalysisProgressSubmit className={className} pendingLabel={pendingLabel} steps={ANALYSIS_PROGRESS_STEPS}>
@@ -617,7 +617,7 @@ function CompactActionButton({
 }) {
   return (
     <PendingSubmitButton
-      className="rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent disabled:cursor-not-allowed disabled:opacity-50"
       pendingLabel={pendingLabel}
     >
       {children}
@@ -634,7 +634,7 @@ function CompactProgressActionButton({
 }) {
   return (
     <AnalysisProgressSubmit
-      className="rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent disabled:cursor-not-allowed disabled:opacity-50"
       pendingLabel={pendingLabel}
       steps={ANALYSIS_PROGRESS_STEPS}
     >
@@ -727,7 +727,7 @@ function FileActionCenter({
         <Link href={`/app/files?file=${file.id}`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
           Select {file.display_name}
         </Link>
-        <Link href={`/app/files?file=${file.id}#analysis-result`} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+        <Link href={`/app/files?file=${file.id}#analysis-result`} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
           View latest analysis
         </Link>
       </>
@@ -736,7 +736,7 @@ function FileActionCenter({
 
   return (
     <div id={`file-${file.id}-actions`} className="space-y-5">
-      <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+      <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
@@ -777,7 +777,7 @@ function FileActionCenter({
                     key={prompt}
                     name="suggested_prompt"
                     value={prompt}
-                    className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue"
+                    className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent"
                   >
                     {prompt}
                   </button>
@@ -967,7 +967,7 @@ function SelectedFileBanner({
   const latestDate = latestAnalysisAt(file) || analysisRuns[0]?.created_at || null;
 
   return (
-    <div className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+    <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
       <div className="flex flex-col gap-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div>
@@ -981,19 +981,19 @@ function SelectedFileBanner({
             <Link href="#file-analysis-form" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               Analyze with Vaeroex
             </Link>
-            <Link href="#file-import-actions" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+            <Link href="#file-import-actions" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               Import data
             </Link>
-            <Link href="#file-report-actions" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+            <Link href="#file-report-actions" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               Create report
             </Link>
-            <Link href="#analysis-history" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+            <Link href="#analysis-history" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               View analysis history
             </Link>
-            <Link href="#file-details" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+            <Link href="#file-details" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               View file details
             </Link>
-            <Link href="/app/files" className="rounded-lg border border-line bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 hover:border-vaeroex-blue">
+            <Link href="/app/files" className="rounded-lg border border-line bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               Change Selection
             </Link>
           </div>
@@ -1253,11 +1253,11 @@ function AnalysisHistory({
                   </form>
                 </>
               ) : null}
-              <Link href={`/app/agents?run=${run.id}` as Route} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue">
+              <Link href={`/app/agents?run=${run.id}` as Route} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
                 Create tasks
               </Link>
               {hasKpis ? (
-                <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-blue">
+                <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
                   Create KPIs
                 </Link>
               ) : null}
@@ -1335,7 +1335,7 @@ function FileDetails({
       <ImportHistory imports={imports} />
 
       {lines.length && !hasCleanAnalysis ? (
-        <section className="rounded-lg border border-blue-100 bg-blue-50/60 p-4">
+        <section className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
           <h4 className="text-sm font-semibold text-ink">Latest Vaeroex analysis</h4>
           <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
             {lines.map((line) => (
@@ -1460,7 +1460,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         ]}
       />
 
-      <section className="rounded-lg border border-blue-100 bg-blue-50/70 p-4">
+      <section className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">File workflow</p>
         <ol className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-3 xl:grid-cols-6">
           {["Upload file", "Select file", "Analyze or import", "Review results", "Create report/KPI/task", "Dashboard updates"].map((step, index) => (

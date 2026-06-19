@@ -9,18 +9,21 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        ink: "#0f172a",
-        line: "#d7e0ec",
-        muted: "#334155",
+        ink: "#0B1F4D",
+        line: "#D1D5DB",
+        muted: "#9CA3AF",
         vaeroex: {
-          blue: "#2563eb",
-          navy: "#0f172a",
-          soft: "#eaf2ff"
+          blue: "#1E6BFF",
+          accent: "#38BDF8",
+          navy: "#0B1F4D",
+          silver: "#D1D5DB",
+          "dark-silver": "#9CA3AF",
+          soft: "#EAF4FF"
         }
       },
       boxShadow: {
-        panel: "0 16px 42px rgba(15, 23, 42, 0.08)",
-        command: "0 22px 70px rgba(15, 23, 42, 0.16)"
+        panel: "0 16px 42px rgba(11, 31, 77, 0.08)",
+        command: "0 22px 70px rgba(11, 31, 77, 0.18)"
       }
     }
   },

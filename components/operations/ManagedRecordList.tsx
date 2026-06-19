@@ -478,7 +478,7 @@ function RecordActionsMenu({
   return (
     <details className="relative">
       <summary
-        className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-lg font-semibold text-slate-600 hover:border-vaeroex-blue"
+        className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-lg font-semibold text-slate-600 hover:border-vaeroex-accent"
         aria-label={`Actions for ${record.title}`}
       >
         ...
@@ -756,7 +756,7 @@ export function ManagedRecordList({
                   return (
                     <article
                       key={record.id}
-                      className={`px-3 py-2 transition ${isActive ? "bg-blue-50/80 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/70"}`}
+                      className={`px-3 py-2 transition ${isActive ? "bg-vaeroex-soft ring-1 ring-inset ring-vaeroex-accent/50" : "hover:bg-slate-50/70"}`}
                       aria-current={isActive ? "true" : undefined}
                     >
                       <div className="grid gap-3 lg:grid-cols-[32px_minmax(220px,1.5fr)_110px_110px_110px_120px_44px] lg:items-center">

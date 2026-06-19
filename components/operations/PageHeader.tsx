@@ -9,7 +9,7 @@ type PageHeaderProps = {
 
 export function PageHeader({ eyebrow, title, description, actions }: PageHeaderProps) {
   return (
-    <section className="rounded-lg border border-line/80 bg-white/95 p-5 shadow-panel">
+    <section className="rounded-lg border border-vaeroex-silver/80 bg-white p-5 shadow-panel">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">{eyebrow}</p>
