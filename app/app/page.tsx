@@ -952,7 +952,14 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),
-    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
+    supabase
+      .from("notifications")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(30),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100)
@@ -1215,8 +1222,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     const status = lower(assignment.status);
     return !assignment.archived_at && status !== "done" && status !== "dismissed" && status !== "complete";
   });
-  const unreadNotifications = notifications.filter((notification) => !notification.read_at);
-  const kpiAlertNotifications = notifications.filter((notification) => notification.type === "kpi_alert");
+  const attentionNotifications = [...notifications].sort((a, b) => {
+    const readSort = Number(Boolean(a.read_at)) - Number(Boolean(b.read_at));
+    return readSort || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
+  const unreadNotifications = attentionNotifications.filter((notification) => !notification.read_at);
+  const kpiAlertNotifications = attentionNotifications.filter((notification) => notification.type === "kpi_alert");
   const recentReportShares = shares.filter((share) => share.source_type === "report").slice(0, 5);
   const dueSoonAssignments = activeAssignments
     .filter((assignment) => assignment.due_date && assignment.due_date >= todayDate && assignment.due_date <= dueWindowEndDate)
@@ -1334,6 +1345,25 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               Shared reports
             </Link>
+          </div>
+          <div className="mt-5">
+            <h3 className="text-sm font-semibold text-ink">Needs attention</h3>
+            <SimpleList
+              items={unreadNotifications.slice(0, 5)}
+              empty="No unread notifications need attention."
+              render={(notification: NotificationRow) => (
+                <Link
+                  key={notification.id}
+                  href="/app/notifications"
+                  className="block rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-sm hover:border-vaeroex-blue"
+                >
+                  <span className="font-semibold text-ink">{notification.title}</span>
+                  <span className="mt-1 block text-xs text-muted">
+                    {notification.priority} · {notification.related_module || notification.type} · {new Date(notification.created_at).toLocaleDateString()}
+                  </span>
+                </Link>
+              )}
+            />
           </div>
         </SectionCard>
 

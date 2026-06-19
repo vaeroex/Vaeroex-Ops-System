@@ -78,9 +78,30 @@ type AppShellProps = {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
   membership: WorkspaceMember | null;
+  notificationUnreadCount?: number;
 };
 
-function NavSection({ label, items }: { label: string; items: Array<{ href: string; label: string }> }) {
+function NotificationBadge({ count, light = false }: { count: number; light?: boolean }) {
+  if (!count) {
+    return null;
+  }
+
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${light ? "bg-white text-vaeroex-blue" : "bg-vaeroex-blue text-white"}`}>
+      {count > 99 ? "99+" : count}
+    </span>
+  );
+}
+
+function NavSection({
+  label,
+  items,
+  notificationUnreadCount
+}: {
+  label: string;
+  items: Array<{ href: string; label: string }>;
+  notificationUnreadCount: number;
+}) {
   return (
     <details open className="group rounded-lg border border-white/10 bg-white/[0.03]">
       <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wide text-blue-100">
@@ -92,9 +113,10 @@ function NavSection({ label, items }: { label: string; items: Array<{ href: stri
           <Link
             key={`${item.href}-${item.label}`}
             href={item.href as Route}
-            className="mx-2 block rounded-md px-3 py-2 text-sm text-blue-50 hover:bg-white/10"
+            className="mx-2 flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm text-blue-50 hover:bg-white/10"
           >
-            {item.label}
+            <span>{item.label}</span>
+            {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} light /> : null}
           </Link>
         ))}
       </div>
@@ -110,7 +132,7 @@ function workspaceAccessLabel(workspace: Workspace | null) {
   return "Subscription required";
 }
 
-export function AppShell({ children, profile, workspaces, activeWorkspace, membership }: AppShellProps) {
+export function AppShell({ children, profile, workspaces, activeWorkspace, membership, notificationUnreadCount = 0 }: AppShellProps) {
   const navSections = isVaeroexAdminEmail(profile?.email) ? [...baseNavSections, adminNavSection] : baseNavSections;
   const accessLabel = workspaceAccessLabel(activeWorkspace);
 
@@ -158,7 +180,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
 
         <nav className="mt-5 flex flex-1 flex-col gap-2 overflow-auto pr-1">
           {navSections.map((section) => (
-            <NavSection key={section.label} label={section.label} items={section.items} />
+            <NavSection key={section.label} label={section.label} items={section.items} notificationUnreadCount={notificationUnreadCount} />
           ))}
         </nav>
 
@@ -187,9 +209,10 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
               </Link>
               <Link
                 href="/app/notifications"
-                className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold"
+                className="inline-flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold"
               >
-                Notifications
+                <span>Notifications</span>
+                <NotificationBadge count={notificationUnreadCount} />
               </Link>
               <div className="rounded-full border border-line bg-white px-3 py-2 text-sm">
                 {profile?.full_name || profile?.email || "User"}
@@ -205,8 +228,9 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
                 <summary className="cursor-pointer list-none whitespace-nowrap text-sm font-semibold text-slate-700">{section.label}</summary>
                 <div className="mt-2 grid gap-1">
                   {section.items.map((item) => (
-                    <Link key={`${section.label}-${item.label}`} href={item.href as Route} className="whitespace-nowrap rounded-md px-2 py-1 text-sm text-slate-700">
-                      {item.label}
+                    <Link key={`${section.label}-${item.label}`} href={item.href as Route} className="flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-2 py-1 text-sm text-slate-700">
+                      <span>{item.label}</span>
+                      {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} /> : null}
                     </Link>
                   ))}
                 </div>

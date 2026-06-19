@@ -648,6 +648,30 @@ export async function markNotificationReadAction(formData: FormData) {
   redirectWithMessage(path, "Notification marked read.");
 }
 
+export async function openNotificationAction(formData: FormData) {
+  const path = returnPath(formData, "/app/notifications");
+  const target = actionHref(formData, "/app");
+  const { supabase, workspaceId } = await requireWorkspace(path);
+  const notificationId = text(formData, "notification_id");
+
+  if (notificationId) {
+    const { error } = await supabase
+      .from("notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", notificationId)
+      .eq("workspace_id", workspaceId)
+      .is("read_at", null);
+
+    if (error) {
+      redirectWithError(path, error.message);
+    }
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/notifications");
+  redirect(target as Route);
+}
+
 export async function markAllNotificationsReadAction(formData: FormData) {
   const path = returnPath(formData, "/app/notifications");
   const { supabase, workspaceId } = await requireWorkspace(path);
@@ -656,6 +680,8 @@ export async function markAllNotificationsReadAction(formData: FormData) {
     .from("notifications")
     .update({ read_at: new Date().toISOString() })
     .eq("workspace_id", workspaceId)
+    .is("archived_at", null)
+    .is("deleted_at", null)
     .is("read_at", null);
 
   if (error) {
@@ -665,4 +691,57 @@ export async function markAllNotificationsReadAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app");
   redirectWithMessage(path, "All notifications marked read.");
+}
+
+export async function archiveReadNotificationsAction(formData: FormData) {
+  const path = returnPath(formData, "/app/notifications");
+  const { supabase, workspaceId } = await requireWorkspace(path);
+
+  const { error } = await supabase
+    .from("notifications")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("workspace_id", workspaceId)
+    .is("archived_at", null)
+    .is("deleted_at", null)
+    .not("read_at", "is", null);
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app");
+  redirectWithMessage(path, "Read notifications archived.");
+}
+
+export async function clearResolvedNotificationsAction(formData: FormData) {
+  const path = returnPath(formData, "/app/notifications");
+  const { supabase, workspaceId } = await requireWorkspace(path);
+  const timestamp = new Date().toISOString();
+
+  const archivedResult = await supabase
+    .from("notifications")
+    .update({ deleted_at: timestamp })
+    .eq("workspace_id", workspaceId)
+    .is("deleted_at", null)
+    .not("archived_at", "is", null);
+
+  if (archivedResult.error) {
+    redirectWithError(path, archivedResult.error.message);
+  }
+
+  const readResult = await supabase
+    .from("notifications")
+    .update({ deleted_at: timestamp })
+    .eq("workspace_id", workspaceId)
+    .is("deleted_at", null)
+    .not("read_at", "is", null);
+
+  if (readResult.error) {
+    redirectWithError(path, readResult.error.message);
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app");
+  redirectWithMessage(path, "Resolved notifications cleared.");
 }
