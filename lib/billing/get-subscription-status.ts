@@ -68,7 +68,7 @@ export async function getSubscriptionStatus({
   if (isVaeroexAdminEmail(normalizedEmail)) {
     return {
       allowed: true,
-      reason: "Vaeroex admin account bypassed the Squarespace subscription check.",
+      reason: "Vaeroex admin account bypassed the subscription check.",
       status: "manual_review",
       plan_slug: null,
       plan: null,
@@ -136,7 +136,7 @@ export async function getSubscriptionStatus({
         ? "Manual activation found."
         : activeSubscription.status === "demo"
           ? "Demo access found."
-          : "Active Squarespace subscription found.",
+          : "Active Vaeroex subscription found.",
       status: activeSubscription.status as SubscriptionStatus,
       plan_slug: activeSubscription.plan_slug,
       plan: getSubscriptionPlan(activeSubscription),
@@ -153,7 +153,7 @@ export async function getSubscriptionStatus({
     allowed: false,
     reason: latest
       ? `Subscription status is ${latest.status}.`
-      : "No active Squarespace subscription was found for this account.",
+      : "No active Vaeroex subscription was found for this account.",
     status: (latest?.status as SubscriptionStatus) || "missing",
     plan_slug: latest?.plan_slug ?? workspace?.plan_slug ?? null,
     plan: getSubscriptionPlan(latest),

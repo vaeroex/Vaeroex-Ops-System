@@ -227,7 +227,7 @@ export const helpArticles: HelpArticle[] = [
     ["refund-guide", "Refund Policy", "How cancellation and refund handling works.", "/refund-policy"],
     ["ai-disclaimer-guide", "AI Disclaimer", "How to interpret Vaeroex-generated recommendations safely.", "/ai-disclaimer"],
     ["sensitive-guide", "Sensitive Data Policy", "What not to upload or enter unless proper controls exist.", "/sensitive-data-policy"],
-    ["billing-guide", "Subscription & Billing Terms", "How the Vaeroex subscription and billing provider work together.", "/subscription-billing-terms"],
+    ["billing-guide", "Subscription & Billing Terms", "How Vaeroex subscription access, billing requests, and promotions work.", "/subscription-billing-terms"],
     ["retention-guide", "Data Retention Notice", "General retention expectations for account, workspace, support, and audit records.", "/data-retention"],
     ["human-review-guide", "Human Review Notice", "Why users remain responsible for reviewing outputs and decisions.", "/human-review"]
   ].map(([id, title, summary, href]) =>

@@ -29,11 +29,11 @@ export default function PricingPage() {
             <h1 className="mt-3 text-4xl font-semibold tracking-tight">Operations intelligence for growing businesses.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
               Build the structure your growth depends on. Vaeroex brings visibility, accountability, and execution support into one subscription.
-              Checkout is handled securely on Squarespace.
+              Checkout is handled securely through Vaeroex checkout.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href={squarespaceCheckoutUrl} className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white">
-                Subscribe on Squarespace
+                Start Vaeroex Subscription
               </a>
               <Link href="/signup" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold">
                 Create account
@@ -46,7 +46,7 @@ export default function PricingPage() {
             <h2 className="mt-2 text-3xl font-semibold">{VAEROEX_PLAN_NAME}</h2>
             <p className="mt-2 text-lg font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
             <p className="mt-3 text-sm leading-6 text-muted">
-              Everything included for operational clarity, business intelligence, accountability, and decision support. Squarespace remains the source of truth for checkout, billing, and subscription status.
+              Everything included for operational clarity, business intelligence, accountability, and decision support. Your Vaeroex subscription is managed through Vaeroex checkout and official Vaeroex sales channels.
             </p>
             <div className="mt-5 rounded-lg border border-line bg-slate-50 p-4">
               <p className="text-sm font-semibold">Included usage</p>
