@@ -36,6 +36,10 @@ type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"]
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
+type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
+type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
+type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
+type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type DateRange = {
   start: Date;
   end: Date;
@@ -510,6 +514,14 @@ function latestKpisByName(kpis: KpiRow[]) {
   return [...latest.values()];
 }
 
+function groupCounts(values: Array<string | null | undefined>) {
+  return values.reduce<Record<string, number>>((counts, value) => {
+    const label = value || "Workspace";
+    counts[label] = (counts[label] || 0) + 1;
+    return counts;
+  }, {});
+}
+
 function buildSmartAlerts({
   overdueTasks,
   unassignedTasks,
@@ -915,7 +927,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     crmHistoryResult,
     reportResult,
     vaeroexRunResult,
-    metricResult
+    metricResult,
+    notificationResult,
+    assignmentResult,
+    shareResult,
+    peopleResult
   ] = await Promise.all([
     supabase
       .from("kpis")
@@ -935,7 +951,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
-    supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500)
+    supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),
+    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
+    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
+    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
+    supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100)
   ]);
 
   const kpis = (kpiResult.data || []) as KpiRow[];
@@ -951,6 +971,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const reports = (reportResult.data || []) as ReportRow[];
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
   const operationalMetrics = (metricResult.data || []) as OperationalMetricRow[];
+  const notifications = (notificationResult.data || []) as NotificationRow[];
+  const assignments = (assignmentResult.data || []) as AssignmentRow[];
+  const shares = (shareResult.data || []) as ShareRow[];
+  const people = (peopleResult.data || []) as PersonRow[];
   const errors = [
     kpiResult.error,
     taskResult.error,
@@ -964,7 +988,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     crmHistoryResult.error,
     reportResult.error,
     vaeroexRunResult.error,
-    metricResult.error
+    metricResult.error,
+    notificationResult.error,
+    assignmentResult.error,
+    shareResult.error,
+    peopleResult.error
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
@@ -1179,6 +1207,49 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         recommendation: recommendedActions[0] || "Keep adding real records, then generate a report after the next management review."
       };
   const hasWorkspaceData = Boolean(kpis.length || tasks.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
+  const todayDate = dateOnly(new Date());
+  const dueWindowEndDate = dateOnly(addDays(new Date(), 14));
+  const peopleById = new Map(people.map((person) => [person.id, person]));
+  const currentUserPerson = people.find((person) => person.email?.toLowerCase() === user?.email?.toLowerCase()) ?? null;
+  const activeAssignments = assignments.filter((assignment) => {
+    const status = lower(assignment.status);
+    return !assignment.archived_at && status !== "done" && status !== "dismissed" && status !== "complete";
+  });
+  const unreadNotifications = notifications.filter((notification) => !notification.read_at);
+  const kpiAlertNotifications = notifications.filter((notification) => notification.type === "kpi_alert");
+  const recentReportShares = shares.filter((share) => share.source_type === "report").slice(0, 5);
+  const dueSoonAssignments = activeAssignments
+    .filter((assignment) => assignment.due_date && assignment.due_date >= todayDate && assignment.due_date <= dueWindowEndDate)
+    .slice(0, 5);
+  const overdueOperationalAssignments = activeAssignments.filter((assignment) => assignment.due_date && assignment.due_date < todayDate).slice(0, 5);
+  const assignedToMe = currentUserPerson ? activeAssignments.filter((assignment) => assignment.assigned_person_id === currentUserPerson.id).slice(0, 5) : [];
+  const assignedToMyRole = currentUserPerson?.role_title
+    ? activeAssignments.filter((assignment) => assignment.assigned_role === currentUserPerson.role_title).slice(0, 5)
+    : [];
+  const assignedToMyDepartment = currentUserPerson?.department
+    ? activeAssignments.filter((assignment) => assignment.assigned_department === currentUserPerson.department).slice(0, 5)
+    : [];
+  const recommendationAssignments = activeAssignments.filter((assignment) => assignment.source_type === "vaeroex_recommendation");
+  const alertsByRole = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_role)));
+  const alertsByDepartment = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_department)));
+  const assignmentOwnerLabel = (assignment: AssignmentRow) => {
+    if (assignment.assigned_person_id && peopleById.has(assignment.assigned_person_id)) {
+      return peopleById.get(assignment.assigned_person_id)?.full_name || "Assigned person";
+    }
+
+    if (assignment.assigned_role) return assignment.assigned_role;
+    if (assignment.assigned_department) return assignment.assigned_department;
+    return "Workspace";
+  };
+  const shareRecipientLabel = (share: ShareRow) => {
+    if (share.person_id && peopleById.has(share.person_id)) {
+      return peopleById.get(share.person_id)?.full_name || "Person";
+    }
+
+    if (share.role) return share.role;
+    if (share.department) return share.department;
+    return "Entire workspace";
+  };
 
   return (
     <div className="space-y-6">
@@ -1239,6 +1310,136 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       />
 
       <SmartAlerts alerts={smartAlerts} />
+
+      <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
+        <SectionCard
+          title="Team accountability"
+          description="Notifications, shared reports, KPI alerts, and assigned follow-up work for this workspace."
+        >
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-blue-100 bg-blue-50 text-blue-800" : undefined} />
+            <StatCard label="KPI alerts" value={kpiAlertNotifications.length} detail="Rules triggered" tone={kpiAlertNotifications.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
+            <StatCard label="Shared reports" value={recentReportShares.length} detail="Recent in-app shares" />
+            <StatCard label="Due soon" value={dueSoonAssignments.length} detail="Next 14 days" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
+            <StatCard label="Overdue" value={overdueOperationalAssignments.length} detail="Assignments past due" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
+            <StatCard label="Assigned recs" value={recommendationAssignments.length} detail="Vaeroex follow-ups" />
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/app/notifications" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
+              Open notifications
+            </Link>
+            <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              Review assignments
+            </Link>
+            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              Shared reports
+            </Link>
+          </div>
+        </SectionCard>
+
+        <SectionCard title="Assigned work" description="Follow-ups can be assigned to a person, role, or department without changing app permissions.">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Assigned to me</h3>
+              <SimpleList
+                items={assignedToMe}
+                empty={currentUserPerson ? "No assignments are directed to you." : "No matching person record found for your login email."}
+                render={(assignment: AssignmentRow) => (
+                  <div key={assignment.id} className="rounded-lg border border-line p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold">{assignment.title}</p>
+                      <StatusBadge value={assignment.priority} />
+                    </div>
+                    <p className="mt-1 text-xs text-muted">Due {assignment.due_date || "not set"} · {assignment.status}</p>
+                  </div>
+                )}
+              />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Assigned to my role</h3>
+              <SimpleList
+                items={assignedToMyRole}
+                empty={currentUserPerson?.role_title ? `No assignments for ${currentUserPerson.role_title}.` : "Add your role on the People page to see role-based assignments."}
+                render={(assignment: AssignmentRow) => (
+                  <div key={assignment.id} className="rounded-lg border border-line p-3">
+                    <p className="text-sm font-semibold">{assignment.title}</p>
+                    <p className="mt-1 text-xs text-muted">{assignment.assigned_role} · Due {assignment.due_date || "not set"}</p>
+                  </div>
+                )}
+              />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Assigned to my department</h3>
+              <SimpleList
+                items={assignedToMyDepartment}
+                empty={currentUserPerson?.department ? `No assignments for ${currentUserPerson.department}.` : "Add your department on the People page to see department work."}
+                render={(assignment: AssignmentRow) => (
+                  <div key={assignment.id} className="rounded-lg border border-line p-3">
+                    <p className="text-sm font-semibold">{assignment.title}</p>
+                    <p className="mt-1 text-xs text-muted">{assignment.assigned_department} · Due {assignment.due_date || "not set"}</p>
+                  </div>
+                )}
+              />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-ink">Overdue assignments</h3>
+              <SimpleList
+                items={overdueOperationalAssignments}
+                empty="No overdue team assignments."
+                render={(assignment: AssignmentRow) => (
+                  <div key={assignment.id} className="rounded-lg border border-red-100 bg-red-50 p-3 text-red-700">
+                    <p className="text-sm font-semibold">{assignment.title}</p>
+                    <p className="mt-1 text-xs">Owner: {assignmentOwnerLabel(assignment)} · Due {assignment.due_date}</p>
+                  </div>
+                )}
+              />
+            </div>
+          </div>
+        </SectionCard>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <SectionCard title="Recent shares" description="Reports, KPI views, file analyses, and Vaeroex recommendations shared inside the workspace.">
+          <SimpleList
+            items={shares.slice(0, 6)}
+            empty="No records have been shared yet."
+            render={(share: ShareRow) => (
+              <div key={share.id} className="rounded-lg border border-line p-3">
+                <p className="text-sm font-semibold">{share.source_title}</p>
+                <p className="mt-1 text-xs text-muted">
+                  {share.source_type.replace(/_/g, " ")} · {shareRecipientLabel(share)} · {share.distribution_schedule.replace(/_/g, " ")}
+                </p>
+              </div>
+            )}
+          />
+        </SectionCard>
+
+        <SectionCard title="KPI alerts by role" description="Who is receiving KPI follow-up signals.">
+          <SimpleList
+            items={alertsByRole.map(([label, count]) => ({ id: label, label, count }))}
+            empty="No role-based KPI alerts have triggered yet."
+            render={(item: { id: string; label: string; count: number }) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-3 text-sm">
+                <span className="font-semibold text-ink">{item.label}</span>
+                <span className="text-muted">{item.count}</span>
+              </div>
+            )}
+          />
+        </SectionCard>
+
+        <SectionCard title="KPI alerts by department" description="Departments with recent alert activity.">
+          <SimpleList
+            items={alertsByDepartment.map(([label, count]) => ({ id: label, label, count }))}
+            empty="No department KPI alerts have triggered yet."
+            render={(item: { id: string; label: string; count: number }) => (
+              <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-3 text-sm">
+                <span className="font-semibold text-ink">{item.label}</span>
+                <span className="text-muted">{item.count}</span>
+              </div>
+            )}
+          />
+        </SectionCard>
+      </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">

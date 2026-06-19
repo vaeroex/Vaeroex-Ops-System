@@ -1,4 +1,5 @@
 import { createChecklistAction, runChecklistAction } from "@/app/app/operations/actions";
+import { AssignmentPanel, AssignmentTargetFields, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -9,6 +10,7 @@ import { ReadableData } from "@/components/operations/ReadableData";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { getRecordFolders, jsonLines, managedValues, shortPreview } from "@/lib/records/management";
+import { PRIORITIES } from "@/lib/team/options";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type ChecklistsPageProps = {
@@ -28,7 +30,7 @@ const checklistEditFields: ManagedRecordEditField[] = [
 export default async function ChecklistsPage({ searchParams }: ChecklistsPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [{ data: checklists, error: checklistsError }, { data: runs, error: runsError }, folderResult] = await Promise.all([
+  const [{ data: checklists, error: checklistsError }, { data: runs, error: runsError }, folderResult, peopleResult] = await Promise.all([
     supabase
       .from("checklists")
       .select("*")
@@ -40,8 +42,10 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(12),
-    getRecordFolders(supabase, workspaceId, "checklists")
+    getRecordFolders(supabase, workspaceId, "checklists"),
+    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
   ]);
+  const people = (peopleResult.data || []) as TeamPersonOption[];
   const checklistNameById = new Map((checklists || []).map((checklist) => [checklist.id, checklist.name]));
   const managedChecklists = (checklists || []).map((checklist) => {
     const management = managedValues(checklist);
@@ -73,7 +77,22 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
         description: checklist.description,
         items_json: jsonLines(checklist.items_json)
       },
-      children: <ReadableData value={checklist.items_json} empty="No checklist items saved." />
+      children: (
+        <div className="space-y-4">
+          <ReadableData value={checklist.items_json} empty="No checklist items saved." />
+          <AssignmentPanel
+            sourceType="checklist"
+            sourceId={checklist.id}
+            sourceTitle={checklist.name}
+            relatedModule="Checklists"
+            defaultTitle={`Follow up: ${checklist.name}`}
+            defaultRole={checklist.assigned_role || "Manager"}
+            returnPath="/app/checklists"
+            actionHref="/app/checklists"
+            people={people}
+          />
+        </div>
+      )
     };
   });
 
@@ -85,7 +104,7 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
         description="Create repeatable checklists, run them from the active workspace, and keep completion history visible for managers."
       />
 
-      <ErrorNotice message={(params?.error as string | undefined) || checklistsError?.message || runsError?.message || folderResult.error?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || checklistsError?.message || runsError?.message || folderResult.error?.message || peopleResult.error?.message} />
 
       <section className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -119,6 +138,11 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
                   </select>
                 </label>
                 <SelectInput label="Status" name="status" defaultValue="Complete" options={["Open", "In progress", "Complete", "Needs review"]} />
+                <AssignmentTargetFields people={people} defaultRole="Manager" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <TextInput label="Due date" name="due_date" type="date" />
+                  <SelectInput label="Priority" name="priority" defaultValue="Medium" options={PRIORITIES} />
+                </div>
                 <TextArea label="Responses or completed items, one per line" name="responses" rows={4} />
                 <TextArea label="Notes" name="notes" rows={3} />
                 <PrimaryButton>Save run</PrimaryButton>
