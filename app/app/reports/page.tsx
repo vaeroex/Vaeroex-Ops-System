@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { runReportSubscriptionNowAction, saveReportSubscriptionPreferenceAction } from "@/app/app/report-subscriptions/actions";
 import { generateReportAction } from "@/app/app/reports/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -860,6 +861,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         title="Reports"
         description="Generate daily, weekly, monthly, quarterly, yearly, and year-to-date intelligence summaries for the active workspace. Reports use the selected period, compare against the prior period where possible, and keep source data hidden unless admin debug mode is enabled."
       />
+      <LegalSafetyNotice tone="review" compact />
       <ModuleTabs
         tabs={[
           { label: "All Reports", href: "/app/reports", active: !params?.report_type },

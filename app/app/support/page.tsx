@@ -35,6 +35,7 @@ export default async function AppSupportPage({ searchParams }: AppSupportPagePro
           <TextInput label="Name" name="name" required defaultValue={context.profile?.full_name || user?.user_metadata?.full_name || ""} />
           <TextInput label="Email" name="email" type="email" required defaultValue={context.profile?.email || user?.email || ""} />
           <TextInput label="Workspace" name="workspace" defaultValue={context.activeWorkspace?.name || ""} placeholder="Workspace name or ID" />
+          <TextInput label="Page/module" name="page_module" placeholder="Dashboard, Files, Reports, Billing..." />
           <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Vaeroex result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
           <label className="block text-sm font-medium">
@@ -43,6 +44,9 @@ export default async function AppSupportPage({ searchParams }: AppSupportPagePro
           </label>
           <div className="md:col-span-2">
             <TextArea label="Message" name="message" required rows={6} />
+            <p className="mt-2 text-xs leading-5 text-muted">
+              Do not include patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data in support requests.
+            </p>
           </div>
           <div className="md:col-span-2">
             <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Send support request</button>

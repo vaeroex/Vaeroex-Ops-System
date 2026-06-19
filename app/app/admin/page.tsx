@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { LEGAL_DOCUMENT_VERSIONS } from "@/lib/legal/content";
 
 type AdminHomeProps = {
   searchParams?: Promise<{ error?: string; message?: string }>;
@@ -19,14 +20,21 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
     return <ErrorNotice message={params?.error || access.error} />;
   }
 
-  const [profiles, workspaces, activeSubscriptions, supportRequests, failedRuns, subscriptionErrors, recentSupport] = await Promise.all([
+  const [profiles, workspaces, activeSubscriptions, supportRequests, failedRuns, subscriptionErrors, recentSupport, legalAcceptances] = await Promise.all([
     access.admin.from("profiles").select("id", { count: "exact", head: true }),
     access.admin.from("workspaces").select("id", { count: "exact", head: true }),
     access.admin.from("customer_subscriptions").select("id", { count: "exact", head: true }).in("status", ["active", "trialing", "demo"]),
     access.admin.from("support_requests").select("id", { count: "exact", head: true }).in("status", ["open", "in_review"]),
     access.admin.from("ai_agent_runs").select("id,agent_type,error_message,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(5),
     access.admin.from("subscription_events").select("id,event_type,customer_email,processing_error,created_at").not("processing_error", "is", null).order("created_at", { ascending: false }).limit(5),
-    access.admin.from("support_requests").select("*").order("created_at", { ascending: false }).limit(5)
+    access.admin.from("support_requests").select("*").order("created_at", { ascending: false }).limit(5),
+    access.admin
+      .from("legal_acceptances")
+      .select("id", { count: "exact", head: true })
+      .eq("terms_version", LEGAL_DOCUMENT_VERSIONS.terms)
+      .eq("privacy_version", LEGAL_DOCUMENT_VERSIONS.privacy)
+      .eq("ai_disclaimer_version", LEGAL_DOCUMENT_VERSIONS.aiDisclaimer)
+      .eq("sensitive_data_policy_version", LEGAL_DOCUMENT_VERSIONS.sensitiveData)
   ]);
 
   const cards: { label: string; value: number; href: Route }[] = [
@@ -53,6 +61,33 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
           </Link>
         ))}
       </section>
+
+      <SectionCard title="Legal and trust readiness" description="Admin-only launch checklist for policy versions and acceptance visibility. Legal content should be reviewed by qualified counsel before commercial launch.">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Terms version", LEGAL_DOCUMENT_VERSIONS.terms],
+            ["Privacy version", LEGAL_DOCUMENT_VERSIONS.privacy],
+            ["Vaeroex disclaimer", LEGAL_DOCUMENT_VERSIONS.aiDisclaimer],
+            ["Sensitive data policy", LEGAL_DOCUMENT_VERSIONS.sensitiveData]
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</p>
+              <p className="mt-1 text-sm font-semibold text-ink">{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          <div className="rounded-lg border border-line p-4">
+            <p className="text-sm text-muted">Latest acceptance records</p>
+            <p className="mt-2 text-3xl font-semibold">{legalAcceptances.count ?? 0}</p>
+          </div>
+          <div className="rounded-lg border border-line p-4">
+            <p className="text-sm text-muted">Estimated users not accepted latest</p>
+            <p className="mt-2 text-3xl font-semibold">{Math.max((profiles.count ?? 0) - (legalAcceptances.count ?? 0), 0)}</p>
+            <p className="mt-2 text-xs leading-5 text-muted">Estimate based on profile count minus latest acceptance records. Use as a launch-readiness signal, not a legal report.</p>
+          </div>
+        </div>
+      </SectionCard>
 
       <section className="grid gap-6 xl:grid-cols-3">
         <SectionCard title="Recent support requests">

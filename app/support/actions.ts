@@ -30,6 +30,7 @@ export async function createSupportRequestAction(formData: FormData) {
   const priority = text(formData, "priority") || "Medium";
   const workspaceInput = text(formData, "workspace");
   const workspaceIdInput = text(formData, "workspace_id");
+  const pageModule = text(formData, "page_module");
 
   if (!name || !email || !issueType || !message) {
     redirectBack(formData, "error", "Name, email, issue type, and message are required.");
@@ -64,11 +65,12 @@ export async function createSupportRequestAction(formData: FormData) {
   }
 
   const workspaceReference = workspaceInput || workspaceIdInput;
-  const fullMessage = workspaceReference && !workspaceId
-    ? `Workspace reference: ${workspaceReference}\n\n${message}`
-    : workspaceInput && !uuidOrNull(workspaceInput)
-      ? `Workspace: ${workspaceInput}\n\n${message}`
-      : message;
+  const contextLines = [
+    pageModule ? `Page/module: ${pageModule}` : "",
+    workspaceReference && !workspaceId ? `Workspace reference: ${workspaceReference}` : "",
+    workspaceInput && !uuidOrNull(workspaceInput) ? `Workspace: ${workspaceInput}` : ""
+  ].filter(Boolean);
+  const fullMessage = contextLines.length ? `${contextLines.join("\n")}\n\n${message}` : message;
   const client = admin || supabase;
 
   if (!client) {

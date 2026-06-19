@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PublicFooter } from "@/components/legal/PublicFooter";
 import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_PLAN_FEATURES, VAEROEX_PLAN_NAME, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 
@@ -17,8 +18,8 @@ const outcomes = [
 
 export default function PricingPage() {
   return (
-    <main className="min-h-screen bg-slate-50 px-6 py-10 text-ink">
-      <section className="mx-auto max-w-5xl">
+    <main className="min-h-screen bg-slate-50 text-ink">
+      <section className="mx-auto max-w-5xl px-6 py-10">
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">
           Vaeroex
         </Link>
@@ -45,7 +46,7 @@ export default function PricingPage() {
             <h2 className="mt-2 text-3xl font-semibold">{VAEROEX_PLAN_NAME}</h2>
             <p className="mt-2 text-lg font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
             <p className="mt-3 text-sm leading-6 text-muted">
-              Everything included for operational clarity, business intelligence, accountability, and decision support. Squarespace remains the source of truth for checkout, billing, discounts, and subscription status.
+              Everything included for operational clarity, business intelligence, accountability, and decision support. Squarespace remains the source of truth for checkout, billing, and subscription status.
             </p>
             <div className="mt-5 rounded-lg border border-line bg-slate-50 p-4">
               <p className="text-sm font-semibold">Included usage</p>
@@ -80,7 +81,12 @@ export default function PricingPage() {
             ))}
           </div>
         </section>
+        <section className="mt-6 rounded-lg border border-line bg-white p-5 text-xs leading-5 text-muted shadow-panel">
+          <p>Subscriptions renew automatically unless canceled. Cancel anytime. Pricing may change in the future with advance notice. Refunds are handled according to the Refund Policy.</p>
+          <p className="mt-2">Vaeroex outputs require human review before customers rely on recommendations or save generated records.</p>
+        </section>
       </section>
+      <PublicFooter />
     </main>
   );
 }

@@ -9,6 +9,7 @@ import {
   dismissPrestigeRecommendationAction
 } from "@/app/app/intelligence/actions";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
+import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -107,6 +108,9 @@ export function BusinessHealthHero({
             <div className="h-full rounded-full bg-[linear-gradient(90deg,#1E6BFF,#38BDF8)]" style={{ width: progressWidth }} />
           </div>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100">{health.explanation}</p>
+          <p className="mt-3 rounded-lg border border-white/10 bg-white/[0.06] p-3 text-xs leading-5 text-slate-100">
+            Business Health is a directional decision-support signal. Review the underlying records before relying on it.
+          </p>
           {health.dataQualityWarning ? (
             <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">{health.dataQualityWarning}</p>
           ) : null}
@@ -348,6 +352,9 @@ export function PrestigeOperationsPanel({
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_.95fr]">
         <SectionCard title="What should I focus on this week?" description="Vaeroex limits this to the top priorities that are tied to visible evidence.">
+          <div className="mb-4">
+            <LegalSafetyNotice tone="review" compact />
+          </div>
           <div className="grid gap-3 lg:grid-cols-2">
             {intelligence.focusPriorities.length ? (
               intelligence.focusPriorities.map((item) => <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} />)
@@ -358,6 +365,9 @@ export function PrestigeOperationsPanel({
         </SectionCard>
 
         <SectionCard title="Profit Leak Detector" description="Revenue and opportunity leakage signals from CRM, KPIs, follow-ups, issues, checklists, SOPs, and files.">
+          <div className="mb-4">
+            <LegalSafetyNotice tone="ai" compact />
+          </div>
           <div className="space-y-3">
             {intelligence.profitLeaks.length ? (
               intelligence.profitLeaks.map((item) => (

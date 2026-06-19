@@ -99,6 +99,38 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["workspace_members"]["Insert"]>;
         Relationships: [];
       };
+      legal_acceptances: {
+        Row: {
+          id: string;
+          user_id: string;
+          workspace_id: string | null;
+          terms_version: string;
+          privacy_version: string;
+          ai_disclaimer_version: string;
+          sensitive_data_policy_version: string;
+          accepted_at: string;
+          user_email: string | null;
+          user_agent: string | null;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workspace_id?: string | null;
+          terms_version: string;
+          privacy_version: string;
+          ai_disclaimer_version: string;
+          sensitive_data_policy_version: string;
+          accepted_at?: string;
+          user_email?: string | null;
+          user_agent?: string | null;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["legal_acceptances"]["Insert"]>;
+        Relationships: [];
+      };
       business_intakes: {
         Row: {
           id: string;

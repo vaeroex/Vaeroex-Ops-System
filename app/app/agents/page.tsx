@@ -3,6 +3,7 @@ import type { Route } from "next";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -982,6 +983,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
       <SuccessNotice message={params?.saved as string | undefined} />
       <ComplianceNotice />
+      <LegalSafetyNotice tone="ai" compact />
 
       <section className="rounded-lg border border-vaeroex-navy bg-vaeroex-navy p-5 text-white shadow-command">
         <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-end">
