@@ -151,6 +151,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=
+CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=
 VAEROEX_ADMIN_EMAILS=
@@ -168,6 +169,7 @@ NEXT_PUBLIC_SQUARESPACE_PRO_CHECKOUT_URL=
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must only be used in server-side code. Never expose it to the browser.
+`CRON_SECRET` protects scheduled report subscription jobs. Add the same secret to Vercel and keep it server-side only.
 
 `VAEROEX_ADMIN_EMAILS` is a comma-separated allowlist for internal Vaeroex owner/admin tools, for example:
 
@@ -400,6 +402,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=
+CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=https://your-domain.example
 VAEROEX_ADMIN_EMAILS=
