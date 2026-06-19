@@ -205,7 +205,7 @@ function unsupportedFileContentMessage(file: Pick<FileUploadRow, "file_extension
     return "Vaeroex could not read this image. Make sure it is a clear PNG or JPG with readable text or visible business context, then try again.";
   }
 
-  return "This file type cannot be analyzed yet. Upload CSV/XLSX for data import, or text-based PDF/DOCX files for analysis.";
+  return "This file type cannot be reviewed yet. Upload CSV/XLSX for data import, or text-based PDF/DOCX files for Vaeroex review.";
 }
 
 function safeFileName(value: string) {
@@ -223,7 +223,7 @@ function validImportType(value: string): ImportType {
     return value;
   }
 
-  redirectWithError("Choose KPI data, CRM leads, or operational metrics before importing.");
+  redirectWithError("Choose KPI data, CRM leads, or business metrics before importing.");
 }
 
 async function requireWorkspace() {
@@ -471,7 +471,7 @@ function extractionSummary(importType: ImportType, rows: ImportRow[], mapping: I
   const mappedRequired = IMPORT_FIELDS[importType].filter((field) => field.required && mapping[field.key]).length;
   const requiredCount = IMPORT_FIELDS[importType].filter((field) => field.required).length;
   const mappedCount = Object.keys(mapping).length;
-  const importLabel = importType === "kpi" ? "KPI history" : importType === "crm" ? "CRM leads" : "operational metrics";
+  const importLabel = importType === "kpi" ? "KPI history" : importType === "crm" ? "CRM leads" : "business metrics";
 
   return `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} for ${importLabel}. ${mappedCount} column${mappedCount === 1 ? "" : "s"} were mapped, including ${mappedRequired} of ${requiredCount} required field${requiredCount === 1 ? "" : "s"}. Review the mappings before saving.`;
 }
@@ -577,7 +577,7 @@ function buildOperationalMetricRecords(
           import_id: importId,
           import_row_id: importRow.id,
           metric_name: mappedText(row, mapping, field("metrics", "metric_name")),
-          category: mappedText(row, mapping, field("metrics", "category"), "Operations"),
+          category: mappedText(row, mapping, field("metrics", "category"), "Business"),
           value: mappedNumber(row, mapping, field("metrics", "value")),
           metric_date: mappedDate(row, mapping, field("metrics", "metric_date")),
           owner: mappedText(row, mapping, field("metrics", "owner")),
@@ -1083,7 +1083,7 @@ function vaeroexReportMarkdown(outputJson: Json, fallback: string) {
   return `# File Report
 
 ## Executive Summary
-${summary || "Vaeroex reviewed the uploaded file and prepared a practical operations summary."}
+${summary || "Vaeroex reviewed the uploaded file and prepared a practical intelligence summary."}
 
 ## Extracted Findings
 ${findings.length ? findings.map((item) => `- ${item}`).join("\n") : "- No specific findings were identified from the extracted content."}
@@ -1092,10 +1092,10 @@ ${findings.length ? findings.map((item) => `- ${item}`).join("\n") : "- No speci
 ${kpis.length ? kpis.map((item) => `- ${item}`).join("\n") : "- Review this file for metrics that should be tracked in the KPI dashboard."}
 
 ## Risks
-${risks.length ? risks.map((item) => `- ${item}`).join("\n") : "- No clear operational risks were found in the extracted content."}
+${risks.length ? risks.map((item) => `- ${item}`).join("\n") : "- No clear risks were found in the extracted content."}
 
-## Operational Issues
-${issues.length ? issues.map((item) => `- ${item}`).join("\n") : "- No specific operational issues were found in the extracted content."}
+## Issues
+${issues.length ? issues.map((item) => `- ${item}`).join("\n") : "- No specific issues were found in the extracted content."}
 
 ## Recommended Actions
 ${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the findings and decide which actions should be assigned."}
@@ -1114,14 +1114,14 @@ function ensureFileReportSections(body: string, file: FileUploadRow, extraction:
     },
     {
       heading: "KPIs Found",
-      body: "- Review the report body for metrics, counts, revenue, lead, cost, quality, staffing, or operational measures worth tracking."
+      body: "- Review the report body for metrics, counts, revenue, lead, cost, quality, staffing, or business measures worth tracking."
     },
     {
       heading: "Risks",
       body: "- Review the report body for customer, staffing, revenue, follow-up, quality, or process risks."
     },
     {
-      heading: "Operational Issues",
+      heading: "Issues",
       body: "- Review the report body for bottlenecks, missing ownership, unclear follow-up, delays, or repeated process gaps."
     },
     {
@@ -1187,12 +1187,12 @@ ${analysisSummary || "Vaeroex reviewed this file and prepared a report from the 
 - Vaeroex reviewed the extracted content shown in the preview below and used it with workspace context to prepare this report.
 
 ## KPIs Found
-- Review the extracted content for metrics that should be saved into KPI history, CRM history, or operational metrics.
+- Review the extracted content for metrics that should be saved into KPI history, CRM history, or business metrics.
 
 ## Risks
 - Confirm any high-impact findings before assigning work or changing records.
 
-## Operational Issues
+## Issues
 - Look for repeated delays, missed follow-up, unclear ownership, missing checklists, or untracked metrics.
 
 ## File Details
@@ -1213,7 +1213,7 @@ ${contentPreview}
 
 ## Recommended Next Actions
 - Review the findings before saving or assigning any recommended work.
-- Import approved spreadsheet rows into KPI, CRM, or operational metrics history when appropriate.
+- Import approved spreadsheet rows into KPI, CRM, or business metrics history when appropriate.
 - Use this file in the next management review so trends are tracked over time.`;
 }
 
@@ -1503,7 +1503,7 @@ export async function importFileAction(formData: FormData) {
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
 
   if (!isSpreadsheet(file)) {
-    redirectWithFileError("Only CSV and XLSX files can be imported into KPI, CRM, or operations history.", file.id);
+    redirectWithFileError("Only CSV and XLSX files can be imported into KPI, CRM, or business history.", file.id);
   }
 
   await updateFileProcessingStatus({ supabase, file, status: "processing" });
@@ -1806,7 +1806,7 @@ export async function createReportFromFileAction(formData: FormData) {
       file,
       prompt:
         reportFocus ||
-        "Create a customer-ready operations report from this uploaded file. Include an executive summary, extracted findings, KPIs found, risks, operational issues, recommendations, and practical next actions.",
+        "Create a customer-ready intelligence report from this uploaded file. Include an executive summary, extracted findings, KPIs found, risks, issues, recommendations, and practical next actions.",
       rowLimit: MAX_REPORT_ROWS
     });
   } catch (error) {
@@ -1880,7 +1880,7 @@ export async function createReportFromFileAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/reports");
   redirect(
-    `/app/reports?message=${encodeURIComponent(`Report created from Vaeroex analysis of ${file.display_name}.`)}&q=${encodeURIComponent(report.title)}` as Route
+    `/app/reports?message=${encodeURIComponent(`Report created from Vaeroex review of ${file.display_name}.`)}&q=${encodeURIComponent(report.title)}` as Route
   );
 }
 
@@ -1917,7 +1917,7 @@ export async function attachFileToReportAction(formData: FormData) {
     attached_at: new Date().toISOString()
   } satisfies JsonObject;
   const withoutDuplicate = existingFiles.filter((item) => item.id !== file.id);
-  const bodyNote = `\n\n## Attached File\n- ${file.display_name} (${file.file_extension.toUpperCase()})\n- Import status: ${file.import_status.replace(/_/g, " ")}\n- Imported rows: ${file.imported_rows}\n${file.analysis_summary ? `- Latest Vaeroex analysis: ${file.analysis_summary.split("\n")[0]}` : "- Latest Vaeroex analysis: Not completed yet."}`;
+  const bodyNote = `\n\n## Attached File\n- ${file.display_name} (${file.file_extension.toUpperCase()})\n- Import status: ${file.import_status.replace(/_/g, " ")}\n- Imported rows: ${file.imported_rows}\n${file.analysis_summary ? `- Latest Vaeroex review: ${file.analysis_summary.split("\n")[0]}` : "- Latest Vaeroex review: Not completed yet."}`;
 
   const { error } = await supabase
     .from("reports")
@@ -1947,7 +1947,7 @@ export async function analyzeFileAction(formData: FormData) {
   const prompt =
     text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
-    "Review this file and explain trends, useful KPIs, operational problems, risks, recommended actions, and an executive summary.";
+    "Review this file and explain trends, useful KPIs, visibility gaps, risks, recommended actions, and an executive summary.";
 
   const workflow = getVaeroexWorkflow("file_analysis");
   let inputJson: Json = {

@@ -49,11 +49,11 @@ type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type ImportType = "kpi" | "crm" | "metrics";
 type JsonRecord = Record<string, unknown>;
 
-const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Operations"];
+const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Execution"];
 const IMPORT_TYPES = [
   { value: "kpi", label: "KPI data" },
   { value: "crm", label: "CRM leads" },
-  { value: "metrics", label: "Operational metrics" }
+  { value: "metrics", label: "Business metrics" }
 ];
 const SUGGESTED_PROMPTS = [
   "What trends do you see?",
@@ -62,7 +62,7 @@ const SUGGESTED_PROMPTS = [
   "Create an executive summary.",
   "Create recommended actions."
 ];
-const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting content", "Sending to Vaeroex", "Generating insights", "Saving analysis", "Done"];
+const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting content", "Sending to Vaeroex", "Preparing findings", "Saving review", "Done"];
 const IMPORT_FIELDS: Record<ImportType, Array<{ key: string; label: string; required?: boolean }>> = {
   kpi: [
     { key: "name", label: "KPI name", required: true },
@@ -96,7 +96,7 @@ const IMPORT_FIELDS: Record<ImportType, Array<{ key: string; label: string; requ
 const fileEditFields: ManagedRecordEditField[] = [
   { name: "display_name", label: "File name", required: true },
   { name: "import_type", label: "Import type", type: "select", options: ["none", "kpi", "crm", "metrics"] },
-  { name: "analysis_summary", label: "Analysis summary", type: "textarea", rows: 5 }
+  { name: "analysis_summary", label: "Vaeroex review summary", type: "textarea", rows: 5 }
 ];
 
 function cleanNoticeMessage(message: string | null | undefined, fallback: string) {
@@ -164,34 +164,34 @@ function fileSupportNotice(file: FileUploadRow) {
   if (isSpreadsheet(file)) {
     return {
       title: "Spreadsheet ready",
-      body: "CSV and XLSX files can be analyzed, imported after review, and used to create reports from parsed rows."
+      body: "CSV and XLSX files can be reviewed, imported after approval, and used to create reports from parsed rows."
     };
   }
 
   if (file.file_extension === "pdf") {
     return {
       title: "PDF text extraction ready",
-      body: "Vaeroex can analyze and report on text-based PDFs. If a PDF is scanned or image-only, Vaeroex will show a clear extraction error instead of creating an empty report."
+      body: "Vaeroex can review and report on text-based PDFs. If a PDF is scanned or image-only, Vaeroex will show a clear extraction error instead of creating an empty report."
     };
   }
 
   if (file.file_extension === "docx") {
     return {
       title: "DOCX text extraction ready",
-      body: "Vaeroex can extract readable text from DOCX files for analysis and report creation."
+      body: "Vaeroex can extract readable text from DOCX files for review and report creation."
     };
   }
 
   if (isImageFile(file)) {
     return {
-      title: "Image OCR and analysis ready",
-      body: "Vaeroex can analyze PNG and JPG files for readable text, visible issues, KPIs, risks, and recommended actions."
+      title: "Image OCR and review ready",
+      body: "Vaeroex can review PNG and JPG files for readable text, visible issues, KPIs, risks, and recommended actions."
     };
   }
 
   return {
     title: "Stored reference file",
-    body: "This file can be stored and attached to reports, but content analysis is not available for this file type yet."
+    body: "This file can be stored and attached to reports, but content review is not available for this file type yet."
   };
 }
 
@@ -396,7 +396,7 @@ function analysisStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
     return "Needs review";
   }
 
-  return "Not analyzed";
+  return "Not reviewed";
 }
 
 function reportsForFile(reports: ReportRow[], fileId: string) {
@@ -494,7 +494,7 @@ function FileAnalysisResult({
   if (!result && !file.processing_error && latestRun?.status !== "failed") {
     return (
       <section id="analysis-result" className="rounded-lg border border-dashed border-line bg-white p-4">
-        <p className="text-sm font-semibold text-ink">No analysis result yet</p>
+        <p className="text-sm font-semibold text-ink">No file review yet</p>
         <p className="mt-2 text-sm leading-6 text-muted">
           Analyze this selected file to see Vaeroex findings, KPIs, risks, opportunities, and recommended next actions here.
         </p>
@@ -518,31 +518,31 @@ function FileAnalysisResult({
       <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Latest Vaeroex analysis</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Latest Vaeroex review</p>
             <h4 className="mt-2 text-base font-semibold text-ink">
               {insightCount
                 ? `Vaeroex found ${insightCount} insight${insightCount === 1 ? "" : "s"}`
-                : "Vaeroex completed the analysis"}
+                : "Vaeroex completed the review"}
             </h4>
             <p className="mt-2 text-sm leading-6 text-slate-700">
               {sections.executiveSummary ||
-                "Vaeroex could not find enough readable business data in this file to generate a useful analysis."}
+                "Vaeroex could not find enough readable business data in this file to generate a useful review."}
             </p>
           </div>
           <StatusBadge value="Completed" />
         </div>
         <p className="mt-3 text-xs leading-5 text-muted">
-          Source file: {file.display_name} · Analysis date: {formatDateTime(analysisDate)} · Status: {fileStatusLabel(file)}
+          Source file: {file.display_name} · Review date: {formatDateTime(analysisDate)} · Status: {fileStatusLabel(file)}
         </p>
       </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <AnalysisSection title="Key Findings" items={sections.findings} empty="No specific findings were saved from this analysis." />
         <AnalysisSection title="KPIs Detected" items={sections.kpis} empty="No KPI suggestions were found yet." />
-        <AnalysisSection title="Operational Risks" items={sections.risks} empty="No clear risks were identified." />
+        <AnalysisSection title="Risks" items={sections.risks} empty="No clear risks were identified." />
         <AnalysisSection title="Opportunities" items={sections.opportunities} empty="No clear opportunities were identified." />
         <AnalysisSection title="Recommended Actions" items={sections.actions} empty="No recommended actions were returned." />
-        <AnalysisSection title="Suggested Tasks" items={sections.tasks} empty="No task drafts were suggested." />
+        <AnalysisSection title="Suggested Follow-ups" items={sections.tasks} empty="No follow-up drafts were suggested." />
         <AnalysisSection title="Suggested Reports" items={sections.reports} empty="No additional reports were suggested." />
         <AnalysisSection title="Suggested KPI Records" items={sections.kpiRecords} empty="No KPI records were suggested." />
         <div className="lg:col-span-2">
@@ -742,7 +742,7 @@ function FileActionCenter({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
             <h3 className="mt-1 text-base font-semibold text-ink">{file.display_name}</h3>
             <p className="mt-1 text-sm leading-6 text-muted">
-              Analyze {file.display_name}, stage imports for review, create a report, attach it to an existing report, or inspect details.
+              Review {file.display_name}, stage imports for approval, create a report, attach it to an existing report, or inspect details.
             </p>
             <p className="mt-2 text-xs font-semibold text-slate-700">{support.title}</p>
             <p className="mt-1 text-xs leading-5 text-slate-600">{support.body}</p>
@@ -756,7 +756,7 @@ function FileActionCenter({
           <div>
             <h4 className="text-sm font-semibold text-ink">Analyze {file.display_name} with Vaeroex</h4>
             <p className="mt-1 text-xs leading-5 text-muted">
-              Ask a question about this file. CSV/XLSX files use parsed rows, PDF/DOCX files use extracted readable text, and images use OCR plus visual analysis.
+              Ask a question about this file. CSV/XLSX files use parsed rows, PDF/DOCX files use extracted readable text, and images use OCR plus visual context.
             </p>
           </div>
         </div>
@@ -788,7 +788,7 @@ function FileActionCenter({
           </form>
         ) : (
           <p className="mt-4 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            {support.body} Upload CSV/XLSX, text-based PDF/DOCX, PNG, or JPG files for analysis and report creation.
+            {support.body} Upload CSV/XLSX, text-based PDF/DOCX, PNG, or JPG files for review and report creation.
           </p>
         )}
       </section>
@@ -796,16 +796,16 @@ function FileActionCenter({
       <section id="file-import-actions" className="rounded-lg border border-line bg-white p-4">
         <h4 className="text-sm font-semibold text-ink">Import data from {file.display_name} after review</h4>
         <p className="mt-1 text-xs leading-5 text-muted">
-          These actions extract rows and show a mapping review first. Nothing is saved to KPI, CRM, or operations history until you approve it.
+          These actions extract rows and show a mapping review first. Nothing is saved to KPI, CRM, or business history until you approve it.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <ImportActionForm file={file} importType="kpi" label={`Import ${file.display_name} as KPI Data`} />
           <ImportActionForm file={file} importType="crm" label={`Import ${file.display_name} as CRM Leads`} />
-          <ImportActionForm file={file} importType="metrics" label={`Import ${file.display_name} as Operational Metrics`} />
+          <ImportActionForm file={file} importType="metrics" label={`Import ${file.display_name} as Business Metrics`} />
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            CSV and XLSX files can be imported into structured KPI, CRM, or operational metric records. PDF, DOCX, PNG, and JPG files can still be analyzed, attached to reports, and organized in the file library.
+            CSV and XLSX files can be imported into structured KPI, CRM, or business metric records. PDF, DOCX, PNG, and JPG files can still be reviewed, attached to reports, and organized in the file library.
           </p>
         ) : null}
       </section>
@@ -819,12 +819,12 @@ function FileActionCenter({
                 <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
                   <p className="font-semibold">Analyze this file first?</p>
                   <p className="mt-1">
-                    Vaeroex will extract readable content, generate findings, then create the report from that analysis. If no useful content is found, no empty report will be created.
+                    Vaeroex will extract readable content, prepare findings, then create the report from that review. If no useful content is found, no empty report will be created.
                   </p>
                 </div>
               ) : (
                 <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-                  This report will use the saved Vaeroex analysis, extracted findings, risks, KPIs, and recommended actions for {file.display_name}.
+                  This report will use the saved Vaeroex review, extracted findings, risks, KPIs, and recommended actions for {file.display_name}.
                 </p>
               )}
               <form action={createReportFromFileAction} className="space-y-3">
@@ -910,7 +910,7 @@ function FileActionCenter({
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support CSV/XLSX rows only. PDF/DOCX analysis uses extracted text, and image analysis uses OCR plus visual context.
+            Rows imported stays at 0 for PDFs, documents, and images because structured imports currently support CSV/XLSX rows only. PDF/DOCX review uses extracted text, and image review uses OCR plus visual context.
           </p>
         ) : null}
       </details>
@@ -938,7 +938,7 @@ function NoSelectedFilePanel() {
           <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
           <h3 className="mt-1 text-base font-semibold text-ink">No file selected.</h3>
           <p className="mt-2 text-sm leading-6 text-muted">
-            No file selected. Choose a file from the list to analyze, import, or create a report.
+            No file selected. Choose a file from the list to review, import, or create a report.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -974,7 +974,7 @@ function SelectedFileBanner({
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
             <h3 className="mt-1 break-words text-base font-semibold text-ink">{file.display_name}</h3>
             <p className="mt-1 text-sm leading-6 text-muted">
-              This is the file Vaeroex will use for analysis, imports, reports, and attachments.
+              This is the file Vaeroex will use for review, imports, reports, and attachments.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -988,7 +988,7 @@ function SelectedFileBanner({
               Create report
             </Link>
             <Link href="#analysis-history" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
-              View analysis history
+              View review history
             </Link>
             <Link href="#file-details" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               View file details
@@ -1016,11 +1016,11 @@ function SelectedFileBanner({
             <p className="mt-1 text-sm font-semibold text-ink">{fileStatusLabel(file)}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last analysis status</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last review status</p>
             <p className="mt-1 text-sm font-semibold text-ink">{status}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last analysis date</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last review date</p>
             <p className="mt-1 text-sm font-semibold text-ink">{formatDateTime(latestDate)}</p>
           </div>
           <div>
@@ -1182,7 +1182,7 @@ function AnalysisHistory({
   if (!visibleRuns.length) {
     return (
       <div id="analysis-history" className="rounded-lg border border-dashed border-line bg-white p-4">
-        <p className="text-sm font-semibold text-ink">No analysis history yet</p>
+        <p className="text-sm font-semibold text-ink">No review history yet</p>
         <p className="mt-2 text-sm leading-6 text-muted">
           Analyze a file and Vaeroex will save the result here so you can review it later, create reports, or confirm follow-up work.
         </p>
@@ -1254,7 +1254,7 @@ function AnalysisHistory({
                 </>
               ) : null}
               <Link href={`/app/agents?run=${run.id}` as Route} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
-                Create tasks
+                Create follow-ups
               </Link>
               {hasKpis ? (
                 <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
@@ -1336,7 +1336,7 @@ function FileDetails({
 
       {lines.length && !hasCleanAnalysis ? (
         <section className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
-          <h4 className="text-sm font-semibold text-ink">Latest Vaeroex analysis</h4>
+          <h4 className="text-sm font-semibold text-ink">Latest Vaeroex review</h4>
           <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
             {lines.map((line) => (
               <p key={line}>{line}</p>
@@ -1448,7 +1448,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       <PageHeader
         eyebrow="Files"
         title="Files & Imports"
-        description="Upload, select, analyze, import, review, and turn file findings into reports or follow-up work. Files are optional: you can still create KPIs, CRM leads, tasks, checklists, SOPs, and reports manually."
+        description="Upload, select, analyze, import, review, and turn file findings into reports or follow-up work. Files are optional: you can still create KPIs, CRM leads, follow-ups, checklists, SOPs, and reports manually."
       />
       <ModuleTabs
         tabs={[
@@ -1463,7 +1463,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       <section className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-muted">File workflow</p>
         <ol className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-3 xl:grid-cols-6">
-          {["Upload file", "Select file", "Analyze or import", "Review results", "Create report/KPI/task", "Dashboard updates"].map((step, index) => (
+          {["Upload file", "Select file", "Analyze or import", "Review results", "Create report/KPI/follow-up", "Intelligence updates"].map((step, index) => (
             <li key={step} className="flex items-center gap-2 rounded-md bg-white px-3 py-2">
               <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-vaeroex-blue text-xs font-semibold text-white">{index + 1}</span>
               <span>{step}</span>
@@ -1551,7 +1551,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
             records={managedFiles}
             folders={folderOptions}
             title="Workspace files"
-            description="Use folders for KPI files, reports, SOPs, CRM files, operations files, and custom collections."
+            description="Use folders for KPI files, reports, SOPs, CRM files, execution files, and custom collections."
             emptyTitle="No files uploaded yet"
             emptyDescription="Upload a CSV, XLSX, PDF, image, or DOCX file to start building a workspace file library."
             returnPath="/app/files"
@@ -1563,7 +1563,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
       <SectionCard
         title="Analysis history"
-        description={selectedFile ? `Saved Vaeroex analysis runs for ${selectedFile.display_name}.` : "Recent file analyses saved for this workspace."}
+        description={selectedFile ? `Saved Vaeroex review runs for ${selectedFile.display_name}.` : "Recent file reviews saved for this workspace."}
       >
         <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={selectedFile?.id} showAll={params?.section === "all-analyses"} />
       </SectionCard>

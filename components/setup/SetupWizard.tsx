@@ -8,9 +8,9 @@ import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton
 
 const steps = [
   "Business",
-  "Operations",
+  "Clarity",
   "Systems",
-  "Template",
+  "Profile",
   "Generate"
 ];
 
@@ -78,10 +78,10 @@ export function SetupWizard({ templates, error }: SetupWizardProps) {
       </section>
 
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 1 ? "" : "hidden"}`}>
-          <h2 className="text-xl font-semibold">Operational pressure points</h2>
+          <h2 className="text-xl font-semibold">Clarity gaps</h2>
           <div className="mt-5 space-y-4">
             <label className="block text-sm font-medium">
-              Main operational problem
+              What is hardest to see clearly right now?
               <textarea required name="main_problem" className="mt-2 min-h-24 w-full rounded-lg border border-line px-3 py-2" />
             </label>
             <label className="block text-sm font-medium">
@@ -89,30 +89,30 @@ export function SetupWizard({ templates, error }: SetupWizardProps) {
               <textarea name="current_tools" className="mt-2 min-h-20 w-full rounded-lg border border-line px-3 py-2" />
             </label>
             <label className="block text-sm font-medium">
-              What gets missed most often?
+              What falls through the cracks most often?
               <textarea required name="missed_often" className="mt-2 min-h-20 w-full rounded-lg border border-line px-3 py-2" />
             </label>
           </div>
       </section>
 
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 2 ? "" : "hidden"}`}>
-          <h2 className="text-xl font-semibold">Systems to build</h2>
+          <h2 className="text-xl font-semibold">Structure to build</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="block text-sm font-medium">
               What do you manage?
               <textarea
                 required
                 name="managed_items"
-                placeholder="Employees, vehicles, equipment, customers, jobs, appointments, projects..."
+                placeholder="Employees, vehicles, equipment, customers, jobs, appointments, locations..."
                 className="mt-2 min-h-28 w-full rounded-lg border border-line px-3 py-2"
               />
             </label>
             <label className="block text-sm font-medium">
-              What do you want Vaeroex Ops System to create?
+              What should Vaeroex help structure first?
               <textarea
                 required
                 name="desired_systems"
-                placeholder="Forms, checklists, dashboards, reports, follow-up systems, SOPs, all of them..."
+                placeholder="Visibility dashboard, accountability follow-ups, reports, checklists, SOPs, CRM, KPI tracking..."
                 className="mt-2 min-h-28 w-full rounded-lg border border-line px-3 py-2"
               />
             </label>
@@ -120,7 +120,7 @@ export function SetupWizard({ templates, error }: SetupWizardProps) {
       </section>
 
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 3 ? "" : "hidden"}`}>
-          <h2 className="text-xl font-semibold">Choose starter template</h2>
+          <h2 className="text-xl font-semibold">Choose business profile</h2>
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
             {templates.map((template) => (
               <button
@@ -146,9 +146,9 @@ export function SetupWizard({ templates, error }: SetupWizardProps) {
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 4 ? "" : "hidden"}`}>
           <h2 className="text-xl font-semibold">Generate workspace</h2>
           <p className="mt-3 text-sm leading-6 text-muted">
-            Vaeroex Ops System will create starter dashboard data, 3 forms, 3 checklists, 3 workflow maps,
-            3 SOP drafts, 5 issue categories, 5 setup tasks, assets when relevant, 1 weekly report,
-            and 1 Vaeroex audit result.
+            Vaeroex will create a practical first workspace for visibility, accountability, and execution:
+            forms, checklists, SOP drafts, issue categories, follow-up records, relevant assets, a report,
+            and a Vaeroex review result.
           </p>
           <div className="mt-5">
             <ComplianceNotice />
@@ -159,7 +159,7 @@ export function SetupWizard({ templates, error }: SetupWizardProps) {
             </div>
           ) : null}
           <ConfirmSubmitButton
-            message="Generate this workspace now? Vaeroex will create demo-ready starter records for review."
+            message="Generate this workspace now? Vaeroex will create the first records for review before you use them with real activity."
             className="mt-6 rounded-lg bg-vaeroex-blue px-5 py-2.5 text-sm font-semibold text-white"
           >
             Generate workspace

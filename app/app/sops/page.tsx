@@ -72,7 +72,7 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
       <PageHeader
         eyebrow="SOPs"
         title="SOP Library"
-        description="Draft, review, and maintain step-by-step operating procedures. Vaeroex-generated drafts remain clearly labeled for manager review."
+        description="Draft, review, and maintain step-by-step working procedures. Vaeroex-generated drafts remain clearly labeled for manager review."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
@@ -99,7 +99,7 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="SOP library" description="Versioned procedures for repeatable work.">
+        <SectionCard title="SOP library" description="Versioned procedures that support consistent execution.">
           <ManagedRecordList
             collection="sops"
             records={managedSops}

@@ -17,7 +17,7 @@ const preferences: Array<{ value: ThemePreference; label: string; description: s
   {
     value: "dark",
     label: "Dark Mode",
-    description: "Premium command-center mode for long working sessions."
+    description: "Premium intelligence workspace for long working sessions."
   },
   {
     value: "system",
@@ -109,7 +109,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Theme Settings</p>
             <h2 className="mt-2 text-xl font-semibold text-ink">Choose your Vaeroex appearance</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Light mode remains the default. Dark mode uses a premium executive command-center palette designed for readability.
+              Light mode remains the default. Dark mode uses a premium executive intelligence palette designed for readability.
             </p>
           </div>
           <span className="inline-flex w-fit rounded-full border border-vaeroex-accent/40 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue dark:bg-white/10 dark:text-vaeroex-accent">

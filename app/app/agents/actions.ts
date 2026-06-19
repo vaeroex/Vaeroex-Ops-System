@@ -264,7 +264,7 @@ function taskDrafts(output: JsonRecord) {
 }
 
 function fieldSchema(fields: unknown, formName: string): Json {
-  const values = asArray(fields).length ? asArray(fields) : ["Submitted by", "Operational details", "Priority", "Manager notes"];
+  const values = asArray(fields).length ? asArray(fields) : ["Submitted by", "Business details", "Priority", "Manager notes"];
 
   return values.map((field, index) => {
     const record = asRecord(field);

@@ -457,12 +457,12 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const teamScore = clampScore(70 + input.people.filter((person) => person.role_title && person.department).length * 4 - overdueTasks.length * 2);
   const categories = [
     healthCategory({
-      name: "Operations Health",
+      name: "Execution Health",
       score: operationsScore,
-      explanation: `${openIssues.length} open issues, ${overdueTasks.length} overdue tasks, and checklist completion at ${formatMetric(checkRate, "Checklist Completion Rate")}.`,
-      improved: checkRate && checkRate >= 90 ? "Checklist discipline is helping operations stay visible." : "Core operating records are now centralized enough to review.",
-      declined: overdueTasks.length ? "Overdue work is pulling operations health down." : "No major operations decline is visible.",
-      nextAction: overdueTasks.length ? "Review overdue tasks and assign owners before the next management meeting." : "Keep reviewing checklist completion weekly."
+      explanation: `${openIssues.length} open issues, ${overdueTasks.length} overdue follow-ups, and checklist completion at ${formatMetric(checkRate, "Checklist Completion Rate")}.`,
+      improved: checkRate && checkRate >= 90 ? "Checklist discipline is improving execution visibility." : "Core business records are now centralized enough to review.",
+      declined: overdueTasks.length ? "Overdue work is pulling execution health down." : "No major execution decline is visible.",
+      nextAction: overdueTasks.length ? "Review overdue follow-ups and assign owners before the next management meeting." : "Keep reviewing checklist completion weekly."
     }),
     healthCategory({
       name: "Sales Health",
@@ -475,10 +475,10 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Accountability Health",
       score: accountabilityScore,
-      explanation: `${Math.round(assignedRate)}% of open tasks have visible ownership; ${overdueTasks.length} are overdue.`,
+      explanation: `${Math.round(assignedRate)}% of open follow-ups have visible ownership; ${overdueTasks.length} are overdue.`,
       improved: assignedRate >= 85 ? "Most open work has some ownership." : "Accountability records are available to clean up.",
       declined: overdueTasks.length ? "Overdue work is the biggest accountability drag." : "No overdue drag is visible.",
-      nextAction: "Turn the top Vaeroex priority into an assigned task with a due date."
+      nextAction: "Turn the top Vaeroex priority into an assigned follow-up with a due date."
     }),
     healthCategory({
       name: "Customer Experience Health",
@@ -486,7 +486,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       explanation: `${satisfaction ? `Satisfaction is ${formatMetric(satisfaction.actual_value, satisfaction.name)}.` : "Customer satisfaction is not fully tracked."} ${responseTime ? `Response time is ${formatMetric(responseTime.actual_value, responseTime.name)}.` : ""}`,
       improved: satisfaction && metricOnTarget(satisfaction) ? "Customer satisfaction is at or above target." : "Customer signals are available for review.",
       declined: responseTime && metricOnTarget(responseTime) === false ? "Response time is above target." : "No major customer experience decline is visible.",
-      nextAction: responseTime && metricOnTarget(responseTime) === false ? "Create a response-time recovery task." : "Keep tracking satisfaction and response time."
+      nextAction: responseTime && metricOnTarget(responseTime) === false ? "Create a response-time recovery follow-up." : "Keep tracking satisfaction and response time."
     }),
     healthCategory({
       name: "Process Health",
@@ -507,7 +507,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Team Execution Health",
       score: teamScore,
-      explanation: `${input.people.length} people are recorded; ${overdueTasks.length} tasks are overdue.`,
+      explanation: `${input.people.length} people are recorded; ${overdueTasks.length} follow-ups are overdue.`,
       improved: input.people.length ? "People records allow role and department briefings." : "Team execution can improve once people records are added.",
       declined: overdueTasks.length ? "Overdue work suggests execution risk." : "No major team execution decline is visible.",
       nextAction: "Use the Accountability Map to redistribute overloaded work."
@@ -521,7 +521,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   return {
     score,
     explanation: `Business Health Score: ${score}/100. ${strong ? `${strong.name} is strongest because ${strong.improved.toLowerCase()}` : "The workspace is still building enough history."} ${weak ? `${weak.name} needs attention because ${weak.declined.toLowerCase()}` : "No category is critically weak right now."}`,
-    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, CRM, tasks, reports, and files are added." : null,
+    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, CRM, follow-ups, reports, and files are added." : null,
     categories
   };
 }
@@ -558,7 +558,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatMetric(revenue.target, revenue.name)}.`,
       owner: "Owner",
       dueDate: addDays(todayDate(), 4),
-      action: "Generate a revenue recovery report and assign CRM follow-up tasks.",
+      action: "Generate a revenue recovery report and assign CRM follow-ups.",
       priority: "High",
       relatedModule: "Reports",
       href: "/app/reports"
@@ -585,10 +585,10 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       id: "overdue-work",
       title: "Assign owners to overdue work",
       why: "Overdue work is the clearest signal that follow-through needs attention.",
-      evidence: `${overdueTasks.length} open task${overdueTasks.length === 1 ? "" : "s"} are past due.`,
-      owner: "Operations Manager",
+      evidence: `${overdueTasks.length} open follow-up${overdueTasks.length === 1 ? "" : "s"} are past due.`,
+      owner: "Execution Manager",
       dueDate: addDays(todayDate(), 2),
-      action: "Review overdue tasks, close stale items, and reassign active work.",
+      action: "Review overdue follow-ups, close stale items, and reassign active work.",
       priority: overdueTasks.length > 5 ? "Urgent" : "High",
       relatedModule: "Tasks",
       href: "/app/tasks"
@@ -603,7 +603,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       evidence: `${openIssues.length} issue${openIssues.length === 1 ? "" : "s"} are still open.`,
       owner: "Operations Manager",
       dueDate: addDays(todayDate(), 5),
-      action: "Sort open issues by severity and convert the top risk into a task.",
+      action: "Sort open issues by severity and convert the top risk into a follow-up.",
       priority: "Medium",
       relatedModule: "Issues",
       href: "/app/issues"
@@ -647,7 +647,7 @@ function buildProfitLeaks(input: PrestigeInput) {
         evidence: `${staleLeads.length} active lead${staleLeads.length === 1 ? "" : "s"} have no recent activity. Potential pipeline value: ${currencyFormatter.format(lostValue)}.`,
         owner: "Sales Manager",
         dueDate: addDays(todayDate(), 2),
-        action: "Create a CRM follow-up task list and assign next contact owners.",
+        action: "Create a CRM follow-up list and assign next contact owners.",
         priority: "High",
         relatedModule: "CRM",
         href: "/app/crm"
@@ -719,9 +719,9 @@ function buildProfitLeaks(input: PrestigeInput) {
       ...action({
         id: "overdue-high-value",
         title: "High-priority overdue work may be costing momentum",
-        why: "High-priority tasks that slip often delay revenue, service recovery, or customer follow-through.",
-        evidence: `${highValueOverdue.length} high-priority task${highValueOverdue.length === 1 ? "" : "s"} are overdue.`,
-        owner: "Operations Manager",
+        why: "High-priority follow-ups that slip often delay revenue, service recovery, or customer follow-through.",
+        evidence: `${highValueOverdue.length} high-priority follow-up${highValueOverdue.length === 1 ? "" : "s"} are overdue.`,
+        owner: "Execution Manager",
         dueDate: addDays(todayDate(), 2),
         action: "Reassign overdue high-priority work and review blockers.",
         priority: "High",
@@ -779,7 +779,7 @@ function buildMemoryTimeline(input: PrestigeInput, focus: PrestigeAction[]) {
       title: report.title,
       whatHappened: report.report_type,
       cause: "Report saved the business story for this period.",
-      actionTaken: "Review recommendations and convert selected actions into tasks.",
+      actionTaken: "Review recommendations and convert selected actions into follow-ups.",
       outcome: "Saved as part of business memory.",
       href: "/app/reports"
     });
@@ -923,7 +923,7 @@ function buildDepartmentScorecards(input: PrestigeInput) {
       explanation:
         score < 70
           ? `${department} scores lower because overdue work, open issues, or missing KPI/checklist signals need attention.`
-          : `${department} is relatively stable based on current tasks, issues, KPIs, and checklist signals.`
+          : `${department} is relatively stable based on current follow-ups, issues, KPIs, and checklist signals.`
     } satisfies DepartmentScorecard;
   });
 }
@@ -932,7 +932,7 @@ function buildToolSprawl(input: PrestigeInput) {
   const usage = [
     ["KPIs", input.kpis.length > 0, "manual KPI tracker"],
     ["CRM", input.crmLeads.length > 0, "CRM spreadsheet"],
-    ["Tasks", input.tasks.length > 0, "loose task list"],
+    ["Follow-ups", input.tasks.length > 0, "loose follow-up list"],
     ["Checklists", input.checklists.length > 0, "paper checklist"],
     ["Files", input.files.length > 0, "shared drive review"],
     ["Reports", input.reports.length > 0, "manual report doc"],
@@ -950,7 +950,7 @@ function buildToolSprawl(input: PrestigeInput) {
     modulesUsed,
     modulesNotUsed,
     replaced,
-    explanation: `Operational data centralized: ${score}%. Vaeroex has replaced or reduced reliance on ${replaced.length ? replaced.join(", ") : "manual tools as records are added"}.`
+    explanation: `Business intelligence centralized: ${score}%. Vaeroex has replaced or reduced reliance on ${replaced.length ? replaced.join(", ") : "manual tools as records are added"}.`
   };
 }
 
@@ -974,7 +974,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
       title: "SOPs should be reviewed every 90 days",
       status: staleSops.length ? "Needs attention" : input.sops.length ? "On track" : "Missing data",
       evidence: staleSops.length ? `${staleSops.length} stale SOPs detected.` : `${input.sops.length} SOPs available.`,
-      recommendedAction: "Create a monthly SOP review task."
+      recommendedAction: "Create a monthly SOP review follow-up."
     },
     {
       title: "Critical issues should have an owner",
@@ -983,9 +983,9 @@ function buildBenchmarkMode(input: PrestigeInput) {
       recommendedAction: "Assign owners to unresolved critical issues."
     },
     {
-      title: "High-priority tasks should have due dates",
+      title: "High-priority follow-ups should have due dates",
       status: highPriorityWithoutDueDate.length ? "Needs attention" : input.tasks.length ? "On track" : "Missing data",
-      evidence: `${highPriorityWithoutDueDate.length} high-priority task${highPriorityWithoutDueDate.length === 1 ? "" : "s"} lack due dates.`,
+      evidence: `${highPriorityWithoutDueDate.length} high-priority follow-up${highPriorityWithoutDueDate.length === 1 ? "" : "s"} lack due dates.`,
       recommendedAction: "Add due dates to high-priority work."
     },
     {
@@ -998,7 +998,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
       title: "CRM leads should have next follow-up activity",
       status: leadsWithoutFollowup.length ? "Needs attention" : input.crmLeads.length ? "On track" : "Missing data",
       evidence: `${leadsWithoutFollowup.length} active lead${leadsWithoutFollowup.length === 1 ? "" : "s"} have no recent activity.`,
-      recommendedAction: "Create CRM follow-up tasks for stalled leads."
+      recommendedAction: "Create CRM follow-ups for stalled leads."
     },
     {
       title: "KPIs should have targets",
@@ -1031,20 +1031,20 @@ function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: Pr
     {
       role: "Manager",
       title: "Manager briefing",
-      summary: `${openTasks.length} open task${openTasks.length === 1 ? "" : "s"} and ${overdue.length} overdue item${overdue.length === 1 ? "" : "s"} need follow-through.`,
-      focus: ["Assign overdue work", "Close open issues", "Create follow-up tasks"]
+      summary: `${openTasks.length} open follow-up${openTasks.length === 1 ? "" : "s"} and ${overdue.length} overdue item${overdue.length === 1 ? "" : "s"} need follow-through.`,
+      focus: ["Assign overdue work", "Close open issues", "Create follow-ups"]
     },
     {
       role: "Supervisor",
       title: "Supervisor briefing",
-      summary: "Focus on today’s tasks, checklist completion, field issues, and assignments due soon.",
+      summary: "Focus on today’s follow-ups, checklist completion, field issues, and assignments due soon.",
       focus: ["Run checklists", "Review field issues", "Confirm assigned work"]
     },
     {
       role: "Coordinator / Staff",
       title: "Staff briefing",
-      summary: "Focus on assigned tasks, due dates, shared reports, and checklist items.",
-      focus: ["Review assigned tasks", "Check due dates", "Open shared reports"]
+      summary: "Focus on assigned follow-ups, due dates, shared reports, and checklist items.",
+      focus: ["Review assigned follow-ups", "Check due dates", "Open shared reports"]
     },
     {
       role: "Viewer",
@@ -1136,7 +1136,7 @@ function buildMeetingMode(input: PrestigeInput, focus: PrestigeAction[]) {
     "KPI review: compare current KPIs to targets and prior period.",
     "CRM pipeline review: inspect stalled leads, proposal-stage records, and follow-up gaps.",
     `Open issues: review ${input.issues.filter(isOpenIssue).length} active issue${input.issues.filter(isOpenIssue).length === 1 ? "" : "s"}.`,
-    `Overdue tasks: review ${overdue.length} overdue task${overdue.length === 1 ? "" : "s"}.`,
+    `Overdue follow-ups: review ${overdue.length} overdue follow-up${overdue.length === 1 ? "" : "s"}.`,
     "Checklist compliance: confirm missed runs, failed runs, and assigned owner follow-up.",
     "SOP review: identify stale or weak procedures affecting current performance.",
     "Department risks: review department scorecards and workload imbalance.",

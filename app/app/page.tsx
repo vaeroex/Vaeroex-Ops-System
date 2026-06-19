@@ -554,9 +554,9 @@ function buildSmartAlerts({
       ? {
           id: "overdue-tasks",
           severity: "High",
-          title: `${overdueTasks.length} overdue task${overdueTasks.length === 1 ? "" : "s"}`,
+          title: `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"}`,
           why: "Overdue work usually means ownership, capacity, or handoff problems need review.",
-          action: "Review overdue tasks",
+          action: "Review overdue follow-ups",
           href: "/app/tasks"
         }
       : null,
@@ -564,8 +564,8 @@ function buildSmartAlerts({
       ? {
           id: "unassigned-tasks",
           severity: "Medium",
-          title: `${unassignedTasks.length} task${unassignedTasks.length === 1 ? "" : "s"} without an owner`,
-          why: "Tasks without clear ownership are easy to miss even when the team is busy.",
+          title: `${unassignedTasks.length} follow-up${unassignedTasks.length === 1 ? "" : "s"} without an owner`,
+          why: "Follow-ups without clear ownership are easy to miss even when the team is busy.",
           action: "Assign owners",
           href: "/app/tasks"
         }
@@ -575,7 +575,7 @@ function buildSmartAlerts({
           id: "kpis-below-target",
           severity: "High",
           title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} below target`,
-          why: "Below-target metrics should be reviewed against recent tasks, CRM activity, and operational issues.",
+          why: "Below-target metrics should be reviewed against recent follow-ups, CRM activity, and open risks.",
           action: "Review KPIs",
           href: "/app/kpis"
         }
@@ -614,9 +614,9 @@ function buildSmartAlerts({
       ? {
           id: "unanalyzed-files",
           severity: "Medium",
-          title: `${unanalyzedFiles.length} uploaded file${unanalyzedFiles.length === 1 ? "" : "s"} not analyzed`,
+          title: `${unanalyzedFiles.length} uploaded file${unanalyzedFiles.length === 1 ? "" : "s"} not reviewed`,
           why: "Uploaded files should either feed historical memory or produce clear findings for reports.",
-          action: "Analyze files",
+          action: "Review files",
           href: "/app/files"
         }
       : null,
@@ -668,11 +668,11 @@ function ExecutiveBriefingCard({
           </div>
           <h2 className="mt-3 text-2xl font-semibold text-white">What changed and what to do next</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-100">
-            A {period.toLowerCase()} owner-ready readout from KPIs, CRM, tasks, issues, files, checklists, SOPs, reports, and Vaeroex insights.
+            A {period.toLowerCase()} owner-ready readout from KPIs, CRM, follow-ups, risks, files, checklists, SOPs, reports, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">Create Task</Link>
+          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">Create Follow-up</Link>
           <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Generate Report</Link>
           <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Review Issues</Link>
           <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Review KPIs</Link>
@@ -701,7 +701,7 @@ function SmartAlerts({ alerts }: { alerts: DashboardAlert[] }) {
     return (
       <section className="rounded-lg border border-emerald-100 bg-emerald-50 p-5 text-emerald-800">
         <p className="text-sm font-semibold">No urgent alerts right now.</p>
-        <p className="mt-1 text-sm leading-6">Vaeroex did not find overdue work, stale reviews, or missing reports that need immediate attention.</p>
+        <p className="mt-1 text-sm leading-6">Vaeroex did not find overdue follow-ups, stale reviews, or missing reports that need immediate attention.</p>
       </section>
     );
   }
@@ -840,15 +840,15 @@ function DemoWorkspaceBanner({
   const summaryItems = [
     ["Demo KPIs", counts.kpis],
     ["Demo Leads", counts.crm],
-    ["Demo Tasks", counts.tasks],
+    ["Demo Follow-ups", counts.tasks],
     ["Demo Reports", counts.reports],
     ["Demo Issues", counts.issues]
   ];
   const countItems = [
     ["KPIs", counts.kpis],
-    ["Operational metrics", counts.operationalMetrics],
+    ["Business metrics", counts.operationalMetrics],
     ["CRM leads", counts.crm],
-    ["Open tasks", counts.tasks],
+    ["Open follow-ups", counts.tasks],
     ["Open issues", counts.issues],
     ["Reports", counts.reports],
     ["SOPs", counts.sops],
@@ -867,8 +867,8 @@ function DemoWorkspaceBanner({
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
-            Demo Workspace &mdash; simulated sample data from January to current month. No real emails or customer notifications are sent.
-            It includes YTD KPI movement, CRM activity, weak-month alerts, reports, tasks, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
+            Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails or customer notifications are sent.
+            It includes YTD KPI movement, CRM activity, weak-month alerts, reports, follow-ups, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -898,7 +898,7 @@ function DemoWorkspaceBanner({
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">Current month signals</p>
           <p className="mt-2 text-xs leading-5">
-            Revenue is healthy, but response time, conversion, overdue tasks, and checklist completion still need owner attention.
+            Revenue is healthy, but response time, conversion, overdue follow-ups, and checklist completion still need owner attention.
           </p>
         </article>
       </div>
@@ -1090,7 +1090,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
     .slice(0, 4);
   const risks = [
-    overdueTasks.length ? `${overdueTasks.length} overdue task${overdueTasks.length === 1 ? "" : "s"} need owner follow-up.` : "",
+    overdueTasks.length ? `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"} need owner attention.` : "",
     openIssues.length ? `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} remain unresolved.` : "",
     checklistFailures.length ? `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"} failed or need review.` : "",
     pendingImports.length ? `${pendingImports.length} extracted file import${pendingImports.length === 1 ? "" : "s"} are waiting for mapping review.` : "",
@@ -1099,15 +1099,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const opportunities = [
     leadsCreated.length ? `${leadsCreated.length} new lead${leadsCreated.length === 1 ? "" : "s"} can be reviewed for follow-up or conversion.` : "",
     positiveTrends[0] ? `${positiveTrends[0].name} is showing the strongest improvement this period.` : "",
-    recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex analysis.` : "",
-    operationalMetrics.length ? "Operational metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
+    recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex review.` : "",
+    operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
-    overdueTasks.length ? "Assign due dates and owners for overdue work before the next management check-in." : "",
-    openIssues.length ? "Sort open issues by severity and convert unresolved items into tasks." : "",
+    overdueTasks.length ? "Assign due dates and owners for overdue follow-ups before the next management check-in." : "",
+    openIssues.length ? "Sort open issues by severity and convert unresolved items into accountable follow-ups." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
-    negativeTrends.length ? "Review declining KPIs against recent imports, CRM activity, and task workload." : "",
+    negativeTrends.length ? "Review declining KPIs against recent imports, CRM activity, and follow-up workload." : "",
     !kpis.length ? "Create your first KPI manually, or import existing KPI data if you already have a spreadsheet." : "",
     !crmLeads.length ? "Add a CRM lead manually, or import a lead list later when one is available." : "",
     !reports.length ? "Generate a report for this period so the management summary is saved." : ""
@@ -1151,7 +1151,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: "demo-current-month-mixed",
           severity: "Medium",
           title: "Current month has mixed signals",
-          why: "Revenue is above target, but conversion, response time, overdue tasks, and checklist completion still need owner follow-up.",
+          why: "Revenue is above target, but conversion, response time, overdue follow-ups, and checklist completion still need owner follow-up.",
           action: "Review recommended actions",
           href: "/app/tasks"
         }
@@ -1177,14 +1177,14 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     {
       id: "profile",
       title: "Complete business profile",
-      helpText: "Confirm workspace name, contact, team size, and business details so Vaeroex recommendations have the right context.",
+      helpText: "Confirm workspace name, contact, team size, and business details so Vaeroex has the right context.",
       href: "/app/setup",
       completed: Boolean(context.activeWorkspace?.primary_contact_email || context.activeWorkspace?.size)
     },
     {
       id: "business-type",
       title: "Choose business type",
-      helpText: "Business type helps Vaeroex suggest practical workflows, KPIs, reports, and operating rhythms.",
+      helpText: "Business type helps Vaeroex suggest practical visibility, accountability, execution, KPI, and report structure.",
       href: "/app/setup",
       completed: Boolean(context.activeWorkspace?.industry)
     },
@@ -1205,21 +1205,21 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     {
       id: "file",
       title: "Upload first file",
-      helpText: "Optional: upload CSV, XLSX, PDF, DOCX, PNG, or JPG when you already have business data to analyze.",
+      helpText: "Optional: upload CSV, XLSX, PDF, DOCX, PNG, or JPG when you already have business data to review.",
       href: "/app/files",
       completed: Boolean(files.length),
       optional: true
     },
     {
       id: "task",
-      title: "Create first task",
+      title: "Create first follow-up",
       helpText: "Create one accountable next action with a priority and due date.",
       href: "/app/tasks",
       completed: Boolean(tasks.length)
     },
     {
       id: "vaeroex",
-      title: "Run first Vaeroex analysis",
+      title: "Run first Vaeroex review",
       helpText: "Ask Vaeroex what needs attention using the records already in this workspace.",
       href: "/app/agents",
       completed: vaeroexRuns.some((run) => run.status === "completed")
@@ -1241,9 +1241,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         declined:
           "March revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and checklist completion fell to 78%.",
         attention:
-          "The current month still shows softer conversion, slower response time, overdue tasks, and checklist completion below target.",
+          "The current month still shows softer conversion, slower response time, overdue follow-ups, and checklist completion below target.",
         recommendation:
-          "Create a CRM follow-up task, update the customer follow-up SOP, run a checklist review, create a KPI review task, and generate a monthly recovery report."
+          "Create a CRM follow-up, update the customer follow-up SOP, run a checklist review, create a KPI review follow-up, and generate a monthly recovery report."
       }
     : {
         whatChanged: recentImports.length
@@ -1337,9 +1337,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Executive Dashboard"
-        title={context.activeWorkspace?.name ?? "Vaeroex executive dashboard"}
-        description={`A ${period.toLowerCase()} view of KPI history, tasks, issues, files, CRM activity, reports, and Vaeroex recommendations.`}
+        eyebrow="Operations Intelligence"
+        title={context.activeWorkspace?.name ?? "Vaeroex intelligence dashboard"}
+        description={`A ${period.toLowerCase()} view of visibility, accountability, execution, KPI history, CRM signals, risks, files, reports, and Vaeroex decision support.`}
         actions={<PeriodSelector period={period} />}
       />
 
@@ -1437,7 +1437,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-        <SectionCard title="Assigned work" description="Follow-ups can be assigned to a person, role, or department without changing app permissions.">
+        <SectionCard title="Accountability assignments" description="Follow-ups can be assigned to a person, role, or department without changing app permissions.">
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <h3 className="text-sm font-semibold text-ink">Assigned to me</h3>
@@ -1499,7 +1499,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Recent shares" description="Reports, KPI views, file analyses, and Vaeroex recommendations shared inside the workspace.">
+        <SectionCard title="Recent shares" description="Reports, KPI views, file analyses, and Vaeroex decision support shared inside the workspace.">
           <SimpleList
             items={shares.slice(0, 6)}
             empty="No records have been shared yet."
@@ -1543,11 +1543,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       <section className="grid gap-4 lg:grid-cols-2">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve existing systems" : "Start from scratch"}</p>
+          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve current structure" : "Build your first structure"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Your workspace already has activity. Focus on improving existing KPIs, CRM records, tasks, checklists, SOPs, and reports instead of creating duplicate systems."
-              : "Add KPIs, CRM leads, tasks, checklists, and SOPs directly in Vaeroex. The dashboard and reports work as soon as records are created."}
+              ? "Your workspace already has activity. Focus on improving existing KPIs, CRM records, follow-ups, checklists, SOPs, and reports instead of creating duplicate systems."
+              : "Add KPIs, CRM leads, follow-ups, checklists, and SOPs directly in Vaeroex. The dashboard and reports work as soon as records are created."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/kpis" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
@@ -1557,12 +1557,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               {crmLeads.length ? "Review CRM" : "Add CRM lead"}
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {tasks.length ? "Review tasks" : "Add task"}
+              {tasks.length ? "Review follow-ups" : "Add follow-up"}
             </Link>
           </div>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Turn data into action" : "Import existing data"}</p>
+          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Turn visibility into execution" : "Import existing data"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
               ? "Use recent files, imports, reports, and Vaeroex findings to update existing dashboards, assign follow-up work, and keep reports current."
@@ -1583,8 +1583,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         {primaryTrends.map((trend) => (
           <KpiCard key={trend.name} trend={trend} />
         ))}
-        <StatCard label="Open Tasks" value={openTasks.length} detail={`${overdueTasks.length} overdue`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
-        <StatCard label="Open Issues" value={openIssues.length} detail="Active operational blockers" tone={openIssues.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
+        <StatCard label="Open Follow-ups" value={openTasks.length} detail={`${overdueTasks.length} overdue`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
+        <StatCard label="Open Risks" value={openIssues.length} detail="Active risks and blockers" tone={openIssues.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Recent Imports" value={recentImports.length} detail={`${pendingImports.length} waiting for review`} tone={pendingImports.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-line bg-white text-ink"} />
       </section>
 
@@ -1630,10 +1630,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Tasks" description="Open work and overdue accountability.">
+        <SectionCard title="Follow-up ownership" description="Open follow-ups and overdue accountability.">
           <SimpleList
             items={openTasks.slice(0, 6)}
-            empty="No open tasks."
+            empty="No open follow-ups."
             render={(task: TaskRow) => (
               <div key={task.id} className="rounded-lg border border-line p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -1705,7 +1705,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           />
         </SectionCard>
 
-        <SectionCard title="File insights" description="Latest Vaeroex file analyses saved to workspace memory.">
+        <SectionCard title="File insights" description="Latest Vaeroex file reviews saved to workspace memory.">
           <SimpleList
             items={fileAnalyses}
             empty="No file analyses saved yet."
@@ -1770,7 +1770,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-        <SectionCard title="Reports and Vaeroex insights" description="Saved management summaries and recent Vaeroex recommendations.">
+        <SectionCard title="Reports and Vaeroex insights" description="Saved management summaries and recent Vaeroex decision support.">
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
               <h3 className="text-sm font-semibold text-ink">Latest reports</h3>
@@ -1789,7 +1789,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               <h3 className="text-sm font-semibold text-ink">Latest Vaeroex insights</h3>
               <SimpleList
                 items={vaeroexRuns.slice(0, 5)}
-                empty="No Vaeroex insights yet."
+                empty="No Vaeroex decision support saved yet."
                 render={(run: VaeroexRunRow) => (
                   <div key={run.id} className="rounded-lg border border-line p-3">
                     <div className="flex items-start justify-between gap-3">

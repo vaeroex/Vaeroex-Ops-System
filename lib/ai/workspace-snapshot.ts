@@ -205,7 +205,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       open_records: openTasks.count ?? 0,
       overdue_records: overdueTasks.count ?? 0,
       statuses: countByStatus(recentTaskRows),
-      guidance: "Task tracking already exists. Recommend assigning owners, due dates, priorities, or converting recommendations into tasks."
+      guidance: "Follow-up ownership already exists. Recommend assigning owners, due dates, priorities, or converting recommendations into follow-ups."
     },
     issue_tracking: {
       exists: true,
@@ -265,7 +265,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
     pendingImports.length ? `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"} are waiting for review or approval.` : "",
-    (overdueTasks.count ?? 0) ? `${overdueTasks.count} task${overdueTasks.count === 1 ? "" : "s"} are overdue.` : "",
+    (overdueTasks.count ?? 0) ? `${overdueTasks.count} follow-up${overdueTasks.count === 1 ? "" : "s"} are overdue.` : "",
     (openIssues.count ?? 0) ? `${openIssues.count} issue${openIssues.count === 1 ? "" : "s"} are open.` : ""
   ].filter(Boolean);
 
@@ -275,9 +275,9 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     workspace_awareness_rules: [
       "Do not recommend creating a Vaeroex module that already exists in module_state.",
       "If a module exists, recommend improving, filling, reviewing, cleaning, converting, assigning, or using existing records.",
-      "Mention the specific existing workspace records, counts, gaps, overdue work, stale items, file analyses, reports, KPIs, CRM records, SOPs, checklists, issues, tasks, assets, or people records that support the recommendation.",
+      "Mention the specific existing workspace records, counts, gaps, overdue work, stale items, file analyses, reports, KPIs, CRM records, SOPs, checklists, issues, follow-ups, assets, or people records that support the recommendation.",
       "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Convert Insight Into Action, Operational Risk, Dashboard / KPI Improvement, CRM / Revenue Improvement, SOP / Process Improvement, or File / Report Follow-up.",
-      "Never say 'Create KPI Dashboard', 'Create CRM', 'Create task tracking', 'Create SOPs', 'Create reports', or 'Upload files' as a generic recommendation. Vaeroex already has those modules."
+      "Never say 'Create KPI Dashboard', 'Create CRM', 'Create follow-up tracking', 'Create SOPs', 'Create reports', or 'Upload files' as a generic recommendation. Vaeroex already has those modules."
     ],
     module_state: moduleState,
     workspace_gaps: gaps,

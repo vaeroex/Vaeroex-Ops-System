@@ -120,7 +120,7 @@ async function requireWorkspace(path: string) {
 
 function formSchemaFromLines(fieldLines: string): Json {
   const values = lines(fieldLines);
-  const fields = values.length ? values : ["Submitted by", "Operational details", "Priority", "Manager notes"];
+  const fields = values.length ? values : ["Submitted by", "Business details", "Priority", "Manager notes"];
 
   return fields.map((field, index) => ({
     key: slugify(field) || `field-${index + 1}`,
@@ -231,7 +231,7 @@ export async function convertSubmissionToTaskAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app/form-submissions");
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Follow-up task created.");
+  redirectWithMessage(path, "Follow-up created.");
 }
 
 export async function createChecklistAction(formData: FormData) {
@@ -299,8 +299,8 @@ export async function createTaskAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace(path);
   const title = text(formData, "title");
 
-  requireValue(path, "Task title", title);
-  validateLength(path, "Task description", text(formData, "description"), 2000);
+  requireValue(path, "Follow-up title", title);
+  validateLength(path, "Follow-up description", text(formData, "description"), 2000);
 
   const { error } = await supabase.from("tasks").insert({
     workspace_id: workspaceId,
@@ -321,7 +321,7 @@ export async function createTaskAction(formData: FormData) {
   }
 
   revalidatePath(path);
-  redirectWithMessage(path, "Task created.");
+  redirectWithMessage(path, "Follow-up created.");
 }
 
 export async function updateTaskStatusAction(formData: FormData) {
@@ -340,7 +340,7 @@ export async function updateTaskStatusAction(formData: FormData) {
   }
 
   revalidatePath(path);
-  redirectWithMessage(path, "Task status updated.");
+  redirectWithMessage(path, "Follow-up status updated.");
 }
 
 export async function createKpiAction(formData: FormData) {
@@ -593,7 +593,7 @@ export async function convertIssueToTaskAction(formData: FormData) {
 
   revalidatePath(path);
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Resolution task created.");
+  redirectWithMessage(path, "Resolution follow-up created.");
 }
 
 export async function createAssetAction(formData: FormData) {

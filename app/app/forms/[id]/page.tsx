@@ -39,7 +39,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
       <PageHeader
         eyebrow="Form detail"
         title={form.name}
-        description={form.description || "Review schema, capture submissions, and create follow-up tasks."}
+        description={form.description || "Review schema, capture submissions, and create follow-ups."}
         actions={
           <Link href="/app/forms" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Back to forms
@@ -92,8 +92,8 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
                   <form action={convertSubmissionToTaskAction} className="mt-4">
                     <input type="hidden" name="form_id" value={form.id} />
                     <input type="hidden" name="submission_id" value={submission.id} />
-                    <ConfirmSubmitButton message="Create a follow-up task from this submission?">
-                      Create follow-up task
+                    <ConfirmSubmitButton message="Create a follow-up from this submission?">
+                      Create follow-up
                     </ConfirmSubmitButton>
                   </form>
                 </article>

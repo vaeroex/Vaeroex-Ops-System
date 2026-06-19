@@ -16,7 +16,7 @@ export default async function ForgotPasswordPage({ searchParams }: ForgotPasswor
   return (
     <AuthShell
       title="Reset password"
-      subtitle="Send password reset instructions for your Vaeroex Ops System account."
+      subtitle="Send password reset instructions for your Vaeroex account."
     >
       <form action={forgotPasswordAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />

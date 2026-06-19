@@ -877,13 +877,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       tone: metricTone(conversionRate?.actual_value ?? null, conversionRate?.target ?? null)
     },
     {
-      label: "Tasks Completed",
+      label: "Follow-ups Completed",
       value: completedTasks,
-      detail: "All completed tasks in this workspace",
+      detail: "All completed follow-ups in this workspace",
       tone: completedTasks > 0 ? "green" : "yellow"
     },
     {
-      label: "Open Tasks",
+      label: "Open Follow-ups",
       value: openTasks,
       detail: "Lower is better for daily accountability",
       tone: openTaskTone(openTasks)
@@ -962,8 +962,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="KPIs"
-        title="KPI Dashboard"
+        eyebrow="Visibility"
+        title="KPI Visibility"
         description="Track practical business metrics by workspace, compare actual results to targets, and keep owners accountable."
       />
       <ModuleTabs
@@ -1108,7 +1108,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             title="KPI records"
             description="KPI rows can be edited, grouped, duplicated, archived, soft-deleted, or moved in bulk."
             emptyTitle="No KPIs yet"
-            emptyDescription="Create your first KPI for revenue, leads, conversion rate, task completion, or any custom metric your team reviews."
+            emptyDescription="Create your first KPI for revenue, leads, conversion rate, follow-up completion, or any custom metric your team reviews."
             searchParams={params}
           />
         </SectionCard>

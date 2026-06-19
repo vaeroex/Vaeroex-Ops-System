@@ -1,6 +1,6 @@
 # Squarespace Subscription Setup
 
-Vaeroex Ops System uses Squarespace as the storefront, checkout, payment, and subscription billing layer. The Vaeroex app controls software access after purchase.
+Vaeroex uses Squarespace as the storefront, checkout, payment, and subscription billing layer. The Vaeroex app controls platform access after purchase.
 
 ## 1. Create One Squarespace Subscription Product
 
@@ -16,14 +16,14 @@ Squarespace remains the source of truth for checkout pricing, discounts, promoti
 
 ## 2. Product Positioning
 
-Use the Vaeroex product for the complete operations platform:
+Use the Vaeroex product for the complete Operations Intelligence Platform:
 
-- Executive Dashboard
+- Operations Intelligence Dashboard
 - CRM
 - KPIs
 - Reports
 - SOPs
-- Tasks
+- Follow-ups
 - Issues
 - Checklists
 - Files
@@ -34,7 +34,7 @@ Use the Vaeroex product for the complete operations platform:
 - Report Scheduling
 - Report Sharing
 - KPI Alerts
-- Vaeroex AI
+- Vaeroex decision support
 - Business Health Score
 - Business Memory
 - Profit Leak Detector
@@ -44,7 +44,7 @@ Use the Vaeroex product for the complete operations platform:
 - Demo Workspace
 - Security Features
 - Help Center
-- Future Prestige Features
+- Future intelligence features
 
 ## 3. Set Checkout Success Page
 
@@ -103,8 +103,7 @@ NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL=
 The app maps these current product names automatically:
 
 - Vaeroex
-- Vaeroex Ops System
-- Vaeroex Operations System
+- Vaeroex Operations Intelligence Platform
 
 For backward compatibility, old legacy product names/SKUs are still accepted by the webhook and mapped to the single internal `vaeroex` plan.
 

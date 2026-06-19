@@ -60,10 +60,10 @@ type ScheduledReportRunRow = Database["public"]["Tables"]["scheduled_report_runs
 type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
-const REPORT_TYPES = ["Operations Summary", "Accountability Review", "Bottleneck Review", "Readiness Snapshot", "Executive Summary"];
+const REPORT_TYPES = ["Intelligence Summary", "Accountability Review", "Bottleneck Review", "Readiness Snapshot", "Executive Summary"];
 const BASE_CATEGORIES = [
   "All",
-  "Tasks",
+  "Follow-ups",
   "Checklists",
   "SOPs",
   "Issues",
@@ -72,7 +72,7 @@ const BASE_CATEGORIES = [
   "KPIs",
   "Files",
   "CRM",
-  "Operational metrics",
+  "Business metrics",
   "Vaeroex insights"
 ];
 const reportEditFields: ManagedRecordEditField[] = [
@@ -803,10 +803,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       preview: shortPreview(report.body_markdown, "No report body yet."),
       meta: [
         { label: "Date range", value: reportDateLabel(report) },
-        { label: "Completed tasks", value: numberFromSource(report.source_data_json, "completed_tasks") },
+        { label: "Completed follow-ups", value: numberFromSource(report.source_data_json, "completed_tasks") },
         { label: "Checklist completions", value: numberFromSource(report.source_data_json, "checklist_completions") },
         { label: "Open issues", value: numberFromSource(report.source_data_json, "open_issues") },
-        { label: "Overdue tasks", value: numberFromSource(report.source_data_json, "overdue_tasks") },
+        { label: "Overdue follow-ups", value: numberFromSource(report.source_data_json, "overdue_tasks") },
         { label: "Shared with", value: reportShares.length ? `${reportShares.length} recipient record${reportShares.length === 1 ? "" : "s"}` : "Not shared" }
       ],
       editFields: reportEditFields,
@@ -858,7 +858,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <PageHeader
         eyebrow="Reports"
         title="Reports"
-        description="Generate daily, weekly, monthly, quarterly, yearly, and year-to-date summaries for the active workspace. Reports use the selected period, compare against the prior period where possible, and keep source data hidden unless admin debug mode is enabled."
+        description="Generate daily, weekly, monthly, quarterly, yearly, and year-to-date intelligence summaries for the active workspace. Reports use the selected period, compare against the prior period where possible, and keep source data hidden unless admin debug mode is enabled."
       />
       <ModuleTabs
         tabs={[
@@ -901,8 +901,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       <SuccessNotice message={params?.message} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Open tasks" value={openTaskCount.count ?? 0} note="Current active follow-up work." />
-        <MetricCard label="Overdue tasks" value={overdueTaskCount.count ?? 0} note="Tasks due before today." />
+        <MetricCard label="Open follow-ups" value={openTaskCount.count ?? 0} note="Current active follow-up work." />
+        <MetricCard label="Overdue follow-ups" value={overdueTaskCount.count ?? 0} note="Follow-ups due before today." />
         <MetricCard label="Open issues" value={openIssueCount.count ?? 0} note="Unresolved risks and blockers." />
         <MetricCard label="Checklist completions" value={checklistCompletionCount.count ?? 0} note={`${sopCount.count ?? 0} SOPs available for reference.`} />
       </section>
@@ -959,7 +959,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <section className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-2">
-          <CreateDrawer title="Generate report" description="Choose a reporting period and Vaeroex will summarize the matching workspace activity." triggerLabel="Generate Report">
+          <CreateDrawer title="Generate report" description="Choose a reporting period and Vaeroex will summarize the matching workspace signals." triggerLabel="Generate Report">
             <form action={generateReportAction} className="grid gap-4">
               <label className="block text-sm font-medium">
                 Workspace
@@ -971,7 +971,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </label>
               <SelectInput label="Report period" name="report_period" defaultValue="Weekly" options={REPORT_PERIODS} required />
               <TextInput label="Date in period" name="anchor_date" type="date" defaultValue={todayDate()} />
-              <SelectInput label="Report type" name="report_type" defaultValue="Operations Summary" options={REPORT_TYPES} required />
+              <SelectInput label="Report type" name="report_type" defaultValue="Intelligence Summary" options={REPORT_TYPES} required />
               <SelectInput label="Category" name="category" defaultValue="All" options={categoryOptions} />
               <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
                 Daily uses the selected day. Weekly uses the selected week. Monthly, quarterly, and yearly use the selected date to choose the matching period. Year to Date always runs January 1 through today.

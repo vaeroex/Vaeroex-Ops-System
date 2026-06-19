@@ -14,14 +14,14 @@ const baseNavSections = [
   {
     label: "Home",
     items: [
-      { href: "/app", label: "Executive Dashboard" },
+      { href: "/app", label: "Operations Intelligence" },
       { href: "/app/notifications", label: "Notifications" }
     ]
   },
   {
-    label: "Operations",
+    label: "Execution",
     items: [
-      { href: "/app/tasks", label: "Tasks" },
+      { href: "/app/tasks", label: "Follow-ups" },
       { href: "/app/checklists", label: "Checklists" },
       { href: "/app/issues", label: "Issues" },
       { href: "/app/assets", label: "Assets" },
@@ -29,7 +29,7 @@ const baseNavSections = [
     ]
   },
   {
-    label: "Sales & Customers",
+    label: "Growth",
     items: [
       { href: "/app/crm", label: "CRM" },
       { href: "/app/forms", label: "Forms" },
@@ -37,7 +37,7 @@ const baseNavSections = [
     ]
   },
   {
-    label: "Data & Insights",
+    label: "Data & Intelligence",
     items: [
       { href: "/app/kpis", label: "KPIs" },
       { href: "/app/files", label: "Files" },
@@ -69,7 +69,7 @@ const adminNavSection = {
     { href: "/app/admin/customers", label: "Customers" },
     { href: "/app/admin/workspaces", label: "Workspaces" },
     { href: "/app/admin/subscriptions", label: "Subscriptions" },
-    { href: "/app/admin/ai-usage", label: "AI Usage" },
+    { href: "/app/admin/ai-usage", label: "Vaeroex Usage" },
     { href: "/app/admin/support-requests", label: "Support Requests" },
     { href: "/app/admin/audit-logs", label: "Audit Logs" }
   ]
@@ -113,7 +113,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Executive Ops System</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Operations Intelligence Platform</span>
         </Link>
 
         <form action={selectWorkspaceAction} className="mt-7 rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm shadow-black/10">
@@ -167,7 +167,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                   {activeWorkspace?.name || "Setup required"} · {accessLabel}
                 </p>
-                <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Command Center</h1>
+                <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Intelligence Hub</h1>
               </div>
             </div>
             <div className="flex items-center gap-3">

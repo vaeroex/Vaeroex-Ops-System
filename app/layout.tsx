@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Vaeroex Ops System",
-  description: "A practical operations system for forms, checklists, SOPs, tasks, reports, and Vaeroex recommendations.",
+  title: "Vaeroex",
+  description: "An Operations Intelligence Platform for visibility, accountability, execution, and business decision support.",
   icons: {
     apple: "/apple-touch-icon.png",
     icon: "/favicon.png"

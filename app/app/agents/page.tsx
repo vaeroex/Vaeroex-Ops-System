@@ -25,7 +25,7 @@ type VaeroexHubPageProps = {
 type JsonRecord = Record<string, unknown>;
 
 const saveLabels: Record<VaeroexSaveTarget, string> = {
-  tasks: "suggested tasks",
+  tasks: "suggested follow-ups",
   sop: "SOP draft",
   form: "form draft",
   checklist: "checklist draft",
@@ -33,7 +33,7 @@ const saveLabels: Record<VaeroexSaveTarget, string> = {
 };
 
 const saveDestinations: Record<string, { label: string; href: Route }> = {
-  tasks: { label: "Tasks", href: "/app/tasks" },
+  tasks: { label: "Follow-ups", href: "/app/tasks" },
   sop: { label: "SOPs", href: "/app/sops" },
   form: { label: "Forms", href: "/app/forms" },
   checklist: { label: "Checklists", href: "/app/checklists" },
@@ -212,7 +212,7 @@ function inferRelatedModule(text: string) {
   if (normalized.includes("report")) return "Reports";
   if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Files";
   if (normalized.includes("issue") || normalized.includes("risk")) return "Issues";
-  return "Tasks";
+  return "Follow-ups";
 }
 
 function moduleHref(moduleName: string): Route {
@@ -279,14 +279,14 @@ function getTaskDrafts(output: JsonRecord) {
     const record = asRecord(task);
 
     return {
-      title: str(record.title, typeof task === "string" ? task : `Recommended task ${index + 1}`),
+      title: str(record.title, typeof task === "string" ? task : `Recommended follow-up ${index + 1}`),
       description:
         str(record.description) ||
         str(record.reason_this_matters) ||
         str(record.recommended_action) ||
         "Review this recommendation and assign an owner.",
       priority: str(record.priority, "Medium"),
-      category: str(record.category, "Operations"),
+      category: str(record.category, "Execution"),
       timing: str(record.due_date_recommendation) || str(record.recommended_due_date) || str(record.due_date)
     };
   });
@@ -300,7 +300,7 @@ function getFormDrafts(output: JsonRecord) {
     return {
       name,
       description: str(record.description) || str(record.purpose),
-      formType: str(record.form_type, "Operations"),
+      formType: str(record.form_type, "Visibility"),
       fields: asArray(record.fields ?? record.recommended_fields ?? record.schema_json).map((field, fieldIndex) => {
         const fieldRecord = asRecord(field);
         return {
@@ -339,7 +339,7 @@ function getSopDrafts(output: JsonRecord) {
 
     return {
       title: str(record.title, typeof draft === "string" ? draft : `Recommended SOP ${index + 1}`),
-      department: str(record.department, "Operations"),
+      department: str(record.department, "Execution"),
       category: str(record.category, "SOP draft"),
       body: str(record.body_markdown) || str(record.content_markdown) || str(record.markdown) || str(record.summary)
     };
@@ -358,7 +358,7 @@ function getReportDrafts(output: JsonRecord) {
 
     return {
       title: str(record.title, index === 0 ? "Vaeroex report draft" : `Vaeroex report draft ${index + 1}`),
-      type: str(record.report_type, "Operations Report"),
+      type: str(record.report_type, "Intelligence Report"),
       body: str(record.body_markdown) || str(record.response_markdown) || str(record.summary)
     };
   });
@@ -450,7 +450,7 @@ function RecommendationActionCards({
     <div className="rounded-lg border border-line bg-white p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h4 className="text-sm font-semibold">Actionable Recommendations</h4>
+          <h4 className="text-sm font-semibold">Recommended Next Actions</h4>
           <p className="mt-1 text-sm leading-6 text-muted">
             Vaeroex drafts are not saved until you confirm. Use these actions to turn insight into workspace records.
           </p>
@@ -481,7 +481,7 @@ function RecommendationActionCards({
             </dl>
             <p className="mt-3 text-sm leading-6 text-slate-700">{recommendation.why}</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create Task</Link>
+              <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create Follow-up</Link>
               <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
                 Open {recommendation.relatedModule}
               </Link>
@@ -592,7 +592,7 @@ function TaskDraftSection({ tasks }: { tasks: ReturnType<typeof getTaskDrafts> }
 
   return (
     <div className="rounded-lg border border-line bg-white p-4">
-      <h4 className="text-sm font-semibold">Task Drafts</h4>
+      <h4 className="text-sm font-semibold">Follow-up Drafts</h4>
       <div className="mt-3 space-y-3">
         {tasks.map((task) => (
           <article key={`${task.title}-${task.description}`} className="rounded-lg border border-line bg-slate-50 p-3">
@@ -839,7 +839,7 @@ function SelectedResult({
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
 
   return (
-    <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into operations modules until you confirm.">
+    <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into workspace records until you confirm.">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -858,7 +858,7 @@ function SelectedResult({
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
             <p className="text-sm font-semibold text-amber-900">Manager confirmation required</p>
             <p className="mt-1 text-sm leading-6 text-amber-900">
-              Review this Vaeroex draft before saving it into operations records.
+              Review this Vaeroex draft before saving it into workspace records.
             </p>
             <div className="mt-4">
               <SaveButtons runId={run.id} workflowKey={run.agent_type} output={displayOutput(output)} />
@@ -975,8 +975,8 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
     <div className="space-y-6">
       <PageHeader
         eyebrow="Ask Vaeroex"
-        title="Your Executive Operations Advisor"
-        description="Ask Vaeroex for business health analysis, risks, focus priorities, action plans, and boardroom-ready recommendations before saving anything into operations records."
+        title="Your Operations Intelligence Advisor"
+        description="Ask Vaeroex for business health, visibility gaps, accountability risks, execution priorities, and boardroom-ready decision support before saving anything into workspace records."
       />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
@@ -989,7 +989,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-silver">Executive Intelligence</p>
             <h2 className="mt-3 text-3xl font-semibold">Ask Vaeroex what deserves leadership attention.</h2>
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-100">
-              Vaeroex reviews the active workspace and returns consulting-style recommendations tied to priorities, risks, accountability, and next actions.
+              Vaeroex reviews the active workspace and returns decision support tied to priorities, risks, accountability, and next actions.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
@@ -1004,7 +1004,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       </section>
 
       <section className="space-y-6">
-        <SectionCard title="Ask Vaeroex for an executive recommendation" description="Use this for a direct operations question. The response is saved for review and shown as a clean business recommendation.">
+        <SectionCard title="Ask Vaeroex for an executive recommendation" description="Use this for a direct business question. The response is saved for review and shown as a clean business recommendation.">
           <div className="mb-4 flex flex-wrap gap-2">
             {[
               "If I were the CEO, what would I do?",
@@ -1045,7 +1045,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         )}
 
         <SectionCard
-          title="Vaeroex workflows"
+          title="Vaeroex intelligence workflows"
           description="Each workflow uses the active workspace context and saves the output as a draft result first."
         >
           <div className="grid gap-4 lg:grid-cols-2">

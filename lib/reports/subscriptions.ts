@@ -71,7 +71,7 @@ export const REPORT_SUBSCRIPTION_CATEGORIES = [
   },
   {
     key: "assigned_tasks",
-    label: "Assigned Tasks",
+    label: "Assigned Follow-ups",
     cadence: "When assigned",
     reportPeriod: null,
     reportType: null,

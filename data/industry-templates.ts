@@ -25,7 +25,7 @@ export const industryTemplates: IndustryTemplate[] = [
   {
     id: "construction",
     name: "Construction Company",
-    description: "For project teams coordinating jobsites, subcontractors, change requests, and daily reviews.",
+    description: "For companies coordinating jobsites, subcontractors, change requests, and daily reviews.",
     forms: ["Daily Jobsite Report", "Subcontractor Issue Form", "Change Request Form"],
     checklists: ["Jobsite Opening Checklist", "Safety/Readiness Checklist", "End-of-Day Wrap-Up"],
     workflows: ["Project start", "Change order review", "Subcontractor issue escalation"],
@@ -33,8 +33,8 @@ export const industryTemplates: IndustryTemplate[] = [
   },
   {
     id: "ems-non-patient",
-    name: "EMS Operations - Non Patient",
-    description: "For non-patient operational workflows such as vehicles, equipment, shift handoffs, and supervisor review.",
+    name: "EMS Readiness - Non Patient",
+    description: "For non-patient business workflows such as vehicles, equipment, shift handoffs, and supervisor review.",
     complianceNotice: COMPLIANCE_NOTICE,
     forms: ["Vehicle Readiness Form", "Shift Handoff Form", "Equipment Issue Report"],
     checklists: ["Start-of-Shift Unit Check", "End-of-Shift Charging Checklist", "Weekly Supervisor Review"],
@@ -65,26 +65,26 @@ export const industryTemplates: IndustryTemplate[] = [
     description: "For facility checks, member inquiries, cleaning, equipment walkthroughs, and daily open/close.",
     forms: ["New Member Inquiry", "Facility Issue Report", "Cleaning/Equipment Check"],
     checklists: ["Opening Checklist", "Closing Checklist", "Equipment Walkthrough"],
-    workflows: ["Member inquiry to tour", "Facility issue to manager review", "Equipment check to maintenance task"],
+    workflows: ["Member inquiry to tour", "Facility issue to manager review", "Equipment check to maintenance follow-up"],
     assetExamples: ["Treadmill", "Front desk tablet", "Cleaning cart", "Speaker system", "Access control device"]
   },
   {
     id: "medical-admin-no-phi",
     name: "Small Medical Admin Office Without PHI",
-    description: "For non-patient administrative tasks, supplies, office workflows, and front desk operations.",
+    description: "For non-patient administrative follow-ups, supplies, office workflows, and front desk coordination.",
     complianceNotice: COMPLIANCE_NOTICE,
-    forms: ["Admin Task Request", "Supply Request", "Front Desk Issue Log"],
+    forms: ["Admin Follow-up Request", "Supply Request", "Front Desk Issue Log"],
     checklists: ["Opening Admin Checklist", "Closing Admin Checklist", "Weekly Office Review"],
-    workflows: ["Admin request to task", "Supply request to restock", "Office issue to manager review"],
+    workflows: ["Admin request to follow-up", "Supply request to restock", "Office issue to manager review"],
     assetExamples: ["Front desk computer", "Printer", "Supply cabinet", "Office phone", "Check-in tablet"]
   },
   {
     id: "agency-consulting",
     name: "Agency/Consulting Business",
-    description: "For client onboarding, project updates, deliverable QA, and follow-up systems.",
-    forms: ["New Client Intake", "Project Status Update", "Client Follow-Up Form"],
-    checklists: ["Client Onboarding Checklist", "Weekly Project Review", "Deliverable QA Checklist"],
-    workflows: ["New client to onboarding", "Weekly project review", "Deliverable QA to client handoff"],
+    description: "For client onboarding, client work updates, deliverable QA, and follow-up systems.",
+    forms: ["New Client Intake", "Client Work Status Update", "Client Follow-Up Form"],
+    checklists: ["Client Onboarding Checklist", "Weekly Client Review", "Deliverable QA Checklist"],
+    workflows: ["New client to onboarding", "Weekly client review", "Deliverable QA to client handoff"],
     assetExamples: ["Client workspace", "Project board", "Shared drive", "QA checklist", "Reporting dashboard"]
   }
 ];
