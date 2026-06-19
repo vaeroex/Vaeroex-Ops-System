@@ -1124,6 +1124,11 @@ export type Database = {
           role: string | null;
           email_status: string;
           pause_until: string | null;
+          schedule_day_of_week: number | null;
+          schedule_day_kind: string;
+          schedule_day_of_month: number | null;
+          schedule_month_in_quarter: number | null;
+          schedule_time: string | null;
           last_generated_at: string | null;
           last_notified_at: string | null;
           created_by: string | null;
@@ -1141,6 +1146,11 @@ export type Database = {
           role?: string | null;
           email_status?: string;
           pause_until?: string | null;
+          schedule_day_of_week?: number | null;
+          schedule_day_kind?: string;
+          schedule_day_of_month?: number | null;
+          schedule_month_in_quarter?: number | null;
+          schedule_time?: string | null;
           last_generated_at?: string | null;
           last_notified_at?: string | null;
           created_by?: string | null;

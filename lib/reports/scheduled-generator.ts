@@ -285,10 +285,12 @@ export async function createScheduledReport({
     }
   }
 
-  await supabase
-    .from("report_subscription_preferences")
-    .update({ last_generated_at: timestamp, last_notified_at: timestamp })
-    .in("id", preferences.map((preference) => preference.id));
+  if (preferences.length) {
+    await supabase
+      .from("report_subscription_preferences")
+      .update({ last_generated_at: timestamp, last_notified_at: timestamp })
+      .in("id", preferences.map((preference) => preference.id));
+  }
 
   return { reportId: report.id, source, startDate, endDate };
 }
