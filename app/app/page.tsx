@@ -9,12 +9,14 @@ import {
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
 import { OnboardingChecklist, type OnboardingChecklistItem } from "@/components/app/OnboardingChecklist";
+import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -31,6 +33,7 @@ type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
+type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -40,6 +43,8 @@ type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
+type BusinessDecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
+type RecommendationOutcomeRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 type DateRange = {
   start: Date;
   end: Date;
@@ -838,8 +843,8 @@ function DemoWorkspaceBanner({
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
-            Demo Workspace &mdash; realistic sample data from January to current month. It includes YTD KPI movement,
-            CRM activity, weak-month alerts, reports, tasks, issues, SOPs, checklist history, files, and Vaeroex insights.
+            Demo Workspace &mdash; simulated sample data from January to current month. No real emails or customer notifications are sent.
+            It includes YTD KPI movement, CRM activity, weak-month alerts, reports, tasks, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -923,6 +928,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sopResult,
     fileResult,
     importResult,
+    assetResult,
     crmLeadResult,
     crmHistoryResult,
     reportResult,
@@ -931,7 +937,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     notificationResult,
     assignmentResult,
     shareResult,
-    peopleResult
+    peopleResult,
+    decisionResult,
+    recommendationOutcomeResult
   ] = await Promise.all([
     supabase
       .from("kpis")
@@ -947,6 +955,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
+    supabase.from("assets").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
@@ -962,7 +971,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       .limit(30),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
-    supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100)
+    supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100),
+    supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
+    supabase
+      .from("vaeroex_recommendation_outcomes")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(40)
   ]);
 
   const kpis = (kpiResult.data || []) as KpiRow[];
@@ -973,6 +990,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const sops = (sopResult.data || []) as SopRow[];
   const files = (fileResult.data || []) as FileUploadRow[];
   const imports = (importResult.data || []) as FileImportRow[];
+  const assets = (assetResult.data || []) as AssetRow[];
   const crmLeads = (crmLeadResult.data || []) as CrmLeadRow[];
   const crmHistory = (crmHistoryResult.data || []) as CrmLeadHistoryRow[];
   const reports = (reportResult.data || []) as ReportRow[];
@@ -982,6 +1000,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
   const shares = (shareResult.data || []) as ShareRow[];
   const people = (peopleResult.data || []) as PersonRow[];
+  const decisions = (decisionResult.data || []) as BusinessDecisionRow[];
+  const recommendationOutcomes = (recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[];
   const errors = [
     kpiResult.error,
     taskResult.error,
@@ -991,6 +1011,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sopResult.error,
     fileResult.error,
     importResult.error,
+    assetResult.error,
     crmLeadResult.error,
     crmHistoryResult.error,
     reportResult.error,
@@ -999,7 +1020,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     notificationResult.error,
     assignmentResult.error,
     shareResult.error,
-    peopleResult.error
+    peopleResult.error,
+    decisionResult.error,
+    recommendationOutcomeResult.error
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
@@ -1261,6 +1284,31 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     if (share.department) return share.department;
     return "Entire workspace";
   };
+  const prestigeIntelligence = buildPrestigeIntelligence({
+    workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
+    isDemoWorkspace: isViewingDemoWorkspace,
+    periodLabel: period,
+    range,
+    kpis,
+    tasks,
+    issues,
+    checklists,
+    checklistRuns,
+    sops,
+    files,
+    imports,
+    assets,
+    crmLeads,
+    reports,
+    vaeroexRuns,
+    operationalMetrics,
+    notifications,
+    assignments,
+    shares,
+    people,
+    decisions,
+    recommendationOutcomes
+  });
 
   return (
     <div className="space-y-6">
@@ -1321,6 +1369,14 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       />
 
       <SmartAlerts alerts={smartAlerts} />
+
+      <PrestigeOperationsPanel
+        intelligence={prestigeIntelligence}
+        returnPath="/app"
+        dateRangeStart={range.startDate}
+        dateRangeEnd={range.endDate}
+        isDemoWorkspace={isViewingDemoWorkspace}
+      />
 
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
         <SectionCard

@@ -932,6 +932,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const workflows = VAEROEX_WORKFLOWS.filter((workflow) => workflow.key !== "ask_vaeroex");
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
+  const promptDefault = typeof params?.prompt === "string" ? params.prompt : "";
   const managedRuns = (runs || []).map((run) => {
     const management = managedValues(run);
     const output = asRecord(run.output_json);
@@ -984,6 +985,23 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
 
       <section className="space-y-6">
         <SectionCard title="Ask Vaeroex" description="Use chat for a general operations question. The run is saved for review.">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {[
+              "If I were the CEO, what would I do?",
+              "What should I focus on this week?",
+              "What could go wrong next month?",
+              "Run Weekly Management Meeting",
+              "Prepare Business Review Package"
+            ].map((prompt) => (
+              <Link
+                key={prompt}
+                href={`/app/agents?prompt=${encodeURIComponent(prompt)}` as Route}
+                className="rounded-full border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
+              >
+                {prompt}
+              </Link>
+            ))}
+          </div>
           <form action={runVaeroexAction} className="space-y-4">
             <input type="hidden" name="workflow_key" value="ask_vaeroex" />
             <TextArea
@@ -991,6 +1009,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
               name="user_prompt"
               required
               rows={5}
+              defaultValue={promptDefault}
               placeholder="Ask about missed follow-ups, ownership gaps, handoffs, SOPs, forms, checklists, reporting, or next actions."
             />
             <PrimaryButton>Ask Vaeroex</PrimaryButton>

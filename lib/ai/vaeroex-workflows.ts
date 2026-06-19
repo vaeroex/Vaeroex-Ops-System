@@ -8,7 +8,12 @@ export type VaeroexWorkflowKey =
   | "form_builder"
   | "checklist_builder"
   | "follow_up"
-  | "file_analysis";
+  | "file_analysis"
+  | "ceo_mode"
+  | "focus_priorities"
+  | "risk_simulation"
+  | "weekly_management_meeting"
+  | "business_review_package";
 
 export type VaeroexSaveTarget = "tasks" | "sop" | "form" | "checklist" | "report";
 
@@ -244,6 +249,81 @@ Do not repeat raw rows, long document excerpts, or technical JSON in the user-fa
 For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Operational Issues, Recommended Actions, Source File.
 If the file suggests follow-up work, include suggested_tasks for manager review.
 If the file suggests KPIs, tasks, reports, or CRM records, reference existing Vaeroex modules and records first. Say "add these KPI records to the existing KPI Dashboard", "attach this analysis to an existing report", "convert these recommendations into tasks", or "update existing CRM records" when workspace context supports it.
+${workspaceAwareInstructions}
+${sharedJsonInstructions}
+`
+  },
+  {
+    key: "ceo_mode",
+    title: "If I Were the CEO",
+    description: "Executive language for what the owner should do next across revenue, risk, accountability, customer experience, operations, and execution.",
+    actionLabel: "Ask CEO view",
+    promptPlaceholder: "Optional context, such as this week, this month, or a weak KPI.",
+    saveTargets: ["tasks", "report"],
+    instructions: `
+Answer as Vaeroex in executive language. Prioritize revenue, risk, team accountability, customer experience, operations, process health, and execution.
+Return only the few actions an owner should seriously consider this week.
+Include suggested_tasks for actions the user may approve.
+${workspaceAwareInstructions}
+${sharedJsonInstructions}
+`
+  },
+  {
+    key: "focus_priorities",
+    title: "What Should I Focus On?",
+    description: "Find the top 3-5 priorities that matter most right now, with evidence and suggested ownership.",
+    actionLabel: "Find focus",
+    promptPlaceholder: "Optional focus area, such as this week, Sales, Operations, or Customer Service.",
+    saveTargets: ["tasks"],
+    instructions: `
+Scan workspace KPIs, CRM, tasks, issues, reports, SOPs, files, alerts, assignments, and checklist completion.
+Return only the top 3-5 priorities. Each priority must include title, why it matters, evidence, recommended owner, recommended due date, and suggested action.
+Do not return a long generic list.
+${workspaceAwareInstructions}
+${sharedJsonInstructions}
+`
+  },
+  {
+    key: "risk_simulation",
+    title: "What Could Go Wrong?",
+    description: "Pre-mortem mode for likely next-month risks and prevention actions.",
+    actionLabel: "Simulate risks",
+    promptPlaceholder: "Optional planning horizon, such as next month or next quarter.",
+    saveTargets: ["tasks", "report"],
+    instructions: `
+Analyze declining KPIs, overdue work, repeated issues, stale SOPs, CRM weakness, checklist misses, and open risks.
+Return predicted risks, why each may happen, evidence, prevention action, suggested owner, and suggested due date.
+Include suggested_tasks for prevention actions.
+${workspaceAwareInstructions}
+${sharedJsonInstructions}
+`
+  },
+  {
+    key: "weekly_management_meeting",
+    title: "Weekly Management Meeting",
+    description: "Generate a practical weekly meeting agenda, summary, decisions needed, and assignments for next week.",
+    actionLabel: "Run meeting mode",
+    promptPlaceholder: "Optional team or department focus.",
+    saveTargets: ["tasks", "report"],
+    instructions: `
+Generate an operations meeting workflow with these sections: KPI review, CRM pipeline review, open issues, overdue tasks, checklist compliance, SOP review, department risks, Vaeroex recommendations, decisions needed, and assignments for next week.
+Do not build video or chat. This is an operations meeting agenda and follow-up workflow.
+Include a report draft and suggested_tasks.
+${workspaceAwareInstructions}
+${sharedJsonInstructions}
+`
+  },
+  {
+    key: "business_review_package",
+    title: "Business Review Package",
+    description: "Prepare an owner, board, bank, investor, franchise, monthly, or quarterly business review package.",
+    actionLabel: "Prepare package",
+    promptPlaceholder: "Use case, such as board meeting, owner review, or quarterly review.",
+    saveTargets: ["report", "tasks"],
+    instructions: `
+Prepare a polished Business Review Package with executive summary, KPI trends, revenue and lead trends, operational risks, corrective actions, progress since last period, open decisions, completed actions, and recommended next steps.
+Do not expose public links. Keep it authenticated and customer-ready.
+Return a report draft in report with title, report_type, body_markdown, and date range if inferable.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
