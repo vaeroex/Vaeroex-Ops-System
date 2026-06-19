@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { AppNavigation } from "@/components/app/AppNavigation";
+import { ThemeControls } from "@/components/app/ThemeControls";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
@@ -53,6 +54,7 @@ const baseNavSections = [
   {
     label: "Account",
     items: [
+      { href: "/app/settings", label: "Settings" },
       { href: "/app/account/subscription", label: "Subscription" },
       { href: "/app/support", label: "Support" }
     ]
@@ -179,6 +181,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
                 <span>Notifications</span>
                 <NotificationBadge count={notificationUnreadCount} />
               </Link>
+              <ThemeControls variant="compact" />
               <div className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-100">
                 {profile?.full_name || profile?.email || "User"}
               </div>
