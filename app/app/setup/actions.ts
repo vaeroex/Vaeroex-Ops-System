@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { COMPLIANCE_NOTICE, industryTemplates } from "@/data/industry-templates";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
+import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -186,7 +187,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       primary_contact_email: user.email ?? null,
       created_by: user.id,
       subscription_status: subscription.status === "missing" ? "manual_review" : subscription.status,
-      plan_slug: subscription.plan_slug,
+      plan_slug: normalizePlanSlug(subscription.plan_slug) || VAEROEX_PLAN_SLUG,
       subscription_required: true,
       manually_unlocked: subscription.source === "manual"
     })

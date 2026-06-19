@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
+import { normalizePlanSlug } from "@/lib/billing/plans";
 
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -16,7 +17,7 @@ export async function updateWorkspaceAccessAction(formData: FormData) {
   const { admin } = await requireVaeroexAdmin("/app/admin/workspaces");
   const workspaceId = text(formData, "workspace_id");
   const status = text(formData, "subscription_status") || "manual_review";
-  const planSlug = text(formData, "plan_slug") || null;
+  const planSlug = normalizePlanSlug(text(formData, "plan_slug"));
 
   if (!workspaceId) {
     redirect("/app/admin/workspaces?error=Workspace is required.");

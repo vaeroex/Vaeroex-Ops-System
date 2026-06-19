@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { displayPlanName, normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import type { Database } from "@/lib/supabase/types";
 
 type AdminWorkspacesPageProps = {
@@ -12,7 +13,7 @@ type AdminWorkspacesPageProps = {
 };
 
 const statuses = ["active", "trialing", "past_due", "canceled", "expired", "manual_review", "demo"];
-const plans = ["", "starter", "growth", "pro"];
+const plans = ["", VAEROEX_PLAN_SLUG];
 type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
 
 function countByWorkspace(rows: Array<{ workspace_id: string }>) {
@@ -116,7 +117,7 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge value={customerStatus(workspace)} />
                   <StatusBadge value={workspace.subscription_status} />
-                  <StatusBadge value={workspace.plan_slug} />
+                  <StatusBadge value={displayPlanName(workspace.plan_slug)} />
                   <StatusBadge value={workspace.manually_unlocked ? "manual unlock" : "locked by status"} />
                 </div>
               </div>
@@ -146,9 +147,9 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
                     <option key={status} value={status}>{status}</option>
                   ))}
                 </select>
-                <select name="plan_slug" defaultValue={workspace.plan_slug || ""} className="rounded-lg border border-line px-3 py-2 text-sm">
+                <select name="plan_slug" defaultValue={normalizePlanSlug(workspace.plan_slug) || ""} className="rounded-lg border border-line px-3 py-2 text-sm">
                   {plans.map((plan) => (
-                    <option key={plan || "none"} value={plan}>{plan || "No plan"}</option>
+                    <option key={plan || "none"} value={plan}>{plan ? "Vaeroex" : "No plan"}</option>
                   ))}
                 </select>
                 <label className="flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm">

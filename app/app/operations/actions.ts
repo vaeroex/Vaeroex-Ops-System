@@ -5,7 +5,6 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -140,18 +139,6 @@ export async function createFormAction(formData: FormData) {
   validateLength(path, "Form type", text(formData, "form_type"), 80);
   validateLength(path, "Description", text(formData, "description"), 800);
 
-  const limit = await isUsageLimitReached({
-    supabase,
-    userId: user.id,
-    email: user.email,
-    workspaceId,
-    limit: "forms"
-  });
-
-  if (limit.reached) {
-    redirectWithError(path, "You’ve reached the limit for your current Vaeroex Ops System plan.");
-  }
-
   const { error } = await supabase.from("forms").insert({
     workspace_id: workspaceId,
     name,
@@ -254,18 +241,6 @@ export async function createChecklistAction(formData: FormData) {
 
   requireValue(path, "Checklist name", name);
   validateLength(path, "Checklist description", text(formData, "description"), 1200);
-
-  const limit = await isUsageLimitReached({
-    supabase,
-    userId: user.id,
-    email: user.email,
-    workspaceId,
-    limit: "checklists"
-  });
-
-  if (limit.reached) {
-    redirectWithError(path, "You’ve reached the limit for your current Vaeroex Ops System plan.");
-  }
 
   const { error } = await supabase.from("checklists").insert({
     workspace_id: workspaceId,

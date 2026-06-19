@@ -59,7 +59,7 @@ begin
       'demo@vaeroex.local',
       demo_user,
       'demo',
-      'pro',
+      'vaeroex',
       false,
       true
     )
@@ -87,7 +87,7 @@ begin
       'demo@vaeroex.local',
       'Vaeroex Demo Owner',
       'demo',
-      'pro',
+      'vaeroex',
       'demo',
       jsonb_build_object('seeded', true),
       true,

@@ -1,25 +1,25 @@
 # Phase 6 Acceptance Review
 
-Phase 6 adds Squarespace subscription access for Vaeroex Ops System. Squarespace remains the storefront, checkout, payment, and subscription billing layer. The Vaeroex app controls account access, workspace creation, plan limits, and manual activation.
+Phase 6 adds Squarespace subscription access for Vaeroex Ops System. Squarespace remains the storefront, checkout, payment, and subscription billing layer. The Vaeroex app controls account access, workspace creation, usage limits, and manual activation.
 
 ## Source-Verified Acceptance Criteria
 
 - App has subscription tables: `subscription_plans`, `customer_subscriptions`, `subscription_events`, `ai_usage`, and `manual_activation_requests`.
 - App has workspace subscription fields: `subscription_status`, `plan_slug`, `subscription_required`, `trial_ends_at`, and `manually_unlocked`.
-- App seeds default Starter, Growth, and Pro plans.
+- App seeds and migrates to the single Vaeroex plan.
 - App can manually activate a customer through `/app/admin/subscriptions`.
 - App can block users without active subscriptions through `requireActiveSubscription` and setup/action gates.
 - App can allow demo workspaces, manually unlocked workspaces, active workspaces, and valid trials.
 - App has `/billing-required` with the required subscription message and purchase/manual activation actions.
 - App has `/app/account/subscription` with subscription status, plan, access state, and usage.
-- App has `/app/admin/subscriptions` with search, manual activation, status changes, plan assignment, notes, activation request review, event review, and raw payload display.
+- App has `/app/admin/subscriptions` with search, manual activation, status changes, Vaeroex plan assignment, notes, activation request review, event review, and raw payload display.
 - App has `/api/squarespace/webhook` for Squarespace order events.
 - App stores Squarespace events in `subscription_events`.
-- App maps Squarespace product names, product IDs, and SKUs to `starter`, `growth`, and `pro`.
-- App has usage limits for workspaces, users, forms, checklists, and monthly Vaeroex runs.
+- App maps Squarespace product names, product IDs, and SKUs to the single internal `vaeroex` plan.
+- App has usage limits for workspaces, users, and monthly Vaeroex runs.
 - App has Squarespace setup documentation in `docs/squarespace-subscription-setup.md`.
 - App has Squarespace thank-you page copy in `docs/squarespace-thank-you-page-copy.md`.
-- App pricing buttons link to Squarespace checkout URLs from `NEXT_PUBLIC_SQUARESPACE_*_CHECKOUT_URL`, with a fallback to `https://www.vaeroex.com/pricing`.
+- App pricing buttons link to the Squarespace checkout URL from `NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL`, with compatibility fallbacks and a final fallback to `https://www.vaeroex.com/pricing`.
 - README explains the Squarespace sales flow.
 
 ## Notes

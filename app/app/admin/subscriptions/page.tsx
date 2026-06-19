@@ -6,6 +6,7 @@ import { JsonPreview } from "@/components/operations/JsonPreview";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { displayPlanName, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 
 type AdminSubscriptionsPageProps = {
   searchParams?: Promise<{ q?: string; error?: string; message?: string }>;
@@ -42,7 +43,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Subscription admin" description="Manually activate Squarespace customers and review subscription events.">
+      <SectionCard title="Subscription admin" description="Manually activate Vaeroex customers and review Squarespace subscription events.">
         {params?.message ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
         <ErrorNotice message={params?.error} />
         <form className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -69,10 +70,8 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
             </label>
             <label className="block text-sm font-medium">
               Plan
-              <select name="plan_slug" defaultValue="starter" className="mt-2 w-full rounded-lg border border-line px-3 py-2">
-                <option value="starter">Starter</option>
-                <option value="growth">Growth</option>
-                <option value="pro">Pro</option>
+              <select name="plan_slug" defaultValue={VAEROEX_PLAN_SLUG} className="mt-2 w-full rounded-lg border border-line px-3 py-2">
+                <option value={VAEROEX_PLAN_SLUG}>Vaeroex</option>
               </select>
             </label>
             <label className="block text-sm font-medium">
@@ -111,16 +110,16 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
                     <p className="font-semibold">{subscription.customer_email}</p>
-                    <p className="mt-1 text-xs text-muted">{subscription.customer_name || "No name"} · {subscription.source}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {subscription.customer_name || "No name"} · {subscription.source} · {displayPlanName(subscription.plan_slug)}
+                    </p>
                   </div>
                   <StatusBadge value={subscription.status} />
                 </div>
                 <form action={updateSubscriptionAction} className="mt-4 grid gap-3 md:grid-cols-4">
                   <input type="hidden" name="subscription_id" value={subscription.id} />
-                  <select name="plan_slug" defaultValue={subscription.plan_slug || "starter"} className="rounded-lg border border-line px-3 py-2 text-sm">
-                    <option value="starter">starter</option>
-                    <option value="growth">growth</option>
-                    <option value="pro">pro</option>
+                  <select name="plan_slug" defaultValue={VAEROEX_PLAN_SLUG} className="rounded-lg border border-line px-3 py-2 text-sm">
+                    <option value={VAEROEX_PLAN_SLUG}>Vaeroex</option>
                   </select>
                   <select name="status" defaultValue={subscription.status} className="rounded-lg border border-line px-3 py-2 text-sm">
                     <option value="active">active</option>
@@ -150,7 +149,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold">{request.email}</p>
-                    <p className="mt-1 text-sm text-muted">{request.company || "No company"} · {request.plan_purchased || "No plan"}</p>
+                    <p className="mt-1 text-sm text-muted">{request.company || "No company"} · Vaeroex subscription</p>
                   </div>
                   <StatusBadge value={request.status} />
                 </div>
