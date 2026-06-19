@@ -138,7 +138,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .select("id,name,category,target,actual_value,metric_date,owner,source,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
-      .limit(30),
+      .limit(120),
     supabase
       .from("file_imports")
       .select("id,file_upload_id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
@@ -168,7 +168,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .select("id,metric_name,category,value,metric_date,owner,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
-      .limit(10)
+      .limit(80)
   ]);
   const recentKpiRows = recentKpis.data ?? [];
   const recentFileRows = recentFiles.data ?? [];

@@ -781,6 +781,7 @@ function DemoWorkspaceBanner({
 }: {
   counts: {
     kpis: number;
+    operationalMetrics: number;
     crm: number;
     tasks: number;
     issues: number;
@@ -804,6 +805,7 @@ function DemoWorkspaceBanner({
   ];
   const countItems = [
     ["KPIs", counts.kpis],
+    ["Operational metrics", counts.operationalMetrics],
     ["CRM leads", counts.crm],
     ["Open tasks", counts.tasks],
     ["Open issues", counts.issues],
@@ -824,7 +826,8 @@ function DemoWorkspaceBanner({
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
-            This workspace is safe for testing. It includes demo KPIs, CRM records, tasks, issues, reports, SOPs, files, alerts, and Vaeroex insights.
+            Demo Workspace &mdash; realistic sample data from January to current month. It includes YTD KPI movement,
+            CRM activity, weak-month alerts, reports, tasks, issues, SOPs, checklist history, files, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -837,6 +840,26 @@ function DemoWorkspaceBanner({
             <DemoActionButton>Switch back to my workspace</DemoActionButton>
           </form>
         </div>
+      </div>
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <article className="rounded-lg border border-blue-200 bg-white/80 p-4">
+          <p className="text-sm font-semibold">March dip</p>
+          <p className="mt-2 text-xs leading-5">
+            Revenue fell below target while response time increased, conversion dropped, and checklist completion missed the mark.
+          </p>
+        </article>
+        <article className="rounded-lg border border-blue-200 bg-white/80 p-4">
+          <p className="text-sm font-semibold">April and May recovery</p>
+          <p className="mt-2 text-xs leading-5">
+            SOP review, checklist follow-up, and CRM accountability helped the business recover from the weak month.
+          </p>
+        </article>
+        <article className="rounded-lg border border-blue-200 bg-white/80 p-4">
+          <p className="text-sm font-semibold">Current month signals</p>
+          <p className="mt-2 text-xs leading-5">
+            Revenue is healthy, but response time, conversion, overdue tasks, and checklist completion still need owner attention.
+          </p>
+        </article>
       </div>
       <div className="mt-5 rounded-lg border border-blue-200 bg-white/80 p-4">
         <p className="text-sm font-semibold">Demo Dashboard Summary</p>
@@ -1021,7 +1044,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   );
   const recentRunChecklistIds = new Set(checklistRuns.filter((run) => inIsoRange(run.created_at, range.start, range.end)).map((run) => run.checklist_id));
   const checklistsWithoutRecentRuns = checklists.filter((checklist) => !recentRunChecklistIds.has(checklist.id));
-  const smartAlerts = buildSmartAlerts({
+  const baseSmartAlerts = buildSmartAlerts({
     overdueTasks,
     unassignedTasks,
     belowTargetKpis,
@@ -1032,8 +1055,30 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     hasCurrentReport,
     checklistsWithoutRecentRuns
   });
+  const demoStoryAlerts: DashboardAlert[] = isViewingDemoWorkspace
+    ? [
+        {
+          id: "demo-march-dip",
+          severity: "High",
+          title: "March performance dip detected",
+          why: "Revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and checklist completion fell to 78%.",
+          action: "Review March report",
+          href: "/app/reports"
+        },
+        {
+          id: "demo-current-month-mixed",
+          severity: "Medium",
+          title: "Current month has mixed signals",
+          why: "Revenue is above target, but conversion, response time, overdue tasks, and checklist completion still need owner follow-up.",
+          action: "Review recommended actions",
+          href: "/app/tasks"
+        }
+      ]
+    : [];
+  const smartAlerts = [...demoStoryAlerts, ...baseSmartAlerts];
   const demoCounts = {
     kpis: demoWorkspaceCounts?.kpis ?? kpis.length,
+    operationalMetrics: demoWorkspaceCounts?.operationalMetrics ?? operationalMetrics.length,
     crm: demoWorkspaceCounts?.crmLeads ?? crmLeads.length,
     tasks: demoWorkspaceCounts?.tasks ?? openTasks.length,
     issues: demoWorkspaceCounts?.issues ?? openIssues.length,
@@ -1105,21 +1150,34 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       completed: Boolean(reports.length)
     }
   ];
-  const briefing = {
-    whatChanged: recentImports.length
-      ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} updated workspace history.`
-      : leadsCreated.length
-        ? `${leadsCreated.length} CRM lead${leadsCreated.length === 1 ? "" : "s"} were created this period.`
-        : "No major new data changes were found for this period yet.",
-    improved: positiveTrends[0]
-      ? `${positiveTrends[0].name} improved ${percentLabel(positiveTrends[0].changePercent)} compared with the previous period.`
-      : "No positive KPI movement is visible yet.",
-    declined: negativeTrends[0]
-      ? `${negativeTrends[0].name} declined ${percentLabel(negativeTrends[0].changePercent)} compared with the previous period.`
-      : "No declining KPI trend is visible yet.",
-    attention: smartAlerts[0]?.title || risks[0] || "No urgent attention area was detected.",
-    recommendation: recommendedActions[0] || "Keep adding real records, then generate a report after the next management review."
-  };
+  const briefing = isViewingDemoWorkspace
+    ? {
+        whatChanged:
+          "The demo history runs from January through the current month. January started okay, February improved, March dipped, April recovered partially, May improved, and the current month is mixed.",
+        improved:
+          "May recovered above target after SOP review, checklist follow-up, CRM accountability, and clearer response-time ownership.",
+        declined:
+          "March revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and checklist completion fell to 78%.",
+        attention:
+          "The current month still shows softer conversion, slower response time, overdue tasks, and checklist completion below target.",
+        recommendation:
+          "Create a CRM follow-up task, update the customer follow-up SOP, run a checklist review, create a KPI review task, and generate a monthly recovery report."
+      }
+    : {
+        whatChanged: recentImports.length
+          ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} updated workspace history.`
+          : leadsCreated.length
+            ? `${leadsCreated.length} CRM lead${leadsCreated.length === 1 ? "" : "s"} were created this period.`
+            : "No major new data changes were found for this period yet.",
+        improved: positiveTrends[0]
+          ? `${positiveTrends[0].name} improved ${percentLabel(positiveTrends[0].changePercent)} compared with the previous period.`
+          : "No positive KPI movement is visible yet.",
+        declined: negativeTrends[0]
+          ? `${negativeTrends[0].name} declined ${percentLabel(negativeTrends[0].changePercent)} compared with the previous period.`
+          : "No declining KPI trend is visible yet.",
+        attention: smartAlerts[0]?.title || risks[0] || "No urgent attention area was detected.",
+        recommendation: recommendedActions[0] || "Keep adding real records, then generate a report after the next management review."
+      };
   const hasWorkspaceData = Boolean(kpis.length || tasks.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
 
   return (
