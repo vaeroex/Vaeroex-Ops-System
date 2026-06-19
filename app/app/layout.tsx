@@ -37,6 +37,19 @@ export default async function ProtectedAppLayout({
 
   const cookieStore = await cookies();
   const context = await getWorkspaceContext(cookieStore.get("vaeroex_workspace_id")?.value);
+  let notificationUnreadCount = 0;
+
+  if (context.activeWorkspace) {
+    const { count } = await supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", context.activeWorkspace.id)
+      .is("read_at", null)
+      .is("archived_at", null)
+      .is("deleted_at", null);
+
+    notificationUnreadCount = count || 0;
+  }
 
   return (
     <AppShell
@@ -44,6 +57,7 @@ export default async function ProtectedAppLayout({
       workspaces={context.workspaces}
       activeWorkspace={context.activeWorkspace}
       membership={context.membership}
+      notificationUnreadCount={notificationUnreadCount}
     >
       {children}
     </AppShell>

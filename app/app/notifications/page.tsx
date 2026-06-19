@@ -1,6 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { markAllNotificationsReadAction, markNotificationReadAction } from "@/app/app/accountability/actions";
+import {
+  archiveReadNotificationsAction,
+  clearResolvedNotificationsAction,
+  markAllNotificationsReadAction,
+  openNotificationAction
+} from "@/app/app/accountability/actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -15,13 +20,49 @@ type NotificationsPageProps = {
 };
 type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
+type NotificationView = "unread" | "read" | "archived" | "all";
+type PriorityGroup = "High" | "Medium" | "Low";
+
+const NOTIFICATION_VIEWS: Array<{ label: string; value: NotificationView }> = [
+  { label: "Unread", value: "unread" },
+  { label: "Read", value: "read" },
+  { label: "Archived", value: "archived" },
+  { label: "All", value: "all" }
+];
+const PRIORITY_GROUPS: PriorityGroup[] = ["High", "Medium", "Low"];
 
 function formatDate(value: string) {
   return new Date(value).toLocaleString();
 }
 
-function safeHref(value: string | null): Route {
-  return value?.startsWith("/app") ? (value as Route) : "/app";
+function isNotificationView(value: string | undefined): value is NotificationView {
+  return NOTIFICATION_VIEWS.some((view) => view.value === value);
+}
+
+function viewHref(value: NotificationView): Route {
+  return value === "unread" ? "/app/notifications" : (`/app/notifications?view=${value}` as Route);
+}
+
+function currentPath(value: NotificationView) {
+  return value === "unread" ? "/app/notifications" : `/app/notifications?view=${value}`;
+}
+
+function safeActionHref(value: string | null) {
+  return value?.startsWith("/app") ? value : "/app";
+}
+
+function priorityGroup(value: string | null): PriorityGroup {
+  const priority = String(value || "").toLowerCase();
+
+  if (priority === "urgent" || priority === "high") {
+    return "High";
+  }
+
+  if (priority === "low") {
+    return "Low";
+  }
+
+  return "Medium";
 }
 
 function SuccessNotice({ message }: { message?: string | null }) {
@@ -29,37 +70,81 @@ function SuccessNotice({ message }: { message?: string | null }) {
   return <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>;
 }
 
-function NotificationCard({ notification }: { notification: NotificationRow }) {
+function TabLink({ label, value, active, count }: { label: string; value: NotificationView; active: boolean; count: number }) {
+  return (
+    <Link
+      href={viewHref(value)}
+      className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+        active ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50 text-slate-700 hover:border-vaeroex-blue"
+      }`}
+    >
+      {label} <span className={active ? "text-blue-100" : "text-muted"}>{count}</span>
+    </Link>
+  );
+}
+
+function NotificationCard({ notification, returnPath }: { notification: NotificationRow; returnPath: string }) {
   const isUnread = !notification.read_at;
+  const isArchived = Boolean(notification.archived_at);
 
   return (
-    <article className={`rounded-lg border p-4 shadow-panel ${isUnread ? "border-blue-200 bg-blue-50/70" : "border-line bg-white"}`}>
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-sm font-semibold text-ink">{notification.title}</h3>
-            {isUnread ? <StatusBadge value="Unread" /> : <StatusBadge value="Read" />}
-            <StatusBadge value={notification.priority} />
+    <form action={openNotificationAction}>
+      <input type="hidden" name="notification_id" value={notification.id} />
+      <input type="hidden" name="return_path" value={returnPath} />
+      <input type="hidden" name="action_href" value={safeActionHref(notification.action_href)} />
+      <button
+        type="submit"
+        className={`block w-full rounded-lg border p-4 text-left shadow-panel transition hover:border-vaeroex-blue hover:bg-blue-50/50 ${
+          isUnread ? "border-blue-200 bg-blue-50/70" : isArchived ? "border-slate-200 bg-slate-50" : "border-line bg-white"
+        }`}
+        aria-label={`Open notification: ${notification.title}`}
+      >
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-sm font-semibold text-ink">{notification.title}</h3>
+              <StatusBadge value={isArchived ? "Archived" : isUnread ? "Unread" : "Read"} />
+              <StatusBadge value={notification.priority} />
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-700">{notification.body || "No message provided."}</p>
+            <p className="mt-2 text-xs text-muted">
+              {notification.related_module || notification.type} · {formatDate(notification.created_at)}
+            </p>
           </div>
-          <p className="mt-2 text-sm leading-6 text-slate-700">{notification.body || "No message provided."}</p>
-          <p className="mt-2 text-xs text-muted">
-            {notification.related_module || notification.type} · {formatDate(notification.created_at)}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <Link href={safeHref(notification.action_href)} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
+          <span className="shrink-0 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
             {notification.action_label || "Open"}
-          </Link>
-          {isUnread ? (
-            <form action={markNotificationReadAction}>
-              <input type="hidden" name="notification_id" value={notification.id} />
-              <input type="hidden" name="return_path" value="/app/notifications" />
-              <button className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Mark read</button>
-            </form>
-          ) : null}
+          </span>
         </div>
+      </button>
+    </form>
+  );
+}
+
+function NotificationPriorityGroup({
+  label,
+  notifications,
+  returnPath
+}: {
+  label: PriorityGroup;
+  notifications: NotificationRow[];
+  returnPath: string;
+}) {
+  if (!notifications.length) {
+    return null;
+  }
+
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-ink">{label} priority</h3>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-muted">{notifications.length}</span>
       </div>
-    </article>
+      <div className="space-y-3">
+        {notifications.map((notification) => (
+          <NotificationCard key={notification.id} notification={notification} returnPath={returnPath} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -81,7 +166,8 @@ function AssignmentRowItem({ assignment }: { assignment: AssignmentRow }) {
 export default async function NotificationsPage({ searchParams }: NotificationsPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const view = params?.view || "all";
+  const view = isNotificationView(params?.view) ? params.view : "unread";
+  const returnPath = currentPath(view);
   const [notificationResult, assignmentResult] = await Promise.all([
     supabase
       .from("notifications")
@@ -95,17 +181,36 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
       .select("*")
       .eq("workspace_id", workspaceId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .order("due_date", { ascending: true, nullsFirst: false })
       .order("created_at", { ascending: false })
       .limit(20)
   ]);
-  const notifications = ((notificationResult.data || []) as NotificationRow[]).filter((notification) => {
-    if (view === "unread") return !notification.read_at;
-    if (view === "read") return Boolean(notification.read_at);
+  const allNotifications = ((notificationResult.data || []) as NotificationRow[]).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  );
+  const activeNotifications = allNotifications.filter((notification) => !notification.archived_at);
+  const notifications = allNotifications.filter((notification) => {
+    if (view === "unread") return !notification.archived_at && !notification.read_at;
+    if (view === "read") return !notification.archived_at && Boolean(notification.read_at);
+    if (view === "archived") return Boolean(notification.archived_at);
     return true;
   });
   const assignments = ((assignmentResult.data || []) as AssignmentRow[]).filter((assignment) => !["Done", "Dismissed"].includes(assignment.status));
-  const unreadCount = ((notificationResult.data || []) as NotificationRow[]).filter((notification) => !notification.read_at).length;
+  const unreadCount = activeNotifications.filter((notification) => !notification.read_at).length;
+  const readCount = activeNotifications.filter((notification) => notification.read_at).length;
+  const archivedCount = allNotifications.filter((notification) => notification.archived_at).length;
+  const totalCount = allNotifications.length;
+  const tabCounts: Record<NotificationView, number> = {
+    unread: unreadCount,
+    read: readCount,
+    archived: archivedCount,
+    all: totalCount
+  };
+  const groupedNotifications = PRIORITY_GROUPS.map((group) => ({
+    label: group,
+    notifications: notifications.filter((notification) => priorityGroup(notification.priority) === group)
+  }));
 
   return (
     <div className="space-y-6">
@@ -118,7 +223,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
       <ErrorNotice message={params?.error || notificationResult.error?.message || assignmentResult.error?.message} />
       <SuccessNotice message={params?.message} />
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid gap-4 md:grid-cols-4">
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
           <p className="text-sm text-muted">Unread</p>
           <p className="mt-2 text-3xl font-semibold">{unreadCount}</p>
@@ -128,39 +233,59 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
           <p className="mt-2 text-3xl font-semibold">{assignments.length}</p>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+          <p className="text-sm text-muted">Archived</p>
+          <p className="mt-2 text-3xl font-semibold">{archivedCount}</p>
+        </article>
+        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
           <p className="text-sm text-muted">Total notifications</p>
-          <p className="mt-2 text-3xl font-semibold">{notificationResult.data?.length || 0}</p>
+          <p className="mt-2 text-3xl font-semibold">{totalCount}</p>
         </article>
       </section>
 
       <section className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-white p-3 shadow-panel">
         <div className="flex flex-wrap gap-2">
-          <Link href="/app/notifications" className={`rounded-lg px-3 py-2 text-sm font-semibold ${view === "all" ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50"}`}>
-            All
-          </Link>
-          <Link href="/app/notifications?view=unread" className={`rounded-lg px-3 py-2 text-sm font-semibold ${view === "unread" ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50"}`}>
-            Unread
-          </Link>
-          <Link href="/app/notifications?view=read" className={`rounded-lg px-3 py-2 text-sm font-semibold ${view === "read" ? "bg-vaeroex-blue text-white" : "border border-line bg-slate-50"}`}>
-            Read
-          </Link>
+          {NOTIFICATION_VIEWS.map((tab) => (
+            <TabLink key={tab.value} label={tab.label} value={tab.value} active={view === tab.value} count={tabCounts[tab.value]} />
+          ))}
         </div>
-        <form action={markAllNotificationsReadAction}>
-          <input type="hidden" name="return_path" value="/app/notifications" />
-          <ConfirmSubmitButton message="Mark all notifications read?">Mark all read</ConfirmSubmitButton>
-        </form>
+        <div className="flex flex-wrap gap-2">
+          <form action={markAllNotificationsReadAction}>
+            <input type="hidden" name="return_path" value={returnPath} />
+            <ConfirmSubmitButton message="Mark all unread notifications read?">Mark All Read</ConfirmSubmitButton>
+          </form>
+          <form action={archiveReadNotificationsAction}>
+            <input type="hidden" name="return_path" value={returnPath} />
+            <ConfirmSubmitButton message="Archive all read notifications?">Archive Read</ConfirmSubmitButton>
+          </form>
+          <form action={clearResolvedNotificationsAction}>
+            <input type="hidden" name="return_path" value={returnPath} />
+            <ConfirmSubmitButton message="Clear read and archived notifications from this history view?">Clear Resolved</ConfirmSubmitButton>
+          </form>
+        </div>
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.2fr_.8fr]">
         <SectionCard title="Notifications" description="In-app notifications only. Vaeroex does not send email from this center yet.">
           {notifications.length ? (
-            <div className="space-y-3">
-              {notifications.map((notification) => (
-                <NotificationCard key={notification.id} notification={notification} />
+            <div className="space-y-6">
+              {groupedNotifications.map((group) => (
+                <NotificationPriorityGroup
+                  key={group.label}
+                  label={group.label}
+                  notifications={group.notifications}
+                  returnPath={returnPath}
+                />
               ))}
             </div>
           ) : (
-            <EmptyState title="No notifications" description="Shared reports, KPI alerts, assignments, file analysis, and Vaeroex recommendations will appear here." />
+            <EmptyState
+              title={view === "unread" ? "No unread notifications" : "No notifications"}
+              description={
+                view === "unread"
+                  ? "You are caught up. Read and archived history is still available in the other tabs."
+                  : "Shared reports, KPI alerts, assignments, file analysis, and Vaeroex recommendations will appear here."
+              }
+            />
           )}
         </SectionCard>
 
