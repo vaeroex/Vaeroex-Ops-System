@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createScheduledReport } from "@/lib/reports/scheduled-generator";
 import {
+  getNextScheduledRun,
   isReportSubscriptionDue,
   isScheduledReportCategory,
   reportSubscriptionCategory
@@ -15,16 +16,18 @@ function dateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
-function preferenceIsActive(preference: PreferenceRow, today: string) {
+function preferenceIsActive(preference: PreferenceRow, now: Date) {
   if (preference.email_status !== "enabled") {
     return false;
   }
+
+  const today = dateOnly(now);
 
   if (preference.pause_until && preference.pause_until >= today) {
     return false;
   }
 
-  return isScheduledReportCategory(preference.category) && isReportSubscriptionDue(preference.category, new Date(`${today}T12:00:00.000Z`));
+  return isScheduledReportCategory(preference.category) && isReportSubscriptionDue(preference, now);
 }
 
 export async function GET(request: Request) {
@@ -40,7 +43,8 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Supabase service role is not configured." }, { status: 500 });
   }
 
-  const today = dateOnly(new Date());
+  const now = new Date();
+  const today = dateOnly(now);
   const { data: preferences, error: preferenceError } = await supabase
     .from("report_subscription_preferences")
     .select("*")
@@ -52,7 +56,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: preferenceError.message }, { status: 500 });
   }
 
-  const duePreferences = ((preferences || []) as PreferenceRow[]).filter((preference) => preferenceIsActive(preference, today));
+  const duePreferences = ((preferences || []) as PreferenceRow[]).filter((preference) => preferenceIsActive(preference, now));
   const workspaceIds = Array.from(new Set(duePreferences.map((preference) => preference.workspace_id)));
   const { data: workspaces, error: workspaceError } = workspaceIds.length
     ? await supabase.from("workspaces").select("*").in("id", workspaceIds)
@@ -82,12 +86,14 @@ export async function GET(request: Request) {
       continue;
     }
 
+    const nextRun = getNextScheduledRun(group[0], new Date(now.getTime() - 24 * 60 * 60 * 1000));
+    const runDate = nextRun ? dateOnly(nextRun) : today;
     const { data: existingRun, error: existingRunError } = await supabase
       .from("scheduled_report_runs")
       .select("id,status,report_id")
       .eq("workspace_id", workspaceId)
       .eq("category", category)
-      .eq("run_date", today)
+      .eq("run_date", runDate)
       .maybeSingle();
 
     if (existingRunError) {
@@ -105,9 +111,9 @@ export async function GET(request: Request) {
       .insert({
         workspace_id: workspaceId,
         category,
-        run_date: today,
+        run_date: runDate,
         status: "pending",
-        metadata_json: { preference_count: group.length }
+        metadata_json: { preference_count: group.length, scheduled_time: group[0]?.schedule_time || null }
       })
       .select("id")
       .single();
@@ -123,7 +129,7 @@ export async function GET(request: Request) {
         workspace,
         category,
         preferences: group,
-        runDate: new Date(`${today}T12:00:00.000Z`)
+        runDate: nextRun || now
       });
 
       await supabase

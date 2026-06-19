@@ -1,8 +1,9 @@
 import type { Route } from "next";
 import type { ReactNode } from "react";
-import { saveReportSubscriptionPreferenceAction } from "@/app/app/report-subscriptions/actions";
+import { runReportSubscriptionNowAction, saveReportSubscriptionPreferenceAction } from "@/app/app/report-subscriptions/actions";
 import { generateReportAction } from "@/app/app/reports/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextInput } from "@/components/operations/FormControls";
@@ -14,7 +15,21 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
-import { REPORT_SUBSCRIPTION_CATEGORIES, REPORT_SUBSCRIPTION_STATUSES, categoryLabel } from "@/lib/reports/subscriptions";
+import {
+  REPORT_QUARTER_MONTH_OPTIONS,
+  REPORT_SCHEDULE_DAY_KINDS,
+  REPORT_SUBSCRIPTION_CATEGORIES,
+  REPORT_SUBSCRIPTION_STATUSES,
+  REPORT_WEEKDAY_OPTIONS,
+  categoryLabel,
+  defaultMonthInQuarter,
+  defaultWeekdayForCategory,
+  getNextScheduledRun,
+  getScheduleDescription,
+  isScheduledReportCategory,
+  normalizeScheduleTime,
+  reportScheduleDayKind
+} from "@/lib/reports/subscriptions";
 import type { Database, Json } from "@/lib/supabase/types";
 import { OPERATIONAL_ROLES } from "@/lib/team/options";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -283,6 +298,152 @@ function recipientLabel(preference: ReportSubscriptionPreferenceRow, peopleById:
   return "Workspace default";
 }
 
+function schedulePreference(category: string, preference?: ReportSubscriptionPreferenceRow | null) {
+  return {
+    category,
+    schedule_day_of_week: preference?.schedule_day_of_week ?? defaultWeekdayForCategory(category),
+    schedule_day_kind: reportScheduleDayKind(preference?.schedule_day_kind || "custom_day"),
+    schedule_day_of_month: preference?.schedule_day_of_month ?? 1,
+    schedule_month_in_quarter: preference?.schedule_month_in_quarter ?? defaultMonthInQuarter(category),
+    schedule_time: normalizeScheduleTime(preference?.schedule_time)
+  };
+}
+
+function nextRunLabel(preference: ReturnType<typeof schedulePreference>) {
+  const nextRun = getNextScheduledRun(preference);
+
+  if (!nextRun) {
+    return "Triggered by activity";
+  }
+
+  return `${nextRun.toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
+function dayKindLabel(value: string) {
+  if (value === "first_business_day") return "First business day";
+  if (value === "last_business_day") return "Last business day";
+  return "Custom day";
+}
+
+function DayOfMonthSelect({ defaultValue }: { defaultValue?: number | null }) {
+  return (
+    <label className="block text-sm font-medium">
+      Day of month
+      <select
+        name="schedule_day_of_month"
+        defaultValue={defaultValue ?? 1}
+        className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+      >
+        {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+          <option key={day} value={day}>
+            {day}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ScheduleFields({
+  category,
+  preference,
+  generic = false
+}: {
+  category?: string;
+  preference?: ReportSubscriptionPreferenceRow | null;
+  generic?: boolean;
+}) {
+  const activeCategory = category || "weekly_review";
+  const schedule = schedulePreference(activeCategory, preference);
+  const scheduled = generic || isScheduledReportCategory(activeCategory);
+
+  if (!scheduled) {
+    return (
+      <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
+        This category is triggered by workspace activity, so it does not need calendar scheduling.
+      </p>
+    );
+  }
+
+  const showWeekly = generic || activeCategory === "weekly_review" || activeCategory === "weekly_planning";
+  const showMonthly = generic || activeCategory === "monthly_executive_summary" || activeCategory === "quarterly_business_review";
+  const showQuarterly = generic || activeCategory === "quarterly_business_review";
+
+  return (
+    <div className="grid gap-3 rounded-lg border border-line bg-slate-50 p-3 md:grid-cols-2">
+      {showWeekly ? (
+        <label className="block text-sm font-medium">
+          Day of week
+          <select
+            name="schedule_day_of_week"
+            defaultValue={schedule.schedule_day_of_week ?? defaultWeekdayForCategory(activeCategory)}
+            className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+          >
+            {REPORT_WEEKDAY_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      {showQuarterly ? (
+        <label className="block text-sm font-medium">
+          Month in quarter
+          <select
+            name="schedule_month_in_quarter"
+            defaultValue={schedule.schedule_month_in_quarter ?? 1}
+            className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+          >
+            {REPORT_QUARTER_MONTH_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
+
+      {showMonthly ? (
+        <>
+          <label className="block text-sm font-medium">
+            Day option
+            <select
+              name="schedule_day_kind"
+              defaultValue={schedule.schedule_day_kind}
+              className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+            >
+              {REPORT_SCHEDULE_DAY_KINDS.map((option) => (
+                <option key={option} value={option}>
+                  {dayKindLabel(option)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <DayOfMonthSelect defaultValue={schedule.schedule_day_of_month} />
+        </>
+      ) : null}
+
+      <TextInput label="Time of day (UTC)" name="schedule_time" type="time" defaultValue={schedule.schedule_time} />
+      <p className="text-xs leading-5 text-muted md:col-span-2">
+        If the selected day does not exist, such as the 31st in February, Vaeroex sends on the last day of that month.
+      </p>
+    </div>
+  );
+}
+
+function ScheduleSummary({ category, preference }: { category: string; preference?: ReportSubscriptionPreferenceRow | null }) {
+  const schedule = schedulePreference(category, preference);
+
+  return (
+    <div className="mt-2 grid gap-1 text-xs text-muted">
+      <span>Schedule: {getScheduleDescription(schedule)}</span>
+      <span>Next run: {nextRunLabel(schedule)}</span>
+    </div>
+  );
+}
+
 function SubscriptionCategorySelect({ defaultValue }: { defaultValue?: string | null }) {
   return (
     <label className="block text-sm font-medium">
@@ -326,11 +487,13 @@ function SubscriptionStatusSelect({ defaultValue }: { defaultValue?: string | nu
 function ReportSubscriptionPreferences({
   preferences,
   people,
-  scheduledRuns
+  scheduledRuns,
+  canRunNow
 }: {
   preferences: ReportSubscriptionPreferenceRow[];
   people: TeamPersonOption[];
   scheduledRuns: ScheduledReportRunRow[];
+  canRunNow: boolean;
 }) {
   const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
   const roleOptions = Array.from(
@@ -350,18 +513,36 @@ function ReportSubscriptionPreferences({
             const preference = findWorkspacePreference(preferences, category.key);
 
             return (
-              <form key={category.key} action={saveReportSubscriptionPreferenceAction} className="grid gap-3 rounded-lg border border-line bg-white p-3 md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-end">
-                <input type="hidden" name="return_path" value="/app/reports" />
-                <input type="hidden" name="category" value={category.key} />
-                <input type="hidden" name="preference_scope" value="workspace" />
-                <div>
-                  <p className="text-sm font-semibold text-ink">{category.label}</p>
-                  <p className="mt-1 text-xs text-muted">{category.cadence} · Current: {preferenceStatusLabel(preference)}</p>
-                </div>
-                <SubscriptionStatusSelect defaultValue={preference?.email_status || "disabled"} />
-                <TextInput label="Pause until" name="pause_until" type="date" defaultValue={preference?.pause_until || ""} />
-                <PrimaryButton>Save</PrimaryButton>
-              </form>
+              <div key={category.key} className="rounded-lg border border-line bg-white p-3">
+                <form action={saveReportSubscriptionPreferenceAction} className="grid gap-3">
+                  <input type="hidden" name="return_path" value="/app/reports" />
+                  <input type="hidden" name="category" value={category.key} />
+                  <input type="hidden" name="preference_scope" value="workspace" />
+                  <div className="grid gap-3 md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-end">
+                    <div>
+                      <p className="text-sm font-semibold text-ink">{category.label}</p>
+                      <p className="mt-1 text-xs text-muted">Current: {preferenceStatusLabel(preference)}</p>
+                      <ScheduleSummary category={category.key} preference={preference} />
+                    </div>
+                    <SubscriptionStatusSelect defaultValue={preference?.email_status || "disabled"} />
+                    <TextInput label="Pause until" name="pause_until" type="date" defaultValue={preference?.pause_until || ""} />
+                    <PrimaryButton>Save</PrimaryButton>
+                  </div>
+                  <ScheduleFields category={category.key} preference={preference} />
+                </form>
+                {canRunNow && isScheduledReportCategory(category.key) ? (
+                  <form action={runReportSubscriptionNowAction} className="mt-3 flex justify-end">
+                    <input type="hidden" name="return_path" value="/app/reports" />
+                    <input type="hidden" name="category" value={category.key} />
+                    <ConfirmSubmitButton
+                      message={`Generate ${category.label} now for this workspace?`}
+                      className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold text-ink hover:bg-slate-50"
+                    >
+                      Run Now
+                    </ConfirmSubmitButton>
+                  </form>
+                ) : null}
+              </div>
             );
           })}
         </div>
@@ -376,6 +557,7 @@ function ReportSubscriptionPreferences({
               <SelectInput label="Role" name="role" options={roleOptions} required />
               <SubscriptionStatusSelect />
               <TextInput label="Pause until" name="pause_until" type="date" />
+              <ScheduleFields generic />
               <PrimaryButton>Save role preference</PrimaryButton>
             </form>
           </div>
@@ -399,6 +581,7 @@ function ReportSubscriptionPreferences({
               </label>
               <SubscriptionStatusSelect />
               <TextInput label="Pause until" name="pause_until" type="date" />
+              <ScheduleFields generic />
               <PrimaryButton>Save person preference</PrimaryButton>
             </form>
           </div>
@@ -412,7 +595,10 @@ function ReportSubscriptionPreferences({
             <div className="mt-3 space-y-2">
               {nonWorkspacePreferences.slice(0, 12).map((preference) => (
                 <div key={preference.id} className="grid gap-2 rounded-lg border border-line p-3 text-sm md:grid-cols-[1fr_auto_auto]">
-                  <span className="font-semibold text-ink">{categoryLabel(preference.category)}</span>
+                  <span>
+                    <span className="font-semibold text-ink">{categoryLabel(preference.category)}</span>
+                    <span className="mt-1 block text-xs text-muted">Next run: {nextRunLabel(schedulePreference(preference.category, preference))}</span>
+                  </span>
                   <span className="text-muted">{recipientLabel(preference, peopleById)}</span>
                   <StatusBadge value={preferenceStatusLabel(preference)} />
                 </div>
@@ -450,6 +636,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     data: { user }
   } = await supabase.auth.getUser();
   const canViewDebug = isVaeroexAdminUser(user);
+  const canRunScheduledReports = canViewDebug || ["owner", "admin"].includes(context.membership?.role || "");
   const debugMode = params?.debug === "1";
   const filterReportType = params?.report_type || "All";
   const filterCategory = params?.category || "All";
@@ -643,7 +830,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         <MetricCard label="Checklist completions" value={checklistCompletionCount.count ?? 0} note={`${sopCount.count ?? 0} SOPs available for reference.`} />
       </section>
 
-      <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} />
+      <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} canRunNow={canRunScheduledReports} />
 
       <section className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-2">
