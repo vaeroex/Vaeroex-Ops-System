@@ -1114,6 +1114,74 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["kpi_alert_events"]["Insert"]>;
         Relationships: [];
       };
+      report_subscription_preferences: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          category: string;
+          preference_scope: string;
+          person_id: string | null;
+          role: string | null;
+          email_status: string;
+          pause_until: string | null;
+          last_generated_at: string | null;
+          last_notified_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          category: string;
+          preference_scope?: string;
+          person_id?: string | null;
+          role?: string | null;
+          email_status?: string;
+          pause_until?: string | null;
+          last_generated_at?: string | null;
+          last_notified_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["report_subscription_preferences"]["Insert"]>;
+        Relationships: [];
+      };
+      scheduled_report_runs: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          category: string;
+          report_id: string | null;
+          run_date: string;
+          status: string;
+          started_at: string;
+          completed_at: string | null;
+          error_message: string | null;
+          metadata_json: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          category: string;
+          report_id?: string | null;
+          run_date: string;
+          status?: string;
+          started_at?: string;
+          completed_at?: string | null;
+          error_message?: string | null;
+          metadata_json?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["scheduled_report_runs"]["Insert"]>;
+        Relationships: [];
+      };
       audit_logs: {
         Row: {
           id: string;

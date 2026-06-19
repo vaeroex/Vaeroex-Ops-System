@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import type { ReactNode } from "react";
+import { saveReportSubscriptionPreferenceAction } from "@/app/app/report-subscriptions/actions";
 import { generateReportAction } from "@/app/app/reports/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
@@ -9,10 +10,13 @@ import { ManagedRecordList, type ManagedRecordEditField } from "@/components/ope
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { StatusBadge } from "@/components/operations/StatusBadge";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
+import { REPORT_SUBSCRIPTION_CATEGORIES, REPORT_SUBSCRIPTION_STATUSES, categoryLabel } from "@/lib/reports/subscriptions";
 import type { Database, Json } from "@/lib/supabase/types";
+import { OPERATIONAL_ROLES } from "@/lib/team/options";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type ReportsPageProps = {
@@ -34,6 +38,8 @@ type ReportsPageProps = {
 };
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
+type ReportSubscriptionPreferenceRow = Database["public"]["Tables"]["report_subscription_preferences"]["Row"];
+type ScheduledReportRunRow = Database["public"]["Tables"]["scheduled_report_runs"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
 const REPORT_PERIODS = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
@@ -261,6 +267,182 @@ function ShareHistory({ shares, peopleById }: { shares: ShareRow[]; peopleById: 
   );
 }
 
+function preferenceStatusLabel(preference?: ReportSubscriptionPreferenceRow) {
+  if (!preference) return "disabled";
+  if (preference.email_status === "paused" && preference.pause_until) return `paused until ${preference.pause_until}`;
+  return preference.email_status;
+}
+
+function findWorkspacePreference(preferences: ReportSubscriptionPreferenceRow[], category: string) {
+  return preferences.find((preference) => preference.category === category && preference.preference_scope === "workspace");
+}
+
+function recipientLabel(preference: ReportSubscriptionPreferenceRow, peopleById: Map<string, string>) {
+  if (preference.preference_scope === "person") return peopleById.get(preference.person_id || "") || "Person";
+  if (preference.preference_scope === "role") return preference.role || "Role";
+  return "Workspace default";
+}
+
+function SubscriptionCategorySelect({ defaultValue }: { defaultValue?: string | null }) {
+  return (
+    <label className="block text-sm font-medium">
+      Category
+      <select
+        name="category"
+        required
+        defaultValue={defaultValue || ""}
+        className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
+      >
+        <option value="">Choose...</option>
+        {REPORT_SUBSCRIPTION_CATEGORIES.map((category) => (
+          <option key={category.key} value={category.key}>
+            {category.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function SubscriptionStatusSelect({ defaultValue }: { defaultValue?: string | null }) {
+  return (
+    <label className="block text-sm font-medium">
+      Status
+      <select
+        name="email_status"
+        defaultValue={defaultValue || "disabled"}
+        className="mt-2 w-full rounded-lg border border-line px-3 py-2 capitalize outline-none focus:border-vaeroex-blue"
+      >
+        {REPORT_SUBSCRIPTION_STATUSES.map((status) => (
+          <option key={status} value={status}>
+            {status}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function ReportSubscriptionPreferences({
+  preferences,
+  people,
+  scheduledRuns
+}: {
+  preferences: ReportSubscriptionPreferenceRow[];
+  people: TeamPersonOption[];
+  scheduledRuns: ScheduledReportRunRow[];
+}) {
+  const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
+  const roleOptions = Array.from(
+    new Set([...OPERATIONAL_ROLES, ...people.map((person) => person.role_title).filter((role): role is string => Boolean(role))])
+  ).sort();
+  const nonWorkspacePreferences = preferences.filter((preference) => preference.preference_scope !== "workspace");
+
+  return (
+    <SectionCard
+      title="Report subscription preferences"
+      description="Control scheduled report and alert categories by workspace, role, or person. Email delivery is optional and never forced; Vaeroex always keeps in-app history available."
+    >
+      <div className="grid gap-6 xl:grid-cols-[1.25fr_.75fr]">
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-ink">Workspace defaults</h3>
+          {REPORT_SUBSCRIPTION_CATEGORIES.map((category) => {
+            const preference = findWorkspacePreference(preferences, category.key);
+
+            return (
+              <form key={category.key} action={saveReportSubscriptionPreferenceAction} className="grid gap-3 rounded-lg border border-line bg-white p-3 md:grid-cols-[1.4fr_.7fr_.7fr_auto] md:items-end">
+                <input type="hidden" name="return_path" value="/app/reports" />
+                <input type="hidden" name="category" value={category.key} />
+                <input type="hidden" name="preference_scope" value="workspace" />
+                <div>
+                  <p className="text-sm font-semibold text-ink">{category.label}</p>
+                  <p className="mt-1 text-xs text-muted">{category.cadence} · Current: {preferenceStatusLabel(preference)}</p>
+                </div>
+                <SubscriptionStatusSelect defaultValue={preference?.email_status || "disabled"} />
+                <TextInput label="Pause until" name="pause_until" type="date" defaultValue={preference?.pause_until || ""} />
+                <PrimaryButton>Save</PrimaryButton>
+              </form>
+            );
+          })}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded-lg border border-line bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold text-ink">Role default</h3>
+            <form action={saveReportSubscriptionPreferenceAction} className="mt-3 grid gap-3">
+              <input type="hidden" name="return_path" value="/app/reports" />
+              <input type="hidden" name="preference_scope" value="role" />
+              <SubscriptionCategorySelect />
+              <SelectInput label="Role" name="role" options={roleOptions} required />
+              <SubscriptionStatusSelect />
+              <TextInput label="Pause until" name="pause_until" type="date" />
+              <PrimaryButton>Save role preference</PrimaryButton>
+            </form>
+          </div>
+
+          <div className="rounded-lg border border-line bg-slate-50 p-4">
+            <h3 className="text-sm font-semibold text-ink">Person preference</h3>
+            <form action={saveReportSubscriptionPreferenceAction} className="mt-3 grid gap-3">
+              <input type="hidden" name="return_path" value="/app/reports" />
+              <input type="hidden" name="preference_scope" value="person" />
+              <SubscriptionCategorySelect />
+              <label className="block text-sm font-medium">
+                Person
+                <select name="person_id" required className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue">
+                  <option value="">Choose...</option>
+                  {people.map((person) => (
+                    <option key={person.id} value={person.id}>
+                      {person.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <SubscriptionStatusSelect />
+              <TextInput label="Pause until" name="pause_until" type="date" />
+              <PrimaryButton>Save person preference</PrimaryButton>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Role and person overrides</h3>
+          {nonWorkspacePreferences.length ? (
+            <div className="mt-3 space-y-2">
+              {nonWorkspacePreferences.slice(0, 12).map((preference) => (
+                <div key={preference.id} className="grid gap-2 rounded-lg border border-line p-3 text-sm md:grid-cols-[1fr_auto_auto]">
+                  <span className="font-semibold text-ink">{categoryLabel(preference.category)}</span>
+                  <span className="text-muted">{recipientLabel(preference, peopleById)}</span>
+                  <StatusBadge value={preferenceStatusLabel(preference)} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg border border-dashed border-line bg-slate-50 p-3 text-sm text-muted">No role or person overrides yet.</p>
+          )}
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-ink">Scheduled report runs</h3>
+          {scheduledRuns.length ? (
+            <div className="mt-3 space-y-2">
+              {scheduledRuns.slice(0, 8).map((run) => (
+                <div key={run.id} className="grid gap-2 rounded-lg border border-line p-3 text-sm md:grid-cols-[1fr_auto_auto]">
+                  <span className="font-semibold text-ink">{categoryLabel(run.category)}</span>
+                  <span className="text-muted">{run.run_date}</span>
+                  <StatusBadge value={run.status} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-3 rounded-lg border border-dashed border-line bg-slate-50 p-3 text-sm text-muted">Scheduled report runs will appear after the production cron executes.</p>
+          )}
+        </div>
+      </div>
+    </SectionCard>
+  );
+}
+
 export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const params = await searchParams;
   const { supabase, context, workspaceId } = await requireWorkspacePage();
@@ -301,7 +483,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     sopCategories,
     folderResult,
     peopleResult,
-    shareResult
+    shareResult,
+    preferenceResult,
+    scheduledRunResult
   ] = await Promise.all([
     reportQuery,
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
@@ -320,11 +504,26 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     supabase.from("sops").select("category").eq("workspace_id", workspaceId),
     getRecordFolders(supabase, workspaceId, "reports"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
-    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "report").is("deleted_at", null).order("created_at", { ascending: false })
+    supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "report").is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase
+      .from("report_subscription_preferences")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .order("category")
+      .order("preference_scope"),
+    supabase
+      .from("scheduled_report_runs")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("run_date", { ascending: false })
+      .limit(20)
   ]);
   const people = (peopleResult.data || []) as TeamPersonOption[];
   const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
   const shares = (shareResult.data || []) as ShareRow[];
+  const preferences = (preferenceResult.data || []) as ReportSubscriptionPreferenceRow[];
+  const scheduledRuns = (scheduledRunResult.data || []) as ScheduledReportRunRow[];
 
   const dynamicCategories = uniqueOptions([
     ...(taskCategories.data || []).map((row) => row.category),
@@ -424,7 +623,17 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         ]}
       />
 
-      <ErrorNotice message={params?.error || error?.message || folderResult.error?.message || peopleResult.error?.message || shareResult.error?.message} />
+      <ErrorNotice
+        message={
+          params?.error ||
+          error?.message ||
+          folderResult.error?.message ||
+          peopleResult.error?.message ||
+          shareResult.error?.message ||
+          preferenceResult.error?.message ||
+          scheduledRunResult.error?.message
+        }
+      />
       <SuccessNotice message={params?.message} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -433,6 +642,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         <MetricCard label="Open issues" value={openIssueCount.count ?? 0} note="Unresolved risks and blockers." />
         <MetricCard label="Checklist completions" value={checklistCompletionCount.count ?? 0} note={`${sopCount.count ?? 0} SOPs available for reference.`} />
       </section>
+
+      <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} />
 
       <section className="space-y-6">
         <div className="grid gap-4 lg:grid-cols-2">
