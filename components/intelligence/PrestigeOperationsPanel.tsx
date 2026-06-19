@@ -36,7 +36,7 @@ function scoreTone(score: number) {
 function priorityTone(priority: string) {
   if (priority === "Urgent" || priority === "High") return "border-red-200 bg-red-50 text-red-700";
   if (priority === "Medium") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-blue-100 bg-blue-50 text-blue-800";
+  return "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue";
 }
 
 function scoreLabel(score: number) {
@@ -82,24 +82,27 @@ export function BusinessHealthHero({
   const progressWidth = `${Math.max(4, Math.min(100, health.score))}%`;
 
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-800 bg-vaeroex-navy text-white shadow-command">
+    <section className="overflow-hidden rounded-lg border border-vaeroex-navy bg-vaeroex-navy text-white shadow-command">
       <div className="grid gap-0 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="border-b border-white/10 p-6 xl:border-b-0 xl:border-r">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-200">Business Health</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-silver">Business Health</p>
+            <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold text-vaeroex-accent">Risk: {risk}</span>
+          </div>
           <div className="mt-5 flex flex-wrap items-end gap-4">
             <p className="text-7xl font-semibold leading-none tracking-normal">
               {health.score}
-              <span className="ml-1 text-2xl text-blue-200">/100</span>
+              <span className="ml-1 text-2xl text-vaeroex-accent">/100</span>
             </p>
             <div className="pb-2">
               <p className="text-xl font-semibold">{scoreLabel(health.score)}</p>
-              <p className="mt-1 text-sm text-blue-100">Vaeroex operating score</p>
+              <p className="mt-1 text-sm text-vaeroex-silver">Vaeroex operating score</p>
             </div>
           </div>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full rounded-full bg-vaeroex-blue" style={{ width: progressWidth }} />
+            <div className="h-full rounded-full bg-[linear-gradient(90deg,#1E6BFF,#38BDF8)]" style={{ width: progressWidth }} />
           </div>
-          <p className="mt-4 max-w-2xl text-sm leading-6 text-blue-50">{health.explanation}</p>
+          <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-100">{health.explanation}</p>
           {health.dataQualityWarning ? (
             <p className="mt-4 rounded-lg border border-amber-300/30 bg-amber-300/10 p-3 text-xs leading-5 text-amber-100">{health.dataQualityWarning}</p>
           ) : null}
@@ -107,24 +110,29 @@ export function BusinessHealthHero({
 
         <div className="grid gap-3 p-6 sm:grid-cols-2">
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Trend direction</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Trend direction</p>
             <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.label}</p>
-            <p className="mt-1 text-sm text-blue-100">{trend.detail} in the {periodLabel.toLowerCase()} view.</p>
+            <p className="mt-1 text-sm text-slate-100">{trend.detail} in the {periodLabel.toLowerCase()} view.</p>
           </article>
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Risk level</p>
-            <p className="mt-3 text-2xl font-semibold">{risk}</p>
-            <p className="mt-1 text-sm text-blue-100">Based on current health score, open risks, and data confidence.</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Risk level</p>
+            <p className="mt-3 inline-flex rounded-full bg-[linear-gradient(90deg,#1E6BFF,#38BDF8)] px-3 py-1 text-2xl font-semibold text-white">{risk}</p>
+            <p className="mt-2 text-sm text-slate-100">Based on current health score, open risks, and data confidence.</p>
           </article>
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Primary focus</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Primary focus</p>
             <p className="mt-3 text-2xl font-semibold">{focus}</p>
-            <p className="mt-1 text-sm text-blue-100">Start here before adding more work to the team.</p>
+            <p className="mt-1 text-sm text-slate-100">Start here before adding more work to the team.</p>
           </article>
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">Week-over-week signal</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Weekly change</p>
             <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.detail}</p>
-            <p className="mt-1 text-sm text-blue-100">Vaeroex uses the visible workspace history and current period filters.</p>
+            <p className="mt-1 text-sm text-slate-100">Workspace signals compared through the current operating view.</p>
+          </article>
+          <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4 sm:col-span-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Monthly change</p>
+            <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.label}</p>
+            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, CRM movement, tasks, issues, files, and reports before calling a trend.</p>
           </article>
         </div>
       </div>
@@ -134,7 +142,7 @@ export function BusinessHealthHero({
 
 function DemoPreviewNotice() {
   return (
-    <p className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-xs leading-5 text-blue-900">
+    <p className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3 text-xs leading-5 text-vaeroex-navy">
       Demo Workspace actions are previews only. No real emails, customer notifications, or live operational records are created from these prestige controls.
     </p>
   );

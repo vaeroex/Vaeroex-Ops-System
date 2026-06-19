@@ -111,7 +111,7 @@ export function OnboardingChecklist({
       ) : null}
 
       {showChecklist ? (
-        <div className="rounded-lg border border-blue-100 bg-white p-5 shadow-panel">
+        <div className="rounded-lg border border-vaeroex-accent/40 bg-white p-5 shadow-panel">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Guided onboarding</p>

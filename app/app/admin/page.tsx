@@ -47,7 +47,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => (
-          <Link key={card.label} href={card.href} className="rounded-lg border border-line bg-white p-5 shadow-panel hover:border-vaeroex-blue">
+          <Link key={card.label} href={card.href} className="rounded-lg border border-line bg-white p-5 shadow-panel hover:border-vaeroex-accent">
             <p className="text-sm text-muted">{card.label}</p>
             <p className="mt-2 text-3xl font-semibold">{card.value}</p>
           </Link>

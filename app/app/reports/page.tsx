@@ -169,7 +169,7 @@ function ReportBody({ body }: { body: string | null }) {
       {sections.map((section) => (
         <section
           key={section.title}
-          className={section.title === "Executive Summary" ? "rounded-lg border border-blue-100 bg-blue-50/60 p-4 lg:col-span-2" : "rounded-lg border border-line bg-slate-50 p-4"}
+          className={section.title === "Executive Summary" ? "rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4 lg:col-span-2" : "rounded-lg border border-line bg-slate-50 p-4"}
         >
           <h4 className="text-sm font-semibold text-ink">{section.title}</h4>
           <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">

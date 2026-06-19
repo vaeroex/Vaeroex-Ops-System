@@ -112,12 +112,12 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
           <span className="grid h-10 w-10 place-items-center rounded-lg bg-vaeroex-blue text-sm font-bold shadow-sm shadow-blue-950/30">V</span>
           <span>
             <span className="block text-sm font-semibold tracking-wide">Vaeroex</span>
-            <span className="block text-xs text-blue-100">Executive Ops System</span>
+            <span className="block text-xs text-vaeroex-silver">Executive Ops System</span>
           </span>
         </Link>
 
         <form action={selectWorkspaceAction} className="mt-7 rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm shadow-black/10">
-          <p className="text-xs uppercase tracking-[0.18em] text-blue-100">Workspace</p>
+          <p className="text-xs uppercase tracking-[0.18em] text-vaeroex-silver">Workspace</p>
           <select
             name="workspace_id"
             aria-label="Workspace switcher"
@@ -134,14 +134,14 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
               <option value="">No workspace yet</option>
             )}
           </select>
-          <p className="mt-2 text-xs text-blue-100">
+          <p className="mt-2 text-xs text-vaeroex-silver">
             Role: <span className="font-semibold text-white">{membership?.role || "setup pending"}</span>
           </p>
-          <p className="mt-2 text-xs text-blue-100">
+          <p className="mt-2 text-xs text-vaeroex-silver">
             Status: <span className="font-semibold text-white">{accessLabel}</span>
           </p>
           {workspaces.length > 1 ? (
-            <button className="mt-3 w-full rounded-md border border-white/10 px-2 py-1.5 text-xs font-semibold text-blue-50 hover:border-vaeroex-blue hover:bg-vaeroex-blue">
+            <button className="mt-3 w-full rounded-md border border-white/10 px-2 py-1.5 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Switch workspace
             </button>
           ) : null}
@@ -150,7 +150,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
         <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} />
 
         <form action={signOutAction} className="mt-5">
-          <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-blue-50 hover:border-vaeroex-blue hover:bg-white/10">
+          <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/10">
             Sign out
           </button>
         </form>
@@ -160,7 +160,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
         <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-4 py-3 text-white shadow-command lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-blue-200">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                 {activeWorkspace?.name || "Setup required"} · {accessLabel}
               </p>
               <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Command Center</h1>
@@ -168,18 +168,18 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, membe
             <div className="flex items-center gap-3">
               <Link
                 href="/app/agents"
-                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-500"
+                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-vaeroex-accent hover:text-vaeroex-navy"
               >
                 Ask Vaeroex
               </Link>
               <Link
                 href="/app/notifications"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:border-vaeroex-blue hover:bg-white/15"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15"
               >
                 <span>Notifications</span>
                 <NotificationBadge count={notificationUnreadCount} />
               </Link>
-              <div className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-blue-50">
+              <div className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-100">
                 {profile?.full_name || profile?.email || "User"}
               </div>
             </div>

@@ -19,14 +19,14 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
           <h1 className="mt-8 max-w-xl text-5xl font-semibold tracking-tight">
             Your company’s daily control panel starts here.
           </h1>
-          <p className="mt-5 max-w-xl text-lg leading-8 text-blue-100">
+          <p className="mt-5 max-w-xl text-lg leading-8 text-slate-100">
             Sign in to review business health, focus priorities, risks, reports, and the work Vaeroex recommends next.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
             {["Health", "Risks", "Actions"].map((label) => (
               <div key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">{label}</p>
-                <p className="mt-2 text-sm text-blue-50">Visible in one workspace</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">{label}</p>
+                <p className="mt-2 text-sm text-slate-100">Visible in one workspace</p>
               </div>
             ))}
           </div>

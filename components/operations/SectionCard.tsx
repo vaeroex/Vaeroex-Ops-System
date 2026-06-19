@@ -8,9 +8,9 @@ type SectionCardProps = {
 
 export function SectionCard({ title, description, children }: SectionCardProps) {
   return (
-    <section className="rounded-lg border border-line/80 bg-white/95 p-5 shadow-panel">
+    <section className="rounded-lg border border-vaeroex-silver/80 bg-white p-5 shadow-panel">
       {title || description ? (
-        <div className="flex flex-col gap-1 border-b border-line pb-3">
+        <div className="flex flex-col gap-1 border-b border-vaeroex-silver pb-3">
           {title ? <h3 className="text-base font-semibold text-ink">{title}</h3> : null}
           {description ? <p className="max-w-4xl text-sm leading-6 text-slate-600">{description}</p> : null}
         </div>

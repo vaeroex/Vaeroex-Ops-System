@@ -44,7 +44,7 @@ const numberFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2
 });
 
-const chartColors = ["#2563eb", "#059669", "#dc2626", "#7c3aed", "#ea580c", "#0891b2", "#be123c"];
+const chartColors = ["#1E6BFF", "#38BDF8", "#0B1F4D", "#059669", "#f59e0b", "#dc2626", "#9CA3AF"];
 const kpiEditFields: ManagedRecordEditField[] = [
   { name: "name", label: "Name", required: true },
   { name: "category", label: "Category" },
@@ -507,9 +507,9 @@ function TrendChart({ rows, metricName }: { rows: KpiRow[]; metricName: string }
           {targetRows.length >= 2 ? (
             <polyline fill="none" points={targetPoints} stroke="#f59e0b" strokeDasharray="8 7" strokeLinecap="round" strokeWidth="3" />
           ) : null}
-          <polyline fill="none" points={actualPoints} stroke="#2563eb" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          <polyline fill="none" points={actualPoints} stroke="#1E6BFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
           {chartRows.map((row, index) => (
-            <circle key={row.id} cx={xFor(index)} cy={yFor(row.actual_value as number)} r="5" fill="#2563eb" stroke="#ffffff" strokeWidth="2" />
+            <circle key={row.id} cx={xFor(index)} cy={yFor(row.actual_value as number)} r="5" fill="#1E6BFF" stroke="#ffffff" strokeWidth="2" />
           ))}
           {firstDate ? (
             <text x={paddingX} y={height - 14} className="fill-slate-500 text-[11px]">

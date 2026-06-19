@@ -75,7 +75,7 @@ type DashboardAlert = {
 const PERIODS: DashboardPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const currencyFormatter = new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 0, style: "currency" });
-const chartColors = ["#2563eb", "#059669", "#dc2626", "#7c3aed", "#ea580c", "#0891b2"];
+const chartColors = ["#1E6BFF", "#38BDF8", "#0B1F4D", "#059669", "#f59e0b", "#dc2626"];
 
 function isDashboardPeriod(value: string | undefined): value is DashboardPeriod {
   return PERIODS.includes(value as DashboardPeriod);
@@ -349,7 +349,7 @@ function KpiCard({ trend }: { trend: MetricTrend }) {
   );
 }
 
-function LineChart({ title, rows, color = "#2563eb" }: { title: string; rows: KpiRow[]; color?: string }) {
+function LineChart({ title, rows, color = "#1E6BFF" }: { title: string; rows: KpiRow[]; color?: string }) {
   const chartRows = rows.filter((row) => row.actual_value !== null).slice(-12);
 
   if (chartRows.length < 2) {
@@ -504,7 +504,7 @@ function isOlderThan(value: string | null | undefined, days: number) {
 function severityTone(severity: DashboardAlert["severity"]) {
   if (severity === "High") return "border-red-200 bg-red-50 text-red-700";
   if (severity === "Medium") return "border-amber-200 bg-amber-50 text-amber-900";
-  return "border-blue-100 bg-blue-50 text-blue-800";
+  return "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue";
 }
 
 function latestKpisByName(kpis: KpiRow[]) {
@@ -661,17 +661,17 @@ function ExecutiveBriefingCard({
     <section className="rounded-lg border border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-blue-200">Executive briefing</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Executive briefing</p>
           <h2 className="mt-2 text-2xl font-semibold text-white">What changed and what to do next</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-blue-100">
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-100">
             A {period.toLowerCase()} owner-ready readout from KPIs, CRM, tasks, issues, files, checklists, SOPs, reports, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-500">Create Task</Link>
-          <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">Generate Report</Link>
-          <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">Review Issues</Link>
-          <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-blue-50 hover:bg-white/15">Review KPIs</Link>
+          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">Create Task</Link>
+          <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Generate Report</Link>
+          <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Review Issues</Link>
+          <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Review KPIs</Link>
         </div>
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-5">
@@ -683,8 +683,8 @@ function ExecutiveBriefingCard({
           ["Vaeroex recommends", recommendation]
         ].map(([label, value]) => (
           <article key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-blue-200">{label}</p>
-            <p className="mt-2 text-sm leading-6 text-blue-50">{value}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">{label}</p>
+            <p className="mt-2 text-sm leading-6 text-slate-100">{value}</p>
           </article>
         ))}
       </div>
@@ -712,7 +712,7 @@ function SmartAlerts({ alerts }: { alerts: DashboardAlert[] }) {
               <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold">{alert.severity}</span>
             </div>
             <p className="mt-2 text-sm leading-6 opacity-90">{alert.why}</p>
-            <Link href={alert.href as Route} className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:border-vaeroex-blue hover:text-vaeroex-blue">
+            <Link href={alert.href as Route} className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:border-vaeroex-accent hover:text-vaeroex-blue">
               {alert.action}
             </Link>
           </article>
@@ -732,7 +732,7 @@ function PeriodSelector({ period }: { period: DashboardPeriod }) {
           className={`rounded-lg px-3 py-2 text-sm font-semibold ${
             item === period
               ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
-              : "border border-line bg-white text-slate-700 hover:border-vaeroex-blue hover:text-vaeroex-blue"
+              : "border border-line bg-white text-slate-700 hover:border-vaeroex-accent hover:text-vaeroex-blue"
           }`}
         >
           {item}
@@ -857,7 +857,7 @@ function DemoWorkspaceBanner({
   ];
 
   return (
-    <section className="rounded-lg border-2 border-blue-300 bg-blue-50 p-5 text-blue-950 shadow-panel">
+    <section className="rounded-lg border-2 border-vaeroex-accent/60 bg-vaeroex-soft p-5 text-vaeroex-navy shadow-panel">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
@@ -879,30 +879,30 @@ function DemoWorkspaceBanner({
         </div>
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <article className="rounded-lg border border-blue-200 bg-white/80 p-4">
+        <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">March dip</p>
           <p className="mt-2 text-xs leading-5">
             Revenue fell below target while response time increased, conversion dropped, and checklist completion missed the mark.
           </p>
         </article>
-        <article className="rounded-lg border border-blue-200 bg-white/80 p-4">
+        <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">April and May recovery</p>
           <p className="mt-2 text-xs leading-5">
             SOP review, checklist follow-up, and CRM accountability helped the business recover from the weak month.
           </p>
         </article>
-        <article className="rounded-lg border border-blue-200 bg-white/80 p-4">
+        <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">Current month signals</p>
           <p className="mt-2 text-xs leading-5">
             Revenue is healthy, but response time, conversion, overdue tasks, and checklist completion still need owner attention.
           </p>
         </article>
       </div>
-      <div className="mt-5 rounded-lg border border-blue-200 bg-white/80 p-4">
+      <div className="mt-5 rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
         <p className="text-sm font-semibold">Demo Dashboard Summary</p>
         <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
           {summaryItems.map(([label, value]) => (
-            <div key={label} className="rounded-lg bg-blue-50 p-3">
+            <div key={label} className="rounded-lg bg-vaeroex-soft p-3">
               <p className="text-2xl font-semibold">{value}</p>
               <p className="mt-1 text-xs leading-4">{label}</p>
             </div>
@@ -1394,7 +1394,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           description="Notifications, shared reports, KPI alerts, and assigned follow-up work for this workspace."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-blue-100 bg-blue-50 text-blue-800" : undefined} />
+            <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue" : undefined} />
             <StatCard label="KPI alerts" value={kpiAlertNotifications.length} detail="Rules triggered" tone={kpiAlertNotifications.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
             <StatCard label="Shared reports" value={recentReportShares.length} detail="Recent in-app shares" />
             <StatCard label="Due soon" value={dueSoonAssignments.length} detail="Next 14 days" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
@@ -1421,7 +1421,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                 <Link
                   key={notification.id}
                   href="/app/notifications"
-                  className="block rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-sm hover:border-vaeroex-blue"
+                  className="block rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3 text-sm hover:border-vaeroex-accent"
                 >
                   <span className="font-semibold text-ink">{notification.title}</span>
                   <span className="mt-1 block text-xs text-muted">
@@ -1585,9 +1585,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <LineChart title="Revenue trend" rows={rowsForMetric(kpis, revenueMetric)} color="#059669" />
-        <LineChart title="Leads trend" rows={rowsForMetric(kpis, leadsMetric)} color="#2563eb" />
-        <LineChart title={`${customMetric} trend`} rows={rowsForMetric(kpis, customMetric)} color="#7c3aed" />
+        <LineChart title="Revenue trend" rows={rowsForMetric(kpis, revenueMetric)} color="#1E6BFF" />
+        <LineChart title="Leads trend" rows={rowsForMetric(kpis, leadsMetric)} color="#38BDF8" />
+        <LineChart title={`${customMetric} trend`} rows={rowsForMetric(kpis, customMetric)} color="#0B1F4D" />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_.85fr]">

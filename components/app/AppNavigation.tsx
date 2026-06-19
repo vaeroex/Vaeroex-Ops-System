@@ -43,9 +43,9 @@ function isActivePath(pathname: string, href: string) {
 function DesktopSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
   return (
     <details open className="group rounded-lg border border-white/10 bg-white/[0.04] shadow-sm shadow-black/10">
-      <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-blue-100">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-silver">
         {section.label}
-        <span className="text-blue-200 transition group-open:rotate-90">&gt;</span>
+        <span className="text-vaeroex-accent transition group-open:rotate-90">&gt;</span>
       </summary>
       <div className="pb-2">
         {section.items.map((item) => {
@@ -56,7 +56,7 @@ function DesktopSection({ section, notificationUnreadCount, pathname }: { sectio
               key={`${item.href}-${item.label}`}
               href={item.href as Route}
               className={`mx-2 flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium ${
-                active ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/20" : "text-blue-50 hover:bg-vaeroex-blue hover:text-white"
+                active ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/20" : "text-slate-100 hover:bg-vaeroex-accent hover:text-vaeroex-navy"
               }`}
             >
               <span>{item.label}</span>
@@ -82,7 +82,7 @@ function MobileSection({ section, notificationUnreadCount, pathname }: { section
               key={`${section.label}-${item.label}`}
               href={item.href as Route}
               className={`flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-2 py-1 text-sm ${
-                active ? "bg-vaeroex-blue text-white" : "text-slate-700 hover:bg-vaeroex-soft hover:text-vaeroex-blue"
+                active ? "bg-vaeroex-blue text-white" : "text-slate-700 hover:bg-vaeroex-accent/20 hover:text-vaeroex-navy"
               }`}
             >
               <span>{item.label}</span>

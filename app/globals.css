@@ -9,7 +9,7 @@
 body {
   margin: 0;
   background: #f8fafc;
-  color: #0f172a;
+  color: #0b1f4d;
   text-rendering: geometricPrecision;
 }
 
@@ -18,7 +18,7 @@ body {
 }
 
 ::selection {
-  background: #2563eb;
+  background: #1e6bff;
   color: #ffffff;
 }
 
@@ -33,4 +33,10 @@ textarea {
     box-shadow 160ms ease,
     color 160ms ease,
     transform 160ms ease;
+}
+
+a.bg-vaeroex-blue:hover,
+button.bg-vaeroex-blue:hover {
+  background-color: #38bdf8;
+  color: #0b1f4d;
 }
