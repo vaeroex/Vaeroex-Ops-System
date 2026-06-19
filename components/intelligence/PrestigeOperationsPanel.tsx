@@ -8,6 +8,7 @@ import {
   createKpiAlertFromPrestigeAction,
   dismissPrestigeRecommendationAction
 } from "@/app/app/intelligence/actions";
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -85,9 +86,12 @@ export function BusinessHealthHero({
     <section className="overflow-hidden rounded-lg border border-vaeroex-navy bg-vaeroex-navy text-white shadow-command">
       <div className="grid gap-0 xl:grid-cols-[0.95fr_1.05fr]">
         <div className="border-b border-white/10 p-6 xl:border-b-0 xl:border-r">
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-silver">Business Health</p>
-            <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold text-vaeroex-accent">Risk: {risk}</span>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-silver">Business Health</p>
+              <span className="rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-xs font-semibold text-vaeroex-accent">Risk: {risk}</span>
+            </div>
+            <VaeroexLogo variant="symbol" size="sm" />
           </div>
           <div className="mt-5 flex flex-wrap items-end gap-4">
             <p className="text-7xl font-semibold leading-none tracking-normal">

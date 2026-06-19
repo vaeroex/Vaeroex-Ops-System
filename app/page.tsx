@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 
 const modules = ["Dashboard", "Forms", "Checklists", "Tasks", "Issues", "Assets", "People", "SOPs", "Reports"];
 
@@ -15,7 +16,9 @@ export default function HomePage() {
       <nav className="border-b border-slate-800 bg-vaeroex-navy px-6 py-4 text-white shadow-command">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-3 text-lg font-semibold">
-            <span className="grid h-9 w-9 place-items-center rounded-lg bg-vaeroex-blue text-sm font-bold">V</span>
+            <span className="grid h-10 w-12 place-items-center rounded-lg border border-white/10 bg-white/10">
+              <VaeroexLogo variant="symbol" size="xs" priority />
+            </span>
             <span>Vaeroex Ops System</span>
           </Link>
           <div className="flex items-center gap-2">
@@ -31,6 +34,7 @@ export default function HomePage() {
 
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-14 lg:grid-cols-[1fr_0.86fr] lg:items-center">
         <div>
+          <VaeroexLogo variant="full" size="hero" priority className="mb-6 max-w-full" />
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Executive command center for growing teams</p>
           <h1 className="mt-4 max-w-3xl text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
             Run your company from one daily control panel.

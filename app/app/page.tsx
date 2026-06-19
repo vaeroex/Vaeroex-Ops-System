@@ -9,6 +9,7 @@ import {
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
 import { OnboardingChecklist, type OnboardingChecklistItem } from "@/components/app/OnboardingChecklist";
+import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { BusinessHealthHero, PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -661,8 +662,11 @@ function ExecutiveBriefingCard({
     <section className="rounded-lg border border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Executive briefing</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">What changed and what to do next</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <VaeroexLogo variant="symbol" size="sm" />
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Executive briefing</p>
+          </div>
+          <h2 className="mt-3 text-2xl font-semibold text-white">What changed and what to do next</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-100">
             A {period.toLowerCase()} owner-ready readout from KPIs, CRM, tasks, issues, files, checklists, SOPs, reports, and Vaeroex insights.
           </p>
