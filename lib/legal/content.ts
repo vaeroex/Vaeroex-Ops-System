@@ -79,22 +79,22 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Subscription and Billing",
         body: [
-          "Vaeroex subscriptions are currently sold and billed through Squarespace or another payment provider.",
-          "Customers should use the same email for purchase and account creation so subscription access can be matched correctly."
+          "Vaeroex subscriptions are available through the Vaeroex Direct Website and official Vaeroex sales channels.",
+          "Customers should use the same email for purchase and account creation so Vaeroex subscription access can be matched correctly."
         ]
       },
       {
         title: "Cancellation",
         body: [
-          "Customers may cancel according to the billing provider workflow.",
+          "Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support.",
           "Access may continue until the end of the paid billing period unless otherwise required by law or approved by Vaeroex."
         ]
       },
       {
         title: "Refunds",
         body: [
-          "Refunds are handled according to the Refund Policy and applicable law.",
-          "Promotions, discounts, and billing adjustments are handled outside the app by the payment provider or Vaeroex support."
+          "Refunds are handled according to the Vaeroex Refund Policy and applicable law.",
+          "Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels."
         ]
       },
       {
@@ -220,7 +220,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Workspace Data", body: ["Workspace data may include business records, KPIs, CRM records, reports, SOPs, checklists, issues, follow-ups, assignments, notifications, and workspace settings."] },
       { title: "Uploaded Files", body: ["Uploaded files may be stored and processed so Vaeroex can provide file libraries, imports, analysis, reports, and historical business memory."] },
       { title: "Usage Data", body: ["Vaeroex may collect usage data such as feature activity, report generation, Vaeroex runs, timestamps, user agent, and operational logs. IP address may be processed where available for security, audit, abuse prevention, or platform operation."] },
-      { title: "Payment Data", body: ["Payment and subscription checkout are handled by Squarespace or another payment provider. Vaeroex generally receives subscription status, customer email, order identifiers, and related billing metadata rather than full payment card details."] },
+      { title: "Payment Data", body: ["Payment and subscription checkout are handled through Vaeroex checkout and official Vaeroex sales channels. Vaeroex may process subscription status, customer email, order identifiers, and related billing metadata, but it does not need full payment card details to operate the workspace."] },
       { title: "How We Use Information", body: ["Vaeroex uses information to provide the platform, maintain workspace access, generate reports, support users, improve reliability, investigate issues, protect the service, and communicate about account or support matters."] },
       { title: "Vaeroex Processing Notice", body: ["When users ask Vaeroex for recommendations, summaries, file analysis, or reports, relevant workspace context may be sent to configured AI service providers to generate the requested output. Users should not submit sensitive or regulated data unless proper controls exist."] },
       { title: "How We Share Information", body: ["Vaeroex may share information with service providers used to host, operate, process, secure, support, or improve the platform. Vaeroex may also disclose information when required by law or to protect the platform and customers."] },
@@ -258,12 +258,12 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/refund-policy",
     updated: "2026-06-19",
     sections: [
-      { title: "Billing Provider", body: ["Vaeroex is currently billed through Squarespace or another payment provider. Checkout, renewals, payment collection, taxes, and payment records are handled outside the app."] },
-      { title: "Automatic Renewal", body: ["Subscriptions renew automatically unless canceled according to the billing provider workflow."] },
+      { title: "Vaeroex Subscription", body: ["Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support."] },
+      { title: "Automatic Renewal", body: ["Vaeroex subscriptions renew automatically unless canceled."] },
       { title: "Cancel Anytime", body: ["Customers may cancel anytime. Access generally continues until the end of the paid billing period unless otherwise required by law or approved by Vaeroex."] },
       { title: "Satisfaction Refund", body: ["First-time subscriptions may be eligible for a 14-day satisfaction refund. After 14 days, monthly subscription fees are generally non-refundable except where required by law or approved by Vaeroex."] },
       { title: "Partial Months", body: ["No refunds are provided for partial months unless required by law or approved by Vaeroex."] },
-      { title: "Promotions", body: ["Promotional pricing, discounts, and coupons are handled externally through Squarespace or the payment provider. The Vaeroex app should not be used as the source of truth for discounts."] },
+      { title: "Promotions", body: ["Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels. Vaeroex support can help customers with questions about eligible offers."] },
       { title: "Pricing Changes", body: ["Subscription pricing may change in the future. Customers will receive advance notice before pricing changes take effect."] }
     ]
   },
@@ -299,13 +299,15 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   "subscription-billing-terms": {
     id: "subscription-billing-terms",
     title: "Subscription and Billing Terms",
-    summary: "How Vaeroex subscription access works with the billing provider.",
+    summary: "How Vaeroex subscription access, billing requests, and promotions work.",
     href: "/subscription-billing-terms",
     updated: "2026-06-19",
     sections: [
       { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex, Operations Intelligence Platform, $399/month, Everything Included."] },
-      { title: "External Billing", body: ["Squarespace or another payment provider handles checkout, payment collection, renewals, taxes, discounts, and promotions."] },
-      { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used during checkout so subscription access can be matched."] },
+      { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
+      { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
+      { title: "Subscription Requests", body: ["Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support."] },
+      { title: "Renewal and Pricing", body: ["Vaeroex subscriptions renew automatically unless canceled. Pricing may change in the future, and customers will receive advance notice before pricing changes take effect."] },
       { title: "Access Changes", body: ["Canceled, expired, or past-due subscriptions may be routed to the billing-required flow unless access is manually unlocked by Vaeroex."] }
     ]
   },

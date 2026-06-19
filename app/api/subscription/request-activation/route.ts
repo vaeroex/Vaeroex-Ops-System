@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const email = value(formData, "email");
 
   if (!name || !email) {
-    return redirectWith("/billing-required", "error", "Enter your name and checkout email.");
+    return redirectWith("/billing-required", "error", "Enter your name and Vaeroex subscription email.");
   }
 
   const { error } = await admin.from("manual_activation_requests").insert({
@@ -38,5 +38,5 @@ export async function POST(request: Request) {
     return redirectWith("/billing-required", "error", error.message);
   }
 
-  return redirectWith("/billing-required", "message", "Manual activation request received. Vaeroex will review your Squarespace purchase.");
+  return redirectWith("/billing-required", "message", "Manual activation request received. Vaeroex will review your subscription access.");
 }
