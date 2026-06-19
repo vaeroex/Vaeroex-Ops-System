@@ -1,13 +1,19 @@
 import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
-import { createDemoWorkspaceAction } from "@/app/app/demo/actions";
+import {
+  createDemoWorkspaceAction,
+  createFreshDemoWorkspaceAction,
+  exitDemoWorkspaceAction,
+  openDemoWorkspaceAction,
+  resetDemoWorkspaceAction
+} from "@/app/app/demo/actions";
 import { OnboardingChecklist, type OnboardingChecklistItem } from "@/components/app/OnboardingChecklist";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
-import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -698,6 +704,142 @@ function SmartAlerts({ alerts }: { alerts: DashboardAlert[] }) {
   );
 }
 
+function isDemoWorkspace(workspace: Database["public"]["Tables"]["workspaces"]["Row"] | null) {
+  return Boolean(workspace && (workspace.subscription_status === "demo" || workspace.name === "Vaeroex Demo Workspace"));
+}
+
+function DemoActionButton({ children, tone = "secondary" }: { children: ReactNode; tone?: "primary" | "secondary" | "danger" }) {
+  const className =
+    tone === "primary"
+      ? "rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white"
+      : tone === "danger"
+        ? "rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700"
+        : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink";
+
+  return <button className={className}>{children}</button>;
+}
+
+function DemoWorkspaceControls({
+  demoWorkspaceExists,
+  isViewingDemoWorkspace,
+  canUseAdminTools
+}: {
+  demoWorkspaceExists: boolean;
+  isViewingDemoWorkspace: boolean;
+  canUseAdminTools: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      {demoWorkspaceExists ? (
+        <p className="text-xs leading-5 text-amber-900">Demo workspace already exists. Open it, reset it, or create a fresh demo.</p>
+      ) : (
+        <p className="text-xs leading-5 text-muted">Create a separate demo workspace with realistic sample data for testing Vaeroex.</p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        {demoWorkspaceExists && !isViewingDemoWorkspace ? (
+          <form action={openDemoWorkspaceAction}>
+            <DemoActionButton tone="primary">Open Demo Workspace</DemoActionButton>
+          </form>
+        ) : null}
+        <form action={createDemoWorkspaceAction}>
+          <DemoActionButton tone={demoWorkspaceExists ? "secondary" : "primary"}>
+            {demoWorkspaceExists ? "Check demo workspace" : "Create demo workspace"}
+          </DemoActionButton>
+        </form>
+        {canUseAdminTools && demoWorkspaceExists ? (
+          <form action={resetDemoWorkspaceAction}>
+            <DemoActionButton tone="danger">Reset demo workspace</DemoActionButton>
+          </form>
+        ) : null}
+        {canUseAdminTools ? (
+          <form action={createFreshDemoWorkspaceAction}>
+            <DemoActionButton>Create fresh demo</DemoActionButton>
+          </form>
+        ) : null}
+        {isViewingDemoWorkspace ? (
+          <form action={exitDemoWorkspaceAction}>
+            <DemoActionButton>Switch back to my workspace</DemoActionButton>
+          </form>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function AdminToolsBadge({ source }: { source: string }) {
+  return (
+    <section className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950 shadow-panel md:flex-row md:items-center md:justify-between">
+      <div>
+        <p className="text-sm font-semibold">Admin tools enabled</p>
+        <p className="mt-1 text-xs leading-5">Admin access detected by {source}. Normal customers do not see this panel.</p>
+      </div>
+      <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-900">Vaeroex admin</span>
+    </section>
+  );
+}
+
+function DemoWorkspaceBanner({
+  counts,
+  canUseAdminTools
+}: {
+  counts: {
+    kpis: number;
+    crm: number;
+    tasks: number;
+    issues: number;
+    reports: number;
+    sops: number;
+    files: number;
+    alerts: number;
+    insights: number;
+  };
+  canUseAdminTools: boolean;
+}) {
+  const countItems = [
+    ["KPIs", counts.kpis],
+    ["CRM leads", counts.crm],
+    ["Open tasks", counts.tasks],
+    ["Open issues", counts.issues],
+    ["Reports", counts.reports],
+    ["SOPs", counts.sops],
+    ["Files", counts.files],
+    ["Alerts", counts.alerts],
+    ["Vaeroex insights", counts.insights]
+  ];
+
+  return (
+    <section className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-blue-950 shadow-panel">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide">Demo Workspace</p>
+          <h2 className="mt-2 text-xl font-semibold">You are viewing sample business data.</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6">
+            This workspace is safe for testing. It includes demo KPIs, CRM records, tasks, issues, reports, SOPs, files, alerts, and Vaeroex insights.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {canUseAdminTools ? (
+            <form action={resetDemoWorkspaceAction}>
+              <DemoActionButton tone="danger">Reset demo workspace</DemoActionButton>
+            </form>
+          ) : null}
+          <form action={exitDemoWorkspaceAction}>
+            <DemoActionButton>Switch back to my workspace</DemoActionButton>
+          </form>
+        </div>
+      </div>
+      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-9">
+        {countItems.map(([label, value]) => (
+          <div key={label} className="rounded-lg bg-white/80 p-3">
+            <p className="text-lg font-semibold">{value}</p>
+            <p className="mt-1 text-xs leading-4">{label}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default async function AppDashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const period = isDashboardPeriod(params?.period) ? params.period : "Weekly";
@@ -707,7 +849,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     data: { user }
   } = await supabase.auth.getUser();
   const canUseAdminOnboardingTools = isVaeroexAdminUser(user);
+  const adminDetectionSource = isVaeroexAdminEmail(user?.email) ? "VAEROEX_ADMIN_EMAILS" : "Supabase user metadata";
   const currentWorkspaceStatus = workspaceStatusLabel(context.activeWorkspace);
+  const isViewingDemoWorkspace = isDemoWorkspace(context.activeWorkspace);
+  const demoWorkspace = context.workspaces.find(isDemoWorkspace) ?? null;
 
   const [
     kpiResult,
@@ -861,6 +1006,17 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     hasCurrentReport,
     checklistsWithoutRecentRuns
   });
+  const demoCounts = {
+    kpis: kpis.length,
+    crm: crmLeads.length,
+    tasks: openTasks.length,
+    issues: openIssues.length,
+    reports: reports.length,
+    sops: sops.length,
+    files: files.length,
+    alerts: smartAlerts.length,
+    insights: vaeroexRuns.filter((run) => run.status === "completed").length
+  };
   const onboardingItems: OnboardingChecklistItem[] = [
     {
       id: "profile",
@@ -948,11 +1104,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{params.message}</div> : null}
       {params?.error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{params.error}</div> : null}
 
+      {canUseAdminOnboardingTools ? <AdminToolsBadge source={adminDetectionSource} /> : null}
+
       {errors.length ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           {errors[0]?.message || "Dashboard data could not be loaded."}
         </div>
       ) : null}
+
+      {isViewingDemoWorkspace ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
 
       <section className="flex flex-wrap gap-2 rounded-lg border border-line bg-white p-3 shadow-panel">
         {PERIODS.map((item) => (
@@ -974,9 +1134,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         adminControls={canUseAdminOnboardingTools}
         workspaceStatus={currentWorkspaceStatus}
         demoWorkspaceForm={
-          <form action={createDemoWorkspaceAction}>
-            <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Create demo workspace</button>
-          </form>
+          <DemoWorkspaceControls
+            demoWorkspaceExists={Boolean(demoWorkspace)}
+            isViewingDemoWorkspace={isViewingDemoWorkspace}
+            canUseAdminTools={canUseAdminOnboardingTools}
+          />
         }
       />
 
