@@ -59,33 +59,33 @@ export default function HomePage() {
     <main className="min-h-screen bg-[#f8fafc] text-ink">
       <PublicSiteHeader />
 
-      <section className="vaeroex-ambient relative overflow-hidden bg-vaeroex-navy px-6 py-16 text-white sm:py-20">
-        <div className="absolute inset-y-8 right-[-5rem] hidden opacity-10 lg:block">
-          <VaeroexLogo variant="full" size="hero" priority className="h-72 w-[44rem]" />
+      <section className="vaeroex-ambient relative overflow-hidden bg-vaeroex-navy px-6 pb-10 pt-7 text-white sm:pb-12 sm:pt-9 lg:pb-10 lg:pt-8">
+        <div className="vaeroex-ambient-background pointer-events-none absolute inset-y-0 right-[-4rem] hidden items-center opacity-[0.08] lg:flex">
+          <VaeroexLogo variant="full" size="hero" priority className="h-56 w-[34rem]" />
         </div>
-        <div className="vaeroex-hero-reveal relative mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+        <div className="vaeroex-hero-reveal relative mx-auto grid max-w-6xl gap-7 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
           <div>
-            <VaeroexLogo variant="full" size="lg" priority className="mb-8" />
+            <VaeroexLogo variant="full" size="md" priority className="mb-4 hidden sm:inline-flex" />
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Intelligence Platform</p>
-            <h1 className="mt-5 max-w-4xl text-5xl font-semibold tracking-tight sm:text-6xl">Vaeroex</h1>
-            <p className="mt-5 max-w-3xl text-2xl font-semibold text-slate-100">Build the structure your growth depends on.</p>
-            <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">
+            <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">Vaeroex</h1>
+            <p className="mt-3 max-w-3xl text-xl font-semibold text-slate-100 sm:text-2xl">Build the structure your growth depends on.</p>
+            <p className="mt-4 hidden max-w-3xl text-base leading-7 text-slate-300 sm:block">
               Vaeroex helps growing businesses transform scattered information into operational clarity, predictive insight, and accountable execution.
             </p>
-            <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold text-slate-100" aria-label="Vaeroex brand pillars">
+            <div className="mt-4 hidden flex-wrap gap-2 text-sm font-semibold text-slate-100 sm:flex" aria-label="Vaeroex brand pillars">
               {["Visibility", "Accountability", "Execution"].map((pillar) => (
                 <span key={pillar} className="rounded-full border border-white/15 bg-white/10 px-4 py-2">
                   {pillar}
                 </span>
               ))}
             </div>
-            <p className="mt-6 inline-flex rounded-full border border-vaeroex-accent/40 bg-vaeroex-accent/10 px-4 py-2 text-sm font-semibold text-vaeroex-accent">
+            <p className="mt-4 hidden rounded-full border border-vaeroex-accent/40 bg-vaeroex-accent/10 px-4 py-2 text-sm font-semibold text-vaeroex-accent sm:inline-flex">
               Now available: Operations Intelligence Suite
             </p>
-            <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300">
+            <p className="mt-3 hidden max-w-3xl text-sm leading-6 text-slate-300 sm:block">
               Built for business owners, executives, directors, managers, and operators who need to understand what is happening, why it matters, and what to do next.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-5 flex flex-wrap gap-3">
               <Link href="/demo" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
                 Book a Demo
               </Link>
