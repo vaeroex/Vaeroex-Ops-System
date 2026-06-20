@@ -20,7 +20,7 @@ Use this script on a real deployed preview or production-like environment. Run i
   - `VAEROEX_ADMIN_EMAILS`
   - Squarespace product/checkout/webhook variables as available
 - Supabase Auth callback configured:
-  - `https://APP_DOMAIN/auth/callback`
+  - `https://vaeroex.com/auth/callback`
 - At least one internal admin account email listed in `VAEROEX_ADMIN_EMAILS`.
 - At least one test customer email that is not the admin email.
 - Squarespace test product or low-risk live purchase path ready.

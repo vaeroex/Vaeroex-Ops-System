@@ -46,13 +46,13 @@ export default async function AccountSubscriptionPage() {
         </div>
         <p className="mt-4 text-sm leading-6 text-muted">{subscription.reason}</p>
         <div className="mt-5 flex flex-wrap gap-3">
-          <Link href="https://www.vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+          <Link href="https://vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             View Vaeroex Subscription
           </Link>
           <Link href="/billing-required#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             I already purchased
           </Link>
-          <Link href="https://www.vaeroex.com/contact" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
+          <Link href="https://vaeroex.com/contact" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Contact Vaeroex
           </Link>
         </div>

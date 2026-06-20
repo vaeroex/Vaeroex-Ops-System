@@ -159,18 +159,18 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
   - Reference: https://vercel.com/docs/environment-variables
 
 - [ ] Custom domain instructions included.
-  - Expected: Add `app.vaeroex.com` or launch domain to the Vercel project, configure DNS, wait for SSL, and update app/Supabase/Squarespace URLs.
+  - Expected: Add `vaeroex.com` to the Vercel project, configure DNS, wait for SSL, and update app/Supabase/Squarespace URLs.
   - Notes: Vercel documents apex domains with A records and subdomains with CNAME records; inspect the domain in Vercel to confirm exact records.
   - Reference: https://vercel.com/docs/domains/working-with-domains/add-a-domain
 
 ## Custom Domain Steps
 
-1. Add the production app domain in Vercel project settings, such as `app.vaeroex.com`.
+1. Add the production app domain in Vercel project settings: `vaeroex.com`.
 2. If using an apex domain, configure the A record Vercel recommends.
 3. If using a subdomain, configure the CNAME record Vercel recommends.
 4. Add both apex and `www` only if needed; configure one canonical redirect to avoid duplicate content.
 5. Wait for Vercel domain verification and SSL certificate provisioning.
 6. Update `NEXT_PUBLIC_APP_URL` to the final app URL and redeploy.
-7. Add the final app URL callback in Supabase Auth, such as `https://app.vaeroex.com/auth/callback`.
+7. Add the final app URL callback in Supabase Auth: `https://vaeroex.com/auth/callback`.
 8. Update Squarespace thank-you/onboarding links to the final signup URL.
 9. Re-run the customer and admin manual testing script after DNS is live.
