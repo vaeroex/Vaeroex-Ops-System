@@ -51,7 +51,7 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <ScrollReveal as="article" delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-white p-6 shadow-command">
+          <ScrollReveal as="article" delayMs={120} className="vaeroex-pricing-card vaeroex-hover-card rounded-lg border border-line bg-white p-6 shadow-command">
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Everything Included</p>
             <h2 className="mt-3 text-3xl font-semibold">{VAEROEX_PLAN_NAME}</h2>
             <p className="mt-2 text-2xl font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>

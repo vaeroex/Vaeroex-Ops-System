@@ -34,7 +34,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
             accountability, and execution can fit your business.
           </p>
           <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Build the structure your growth depends on.</p>
-          <ScrollReveal delayMs={120} className="vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
+          <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Product preview can include</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               {previewItems.map((item, index) => (
