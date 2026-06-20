@@ -4,13 +4,16 @@ import { SelectInput, TextArea, TextInput } from "@/components/operations/FormCo
 
 type PublicRequestFormProps = {
   returnPath: "/contact" | "/demo";
-  issueType: "Contact request" | "Demo request";
+  issueType: string;
+  issueOptions?: string[];
   message?: string;
   error?: string;
   submitLabel: string;
 };
 
-export function PublicRequestForm({ returnPath, issueType, message, error, submitLabel }: PublicRequestFormProps) {
+export function PublicRequestForm({ returnPath, issueType, issueOptions, message, error, submitLabel }: PublicRequestFormProps) {
+  const showInquiryType = Boolean(issueOptions?.length);
+
   return (
     <div className="rounded-lg border border-line bg-white p-6 shadow-panel">
       {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
@@ -19,7 +22,11 @@ export function PublicRequestForm({ returnPath, issueType, message, error, submi
       </div>
       <form action={createSupportRequestAction} className="mt-6 grid gap-4 md:grid-cols-2">
         <input type="hidden" name="return_path" value={returnPath} />
-        <input type="hidden" name="issue_type" value={issueType} />
+        {showInquiryType ? (
+          <SelectInput label="Inquiry type" name="issue_type" required defaultValue={issueType} options={issueOptions || []} />
+        ) : (
+          <input type="hidden" name="issue_type" value={issueType} />
+        )}
         <input type="hidden" name="page_module" value={issueType} />
         <TextInput label="Name" name="name" required />
         <TextInput label="Email" name="email" type="email" required />
@@ -30,7 +37,7 @@ export function PublicRequestForm({ returnPath, issueType, message, error, submi
         <SelectInput label="Preferred contact method" name="preferred_contact_method" required options={["Email", "Phone", "Text", "Video call"]} />
         <TextInput label="Workspace" name="workspace" placeholder="Optional if you already have one" />
         <div className="md:col-span-2">
-          <TextArea label="What are you trying to improve?" name="improvement_goal" required rows={4} />
+          <TextArea label="What are you looking to improve or explore with Vaeroex?" name="improvement_goal" required rows={4} />
         </div>
         <div className="md:col-span-2">
           <TextArea label="Message" name="message" required rows={5} />
