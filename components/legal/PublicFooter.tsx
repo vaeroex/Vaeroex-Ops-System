@@ -1,13 +1,15 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { legalLinks } from "@/lib/legal/content";
 
-const platformLinks = [
+const platformLinks: Array<[string, Route]> = [
   ["Pricing", "/pricing"],
   ["About", "/about"],
+  ["Network", "/networking"],
   ["Trust", "/trust"],
   ["Help", "/help"]
-] as const;
+] as Array<[string, Route]>;
 
 const accessLinks = [
   ["Book a Demo", "/demo"],

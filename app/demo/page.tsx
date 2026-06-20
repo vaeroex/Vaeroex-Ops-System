@@ -32,6 +32,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
             Tell us what you are trying to improve. Vaeroex will review your request and help you understand how visibility,
             accountability, and execution can fit your business.
           </p>
+          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Build the structure your growth depends on.</p>
           <div className="mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Product preview can include</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">

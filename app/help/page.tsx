@@ -42,6 +42,7 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
             <p className="mt-4 text-sm leading-6 text-muted">
               Public help articles explain the platform, best practices, trust posture, legal policies, and how to contact Vaeroex.
             </p>
+            <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Operations Intelligence Platform • Build the structure your growth depends on.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               {loggedIn ? (
                 <Link href="/app/help" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
