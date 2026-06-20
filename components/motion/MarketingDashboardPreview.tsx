@@ -49,47 +49,69 @@ export function MarketingDashboardPreview() {
   }, []);
 
   return (
-    <aside className="vaeroex-dashboard-preview rounded-xl border border-white/15 bg-white/95 p-4 text-ink shadow-command lg:p-5" aria-label="Operations Intelligence Suite demo preview">
-      <div className="flex items-center justify-between gap-3 border-b border-line pb-3">
+    <aside className="vaeroex-dashboard-preview rounded-xl border border-white/15 bg-white/95 p-3 text-ink shadow-command lg:p-4" aria-label="Operations Intelligence Suite demo preview">
+      <div className="flex items-center justify-between gap-3 border-b border-line pb-2.5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Demo signal preview</p>
           <h2 className="mt-1 text-lg font-semibold">Operations Intelligence Suite</h2>
         </div>
         <span className="rounded-full bg-vaeroex-navy px-3 py-1 text-xs font-semibold text-white">Live loop</span>
       </div>
-      <div className="mt-4 rounded-lg border border-line bg-slate-50 p-4">
-        <AnimatedMetric
-          label="Business Health Score"
-          from={78}
-          value={84}
-          suffix="/100"
-          helper="Example score movement after recommended follow-up actions."
-          className="rounded-lg"
-        />
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent transition-[width] duration-700" />
+      <div className="sm:hidden">
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-lg border border-line bg-slate-50 p-3">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] text-muted">Business Health</p>
+            <p className="mt-1 text-2xl font-semibold text-vaeroex-blue">84/100</p>
+            <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-200">
+              <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent" />
+            </div>
+          </div>
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+            <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] opacity-75">Profit Leak</p>
+            <p className="mt-1 text-sm font-semibold leading-5">7 leads need follow-up</p>
+          </div>
+        </div>
+        <div className="mt-2 rounded-lg border border-vaeroex-blue/25 bg-vaeroex-soft px-3 py-2.5 text-vaeroex-blue">
+          <p className="text-[0.65rem] font-semibold uppercase tracking-[0.14em] opacity-75">Recommended Action</p>
+          <p className="mt-1 text-sm font-semibold">Assign CRM follow-up owner</p>
         </div>
       </div>
-      <div className="mt-3 grid gap-2">
-        {previewSignals.map(([title, body, tone], index) => {
-          const visible = motionDisabled || index < visibleCount;
 
-          return (
-            <div
-              key={title}
-              className={[
-                "rounded-lg border p-3 transition duration-500",
-                toneClass(tone),
-                visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-              ].join(" ")}
-            >
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-75">{title}</p>
-              <p className="mt-1 text-sm font-semibold">{body}</p>
-            </div>
-          );
-        })}
+      <div className="hidden sm:block">
+        <div className="mt-3 rounded-lg border border-line bg-slate-50 p-3">
+          <AnimatedMetric
+            label="Business Health Score"
+            from={78}
+            value={84}
+            suffix="/100"
+            helper="Example score movement after recommended follow-up actions."
+            className="rounded-lg"
+          />
+          <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-slate-200">
+            <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent transition-[width] duration-700" />
+          </div>
+        </div>
+        <div className="mt-2.5 grid gap-1.5">
+          {previewSignals.map(([title, body, tone], index) => {
+            const visible = motionDisabled || index < visibleCount;
+
+            return (
+              <div
+                key={title}
+                className={[
+                  "rounded-lg border px-3 py-2.5 transition duration-500",
+                  toneClass(tone),
+                  visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+                ].join(" ")}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-75">{title}</p>
+                <p className="mt-1 text-sm font-semibold">{body}</p>
+              </div>
+            );
+          })}
+        </div>
+        <p className="mt-2.5 text-xs leading-5 text-slate-500">Mock website animation only. Not connected to customer data.</p>
       </div>
-      <p className="mt-3 text-xs leading-5 text-slate-500">Mock website animation only. Not connected to customer data.</p>
     </aside>
   );
 }

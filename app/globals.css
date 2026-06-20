@@ -116,7 +116,7 @@ button.bg-vaeroex-blue:hover {
   animation: vaeroex-ambient-drift 18s ease-in-out infinite alternate;
 }
 
-.vaeroex-ambient > * {
+.vaeroex-ambient > :not(.vaeroex-ambient-background) {
   position: relative;
   z-index: 1;
 }
