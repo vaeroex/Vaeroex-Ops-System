@@ -61,7 +61,7 @@ export const squarespaceCheckoutUrl =
   process.env.NEXT_PUBLIC_SQUARESPACE_PRO_CHECKOUT_URL ||
   process.env.NEXT_PUBLIC_SQUARESPACE_GROWTH_CHECKOUT_URL ||
   process.env.NEXT_PUBLIC_SQUARESPACE_STARTER_CHECKOUT_URL ||
-  "https://www.vaeroex.com/pricing";
+  "https://vaeroex.com/pricing";
 
 export const squarespaceCheckoutUrls = {
   [VAEROEX_PLAN_SLUG]: squarespaceCheckoutUrl

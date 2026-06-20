@@ -170,13 +170,13 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
 
 ## Custom Domain Steps
 
-1. Add the production app domain to the Vercel project, such as `app.vaeroex.com`.
+1. Add the production app domain to the Vercel project: `vaeroex.com`.
 2. Configure DNS using Vercel's recommended record.
 3. Use an A record for an apex domain or a CNAME record for a subdomain.
 4. Wait for Vercel verification and SSL certificate provisioning.
 5. Set `NEXT_PUBLIC_APP_URL` to the final app URL.
 6. Redeploy after environment changes.
-7. Add `https://APP_DOMAIN/auth/callback` to Supabase Auth redirect URLs.
+7. Add `https://vaeroex.com/auth/callback` to Supabase Auth redirect URLs.
 8. Update Squarespace success/thank-you links to the final signup URL.
 9. Re-run `docs/manual-testing-script.md` on the final domain.
 

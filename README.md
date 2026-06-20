@@ -413,14 +413,14 @@ OPENAI_API_KEY=
 OPENAI_MODEL=
 CRON_SECRET=
 RESEND_API_KEY=
-NEXT_PUBLIC_APP_URL=https://your-domain.example
+NEXT_PUBLIC_APP_URL=https://vaeroex.com
 VAEROEX_ADMIN_EMAILS=
 ```
 
 5. In Supabase, add the deployed URL to auth redirect URLs:
 
 ```text
-https://your-domain.example/auth/callback
+https://vaeroex.com/auth/callback
 ```
 
 6. Apply Supabase migrations before production use:

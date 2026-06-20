@@ -18,7 +18,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
         </p>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          <Link href="https://www.vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+          <Link href="https://vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             View Vaeroex subscription
           </Link>
           <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
@@ -27,7 +27,7 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
           <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Request Manual Activation
           </a>
-          <Link href="https://www.vaeroex.com/contact" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
+          <Link href="https://vaeroex.com/contact" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Contact Vaeroex
           </Link>
         </div>

@@ -61,7 +61,7 @@ docs/squarespace-thank-you-page-copy.md
 Primary sign-up URL:
 
 ```text
-https://app.vaeroex.com/signup
+https://vaeroex.com/signup
 ```
 
 Customers should use the same email address they used for Squarespace checkout. This lets Vaeroex match the app account to the Squarespace subscription.
@@ -88,7 +88,7 @@ Manual activations create or update `customer_subscriptions` with `plan_slug = '
 When ready, configure a Squarespace order webhook to send order events to:
 
 ```text
-https://app.vaeroex.com/api/squarespace/webhook
+https://vaeroex.com/api/squarespace/webhook
 ```
 
 Add these environment variables:

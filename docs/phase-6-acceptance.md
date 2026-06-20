@@ -19,7 +19,7 @@ Phase 6 adds Squarespace subscription access for Vaeroex Ops System. Squarespace
 - App has usage limits for workspaces, users, and monthly Vaeroex runs.
 - App has Squarespace setup documentation in `docs/squarespace-subscription-setup.md`.
 - App has Squarespace thank-you page copy in `docs/squarespace-thank-you-page-copy.md`.
-- App pricing buttons link to the Squarespace checkout URL from `NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL`, with compatibility fallbacks and a final fallback to `https://www.vaeroex.com/pricing`.
+- App pricing buttons link to the Squarespace checkout URL from `NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL`, with compatibility fallbacks and a final fallback to `https://vaeroex.com/pricing`.
 - README explains the Squarespace sales flow.
 
 ## Notes
