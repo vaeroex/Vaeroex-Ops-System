@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { PulsarEasterEgg } from "@/components/app/PulsarEasterEgg";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -31,19 +32,22 @@ const themeScript = `
   try {
     var key = "vaeroex-theme";
     var stored = window.localStorage.getItem(key) || "dark";
-    if (stored !== "light" && stored !== "dark" && stored !== "system") {
+    if (stored !== "light" && stored !== "dark" && stored !== "system" && stored !== "pulsar") {
       stored = "dark";
     }
     var systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-    var resolvedDark = stored === "dark" || (stored === "system" && systemDark);
+    var resolvedTheme = stored === "pulsar" ? "pulsar" : stored === "system" ? (systemDark ? "dark" : "light") : stored;
+    var darkSurface = resolvedTheme !== "light";
     var root = document.documentElement;
-    root.classList.toggle("dark", resolvedDark);
-    root.dataset.theme = resolvedDark ? "dark" : "light";
+    root.classList.toggle("dark", darkSurface);
+    root.classList.toggle("pulsar", resolvedTheme === "pulsar");
+    root.dataset.theme = resolvedTheme;
     root.dataset.themePreference = stored;
-    root.style.colorScheme = resolvedDark ? "dark" : "light";
+    root.style.colorScheme = darkSurface ? "dark" : "light";
   } catch (error) {
     var root = document.documentElement;
     root.classList.add("dark");
+    root.classList.remove("pulsar");
     root.dataset.theme = "dark";
     root.dataset.themePreference = "dark";
     root.style.colorScheme = "dark";
@@ -61,7 +65,10 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body>{children}</body>
+      <body>
+        {children}
+        <PulsarEasterEgg />
+      </body>
     </html>
   );
 }
