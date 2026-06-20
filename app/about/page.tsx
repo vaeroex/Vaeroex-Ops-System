@@ -102,7 +102,7 @@ export default function AboutPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">The Solution</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Vaeroex turns information into intelligence, accountability, and execution.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex was built as an Intelligence Platform, with the Operations Intelligence Suite as its first major product.
+              Vaeroex was built as an Intelligence Platform, with Operations Intelligence as its first major capability.
               Rather than simply storing data, Vaeroex helps leaders connect business activity to performance signals, accountability systems,
               predictive insights, decision support, risks, and recommended next actions.
             </p>
