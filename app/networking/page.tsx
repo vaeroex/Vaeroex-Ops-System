@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const networkGroups = [
   ["Business owners", "Leaders building stronger visibility, accountability, and execution inside growing companies."],
@@ -25,7 +26,7 @@ export default function NetworkingPage() {
     <main className="min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section className="vaeroex-hero-reveal mx-auto max-w-6xl px-6 py-12">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Network</p>
         <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">
           A curated network for business leaders, operators, consultants, implementation partners, and strategic partners.
@@ -53,10 +54,10 @@ export default function NetworkingPage() {
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {networkPrinciples.map((principle) => (
-              <div key={principle} className="rounded-lg border border-line bg-slate-50 p-4 text-sm font-semibold shadow-sm">
+            {networkPrinciples.map((principle, index) => (
+              <ScrollReveal key={principle} delayMs={index * 55} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-4 text-sm font-semibold shadow-sm">
                 {principle}
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </div>
@@ -73,11 +74,11 @@ export default function NetworkingPage() {
           </Link>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {networkGroups.map(([title, description]) => (
-            <article key={title} className="rounded-lg border border-line bg-white p-5 shadow-panel">
+          {networkGroups.map(([title, description], index) => (
+            <ScrollReveal key={title} as="article" delayMs={(index % 3) * 80} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
               <h3 className="text-lg font-semibold text-vaeroex-blue">{title}</h3>
               <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-            </article>
+            </ScrollReveal>
           ))}
         </div>
       </section>
@@ -92,7 +93,7 @@ export default function NetworkingPage() {
               The goal is to help leaders find aligned support where it strengthens the platform outcome.
             </p>
           </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
+          <ScrollReveal delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Examples of fit</p>
             <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
               <li>Referral partners who serve growing businesses.</li>
@@ -100,12 +101,12 @@ export default function NetworkingPage() {
               <li>Operators who understand performance, accountability, and workflow execution.</li>
               <li>Trusted service providers who support business growth and management systems.</li>
             </ul>
-          </div>
+          </ScrollReveal>
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
+        <ScrollReveal className="vaeroex-ambient rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Strategic Partner Interest</p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -118,7 +119,7 @@ export default function NetworkingPage() {
               Contact Vaeroex
             </Link>
           </div>
-        </div>
+        </ScrollReveal>
       </section>
 
       <PublicFooter />

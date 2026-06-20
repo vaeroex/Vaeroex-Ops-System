@@ -41,6 +41,109 @@ button.bg-vaeroex-blue:hover {
   color: #0b1f4d;
 }
 
+@keyframes vaeroex-fade-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 14px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes vaeroex-ambient-drift {
+  0% {
+    transform: translate3d(-2%, -1%, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(2%, 1%, 0) scale(1.04);
+  }
+
+  100% {
+    transform: translate3d(0, -2%, 0) scale(1.01);
+  }
+}
+
+.vaeroex-hero-reveal {
+  animation: vaeroex-fade-up 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.vaeroex-ambient {
+  position: relative;
+  overflow: hidden;
+}
+
+.vaeroex-ambient::before {
+  position: absolute;
+  inset: -35%;
+  z-index: 0;
+  pointer-events: none;
+  content: "";
+  background:
+    radial-gradient(circle at 18% 20%, rgba(56, 189, 248, 0.2), transparent 30%),
+    radial-gradient(circle at 80% 35%, rgba(30, 107, 255, 0.18), transparent 28%),
+    radial-gradient(circle at 45% 80%, rgba(255, 255, 255, 0.08), transparent 24%);
+  opacity: 0.8;
+  animation: vaeroex-ambient-drift 18s ease-in-out infinite alternate;
+}
+
+.vaeroex-ambient > * {
+  position: relative;
+  z-index: 1;
+}
+
+.vaeroex-scroll-reveal {
+  opacity: var(--vaeroex-reveal-opacity, 1);
+  transform: translate3d(0, var(--vaeroex-reveal-y, 0), 0);
+  transition:
+    opacity 650ms ease var(--vaeroex-reveal-delay, 0ms),
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1) var(--vaeroex-reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.vaeroex-hover-card {
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.vaeroex-hover-card:hover {
+  border-color: rgba(30, 107, 255, 0.34);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
+  transform: translate3d(0, -2px, 0);
+}
+
+.vaeroex-scroll-reveal.vaeroex-hover-card {
+  transition:
+    opacity 650ms ease var(--vaeroex-reveal-delay, 0ms),
+    transform 650ms cubic-bezier(0.22, 1, 0.36, 1) var(--vaeroex-reveal-delay, 0ms),
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.vaeroex-scroll-reveal.vaeroex-hover-card:hover {
+  transform: translate3d(0, calc(var(--vaeroex-reveal-y, 0px) - 2px), 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .vaeroex-ambient::before {
+    animation: none;
+  }
+}
+
 .dark {
   color-scheme: dark;
 }

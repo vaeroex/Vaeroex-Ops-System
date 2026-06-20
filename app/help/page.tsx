@@ -2,6 +2,7 @@ import Link from "next/link";
 import { HelpArticleCard } from "@/components/help/HelpArticleCard";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { articlesByCategory, helpCategories, searchHelpArticles, type HelpCategory } from "@/lib/help/content";
 
@@ -36,7 +37,7 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
       <PublicSiteHeader />
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
-          <div>
+          <div className="vaeroex-hero-reveal">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Help Hub</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight">Learn how Vaeroex helps build visibility, accountability, and execution.</h1>
             <p className="mt-4 text-sm leading-6 text-muted">
@@ -59,7 +60,7 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
             </div>
           </div>
 
-          <form className="rounded-lg border border-line bg-white p-5 shadow-panel">
+          <ScrollReveal as="form" delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
             <label className="block text-sm font-semibold">
               Search help
               <input
@@ -83,7 +84,7 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
               </select>
             </label>
             <button className="mt-4 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
-          </form>
+          </ScrollReveal>
         </div>
 
         <section className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -92,11 +93,11 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
             ["Feature guides", "KPIs, CRM, reports, files, SOPs, and more."],
             ["AI & Vaeroex", "How recommendations work and why review matters."],
             ["Legal & trust", "Policies, sensitive data, and security posture."]
-          ].map(([title, description]) => (
-            <article key={title} className="rounded-lg border border-line bg-white p-4 shadow-sm">
+          ].map(([title, description], index) => (
+            <ScrollReveal key={title} as="article" delayMs={index * 70} className="vaeroex-hover-card rounded-lg border border-line bg-white p-4 shadow-sm">
               <h2 className="font-semibold">{title}</h2>
               <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-            </article>
+            </ScrollReveal>
           ))}
         </section>
 
@@ -110,8 +111,10 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
               Visit Trust Center
             </Link>
           </div>
-          {visibleArticles.slice(0, 18).map((article) => (
-            <HelpArticleCard key={article.id} article={article} />
+          {visibleArticles.slice(0, 18).map((article, index) => (
+            <ScrollReveal key={article.id} delayMs={(index % 6) * 50}>
+              <HelpArticleCard article={article} />
+            </ScrollReveal>
           ))}
         </section>
       </section>
