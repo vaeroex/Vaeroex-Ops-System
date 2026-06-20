@@ -18,8 +18,9 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Contact Vaeroex</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Talk with Vaeroex about your operations intelligence needs.</h1>
           <p className="mt-4 text-sm leading-6 text-muted">
-            Send questions about the platform, pricing, subscriptions, setup, trust, or whether Vaeroex is a fit for your business.
+            Send questions about the Operations Intelligence Platform, pricing, subscriptions, setup, trust, partnerships, or whether Vaeroex is a fit for your business.
           </p>
+          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Visibility • Accountability • Execution</p>
           <div className="mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Looking for a product walkthrough?</p>
             <p className="mt-2 text-sm leading-6 text-muted">Use the demo request page if you want a guided preview.</p>

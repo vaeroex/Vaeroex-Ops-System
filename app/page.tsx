@@ -88,7 +88,7 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">What Vaeroex Does</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Turn daily business activity into decision support.</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Turn daily business activity into operational intelligence.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
               Vaeroex gives leadership a practical structure for seeing performance, understanding risk, and following through.
             </p>
