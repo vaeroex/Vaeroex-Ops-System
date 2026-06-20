@@ -2,6 +2,7 @@ import Link from "next/link";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const audienceTypes = ["Owners", "Executives", "Directors", "Managers", "Operators"];
 
@@ -47,11 +48,11 @@ export default function HomePage() {
     <main className="min-h-screen bg-[#f8fafc] text-ink">
       <PublicSiteHeader />
 
-      <section className="relative overflow-hidden bg-vaeroex-navy px-6 py-16 text-white sm:py-20">
+      <section className="vaeroex-ambient relative overflow-hidden bg-vaeroex-navy px-6 py-16 text-white sm:py-20">
         <div className="absolute inset-y-8 right-[-5rem] hidden opacity-10 lg:block">
           <VaeroexLogo variant="full" size="hero" priority className="h-72 w-[44rem]" />
         </div>
-        <div className="relative mx-auto max-w-6xl">
+        <div className="vaeroex-hero-reveal relative mx-auto max-w-6xl">
           <VaeroexLogo variant="full" size="lg" priority className="mb-8" />
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Intelligence Platform</p>
           <h1 className="mt-5 max-w-4xl text-5xl font-semibold tracking-tight sm:text-6xl">Vaeroex</h1>
@@ -95,13 +96,13 @@ export default function HomePage() {
               Vaeroex combines business memory, predictive insight, risk detection, and decision support to help teams operate with greater visibility and accountability.
             </p>
           </div>
-          <article className="rounded-lg border border-line bg-slate-50 p-6 shadow-sm">
+          <ScrollReveal as="article" delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-6 shadow-sm">
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Brand pillars</p>
             <h3 className="mt-3 text-2xl font-semibold tracking-tight">Visibility • Accountability • Execution</h3>
             <p className="mt-3 text-sm leading-6 text-muted">
               Vaeroex is built around a simple leadership pattern: see what is happening, clarify who owns it, and turn insight into reviewed action.
             </p>
-          </article>
+          </ScrollReveal>
         </div>
       </section>
 
@@ -117,11 +118,11 @@ export default function HomePage() {
           </p>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {suiteCapabilities.map(([title, description]) => (
-            <article key={title} className="rounded-lg border border-line bg-white p-4 shadow-panel">
+          {suiteCapabilities.map(([title, description], index) => (
+            <ScrollReveal key={title} as="article" delayMs={(index % 6) * 70} className="vaeroex-hover-card rounded-lg border border-line bg-white p-4 shadow-panel">
               <h3 className="font-semibold text-vaeroex-blue">{title}</h3>
               <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-            </article>
+            </ScrollReveal>
           ))}
         </div>
       </section>
@@ -138,7 +139,7 @@ export default function HomePage() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               {intelligenceLoop.map(([title, description], index) => (
-                <article key={title} className="rounded-lg border border-line bg-slate-50 p-4 shadow-sm">
+                <ScrollReveal key={title} as="article" delayMs={index * 80} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-4 shadow-sm">
                   <div className="flex items-center gap-3">
                     <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-vaeroex-navy text-xs font-semibold text-white">
                       {index + 1}
@@ -146,7 +147,7 @@ export default function HomePage() {
                     <h3 className="font-semibold">{title}</h3>
                   </div>
                   <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
-                </article>
+                </ScrollReveal>
               ))}
             </div>
           </div>
@@ -162,20 +163,20 @@ export default function HomePage() {
               Vaeroex is built for leaders who need a better way to understand performance, risk, ownership, and follow-through.
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {audienceTypes.map((audience) => (
-                <div key={audience} className="rounded-lg border border-line bg-white p-4 text-sm font-semibold shadow-sm">
+              {audienceTypes.map((audience, index) => (
+                <ScrollReveal key={audience} delayMs={index * 60} className="vaeroex-hover-card rounded-lg border border-line bg-white p-4 text-sm font-semibold shadow-sm">
                   {audience}
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
-          <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+          <ScrollReveal as="article" delayMs={140} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
             <p className="text-sm font-semibold text-vaeroex-blue">Best fit</p>
             <p className="mt-3 text-2xl font-semibold">Businesses with 3-50 employees that are growing faster than their structure.</p>
             <p className="mt-3 text-sm leading-6 text-muted">
               The platform is designed for practical leadership rhythms: reviewing signals, assigning ownership, tracking recommendations, and measuring whether actions worked.
             </p>
-          </article>
+          </ScrollReveal>
         </div>
       </section>
 
@@ -184,11 +185,11 @@ export default function HomePage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Why Vaeroex Is Different</p>
           <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight">Vaeroex connects visibility, accountability, and execution.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {differentCards.map(([setup, point]) => (
-              <article key={setup} className="rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
+            {differentCards.map(([setup, point], index) => (
+              <ScrollReveal key={setup} as="article" delayMs={index * 90} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
                 <p className="text-sm font-semibold text-muted">{setup}</p>
                 <h3 className="mt-3 text-lg font-semibold text-vaeroex-blue">{point}</h3>
-              </article>
+              </ScrollReveal>
             ))}
           </div>
         </div>
@@ -208,10 +209,10 @@ export default function HomePage() {
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
-              {futureCategories.map((category) => (
-                <div key={category} className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
+              {futureCategories.map((category, index) => (
+                <ScrollReveal key={category} delayMs={index * 50} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
                   {category}
-                </div>
+                </ScrollReveal>
               ))}
             </div>
           </div>
@@ -219,7 +220,7 @@ export default function HomePage() {
       </section>
 
       <section className="px-6 py-12">
-        <div className="mx-auto max-w-6xl rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
+        <ScrollReveal className="vaeroex-ambient mx-auto max-w-6xl rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Ready to see Vaeroex?</p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -232,7 +233,7 @@ export default function HomePage() {
               Book a Demo
             </Link>
           </div>
-        </div>
+        </ScrollReveal>
       </section>
 
       <PublicFooter />

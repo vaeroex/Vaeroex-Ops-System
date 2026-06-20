@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_PLAN_FEATURES, VAEROEX_PLAN_NAME, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 
@@ -34,7 +35,7 @@ export default function PricingPage() {
 
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-          <div>
+          <div className="vaeroex-hero-reveal">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Pricing</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">One Vaeroex plan. Everything included.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
@@ -50,7 +51,7 @@ export default function PricingPage() {
             </div>
           </div>
 
-          <article className="rounded-lg border border-line bg-white p-6 shadow-command">
+          <ScrollReveal as="article" delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-white p-6 shadow-command">
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Everything Included</p>
             <h2 className="mt-3 text-3xl font-semibold">{VAEROEX_PLAN_NAME}</h2>
             <p className="mt-2 text-2xl font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
@@ -76,16 +77,16 @@ export default function PricingPage() {
                 <li>All visibility, accountability, and execution tools included</li>
               </ul>
             </div>
-          </article>
+          </ScrollReveal>
         </div>
 
         <section className="mt-8 rounded-lg border border-line bg-white p-6 shadow-panel">
           <h2 className="text-xl font-semibold">Included platform capabilities</h2>
           <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {included.map((feature) => (
-              <div key={feature} className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
+            {included.map((feature, index) => (
+              <ScrollReveal key={feature} delayMs={(index % 6) * 45} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
                 {feature}
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </section>
@@ -93,10 +94,10 @@ export default function PricingPage() {
         <section className="mt-6 rounded-lg border border-line bg-white p-6 shadow-panel">
           <h2 className="text-xl font-semibold">Plan details</h2>
           <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {VAEROEX_PLAN_FEATURES.map((feature) => (
-              <div key={feature} className="rounded-lg border border-line px-3 py-2 text-sm text-muted">
+            {VAEROEX_PLAN_FEATURES.map((feature, index) => (
+              <ScrollReveal key={feature} delayMs={(index % 6) * 45} className="vaeroex-hover-card rounded-lg border border-line px-3 py-2 text-sm text-muted">
                 {feature}
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </section>

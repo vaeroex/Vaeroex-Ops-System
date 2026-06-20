@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const recurringProblems = [
   "Scattered information",
@@ -24,7 +25,7 @@ export default function AboutPage() {
     <main className="min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
 
-      <section className="mx-auto max-w-6xl px-6 py-12">
+      <section className="vaeroex-hero-reveal mx-auto max-w-6xl px-6 py-12">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Why Vaeroex Exists</p>
         <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">
           Businesses do not need more disconnected software. They need structure.
@@ -71,10 +72,10 @@ export default function AboutPage() {
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
-            {recurringProblems.map((problem) => (
-              <div key={problem} className="rounded-lg border border-line bg-white p-4 text-sm font-semibold shadow-sm">
+            {recurringProblems.map((problem, index) => (
+              <ScrollReveal key={problem} delayMs={index * 55} className="vaeroex-hover-card rounded-lg border border-line bg-white p-4 text-sm font-semibold shadow-sm">
                 {problem}
-              </div>
+              </ScrollReveal>
             ))}
           </div>
         </div>
@@ -85,11 +86,11 @@ export default function AboutPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">The Insight</p>
           <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight">Most businesses do not struggle because they lack effort. They struggle because they lack clarity.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {insightCards.map(([title, description]) => (
-              <article key={title} className="rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
+            {insightCards.map(([title, description], index) => (
+              <ScrollReveal key={title} as="article" delayMs={index * 80} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
                 <h3 className="font-semibold text-vaeroex-blue">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-              </article>
+              </ScrollReveal>
             ))}
           </div>
         </div>
@@ -106,18 +107,18 @@ export default function AboutPage() {
               predictive insights, decision support, risks, and recommended next actions.
             </p>
           </div>
-          <article className="rounded-lg border border-line bg-vaeroex-navy p-6 text-white shadow-command">
+          <ScrollReveal as="article" delayMs={120} className="vaeroex-ambient rounded-lg border border-line bg-vaeroex-navy p-6 text-white shadow-command">
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Mission</p>
             <h3 className="mt-3 text-3xl font-semibold tracking-tight">Build the structure your growth depends on.</h3>
             <p className="mt-4 text-sm leading-6 text-slate-300">
               Helping leaders understand what is happening, why it matters, and what should happen next.
             </p>
-          </article>
+          </ScrollReveal>
         </div>
       </section>
 
       <section className="border-y border-line bg-white px-6 py-12">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr]">
+        <ScrollReveal className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Founder Perspective</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Isaac, Founder of Vaeroex</h2>
@@ -145,11 +146,11 @@ export default function AboutPage() {
               while staying focused on a simple goal: helping leaders understand what is happening, why it matters, and what should happen next.
             </p>
           </div>
-        </div>
+        </ScrollReveal>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="rounded-lg border border-line bg-white p-6 shadow-panel">
+        <ScrollReveal className="vaeroex-hover-card rounded-lg border border-line bg-white p-6 shadow-panel">
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Aligned Partners</p>
           <div className="mt-3 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
@@ -162,11 +163,11 @@ export default function AboutPage() {
               Explore Vaeroex Network
             </Link>
           </div>
-        </div>
+        </ScrollReveal>
       </section>
 
       <section className="px-6 pb-12">
-        <div className="mx-auto max-w-6xl rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
+        <ScrollReveal className="vaeroex-ambient mx-auto max-w-6xl rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Structure Creates Clarity</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight">Structure turns complexity into clarity.</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
@@ -175,7 +176,7 @@ export default function AboutPage() {
           <Link href="/demo" className="mt-6 inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
             Book a Demo
           </Link>
-        </div>
+        </ScrollReveal>
       </section>
 
       <PublicFooter />
