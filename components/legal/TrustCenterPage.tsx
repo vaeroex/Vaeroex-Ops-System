@@ -8,9 +8,9 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
     <div className="space-y-6">
       <section className="rounded-lg border border-vaeroex-silver/80 bg-white p-6 shadow-panel">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Trust Center</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Built for workspace-scoped operations intelligence.</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight">Built for workspace-scoped intelligence and human-reviewed decision support.</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-          Vaeroex is designed to help businesses create visibility, accountability, and execution while keeping customer data responsibilities clear.
+          Vaeroex is designed to help businesses create visibility, accountability, execution, business memory, and decision support while keeping customer data responsibilities clear.
           This page avoids unsupported compliance claims and explains the current trust posture in plain English.
         </p>
       </section>

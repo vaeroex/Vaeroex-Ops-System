@@ -28,7 +28,7 @@ export default function NetworkingPage() {
       <section className="mx-auto max-w-6xl px-6 py-12">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Network</p>
         <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">
-          A curated network for operators, business leaders, consultants, and strategic partners.
+          A curated network for business leaders, operators, consultants, implementation partners, and strategic partners.
         </h1>
         <p className="mt-5 max-w-3xl text-base leading-7 text-muted">
           The Vaeroex Network connects business leaders, operators, consultants, and strategic partners who believe that visibility,
@@ -49,7 +49,7 @@ export default function NetworkingPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Extension of the Platform</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Business intelligence is stronger when trusted people help turn it into action.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex is software first, but implementation, referrals, and trusted expertise can help leaders move faster when the right relationship is available.
+              Vaeroex is an Intelligence Platform first, but implementation, referrals, and trusted expertise can help leaders move faster when the right relationship is available.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">

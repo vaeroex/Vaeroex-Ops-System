@@ -30,7 +30,7 @@ const baseNavSections = [
     ]
   },
   {
-    label: "Growth",
+    label: "Relationships",
     items: [
       { href: "/app/crm", label: "CRM" },
       { href: "/app/forms", label: "Forms" },
@@ -124,7 +124,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Operations Intelligence Platform</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Intelligence Platform</span>
         </Link>
 
         <form action={selectWorkspaceAction} className="mt-5 rounded-lg border border-white/10 bg-white/[0.055] p-3 shadow-sm shadow-black/10">

@@ -5,8 +5,14 @@ import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_PLAN_FEATURES, VAEROEX_PLAN_NAME, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 
 const included = [
-  "Operations Intelligence Platform",
+  "Vaeroex Intelligence Platform",
+  "Operations Intelligence Suite",
   "Executive Dashboard",
+  "Business Health Score",
+  "Business Memory",
+  "Profit Leak Detection",
+  "Predictive Insights",
+  "Decision Support",
   "KPIs",
   "CRM",
   "Reports",
@@ -18,10 +24,7 @@ const included = [
   "Team Accountability",
   "Notifications",
   "Scheduled Reports",
-  "Vaeroex AI",
-  "Business Health Score",
-  "Business Memory",
-  "Profit Leak Detection"
+  "Vaeroex"
 ];
 
 export default function PricingPage() {
@@ -35,7 +38,7 @@ export default function PricingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Pricing</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">One Vaeroex plan. Everything included.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-              Build the structure your growth depends on. Vaeroex brings visibility, accountability, and execution support into one subscription.
+              Build the structure your growth depends on. Vaeroex brings the Operations Intelligence Suite into one subscription for visibility, accountability, execution, and decision support.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href={squarespaceCheckoutUrl} className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white">
@@ -51,6 +54,16 @@ export default function PricingPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Everything Included</p>
             <h2 className="mt-3 text-3xl font-semibold">{VAEROEX_PLAN_NAME}</h2>
             <p className="mt-2 text-2xl font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              <div className="rounded-lg border border-line bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Platform</p>
+                <p className="mt-1 text-sm font-semibold">Vaeroex Intelligence Platform</p>
+              </div>
+              <div className="rounded-lg border border-line bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Product</p>
+                <p className="mt-1 text-sm font-semibold">Operations Intelligence Suite</p>
+              </div>
+            </div>
             <p className="mt-3 text-sm leading-6 text-muted">
               Your Vaeroex subscription is managed through Vaeroex checkout and official Vaeroex sales channels.
             </p>

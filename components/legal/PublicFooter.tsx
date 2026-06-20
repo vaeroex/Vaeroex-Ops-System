@@ -4,6 +4,7 @@ import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { legalLinks } from "@/lib/legal/content";
 
 const platformLinks: Array<[string, Route]> = [
+  ["Operations Intelligence", "/#operations-intelligence"],
   ["Pricing", "/pricing"],
   ["About", "/about"],
   ["Network", "/networking"],
@@ -28,7 +29,7 @@ export function PublicFooter() {
             <span className="font-semibold">Vaeroex</span>
           </Link>
           <p className="mt-3 max-w-md leading-6">
-            Operations Intelligence Platform. Build the structure your growth depends on.
+            Intelligence Platform. Build the structure your growth depends on.
           </p>
           <p className="mt-3 text-xs">Visibility • Accountability • Execution</p>
         </div>

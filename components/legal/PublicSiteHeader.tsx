@@ -4,11 +4,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const navLinks = [
   { href: "/#platform", label: "Platform" },
+  { href: "/#operations-intelligence", label: "Operations Intelligence" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/networking", label: "Network" },
   { href: "/about", label: "About" },
-  { href: "/trust", label: "Trust" },
-  { href: "/help", label: "Help" },
-  { href: "/contact", label: "Contact" }
+  { href: "/trust", label: "Trust" }
 ] as const;
 
 async function isLoggedIn() {
@@ -37,7 +37,7 @@ export async function PublicSiteHeader() {
           </span>
           <span>
             <span className="block text-base font-semibold leading-none">Vaeroex</span>
-            <span className="mt-1 block text-xs font-medium text-vaeroex-silver">Operations Intelligence Platform</span>
+            <span className="mt-1 block text-xs font-medium text-vaeroex-silver">Intelligence Platform</span>
           </span>
         </Link>
 
