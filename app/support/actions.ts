@@ -107,7 +107,20 @@ export async function createSupportRequestAction(formData: FormData) {
   const successMessage =
     issueType === "Demo request" || issueType === "Product Demo"
       ? "Demo request received. Vaeroex will review it."
-      : ["Contact request", "General Question", "Platform Questions", "Partnership Opportunities", "Business Inquiry", "Billing or Subscription"].includes(issueType)
+      : [
+          "Contact request",
+          "General Question",
+          "General Inquiry",
+          "Platform Questions",
+          "Network Interest",
+          "Strategic Partnership",
+          "Advisor Interest",
+          "Investor / Strategic Relationship",
+          "Implementation Partner",
+          "Partnership Opportunities",
+          "Business Inquiry",
+          "Billing or Subscription"
+        ].includes(issueType)
         ? "Contact request received. Vaeroex will review it."
         : "Support request received. Vaeroex will review it.";
 

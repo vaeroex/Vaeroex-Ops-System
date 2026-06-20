@@ -5,13 +5,18 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const inquiryCategories = [
-  "General Question",
   "Product Demo",
   "Platform Questions",
+  "Network Interest",
+  "Strategic Partnership",
+  "Advisor Interest",
+  "Investor / Strategic Relationship",
+  "Implementation Partner",
   "Partnership Opportunities",
   "Business Inquiry",
   "Support Request",
-  "Billing or Subscription"
+  "Billing or Subscription",
+  "General Inquiry"
 ];
 
 type ContactPageProps = {
@@ -44,7 +49,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
         <ScrollReveal delayMs={140}>
           <PublicRequestForm
             returnPath="/contact"
-            issueType="General Question"
+            issueType="General Inquiry"
             issueOptions={inquiryCategories}
             message={params?.message}
             error={params?.error}
