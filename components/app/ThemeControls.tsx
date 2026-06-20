@@ -1,13 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  DEFAULT_THEME_PREFERENCE,
+  isDarkSurface,
+  normalizeThemePreference,
+  resolveThemePreference,
+  VAEROEX_THEME_STORAGE_KEY,
+  type ResolvedTheme,
+  type ThemePreference
+} from "@/lib/theme/preferences";
 
-type ThemePreference = "light" | "dark" | "system";
 type ThemeControlsProps = {
   variant?: "compact" | "panel";
 };
 
-const storageKey = "vaeroex-theme";
 const preferences: Array<{ value: ThemePreference; label: string; description: string }> = [
   {
     value: "dark",
@@ -23,40 +30,46 @@ const preferences: Array<{ value: ThemePreference; label: string; description: s
     value: "system",
     label: "System Default",
     description: "Follow this device's current appearance setting."
+  },
+  {
+    value: "pulsar",
+    label: "Pulsar Mode",
+    description: "A premium galactic intelligence layer with subtle signal accents."
   }
 ];
 
-function isThemePreference(value: string | null): value is ThemePreference {
-  return value === "light" || value === "dark" || value === "system";
-}
-
-function resolveTheme(preference: ThemePreference) {
-  return preference === "dark" || (preference === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
+function getSystemDark() {
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
 
 function applyTheme(preference: ThemePreference) {
-  const isDark = resolveTheme(preference);
+  const resolvedTheme = resolveThemePreference(preference, getSystemDark());
+  const darkSurface = isDarkSurface(resolvedTheme);
   const root = document.documentElement;
 
-  root.classList.toggle("dark", isDark);
-  root.dataset.theme = isDark ? "dark" : "light";
+  root.classList.toggle("dark", darkSurface);
+  root.classList.toggle("pulsar", resolvedTheme === "pulsar");
+  root.dataset.theme = resolvedTheme;
   root.dataset.themePreference = preference;
-  root.style.colorScheme = isDark ? "dark" : "light";
-  window.localStorage.setItem(storageKey, preference);
+  root.style.colorScheme = darkSurface ? "dark" : "light";
+  window.localStorage.setItem(VAEROEX_THEME_STORAGE_KEY, preference);
+}
+
+function resolvedThemeLabel(theme: ResolvedTheme) {
+  if (theme === "pulsar") return "Pulsar";
+  return theme === "dark" ? "Dark" : "Light";
 }
 
 export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
-  const [preference, setPreference] = useState<ThemePreference>("dark");
-  const [resolvedMode, setResolvedMode] = useState<"light" | "dark">("dark");
+  const [preference, setPreference] = useState<ThemePreference>(DEFAULT_THEME_PREFERENCE);
+  const [resolvedMode, setResolvedMode] = useState<ResolvedTheme>("dark");
 
   useEffect(() => {
-    const stored = window.localStorage.getItem(storageKey);
-    const initialPreference = isThemePreference(stored) ? stored : "dark";
+    const initialPreference = normalizeThemePreference(window.localStorage.getItem(VAEROEX_THEME_STORAGE_KEY));
     const media = window.matchMedia("(prefers-color-scheme: dark)");
 
     const syncResolvedMode = (nextPreference: ThemePreference) => {
-      const isDark = nextPreference === "dark" || (nextPreference === "system" && media.matches);
-      setResolvedMode(isDark ? "dark" : "light");
+      setResolvedMode(resolveThemePreference(nextPreference, media.matches));
     };
 
     setPreference(initialPreference);
@@ -64,11 +77,9 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
     syncResolvedMode(initialPreference);
 
     const handleSystemChange = () => {
-      const current = (window.localStorage.getItem(storageKey) || "dark") as ThemePreference;
-      if (isThemePreference(current)) {
-        applyTheme(current);
-        syncResolvedMode(current);
-      }
+      const current = normalizeThemePreference(window.localStorage.getItem(VAEROEX_THEME_STORAGE_KEY));
+      applyTheme(current);
+      syncResolvedMode(current);
     };
 
     media.addEventListener("change", handleSystemChange);
@@ -78,7 +89,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
   const updatePreference = (nextPreference: ThemePreference) => {
     setPreference(nextPreference);
     applyTheme(nextPreference);
-    setResolvedMode(resolveTheme(nextPreference) ? "dark" : "light");
+    setResolvedMode(resolveThemePreference(nextPreference, getSystemDark()));
   };
 
   if (variant === "compact") {
@@ -113,13 +124,17 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
             </p>
           </div>
           <span className="inline-flex w-fit rounded-full border border-vaeroex-accent/40 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue dark:bg-white/10 dark:text-vaeroex-accent">
-            Current: {resolvedMode === "dark" ? "Dark" : "Light"}
+            Current: {resolvedThemeLabel(resolvedMode)}
           </span>
         </div>
 
-        <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           {preferences.map((item) => {
             const active = preference === item.value;
+            const activeClass =
+              item.value === "pulsar"
+                ? "border-cyan-300/60 bg-[linear-gradient(135deg,rgba(37,99,235,0.16),rgba(124,58,237,0.18))] text-vaeroex-navy ring-2 ring-cyan-300/20 dark:text-white"
+                : "border-vaeroex-blue bg-vaeroex-soft text-vaeroex-navy ring-2 ring-vaeroex-blue/15 dark:bg-white/10 dark:text-white";
 
             return (
               <button
@@ -129,7 +144,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
                 onClick={() => updatePreference(item.value)}
                 className={`rounded-lg border p-4 text-left shadow-sm ${
                   active
-                    ? "border-vaeroex-blue bg-vaeroex-soft text-vaeroex-navy ring-2 ring-vaeroex-blue/15 dark:bg-white/10 dark:text-white"
+                    ? activeClass
                     : "border-line bg-white text-ink hover:border-vaeroex-accent dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-secondary dark:text-vaeroex-dark-text"
                 }`}
               >
@@ -142,12 +157,12 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
       </div>
 
       <div className="rounded-lg border border-vaeroex-silver bg-white p-5 shadow-panel dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-card">
-        <p className="text-sm font-semibold text-ink">Dark Mode Preview</p>
+        <p className="text-sm font-semibold text-ink">Premium Theme Preview</p>
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {[
             ["Business Health", "Executive scorecard surfaces stay high contrast."],
             ["Ask Vaeroex", "Recommendations read like an intelligence center."],
-            ["Reports and KPIs", "Charts retain Vaeroex Blue and Electric Blue series."]
+            ["Pulsar Mode", "Signal accents add a galactic layer without sacrificing readability."]
           ].map(([title, description]) => (
             <div key={title} className="rounded-lg border border-line bg-slate-50 p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-secondary">
               <p className="text-sm font-semibold text-vaeroex-blue">{title}</p>

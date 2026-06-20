@@ -93,6 +93,37 @@ button.bg-vaeroex-blue:hover {
   }
 }
 
+@keyframes vaeroex-pulsar-breathe {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 1px rgba(34, 211, 238, 0.18),
+      0 18px 56px rgba(37, 99, 235, 0.18);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 1px rgba(240, 171, 252, 0.28),
+      0 20px 68px rgba(124, 58, 237, 0.28);
+  }
+}
+
+@keyframes vaeroex-pulsar-sweep {
+  0% {
+    transform: translate3d(-42%, 0, 0);
+    opacity: 0;
+  }
+
+  35% {
+    opacity: 0.22;
+  }
+
+  100% {
+    transform: translate3d(150%, 0, 0);
+    opacity: 0;
+  }
+}
+
 .vaeroex-hero-reveal {
   animation: vaeroex-fade-up 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -189,6 +220,31 @@ button.bg-vaeroex-blue:hover {
   animation: vaeroex-line-flow 4.5s linear infinite;
 }
 
+.vaeroex-pulsar-signal-button {
+  position: relative;
+  overflow: visible;
+}
+
+.vaeroex-pulsar-signal-button::before {
+  position: absolute;
+  inset: -7px;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  border-radius: 999px;
+  background:
+    radial-gradient(circle, rgba(34, 211, 238, 0.28), transparent 58%),
+    radial-gradient(circle, rgba(147, 51, 234, 0.2), transparent 72%);
+  opacity: 0.78;
+  animation: vaeroex-pulsar-breathe 4.8s ease-in-out infinite;
+}
+
+.vaeroex-pulsar-signal-dot {
+  display: grid;
+  place-items: center;
+  color: #a5f3fc;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -207,7 +263,8 @@ button.bg-vaeroex-blue:hover {
   .vaeroex-pricing-card::before,
   .vaeroex-trust-card::before,
   .vaeroex-form-intro::before,
-  .vaeroex-network-line {
+  .vaeroex-network-line,
+  .vaeroex-pulsar-signal-button::before {
     animation: none;
   }
 }
@@ -354,4 +411,212 @@ button.bg-vaeroex-blue:hover {
 .dark svg line[stroke="#e5e7eb"],
 .dark svg [stroke="#e5e7eb"] {
   stroke: #253041;
+}
+
+.pulsar {
+  color-scheme: dark;
+  --pulsar-bg: #030712;
+  --pulsar-surface: #07111f;
+  --pulsar-card: #11112b;
+  --pulsar-border: rgba(34, 211, 238, 0.22);
+  --pulsar-border-strong: rgba(240, 171, 252, 0.34);
+  --pulsar-text: #f8fafc;
+  --pulsar-muted: #b8c7e8;
+  --pulsar-blue: #2563eb;
+  --pulsar-cyan: #22d3ee;
+  --pulsar-violet: #7c3aed;
+  --pulsar-magenta: #db2777;
+  --pulsar-gold: #fde68a;
+}
+
+.pulsar body {
+  background:
+    radial-gradient(circle at 14% 12%, rgba(37, 99, 235, 0.2), transparent 24%),
+    radial-gradient(circle at 86% 8%, rgba(124, 58, 237, 0.18), transparent 28%),
+    radial-gradient(circle at 74% 82%, rgba(219, 39, 119, 0.1), transparent 24%),
+    linear-gradient(135deg, #030712 0%, #07111f 42%, #11112b 100%);
+  color: var(--pulsar-text);
+}
+
+.pulsar body::before {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+  background-image:
+    radial-gradient(circle at 20% 24%, rgba(248, 250, 252, 0.22) 0 1px, transparent 1.5px),
+    radial-gradient(circle at 78% 18%, rgba(34, 211, 238, 0.28) 0 1px, transparent 1.5px),
+    linear-gradient(rgba(34, 211, 238, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 58, 237, 0.04) 1px, transparent 1px);
+  background-size:
+    260px 260px,
+    340px 340px,
+    72px 72px,
+    72px 72px;
+  opacity: 0.32;
+}
+
+.pulsar .bg-\[\#f8fafc\],
+.pulsar .bg-slate-50 {
+  background:
+    radial-gradient(circle at 18% 12%, rgba(37, 99, 235, 0.16), transparent 30%),
+    radial-gradient(circle at 88% 0%, rgba(147, 51, 234, 0.12), transparent 28%),
+    var(--pulsar-bg) !important;
+}
+
+.pulsar .bg-slate-50\/70,
+.pulsar .bg-slate-50\/80,
+.pulsar .bg-slate-100,
+.pulsar .bg-vaeroex-dark-secondary {
+  background-color: rgba(7, 17, 31, 0.9) !important;
+}
+
+.pulsar .bg-slate-200 {
+  background-color: rgba(34, 211, 238, 0.12) !important;
+}
+
+.pulsar .bg-white,
+.pulsar .bg-white\/90,
+.pulsar .bg-white\/95,
+.pulsar .bg-vaeroex-dark-card {
+  background:
+    linear-gradient(135deg, rgba(17, 17, 43, 0.95), rgba(7, 17, 31, 0.96)),
+    radial-gradient(circle at top right, rgba(34, 211, 238, 0.12), transparent 32%) !important;
+}
+
+.pulsar .bg-white\/70,
+.pulsar .bg-white\/80 {
+  background-color: rgba(17, 17, 43, 0.82) !important;
+}
+
+.pulsar .bg-vaeroex-navy {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(34, 211, 238, 0.12), transparent 30%),
+    linear-gradient(135deg, #030712, #07111f 48%, #11112b) !important;
+}
+
+.pulsar .bg-vaeroex-soft {
+  background-color: rgba(37, 99, 235, 0.18) !important;
+}
+
+.pulsar .bg-vaeroex-blue {
+  background-color: var(--pulsar-blue) !important;
+}
+
+.pulsar a.bg-vaeroex-blue:hover,
+.pulsar button.bg-vaeroex-blue:hover {
+  background-color: var(--pulsar-cyan) !important;
+  color: #030712 !important;
+}
+
+.pulsar .border-line,
+.pulsar .border-vaeroex-silver,
+.pulsar .border-slate-200,
+.pulsar .border-vaeroex-dark-border {
+  border-color: var(--pulsar-border) !important;
+}
+
+.pulsar .divide-line > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--pulsar-border) !important;
+}
+
+.pulsar .text-ink,
+.pulsar .text-vaeroex-navy,
+.pulsar .text-slate-700,
+.pulsar .text-slate-800,
+.pulsar .text-slate-900 {
+  color: var(--pulsar-text) !important;
+}
+
+.pulsar .text-muted,
+.pulsar .text-vaeroex-dark-silver,
+.pulsar .text-slate-400,
+.pulsar .text-slate-500,
+.pulsar .text-slate-600 {
+  color: var(--pulsar-muted) !important;
+}
+
+.pulsar .text-vaeroex-blue {
+  color: var(--pulsar-cyan) !important;
+}
+
+.pulsar .text-vaeroex-accent {
+  color: #a5f3fc !important;
+}
+
+.pulsar input:not([type="checkbox"]):not([type="radio"]),
+.pulsar textarea,
+.pulsar select {
+  background-color: rgba(3, 7, 18, 0.78) !important;
+  border-color: var(--pulsar-border) !important;
+  color: var(--pulsar-text) !important;
+}
+
+.pulsar option {
+  background-color: #07111f;
+  color: var(--pulsar-text);
+}
+
+.pulsar input::placeholder,
+.pulsar textarea::placeholder {
+  color: #8ea2ca;
+}
+
+.pulsar .shadow-panel {
+  box-shadow:
+    0 18px 54px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(34, 211, 238, 0.06);
+}
+
+.pulsar .shadow-command {
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.48),
+    0 0 60px rgba(37, 99, 235, 0.12);
+}
+
+.pulsar .vaeroex-ambient::before {
+  background:
+    radial-gradient(circle at 18% 20%, rgba(34, 211, 238, 0.22), transparent 28%),
+    radial-gradient(circle at 80% 35%, rgba(124, 58, 237, 0.22), transparent 30%),
+    radial-gradient(circle at 45% 80%, rgba(219, 39, 119, 0.12), transparent 24%);
+}
+
+.pulsar .vaeroex-dashboard-preview,
+.pulsar .vaeroex-pricing-card,
+.pulsar .vaeroex-trust-card,
+.pulsar .vaeroex-form-intro,
+.pulsar .vaeroex-hover-card:hover {
+  border-color: var(--pulsar-border-strong) !important;
+  box-shadow:
+    0 18px 58px rgba(0, 0, 0, 0.42),
+    0 0 42px rgba(37, 99, 235, 0.13),
+    0 0 1px rgba(240, 171, 252, 0.32);
+}
+
+.pulsar .vaeroex-dashboard-preview::before,
+.pulsar .vaeroex-pricing-card::before,
+.pulsar .vaeroex-trust-card::before,
+.pulsar .vaeroex-form-intro::before {
+  width: 52%;
+  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.22), rgba(240, 171, 252, 0.16), transparent);
+  animation: vaeroex-pulsar-sweep 8.5s ease-in-out infinite;
+}
+
+.pulsar .vaeroex-network-line {
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.45));
+}
+
+.pulsar svg line[stroke="#e5e7eb"],
+.pulsar svg [stroke="#e5e7eb"] {
+  stroke: rgba(34, 211, 238, 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulsar .vaeroex-dashboard-preview::before,
+  .pulsar .vaeroex-pricing-card::before,
+  .pulsar .vaeroex-trust-card::before,
+  .pulsar .vaeroex-form-intro::before {
+    animation: none;
+  }
 }
