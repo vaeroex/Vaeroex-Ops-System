@@ -27,9 +27,9 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
         <div>
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Book a Demo</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight">Preview Vaeroex as an Intelligence Platform.</h1>
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight">Request a Vaeroex demo.</h1>
           <p className="mt-4 text-sm leading-6 text-muted">
-            Tell us what you are trying to improve. Vaeroex will review your request and help you understand how visibility,
+            Tell us what you are looking to improve. Vaeroex will review your request and help you understand how visibility,
             accountability, and execution can fit your business.
           </p>
           <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Build the structure your growth depends on.</p>
@@ -52,7 +52,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
           issueType="Demo request"
           message={params?.message}
           error={params?.error}
-          submitLabel="Request demo"
+          submitLabel="Request Vaeroex demo"
         />
       </section>
       <PublicFooter />
