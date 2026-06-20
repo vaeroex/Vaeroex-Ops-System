@@ -93,21 +93,6 @@ button.bg-vaeroex-blue:hover {
   }
 }
 
-@keyframes vaeroex-pulsar-breathe {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 1px rgba(34, 211, 238, 0.18),
-      0 18px 56px rgba(37, 99, 235, 0.18);
-  }
-
-  50% {
-    box-shadow:
-      0 0 0 1px rgba(240, 171, 252, 0.28),
-      0 20px 68px rgba(124, 58, 237, 0.28);
-  }
-}
-
 @keyframes vaeroex-pulsar-sweep {
   0% {
     transform: translate3d(-42%, 0, 0);
@@ -220,31 +205,6 @@ button.bg-vaeroex-blue:hover {
   animation: vaeroex-line-flow 4.5s linear infinite;
 }
 
-.vaeroex-pulsar-signal-button {
-  position: relative;
-  overflow: visible;
-}
-
-.vaeroex-pulsar-signal-button::before {
-  position: absolute;
-  inset: -7px;
-  z-index: -1;
-  pointer-events: none;
-  content: "";
-  border-radius: 999px;
-  background:
-    radial-gradient(circle, rgba(34, 211, 238, 0.28), transparent 58%),
-    radial-gradient(circle, rgba(147, 51, 234, 0.2), transparent 72%);
-  opacity: 0.78;
-  animation: vaeroex-pulsar-breathe 4.8s ease-in-out infinite;
-}
-
-.vaeroex-pulsar-signal-dot {
-  display: grid;
-  place-items: center;
-  color: #a5f3fc;
-}
-
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -263,8 +223,7 @@ button.bg-vaeroex-blue:hover {
   .vaeroex-pricing-card::before,
   .vaeroex-trust-card::before,
   .vaeroex-form-intro::before,
-  .vaeroex-network-line,
-  .vaeroex-pulsar-signal-button::before {
+  .vaeroex-network-line {
     animation: none;
   }
 }

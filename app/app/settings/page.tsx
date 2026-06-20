@@ -11,7 +11,7 @@ export default async function SettingsPage() {
       <PageHeader
         eyebrow="User Settings"
         title="Vaeroex Settings"
-        description="Manage your personal workspace experience, including the premium dark mode for long operating sessions."
+        description="Manage your personal workspace experience, including the official Pulsar visual identity and display preferences."
       />
 
       <ThemeControls />
