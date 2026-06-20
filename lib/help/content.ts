@@ -67,14 +67,14 @@ export const helpArticles: HelpArticle[] = [
     mistakes: ["Tracking too many metrics at once", "Not assigning owners", "Ignoring stale records"],
     nextLabel: "Explore Operations Intelligence",
     nextHref: "/app",
-    related: ["Operations Intelligence Suite", "Business Memory", "Decision Support"]
+    related: ["Operations Intelligence", "Business Memory", "Decision Support"]
   }),
   article({
     id: "operations-intelligence-suite",
     category: "Getting Started",
-    title: "What is the Operations Intelligence Suite?",
+    title: "What is Operations Intelligence?",
     summary: "The current Vaeroex product for visibility, accountability, and execution.",
-    what: "The Operations Intelligence Suite brings together business data, team activity, reports, KPIs, files, tasks, SOPs, CRM, alerts, and Vaeroex intelligence into one structured operating layer.",
+    what: "Operations Intelligence brings together business data, team activity, reports, KPIs, files, tasks, SOPs, CRM, alerts, and Vaeroex intelligence into one structured operating layer.",
     why: "Leaders need more than a place to store records. They need to understand performance, risk, ownership, recommended actions, and whether follow-through improved outcomes.",
     when: "Use it when the business needs a practical structure for leadership review, recurring reports, KPI trends, operational risk, and accountability.",
     workflow: ["Add or import records", "Review Business Health Score", "Use reports and briefings", "Approve recommended actions", "Track whether actions worked"],

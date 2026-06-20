@@ -5,10 +5,10 @@ import "./globals.css";
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vaeroex.com"),
   title: "Vaeroex — Intelligence Platform",
-  description: "Vaeroex is an Intelligence Platform for growing businesses. Its Operations Intelligence Suite helps leaders improve visibility, accountability, execution, decision support, business memory, and operational performance.",
+  description: "Vaeroex is an Intelligence Platform for growing businesses. Operations Intelligence helps leaders improve visibility, accountability, execution, decision support, business memory, and operational performance.",
   openGraph: {
     title: "Vaeroex — Intelligence Platform",
-    description: "Vaeroex is an Intelligence Platform for growing businesses. Its Operations Intelligence Suite helps leaders improve visibility, accountability, execution, decision support, business memory, and operational performance.",
+    description: "Vaeroex is an Intelligence Platform for growing businesses. Operations Intelligence helps leaders improve visibility, accountability, execution, decision support, business memory, and operational performance.",
     siteName: "Vaeroex",
     type: "website",
     images: [

@@ -49,11 +49,11 @@ export function MarketingDashboardPreview() {
   }, []);
 
   return (
-    <aside className="vaeroex-dashboard-preview rounded-xl border border-white/15 bg-white/95 p-3 text-ink shadow-command lg:p-4" aria-label="Operations Intelligence Suite demo preview">
+    <aside className="vaeroex-dashboard-preview rounded-xl border border-white/15 bg-white/95 p-3 text-ink shadow-command lg:p-4" aria-label="Operations Intelligence demo preview">
       <div className="flex items-center justify-between gap-3 border-b border-line pb-2.5">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Demo signal preview</p>
-          <h2 className="mt-1 text-lg font-semibold">Operations Intelligence Suite</h2>
+          <h2 className="mt-1 text-lg font-semibold">Operations Intelligence</h2>
         </div>
         <span className="rounded-full bg-vaeroex-navy px-3 py-1 text-xs font-semibold text-white">Live loop</span>
       </div>

@@ -46,7 +46,7 @@ export default function NetworkingPage() {
           and strategic relationships who believe that visibility, accountability, and execution drive growth.
         </p>
         <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
-          {["Intelligence Platform", "Operations Intelligence Suite", "Visibility", "Accountability", "Execution"].map((pillar) => (
+          {["Intelligence Platform", "Operations Intelligence", "Visibility", "Accountability", "Execution"].map((pillar) => (
             <span key={pillar} className="rounded-full border border-line bg-white px-4 py-2 shadow-sm">
               {pillar}
             </span>
@@ -71,7 +71,7 @@ export default function NetworkingPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Extension of the Platform</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Business intelligence is stronger when trusted people help turn it into action.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex is an Intelligence Platform first, with the Operations Intelligence Suite as its current product. The Network extends that mission through trusted relationships,
+              Vaeroex is an Intelligence Platform first, with Operations Intelligence as a core capability. The Network extends that mission through trusted relationships,
               implementation support, practical expertise, and strategic conversations that help strong ideas become stronger business structure.
             </p>
           </div>

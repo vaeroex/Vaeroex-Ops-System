@@ -80,7 +80,7 @@ export default function HomePage() {
               ))}
             </div>
             <p className="mt-4 hidden rounded-full border border-vaeroex-accent/40 bg-vaeroex-accent/10 px-4 py-2 text-sm font-semibold text-vaeroex-accent sm:inline-flex">
-              Now available: Operations Intelligence Suite
+              Now available: Operations Intelligence
             </p>
             <p className="mt-3 hidden max-w-3xl text-sm leading-6 text-slate-300 sm:block">
               Built for business owners, executives, directors, managers, and operators who need to understand what is happening, why it matters, and what to do next.
@@ -150,12 +150,12 @@ export default function HomePage() {
       <section id="operations-intelligence" className="mx-auto max-w-6xl px-6 py-12">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Current Flagship Product</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Operations Intelligence Suite</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Operations Intelligence</h2>
           <p className="mt-3 text-xl font-semibold text-slate-700">
             A complete intelligence system for visibility, accountability, and execution.
           </p>
           <p className="mt-4 text-sm leading-6 text-muted">
-            The Operations Intelligence Suite brings together business data, team activity, reports, KPIs, files, tasks, SOPs, CRM, alerts, and Vaeroex intelligence into one structured operating layer.
+            Operations Intelligence brings together business data, team activity, reports, KPIs, files, tasks, SOPs, CRM, alerts, and Vaeroex intelligence into one structured operating layer.
           </p>
         </div>
         <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -257,7 +257,7 @@ export default function HomePage() {
             <div>
               <h2 className="text-3xl font-semibold tracking-tight">Build the structure your growth depends on.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Book a demo to see how the Operations Intelligence Suite helps turn business activity into clarity, accountability, and execution.
+                Book a demo to see how Operations Intelligence helps turn business activity into clarity, accountability, and execution.
               </p>
             </div>
             <Link href="/demo" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">

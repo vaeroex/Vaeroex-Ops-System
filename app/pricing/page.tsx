@@ -7,7 +7,7 @@ import { VAEROEX_PLAN_FEATURES, VAEROEX_PLAN_NAME, VAEROEX_PLAN_PRICE_LABEL } fr
 
 const included = [
   "Vaeroex Intelligence Platform",
-  "Operations Intelligence Suite",
+  "Operations Intelligence",
   "Executive Dashboard",
   "Business Health Score",
   "Business Memory",
@@ -39,7 +39,7 @@ export default function PricingPage() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Pricing</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">One Vaeroex plan. Everything included.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-              Build the structure your growth depends on. Vaeroex brings the Operations Intelligence Suite into one subscription for visibility, accountability, execution, and decision support.
+              Build the structure your growth depends on. Vaeroex brings Operations Intelligence into one subscription for visibility, accountability, execution, and decision support.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href={squarespaceCheckoutUrl} className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white">
@@ -62,7 +62,7 @@ export default function PricingPage() {
               </div>
               <div className="rounded-lg border border-line bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Product</p>
-                <p className="mt-1 text-sm font-semibold">Operations Intelligence Suite</p>
+                <p className="mt-1 text-sm font-semibold">Operations Intelligence</p>
               </div>
             </div>
             <p className="mt-3 text-sm leading-6 text-muted">
