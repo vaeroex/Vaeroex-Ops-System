@@ -17,24 +17,19 @@ type ThemeControlsProps = {
 
 const preferences: Array<{ value: ThemePreference; label: string; description: string }> = [
   {
-    value: "dark",
-    label: "Dark Mode",
-    description: "Premium intelligence workspace for long working sessions."
-  },
-  {
-    value: "light",
-    label: "Light Mode",
-    description: "Bright executive workspace for users who prefer lighter surfaces."
+    value: "pulsar",
+    label: "Pulsar",
+    description: "The flagship Vaeroex visual identity with premium signal accents."
   },
   {
     value: "system",
-    label: "System Default",
+    label: "System",
     description: "Follow this device's current appearance setting."
   },
   {
-    value: "pulsar",
-    label: "Pulsar Mode",
-    description: "A premium galactic intelligence layer with subtle signal accents."
+    value: "light",
+    label: "Light",
+    description: "Bright executive workspace for users who prefer lighter surfaces."
   }
 ];
 
@@ -56,13 +51,12 @@ function applyTheme(preference: ThemePreference) {
 }
 
 function resolvedThemeLabel(theme: ResolvedTheme) {
-  if (theme === "pulsar") return "Pulsar";
-  return theme === "dark" ? "Dark" : "Light";
+  return theme === "pulsar" ? "Pulsar" : "Light";
 }
 
 export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
   const [preference, setPreference] = useState<ThemePreference>(DEFAULT_THEME_PREFERENCE);
-  const [resolvedMode, setResolvedMode] = useState<ResolvedTheme>("dark");
+  const [resolvedMode, setResolvedMode] = useState<ResolvedTheme>("pulsar");
 
   useEffect(() => {
     const initialPreference = normalizeThemePreference(window.localStorage.getItem(VAEROEX_THEME_STORAGE_KEY));
@@ -104,7 +98,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
         >
           {preferences.map((item) => (
             <option key={item.value} value={item.value}>
-              {item.label.replace(" Mode", "")}
+              {item.label}
             </option>
           ))}
         </select>
@@ -120,7 +114,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Theme Settings</p>
             <h2 className="mt-2 text-xl font-semibold text-ink">Choose your Vaeroex appearance</h2>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-              Dark mode is the default Vaeroex experience. Light mode and system preference remain available when you want them.
+              Pulsar is the default Vaeroex visual identity. System and Light remain available when you want them.
             </p>
           </div>
           <span className="inline-flex w-fit rounded-full border border-vaeroex-accent/40 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue dark:bg-white/10 dark:text-vaeroex-accent">
@@ -128,7 +122,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
           </span>
         </div>
 
-        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="mt-5 grid gap-3 lg:grid-cols-3">
           {preferences.map((item) => {
             const active = preference === item.value;
             const activeClass =
@@ -162,7 +156,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
           {[
             ["Business Health", "Executive scorecard surfaces stay high contrast."],
             ["Ask Vaeroex", "Recommendations read like an intelligence center."],
-            ["Pulsar Mode", "Signal accents add a galactic layer without sacrificing readability."]
+            ["Pulsar", "Signal accents create the official Vaeroex visual experience without sacrificing readability."]
           ].map(([title, description]) => (
             <div key={title} className="rounded-lg border border-line bg-slate-50 p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-secondary">
               <p className="text-sm font-semibold text-vaeroex-blue">{title}</p>
