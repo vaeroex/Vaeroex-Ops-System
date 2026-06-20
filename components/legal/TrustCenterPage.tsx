@@ -18,7 +18,7 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
 
       <section className="grid gap-4 md:grid-cols-2">
         {trustSections.map(([title, body], index) => (
-          <ScrollReveal key={title} as="article" disabled={inApp} delayMs={(index % 6) * 55} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
+          <ScrollReveal key={title} as="article" disabled={inApp} delayMs={(index % 6) * 55} className="vaeroex-trust-card vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
             <h2 className="text-base font-semibold text-ink">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-muted">{body}</p>
           </ScrollReveal>

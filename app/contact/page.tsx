@@ -38,7 +38,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             visibility, accountability, and execution can support your business, we'd like to hear from you.
           </p>
           <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Visibility • Accountability • Execution</p>
-          <ScrollReveal delayMs={120} className="vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
+          <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Looking for a product walkthrough?</p>
             <p className="mt-2 text-sm leading-6 text-muted">Use the demo request page if you want a guided Vaeroex preview.</p>
             <Link href="/demo" className="mt-4 inline-flex rounded-lg border border-line px-4 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { NetworkGraph } from "@/components/motion/NetworkGraph";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const networkGroups = [
@@ -82,6 +83,17 @@ export default function NetworkingPage() {
             ))}
           </div>
         </div>
+      </section>
+
+      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Strategic ecosystem</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationships organized around visibility, accountability, and execution.</h2>
+          <p className="mt-4 text-sm leading-6 text-muted">
+            The Vaeroex Network is not an open directory or marketplace. It is designed around credible relationships that can help the Intelligence Platform create practical business value.
+          </p>
+        </div>
+        <NetworkGraph />
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">

@@ -67,6 +67,32 @@ button.bg-vaeroex-blue:hover {
   }
 }
 
+@keyframes vaeroex-line-flow {
+  from {
+    stroke-dashoffset: 18;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes vaeroex-panel-sheen {
+  0% {
+    transform: translate3d(-35%, 0, 0);
+    opacity: 0;
+  }
+
+  28% {
+    opacity: 0.18;
+  }
+
+  100% {
+    transform: translate3d(135%, 0, 0);
+    opacity: 0;
+  }
+}
+
 .vaeroex-hero-reveal {
   animation: vaeroex-fade-up 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -129,6 +155,40 @@ button.bg-vaeroex-blue:hover {
   transform: translate3d(0, calc(var(--vaeroex-reveal-y, 0px) - 2px), 0);
 }
 
+.vaeroex-dashboard-preview,
+.vaeroex-pricing-card,
+.vaeroex-trust-card,
+.vaeroex-form-intro {
+  position: relative;
+  overflow: hidden;
+}
+
+.vaeroex-dashboard-preview::before,
+.vaeroex-pricing-card::before,
+.vaeroex-trust-card::before,
+.vaeroex-form-intro::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 44%;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.16), transparent);
+  transform: translate3d(-35%, 0, 0);
+  animation: vaeroex-panel-sheen 7.5s ease-in-out infinite;
+}
+
+.vaeroex-dashboard-preview > *,
+.vaeroex-pricing-card > *,
+.vaeroex-trust-card > *,
+.vaeroex-form-intro > * {
+  position: relative;
+  z-index: 1;
+}
+
+.vaeroex-network-line {
+  animation: vaeroex-line-flow 4.5s linear infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -140,6 +200,14 @@ button.bg-vaeroex-blue:hover {
   }
 
   .vaeroex-ambient::before {
+    animation: none;
+  }
+
+  .vaeroex-dashboard-preview::before,
+  .vaeroex-pricing-card::before,
+  .vaeroex-trust-card::before,
+  .vaeroex-form-intro::before,
+  .vaeroex-network-line {
     animation: none;
   }
 }
