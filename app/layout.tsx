@@ -30,9 +30,9 @@ const themeScript = `
 (function () {
   try {
     var key = "vaeroex-theme";
-    var stored = window.localStorage.getItem(key) || "light";
+    var stored = window.localStorage.getItem(key) || "dark";
     if (stored !== "light" && stored !== "dark" && stored !== "system") {
-      stored = "light";
+      stored = "dark";
     }
     var systemDark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
     var resolvedDark = stored === "dark" || (stored === "system" && systemDark);
@@ -42,7 +42,11 @@ const themeScript = `
     root.dataset.themePreference = stored;
     root.style.colorScheme = resolvedDark ? "dark" : "light";
   } catch (error) {
-    document.documentElement.style.colorScheme = "light";
+    var root = document.documentElement;
+    root.classList.add("dark");
+    root.dataset.theme = "dark";
+    root.dataset.themePreference = "dark";
+    root.style.colorScheme = "dark";
   }
 })();
 `;
@@ -53,7 +57,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className="dark" data-theme="dark" data-theme-preference="dark" style={{ colorScheme: "dark" }} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
