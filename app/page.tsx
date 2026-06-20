@@ -189,7 +189,7 @@ export default function HomePage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_0.9fr] lg:items-start">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Built For Growing Businesses</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">For teams that need structure without enterprise complexity.</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">For businesses that need structure without enterprise complexity.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
               Vaeroex is built for leaders who need a better way to understand performance, risk, ownership, and follow-through.
             </p>
@@ -202,10 +202,10 @@ export default function HomePage() {
             </div>
           </div>
           <ScrollReveal as="article" delayMs={140} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
-            <p className="text-sm font-semibold text-vaeroex-blue">Best fit</p>
-            <p className="mt-3 text-2xl font-semibold">Businesses with 3-50 employees that are growing faster than their structure.</p>
+            <p className="text-sm font-semibold text-vaeroex-blue">Built for</p>
+            <p className="mt-3 text-2xl font-semibold">Businesses that value visibility, accountability, and execution.</p>
             <p className="mt-3 text-sm leading-6 text-muted">
-              The platform is designed for practical leadership rhythms: reviewing signals, assigning ownership, tracking recommendations, and measuring whether actions worked.
+              Whether you are building your first team or managing a growing organization, Vaeroex helps turn information into clarity, accountability, and action.
             </p>
           </ScrollReveal>
         </div>
