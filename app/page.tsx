@@ -3,46 +3,43 @@ import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 
-const whatVaeroexDoes = [
-  ["Understand performance", "See KPI movement, revenue signals, leads, issues, reports, and business health in one place."],
-  ["Track accountability", "Clarify owners, due dates, review points, and the work that needs leadership attention."],
-  ["Create reports", "Turn workspace activity into daily, weekly, monthly, quarterly, yearly, and year-to-date summaries."],
-  ["Identify risks", "Surface overdue work, slipping metrics, stale procedures, missed follow-ups, and operational patterns."],
-  ["Turn insight into action", "Create reviewed follow-ups, SOP updates, checklist reviews, and decision-ready next steps."]
+const audienceTypes = ["Owners", "Executives", "Directors", "Managers", "Operators"];
+
+const suiteCapabilities = [
+  ["Business Health Score", "Measure overall business performance across operations, sales, accountability, process health, and execution."],
+  ["Business Memory", "Preserve operational context over time so leaders can understand what changed, when it changed, and what actions followed."],
+  ["Profit Leak Detection", "Identify missed follow-ups, underperforming KPIs, unresolved issues, stale SOPs, and other hidden performance gaps."],
+  ["Predictive Insights", "Surface emerging risks and performance signals before they become larger operational problems."],
+  ["Decision Support", "Turn scattered business activity into recommended next actions, assigned ownership, and measurable follow-through."],
+  ["Risk Intelligence", "Monitor operational indicators, overdue work, declining metrics, and repeated issues that may require leadership attention."],
+  ["Accountability Intelligence", "Understand who owns what, what is overdue, what is unresolved, and where execution is breaking down."],
+  ["Executive Briefings", "Generate leadership-ready summaries that explain performance, risks, trends, and recommended next actions."],
+  ["Recommendation Tracking", "Track whether recommended actions were accepted, assigned, completed, and whether they improved outcomes."],
+  ["Operations Autopilot with Human Approval", "Allow Vaeroex to suggest actions while requiring human review before records are created or changed."]
 ];
 
-const audiences = ["Owners", "Executives", "Directors", "Managers", "Supervisors", "Operators"];
-
-const capabilities = [
-  "Executive Dashboard",
-  "KPIs",
-  "CRM",
-  "Reports",
-  "SOPs",
-  "Tasks",
-  "Issues",
-  "Checklists",
-  "Files",
-  "People",
-  "Notifications",
-  "Business Health Score",
-  "Business Memory",
-  "Profit Leak Detection",
-  "Scheduled Reports"
+const intelligenceLoop = [
+  ["Capture", "Bring together tasks, KPIs, reports, CRM activity, files, issues, SOPs, checklists, and team activity."],
+  ["Remember", "Build business memory by preserving context, decisions, reports, actions, and historical performance."],
+  ["Analyze", "Use operational intelligence to identify trends, risks, performance changes, and accountability gaps."],
+  ["Prioritize", "Surface what matters most through Business Health Score, Profit Leak Detection, Smart Alerts, and Executive Briefings."],
+  ["Execute", "Turn recommendations into tasks, SOPs, KPI alerts, reports, assignments, and follow-up actions."],
+  ["Measure", "Track outcomes over time to understand what improved, what declined, and what needs attention next."]
 ];
 
-const workflowSteps = [
-  ["Centralize operations", "Bring KPIs, CRM, reports, files, tasks, issues, SOPs, and people into a structured workspace."],
-  ["Analyze performance", "Review trends, targets, accountability signals, and business activity over time."],
-  ["Surface risks", "See where follow-up, ownership, procedure review, or execution is starting to slip."],
-  ["Assign actions", "Turn decisions into clear next steps with owners, timing, and visible status."],
-  ["Track outcomes", "Use reports and business memory to see whether decisions are improving performance."]
+const differentCards = [
+  ["Most tools help teams store work.", "Vaeroex helps leaders understand work."],
+  ["Most dashboards show numbers.", "Vaeroex explains what changed, why it matters, and what should happen next."],
+  ["Most AI tools generate summaries.", "Vaeroex connects recommendations to tasks, reports, SOPs, KPIs, assignments, and outcomes."]
 ];
 
-const whyVaeroex = [
-  ["Visibility", "Know what is happening before small problems become expensive patterns."],
-  ["Accountability", "Make ownership visible so decisions do not disappear into conversation."],
-  ["Execution", "Move from insight to reviewed action, then measure whether the action worked."]
+const futureCategories = [
+  "Business intelligence",
+  "Decision intelligence",
+  "Predictive intelligence",
+  "Workforce intelligence",
+  "Risk intelligence",
+  "Performance intelligence"
 ];
 
 export default function HomePage() {
@@ -56,20 +53,25 @@ export default function HomePage() {
         </div>
         <div className="relative mx-auto max-w-6xl">
           <VaeroexLogo variant="full" size="lg" priority className="mb-8" />
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Operations Intelligence Platform</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Intelligence Platform</p>
           <h1 className="mt-5 max-w-4xl text-5xl font-semibold tracking-tight sm:text-6xl">Vaeroex</h1>
           <p className="mt-5 max-w-3xl text-2xl font-semibold text-slate-100">Build the structure your growth depends on.</p>
           <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">
-            Vaeroex helps growing businesses turn operations, performance data, reports, tasks, teams, and business activity into clarity,
-            accountability, and better execution.
+            Vaeroex helps growing businesses transform scattered information into operational clarity, predictive insight, and accountable execution.
           </p>
-          <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold text-slate-100">
+          <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold text-slate-100" aria-label="Vaeroex brand pillars">
             {["Visibility", "Accountability", "Execution"].map((pillar) => (
               <span key={pillar} className="rounded-full border border-white/15 bg-white/10 px-4 py-2">
                 {pillar}
               </span>
             ))}
           </div>
+          <p className="mt-6 inline-flex rounded-full border border-vaeroex-accent/40 bg-vaeroex-accent/10 px-4 py-2 text-sm font-semibold text-vaeroex-accent">
+            Now available: Operations Intelligence Suite
+          </p>
+          <p className="mt-4 max-w-3xl text-sm leading-6 text-slate-300">
+            Built for business owners, executives, directors, managers, and operators who need to understand what is happening, why it matters, and what to do next.
+          </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link href="/demo" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Book a Demo
@@ -77,29 +79,76 @@ export default function HomePage() {
             <Link href="/pricing" className="rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
               View Pricing
             </Link>
-            <Link href="#platform" className="rounded-lg border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-              Explore Platform
+            <Link href="#operations-intelligence" className="rounded-lg border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+              Explore Operations Intelligence
             </Link>
           </div>
         </div>
       </section>
 
       <section id="platform" className="border-b border-line bg-white px-6 py-12">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">What Vaeroex Does</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Turn daily business activity into operational intelligence.</h2>
+            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Platform</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">The intelligence layer for growing businesses.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex gives leadership a practical structure for seeing performance, understanding risk, and following through.
+              Vaeroex combines business memory, predictive insight, risk detection, and decision support to help teams operate with greater visibility and accountability.
             </p>
           </div>
-          <div className="grid gap-3 md:grid-cols-2">
-            {whatVaeroexDoes.map(([title, description]) => (
-              <article key={title} className="rounded-lg border border-line bg-slate-50 p-4 shadow-sm">
-                <h3 className="font-semibold">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-              </article>
-            ))}
+          <article className="rounded-lg border border-line bg-slate-50 p-6 shadow-sm">
+            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Brand pillars</p>
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight">Visibility • Accountability • Execution</h3>
+            <p className="mt-3 text-sm leading-6 text-muted">
+              Vaeroex is built around a simple leadership pattern: see what is happening, clarify who owns it, and turn insight into reviewed action.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <section id="operations-intelligence" className="mx-auto max-w-6xl px-6 py-12">
+        <div className="max-w-3xl">
+          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Current Flagship Product</p>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Operations Intelligence Suite</h2>
+          <p className="mt-3 text-xl font-semibold text-slate-700">
+            A complete intelligence system for visibility, accountability, and execution.
+          </p>
+          <p className="mt-4 text-sm leading-6 text-muted">
+            The Operations Intelligence Suite brings together business data, team activity, reports, KPIs, files, tasks, SOPs, CRM, alerts, and Vaeroex intelligence into one structured operating layer.
+          </p>
+        </div>
+        <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {suiteCapabilities.map(([title, description]) => (
+            <article key={title} className="rounded-lg border border-line bg-white p-4 shadow-panel">
+              <h3 className="font-semibold text-vaeroex-blue">{title}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section className="border-y border-line bg-white px-6 py-12">
+        <div className="mx-auto max-w-6xl">
+          <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">The Vaeroex Intelligence Loop</p>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight">From insight to action, then back to measured outcomes.</h2>
+              <p className="mt-4 text-sm leading-6 text-muted">
+                Vaeroex does more than store information. It helps organizations build a continuous loop from insight to action.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2">
+              {intelligenceLoop.map(([title, description], index) => (
+                <article key={title} className="rounded-lg border border-line bg-slate-50 p-4 shadow-sm">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-vaeroex-navy text-xs font-semibold text-white">
+                      {index + 1}
+                    </span>
+                    <h3 className="font-semibold">{title}</h3>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-muted">{description}</p>
+                </article>
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -109,8 +158,11 @@ export default function HomePage() {
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Built For Growing Businesses</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">For teams that need structure without enterprise complexity.</h2>
+            <p className="mt-4 text-sm leading-6 text-muted">
+              Vaeroex is built for leaders who need a better way to understand performance, risk, ownership, and follow-through.
+            </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {audiences.map((audience) => (
+              {audienceTypes.map((audience) => (
                 <div key={audience} className="rounded-lg border border-line bg-white p-4 text-sm font-semibold shadow-sm">
                   {audience}
                 </div>
@@ -121,7 +173,7 @@ export default function HomePage() {
             <p className="text-sm font-semibold text-vaeroex-blue">Best fit</p>
             <p className="mt-3 text-2xl font-semibold">Businesses with 3-50 employees that are growing faster than their structure.</p>
             <p className="mt-3 text-sm leading-6 text-muted">
-              Vaeroex is designed for owners and operators who need better visibility, clearer accountability, and stronger execution habits.
+              The platform is designed for practical leadership rhythms: reviewing signals, assigning ownership, tracking recommendations, and measuring whether actions worked.
             </p>
           </article>
         </div>
@@ -129,61 +181,39 @@ export default function HomePage() {
 
       <section className="border-y border-line bg-white px-6 py-12">
         <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Platform Capabilities</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">One place for the signals that run the business.</h2>
-            </div>
-            <Link href="/pricing" className="text-sm font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
-              See everything included
-            </Link>
-          </div>
-          <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-            {capabilities.map((capability) => (
-              <div key={capability} className="rounded-lg border border-line bg-slate-50 p-3 text-sm font-semibold shadow-sm">
-                {capability}
-              </div>
+          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Why Vaeroex Is Different</p>
+          <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight">Vaeroex connects visibility, accountability, and execution.</h2>
+          <div className="mt-6 grid gap-4 md:grid-cols-3">
+            {differentCards.map(([setup, point]) => (
+              <article key={setup} className="rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
+                <p className="text-sm font-semibold text-muted">{setup}</p>
+                <h3 className="mt-3 text-lg font-semibold text-vaeroex-blue">{point}</h3>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-8 lg:grid-cols-[0.75fr_1.25fr]">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">How It Works</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">From scattered updates to structured execution.</h2>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Start with the records you already have, add the workflows you need, and let Vaeroex help leadership see what deserves attention.
-            </p>
-          </div>
-          <div className="grid gap-3">
-            {workflowSteps.map(([title, description], index) => (
-              <article key={title} className="flex gap-4 rounded-lg border border-line bg-white p-4 shadow-panel">
-                <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-vaeroex-navy text-sm font-semibold text-white">
-                  {index + 1}
-                </span>
-                <div>
-                  <h3 className="font-semibold">{title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-muted">{description}</p>
+        <div className="rounded-lg border border-line bg-white p-6 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Long-Term Vision</p>
+          <div className="mt-3 grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+            <div>
+              <h2 className="text-3xl font-semibold tracking-tight">Built to expand as an intelligence layer.</h2>
+              <p className="mt-4 text-sm leading-6 text-muted">
+                Vaeroex is designed to expand across multiple intelligence categories as the platform evolves, including business intelligence, decision intelligence, predictive intelligence, workforce intelligence, risk intelligence, and performance intelligence.
+              </p>
+              <p className="mt-3 text-sm leading-6 text-muted">
+                The long-term vision for Vaeroex is to become the intelligence layer that helps organizations understand performance, anticipate risk, improve execution, and make better decisions.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {futureCategories.map((category) => (
+                <div key={category} className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
+                  {category}
                 </div>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="border-y border-line bg-white px-6 py-12">
-        <div className="mx-auto max-w-6xl">
-          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Why Vaeroex</p>
-          <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight">Visibility, accountability, and execution are the structure growth depends on.</h2>
-          <div className="mt-6 grid gap-4 md:grid-cols-3">
-            {whyVaeroex.map(([title, description]) => (
-              <article key={title} className="rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
-                <h3 className="text-lg font-semibold text-vaeroex-blue">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-              </article>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </section>
@@ -195,7 +225,7 @@ export default function HomePage() {
             <div>
               <h2 className="text-3xl font-semibold tracking-tight">Build the structure your growth depends on.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Book a demo to see how Vaeroex turns business activity into visibility, accountability, and execution.
+                Book a demo to see how the Operations Intelligence Suite helps turn business activity into clarity, accountability, and execution.
               </p>
             </div>
             <Link href="/demo" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">

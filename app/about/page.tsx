@@ -30,8 +30,7 @@ export default function AboutPage() {
           Businesses do not need more disconnected software. They need structure.
         </h1>
         <p className="mt-5 max-w-3xl text-base leading-7 text-muted">
-          Vaeroex is an Operations Intelligence Platform built to help leaders understand what is happening, why it matters,
-          and what should happen next.
+          Vaeroex is an Intelligence Platform built to help growing businesses turn information into clarity, accountability, and execution.
         </p>
         <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
           {["Visibility", "Accountability", "Execution"].map((pillar) => (
@@ -100,10 +99,11 @@ export default function AboutPage() {
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">The Solution</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Vaeroex turns information into clarity, accountability, and execution.</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Vaeroex turns information into intelligence, accountability, and execution.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
+              Vaeroex was built as an Intelligence Platform, with the Operations Intelligence Suite as its first major product.
               Rather than simply storing data, Vaeroex helps leaders connect business activity to performance signals, accountability systems,
-              reports, risks, and recommended next actions.
+              predictive insights, decision support, risks, and recommended next actions.
             </p>
           </div>
           <article className="rounded-lg border border-line bg-vaeroex-navy p-6 text-white shadow-command">
@@ -137,8 +137,12 @@ export default function AboutPage() {
               continuous improvement, and the importance of turning information into actionable intelligence.
             </p>
             <p>
-              That experience became the foundation for Vaeroex: a premium Operations Intelligence Platform for growing businesses that need
-              better visibility, clearer accountability, and stronger execution.
+              That experience became the foundation for Vaeroex. The platform was built to help organizations transform information into clarity,
+              accountability, and execution through business memory, operational visibility, predictive insight, and decision support.
+            </p>
+            <p>
+              The long-term vision is to continue expanding the intelligence, insights, and operational capabilities available to growing businesses
+              while staying focused on a simple goal: helping leaders understand what is happening, why it matters, and what should happen next.
             </p>
           </div>
         </div>
@@ -151,7 +155,7 @@ export default function AboutPage() {
             <div>
               <h2 className="text-2xl font-semibold tracking-tight">Vaeroex also connects with operators, consultants, and trusted service providers.</h2>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-                The Vaeroex Network extends the platform through practical business support, referrals, implementation partners, and strategic introductions.
+                The Vaeroex Network extends the Intelligence Platform through practical business support, referrals, implementation partners, and strategic introductions.
               </p>
             </div>
             <Link href={"/networking" as Route} className="inline-flex shrink-0 rounded-lg border border-line px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
@@ -166,7 +170,7 @@ export default function AboutPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Structure Creates Clarity</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight">Structure turns complexity into clarity.</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            Vaeroex is built to help growing organizations create the visibility, accountability, and execution needed to make better decisions and build sustainable growth.
+            Vaeroex is built to help growing organizations create the visibility, accountability, execution, and decision support needed to make better-informed decisions.
           </p>
           <Link href="/demo" className="mt-6 inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
             Book a Demo

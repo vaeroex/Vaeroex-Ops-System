@@ -1106,12 +1106,12 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
     },
     {
       monthIndex: 1,
-      title: "February Growth Report",
+      title: "February Pipeline Report",
       type: "Monthly",
       summary: "February improved across revenue, conversion, response time, and checklist completion.",
       improved: ["Revenue moved above target.", "Conversion reached 27%.", "Checklist completion reached 96%."],
       declined: ["SOP review was still below full completion."],
-      risks: ["Growth could hide process drift if SOP review stayed partial."],
+      risks: ["Pipeline momentum could hide process drift if SOP review stayed partial."],
       actions: ["Keep weekly sales follow-up review.", "Schedule monthly SOP review."]
     },
     {

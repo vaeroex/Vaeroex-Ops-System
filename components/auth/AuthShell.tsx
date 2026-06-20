@@ -16,7 +16,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
         <section className="hidden rounded-lg border border-slate-800 bg-vaeroex-navy p-8 text-white shadow-command lg:block">
           <Link href="/" className="inline-flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3">
             <VaeroexLogo variant="full" size="lg" priority />
-            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Operations Intelligence Platform</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Intelligence Platform</span>
           </Link>
           <h1 className="mt-8 max-w-xl text-5xl font-semibold tracking-tight">
             Build the structure your growth depends on.
@@ -38,7 +38,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
             <div className="mb-5 flex justify-center">
               <VaeroexLogo variant="full" size="hero" priority className="max-w-full" />
             </div>
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Operations Intelligence Platform</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Intelligence Platform</p>
             <h2 className="mt-2 text-2xl font-semibold">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">{subtitle}</p>
           </div>

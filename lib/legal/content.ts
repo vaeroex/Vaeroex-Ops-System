@@ -45,7 +45,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   terms: {
     id: "terms",
     title: "Terms of Service",
-    summary: "Plain-English terms for using Vaeroex as an Operations Intelligence Platform.",
+    summary: "Plain-English terms for using Vaeroex as an Intelligence Platform.",
     href: "/terms",
     updated: LEGAL_DOCUMENT_VERSIONS.terms,
     sections: [
@@ -59,8 +59,8 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Description of Service",
         body: [
-          "Vaeroex is an Operations Intelligence Platform designed to help businesses improve visibility, accountability, and execution.",
-          "The platform may include dashboards, KPI records, CRM records, files, SOPs, checklists, issues, reports, notifications, and Vaeroex-generated recommendations."
+          "Vaeroex is an Intelligence Platform designed to help businesses improve visibility, accountability, execution, and decision support.",
+          "The current Vaeroex product is the Operations Intelligence Suite. It may include dashboards, KPI records, CRM records, files, SOPs, checklists, issues, reports, notifications, business memory, predictive insights, and Vaeroex-generated recommendations."
         ]
       },
       {
@@ -122,7 +122,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Vaeroex Recommendations and Human Review",
         body: [
-          "Vaeroex recommendations are advisory and operational-support outputs.",
+          "Vaeroex recommendations, predictive insights, decision-support outputs, and business-memory summaries are advisory support outputs.",
           "Users are responsible for reviewing, approving, and implementing recommendations before relying on them or saving records."
         ]
       },
@@ -275,7 +275,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/ai-disclaimer",
     updated: LEGAL_DOCUMENT_VERSIONS.aiDisclaimer,
     sections: [
-      { title: "Operational Support", body: ["Vaeroex uses AI to assist with operational analysis, recommendations, summaries, file reviews, and reports."] },
+      { title: "Operational Support", body: ["Vaeroex uses AI-assisted systems to assist with operational analysis, predictive insights, decision support, recommendations, summaries, file reviews, and reports."] },
       { title: "Possible Errors", body: ["Outputs may be incomplete, inaccurate, outdated, or unsuitable for a specific business situation."] },
       { title: "Human Review Required", body: ["Users must review and approve Vaeroex-generated outputs before relying on them or saving them into tasks, reports, KPIs, SOPs, forms, checklists, or follow-ups."] },
       { title: "No Professional Advice", body: ["Vaeroex does not provide legal, medical, financial, tax, insurance, employment, compliance, safety, or regulated professional advice."] },
@@ -304,7 +304,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/subscription-billing-terms",
     updated: "2026-06-19",
     sections: [
-      { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex, Operations Intelligence Platform, $399/month, Everything Included."] },
+      { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex, Operations Intelligence Suite on the Vaeroex Intelligence Platform, $399/month, Everything Included."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
       { title: "Subscription Requests", body: ["Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support."] },
@@ -345,7 +345,7 @@ export const trustSections = [
   ["Authentication", "Vaeroex uses Supabase Auth for account access and session management."],
   ["Data Storage", "Workspace records are stored in Supabase Postgres with Row Level Security policies designed to enforce tenant separation."],
   ["File Security", "Files are stored by workspace and should be used for business records that are appropriate for Vaeroex."],
-  ["Vaeroex Safety", "Vaeroex outputs require human review before users rely on recommendations or save generated records."],
+  ["Vaeroex Safety", "Vaeroex recommendations, predictive insights, decision-support outputs, and business-memory summaries require human review before users rely on them or save generated records."],
   ["Human Review", "Owners and managers remain responsible for decisions, implementation, and follow-through."],
   ["Audit Logging", "Admin, support, usage, and workspace events are designed to be logged where applicable for review and troubleshooting."],
   ["Demo Workspace Isolation", "Demo workspaces are sample business environments and should remain separate from real customer data."],
@@ -356,9 +356,9 @@ export const trustSections = [
 export const releaseNotes = [
   {
     date: "June 2026",
-    title: "Operations Intelligence Platform foundation",
+    title: "Intelligence Platform foundation",
     type: "Feature added",
-    body: "Vaeroex now includes workspace setup, dashboard intelligence, KPIs, CRM, files, reports, SOPs, checklists, follow-ups, and Vaeroex recommendations."
+    body: "Vaeroex now includes the Operations Intelligence Suite foundation: workspace setup, dashboard intelligence, KPIs, CRM, files, reports, SOPs, checklists, follow-ups, business memory, and Vaeroex recommendations."
   },
   {
     date: "June 2026",
