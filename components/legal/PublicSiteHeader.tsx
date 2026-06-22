@@ -1,15 +1,16 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
-const navLinks = [
-  { href: "/#platform", label: "Platform" },
-  { href: "/#operations-intelligence", label: "Operations Intelligence" },
+const navLinks: Array<{ href: Route; label: string }> = [
+  { href: "/", label: "Platform" },
+  { href: "/operations-intelligence" as Route, label: "Operations Intelligence" },
   { href: "/pricing", label: "Pricing" },
   { href: "/networking", label: "Network" },
   { href: "/trust", label: "Trust" },
   { href: "/help", label: "Help" }
-] as const;
+];
 
 async function isLoggedIn() {
   const supabase = await createSupabaseServerClient();

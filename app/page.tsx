@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
@@ -34,21 +35,6 @@ const intelligenceDomains = [
   ["Defense Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support complex environments where visibility, context, and decision support matter."]
 ] as const;
 
-const operationsCapabilities = [
-  ["Executive Dashboard", "A leadership view of current performance, risks, priorities, and recommended next actions."],
-  ["Business Health Score", "A sample score model that summarizes operating signals into a focused executive view."],
-  ["Business Memory", "Historical context for reports, decisions, imports, actions, KPI movement, and follow-up outcomes."],
-  ["Reports", "Daily, weekly, monthly, quarterly, yearly, and year-to-date summaries using workspace context."],
-  ["KPI Intelligence", "Track targets, actuals, trends, comparisons, and below-target signals."],
-  ["CRM", "Understand lead activity, follow-ups, conversion movement, and pipeline accountability."],
-  ["Profit Leak Detection", "Identify missed actions, stalled follow-ups, unresolved issues, and avoidable execution gaps."],
-  ["Decision Support", "Convert workspace context into reviewed recommendations and next steps."],
-  ["Recommendations", "Draft actions for managers to approve, assign, track, and measure."],
-  ["Accountability", "Connect owners, roles, assignments, tasks, and follow-up expectations."],
-  ["Notifications", "Surface shared reports, assignments, KPI alerts, and items needing attention."],
-  ["Scheduled Reports", "Support recurring leadership reviews without forcing email delivery."]
-] as const;
-
 const intelligenceLoop = [
   ["Capture", "Bring together signals, records, observations, files, events, context, and activity."],
   ["Remember", "Preserve relevant history so new signals can be compared against prior context and outcomes."],
@@ -71,7 +57,7 @@ const signalCards = [
 
 const differentCards = [
   ["Most tools store information.", "Vaeroex helps organizations understand it."],
-  ["Most dashboards show numbers.", "Vaeroex explains what changed, why it matters, and what should happen next."],
+  ["Most systems show information.", "Vaeroex explains what changed, why it matters, and what should happen next."],
   ["Most systems stop at visibility.", "Vaeroex connects visibility to accountability and execution."]
 ] as const;
 
@@ -80,6 +66,8 @@ function badgeClass(status: string) {
     ? "border-vaeroex-accent/40 bg-vaeroex-accent/10 text-vaeroex-accent"
     : "border-fuchsia-300/30 bg-fuchsia-500/10 text-fuchsia-100";
 }
+
+const operationsIntelligenceRoute = "/operations-intelligence" as Route;
 
 export default function HomePage() {
   return (
@@ -114,7 +102,7 @@ export default function HomePage() {
               <Link href="#platform" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
                 Explore Vaeroex
               </Link>
-              <Link href="#operations-intelligence" className="rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+              <Link href={operationsIntelligenceRoute} className="rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
                 View Operations Intelligence
               </Link>
               <Link href="/demo" className="rounded-lg border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
@@ -232,24 +220,27 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section id="operations-intelligence" className="bg-[#050b18] px-6 py-14">
+      <section className="bg-[#050b18] px-6 py-14">
         <div className="mx-auto max-w-6xl">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Current Capability</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Operations Intelligence</h2>
-            <p className="mt-3 text-xl font-semibold text-slate-100">What Vaeroex can do today.</p>
-            <p className="mt-4 text-sm leading-6 text-slate-300">
-              Operations Intelligence is Vaeroex's current intelligence capability for organizations that need greater visibility, accountability, and execution across their operations.
-            </p>
-          </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {operationsCapabilities.map(([title, description], index) => (
-              <ScrollReveal key={title} as="article" delayMs={(index % 6) * 70} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-command">
-                <h3 className="font-semibold text-vaeroex-accent">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
-              </ScrollReveal>
-            ))}
-          </div>
+          <ScrollReveal className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-6 shadow-command">
+            <div className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Current Capability</p>
+                <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Operations Intelligence</h2>
+                <p className="mt-4 text-sm leading-6 text-slate-300">
+                  Vaeroex's current intelligence capability helps organizations improve visibility, accountability, and execution across their operations.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-3 lg:justify-end">
+                <Link href={operationsIntelligenceRoute} className="inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+                  Explore Operations Intelligence
+                </Link>
+                <Link href="/demo" className="inline-flex rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+                  Book a Demo
+                </Link>
+              </div>
+            </div>
+          </ScrollReveal>
         </div>
       </section>
 
