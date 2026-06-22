@@ -111,8 +111,8 @@ export async function PublicSiteHeader() {
               Login
             </Link>
           )}
-          <Link href="/operations-intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-            Explore Operations Intelligence
+          <Link href="/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+            Start With Vaeroex
           </Link>
         </div>
       </div>
