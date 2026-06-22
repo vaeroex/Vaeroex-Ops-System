@@ -1410,6 +1410,10 @@ export type Database = {
           stripe_price_id: string | null;
           stripe_current_period_end: string | null;
           stripe_cancel_at_period_end: boolean;
+          onboarding_email_status: string;
+          onboarding_email_sent_at: string | null;
+          onboarding_email_message_id: string | null;
+          onboarding_email_error: string | null;
           current_period_start: string | null;
           current_period_end: string | null;
           canceled_at: string | null;
@@ -1438,6 +1442,10 @@ export type Database = {
           stripe_price_id?: string | null;
           stripe_current_period_end?: string | null;
           stripe_cancel_at_period_end?: boolean;
+          onboarding_email_status?: string;
+          onboarding_email_sent_at?: string | null;
+          onboarding_email_message_id?: string | null;
+          onboarding_email_error?: string | null;
           current_period_start?: string | null;
           current_period_end?: string | null;
           canceled_at?: string | null;

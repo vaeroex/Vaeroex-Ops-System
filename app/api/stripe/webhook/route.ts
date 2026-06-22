@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
+import { sendVaeroexOnboardingEmail, type OnboardingEmailResult } from "@/lib/email/onboarding";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -27,6 +28,14 @@ type ExistingSubscription = {
   customer_name: string | null;
   user_id: string | null;
   manually_activated: boolean;
+};
+
+type StripeSyncResult = {
+  customerEmail: string | null;
+  customerName: string | null;
+  stripeSubscriptionId: string | null;
+  status: ReturnType<typeof mapStripeStatus>;
+  subscriptionRecordId: string | null;
 };
 
 function asJson(value: unknown): Json {
@@ -111,7 +120,7 @@ async function syncStripeSubscription({
 }) {
   const stripeSubscriptionId = subscription?.id || stripeObjectId(session?.subscription) || stripeObjectId(invoice?.subscription);
   const stripeCustomerId = stripeObjectId(subscription?.customer) || stripeObjectId(session?.customer) || stripeObjectId(invoice?.customer) || customer?.id || null;
-  const existing = await findExistingSubscription({
+  let existing = await findExistingSubscription({
     admin,
     stripeSubscriptionId,
     stripeCustomerId,
@@ -153,11 +162,23 @@ async function syncStripeSubscription({
     const { error } = await admin.from("customer_subscriptions").update(payload).eq("id", existing.id);
     if (error) throw error;
   } else {
-    const { error } = await admin.from("customer_subscriptions").insert({
-      ...payload,
-      manually_activated: false
-    });
+    const { error, data } = await admin
+      .from("customer_subscriptions")
+      .insert({
+        ...payload,
+        manually_activated: false
+      })
+      .select("id")
+      .single();
     if (error) throw error;
+    existing = {
+      id: data.id,
+      workspace_id: null,
+      customer_email: customerEmail,
+      customer_name: customerName,
+      user_id: userId,
+      manually_activated: false
+    };
   }
 
   if (existing?.workspace_id) {
@@ -172,8 +193,10 @@ async function syncStripeSubscription({
 
   return {
     customerEmail,
+    customerName,
     stripeSubscriptionId,
-    status
+    status,
+    subscriptionRecordId: existing?.id ?? null
   };
 }
 
@@ -229,10 +252,109 @@ async function processStripeEvent(admin: AdminClient, event: StripeEvent) {
     default:
       return {
         customerEmail: null,
+        customerName: null,
         stripeSubscriptionId: null,
-        status: "manual_review" as const
+        status: "manual_review" as const,
+        subscriptionRecordId: null
       };
   }
+}
+
+function shouldSendOnboardingEmail(event: StripeEvent, result: StripeSyncResult) {
+  return (
+    ["checkout.session.completed", "customer.subscription.created"].includes(event.type) &&
+    ["active", "trialing"].includes(result.status) &&
+    Boolean(result.customerEmail && result.subscriptionRecordId)
+  );
+}
+
+async function markOnboardingEmailResult({
+  admin,
+  subscriptionRecordId,
+  result
+}: {
+  admin: AdminClient;
+  subscriptionRecordId: string;
+  result: OnboardingEmailResult;
+}) {
+  if (result.status === "sent") {
+    await admin
+      .from("customer_subscriptions")
+      .update({
+        onboarding_email_status: "sent",
+        onboarding_email_sent_at: new Date().toISOString(),
+        onboarding_email_message_id: result.messageId,
+        onboarding_email_error: null
+      })
+      .eq("id", subscriptionRecordId);
+    return;
+  }
+
+  if (result.status === "skipped") {
+    await admin
+      .from("customer_subscriptions")
+      .update({
+        onboarding_email_status: "skipped",
+        onboarding_email_error: result.reason
+      })
+      .eq("id", subscriptionRecordId);
+    return;
+  }
+
+  await admin
+    .from("customer_subscriptions")
+    .update({
+      onboarding_email_status: "failed",
+      onboarding_email_error: result.error
+    })
+    .eq("id", subscriptionRecordId);
+}
+
+async function sendOnboardingEmailOnce(admin: AdminClient, event: StripeEvent, result: StripeSyncResult) {
+  if (!shouldSendOnboardingEmail(event, result) || !result.customerEmail || !result.subscriptionRecordId) {
+    return { status: "not_applicable" as const };
+  }
+
+  const { data: claim, error: claimError } = await admin
+    .from("customer_subscriptions")
+    .update({
+      onboarding_email_status: "sending",
+      onboarding_email_error: null
+    })
+    .eq("id", result.subscriptionRecordId)
+    .in("onboarding_email_status", ["not_sent", "failed"])
+    .is("onboarding_email_sent_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (claimError) {
+    await admin
+      .from("customer_subscriptions")
+      .update({
+        onboarding_email_status: "failed",
+        onboarding_email_error: claimError.message
+      })
+      .eq("id", result.subscriptionRecordId);
+    return { status: "failed" as const, error: claimError.message };
+  }
+
+  if (!claim) {
+    return { status: "already_handled" as const };
+  }
+
+  const emailResult = await sendVaeroexOnboardingEmail({
+    to: result.customerEmail,
+    customerName: result.customerName,
+    stripeSubscriptionId: result.stripeSubscriptionId
+  });
+
+  await markOnboardingEmailResult({
+    admin,
+    subscriptionRecordId: result.subscriptionRecordId,
+    result: emailResult
+  });
+
+  return emailResult;
 }
 
 export async function POST(request: Request) {
@@ -295,6 +417,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await processStripeEvent(admin, event);
+    const onboardingEmail = await sendOnboardingEmailOnce(admin, event, result);
 
     if (eventRow) {
       await admin
@@ -308,7 +431,13 @@ export async function POST(request: Request) {
         .eq("id", eventRow.id);
     }
 
-    return NextResponse.json({ ok: true, processed: true, event_id: eventRow?.id ?? null, status: result.status });
+    return NextResponse.json({
+      ok: true,
+      processed: true,
+      event_id: eventRow?.id ?? null,
+      status: result.status,
+      onboarding_email: onboardingEmail
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Stripe subscription event processing failed.";
 
