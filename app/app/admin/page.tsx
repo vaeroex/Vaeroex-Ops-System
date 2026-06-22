@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { TruncatedLogMessage } from "@/components/admin/AdminLogViews";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -114,7 +115,9 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
             {failedRuns.data?.length ? failedRuns.data.map((run) => (
               <article key={run.id} className="rounded-lg border border-line p-3">
                 <p className="text-sm font-semibold">{run.agent_type}</p>
-                <p className="mt-2 text-xs leading-5 text-red-700">{run.error_message || "Vaeroex run failed."}</p>
+                <div className="mt-2">
+                  <TruncatedLogMessage message={run.error_message || "Vaeroex run failed."} />
+                </div>
               </article>
             )) : (
               <EmptyState title="No recent Vaeroex errors" description="Failed Vaeroex runs will appear here for investigation." />
@@ -128,7 +131,9 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
               <article key={event.id} className="rounded-lg border border-line p-3">
                 <p className="text-sm font-semibold">{event.event_type || "Squarespace event"}</p>
                 <p className="mt-1 text-xs text-muted">{event.customer_email || "No customer email"}</p>
-                <p className="mt-2 text-xs leading-5 text-red-700">{event.processing_error}</p>
+                <div className="mt-2">
+                  <TruncatedLogMessage message={event.processing_error} />
+                </div>
               </article>
             )) : (
               <EmptyState title="No subscription errors" description="Webhook processing errors will appear here." />
