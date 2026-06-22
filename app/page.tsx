@@ -9,9 +9,9 @@ import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const intelligenceFlow = [
   ["Information", "Signals, records, observations, activity, files, events, and context exist across every organization."],
-  ["Visibility", "Intelligence reveals what is happening across people, systems, assets, environments, and decisions."],
+  ["Visibility", "Intelligence reveals what is happening across people, systems, assets, environments, decisions, and change."],
   ["Understanding", "Intelligence connects context, patterns, history, and change so leaders understand why something matters."],
-  ["Action", "Intelligence becomes valuable when it supports decisions, ownership, response, measurement, and execution."]
+  ["Action", "Intelligence becomes valuable when it supports awareness, prediction, decisions, response, measurement, and execution."]
 ] as const;
 
 const intelligenceCapabilities = [
@@ -36,11 +36,12 @@ const intelligenceDomains = [
 ] as const;
 
 const intelligenceLoop = [
-  ["Capture", "Bring together signals, records, observations, files, events, context, and activity."],
-  ["Remember", "Preserve relevant history so new signals can be compared against prior context and outcomes."],
-  ["Analyze", "Identify patterns, anomalies, risk surfaces, changing conditions, and decision points."],
-  ["Prioritize", "Surface what matters most through confidence, urgency, impact, ownership, and timing."],
-  ["Execute", "Turn recommendations into reviewed decisions, assigned response paths, and measurable action."],
+  ["Capture", "Collect signals, activity, files, events, observations, and context from across an organization or environment."],
+  ["Remember", "Preserve context, history, decisions, outcomes, and patterns so intelligence does not reset."],
+  ["Analyze", "Identify relationships, changes, anomalies, risk patterns, and meaningful signals."],
+  ["Predict", "Surface emerging risks, likely outcomes, opportunities, and conditions before they become obvious."],
+  ["Prioritize", "Determine what matters most and what requires attention, review, escalation, or response."],
+  ["Execute", "Turn intelligence into ownership, decisions, assignments, alerts, workflows, and action."],
   ["Measure", "Track outcomes over time to understand what changed, what improved, and what needs attention next."]
 ] as const;
 
@@ -56,9 +57,9 @@ const signalCards = [
 ] as const;
 
 const differentCards = [
-  ["Most tools store information.", "Vaeroex helps organizations understand it."],
-  ["Most systems show information.", "Vaeroex explains what changed, why it matters, and what should happen next."],
-  ["Most systems stop at visibility.", "Vaeroex connects visibility to accountability and execution."]
+  ["Most organizations have information.", "Vaeroex turns scattered signals into visibility."],
+  ["Most systems show what happened.", "Vaeroex helps explain why it matters and what may happen next."],
+  ["Most intelligence stops at awareness.", "Vaeroex connects understanding to ownership, response, and action."]
 ] as const;
 
 function badgeClass(status: string) {
@@ -85,11 +86,10 @@ export default function HomePage() {
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Intelligence Platform</p>
             <h1 className="mt-3 max-w-4xl text-5xl font-semibold tracking-tight sm:text-6xl">Vaeroex</h1>
             <p className="mt-4 max-w-3xl text-2xl font-semibold leading-tight text-slate-100 sm:text-3xl">
-              Transforming information into visibility, understanding, and action.
+              Transforming information into visibility, awareness, prediction, and action.
             </p>
-            <p className="mt-4 max-w-3xl text-lg font-semibold text-vaeroex-accent">Build the structure your growth depends on.</p>
             <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300">
-              Vaeroex helps organizations transform scattered information into meaningful intelligence, creating the visibility, understanding, and action needed to make better decisions and execute with confidence.
+              Vaeroex helps organizations transform scattered information into meaningful intelligence, creating the visibility, awareness, prediction, and action needed to understand sooner and move with confidence.
             </p>
             <div className="mt-5 flex flex-wrap gap-2 text-sm font-semibold text-slate-100" aria-label="Vaeroex brand pillars">
               {["Visibility", "Accountability", "Execution"].map((pillar) => (
@@ -225,10 +225,10 @@ export default function HomePage() {
           <ScrollReveal className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-6 shadow-command">
             <div className="grid gap-5 lg:grid-cols-[0.78fr_1.22fr] lg:items-center">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Current Capability</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Applied Intelligence</p>
                 <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Operations Intelligence</h2>
                 <p className="mt-4 text-sm leading-6 text-slate-300">
-                  Vaeroex's current intelligence capability helps organizations improve visibility, accountability, and execution across their operations.
+                  Operations Intelligence is one application of Vaeroex, focused on helping organizations improve visibility, accountability, and execution in operational environments.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 lg:justify-end">
@@ -249,9 +249,9 @@ export default function HomePage() {
           <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">The Vaeroex Intelligence Loop</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Capture, remember, analyze, prioritize, execute, and measure.</h2>
+              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Capture, remember, analyze, predict, prioritize, execute, and measure.</h2>
               <p className="mt-4 text-sm leading-6 text-slate-300">
-                Vaeroex does more than store information. It helps organizations build a continuous loop from insight to action, then back to measured outcomes.
+                Vaeroex helps organizations move from raw signals to awareness, prediction, action, and measured outcomes.
               </p>
             </div>
             <IntelligenceLoopShowcase steps={intelligenceLoop} />
@@ -262,7 +262,7 @@ export default function HomePage() {
       <section className="border-b border-white/10 bg-[#050b18] px-6 py-14">
         <div className="mx-auto max-w-6xl">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Why Vaeroex Is Different</p>
-          <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white">Vaeroex connects visibility, accountability, and execution.</h2>
+          <h2 className="mt-3 max-w-3xl text-3xl font-semibold tracking-tight text-white">Vaeroex connects information, context, prediction, and action.</h2>
           <div className="mt-6 grid gap-4 md:grid-cols-3">
             {differentCards.map(([setup, point], index) => (
               <ScrollReveal key={setup} as="article" delayMs={index * 90} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-5 shadow-command">
@@ -279,17 +279,20 @@ export default function HomePage() {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Explore Vaeroex</p>
           <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
-              <h2 className="text-3xl font-semibold tracking-tight">Build the structure your growth depends on.</h2>
+              <h2 className="text-3xl font-semibold tracking-tight">The Advantage of Knowing First.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Book a demo to see how Vaeroex turns information into visibility, understanding, action, accountability, and execution.
+                See further, understand faster, and move first with an intelligence platform built to turn information into visibility, awareness, prediction, and action.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/demo" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Book a Demo
+              <Link href="#platform" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+                Explore Platform
               </Link>
-              <Link href="/pricing" className="inline-flex shrink-0 rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-                View Pricing
+              <Link href={operationsIntelligenceRoute} className="inline-flex shrink-0 rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+                View Operations Intelligence
+              </Link>
+              <Link href="/demo" className="inline-flex shrink-0 rounded-lg border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+                Book a Demo
               </Link>
             </div>
           </div>
