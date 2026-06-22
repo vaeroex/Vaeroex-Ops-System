@@ -17,6 +17,7 @@ const productCapabilities = [
   ["Files", "Upload business records, extract usable context, and connect file analysis to reports."],
   ["People", "Connect responsibility, roles, assignments, and notification paths."],
   ["Notifications", "Surface shared reports, assignments, KPI alerts, and items needing attention."],
+  ["Executive Briefings", "Summarize what changed, what matters, and what leadership should review next."],
   ["Scheduled Reports", "Support recurring leadership reviews without forcing email delivery."],
   ["Decision Support", "Convert workspace context into reviewed recommendations and next steps."],
   ["Accountability", "Clarify owners, due dates, follow-up expectations, and execution status."]

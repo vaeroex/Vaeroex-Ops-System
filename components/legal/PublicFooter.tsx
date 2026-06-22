@@ -30,7 +30,7 @@ export function PublicFooter() {
             <span className="font-semibold">Vaeroex</span>
           </Link>
           <p className="mt-3 max-w-md leading-6">
-            Intelligence Platform. Build the structure your growth depends on.
+            Intelligence Platform. The Advantage of Knowing First.
           </p>
           <p className="mt-3 text-xs">Visibility • Accountability • Execution</p>
         </div>
