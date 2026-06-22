@@ -1515,15 +1515,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const onboardingItems: OnboardingChecklistItem[] = [
     {
       id: "profile",
-      title: "Complete business profile",
-      helpText: "Confirm workspace name, contact, team size, and business details so Vaeroex has the right context.",
+      title: "Complete workspace context",
+      helpText: "Confirm workspace name, contact, team size, and organization details so Vaeroex has the right context.",
       href: "/app/setup",
       completed: Boolean(context.activeWorkspace?.primary_contact_email || context.activeWorkspace?.size)
     },
     {
       id: "business-type",
-      title: "Choose business type",
-      helpText: "Business type helps Vaeroex suggest practical visibility, accountability, execution, KPI, and report structure.",
+      title: "Choose operational environment",
+      helpText: "The environment helps Vaeroex suggest practical visibility, accountability, execution, KPI, and report structure.",
       href: "/app/setup",
       completed: Boolean(context.activeWorkspace?.industry)
     },

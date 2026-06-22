@@ -2,7 +2,7 @@ import { SetupWizard } from "@/components/setup/SetupWizard";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { industryTemplates } from "@/data/industry-templates";
+import { workspaceSetupCategories } from "@/data/workspace-categories";
 import { redirect } from "next/navigation";
 
 type SetupPageProps = {
@@ -37,14 +37,15 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     <div className="space-y-6">
       <section className="rounded-lg border border-line bg-white p-6 shadow-panel">
         <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Setup wizard</p>
-        <h2 className="mt-2 text-2xl font-semibold">Create your operations intelligence workspace</h2>
+        <h2 className="mt-2 text-2xl font-semibold">Create your Vaeroex workspace</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-          Answer a few setup questions, choose a business profile, and build the first layer of visibility, accountability, and execution structure.
-          Vaeroex will then help surface risks, decisions, reports, and suggested next actions.
+          Answer a few setup questions, choose the type of operational environment Vaeroex will analyze, and build the
+          first layer of visibility, accountability, and execution structure. The selection only helps configure initial
+          dashboards, terminology, workflows, and intelligence signals. You can adjust this later.
         </p>
       </section>
       <ComplianceNotice />
-      <SetupWizard templates={industryTemplates} error={params?.error} />
+      <SetupWizard categories={workspaceSetupCategories} error={params?.error} />
     </div>
   );
 }
