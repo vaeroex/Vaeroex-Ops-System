@@ -4,6 +4,7 @@ import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { legalLinks } from "@/lib/legal/content";
 
 const platformLinks: Array<[string, Route]> = [
+  ["Platform", "/#platform"],
   ["Operations Intelligence", "/#operations-intelligence"],
   ["Pricing", "/pricing"],
   ["About", "/about"],

@@ -7,8 +7,8 @@ const navLinks = [
   { href: "/#operations-intelligence", label: "Operations Intelligence" },
   { href: "/pricing", label: "Pricing" },
   { href: "/networking", label: "Network" },
-  { href: "/about", label: "About" },
-  { href: "/trust", label: "Trust" }
+  { href: "/trust", label: "Trust" },
+  { href: "/help", label: "Help" }
 ] as const;
 
 async function isLoggedIn() {
