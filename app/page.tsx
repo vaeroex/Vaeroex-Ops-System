@@ -100,13 +100,10 @@ export default function HomePage() {
             </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Link href="#platform" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Explore Vaeroex
+                View Platform
               </Link>
               <Link href={operationsIntelligenceRoute} className="rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-                View Operations Intelligence
-              </Link>
-              <Link href="/demo" className="rounded-lg border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-                Book a Demo
+                Explore Operations Intelligence
               </Link>
             </div>
           </div>
@@ -235,8 +232,8 @@ export default function HomePage() {
                 <Link href={operationsIntelligenceRoute} className="inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
                   Explore Operations Intelligence
                 </Link>
-                <Link href="/demo" className="inline-flex rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-                  Book a Demo
+                <Link href="#platform" className="inline-flex rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+                  Learn More
                 </Link>
               </div>
             </div>
@@ -286,13 +283,10 @@ export default function HomePage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <Link href="#platform" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Explore Platform
+                View Platform
               </Link>
               <Link href={operationsIntelligenceRoute} className="inline-flex shrink-0 rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-                View Operations Intelligence
-              </Link>
-              <Link href="/demo" className="inline-flex shrink-0 rounded-lg border border-white/20 bg-transparent px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
-                Book a Demo
+                Explore Operations Intelligence
               </Link>
             </div>
           </div>

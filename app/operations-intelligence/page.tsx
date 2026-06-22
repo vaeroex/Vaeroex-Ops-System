@@ -62,8 +62,11 @@ export default function OperationsIntelligencePage() {
               Vaeroex helps organizations turn operational activity into visibility, accountability, and execution through dashboards, KPIs, reports, SOPs, tasks, CRM context, file analysis, and decision support.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/demo" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Book a Demo
+              <Link href="#how-it-works" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white shadow-sm shadow-blue-950/30 hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+                Learn More
+              </Link>
+              <Link href="/" className="rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
+                View Platform
               </Link>
               <Link href="/pricing" className="rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
                 View Pricing
@@ -119,7 +122,7 @@ export default function OperationsIntelligencePage() {
         </div>
       </section>
 
-      <section className="border-b border-white/10 bg-[#030712] px-6 py-14">
+      <section id="how-it-works" className="border-b border-white/10 bg-[#030712] px-6 py-14">
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">How It Works</p>
@@ -171,12 +174,12 @@ export default function OperationsIntelligencePage() {
             <div>
               <h2 className="text-3xl font-semibold tracking-tight">Build the structure your growth depends on.</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Book a demo or view pricing to see how Vaeroex can support visibility, accountability, execution, and decision support.
+                Learn how Vaeroex can support visibility, accountability, execution, and decision support, then review the subscription details when you are ready.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link href="/demo" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Book a Demo
+              <Link href="/" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+                View Platform
               </Link>
               <Link href="/pricing" className="inline-flex shrink-0 rounded-lg border border-white/20 bg-white/10 px-5 py-3 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:text-vaeroex-accent">
                 View Pricing

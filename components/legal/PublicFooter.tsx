@@ -15,7 +15,7 @@ const platformLinks: Array<[string, Route]> = [
 ] as Array<[string, Route]>;
 
 const accessLinks = [
-  ["Book a Demo", "/demo"],
+  ["Explore Operations Intelligence", "/operations-intelligence"],
   ["Contact", "/contact"],
   ["Login", "/login"],
   ["Signup", "/signup"]
