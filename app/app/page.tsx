@@ -73,6 +73,14 @@ type DashboardAlert = {
   action: string;
   href: string;
 };
+type DashboardSignal = {
+  id: string;
+  title: string;
+  source: string;
+  status?: string | null;
+  context: string;
+  href: Route;
+};
 
 const PERIODS: DashboardPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const DASHBOARD_MODES: DashboardMode[] = ["Executive View", "Operations View", "Intelligence View"];
@@ -863,6 +871,45 @@ function WeeklyTrendCard({ trends }: { trends: MetricTrend[] }) {
   );
 }
 
+function SignalList({
+  items,
+  empty,
+  tone
+}: {
+  items: DashboardSignal[];
+  empty: string;
+  tone: "risk" | "opportunity" | "action";
+}) {
+  const toneClasses = {
+    risk: "border-red-100 bg-red-50/80 text-red-800 hover:border-red-200 hover:bg-red-50",
+    opportunity: "border-emerald-100 bg-emerald-50/80 text-emerald-800 hover:border-emerald-200 hover:bg-emerald-50",
+    action: "border-line bg-slate-50 text-slate-800 hover:border-vaeroex-accent hover:bg-vaeroex-soft"
+  };
+
+  return (
+    <SimpleList
+      items={items}
+      empty={empty}
+      render={(item: DashboardSignal) => (
+        <Link
+          key={item.id}
+          href={item.href}
+          className={`block rounded-lg border p-3 text-sm transition ${toneClasses[tone]}`}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold">{item.title}</p>
+              <p className="mt-1 text-xs opacity-80">{item.source}</p>
+            </div>
+            {item.status ? <StatusBadge value={item.status} /> : null}
+          </div>
+          <p className="mt-2 text-xs leading-5 opacity-90">{item.context}</p>
+        </Link>
+      )}
+    />
+  );
+}
+
 function DemoActionButton({ children, tone = "secondary" }: { children: ReactNode; tone?: "primary" | "secondary" | "danger" }) {
   const className =
     tone === "primary"
@@ -1280,6 +1327,173 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       ]
     : [];
   const smartAlerts = [...demoStoryAlerts, ...baseSmartAlerts];
+  const prioritizedIssues = [...oldIssues, ...openIssues.filter((issue) => !oldIssues.some((oldIssue) => oldIssue.id === issue.id))];
+  const riskSignals: DashboardSignal[] = [
+    ...prioritizedIssues.slice(0, 3).map((issue) => ({
+      id: `issue-${issue.id}`,
+      title: issue.title,
+      source: "Issue",
+      status: issue.severity || issue.status,
+      context: issue.recommended_fix || `Status: ${issue.status || "Open"}`,
+      href: "/app/issues" as Route
+    })),
+    ...overdueTasks.slice(0, 3).map((task) => ({
+      id: `task-${task.id}`,
+      title: task.title,
+      source: "Follow-up",
+      status: task.priority || task.status,
+      context: `Due ${task.due_date || "not set"} · ${task.assigned_to ? `Owner: ${task.assigned_to}` : "Owner not assigned"}`,
+      href: "/app/tasks" as Route
+    })),
+    ...belowTargetKpis.slice(0, 3).map((kpi) => ({
+      id: `kpi-${kpi.id}`,
+      title: kpi.name,
+      source: "KPI risk",
+      status: "Below target",
+      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs target ${formatMetricValue(kpi.target, kpi.name)}.`,
+      href: "/app/kpis" as Route
+    })),
+    ...checklistFailures.slice(0, 3).map((run) => ({
+      id: `checklist-${run.id}`,
+      title: run.notes || `Checklist run ${run.id.slice(0, 8)}`,
+      source: "Checklist",
+      status: run.status,
+      context: `Run recorded ${new Date(run.created_at).toLocaleDateString()}. Review the checklist result and escalation rule.`,
+      href: "/app/checklists" as Route
+    })),
+    ...pendingImports.slice(0, 3).map((item) => ({
+      id: `import-${item.id}`,
+      title: `${item.import_type.replace(/_/g, " ")} import needs review`,
+      source: "Files",
+      status: item.status,
+      context: `${item.rows_imported} of ${item.rows_total} rows saved. Review mappings before using this data in reports.`,
+      href: "/app/files" as Route
+    })),
+    ...negativeTrends.slice(0, 3).map((trend) => ({
+      id: `trend-risk-${trend.name}`,
+      title: trend.name,
+      source: "KPI trend",
+      status: "Declining",
+      context: `${trend.name} is down ${numberFormatter.format(Math.abs(trend.changePercent || 0))}% vs the previous period.`,
+      href: "/app/kpis" as Route
+    }))
+  ].slice(0, 3);
+  const opportunitySignals: DashboardSignal[] = [
+    ...leadsCreated.slice(0, 3).map((lead) => ({
+      id: `lead-${lead.id}`,
+      title: lead.lead_name,
+      source: lead.company ? `CRM · ${lead.company}` : "CRM",
+      status: lead.status,
+      context: `${formatMetricValue(lead.estimated_value, "revenue", "No value set")} estimated value · ${lead.last_activity_at ? `Last activity ${new Date(lead.last_activity_at).toLocaleDateString()}` : "No recent activity recorded"}.`,
+      href: "/app/crm" as Route
+    })),
+    ...positiveTrends.slice(0, 3).map((trend) => ({
+      id: `trend-opportunity-${trend.name}`,
+      title: trend.name,
+      source: "KPI trend",
+      status: "Improving",
+      context: `${trend.name} improved ${percentLabel(trend.changePercent)} compared with the previous period.`,
+      href: "/app/kpis" as Route
+    })),
+    ...recentImports.slice(0, 3).map((item) => ({
+      id: `recent-import-${item.id}`,
+      title: `${item.import_type.replace(/_/g, " ")} import`,
+      source: "Files",
+      status: item.status === "completed" ? "Saved" : item.status,
+      context: `${item.rows_imported} of ${item.rows_total} rows available for historical reporting.`,
+      href: "/app/files" as Route
+    })),
+    ...fileAnalyses.slice(0, 3).map((file) => ({
+      id: `file-analysis-${file.id}`,
+      title: file.display_name,
+      source: "File analysis",
+      status: file.import_status,
+      context: file.analysis_summary ? file.analysis_summary.slice(0, 140) : "Analysis saved to workspace memory.",
+      href: "/app/files" as Route
+    }))
+  ].slice(0, 3);
+  const recommendedActionSignals: DashboardSignal[] = [
+    overdueTasks.length
+      ? {
+          id: "action-overdue-tasks",
+          title: "Assign overdue follow-ups",
+          source: `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"}`,
+          status: "High",
+          context: `Start with: ${overdueTasks[0]?.title || "the oldest overdue follow-up"}.`,
+          href: "/app/tasks" as Route
+        }
+      : null,
+    openIssues.length
+      ? {
+          id: "action-open-issues",
+          title: "Review open issues",
+          source: `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"}`,
+          status: openIssues[0]?.severity || "Medium",
+          context: `Start with: ${openIssues[0]?.title || "the highest-priority issue"}.`,
+          href: "/app/issues" as Route
+        }
+      : null,
+    checklistFailures.length
+      ? {
+          id: "action-checklists",
+          title: "Review failed checklist runs",
+          source: `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"}`,
+          status: checklistFailures[0]?.status || "Needs review",
+          context: "Update the process, owner, or escalation rule if the failure repeats.",
+          href: "/app/checklists" as Route
+        }
+      : null,
+    pendingImports.length
+      ? {
+          id: "action-pending-imports",
+          title: "Approve file import mappings",
+          source: `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"}`,
+          status: "Needs review",
+          context: "Save approved mappings so reports and dashboards use the latest uploaded data.",
+          href: "/app/files" as Route
+        }
+      : null,
+    negativeTrends[0]
+      ? {
+          id: `action-negative-trend-${negativeTrends[0].name}`,
+          title: `Review ${negativeTrends[0].name}`,
+          source: "KPI trend",
+          status: "Declining",
+          context: "Compare this KPI against recent CRM activity, imports, issues, and follow-up workload.",
+          href: "/app/kpis" as Route
+        }
+      : null,
+    !kpis.length
+      ? {
+          id: "action-first-kpi",
+          title: "Create your first KPI",
+          source: "KPI setup",
+          status: "Start here",
+          context: "Add one owner-level metric such as revenue, leads, jobs completed, or customer issues.",
+          href: "/app/kpis" as Route
+        }
+      : null,
+    !crmLeads.length
+      ? {
+          id: "action-first-crm",
+          title: "Add your first CRM lead",
+          source: "CRM setup",
+          status: "Start here",
+          context: "A single lead is enough to connect sales follow-up to reports and dashboard context.",
+          href: "/app/crm" as Route
+        }
+      : null,
+    !reports.length
+      ? {
+          id: "action-first-report",
+          title: "Generate a report",
+          source: "Reports",
+          status: "Recommended",
+          context: "Save a management summary so decisions and follow-up work have a record.",
+          href: "/app/reports" as Route
+        }
+      : null
+  ].filter(Boolean).slice(0, 3) as DashboardSignal[];
   const demoCounts = {
     kpis: demoWorkspaceCounts?.kpis ?? kpis.length,
     operationalMetrics: demoWorkspaceCounts?.operationalMetrics ?? operationalMetrics.length,
@@ -2016,30 +2230,22 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       {isIntelligenceView ? (
         <DashboardAccordion
           title="Intelligence signals"
-          summary={`${risks.length} risk signal${risks.length === 1 ? "" : "s"}, ${opportunities.length} opportunit${opportunities.length === 1 ? "y" : "ies"}, and ${recommendedActions.length} recommended action${recommendedActions.length === 1 ? "" : "s"} are available for review.`}
+          summary={`${riskSignals.length} actionable risk signal${riskSignals.length === 1 ? "" : "s"}, ${opportunitySignals.length} opportunit${opportunitySignals.length === 1 ? "y" : "ies"}, and ${recommendedActionSignals.length} recommended action${recommendedActionSignals.length === 1 ? "" : "s"} are available for review.`}
         >
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Risks">
-          <SimpleList
-            items={risks.map((item, index) => ({ id: `${index}`, label: item }))}
-            empty="No major risks found for this period."
-            render={(item: { id: string; label: string }) => <p key={item.id} className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-700">{item.label}</p>}
-          />
+        <SectionCard title="Risks" description="Top source records behind the current risk summary.">
+          <SignalList items={riskSignals} empty="No major risks found for this period." tone="risk" />
         </SectionCard>
 
-        <SectionCard title="Opportunities">
-          <SimpleList
-            items={opportunities.map((item, index) => ({ id: `${index}`, label: item }))}
-            empty="No clear opportunities found yet."
-            render={(item: { id: string; label: string }) => <p key={item.id} className="rounded-lg border border-emerald-100 bg-emerald-50 p-3 text-sm text-emerald-800">{item.label}</p>}
-          />
+        <SectionCard title="Opportunities" description="Specific leads, KPI gains, imports, or analyses worth acting on.">
+          <SignalList items={opportunitySignals} empty="No clear opportunities found yet." tone="opportunity" />
         </SectionCard>
 
-        <SectionCard title="Recommended actions">
-          <SimpleList
-            items={recommendedActions.map((item, index) => ({ id: `${index}`, label: item }))}
+        <SectionCard title="Recommended actions" description="Each action points to the module where the work should happen.">
+          <SignalList
+            items={recommendedActionSignals}
             empty="Keep the current cadence and review again after more activity is recorded."
-            render={(item: { id: string; label: string }) => <p key={item.id} className="rounded-lg border border-line bg-slate-50 p-3 text-sm text-slate-700">{item.label}</p>}
+            tone="action"
           />
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
