@@ -3,23 +3,12 @@ import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { CapabilityIntelligenceDemo } from "@/components/motion/CapabilityIntelligenceDemo";
 import { IntelligenceFlowDemo } from "@/components/motion/IntelligenceFlowDemo";
 import { IntelligenceLoopShowcase } from "@/components/motion/IntelligenceLoopShowcase";
 import { MarketingDashboardPreview } from "@/components/motion/MarketingDashboardPreview";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
-
-const intelligenceCapabilities = [
-  ["Visibility", "Current", "Available through Vaeroex today.", "Structure scattered signals into a clearer view of what is happening and what needs attention."],
-  ["Context Memory", "Current", "Available through Vaeroex today.", "Preserve relevant history so current signals can be understood against prior decisions, patterns, and outcomes."],
-  ["Risk Detection", "Current", "Available through Vaeroex today.", "Surface changing conditions, repeated friction, unresolved signals, and emerging exposure before they are ignored."],
-  ["Predictive Insight", "Current", "Available through Vaeroex today.", "Identify directional movement and early indicators that may require review, escalation, or response."],
-  ["Decision Support", "Current", "Available through Vaeroex today.", "Turn context into review-ready recommendations, priorities, ownership paths, and next-step options."],
-  ["Accountability Systems", "Current", "Available through Vaeroex today.", "Clarify responsibility, response paths, unresolved items, and the link between decisions and execution."],
-  ["Performance Intelligence", "Current", "Available through Vaeroex today.", "Compare outcomes, targets, movement, and signal quality over time."],
-  ["Operational Intelligence", "Current", "Available through Vaeroex today.", "Apply intelligence to organizational execution, reviews, workflows, records, and recurring decisions."],
-  ["Asset Intelligence", "Expanding", "An intelligence capability area the platform can continue to evolve toward.", "Apply intelligence to assets, equipment, systems, reliability, and environmental signals."],
-  ["Situational Awareness", "Expanding", "An intelligence capability area the platform can continue to evolve toward.", "Help teams understand context, risk, alerts, and priorities across changing environments."]
-] as const;
+import { SignalProductionDemo } from "@/components/motion/SignalProductionDemo";
 
 const intelligenceDomains = [
   ["Operations Intelligence", "Current", "Helps organizations understand execution, accountability, performance signals, reviews, and operational decisions."],
@@ -37,17 +26,6 @@ const intelligenceLoop = [
   ["Prioritize", "Determine what matters most and what requires attention, review, escalation, or response."],
   ["Execute", "Turn intelligence into ownership, decisions, assignments, alerts, workflows, and action."],
   ["Measure", "Track outcomes over time to understand what changed, what improved, and what needs attention next."]
-] as const;
-
-const signalCards = [
-  ["Signal Confidence", "Illustrative confidence score for a detected pattern."],
-  ["Risk Surface", "Example risk signal identified from changing conditions."],
-  ["Anomaly Pattern", "Sample pattern that differs from expected behavior."],
-  ["Context Match", "Historical context connected to a current signal."],
-  ["Decision Point", "A moment requiring review, prioritization, or response."],
-  ["Action Path", "Suggested next step generated from intelligence."],
-  ["Ownership Signal", "Responsible party or response path identified."],
-  ["Outcome Signal", "Impact tracked after action is taken."]
 ] as const;
 
 const differentCards = [
@@ -132,16 +110,8 @@ export default function HomePage() {
               These website examples are illustrative only. They show the kind of visibility, accountability, and execution signals Vaeroex is built to organize.
             </p>
           </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {signalCards.map(([title, description], index) => (
-              <ScrollReveal key={title} delayMs={(index % 4) * 70} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-5 shadow-command">
-                <span className="inline-flex rounded-full border border-vaeroex-accent/30 bg-vaeroex-accent/10 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-vaeroex-accent">
-                  Sample
-                </span>
-                <h3 className="mt-4 font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
-              </ScrollReveal>
-            ))}
+          <div className="mt-6">
+            <SignalProductionDemo />
           </div>
         </div>
       </section>
@@ -155,17 +125,8 @@ export default function HomePage() {
               Vaeroex combines current platform capabilities with an architecture designed to evolve across multiple intelligence domains over time.
             </p>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-            {intelligenceCapabilities.map(([title, status, badge, description], index) => (
-              <ScrollReveal key={title} as="article" delayMs={(index % 5) * 65} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.055] p-4 shadow-command backdrop-blur">
-                <span className={`inline-flex rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold ${badgeClass(status)}`}>
-                  {status}
-                </span>
-                <h3 className="mt-4 font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-xs leading-5 text-slate-400">{badge}</p>
-                <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
-              </ScrollReveal>
-            ))}
+          <div className="mt-6">
+            <CapabilityIntelligenceDemo />
           </div>
         </div>
       </section>

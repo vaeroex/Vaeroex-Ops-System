@@ -45,58 +45,63 @@ export function IntelligenceFlowDemo() {
   const [activeIndex, setActiveIndex] = useState(0);
   const activeStage = intelligenceStages[activeIndex];
   const nextStage = intelligenceStages[activeIndex + 1];
+  const stageProgress = `${(activeIndex / (intelligenceStages.length - 1)) * 100}%`;
 
   return (
     <div className="vaeroex-intelligence-flow relative overflow-hidden rounded-xl border border-white/10 bg-[#08111f]/95 p-4 shadow-command sm:p-5">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(56,189,248,0.22),transparent_28%),radial-gradient(circle_at_82%_72%,rgba(124,58,237,0.20),transparent_32%)]" />
       <div className="relative grid gap-5">
-        <div className="grid gap-3 lg:grid-cols-5" aria-label="Interactive intelligence flow stages">
-          {intelligenceStages.map((stage, index) => {
-            const isActive = index === activeIndex;
-            const isComplete = index < activeIndex;
+        <div className="relative" style={{ "--stage-progress": stageProgress } as CSSProperties}>
+          <div className="pointer-events-none absolute left-[10%] right-[10%] top-7 hidden h-px bg-white/10 lg:block">
+            <span className="block h-px bg-gradient-to-r from-vaeroex-blue via-vaeroex-accent to-fuchsia-400 transition-[width] duration-500 ease-out" style={{ width: stageProgress }} />
+            <span className="vaeroex-stage-stream absolute inset-0" aria-hidden="true">
+              <span />
+              <span />
+            </span>
+          </div>
+          <div className="relative z-10 grid gap-3 lg:grid-cols-5" aria-label="Interactive intelligence flow stages">
+            {intelligenceStages.map((stage, index) => {
+              const isActive = index === activeIndex;
+              const isComplete = index < activeIndex;
 
-            return (
-              <button
-                key={stage.title}
-                type="button"
-                onClick={() => setActiveIndex(index)}
-                className={[
-                  "group relative rounded-lg border p-3 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50",
-                  isActive
-                    ? "border-vaeroex-accent/70 bg-vaeroex-accent/10 shadow-[0_0_34px_rgba(56,189,248,0.26)]"
-                    : isComplete
-                      ? "border-vaeroex-blue/40 bg-vaeroex-blue/10"
-                      : "border-white/10 bg-white/[0.055] hover:border-vaeroex-accent/45 hover:bg-white/[0.08]"
-                ].join(" ")}
-                aria-pressed={isActive}
-                title={stage.description}
-              >
-                <span className="flex items-center gap-2">
-                  <span
-                    className={[
-                      "grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-semibold",
-                      isActive
-                        ? "border-vaeroex-accent bg-vaeroex-accent text-vaeroex-navy"
-                        : isComplete
-                          ? "border-vaeroex-blue bg-vaeroex-blue text-white"
-                          : "border-white/15 bg-white/5 text-slate-300"
-                    ].join(" ")}
-                  >
-                    {index + 1}
+              return (
+                <button
+                  key={stage.title}
+                  type="button"
+                  onClick={() => setActiveIndex(index)}
+                  className={[
+                    "group relative rounded-lg border p-3 text-left transition duration-200 focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50",
+                    isActive
+                      ? "border-vaeroex-accent/70 bg-vaeroex-accent/10 shadow-[0_0_34px_rgba(56,189,248,0.26)]"
+                      : isComplete
+                        ? "border-vaeroex-blue/40 bg-vaeroex-blue/10"
+                        : "border-white/10 bg-white/[0.055] hover:border-vaeroex-accent/45 hover:bg-white/[0.08]"
+                  ].join(" ")}
+                  aria-pressed={isActive}
+                  title={stage.description}
+                >
+                  <span className="flex items-center gap-2">
+                    <span
+                      className={[
+                        "grid h-8 w-8 shrink-0 place-items-center rounded-full border text-xs font-semibold",
+                        isActive
+                          ? "border-vaeroex-accent bg-vaeroex-accent text-vaeroex-navy"
+                          : isComplete
+                            ? "border-vaeroex-blue bg-vaeroex-blue text-white"
+                            : "border-white/15 bg-white/5 text-slate-300"
+                      ].join(" ")}
+                    >
+                      {index + 1}
+                    </span>
+                    <span>
+                      <span className="block text-sm font-semibold text-white">{stage.title}</span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-400">{stage.short}</span>
+                    </span>
                   </span>
-                  <span>
-                    <span className="block text-sm font-semibold text-white">{stage.title}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-400">{stage.short}</span>
-                  </span>
-                </span>
-                {index < intelligenceStages.length - 1 ? (
-                  <span className="pointer-events-none absolute -bottom-3 left-1/2 hidden h-px w-16 -translate-x-1/2 bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent lg:left-auto lg:right-[-2.2rem] lg:top-1/2 lg:block lg:w-9 lg:-translate-y-1/2 lg:translate-x-0">
-                    <span className="vaeroex-flow-dot absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-vaeroex-accent shadow-[0_0_16px_rgba(56,189,248,0.8)]" />
-                  </span>
-                ) : null}
-              </button>
-            );
-          })}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid gap-4 lg:grid-cols-[1fr_0.42fr_1fr] lg:items-stretch">

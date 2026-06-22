@@ -300,6 +300,22 @@ button.bg-vaeroex-blue:hover {
   animation-delay: 0.84s;
 }
 
+.vaeroex-stage-stream span {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 9999px;
+  background: #38bdf8;
+  box-shadow: 0 0 22px rgba(56, 189, 248, 0.9);
+  animation: vaeroex-flow-dot-horizontal 2.8s ease-in-out infinite;
+}
+
+.vaeroex-stage-stream span:nth-child(2) {
+  animation-delay: 0.7s;
+}
+
 @media (min-width: 1024px) {
   .vaeroex-signal-stream span {
     top: 0;
@@ -330,7 +346,8 @@ button.bg-vaeroex-blue:hover {
   .vaeroex-intelligence-flow::before,
   .vaeroex-flow-dot,
   .vaeroex-signal-chip,
-  .vaeroex-signal-stream span {
+  .vaeroex-signal-stream span,
+  .vaeroex-stage-stream span {
     animation: none;
   }
 }
