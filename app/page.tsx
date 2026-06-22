@@ -3,16 +3,10 @@ import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { IntelligenceFlowDemo } from "@/components/motion/IntelligenceFlowDemo";
 import { IntelligenceLoopShowcase } from "@/components/motion/IntelligenceLoopShowcase";
 import { MarketingDashboardPreview } from "@/components/motion/MarketingDashboardPreview";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
-
-const intelligenceFlow = [
-  ["Information", "Signals, records, observations, activity, files, events, and context exist across every organization."],
-  ["Visibility", "Intelligence reveals what is happening across people, systems, assets, environments, decisions, and change."],
-  ["Understanding", "Intelligence connects context, patterns, history, and change so leaders understand why something matters."],
-  ["Action", "Intelligence becomes valuable when it supports awareness, prediction, decisions, response, measurement, and execution."]
-] as const;
 
 const intelligenceCapabilities = [
   ["Visibility", "Current", "Available through Vaeroex today.", "Structure scattered signals into a clearer view of what is happening and what needs attention."],
@@ -117,24 +111,13 @@ export default function HomePage() {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">What Intelligence Means</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Information becomes useful when it creates action.</h2>
             <p className="mt-4 text-sm leading-6 text-slate-300">
-              Information is everywhere. Visibility shows what is happening. Understanding explains why it matters. Action turns intelligence into execution.
+              Information is everywhere. Visibility shows what is happening. Understanding explains why it matters. Prediction shows what may happen next. Action turns intelligence into execution.
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-300">
               Vaeroex is built to help organizations move from scattered information to structured intelligence.
             </p>
           </div>
-          <div className="relative grid gap-3 md:grid-cols-4">
-            <div className="pointer-events-none absolute left-8 right-8 top-8 hidden h-px bg-gradient-to-r from-vaeroex-blue via-vaeroex-accent to-fuchsia-400 md:block" />
-            {intelligenceFlow.map(([title, description], index) => (
-              <ScrollReveal key={title} delayMs={index * 90} className="vaeroex-hover-card relative rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-command backdrop-blur">
-                <span className="grid h-10 w-10 place-items-center rounded-full border border-vaeroex-accent/40 bg-vaeroex-accent/10 text-sm font-semibold text-vaeroex-accent">
-                  {index + 1}
-                </span>
-                <h3 className="mt-4 font-semibold text-white">{title}</h3>
-                <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
-              </ScrollReveal>
-            ))}
-          </div>
+          <IntelligenceFlowDemo />
         </div>
       </section>
 
