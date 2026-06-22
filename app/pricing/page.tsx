@@ -5,28 +5,34 @@ import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_PLAN_FEATURES, VAEROEX_PLAN_NAME, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 
-const included = [
-  "Vaeroex Intelligence Platform",
-  "Operations Intelligence",
+const platformCapabilities = [
+  "Visibility",
+  "Awareness",
+  "Prediction",
+  "Decision Support",
+  "Risk Detection",
+  "Context Memory",
+  "Accountability",
+  "Situational Awareness",
+  "Execution Support"
+] as const;
+
+const operationsCapabilities = [
   "Executive Dashboard",
   "Business Health Score",
   "Business Memory",
-  "Profit Leak Detection",
-  "Predictive Insights",
-  "Decision Support",
-  "KPIs",
-  "CRM",
+  "KPI Intelligence",
   "Reports",
-  "SOPs",
+  "CRM",
   "Tasks",
+  "SOPs",
   "Issues",
   "Files",
   "People",
-  "Team Accountability",
   "Notifications",
   "Scheduled Reports",
-  "Vaeroex"
-];
+  "Profit Leak Detection"
+] as const;
 
 export default function PricingPage() {
   return (
@@ -37,13 +43,13 @@ export default function PricingPage() {
         <div className="grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div className="vaeroex-hero-reveal">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Pricing</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">One Vaeroex plan. Everything included.</h1>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">One Vaeroex subscription. Everything included.</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-              Build the structure your growth depends on. Vaeroex brings Operations Intelligence into one subscription for visibility, accountability, execution, and decision support.
+              One subscription for the Vaeroex Intelligence Platform, including Operations Intelligence and all current platform capabilities.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a href={squarespaceCheckoutUrl} className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white">
-                Start Vaeroex Subscription
+                Start with Vaeroex
               </a>
               <Link href="/demo" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
                 Book a Demo
@@ -61,7 +67,7 @@ export default function PricingPage() {
                 <p className="mt-1 text-sm font-semibold">Vaeroex Intelligence Platform</p>
               </div>
               <div className="rounded-lg border border-line bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Product</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted">Current Capability</p>
                 <p className="mt-1 text-sm font-semibold">Operations Intelligence</p>
               </div>
             </div>
@@ -81,13 +87,40 @@ export default function PricingPage() {
         </div>
 
         <section className="mt-8 rounded-lg border border-line bg-white p-6 shadow-panel">
-          <h2 className="text-xl font-semibold">Included platform capabilities</h2>
-          <div className="mt-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {included.map((feature, index) => (
-              <ScrollReveal key={feature} delayMs={(index % 6) * 45} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
-                {feature}
-              </ScrollReveal>
-            ))}
+          <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Platform Intelligence Capabilities</p>
+              <h2 className="mt-2 text-xl font-semibold">What the Vaeroex platform provides.</h2>
+              <p className="mt-3 text-sm leading-6 text-muted">
+                Vaeroex is the Intelligence Platform. Operations Intelligence is the current included capability within that platform.
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {platformCapabilities.map((feature, index) => (
+                <ScrollReveal key={feature} delayMs={(index % 5) * 45} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
+                  {feature}
+                </ScrollReveal>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-line pt-6">
+            <div className="grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Current Included Capability</p>
+                <h2 className="mt-2 text-xl font-semibold">Operations Intelligence</h2>
+                <p className="mt-3 text-sm leading-6 text-muted">
+                  The included capability for organizations that need practical visibility, accountability, execution, and decision support across daily operations.
+                </p>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {operationsCapabilities.map((feature, index) => (
+                  <ScrollReveal key={feature} delayMs={(index % 5) * 45} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
+                    {feature}
+                  </ScrollReveal>
+                ))}
+              </div>
+            </div>
           </div>
         </section>
 
