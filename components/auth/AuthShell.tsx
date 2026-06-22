@@ -19,16 +19,16 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
             <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Intelligence Platform</span>
           </Link>
           <h1 className="mt-8 max-w-xl text-5xl font-semibold tracking-tight">
-            Build the structure your growth depends on.
+            The Advantage of Knowing First.
           </h1>
           <p className="mt-5 max-w-xl text-lg leading-8 text-slate-100">
-            Sign in to review business health, visibility gaps, accountability signals, reports, and the execution priorities Vaeroex recommends next.
+            Vaeroex helps organizations transform information into visibility, awareness, prediction, and action.
           </p>
           <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {["Visibility", "Accountability", "Execution"].map((label) => (
+            {["Visibility", "Awareness", "Execution"].map((label) => (
               <div key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
                 <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">{label}</p>
-                <p className="mt-2 text-sm text-slate-100">Visible in one workspace</p>
+                <p className="mt-2 text-sm text-slate-100">Built into your workspace</p>
               </div>
             ))}
           </div>
