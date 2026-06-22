@@ -672,10 +672,10 @@ function ExecutiveBriefingCard({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">Create Follow-up</Link>
-          <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Generate Report</Link>
-          <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Review Issues</Link>
-          <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15">Review KPIs</Link>
+          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45">Create Follow-up</Link>
+          <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">Generate Report</Link>
+          <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">Review Issues</Link>
+          <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">Review KPIs</Link>
         </div>
       </div>
       <div className="mt-5 grid gap-3 lg:grid-cols-5">
