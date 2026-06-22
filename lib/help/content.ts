@@ -3,7 +3,7 @@ import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export type HelpCategory =
   | "Getting Started"
-  | "Features"
+  | "Operations Intelligence"
   | "AI & Vaeroex"
   | "Best Practices"
   | "Legal & Compliance"
@@ -28,7 +28,7 @@ export type HelpArticle = {
 
 export const helpCategories: HelpCategory[] = [
   "Getting Started",
-  "Features",
+  "Operations Intelligence",
   "AI & Vaeroex",
   "Best Practices",
   "Legal & Compliance",
@@ -46,71 +46,71 @@ export const helpArticles: HelpArticle[] = [
     id: "what-is-vaeroex",
     category: "Getting Started",
     title: "What is Vaeroex?",
-    summary: "Vaeroex is an Intelligence Platform for growing businesses.",
-    what: "Vaeroex helps organize business signals from KPIs, CRM, files, reports, SOPs, checklists, issues, people, follow-ups, and historical business memory.",
-    why: "Owners and managers need one place to see what is happening, why it matters, who owns it, and what needs attention.",
-    when: "Use Vaeroex when the business has scattered records, inconsistent follow-through, unclear ownership, or limited visibility.",
-    workflow: ["Create a workspace", "Add or import business records", "Review the dashboard", "Ask Vaeroex what needs attention", "Approve the next actions"],
-    mistakes: ["Uploading regulated sensitive data", "Treating recommendations as automatic decisions", "Creating duplicate systems instead of improving existing records"],
-    nextLabel: "Open dashboard",
-    nextHref: "/app",
-    related: ["Executive Dashboard", "Ask Vaeroex", "Sensitive Data Policy"]
+    summary: "Vaeroex is an intelligence company and Intelligence Platform.",
+    what: "Vaeroex helps organizations turn information into visibility, awareness, prediction, and action.",
+    why: "Organizations often have many signals but limited structure for understanding what is happening, why it matters, what may happen next, and what action should follow.",
+    when: "Use this guide when you want the company-level explanation before learning the current Operations Intelligence product.",
+    workflow: ["Understand the Vaeroex intelligence model", "Review Operations Intelligence as the current product", "Open Trust Center before uploading data", "Use support or contact channels when needed"],
+    mistakes: ["Treating Vaeroex as only one product screen", "Assuming outputs replace judgment", "Uploading regulated sensitive data"],
+    nextLabel: "View platform",
+    nextHref: "/",
+    related: ["Intelligence Platform", "Operations Intelligence", "Trust Center"]
   }),
   article({
     id: "intelligence-platform",
     category: "Getting Started",
     title: "What is an Intelligence Platform?",
-    summary: "A system that helps turn scattered business information into clarity, decision support, and accountable execution.",
-    what: "An Intelligence Platform connects records, trends, roles, recommendations, and historical context so leadership can make better-informed decisions.",
-    why: "Growing businesses often outgrow spreadsheets, memory, and informal updates before they build the structure needed for better visibility and follow-through.",
-    when: "Use it when growth creates recurring handoff problems, unclear ownership, weak reporting, or decisions that depend too much on scattered context.",
-    workflow: ["Capture business signals", "Preserve business memory", "Analyze trends and risks", "Prioritize what needs attention", "Assign owners", "Review outcomes"],
+    summary: "A system that helps collect signals, preserve context, identify patterns, surface risk, support decisions, and turn insight into action.",
+    what: "An Intelligence Platform connects information, historical context, risk signals, recommendations, ownership paths, and outcomes so people can make better-informed decisions.",
+    why: "Information alone is not intelligence. Intelligence requires context, awareness, prediction, and a path to action.",
+    when: "Use this guide when you want to understand Vaeroex beyond the current Operations Intelligence product.",
+    workflow: ["Capture signals", "Preserve context", "Identify patterns", "Surface risk", "Support decisions", "Turn insight into action"],
     mistakes: ["Tracking too many metrics at once", "Not assigning owners", "Ignoring stale records"],
-    nextLabel: "Explore Operations Intelligence",
-    nextHref: "/app",
-    related: ["Operations Intelligence", "Business Memory", "Decision Support"]
+    nextLabel: "Explore platform",
+    nextHref: "/",
+    related: ["Information", "Visibility", "Awareness", "Prediction", "Action"]
   }),
   article({
     id: "operations-intelligence-suite",
     category: "Getting Started",
     title: "What is Operations Intelligence?",
-    summary: "The current Vaeroex product for visibility, accountability, and execution.",
-    what: "Operations Intelligence brings together business data, team activity, reports, KPIs, files, tasks, SOPs, CRM, alerts, and Vaeroex intelligence into one structured operating layer.",
-    why: "Leaders need more than a place to store records. They need to understand performance, risk, ownership, recommended actions, and whether follow-through improved outcomes.",
-    when: "Use it when the business needs a practical structure for leadership review, recurring reports, KPI trends, operational risk, and accountability.",
+    summary: "The current Vaeroex product for operational visibility, accountability, execution, reporting, and decision support.",
+    what: "Operations Intelligence applies the Vaeroex intelligence model to operational records, dashboards, KPIs, CRM, files, reports, SOPs, tasks, issues, alerts, and business memory.",
+    why: "It helps organizations understand operating signals, ownership, performance, risk, recommended actions, and follow-through.",
+    when: "Use it when the organization needs practical structure for operations review, recurring reports, KPI trends, risk, and accountability.",
     workflow: ["Add or import records", "Review Business Health Score", "Use reports and briefings", "Approve recommended actions", "Track whether actions worked"],
     mistakes: ["Expecting automatic decisions", "Skipping human review", "Leaving records without owners"],
-    nextLabel: "Open dashboard",
-    nextHref: "/app",
+    nextLabel: "Learn more",
+    nextHref: "/operations-intelligence",
     related: ["Business Health Score", "Profit Leak Detection", "Recommendation Tracking"]
   }),
   article({
     id: "build-the-structure",
     category: "Getting Started",
-    title: "Build the structure your growth depends on",
-    summary: "The Vaeroex operating idea: growth needs repeatable structure.",
-    what: "The slogan means Vaeroex helps document how the business runs, where it is slipping, and what actions should be reviewed next.",
+    title: "Operations Intelligence structure principle",
+    summary: "The Operations Intelligence product idea: growth needs repeatable structure.",
+    what: "The slogan belongs to Operations Intelligence. It means the product helps document how work runs, where execution is slipping, and what actions should be reviewed next.",
     why: "Without structure, growth creates more chasing, missed follow-ups, stale procedures, and unclear decisions.",
-    when: "Use this mindset when creating KPIs, SOPs, checklists, reports, role assignments, and follow-up systems.",
+    when: "Use this mindset inside Operations Intelligence when creating KPIs, SOPs, checklists, reports, role assignments, and follow-up systems.",
     workflow: ["Choose one visibility gap", "Add the record or KPI", "Assign a clear owner", "Review weekly", "Improve the process"],
     mistakes: ["Trying to perfect every workflow before starting", "Leaving records ownerless", "Using reports without action review"],
     nextLabel: "Ask Vaeroex",
     nextHref: "/app/agents",
-    related: ["Visibility", "Accountability", "Execution"]
+    related: ["Operations Intelligence", "Visibility", "Execution"]
   }),
   article({
     id: "visibility-accountability-execution",
     category: "Getting Started",
-    title: "Understanding Visibility, Accountability, and Execution",
-    summary: "The three pillars behind Vaeroex.",
-    what: "Visibility shows what is happening. Accountability clarifies who owns it. Execution turns insight into reviewed action.",
-    why: "Most business problems become easier to solve when the signal, owner, and next step are clear.",
-    when: "Use these pillars when building dashboards, assigning follow-ups, reviewing reports, or updating SOPs.",
-    workflow: ["Find the signal", "Assign ownership", "Set a review date", "Confirm completion", "Measure the result"],
-    mistakes: ["Collecting data without review", "Assigning work without a due date", "Skipping outcome review"],
-    nextLabel: "Review reports",
-    nextHref: "/app/reports",
-    related: ["Executive Dashboard", "Notifications", "Report Scheduling"]
+    title: "Understanding Visibility, Awareness, and Execution",
+    summary: "The company-level pillars behind Vaeroex.",
+    what: "Visibility shows what is happening. Awareness connects context, risk, and meaning. Execution turns intelligence into response, ownership, and outcomes.",
+    why: "Signals become more useful when people can see them, understand them, and act on them.",
+    when: "Use these pillars when reviewing Vaeroex as a company-level Intelligence Platform.",
+    workflow: ["Find the signal", "Understand the context", "Assess risk or opportunity", "Choose a response", "Measure the outcome"],
+    mistakes: ["Collecting information without interpretation", "Stopping at awareness without action", "Treating outputs as guaranteed"],
+    nextLabel: "View platform",
+    nextHref: "/",
+    related: ["Information", "Prediction", "Action"]
   }),
   ...[
     ["creating-workspace", "Creating your workspace", "Set up the business profile Vaeroex uses for workspace context.", "/app/setup"],
@@ -136,7 +136,7 @@ export const helpArticles: HelpArticle[] = [
       mistakes: ["Starting with too much detail", "Leaving records stale", "Skipping review dates"],
       nextLabel: "Open related page",
       nextHref: href as Route,
-      related: ["Visibility", "Accountability", "Execution"]
+      related: ["Visibility", "Awareness", "Execution"]
     })
   ),
   ...[
@@ -163,7 +163,7 @@ export const helpArticles: HelpArticle[] = [
   ].map(([id, title, summary, href]) =>
     article({
       id,
-      category: "Features",
+      category: "Operations Intelligence",
       title,
       summary,
       what: summary,
@@ -273,7 +273,7 @@ export const helpArticles: HelpArticle[] = [
     why: "Customers need careful, plain-English security and responsibility language without unsupported compliance claims.",
     when: "Use it before onboarding customers, inviting staff, uploading files, or asking security questions.",
     workflow: ["Review workspace isolation", "Assign roles carefully", "Avoid sensitive data", "Use human review", `Contact ${VAEROEX_CONTACT_EMAILS.support} for trust questions`],
-    mistakes: ["Assuming guaranteed security", "Inviting the wrong role", "Mixing demo data and live data"],
+    mistakes: ["Assuming absolute security claims", "Inviting the wrong role", "Mixing demo data and live data"],
     nextLabel: "Open Trust Center",
     nextHref: "/app/help/trust",
     related: ["Privacy Policy", "Sensitive Data Policy", "Human Review Notice"]
