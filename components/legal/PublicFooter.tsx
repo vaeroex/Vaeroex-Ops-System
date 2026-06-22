@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { legalLinks } from "@/lib/legal/content";
 
 const platformLinks: Array<[string, Route]> = [
@@ -20,6 +21,13 @@ const accessLinks = [
   ["Signup", "/signup"]
 ] as const;
 
+const contactLinks = [
+  ["General", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
+  ["Support", VAEROEX_CONTACT_EMAILS.support, VAEROEX_MAILTO_LINKS.support],
+  ["Billing", VAEROEX_CONTACT_EMAILS.billing, VAEROEX_MAILTO_LINKS.billing],
+  ["Partners", VAEROEX_CONTACT_EMAILS.partners, VAEROEX_MAILTO_LINKS.partners]
+] as const;
+
 export function PublicFooter() {
   return (
     <footer className="border-t border-line bg-white px-6 py-8 text-sm text-muted">
@@ -34,7 +42,7 @@ export function PublicFooter() {
           </p>
           <p className="mt-3 text-xs">Visibility • Accountability • Execution</p>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="font-semibold text-ink">Platform</p>
             <div className="mt-3 grid gap-2">
@@ -52,6 +60,16 @@ export function PublicFooter() {
                 <Link key={href} href={href} className="hover:text-vaeroex-blue">
                   {label}
                 </Link>
+              ))}
+            </div>
+          </div>
+          <div>
+            <p className="font-semibold text-ink">Direct Email</p>
+            <div className="mt-3 grid gap-2">
+              {contactLinks.map(([label, email, href]) => (
+                <a key={email} href={href} className="hover:text-vaeroex-blue">
+                  {label}: {email}
+                </a>
               ))}
             </div>
           </div>

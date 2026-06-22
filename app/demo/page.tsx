@@ -3,6 +3,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 type DemoPageProps = {
   searchParams?: Promise<{ error?: string; message?: string }>;
@@ -46,6 +47,13 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
           </ScrollReveal>
           <p className="mt-5 text-sm leading-6 text-muted">
             Already have an account? <Link href="/login" className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">Login</Link> or go to your workspace.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-muted">
+            Demo requests and follow-up can also be sent to{" "}
+            <a href={VAEROEX_MAILTO_LINKS.demo} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+              {VAEROEX_CONTACT_EMAILS.demo}
+            </a>
+            .
           </p>
         </div>
         <ScrollReveal delayMs={140}>

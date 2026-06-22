@@ -1,4 +1,5 @@
 import type { Route } from "next";
+import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export type HelpCategory =
   | "Getting Started"
@@ -256,7 +257,7 @@ export const helpArticles: HelpArticle[] = [
       what: summary,
       why: "Clear policy language reduces confusion and helps customers understand responsibilities.",
       when: "Review before launch, onboarding, using Vaeroex recommendations, uploading files, or handling sensitive workflows.",
-      workflow: ["Open the policy", "Review customer responsibilities", "Confirm the use case is appropriate", "Contact support with questions"],
+      workflow: ["Open the policy", "Review customer responsibilities", "Confirm the use case is appropriate", `Contact ${VAEROEX_CONTACT_EMAILS.support} with questions`],
       mistakes: ["Assuming certifications that are not stated", "Entering prohibited sensitive data", "Using recommendations without review"],
       nextLabel: "Open policy",
       nextHref: href as Route,
@@ -271,7 +272,7 @@ export const helpArticles: HelpArticle[] = [
     what: "The Trust Center explains how Vaeroex is designed to keep customer workspaces separated and reviewed.",
     why: "Customers need careful, plain-English security and responsibility language without unsupported compliance claims.",
     when: "Use it before onboarding customers, inviting staff, uploading files, or asking security questions.",
-    workflow: ["Review workspace isolation", "Assign roles carefully", "Avoid sensitive data", "Use human review", "Contact support for trust questions"],
+    workflow: ["Review workspace isolation", "Assign roles carefully", "Avoid sensitive data", "Use human review", `Contact ${VAEROEX_CONTACT_EMAILS.support} for trust questions`],
     mistakes: ["Assuming guaranteed security", "Inviting the wrong role", "Mixing demo data and live data"],
     nextLabel: "Open Trust Center",
     nextHref: "/app/help/trust",
@@ -285,7 +286,7 @@ export const helpArticles: HelpArticle[] = [
     what: "Release notes show meaningful feature additions, improvements, security updates, and bug fixes.",
     why: "They help customers see Vaeroex is maintained and improving.",
     when: "Review after updates, during onboarding, or before inviting more team members.",
-    workflow: ["Open release notes", "Review changes by date", "Share relevant updates", "Contact support with questions"],
+    workflow: ["Open release notes", "Review changes by date", "Share relevant updates", `Contact ${VAEROEX_CONTACT_EMAILS.support} with questions`],
     mistakes: ["Using release notes as legal guarantees", "Expecting internal implementation details"],
     nextLabel: "Open release notes",
     nextHref: "/app/help/release-notes",
@@ -296,10 +297,10 @@ export const helpArticles: HelpArticle[] = [
     category: "Contact Support",
     title: "Contact Support",
     summary: "Submit support, bug, feature, confusion, billing, or subscription questions.",
-    what: "Support requests route questions to Vaeroex for review.",
+    what: `Support requests route questions to Vaeroex for review. Support questions can also be sent to ${VAEROEX_CONTACT_EMAILS.support}; billing, subscription, and payment questions can be sent to ${VAEROEX_CONTACT_EMAILS.billing}.`,
     why: "A clear support path reduces confusion and helps improve the platform.",
-    when: "Use support for bugs, billing questions, confusing workflows, feature requests, or account access issues.",
-    workflow: ["Open support", "Choose issue type", "Include page/module", "Explain the problem", "Submit the request"],
+    when: `Use support for bugs, confusing workflows, feature requests, or account access issues. Use ${VAEROEX_CONTACT_EMAILS.billing} for billing, subscription, and payment questions.`,
+    workflow: ["Open support", "Choose issue type", "Include page/module", "Explain the problem", "Submit the request or email the right Vaeroex alias"],
     mistakes: ["Including regulated sensitive data", "Submitting unclear workspace references", "Leaving out the page where the issue happened"],
     nextLabel: "Submit support request",
     nextHref: "/app/support",

@@ -4,6 +4,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 type SupportPageProps = {
   searchParams?: Promise<{ error?: string; message?: string }>;
@@ -22,6 +23,22 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
         <p className="mt-3 text-sm leading-6 text-muted">
           Send workspace access, billing, setup, visibility, accountability, or execution questions to Vaeroex for review.
         </p>
+        <div className="mt-4 grid gap-2 rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-muted">
+          <p>
+            Support questions can also be sent to{" "}
+            <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+              {VAEROEX_CONTACT_EMAILS.support}
+            </a>
+            .
+          </p>
+          <p>
+            Billing, subscription, or payment questions can be sent to{" "}
+            <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+              {VAEROEX_CONTACT_EMAILS.billing}
+            </a>
+            .
+          </p>
+        </div>
         {params?.message ? <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
         <div className="mt-5">
           <ErrorNotice message={params?.error} />

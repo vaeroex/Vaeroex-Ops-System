@@ -3,6 +3,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
@@ -27,6 +28,21 @@ export default async function AppSupportPage({ searchParams }: AppSupportPagePro
       />
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
       <ErrorNotice message={params?.error} />
+
+      <div className="grid gap-3 rounded-lg border border-line bg-surface p-4 text-sm leading-6 text-muted md:grid-cols-2">
+        <p>
+          Support questions:{" "}
+          <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+            {VAEROEX_CONTACT_EMAILS.support}
+          </a>
+        </p>
+        <p>
+          Billing, subscription, or payment questions:{" "}
+          <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+            {VAEROEX_CONTACT_EMAILS.billing}
+          </a>
+        </p>
+      </div>
 
       <SectionCard title="Support request">
         <form action={createSupportRequestAction} className="grid gap-4 md:grid-cols-2">

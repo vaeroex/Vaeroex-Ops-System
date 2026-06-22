@@ -4,6 +4,7 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_PLAN_FEATURES, VAEROEX_PLAN_NAME, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const platformCapabilities = [
   "Visibility",
@@ -138,6 +139,13 @@ export default function PricingPage() {
         <section className="mt-6 rounded-lg border border-line bg-white p-5 text-xs leading-5 text-muted shadow-panel">
           <p>Vaeroex subscriptions renew automatically unless canceled. Cancel anytime. Pricing may change in the future with advance notice.</p>
           <p className="mt-2">Refunds are handled according to the Refund Policy. Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels.</p>
+          <p className="mt-2">
+            Billing, subscription, or payment questions can be sent to{" "}
+            <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+              {VAEROEX_CONTACT_EMAILS.billing}
+            </a>
+            .
+          </p>
           <p className="mt-2">Vaeroex outputs require human review before customers rely on recommendations or save generated records.</p>
         </section>
       </section>

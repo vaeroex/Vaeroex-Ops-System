@@ -3,6 +3,7 @@ import { HelpArticleCard } from "@/components/help/HelpArticleCard";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { articlesByCategory, helpCategories, searchHelpArticles, type HelpCategory } from "@/lib/help/content";
 
@@ -58,6 +59,13 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
                 Contact Vaeroex
               </Link>
             </div>
+            <p className="mt-4 text-sm leading-6 text-muted">
+              Support questions can also be sent to{" "}
+              <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+                {VAEROEX_CONTACT_EMAILS.support}
+              </a>
+              .
+            </p>
           </div>
 
           <ScrollReveal as="form" delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
