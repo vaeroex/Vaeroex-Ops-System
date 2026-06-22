@@ -15,8 +15,8 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
 
   return (
     <AuthShell
-      title="Create your Vaeroex account"
-      subtitle="Start with a secure account, then build the visibility, accountability, and execution structure your business needs."
+      title="Get Started With Vaeroex"
+      subtitle="Create your workspace and access Operations Intelligence."
     >
       <form action={signUpAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
@@ -51,7 +51,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
           />
         </label>
         <button className="w-full rounded-lg bg-vaeroex-blue px-4 py-2.5 text-sm font-semibold text-white">
-          Start setup
+          Create account
         </button>
       </form>
       <p className="mt-5 text-sm text-muted">

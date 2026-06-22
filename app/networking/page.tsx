@@ -3,6 +3,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { NetworkGraph } from "@/components/motion/NetworkGraph";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const networkGroups = [
   ["Business Owners", "Leaders building stronger visibility, accountability, and execution inside growing companies."],
@@ -62,7 +63,17 @@ export default function NetworkingPage() {
           <Link href="/contact" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
             Start a Conversation
           </Link>
+          <a href={VAEROEX_MAILTO_LINKS.partners} className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
+            Email Partners
+          </a>
         </div>
+        <p className="mt-4 text-sm leading-6 text-muted">
+          Network and strategic relationship inquiries can be sent directly to{" "}
+          <a href={VAEROEX_MAILTO_LINKS.partners} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+            {VAEROEX_CONTACT_EMAILS.partners}
+          </a>
+          .
+        </p>
       </section>
 
       <section className="border-y border-line bg-white px-6 py-12">
@@ -146,6 +157,9 @@ export default function NetworkingPage() {
             <Link href="/contact" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
               Explore Strategic Partnerships
             </Link>
+            <a href={VAEROEX_MAILTO_LINKS.partners} className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
+              Contact {VAEROEX_CONTACT_EMAILS.partners}
+            </a>
           </div>
         </div>
       </section>
@@ -189,9 +203,9 @@ export default function NetworkingPage() {
                 Contact Vaeroex to discuss network interest, strategic partnerships, advisor relationships, implementation support, or trusted business relationships.
               </p>
             </div>
-            <Link href="/contact" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+            <a href={VAEROEX_MAILTO_LINKS.partners} className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Partner with Vaeroex
-            </Link>
+            </a>
           </div>
         </ScrollReveal>
       </section>

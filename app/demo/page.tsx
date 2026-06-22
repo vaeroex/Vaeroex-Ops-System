@@ -3,6 +3,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 type DemoPageProps = {
   searchParams?: Promise<{ error?: string; message?: string }>;
@@ -27,7 +28,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
       <PublicSiteHeader />
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
         <div className="vaeroex-hero-reveal">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Book a Demo</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Demo</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Request a Vaeroex demo.</h1>
           <p className="mt-4 text-sm leading-6 text-muted">
             Tell us what you are looking to improve. Vaeroex will review your request and help you understand how visibility,
@@ -46,6 +47,13 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
           </ScrollReveal>
           <p className="mt-5 text-sm leading-6 text-muted">
             Already have an account? <Link href="/login" className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">Login</Link> or go to your workspace.
+          </p>
+          <p className="mt-3 text-sm leading-6 text-muted">
+            Demo requests and follow-up can also be sent to{" "}
+            <a href={VAEROEX_MAILTO_LINKS.demo} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+              {VAEROEX_CONTACT_EMAILS.demo}
+            </a>
+            .
           </p>
         </div>
         <ScrollReveal delayMs={140}>

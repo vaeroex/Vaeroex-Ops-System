@@ -320,6 +320,15 @@ function FolderManager({
   );
 }
 
+const inactiveFilterLinkClass =
+  "border border-transparent bg-white/5 text-slate-200 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
+const inactivePagePillClass =
+  "border border-white/10 bg-white/5 text-slate-200 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
+const recordRowInactiveClass = "hover:bg-cyan-950/20 hover:ring-1 hover:ring-inset hover:ring-vaeroex-accent/20";
+const actionMenuPanelClass = "absolute right-0 z-20 mt-2 w-72 rounded-lg border border-line bg-white p-3 shadow-lg";
+const menuItemClass =
+  "block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
+
 function FolderQuickFilters({
   folders,
   records,
@@ -346,7 +355,7 @@ function FolderQuickFilters({
       <div className="mt-3 flex gap-2 overflow-x-auto lg:block lg:space-y-1">
         <Link
           href={listHref(returnPath, { folder: "" }) as Route}
-          className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${!activeFolder ? "bg-vaeroex-blue text-white" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
+          className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${!activeFolder ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
         >
           <span>All records</span>
           <span className="text-xs opacity-80">{records.length}</span>
@@ -355,7 +364,7 @@ function FolderQuickFilters({
           <Link
             key={folder.id}
             href={listHref(returnPath, { folder: folder.id }) as Route}
-            className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === folder.id ? "bg-vaeroex-blue text-white" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
+            className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === folder.id ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
           >
             <span className="truncate">{folder.name}</span>
             <span className="text-xs opacity-80">{counts[folder.id] || 0}</span>
@@ -364,7 +373,7 @@ function FolderQuickFilters({
         {unfiledCount ? (
           <Link
             href={listHref(returnPath, { folder: "unfiled" }) as Route}
-            className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === "unfiled" ? "bg-vaeroex-blue text-white" : "bg-slate-50 text-slate-700 hover:bg-slate-100"}`}
+            className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === "unfiled" ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
           >
             <span>Unfiled</span>
             <span className="text-xs opacity-80">{unfiledCount}</span>
@@ -374,8 +383,6 @@ function FolderQuickFilters({
     </aside>
   );
 }
-
-const menuItemClass = "block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50";
 
 function RecordEditForm({
   collection,
@@ -478,12 +485,12 @@ function RecordActionsMenu({
   return (
     <details className="relative">
       <summary
-        className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-lg font-semibold text-slate-600 hover:border-vaeroex-accent"
+        className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-lg font-semibold text-slate-600 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
         aria-label={`Actions for ${record.title}`}
       >
         ...
       </summary>
-      <div className="absolute right-0 z-20 mt-2 w-72 rounded-lg border border-line bg-white p-3 shadow-lg">
+      <div className={actionMenuPanelClass}>
         <div className="space-y-2">
           <RecordDetailDrawer
             title={record.title}
@@ -526,7 +533,7 @@ function RecordActionsMenu({
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
                 ))}
               </select>
-              <button className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold">Move</button>
+              <button className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">Move</button>
             </form>
           </details>
 
@@ -557,7 +564,7 @@ function RecordActionsMenu({
             <input type="hidden" name="return_path" value={returnPath} />
             <ConfirmSubmitButton
               message={`Delete "${record.title}"? It will be hidden from active views.`}
-              className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50"
+              className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-950/35 hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/40"
             >
               Delete
             </ConfirmSubmitButton>
@@ -727,14 +734,14 @@ export function ManagedRecordList({
                     <Link
                       key={option}
                       href={listHref(returnPath, { ...baseParams, limit: option }) as Route}
-                      className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${String(visibleLimit) === option && limitValue !== "all" ? "bg-vaeroex-blue text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                      className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${String(visibleLimit) === option && limitValue !== "all" ? "bg-vaeroex-blue text-white" : inactivePagePillClass}`}
                     >
                       {option}
                     </Link>
                   ))}
                   <Link
                     href={listHref(returnPath, { ...baseParams, limit: "all" }) as Route}
-                    className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${limitValue === "all" ? "bg-vaeroex-blue text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"}`}
+                    className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${limitValue === "all" ? "bg-vaeroex-blue text-white" : inactivePagePillClass}`}
                   >
                     View All
                   </Link>
@@ -756,7 +763,7 @@ export function ManagedRecordList({
                   return (
                     <article
                       key={record.id}
-                      className={`px-3 py-2 transition ${isActive ? "bg-vaeroex-soft ring-1 ring-inset ring-vaeroex-accent/50" : "hover:bg-slate-50/70"}`}
+                      className={`px-3 py-2 transition ${isActive ? "bg-vaeroex-soft ring-1 ring-inset ring-vaeroex-accent/50" : recordRowInactiveClass}`}
                       aria-current={isActive ? "true" : undefined}
                     >
                       <div className="grid gap-3 lg:grid-cols-[32px_minmax(220px,1.5fr)_110px_110px_110px_120px_44px] lg:items-center">

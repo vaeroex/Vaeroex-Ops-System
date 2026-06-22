@@ -218,7 +218,15 @@ const supportActions = read("app/support/actions.ts");
 check(supportActions.includes(".from(\"workspace_members\")") && supportActions.includes(".eq(\"user_id\", user.id)"), "Support requests must validate workspace membership before storing workspace_id.");
 
 const clientFiles = sourceFiles.filter((file) => read(file).startsWith("\"use client\"") || read(file).startsWith("'use client'"));
-const serverSecrets = ["SUPABASE_SERVICE_ROLE_KEY", "OPENAI_API_KEY", "CRON_SECRET", "SQUARESPACE_WEBHOOK_SECRET", "SQUARESPACE_API_KEY"];
+const serverSecrets = [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "OPENAI_API_KEY",
+  "CRON_SECRET",
+  "SQUARESPACE_WEBHOOK_SECRET",
+  "SQUARESPACE_API_KEY",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET"
+];
 
 for (const file of clientFiles) {
   const content = read(file);

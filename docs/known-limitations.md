@@ -14,10 +14,11 @@ Vaeroex Ops System is ready for a limited beta after manual testing passes. It i
 - Load testing has not been performed.
 - Automated test coverage is not yet present.
 
-## Squarespace Subscription Flow
+## Billing Flow
 
-- Squarespace remains the storefront, checkout, payment, and subscription billing layer.
-- Stripe and internal app checkout are intentionally not implemented.
+- Stripe Checkout is now the new-customer subscription path for Operations Intelligence.
+- Existing Squarespace and manual subscription records remain supported for legacy and admin workflows.
+- Stripe products, prices, webhooks, portal settings, and live event handling still need production verification.
 - Live Squarespace webhook payloads still need to be verified against real Squarespace order/subscription events.
 - Manual activation is the recommended early-launch path.
 - Failed payment and cancellation behavior depends on webhook payload clarity or admin review.
@@ -75,7 +76,7 @@ Vaeroex Ops System is ready for a limited beta after manual testing passes. It i
 
 ## What Not To Build Yet
 
-- Do not build Stripe or an internal checkout system until the Squarespace sales flow has real beta feedback.
+- Do not add more billing complexity until the Stripe subscription flow has real beta feedback.
 - Do not build full impersonation yet.
 - Do not build broad integrations before the core workflow proves useful.
 - Do not build heavy analytics before the first beta teams reveal which metrics matter.

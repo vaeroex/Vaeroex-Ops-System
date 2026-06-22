@@ -1400,10 +1400,16 @@ export type Database = {
           customer_email: string;
           customer_name: string | null;
           source: string;
+          billing_provider: string;
           plan_slug: string | null;
           status: string;
           squarespace_order_id: string | null;
           squarespace_customer_id: string | null;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          stripe_price_id: string | null;
+          stripe_current_period_end: string | null;
+          stripe_cancel_at_period_end: boolean;
           current_period_start: string | null;
           current_period_end: string | null;
           canceled_at: string | null;
@@ -1422,10 +1428,16 @@ export type Database = {
           customer_email: string;
           customer_name?: string | null;
           source?: string;
+          billing_provider?: string;
           plan_slug?: string | null;
           status?: string;
           squarespace_order_id?: string | null;
           squarespace_customer_id?: string | null;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          stripe_price_id?: string | null;
+          stripe_current_period_end?: string | null;
+          stripe_cancel_at_period_end?: boolean;
           current_period_start?: string | null;
           current_period_end?: string | null;
           canceled_at?: string | null;
@@ -1444,9 +1456,12 @@ export type Database = {
         Row: {
           id: string;
           source: string;
+          billing_provider: string | null;
           event_type: string | null;
           customer_email: string | null;
           squarespace_order_id: string | null;
+          stripe_event_id: string | null;
+          stripe_subscription_id: string | null;
           payload_json: Json;
           processed: boolean;
           processing_error: string | null;
@@ -1455,9 +1470,12 @@ export type Database = {
         Insert: {
           id?: string;
           source?: string;
+          billing_provider?: string | null;
           event_type?: string | null;
           customer_email?: string | null;
           squarespace_order_id?: string | null;
+          stripe_event_id?: string | null;
+          stripe_subscription_id?: string | null;
           payload_json?: Json;
           processed?: boolean;
           processing_error?: string | null;

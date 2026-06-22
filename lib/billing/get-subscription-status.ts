@@ -72,6 +72,8 @@ export async function getSubscriptionStatus({
       status: "manual_review",
       plan_slug: null,
       plan: null,
+      billing_provider: null,
+      stripe_customer_id: null,
       source: "admin"
     };
   }
@@ -105,13 +107,20 @@ export async function getSubscriptionStatus({
   const workspaceAccess = isWorkspaceAllowed(workspace);
 
   if (workspaceAccess) {
-    const plan = getSubscriptionPlan(subscriptionRows.find((subscription) => subscription.plan_slug === workspace?.plan_slug));
+    const workspaceSubscription =
+      subscriptionRows.find((subscription) => workspaceId && subscription.workspace_id === workspaceId) ||
+      subscriptionRows.find((subscription) => subscription.plan_slug === workspace?.plan_slug) ||
+      subscriptionRows[0];
+    const plan = getSubscriptionPlan(workspaceSubscription);
+
     return {
       allowed: true,
       reason: workspaceAccess.reason,
       status: (workspace?.subscription_status as SubscriptionStatus) || "active",
       plan_slug: workspace?.plan_slug ?? null,
       plan,
+      billing_provider: workspaceSubscription?.billing_provider ?? null,
+      stripe_customer_id: workspaceSubscription?.stripe_customer_id ?? null,
       source: workspaceAccess.source
     };
   }
@@ -140,6 +149,8 @@ export async function getSubscriptionStatus({
       status: activeSubscription.status as SubscriptionStatus,
       plan_slug: activeSubscription.plan_slug,
       plan: getSubscriptionPlan(activeSubscription),
+      billing_provider: activeSubscription.billing_provider,
+      stripe_customer_id: activeSubscription.stripe_customer_id,
       source: activeSubscription.manually_activated
         ? "manual"
         : activeSubscription.status === "demo"
@@ -157,6 +168,8 @@ export async function getSubscriptionStatus({
     status: (latest?.status as SubscriptionStatus) || "missing",
     plan_slug: latest?.plan_slug ?? workspace?.plan_slug ?? null,
     plan: getSubscriptionPlan(latest),
+    billing_provider: latest?.billing_provider ?? null,
+    stripe_customer_id: latest?.stripe_customer_id ?? null,
     source: "missing"
   };
 }

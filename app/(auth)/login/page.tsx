@@ -15,8 +15,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <AuthShell
-      title="Log in"
-      subtitle="Continue to your operations intelligence workspace, decision support, and accountability signals."
+      title="Welcome Back"
+      subtitle="Access your Vaeroex workspace."
     >
       <form action={signInAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />

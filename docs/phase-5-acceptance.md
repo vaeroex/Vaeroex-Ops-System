@@ -46,7 +46,7 @@ Date: 2026-06-17
 
 - Intake and workflow editing pages are still placeholder routes.
 - Email invitation delivery is not implemented.
-- Billing, Stripe, storage uploads, and third-party integrations are not implemented.
+- Storage uploads and third-party integrations are not implemented in this phase. Stripe billing was added later for new-customer checkout.
 - Edit/delete flows and richer filtering for operations records are still future work.
 - Vaeroex result editing before confirmed save is still future work.
 - Automated test suite is not yet present.

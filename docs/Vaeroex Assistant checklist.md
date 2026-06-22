@@ -23,7 +23,7 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
    - A small service, field operations, construction, automotive, fitness, or internal operations team with one owner/admin, 3-10 staff, non-regulated operational data, and a willingness to use manual activation during onboarding.
 
 5. What not to build yet:
-   - Stripe or internal checkout.
+   - Additional billing tiers or custom invoicing.
    - Full customer impersonation.
    - File uploads for support requests.
    - Advanced integrations.
@@ -124,7 +124,7 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
   - Status: Source verified; needs live account test.
 
 - [ ] API key safety.
-  - Expected: `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, Squarespace secrets, and admin allowlist stay server-side; public checkout URLs use `NEXT_PUBLIC_`.
+  - Expected: `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, Stripe/Squarespace secrets, and admin allowlist stay server-side; legacy public checkout URLs use `NEXT_PUBLIC_` only when needed.
   - Status: Source verified; needs Vercel env audit.
 
 - [ ] RLS policies.
