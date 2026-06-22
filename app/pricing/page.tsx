@@ -1,24 +1,25 @@
 import Link from "next/link";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { VAEROEX_PLAN_LIMITS, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
+import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const buyingSummary = [
-  ["Product name", "Operations Intelligence"],
-  ["Price", VAEROEX_PLAN_PRICE_LABEL],
-  ["Included workspace", `${VAEROEX_PLAN_LIMITS.max_workspaces} included`],
-  ["Included users", `${VAEROEX_PLAN_LIMITS.max_users} included`]
+  ["Workspace", `${VAEROEX_PLAN_LIMITS.max_workspaces} included`],
+  ["Users", `${VAEROEX_PLAN_LIMITS.max_users} included`],
+  ["Billing", "Monthly subscription"]
 ] as const;
 
 const subscriptionDetails = [
-  "One Vaeroex subscription",
   `${VAEROEX_PLAN_LIMITS.max_workspaces} workspace included`,
   `${VAEROEX_PLAN_LIMITS.max_users} users included`,
   "Monthly subscription",
-  "Automatic renewal unless canceled",
-  "Subscription access managed by Vaeroex"
+  "Subscription renews automatically unless canceled",
+  "Pricing may change with advance notice",
+  "Refunds handled according to the Refund Policy"
 ] as const;
 
 export default function PricingPage() {
@@ -27,17 +28,15 @@ export default function PricingPage() {
       <PublicSiteHeader />
 
       <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
+        <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div className="vaeroex-hero-reveal">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Pricing</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Operations Intelligence pricing.</h1>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Vaeroex Pricing</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-              A single Vaeroex subscription for the current Operations Intelligence capability.
+              Vaeroex pricing is organized by product and subscription type. Choose the Vaeroex subscription you want to start with.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/signup" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Start With Vaeroex
-              </Link>
+            <div className="mt-6 flex flex-wrap items-start gap-3">
+              <StartWithVaeroexMenu />
               <a href={VAEROEX_MAILTO_LINKS.billing} className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
                 Billing Questions
               </a>
@@ -45,10 +44,21 @@ export default function PricingPage() {
           </div>
 
           <ScrollReveal as="article" delayMs={120} className="vaeroex-pricing-card vaeroex-hover-card rounded-lg border border-line bg-white p-6 shadow-command">
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Vaeroex Subscription</p>
-            <h2 className="mt-3 text-3xl font-semibold">Operations Intelligence</h2>
-            <p className="mt-2 text-4xl font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
-            <dl className="mt-5 grid gap-2 sm:grid-cols-2">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Available Product</p>
+                <h2 className="mt-3 text-3xl font-semibold">Operations Intelligence</h2>
+                <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
+                  For organizations that need operational visibility, accountability, execution, and decision support.
+                </p>
+              </div>
+              <div className="shrink-0 rounded-lg border border-vaeroex-blue/20 bg-vaeroex-soft px-4 py-3 text-left sm:text-right">
+                <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Price</p>
+                <p className="mt-1 text-3xl font-semibold text-vaeroex-blue">{VAEROEX_PLAN_PRICE_LABEL}</p>
+              </div>
+            </div>
+
+            <dl className="mt-5 grid gap-2 sm:grid-cols-3">
               {buyingSummary.map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
@@ -56,29 +66,50 @@ export default function PricingPage() {
                 </div>
               ))}
             </dl>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a href={squarespaceCheckoutUrl} className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+                Start With Operations Intelligence
+              </a>
+              <Link href="/operations-intelligence" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
+                Learn More
+              </Link>
+            </div>
+
+            <details className="mt-6 rounded-lg border border-line bg-slate-50">
+              <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-ink hover:text-vaeroex-blue [&::-webkit-details-marker]:hidden">
+                Subscription Details
+              </summary>
+              <div className="grid gap-2 border-t border-line p-4">
+                {subscriptionDetails.map((detail) => (
+                  <div key={detail} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold">
+                    {detail}
+                  </div>
+                ))}
+                <div className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold">
+                  Billing questions:{" "}
+                  <a href={VAEROEX_MAILTO_LINKS.billing} className="text-vaeroex-blue hover:text-vaeroex-accent">
+                    {VAEROEX_CONTACT_EMAILS.billing}
+                  </a>
+                </div>
+              </div>
+            </details>
           </ScrollReveal>
         </div>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[0.85fr_1.15fr]">
+        <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
           <ScrollReveal className="rounded-lg border border-line bg-white p-6 shadow-panel">
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Subscription Details</p>
-            <h2 className="mt-2 text-2xl font-semibold">What is included in the subscription?</h2>
-            <div className="mt-4 grid gap-2">
-              {subscriptionDetails.map((detail) => (
-                <div key={detail} className="rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold">
-                  {detail}
-                </div>
-              ))}
+            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Billing Details</p>
+            <div className="mt-3 space-y-3 text-sm leading-6 text-muted">
+              <p>Vaeroex subscriptions renew automatically unless canceled.</p>
+              <p>Pricing may change in the future. Customers will receive advance notice before pricing changes take effect.</p>
+              <p>Refunds are handled according to the Vaeroex Refund Policy.</p>
             </div>
           </ScrollReveal>
 
           <ScrollReveal delayMs={120} className="rounded-lg border border-line bg-white p-6 shadow-panel">
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Billing Details</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Contact</p>
             <div className="mt-3 space-y-3 text-sm leading-6 text-muted">
-              <p>Vaeroex subscriptions renew automatically unless canceled.</p>
-              <p>Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex billing.</p>
-              <p>Pricing may change in the future. Customers will receive advance notice before pricing changes take effect.</p>
-              <p>Refunds are handled according to the Vaeroex Refund Policy.</p>
               <p>
                 Billing, subscription, or payment questions can be sent to{" "}
                 <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
@@ -86,23 +117,15 @@ export default function PricingPage() {
                 </a>
                 .
               </p>
-            </div>
-          </ScrollReveal>
-        </section>
-
-        <section className="mt-8 rounded-lg border border-line bg-vaeroex-navy p-6 text-white shadow-command">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Start</p>
-              <h2 className="mt-2 text-2xl font-semibold">Create your Vaeroex account.</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-300">
-                Begin with account setup, then continue toward workspace creation and subscription access.
+              <p>
+                General questions can be sent to{" "}
+                <a href={VAEROEX_MAILTO_LINKS.general} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+                  {VAEROEX_CONTACT_EMAILS.general}
+                </a>
+                .
               </p>
             </div>
-            <Link href="/signup" className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-              Start With Vaeroex
-            </Link>
-          </div>
+          </ScrollReveal>
         </section>
       </section>
 
