@@ -1,7 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { COMPLIANCE_NOTICE, industryTemplates } from "@/data/industry-templates";
+import { workspaceSetupCategories } from "@/data/workspace-categories";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
@@ -83,11 +83,13 @@ Escalate after one missed deadline or repeated ownership gap.
 The process is complete when the owner logs the outcome and the manager confirms closure.`;
 }
 
-function buildVaeroexAuditSummary(companyName: string, mainProblem: string) {
+function buildVaeroexAuditSummary(companyName: string, mainProblem: string, organizationDescription: string, environmentName: string) {
   return {
     title: "Vaeroex Operations Intelligence Review",
     generated_by: "Vaeroex",
-    business_summary: `${companyName} needs clear visibility, accountability, and execution structure for repeatable growth.`,
+    business_summary: `${companyName} is configured as a ${environmentName} environment. ${
+      organizationDescription || "The organization"
+    } needs clear visibility, accountability, and execution structure for repeatable growth.`,
     current_operational_problems: [mainProblem || "Visibility and execution priorities need to be clarified during setup."],
     main_bottlenecks: ["Unclear ownership", "Missed follow-ups", "No weekly manager review cadence"],
     accountability_gaps: ["Follow-ups need assigned owners, due dates, and completion standards."],
@@ -143,26 +145,28 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
   }
 
   const businessName = value(formData, "business_name");
-  const templateId = value(formData, "template_id");
-  const industry = value(formData, "industry");
+  const categoryId = value(formData, "category_id") || value(formData, "template_id");
+  const organizationType = value(formData, "organization_type") || value(formData, "industry");
   const teamSize = value(formData, "team_size");
   const locations = value(formData, "locations");
+  const organizationDescription = value(formData, "organization_description");
   const mainProblem = value(formData, "main_problem");
   const currentTools = value(formData, "current_tools");
   const missedOften = value(formData, "missed_often");
   const managedItems = value(formData, "managed_items");
   const desiredSystems = value(formData, "desired_systems");
 
-  const template =
-    industryTemplates.find((item) => item.id === templateId) ??
-    industryTemplates.find((item) => item.name === industry) ??
-    industryTemplates[0];
+  const category =
+    workspaceSetupCategories.find((item) => item.id === categoryId) ??
+    workspaceSetupCategories.find((item) => item.name === organizationType) ??
+    workspaceSetupCategories[0];
 
   if (
     !businessName ||
-    !template ||
+    !category ||
     !teamSize ||
     !locations ||
+    !organizationDescription ||
     !mainProblem ||
     !missedOften ||
     !managedItems ||
@@ -181,7 +185,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     .from("workspaces")
     .insert({
       name: businessName,
-      industry: template.name,
+      industry: category.name,
       size: teamSize,
       primary_contact_name: user.user_metadata?.full_name ?? null,
       primary_contact_email: user.email ?? null,
@@ -211,13 +215,13 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     redirect(`/app/setup?error=${encodeURIComponent(memberError.message)}`);
   }
 
-  const auditSummary = buildVaeroexAuditSummary(businessName, mainProblem);
+  const auditSummary = buildVaeroexAuditSummary(businessName, mainProblem, organizationDescription, category.name);
 
   const operations = [
     supabase.from("business_intakes").insert({
       workspace_id: workspaceId,
       company_name: businessName,
-      industry: template.name,
+      industry: category.name,
       team_size: teamSize,
       locations,
       current_tools: currentTools,
@@ -230,23 +234,25 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       ideal_outcome: desiredSystems,
       raw_answers_json: {
         businessName,
-        templateId: template.id,
+        categoryId: category.id,
+        organizationType: category.name,
+        organizationDescription,
         locations,
         currentTools,
         missedOften,
         managedItems,
         desiredSystems,
-        complianceNotice: template.complianceNotice || null
+        complianceNotice: category.complianceNotice || null
       } satisfies Json,
       ai_summary: auditSummary.business_summary,
       ai_recommendations: auditSummary.recommended_systems_to_build.join("\n"),
       created_by: user.id
     }),
     supabase.from("forms").insert(
-      template.forms.map((name, index) => ({
+      category.forms.map((name, index) => ({
         workspace_id: workspaceId,
         name,
-        description: `${name} generated from the ${template.name} business profile.`,
+        description: `${name} generated from the ${category.name} operational environment.`,
         form_type: index === 0 ? "intake" : index === 1 ? "completion" : "follow-up",
         schema_json: fieldSchemaFor(name),
         is_public: index === 0,
@@ -255,10 +261,10 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       }))
     ),
     supabase.from("checklists").insert(
-      template.checklists.map((name, index) => ({
+      category.checklists.map((name, index) => ({
         workspace_id: workspaceId,
         name,
-        description: `${name} generated from the ${template.name} business profile.`,
+        description: `${name} generated from the ${category.name} operational environment.`,
         category: index === 2 ? "Manager review" : "Execution",
         frequency: index === 0 ? "Daily" : index === 1 ? "Per job" : "Weekly",
         items_json: checklistItemsFor(name),
@@ -267,7 +273,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       }))
     ),
     supabase.from("workflow_maps").insert(
-      template.workflows.map((name) => ({
+      category.workflows.map((name) => ({
         workspace_id: workspaceId,
         name,
         description: `${name} workflow generated during setup.`,
@@ -280,7 +286,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       }))
     ),
     supabase.from("sops").insert(
-      template.workflows.map((name) => ({
+      category.workflows.map((name) => ({
         workspace_id: workspaceId,
         title: `${name} SOP`,
         department: "Execution",
@@ -331,7 +337,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       }))
     ),
     supabase.from("assets").insert(
-      (template.assetExamples || ["Tracked asset", "Manager device", "Supply bin", "Vehicle", "Checklist station"])
+      (category.assetExamples || ["Tracked asset", "Manager device", "Supply bin", "Vehicle", "Checklist station"])
         .slice(0, 5)
         .map((assetName, index) => ({
           workspace_id: workspaceId,
@@ -351,7 +357,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       date_range_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       date_range_end: new Date().toISOString().slice(0, 10),
       body_markdown: `# Weekly Intelligence Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\n${auditSummary.business_summary}\n\n## Recommended Next Actions\n- Review initial forms.\n- Assign checklist owners.\n- Review issue categories.\n- Run Vaeroex review after real data is added.`,
-      source_data_json: { generatedFrom: "setup", template: template.name } satisfies Json,
+      source_data_json: { generatedFrom: "setup", organizationType: category.name } satisfies Json,
       created_by: user.id
     }),
     supabase.from("ai_agent_runs").insert({
@@ -360,7 +366,8 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       input_json: {
         setup: true,
         businessName,
-        template: template.name,
+        organizationType: category.name,
+        organizationDescription,
         mainProblem,
         currentTools,
         missedOften

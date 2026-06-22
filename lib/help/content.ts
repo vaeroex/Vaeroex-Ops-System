@@ -113,7 +113,7 @@ export const helpArticles: HelpArticle[] = [
     related: ["Information", "Prediction", "Action"]
   }),
   ...[
-    ["creating-workspace", "Creating your workspace", "Set up the business profile Vaeroex uses for workspace context.", "/app/setup"],
+    ["creating-workspace", "Creating your workspace", "Set up the organization context Vaeroex uses for workspace intelligence.", "/app/setup"],
     ["demo-workspace", "Using the demo workspace", "Explore realistic sample data without touching your live workspace.", "/app"],
     ["dashboard", "Understanding the dashboard", "Use the dashboard to see business health, risks, opportunities, and priorities.", "/app"],
     ["first-kpi", "Creating your first KPI", "Start with a small set of metrics that actually drive decisions.", "/app/kpis"],
