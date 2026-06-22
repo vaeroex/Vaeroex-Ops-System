@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 type BillingRequiredPageProps = {
   searchParams?: Promise<{ reason?: string; error?: string; message?: string }>;
@@ -27,10 +28,17 @@ export default async function BillingRequiredPage({ searchParams }: BillingRequi
           <a href="#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Request Manual Activation
           </a>
-          <Link href="https://vaeroex.com/contact" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            Contact Vaeroex
-          </Link>
+          <a href={VAEROEX_MAILTO_LINKS.billing} className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
+            Email Billing
+          </a>
         </div>
+        <p className="mt-4 text-sm leading-6 text-muted">
+          Billing, subscription, or payment questions can be sent to{" "}
+          <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+            {VAEROEX_CONTACT_EMAILS.billing}
+          </a>
+          .
+        </p>
       </section>
 
       <section id="already-purchased" className="mx-auto mt-6 max-w-3xl rounded-lg border border-line bg-white p-7 shadow-panel">

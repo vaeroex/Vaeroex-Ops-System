@@ -3,6 +3,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const inquiryCategories = [
   "Product Demo",
@@ -18,6 +19,13 @@ const inquiryCategories = [
   "Billing or Subscription",
   "General Inquiry"
 ];
+
+const contactChannels = [
+  ["General & demo", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
+  ["Support", VAEROEX_CONTACT_EMAILS.support, VAEROEX_MAILTO_LINKS.support],
+  ["Billing", VAEROEX_CONTACT_EMAILS.billing, VAEROEX_MAILTO_LINKS.billing],
+  ["Partnerships", VAEROEX_CONTACT_EMAILS.partners, VAEROEX_MAILTO_LINKS.partners]
+] as const;
 
 type ContactPageProps = {
   searchParams?: Promise<{ error?: string; message?: string }>;
@@ -44,6 +52,17 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             <Link href="/demo" className="mt-4 inline-flex rounded-lg border border-line px-4 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
               Book a Demo
             </Link>
+          </ScrollReveal>
+          <ScrollReveal delayMs={180} className="vaeroex-hover-card mt-4 rounded-lg border border-line bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-vaeroex-blue">Prefer direct email?</p>
+            <div className="mt-3 grid gap-2 text-sm">
+              {contactChannels.map(([label, email, href]) => (
+                <a key={email} href={href} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-slate-50 px-3 py-2 font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
+                  <span>{label}</span>
+                  <span>{email}</span>
+                </a>
+              ))}
+            </div>
           </ScrollReveal>
         </div>
         <ScrollReveal delayMs={140}>

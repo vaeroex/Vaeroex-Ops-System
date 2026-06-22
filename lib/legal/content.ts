@@ -1,4 +1,5 @@
 import type { Route } from "next";
+import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export const LEGAL_DOCUMENT_VERSIONS = {
   terms: "2026-06-19",
@@ -87,7 +88,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Cancellation",
         body: [
-          "Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support.",
+          `Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`,
           "Access may continue until the end of the paid billing period unless otherwise required by law or approved by Vaeroex."
         ]
       },
@@ -205,7 +206,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       },
       {
         title: "Contact",
-        body: ["Questions about these terms can be sent through the Vaeroex support page."]
+        body: [`Questions about these terms can be sent to ${VAEROEX_CONTACT_EMAILS.support} or through the Vaeroex support page.`]
       }
     ]
   },
@@ -228,11 +229,11 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Service Providers and Subprocessors", body: ["A subprocessors list should be finalized before broad commercial launch. Examples may include hosting, database, authentication, payment, email, analytics, support, and AI infrastructure providers."] },
       { title: "Data Security", body: ["Vaeroex is designed with workspace-scoped access and role-aware controls. No service can guarantee absolute security, and customers remain responsible for account access, workspace roles, and the data they choose to enter."] },
       { title: "Data Retention", body: ["Vaeroex may retain account, workspace, support, billing, usage, and audit records as needed to operate the service, comply with legal obligations, resolve disputes, and enforce agreements."] },
-      { title: "Customer Controls", body: ["Workspace owners and admins can manage workspace records, roles, and some settings inside the app. Additional data requests can be submitted through support."] },
+      { title: "Customer Controls", body: [`Workspace owners and admins can manage workspace records, roles, and some settings inside the app. Additional data requests can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`] },
       { title: "Cookies and Analytics", body: ["Vaeroex may use cookies or similar technologies for authentication, security, preferences, and platform operation. Analytics details should be finalized before commercial launch."] },
       { title: "Children's Privacy", body: ["Vaeroex is intended for business use and is not directed to children."] },
       { title: "Changes to Privacy Policy", body: ["Vaeroex may update this policy as the platform evolves. Material updates may require users to review and accept updated terms."] },
-      { title: "Contact", body: ["Privacy questions can be sent through Vaeroex support."] }
+      { title: "Contact", body: [`Privacy questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`] }
     ]
   },
   "acceptable-use": {
@@ -259,12 +260,12 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/refund-policy",
     updated: "2026-06-19",
     sections: [
-      { title: "Vaeroex Subscription", body: ["Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support."] },
+      { title: "Vaeroex Subscription", body: [`Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`] },
       { title: "Automatic Renewal", body: ["Vaeroex subscriptions renew automatically unless canceled."] },
       { title: "Cancel Anytime", body: ["Customers may cancel anytime. Access generally continues until the end of the paid billing period unless otherwise required by law or approved by Vaeroex."] },
       { title: "Satisfaction Refund", body: ["First-time subscriptions may be eligible for a 14-day satisfaction refund. After 14 days, monthly subscription fees are generally non-refundable except where required by law or approved by Vaeroex."] },
       { title: "Partial Months", body: ["No refunds are provided for partial months unless required by law or approved by Vaeroex."] },
-      { title: "Promotions", body: ["Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels. Vaeroex support can help customers with questions about eligible offers."] },
+      { title: "Promotions", body: [`Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels. ${VAEROEX_CONTACT_EMAILS.billing} can help customers with questions about eligible offers.`] },
       { title: "Pricing Changes", body: ["Subscription pricing may change in the future. Customers will receive advance notice before pricing changes take effect."] }
     ]
   },
@@ -307,7 +308,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex, Operations Intelligence Suite on the Vaeroex Intelligence Platform, $399/month, Everything Included."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
-      { title: "Subscription Requests", body: ["Customers can manage subscription-related requests through the Vaeroex website or by contacting Vaeroex support."] },
+      { title: "Subscription Requests", body: [`Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`] },
       { title: "Renewal and Pricing", body: ["Vaeroex subscriptions renew automatically unless canceled. Pricing may change in the future, and customers will receive advance notice before pricing changes take effect."] },
       { title: "Access Changes", body: ["Canceled, expired, or past-due subscriptions may be routed to the billing-required flow unless access is manually unlocked by Vaeroex."] }
     ]
@@ -350,7 +351,7 @@ export const trustSections = [
   ["Audit Logging", "Admin, support, usage, and workspace events are designed to be logged where applicable for review and troubleshooting."],
   ["Demo Workspace Isolation", "Demo workspaces are sample business environments and should remain separate from real customer data."],
   ["Customer Data Responsibilities", "Customers remain responsible for the information they enter, workspace roles they assign, and compliance obligations that apply to their business."],
-  ["Security Contact", "Security or trust questions can be sent through Vaeroex support."]
+  ["Security Contact", `Security or trust questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`]
 ] as const;
 
 export const releaseNotes = [

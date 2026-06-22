@@ -3,6 +3,7 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { displayPlanName, displaySubscriptionStatus, normalizePlanLimits, VAEROEX_PLAN_LIMITS } from "@/lib/billing/plans";
 import { getSubscriptionUsageStatus } from "@/lib/billing/usage-limits";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
@@ -52,10 +53,17 @@ export default async function AccountSubscriptionPage() {
           <Link href="/billing-required#already-purchased" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             I already purchased
           </Link>
-          <Link href="https://vaeroex.com/contact" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            Contact Vaeroex
-          </Link>
+          <a href={VAEROEX_MAILTO_LINKS.billing} className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
+            Email Billing
+          </a>
         </div>
+        <p className="mt-3 text-sm leading-6 text-muted">
+          Billing, subscription, or payment questions can be sent to{" "}
+          <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
+            {VAEROEX_CONTACT_EMAILS.billing}
+          </a>
+          .
+        </p>
       </SectionCard>
 
       <SectionCard title="Current usage" description="Usage is checked against active Vaeroex access limits. All product features are included.">
