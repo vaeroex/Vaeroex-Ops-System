@@ -881,9 +881,12 @@ function SignalList({
   tone: "risk" | "opportunity" | "action";
 }) {
   const toneClasses = {
-    risk: "border-red-100 bg-red-50/80 text-red-800 hover:border-red-200 hover:bg-red-50",
-    opportunity: "border-emerald-100 bg-emerald-50/80 text-emerald-800 hover:border-emerald-200 hover:bg-emerald-50",
-    action: "border-line bg-slate-50 text-slate-800 hover:border-vaeroex-accent hover:bg-vaeroex-soft"
+    risk:
+      "border-red-400/40 bg-red-950/30 text-red-100 shadow-sm shadow-red-950/20 hover:border-red-300/70 hover:bg-red-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 active:bg-red-950/60",
+    opportunity:
+      "border-emerald-400/40 bg-emerald-950/30 text-emerald-100 shadow-sm shadow-emerald-950/20 hover:border-cyan-400/50 hover:bg-emerald-950/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 active:bg-emerald-950/60",
+    action:
+      "border-cyan-400/30 bg-slate-950/70 text-slate-100 shadow-sm shadow-slate-950/20 hover:border-cyan-400/60 hover:bg-blue-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 active:bg-blue-950/50"
   };
 
   return (
@@ -894,7 +897,7 @@ function SignalList({
         <Link
           key={item.id}
           href={item.href}
-          className={`block rounded-lg border p-3 text-sm transition ${toneClasses[tone]}`}
+          className={`block rounded-lg border p-3 text-sm transition hover:underline hover:decoration-current hover:underline-offset-4 ${toneClasses[tone]}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
