@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
+import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const navLinks: Array<{ href: Route; label: string }> = [
@@ -111,9 +112,7 @@ export async function PublicSiteHeader() {
               Login
             </Link>
           )}
-          <Link href="/signup" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-            Start With Vaeroex
-          </Link>
+          <StartWithVaeroexMenu align="right" size="compact" />
         </div>
       </div>
       <nav className="mx-auto mt-4 flex max-w-6xl flex-wrap gap-2 lg:hidden" aria-label="Public navigation mobile">
