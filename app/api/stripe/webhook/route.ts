@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
-import { sendVaeroexOnboardingEmail, type OnboardingEmailResult } from "@/lib/email/onboarding";
+import { sendVaeroexWelcomeEmail, type WelcomeEmailResult } from "@/lib/email/welcome";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -260,7 +260,7 @@ async function processStripeEvent(admin: AdminClient, event: StripeEvent) {
   }
 }
 
-function shouldSendOnboardingEmail(event: StripeEvent, result: StripeSyncResult) {
+function shouldSendWelcomeEmail(event: StripeEvent, result: StripeSyncResult) {
   return (
     ["checkout.session.completed", "customer.subscription.created"].includes(event.type) &&
     ["active", "trialing"].includes(result.status) &&
@@ -268,14 +268,14 @@ function shouldSendOnboardingEmail(event: StripeEvent, result: StripeSyncResult)
   );
 }
 
-async function markOnboardingEmailResult({
+async function markWelcomeEmailResult({
   admin,
   subscriptionRecordId,
   result
 }: {
   admin: AdminClient;
   subscriptionRecordId: string;
-  result: OnboardingEmailResult;
+  result: WelcomeEmailResult;
 }) {
   if (result.status === "sent") {
     await admin
@@ -310,8 +310,8 @@ async function markOnboardingEmailResult({
     .eq("id", subscriptionRecordId);
 }
 
-async function sendOnboardingEmailOnce(admin: AdminClient, event: StripeEvent, result: StripeSyncResult) {
-  if (!shouldSendOnboardingEmail(event, result) || !result.customerEmail || !result.subscriptionRecordId) {
+async function sendWelcomeEmailOnce(admin: AdminClient, event: StripeEvent, result: StripeSyncResult) {
+  if (!shouldSendWelcomeEmail(event, result) || !result.customerEmail || !result.subscriptionRecordId) {
     return { status: "not_applicable" as const };
   }
 
@@ -342,13 +342,12 @@ async function sendOnboardingEmailOnce(admin: AdminClient, event: StripeEvent, r
     return { status: "already_handled" as const };
   }
 
-  const emailResult = await sendVaeroexOnboardingEmail({
+  const emailResult = await sendVaeroexWelcomeEmail({
     to: result.customerEmail,
-    customerName: result.customerName,
     stripeSubscriptionId: result.stripeSubscriptionId
   });
 
-  await markOnboardingEmailResult({
+  await markWelcomeEmailResult({
     admin,
     subscriptionRecordId: result.subscriptionRecordId,
     result: emailResult
@@ -417,7 +416,7 @@ export async function POST(request: Request) {
 
   try {
     const result = await processStripeEvent(admin, event);
-    const onboardingEmail = await sendOnboardingEmailOnce(admin, event, result);
+    const welcomeEmail = await sendWelcomeEmailOnce(admin, event, result);
 
     if (eventRow) {
       await admin
@@ -436,7 +435,7 @@ export async function POST(request: Request) {
       processed: true,
       event_id: eventRow?.id ?? null,
       status: result.status,
-      onboarding_email: onboardingEmail
+      welcome_email: welcomeEmail
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Stripe subscription event processing failed.";
