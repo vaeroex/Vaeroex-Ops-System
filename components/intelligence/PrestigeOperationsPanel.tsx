@@ -290,6 +290,36 @@ function MiniList({ items, empty }: { items: string[]; empty: string }) {
   );
 }
 
+function IntelligenceAccordion({
+  title,
+  description,
+  summary,
+  children,
+  defaultOpen = false
+}: {
+  title: string;
+  description?: string;
+  summary: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details open={defaultOpen} className="group rounded-lg border border-vaeroex-silver/80 bg-white shadow-panel">
+      <summary className="flex cursor-pointer list-none flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h3 className="text-base font-semibold text-ink">{title}</h3>
+          {description ? <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">{description}</p> : null}
+          <p className="mt-2 text-sm leading-6 text-muted">{summary}</p>
+        </div>
+        <span className="inline-flex w-fit rounded-full border border-line px-3 py-1 text-xs font-semibold text-slate-600 group-open:bg-vaeroex-soft group-open:text-vaeroex-blue">
+          Expand
+        </span>
+      </summary>
+      <div className="space-y-4 border-t border-vaeroex-silver p-5">{children}</div>
+    </details>
+  );
+}
+
 export function PrestigeOperationsPanel({
   intelligence,
   returnPath = "/app",
@@ -330,7 +360,11 @@ export function PrestigeOperationsPanel({
 
       {showHealthHero ? <BusinessHealthHero intelligence={intelligence} /> : null}
 
-      <SectionCard title="Health breakdown" description="Each category explains what improved, what declined, and what to do next.">
+      <IntelligenceAccordion
+        title="Health breakdown"
+        description="Each category explains what improved, what declined, and what to do next."
+        summary={`${health.categories.length} health categories are scored. Weakest area: ${[...health.categories].sort((a, b) => a.score - b.score)[0]?.name || "None yet"}.`}
+      >
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {health.categories.map((category) => (
             <article key={category.name} className={`rounded-lg border p-4 ${scoreTone(category.score)}`}>
@@ -348,10 +382,14 @@ export function PrestigeOperationsPanel({
             </article>
           ))}
         </div>
-      </SectionCard>
+      </IntelligenceAccordion>
 
       <section className="grid gap-4 xl:grid-cols-[1.05fr_.95fr]">
-        <SectionCard title="What should I focus on this week?" description="Vaeroex limits this to the top priorities that are tied to visible evidence.">
+        <IntelligenceAccordion
+          title="What should I focus on this week?"
+          description="Vaeroex limits this to the top priorities that are tied to visible evidence."
+          summary={`${intelligence.focusPriorities.length} focus priorit${intelligence.focusPriorities.length === 1 ? "y" : "ies"} available for review.`}
+        >
           <div className="mb-4">
             <LegalSafetyNotice tone="review" compact />
           </div>
@@ -362,9 +400,13 @@ export function PrestigeOperationsPanel({
               <p className="text-sm leading-6 text-muted">No urgent focus areas were detected from the current workspace data.</p>
             )}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="Profit Leak Detector" description="Revenue and opportunity leakage signals from CRM, KPIs, follow-ups, issues, checklists, SOPs, and files.">
+        <IntelligenceAccordion
+          title="Profit Leak Detector"
+          description="Revenue and opportunity leakage signals from CRM, KPIs, follow-ups, issues, checklists, SOPs, and files."
+          summary={`${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`}
+        >
           <div className="mb-4">
             <LegalSafetyNotice tone="ai" compact />
           </div>
@@ -381,10 +423,14 @@ export function PrestigeOperationsPanel({
               <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep CRM follow-ups, KPI targets, and ownership records current.</p>
             )}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
       </section>
 
-      <SectionCard title="Business Memory" description="Important moments Vaeroex can reference when answering what changed, what caused it, and whether actions helped.">
+      <IntelligenceAccordion
+        title="Business Memory"
+        description="Important moments Vaeroex can reference when answering what changed, what caused it, and whether actions helped."
+        summary={`${intelligence.memoryTimeline.length} memory record${intelligence.memoryTimeline.length === 1 ? "" : "s"} stored for this workspace.`}
+      >
         <div className="grid gap-3 lg:grid-cols-2">
           {intelligence.memoryTimeline.length ? (
             intelligence.memoryTimeline.map((moment) => (
@@ -413,10 +459,13 @@ export function PrestigeOperationsPanel({
             </Link>
           ))}
         </div>
-      </SectionCard>
+      </IntelligenceAccordion>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Department Scorecards">
+        <IntelligenceAccordion
+          title="Department Scorecards"
+          summary={`${intelligence.departmentScorecards.length} department scorecard${intelligence.departmentScorecards.length === 1 ? "" : "s"} generated from current workspace activity.`}
+        >
           <div className="space-y-3">
             {intelligence.departmentScorecards.slice(0, 8).map((card) => (
               <article key={card.department} className={`rounded-lg border p-4 ${scoreTone(card.score)}`}>
@@ -429,9 +478,12 @@ export function PrestigeOperationsPanel({
               </article>
             ))}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="Data Quality Score">
+        <IntelligenceAccordion
+          title="Data Quality Analysis"
+          summary={`Data quality score is ${intelligence.dataQuality.score}/100 with ${intelligence.dataQuality.gaps.length} visible gap${intelligence.dataQuality.gaps.length === 1 ? "" : "s"}.`}
+        >
           <div className={`rounded-lg border p-5 ${scoreTone(intelligence.dataQuality.score)}`}>
             <p className="text-sm font-semibold">Data Quality Score</p>
             <p className="mt-2 text-5xl font-semibold">{intelligence.dataQuality.score}<span className="text-xl">/100</span></p>
@@ -445,9 +497,13 @@ export function PrestigeOperationsPanel({
             ))}
             {!intelligence.dataQuality.gaps.length ? <p className="text-sm leading-6 text-muted">No major data gaps found.</p> : null}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="Centralization / Tool Sprawl" description="An insight into how much operational work has moved into Vaeroex.">
+        <IntelligenceAccordion
+          title="Centralization / Tool Sprawl"
+          description="An insight into how much operational work has moved into Vaeroex."
+          summary={`${intelligence.toolSprawl.score}% of visible operating data is centralized in Vaeroex.`}
+        >
           <div className={`rounded-lg border p-5 ${scoreTone(intelligence.toolSprawl.score)}`}>
             <p className="text-sm font-semibold">Operational data centralized</p>
             <p className="mt-2 text-5xl font-semibold">{intelligence.toolSprawl.score}<span className="text-xl">%</span></p>
@@ -463,11 +519,15 @@ export function PrestigeOperationsPanel({
               <MiniList items={intelligence.toolSprawl.modulesNotUsed} empty="All core modules are in use." />
             </div>
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[.95fr_1.05fr]">
-        <SectionCard title="Decision Journal" description="Log why leadership made decisions, what outcome was expected, and when Vaeroex should review whether it helped.">
+        <IntelligenceAccordion
+          title="Decision Journal"
+          description="Log why leadership made decisions, what outcome was expected, and when Vaeroex should review whether it helped."
+          summary={`${intelligence.decisions.recent.length} recent decision${intelligence.decisions.recent.length === 1 ? "" : "s"} available for business memory.`}
+        >
           <CreateDrawer title="Log decision" description="Vaeroex will keep this in business memory and include it in monthly and quarterly reviews." triggerLabel="Log Decision">
             <form action={createBusinessDecisionAction} className="grid gap-4 lg:grid-cols-2">
               <input type="hidden" name="return_path" value={returnPath} />
@@ -503,9 +563,13 @@ export function PrestigeOperationsPanel({
               <p className="text-sm leading-6 text-muted">No decisions logged yet.</p>
             )}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="Vaeroex recommendation queue" description="Vaeroex suggests actions, but a human must approve before anything is saved.">
+        <IntelligenceAccordion
+          title="Vaeroex recommendation queue"
+          description="Vaeroex suggests actions, but a human must approve before anything is saved."
+          summary={`${intelligence.recommendationTracking.approvalQueue.length} recommendation${intelligence.recommendationTracking.approvalQueue.length === 1 ? "" : "s"} waiting for review.`}
+        >
           <div className="grid gap-3 lg:grid-cols-2">
             {intelligence.recommendationTracking.approvalQueue.slice(0, 6).map((item) => (
               <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} />
@@ -515,36 +579,49 @@ export function PrestigeOperationsPanel({
             <p className="text-sm font-semibold text-ink">Recommendation outcome tracking</p>
             <MiniList items={intelligence.recommendationTracking.outcomeNotes} empty="No recommendation outcomes yet." />
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Weekly Management Meeting Mode">
+        <IntelligenceAccordion
+          title="Weekly Meeting Mode"
+          summary={`${intelligence.meetingMode.agenda.length} agenda item${intelligence.meetingMode.agenda.length === 1 ? "" : "s"} ready for the next management review.`}
+        >
           <MiniList items={intelligence.meetingMode.agenda} empty="No agenda available." />
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create follow-ups</Link>
             <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold">Generate weekly report</Link>
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="What could go wrong next month?">
+        <IntelligenceAccordion
+          title="Risk Simulation"
+          summary={`${intelligence.riskSimulation.length} forward-looking risk scenario${intelligence.riskSimulation.length === 1 ? "" : "s"} generated from current signals.`}
+        >
           <div className="space-y-3">
             {intelligence.riskSimulation.slice(0, 4).map((item) => (
               <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} />
             ))}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="If I were the CEO">
+        <IntelligenceAccordion
+          title="CEO Mode"
+          summary={intelligence.ceoMode.actions.length ? `${intelligence.ceoMode.actions.length} executive action${intelligence.ceoMode.actions.length === 1 ? "" : "s"} available.` : "No executive actions found yet."}
+        >
           <p className="text-sm leading-6 text-muted">{intelligence.ceoMode.summary}</p>
           <div className="mt-4">
             <MiniList items={intelligence.ceoMode.actions} empty="No executive actions found." />
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
-        <SectionCard title="Benchmark Mode" description="Default best-practice operating standards. No anonymous customer benchmarking is used.">
+        <IntelligenceAccordion
+          title="Benchmark Mode"
+          description="Default best-practice operating standards. No anonymous customer benchmarking is used."
+          summary={`${intelligence.benchmarkMode.length} best-practice benchmark${intelligence.benchmarkMode.length === 1 ? "" : "s"} available for comparison.`}
+        >
           <div className="space-y-3">
             {intelligence.benchmarkMode.map((item) => (
               <article key={item.title} className="rounded-lg border border-line p-3 text-sm">
@@ -557,9 +634,13 @@ export function PrestigeOperationsPanel({
               </article>
             ))}
           </div>
-        </SectionCard>
+        </IntelligenceAccordion>
 
-        <SectionCard title="Business Review Package" description="Owner, leadership, bank, investor, franchise, or quarterly review package.">
+        <IntelligenceAccordion
+          title="Business Review Package"
+          description="Owner, leadership, bank, investor, franchise, or quarterly review package."
+          summary={`${intelligence.businessReviewPackage.sections.length} review section${intelligence.businessReviewPackage.sections.length === 1 ? "" : "s"} ready to prepare.`}
+        >
           <div className="grid gap-3 md:grid-cols-2">
             {intelligence.businessReviewPackage.sections.map((section) => (
               <article key={section.title} className="rounded-lg border border-line bg-white p-4">
@@ -584,7 +665,7 @@ export function PrestigeOperationsPanel({
               </ConfirmSubmitButton>
             </form>
           )}
-        </SectionCard>
+        </IntelligenceAccordion>
       </section>
     </div>
   );
