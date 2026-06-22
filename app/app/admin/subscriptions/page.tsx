@@ -12,6 +12,8 @@ type AdminSubscriptionsPageProps = {
   searchParams?: Promise<{ q?: string; error?: string; message?: string }>;
 };
 
+const subscriptionStatusOptions = ["active", "trialing", "past_due", "unpaid", "incomplete", "canceled", "expired", "manual_review", "demo"] as const;
+
 export default async function AdminSubscriptionsPage({ searchParams }: AdminSubscriptionsPageProps) {
   const params = await searchParams;
   const access = await getVaeroexAdminAccess();
@@ -43,7 +45,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Subscription admin" description="Manually activate Vaeroex customers and review Squarespace subscription events.">
+      <SectionCard title="Subscription admin" description="Manually activate Vaeroex customers and review Stripe, Squarespace, and manual subscription events.">
         {params?.message ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
         <ErrorNotice message={params?.error} />
         <form className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -58,7 +60,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
       </SectionCard>
 
       <section className="space-y-6">
-        <CreateDrawer title="Create manual activation" description="Use after confirming a Squarespace purchase or testing access for a verified account." triggerLabel="New Activation">
+        <CreateDrawer title="Create manual activation" description="Use after confirming a purchase or testing access for a verified account." triggerLabel="New Activation">
           <form action={createManualSubscriptionAction} className="grid gap-4 lg:grid-cols-2">
             <label className="block text-sm font-medium">
               Customer email
@@ -77,12 +79,9 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
             <label className="block text-sm font-medium">
               Status
               <select name="status" defaultValue="active" className="mt-2 w-full rounded-lg border border-line px-3 py-2">
-                <option value="active">active</option>
-                <option value="trialing">trialing</option>
-                <option value="manual_review">manual_review</option>
-                <option value="past_due">past_due</option>
-                <option value="canceled">canceled</option>
-                <option value="expired">expired</option>
+                {subscriptionStatusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </label>
             <label className="block text-sm font-medium">
@@ -90,7 +89,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
               <input name="workspace_id" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
             </label>
             <label className="block text-sm font-medium">
-              Squarespace order ID
+              Legacy order ID
               <input name="squarespace_order_id" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
             </label>
             <label className="block text-sm font-medium lg:col-span-2">
@@ -111,7 +110,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                   <div>
                     <p className="font-semibold">{subscription.customer_email}</p>
                     <p className="mt-1 text-xs text-muted">
-                      {subscription.customer_name || "No name"} · {subscription.source} · {displayPlanName(subscription.plan_slug)}
+                      {subscription.customer_name || "No name"} · {subscription.billing_provider || subscription.source} · {displayPlanName(subscription.plan_slug)}
                     </p>
                   </div>
                   <StatusBadge value={subscription.status} />
@@ -122,20 +121,16 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                     <option value={VAEROEX_PLAN_SLUG}>Vaeroex</option>
                   </select>
                   <select name="status" defaultValue={subscription.status} className="rounded-lg border border-line px-3 py-2 text-sm">
-                    <option value="active">active</option>
-                    <option value="trialing">trialing</option>
-                    <option value="past_due">past_due</option>
-                    <option value="canceled">canceled</option>
-                    <option value="expired">expired</option>
-                    <option value="manual_review">manual_review</option>
-                    <option value="demo">demo</option>
+                    {subscriptionStatusOptions.map((status) => (
+                      <option key={status} value={status}>{status}</option>
+                    ))}
                   </select>
                   <input name="notes" defaultValue={subscription.notes || ""} className="rounded-lg border border-line px-3 py-2 text-sm" />
                   <button className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">Update</button>
                 </form>
               </article>
             )) : (
-              <EmptyState title="No customer subscriptions found" description="Create a manual activation after confirming the Squarespace purchase, or wait for a Squarespace webhook event." />
+              <EmptyState title="No customer subscriptions found" description="Create a manual activation after confirming a purchase, or wait for a Stripe or legacy billing event." />
             )}
           </div>
         </SectionCard>
@@ -171,14 +166,16 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
           </div>
         </SectionCard>
 
-        <SectionCard title="Squarespace events">
+        <SectionCard title="Subscription events">
           <div className="space-y-4">
             {events?.length ? events.map((event) => (
               <article key={event.id} className="rounded-lg border border-line p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <p className="font-semibold">{event.event_type || "Squarespace event"}</p>
-                    <p className="mt-1 text-xs text-muted">{event.customer_email || "No email"} · {event.squarespace_order_id || "No order"}</p>
+                    <p className="font-semibold">{event.event_type || "Subscription event"}</p>
+                    <p className="mt-1 text-xs text-muted">
+                      {event.customer_email || "No email"} · {event.billing_provider || event.source || "unknown"} · {event.stripe_event_id || event.squarespace_order_id || "No event ID"}
+                    </p>
                   </div>
                   <StatusBadge value={event.processed ? "processed" : "manual_review"} />
                 </div>
@@ -188,7 +185,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                 </div>
               </article>
             )) : (
-              <EmptyState title="No Squarespace events yet" description="When the webhook is configured, received order events and processing details will appear here." />
+              <EmptyState title="No subscription events yet" description="When Stripe or legacy billing webhooks are configured, received events and processing details will appear here." />
             )}
           </div>
         </SectionCard>

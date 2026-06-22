@@ -1,13 +1,19 @@
 import Link from "next/link";
-import { StatusBadge } from "@/components/operations/StatusBadge";
+import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { StatusBadge } from "@/components/operations/StatusBadge";
 import { displayPlanName, displaySubscriptionStatus, normalizePlanLimits, VAEROEX_PLAN_LIMITS } from "@/lib/billing/plans";
 import { getSubscriptionUsageStatus } from "@/lib/billing/usage-limits";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
-export default async function AccountSubscriptionPage() {
+type AccountSubscriptionPageProps = {
+  searchParams?: Promise<{ error?: string; message?: string }>;
+};
+
+export default async function AccountSubscriptionPage({ searchParams }: AccountSubscriptionPageProps) {
+  const params = await searchParams;
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
@@ -29,11 +35,13 @@ export default async function AccountSubscriptionPage() {
   return (
     <div className="space-y-6">
       <SectionCard title="Subscription access" description="Vaeroex access is connected to your Vaeroex subscription email.">
+        {params?.message ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
+        <ErrorNotice message={params?.error} />
         <div className="grid gap-4 md:grid-cols-3">
           <div className="rounded-lg border border-line p-4">
             <p className="text-sm text-muted">Status</p>
             <div className="mt-2">
-              <StatusBadge value={displaySubscriptionStatus(subscription.status, subscription.source)} />
+              <StatusBadge value={displaySubscriptionStatus(subscription.status, subscription.billing_provider || subscription.source)} />
             </div>
           </div>
           <div className="rounded-lg border border-line p-4">
@@ -47,6 +55,13 @@ export default async function AccountSubscriptionPage() {
         </div>
         <p className="mt-4 text-sm leading-6 text-muted">{subscription.reason}</p>
         <div className="mt-5 flex flex-wrap gap-3">
+          {subscription.stripe_customer_id ? (
+            <form action="/api/stripe/portal" method="post">
+              <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white" type="submit">
+                Manage billing
+              </button>
+            </form>
+          ) : null}
           <Link href="https://vaeroex.com/pricing" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             View Vaeroex Subscription
           </Link>

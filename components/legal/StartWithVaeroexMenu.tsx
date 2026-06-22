@@ -1,11 +1,10 @@
-import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const startOptions = [
   {
     title: "Operations Intelligence",
     description: "Start the current Vaeroex product subscription.",
-    href: squarespaceCheckoutUrl,
+    href: "/api/stripe/checkout",
     action: "Start subscription"
   },
   {

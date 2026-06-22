@@ -1,6 +1,15 @@
 import type { Json } from "@/lib/supabase/types";
 
-export type SubscriptionStatus = "active" | "trialing" | "past_due" | "canceled" | "expired" | "manual_review" | "demo";
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "unpaid"
+  | "canceled"
+  | "incomplete"
+  | "expired"
+  | "manual_review"
+  | "demo";
 
 export type PlanSlug = "vaeroex";
 
@@ -22,6 +31,8 @@ export type SubscriptionAccessResult = {
     slug: string;
     features_json: Json;
   }) | null;
+  billing_provider?: string | null;
+  stripe_customer_id?: string | null;
   source: "subscription" | "workspace" | "demo" | "manual" | "trial" | "admin" | "missing";
 };
 

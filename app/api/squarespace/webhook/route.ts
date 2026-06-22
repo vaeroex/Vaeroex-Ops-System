@@ -152,6 +152,7 @@ export async function POST(request: Request) {
     .from("subscription_events")
     .insert({
       source: "squarespace",
+      billing_provider: "squarespace",
       event_type: eventType,
       customer_email: customerEmail,
       squarespace_order_id: orderId,
@@ -183,6 +184,7 @@ export async function POST(request: Request) {
         customer_email: customerEmail,
         customer_name: customerName,
         source: "squarespace",
+        billing_provider: "squarespace",
         plan_slug: planSlug,
         status,
         squarespace_order_id: orderId,
