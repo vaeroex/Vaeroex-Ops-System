@@ -137,7 +137,7 @@ export function IntelligenceFlowDemo() {
           <div className="mt-5 overflow-hidden rounded-full border border-white/10 bg-white/[0.06] p-1">
             <div className="relative h-1.5 rounded-full bg-white/10">
               <span className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-vaeroex-blue via-vaeroex-accent to-fuchsia-400 transition-[width] duration-300 ease-out" style={{ width: stageProgress }} />
-              <span key={activeStage.title} className="vaeroex-output-signal absolute top-1/2 h-2 w-2 -translate-y-1/2 rounded-full bg-vaeroex-accent shadow-[0_0_14px_rgba(56,189,248,0.75)]" />
+              <span className="absolute top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-vaeroex-accent shadow-[0_0_14px_rgba(56,189,248,0.55)]" style={{ left: stageProgress }} />
             </div>
           </div>
 
