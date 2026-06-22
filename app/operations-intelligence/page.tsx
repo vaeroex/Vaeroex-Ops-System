@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const productCapabilities = [
@@ -21,13 +22,6 @@ const productCapabilities = [
   ["Scheduled Reports", "Support recurring leadership reviews without forcing email delivery."],
   ["Decision Support", "Convert workspace context into reviewed recommendations and next steps."],
   ["Accountability", "Clarify owners, due dates, follow-up expectations, and execution status."]
-] as const;
-
-const dashboardSignals = [
-  ["Business Health Score", "92 / 100", "Strong execution, low risk"],
-  ["Profit Leak", "7 items", "Follow-ups and issue drift need review"],
-  ["KPI Intelligence", "3 below target", "Response time, conversion, checklist completion"],
-  ["CRM Follow-Up", "Owner needed", "Pipeline accountability gap detected"]
 ] as const;
 
 const operatingExamples = [
@@ -74,31 +68,7 @@ export default function OperationsIntelligencePage() {
             </div>
           </div>
 
-          <div className="rounded-xl border border-white/15 bg-[#08111f]/95 p-4 shadow-command">
-            <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Sample Dashboard Preview</p>
-                <h2 className="mt-1 text-xl font-semibold text-white">Executive operating view</h2>
-              </div>
-              <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-100">Live-ready</span>
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {dashboardSignals.map(([label, value, helper]) => (
-                <div key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-                  <p className="mt-2 text-2xl font-semibold text-vaeroex-accent">{value}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{helper}</p>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 rounded-lg border border-amber-300/25 bg-amber-400/10 p-4 text-amber-100">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-75">Recommended Action</p>
-              <p className="mt-2 text-sm font-semibold leading-6">
-                Assign CRM follow-up owner, review overdue issues, and generate a weekly recovery report.
-              </p>
-            </div>
-            <p className="mt-3 text-xs leading-5 text-slate-400">Illustrative product preview only. Actual workspace results depend on customer data and configuration.</p>
-          </div>
+          <OperationsIntelligenceEngineDemo />
         </div>
       </section>
 
