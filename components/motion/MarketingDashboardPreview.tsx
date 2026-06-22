@@ -1,8 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
-import { AnimatedMetric } from "@/components/motion/AnimatedMetric";
-
 const previewSignals = [
   ["Anomaly Detected", "Unexpected pattern surfaced.", "amber"],
   ["Risk Detected", "Emerging condition requires attention.", "red"],
@@ -33,27 +28,6 @@ function toneClass(tone: (typeof previewSignals)[number][2]) {
 }
 
 export function MarketingDashboardPreview() {
-  const [visibleCount, setVisibleCount] = useState<number>(previewSignals.length);
-  const [motionDisabled, setMotionDisabled] = useState(false);
-
-  useEffect(() => {
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
-    if (reducedMotion) {
-      setMotionDisabled(true);
-      setVisibleCount(previewSignals.length);
-      return;
-    }
-
-    setVisibleCount(0);
-
-    const timers = previewSignals.map((_, index) =>
-      window.setTimeout(() => setVisibleCount(index + 1), 520 + index * 620)
-    );
-
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
-  }, []);
-
   return (
     <aside className="vaeroex-dashboard-preview rounded-xl border border-white/15 bg-[#08111f]/95 p-3 text-white shadow-command lg:p-4" aria-label="Example Vaeroex intelligence preview">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-2.5">
@@ -85,36 +59,20 @@ export function MarketingDashboardPreview() {
 
       <div className="hidden sm:block">
         <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.06] p-3">
-          <AnimatedMetric
-            label="Signal Confidence"
-            from={52}
-            value={84}
-            suffix="%"
-            helper="Illustrative confidence score for a detected pattern."
-            className="rounded-lg"
-          />
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-muted">Signal Confidence</p>
+          <p className="mt-2 text-3xl font-semibold tracking-tight text-vaeroex-blue">84%</p>
+          <p className="mt-2 text-sm leading-6 text-muted">Illustrative confidence score for a detected pattern.</p>
           <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent transition-[width] duration-700" />
+            <div className="h-full w-[84%] rounded-full bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent" />
           </div>
         </div>
         <div className="mt-2.5 grid gap-1.5">
-          {previewSignals.map(([title, body, tone], index) => {
-            const visible = motionDisabled || index < visibleCount;
-
-            return (
-              <div
-                key={title}
-                className={[
-                  "rounded-lg border px-3 py-2.5 transition duration-500",
-                  toneClass(tone),
-                  visible ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
-                ].join(" ")}
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-75">{title}</p>
-                <p className="mt-1 text-sm font-semibold">{body}</p>
-              </div>
-            );
-          })}
+          {previewSignals.map(([title, body, tone]) => (
+            <div key={title} className={["rounded-lg border px-3 py-2.5", toneClass(tone)].join(" ")}>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-75">{title}</p>
+              <p className="mt-1 text-sm font-semibold">{body}</p>
+            </div>
+          ))}
         </div>
         <p className="mt-2.5 text-xs leading-5 text-slate-400">Illustrative website preview only. Not connected to customer data.</p>
       </div>
