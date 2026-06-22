@@ -173,8 +173,8 @@ export default function AboutPage() {
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
             Vaeroex is built to help growing organizations create the visibility, accountability, execution, and decision support needed to make better-informed decisions.
           </p>
-          <Link href="/demo" className="mt-6 inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-            Book a Demo
+          <Link href="/" className="mt-6 inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+            View Platform
           </Link>
         </ScrollReveal>
       </section>
