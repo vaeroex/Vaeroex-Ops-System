@@ -17,7 +17,7 @@ Release gate:
 - `pnpm typecheck` passes.
 - `pnpm build` passes.
 - Supabase migrations apply cleanly.
-- Customer flow passes from Squarespace purchase through Vaeroex report generation.
+- Customer flow passes from Stripe checkout or manual activation through Vaeroex report generation.
 - Admin flow passes from customer lookup through activation, support review, and AI usage review.
 - RLS separation is tested with at least two customer accounts.
 
@@ -30,14 +30,14 @@ Focus:
 
 Must-have work:
 - Complete manual test script in `docs/manual-testing-script.md`.
-- Confirm Squarespace purchase and manual activation process.
+- Confirm Stripe checkout, webhook processing, portal access, and manual activation process.
 - Confirm support request flow and internal admin review.
 - Confirm OpenAI latency, cost, and output quality.
 - Confirm no blank Vaeroex prompt and no exposed server keys.
-- Verify custom domain, Supabase Auth callback, and Squarespace thank-you links.
+- Verify custom domain, Supabase Auth callback, Stripe success URL, and billing support links.
 
 Do not add:
-- Stripe checkout.
+- Additional billing products or plan complexity.
 - Full impersonation.
 - Large integrations.
 - Advanced dashboards.
@@ -53,7 +53,7 @@ Likely work:
 - Add automated tests around workspace creation, subscription gating, and Vaeroex save confirmation.
 - Add better validation messages for setup and core operations forms.
 - Add support request notifications to internal admin email or a lightweight support inbox.
-- Add richer error logging for Vaeroex failures and Squarespace webhook processing.
+- Add richer error logging for Vaeroex failures and billing webhook processing.
 - Add real token usage/cost capture from Vaeroex model responses.
 - Improve public form submission experience.
 - Add edit flows for the highest-use modules.
@@ -98,14 +98,14 @@ Possible work:
 - Public form share pages.
 - File uploads for support and operational records.
 - Basic integrations chosen from beta feedback.
-- Optional annual plan mapping for Squarespace products.
+- Optional annual billing after the monthly Stripe flow is stable.
 
 Decision rule:
 - Build expansion items only when at least two beta customers ask for the same workflow or support data shows a recurring blocker.
 
 ## What Not To Build Yet
 
-- Internal checkout or Stripe billing.
+- Additional billing tiers, annual plans, or custom billing automation.
 - Full customer impersonation.
 - Healthcare/regulated-data workflows.
 - Enterprise SSO/SCIM.
@@ -127,7 +127,7 @@ Avoid first:
 - Customers requiring procurement/security review.
 - Customers that need PHI/ePHI handling.
 - Customers whose first requirement is integrations.
-- Customers expecting fully automated billing and self-service subscription management.
+- Customers expecting complex billing terms, procurement workflows, or custom invoicing.
 
 ## Version 1 Exit Criteria
 

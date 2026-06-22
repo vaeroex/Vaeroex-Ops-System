@@ -4,7 +4,6 @@ import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { VAEROEX_PLAN_LIMITS, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
-import { squarespaceCheckoutUrl } from "@/lib/billing/squarespace-plan-map";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const buyingSummary = [
@@ -22,7 +21,15 @@ const subscriptionDetails = [
   "Refunds handled according to the Refund Policy"
 ] as const;
 
-export default function PricingPage() {
+type PricingPageProps = {
+  searchParams?: Promise<{ checkout?: string; checkout_error?: string }>;
+};
+
+export default async function PricingPage({ searchParams }: PricingPageProps) {
+  const params = await searchParams;
+  const checkoutError = params?.checkout_error;
+  const checkoutCancelled = params?.checkout === "cancelled";
+
   return (
     <main className="min-h-screen bg-slate-50 text-ink">
       <PublicSiteHeader />
@@ -44,6 +51,16 @@ export default function PricingPage() {
           </div>
 
           <ScrollReveal as="article" delayMs={120} className="vaeroex-pricing-card vaeroex-hover-card rounded-lg border border-line bg-white p-6 shadow-command">
+            {checkoutError ? (
+              <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
+                {checkoutError}
+              </div>
+            ) : null}
+            {checkoutCancelled ? (
+              <div className="mb-5 rounded-lg border border-line bg-slate-50 p-4 text-sm font-semibold text-muted">
+                Checkout was cancelled. You can restart when you are ready.
+              </div>
+            ) : null}
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Available Product</p>
@@ -68,7 +85,7 @@ export default function PricingPage() {
             </dl>
 
             <div className="mt-6 flex flex-wrap gap-3">
-              <a href={squarespaceCheckoutUrl} className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+              <a href="/api/stripe/checkout" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
                 Start With Operations Intelligence
               </a>
               <Link href="/operations-intelligence" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">

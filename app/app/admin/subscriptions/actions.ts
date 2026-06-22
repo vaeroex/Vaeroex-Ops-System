@@ -43,6 +43,7 @@ export async function createManualSubscriptionAction(formData: FormData) {
     customer_email: email,
     customer_name: text(formData, "customer_name"),
     source: "manual",
+    billing_provider: "manual",
     plan_slug: planSlug,
     status,
     squarespace_order_id: text(formData, "squarespace_order_id") || null,

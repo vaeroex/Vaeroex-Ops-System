@@ -189,20 +189,20 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
 2. Needs manual testing:
    - Vercel production deployment build.
    - Supabase migrations and seed data.
-   - Squarespace purchase, activation, and webhook behavior.
+   - Stripe checkout, activation, portal, and webhook behavior.
    - OpenAI Vaeroex workflows.
    - Browser customer/admin flows.
    - Two-user workspace separation and role permission checks.
 
 3. Known limitations:
    - See `docs/known-limitations.md`.
-   - Main current limitations: manual activation recommended, no Stripe/internal checkout, no full impersonation, no support file upload, limited edit/delete flows, no automated tests yet, and live webhook payloads still need verification.
+   - Main current limitations: manual activation remains a fallback, Stripe production setup still needs live verification, no full impersonation, no support file upload, limited edit/delete flows, no automated tests yet, and live webhook payloads still need verification.
 
 4. Recommended first beta customer type:
    - Small non-regulated service or operations-heavy business with one owner/admin champion, 3-10 staff, and real pain around missed follow-ups, checklists, SOPs, task ownership, or weekly reporting.
 
 5. What not to build yet:
-   - Stripe/internal checkout.
+   - Additional billing tiers or custom invoicing.
    - Full customer impersonation.
    - Broad integrations.
    - Regulated-data workflows.
