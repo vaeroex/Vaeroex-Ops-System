@@ -7,6 +7,20 @@ import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emai
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { articlesByCategory, helpCategories, searchHelpArticles, type HelpCategory } from "@/lib/help/content";
 
+const helpFocusCards = [
+  ["What is Vaeroex?", "Vaeroex is an intelligence company focused on turning information into visibility, awareness, prediction, and action."],
+  ["What is an Intelligence Platform?", "A system for collecting signals, preserving context, identifying patterns, surfacing risk, supporting decisions, and turning insight into action."],
+  ["What is Operations Intelligence?", "The current Vaeroex product focused on operational visibility, accountability, execution, reporting, and decision support."],
+  ["Trust & Safety", "Review human oversight, workspace boundaries, sensitive data rules, and responsible intelligence guidance."]
+] as const;
+
+const contactChannels = [
+  ["General", VAEROEX_CONTACT_EMAILS.general],
+  ["Support", VAEROEX_CONTACT_EMAILS.support],
+  ["Billing", VAEROEX_CONTACT_EMAILS.billing],
+  ["Partners", VAEROEX_CONTACT_EMAILS.partners]
+] as const;
+
 type PublicHelpPageProps = {
   searchParams?: Promise<{ q?: string; category?: string }>;
 };
@@ -40,11 +54,11 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
         <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
           <div className="vaeroex-hero-reveal">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Help Hub</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight">Learn how Vaeroex helps build visibility, accountability, and execution.</h1>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight">Learn Vaeroex as an Intelligence Platform and Operations Intelligence as the current product.</h1>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Public help articles explain the platform, best practices, trust posture, legal policies, and how to contact Vaeroex.
+              Public help articles explain the company-level intelligence model, Operations Intelligence workflows, trust posture, legal policies, billing access, and support paths.
             </p>
-            <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Intelligence Platform • Build the structure your growth depends on.</p>
+            <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Information • Visibility • Awareness • Prediction • Action</p>
             <div className="mt-6 flex flex-wrap gap-3">
               {loggedIn ? (
                 <Link href="/app/help" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
@@ -96,17 +110,24 @@ export default async function PublicHelpPage({ searchParams }: PublicHelpPagePro
         </div>
 
         <section className="mt-10 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[
-            ["Getting started", "What Vaeroex is and how to begin."],
-            ["Feature guides", "KPIs, CRM, reports, files, SOPs, and more."],
-            ["AI & Vaeroex", "How recommendations work and why review matters."],
-            ["Legal & trust", "Policies, sensitive data, and security posture."]
-          ].map(([title, description], index) => (
+          {helpFocusCards.map(([title, description], index) => (
             <ScrollReveal key={title} as="article" delayMs={index * 70} className="vaeroex-hover-card rounded-lg border border-line bg-white p-4 shadow-sm">
               <h2 className="font-semibold">{title}</h2>
               <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
             </ScrollReveal>
           ))}
+        </section>
+
+        <section className="mt-8 rounded-lg border border-line bg-white p-5 shadow-panel">
+          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Contact Paths</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {contactChannels.map(([label, email]) => (
+              <a key={email} href={`mailto:${email}`} className="rounded-lg border border-line bg-slate-50 p-3 text-sm hover:border-vaeroex-blue hover:text-vaeroex-blue">
+                <span className="block font-semibold">{label}</span>
+                <span className="mt-1 block text-muted">{email}</span>
+              </a>
+            ))}
+          </div>
         </section>
 
         <section className="mt-10 space-y-4">

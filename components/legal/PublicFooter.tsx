@@ -40,7 +40,7 @@ export function PublicFooter() {
           <p className="mt-3 max-w-md leading-6">
             Intelligence Platform. The Advantage of Knowing First.
           </p>
-          <p className="mt-3 text-xs">Visibility • Accountability • Execution</p>
+          <p className="mt-3 text-xs">Visibility • Awareness • Execution</p>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div>
