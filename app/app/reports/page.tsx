@@ -539,7 +539,7 @@ function ReportSubscriptionPreferences({
                     <input type="hidden" name="category" value={category.key} />
                     <ConfirmSubmitButton
                       message={`Generate ${category.label} now for this workspace?`}
-                      className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold text-ink hover:bg-slate-50"
+                      className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold text-ink hover:border-vaeroex-accent/45 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
                     >
                       Run Now
                     </ConfirmSubmitButton>

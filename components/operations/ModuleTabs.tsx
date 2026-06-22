@@ -18,7 +18,7 @@ export function ModuleTabs({ tabs }: ModuleTabsProps) {
         <Link
           key={tab.href}
           href={tab.href}
-          className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold ${tab.active ? "bg-vaeroex-blue text-white" : "text-slate-700 hover:bg-slate-50"}`}
+          className={`whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 ${tab.active ? "bg-vaeroex-blue text-white" : "text-slate-700 hover:bg-cyan-950/40 hover:text-vaeroex-accent"}`}
         >
           {tab.label}
         </Link>

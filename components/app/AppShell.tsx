@@ -156,7 +156,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
             )}
           </select>
           {workspaces.length > 1 ? (
-            <button className="mt-2 w-full rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+            <button className="mt-2 w-full rounded-md border border-white/10 bg-white/[0.04] px-2 py-1.5 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
               Switch Workspace
             </button>
           ) : null}
@@ -165,7 +165,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
         <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} />
 
         <form action={signOutAction} className="mt-5">
-          <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/10">
+          <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
             Sign out
           </button>
         </form>
@@ -188,13 +188,13 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
             <div className="flex items-center gap-3">
               <Link
                 href="/app/agents"
-                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-vaeroex-accent hover:text-vaeroex-navy"
+                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
               >
                 Ask Vaeroex
               </Link>
               <Link
                 href="/app/notifications"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent hover:bg-white/15"
+                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
               >
                 <span>Notifications</span>
                 <NotificationBadge count={notificationUnreadCount} />
