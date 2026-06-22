@@ -9,6 +9,7 @@ const platformLinks: Array<[string, Route]> = [
   ["Operations Intelligence", "/operations-intelligence"],
   ["Pricing", "/pricing"],
   ["About", "/about"],
+  ["Careers", "/careers"],
   ["Network", "/networking"],
   ["Trust", "/trust"],
   ["Help", "/help"]
