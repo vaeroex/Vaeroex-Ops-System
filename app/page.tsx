@@ -2,37 +2,36 @@ import Link from "next/link";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { AnimatedMetric } from "@/components/motion/AnimatedMetric";
 import { IntelligenceLoopShowcase } from "@/components/motion/IntelligenceLoopShowcase";
 import { MarketingDashboardPreview } from "@/components/motion/MarketingDashboardPreview";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 
 const intelligenceFlow = [
-  ["Information", "Signals, records, activity, files, and context exist across every organization."],
-  ["Visibility", "Leaders need to see what is happening without relying on scattered updates."],
-  ["Understanding", "Intelligence explains why changes matter, where risk is forming, and what deserves attention."],
-  ["Action", "Useful intelligence becomes ownership, decisions, follow-up, measurement, and execution."]
+  ["Information", "Signals, records, observations, activity, files, events, and context exist across every organization."],
+  ["Visibility", "Intelligence reveals what is happening across people, systems, assets, environments, and decisions."],
+  ["Understanding", "Intelligence connects context, patterns, history, and change so leaders understand why something matters."],
+  ["Action", "Intelligence becomes valuable when it supports decisions, ownership, response, measurement, and execution."]
 ] as const;
 
 const intelligenceCapabilities = [
-  ["Visibility", "Current", "Available through Vaeroex today.", "Organize activity, metrics, records, and signals into a clearer operating view."],
-  ["Business Memory", "Current", "Available through Vaeroex today.", "Preserve historical context, decisions, reports, actions, and performance changes."],
-  ["Risk Detection", "Current", "Available through Vaeroex today.", "Surface missed follow-ups, overdue work, declining metrics, repeated issues, and execution gaps."],
-  ["Predictive Insights", "Current", "Available through Vaeroex today.", "Identify emerging patterns before they become larger performance problems."],
-  ["Decision Support", "Current", "Available through Vaeroex today.", "Turn intelligence into recommended actions, ownership, and review-ready decisions."],
-  ["Accountability Systems", "Current", "Available through Vaeroex today.", "Clarify who owns what, what is unresolved, and where execution is slowing down."],
-  ["Performance Intelligence", "Current", "Available through Vaeroex today.", "Compare KPIs, outcomes, risks, and operating trends over time."],
-  ["Operational Intelligence", "Current", "Available through Vaeroex today.", "Connect dashboards, reports, tasks, SOPs, files, CRM, checklists, and alerts."],
-  ["Asset Intelligence", "Expanding", "A domain where Vaeroex intelligence can continue to evolve.", "Apply intelligence to assets, equipment, systems, reliability, and operating signals."],
-  ["Situational Awareness", "Expanding", "A domain where Vaeroex intelligence can continue to evolve.", "Help teams understand context, risks, alerts, and priorities across changing environments."]
+  ["Visibility", "Current", "Available through Vaeroex today.", "Structure scattered signals into a clearer view of what is happening and what needs attention."],
+  ["Context Memory", "Current", "Available through Vaeroex today.", "Preserve relevant history so current signals can be understood against prior decisions, patterns, and outcomes."],
+  ["Risk Detection", "Current", "Available through Vaeroex today.", "Surface changing conditions, repeated friction, unresolved signals, and emerging exposure before they are ignored."],
+  ["Predictive Insight", "Current", "Available through Vaeroex today.", "Identify directional movement and early indicators that may require review, escalation, or response."],
+  ["Decision Support", "Current", "Available through Vaeroex today.", "Turn context into review-ready recommendations, priorities, ownership paths, and next-step options."],
+  ["Accountability Systems", "Current", "Available through Vaeroex today.", "Clarify responsibility, response paths, unresolved items, and the link between decisions and execution."],
+  ["Performance Intelligence", "Current", "Available through Vaeroex today.", "Compare outcomes, targets, movement, and signal quality over time."],
+  ["Operational Intelligence", "Current", "Available through Vaeroex today.", "Apply intelligence to organizational execution, reviews, workflows, records, and recurring decisions."],
+  ["Asset Intelligence", "Expanding", "An intelligence capability area the platform can continue to evolve toward.", "Apply intelligence to assets, equipment, systems, reliability, and environmental signals."],
+  ["Situational Awareness", "Expanding", "An intelligence capability area the platform can continue to evolve toward.", "Help teams understand context, risk, alerts, and priorities across changing environments."]
 ] as const;
 
 const intelligenceDomains = [
-  ["Operations Intelligence", "Current", "Helps organizations understand performance, accountability, risks, reports, KPIs, and execution."],
-  ["Industrial Intelligence", "Expanding domain", "Applies intelligence to assets, equipment, systems, reliability, and operational signals."],
-  ["Infrastructure Intelligence", "Expanding domain", "Applies intelligence to distributed systems, remote environments, critical assets, and field visibility."],
-  ["Security Intelligence", "Expanding domain", "Applies intelligence to risk awareness, monitoring, alerts, and situational understanding."],
-  ["Defense Intelligence", "Expanding domain", "Applies intelligence to complex environments where visibility, context, and decision support matter."]
+  ["Operations Intelligence", "Current", "Helps organizations understand execution, accountability, performance signals, reviews, and operational decisions."],
+  ["Industrial Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support assets, equipment, systems, reliability, and field signals."],
+  ["Infrastructure Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support distributed systems, remote environments, critical assets, and visibility."],
+  ["Security Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support risk awareness, monitoring context, alerts, and situational understanding."],
+  ["Defense Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support complex environments where visibility, context, and decision support matter."]
 ] as const;
 
 const operationsCapabilities = [
@@ -51,19 +50,23 @@ const operationsCapabilities = [
 ] as const;
 
 const intelligenceLoop = [
-  ["Capture", "Bring together tasks, KPIs, reports, CRM activity, files, issues, SOPs, checklists, and team activity."],
-  ["Remember", "Preserve context through business memory, decisions, reports, actions, and historical performance."],
-  ["Analyze", "Identify trends, risks, accountability gaps, and performance changes."],
-  ["Prioritize", "Surface what matters most through health scores, alerts, profit leak detection, and executive briefings."],
-  ["Execute", "Turn recommendations into tasks, reports, SOP reviews, assignments, alerts, and follow-up actions."],
-  ["Measure", "Track outcomes over time to understand what improved, what declined, and what needs attention next."]
+  ["Capture", "Bring together signals, records, observations, files, events, context, and activity."],
+  ["Remember", "Preserve relevant history so new signals can be compared against prior context and outcomes."],
+  ["Analyze", "Identify patterns, anomalies, risk surfaces, changing conditions, and decision points."],
+  ["Prioritize", "Surface what matters most through confidence, urgency, impact, ownership, and timing."],
+  ["Execute", "Turn recommendations into reviewed decisions, assigned response paths, and measurable action."],
+  ["Measure", "Track outcomes over time to understand what changed, what improved, and what needs attention next."]
 ] as const;
 
-const exampleSignals = [
-  ["Business Health Score", 84, "/100", "Illustrative leadership signal"],
-  ["Risk Signals", 12, "", "Example risks surfaced"],
-  ["Follow-ups Assigned", 18, "", "Sample accountability actions"],
-  ["Trends Reviewed", 36, "", "Sample performance changes"]
+const signalCards = [
+  ["Signal Confidence", "Illustrative confidence score for a detected pattern."],
+  ["Risk Surface", "Example risk signal identified from changing conditions."],
+  ["Anomaly Pattern", "Sample pattern that differs from expected behavior."],
+  ["Context Match", "Historical context connected to a current signal."],
+  ["Decision Point", "A moment requiring review, prioritization, or response."],
+  ["Action Path", "Suggested next step generated from intelligence."],
+  ["Ownership Signal", "Responsible party or response path identified."],
+  ["Outcome Signal", "Impact tracked after action is taken."]
 ] as const;
 
 const differentCards = [
@@ -162,16 +165,14 @@ export default function HomePage() {
             </p>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {exampleSignals.map(([label, value, suffix, helper], index) => (
-              <AnimatedMetric
-                key={label}
-                label={label}
-                value={value}
-                suffix={suffix}
-                delayMs={index * 90}
-                helper={helper}
-                className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-5 shadow-command"
-              />
+            {signalCards.map(([title, description], index) => (
+              <ScrollReveal key={title} delayMs={(index % 4) * 70} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-5 shadow-command">
+                <span className="inline-flex rounded-full border border-vaeroex-accent/30 bg-vaeroex-accent/10 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-vaeroex-accent">
+                  Sample
+                </span>
+                <h3 className="mt-4 font-semibold text-white">{title}</h3>
+                <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
+              </ScrollReveal>
             ))}
           </div>
         </div>
