@@ -516,6 +516,59 @@ function buildKpiRecords(
     .filter(({ record }) => record.name && record.actual_value !== null);
 }
 
+function kpiDedupeKey(name: string, metricDate: string) {
+  return `${name.trim().toLowerCase()}::${metricDate}`;
+}
+
+async function removeDuplicateKpiRows({
+  supabase,
+  rows,
+  workspaceId,
+  sourceFileId
+}: {
+  supabase: SupabaseServerClient;
+  rows: ReturnType<typeof buildKpiRecords>;
+  workspaceId: string;
+  sourceFileId: string;
+}) {
+  if (!rows.length) {
+    const duplicateRows: typeof rows = [];
+    return { duplicateRows, rows };
+  }
+
+  const { data, error } = await supabase
+    .from("kpis")
+    .select("id,name,metric_date,source_file_id,import_row_id")
+    .eq("workspace_id", workspaceId)
+    .eq("source_file_id", sourceFileId)
+    .limit(5000);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const existingImportRows = new Set((data || []).map((row) => row.import_row_id).filter(Boolean));
+  const existingNameDates = new Set((data || []).map((row) => kpiDedupeKey(row.name, row.metric_date)));
+  const duplicateRows: typeof rows = [];
+  const uniqueRows: typeof rows = [];
+
+  for (const row of rows) {
+    const duplicateByImportRow = existingImportRows.has(row.importRowId);
+    const duplicateByNameDate = existingNameDates.has(kpiDedupeKey(row.record.name, row.record.metric_date));
+
+    if (duplicateByImportRow || duplicateByNameDate) {
+      duplicateRows.push(row);
+      continue;
+    }
+
+    existingImportRows.add(row.importRowId);
+    existingNameDates.add(kpiDedupeKey(row.record.name, row.record.metric_date));
+    uniqueRows.push(row);
+  }
+
+  return { duplicateRows, rows: uniqueRows };
+}
+
 function buildCrmLeadRecords(
   importRows: Pick<FileImportRow, "id" | "data_json">[],
   workspaceId: string,
@@ -1488,7 +1541,8 @@ export async function uploadFileAction(formData: FormData) {
       ? "File uploaded. Next: analyze it with Vaeroex, import rows for review, or create a report from the spreadsheet."
       : storedExtension === "pdf" || storedExtension === "docx"
         ? "File uploaded. Next: analyze it with Vaeroex or create a report from extracted document text."
-        : "File uploaded. Next: analyze it with Vaeroex for image text, visible issues, KPIs, and recommendations."
+        : "File uploaded. Next: analyze it with Vaeroex for image text, visible issues, KPIs, and recommendations.",
+    data.id
   );
 }
 
@@ -1661,16 +1715,28 @@ export async function saveExtractedImportAction(formData: FormData) {
   }
 
   let importedRowCount = 0;
+  let duplicateKpiRowCount = 0;
+  let importedKpiImportRowIds: string[] = [];
+  let duplicateKpiImportRowIds: string[] = [];
 
   try {
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
 
     if (importType === "kpi") {
       const targetRows = buildKpiRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
-      importedRowCount = targetRows.length;
+      const deduped = await removeDuplicateKpiRows({
+        supabase,
+        rows: targetRows,
+        workspaceId,
+        sourceFileId: file.id
+      });
+      duplicateKpiRowCount = deduped.duplicateRows.length;
+      importedRowCount = deduped.rows.length;
+      importedKpiImportRowIds = deduped.rows.map((row) => row.importRowId);
+      duplicateKpiImportRowIds = deduped.duplicateRows.map((row) => row.importRowId);
 
-      if (targetRows.length) {
-        const { error } = await supabase.from("kpis").insert(targetRows.map((row) => row.record));
+      if (deduped.rows.length) {
+        const { error } = await supabase.from("kpis").insert(deduped.rows.map((row) => row.record));
 
         if (error) {
           throw new Error(error.message);
@@ -1699,7 +1765,7 @@ export async function saveExtractedImportAction(formData: FormData) {
       }
     }
 
-    if (!importedRowCount) {
+    if (!importedRowCount && !duplicateKpiRowCount) {
       throw new Error("No rows matched the selected mappings. Check the required fields and try again.");
     }
 
@@ -1713,13 +1779,37 @@ export async function saveExtractedImportAction(formData: FormData) {
       source_file_id: file.id
     } satisfies JsonObject;
 
-    await supabase
-      .from("file_import_rows")
-      .update({
-        status: "imported"
-      })
-      .eq("workspace_id", workspaceId)
-      .eq("import_id", importId);
+    if (importType === "kpi") {
+      if (importedKpiImportRowIds.length) {
+        await supabase
+          .from("file_import_rows")
+          .update({
+            status: "imported"
+          })
+          .eq("workspace_id", workspaceId)
+          .eq("import_id", importId)
+          .in("id", importedKpiImportRowIds);
+      }
+
+      if (duplicateKpiImportRowIds.length) {
+        await supabase
+          .from("file_import_rows")
+          .update({
+            status: "skipped_duplicate"
+          })
+          .eq("workspace_id", workspaceId)
+          .eq("import_id", importId)
+          .in("id", duplicateKpiImportRowIds);
+      }
+    } else {
+      await supabase
+        .from("file_import_rows")
+        .update({
+          status: "imported"
+        })
+        .eq("workspace_id", workspaceId)
+        .eq("import_id", importId);
+    }
 
     await supabase
       .from("file_imports")
@@ -1768,6 +1858,19 @@ export async function saveExtractedImportAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/kpis");
   revalidatePath("/app/reports");
+  if (importType === "kpi") {
+    const duplicateNote = duplicateKpiRowCount
+      ? ` ${duplicateKpiRowCount} duplicate row${duplicateKpiRowCount === 1 ? "" : "s"} skipped.`
+      : "";
+
+    redirectWithMessage(
+      importedRowCount
+        ? `KPI history updated. Dashboard and reports now include this data. ${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved.${duplicateNote}`
+        : `KPI history already included this data. No duplicate KPI rows were saved.${duplicateNote}`,
+      file.id
+    );
+  }
+
   redirectWithMessage(`${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved to history.`, file.id);
 }
 
