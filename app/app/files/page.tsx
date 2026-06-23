@@ -116,7 +116,18 @@ function SuccessNotice({ message }: { message?: string | null }) {
     return null;
   }
 
-  return <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>;
+  const showKpiLink = message.toLowerCase().includes("kpi history");
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 md:flex-row md:items-center md:justify-between">
+      <p>{message}</p>
+      {showKpiLink ? (
+        <Link href="/app/kpis" className="w-fit rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-800">
+          View KPIs
+        </Link>
+      ) : null}
+    </div>
+  );
 }
 
 function fileSizeLabel(bytes: number) {
@@ -238,6 +249,7 @@ function importStatusLabel(value: string) {
   if (value === "needs_review" || value === "extracted") return "Needs review";
   if (value === "completed") return "Saved";
   if (value === "failed") return "Failed";
+  if (value === "skipped_duplicate") return "Skipped duplicate";
   return value || "Staged";
 }
 
@@ -259,6 +271,58 @@ function columnsForRows(rows: FileImportDataRow[]) {
     new Set(
       rows.flatMap((row) => Object.keys(rowValues(row))).filter(Boolean)
     )
+  );
+}
+
+function kpiMappingConfidence(importRecord: FileImportRow) {
+  const nameColumn = mappingValue(importRecord.mapping_json, "name");
+  const actualValueColumn = mappingValue(importRecord.mapping_json, "actual_value");
+  const dateColumn = mappingValue(importRecord.mapping_json, "metric_date");
+  const targetColumn = mappingValue(importRecord.mapping_json, "target");
+
+  if (!nameColumn || !actualValueColumn) {
+    return {
+      label: "Cannot import",
+      tone: "border-red-200 bg-red-50 text-red-700",
+      help: "Choose a KPI name column and actual value column before saving approved data.",
+      nameColumn,
+      actualValueColumn,
+      dateColumn,
+      targetColumn
+    };
+  }
+
+  if (!dateColumn || !targetColumn) {
+    return {
+      label: "Needs review",
+      tone: "border-amber-200 bg-amber-50 text-amber-900",
+      help: "Required fields were detected. Review optional date and target mappings before saving.",
+      nameColumn,
+      actualValueColumn,
+      dateColumn,
+      targetColumn
+    };
+  }
+
+  return {
+    label: "High confidence",
+    tone: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    help: "Required KPI fields and key optional fields were detected. Review the sample rows before saving.",
+    nameColumn,
+    actualValueColumn,
+    dateColumn,
+    targetColumn
+  };
+}
+
+function DetectedColumnCard({ label, value, required = false }: { label: string; value: string; required?: boolean }) {
+  const detected = Boolean(value);
+
+  return (
+    <div className={`rounded-lg border p-3 ${detected ? "border-line bg-white" : required ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
+      <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{detected ? value : "Not detected"}</p>
+    </div>
   );
 }
 
@@ -656,7 +720,7 @@ function ImportActionForm({ file, importType, label }: { file: FileUploadRow; im
     <form action={importFileAction}>
       <input type="hidden" name="file_id" value={file.id} />
       <input type="hidden" name="import_type" value={importType} />
-      <ActionButton pendingLabel="Importing...">{label}</ActionButton>
+      <ActionButton pendingLabel={importType === "kpi" ? "Preparing review..." : "Importing..."}>{label}</ActionButton>
     </form>
   );
 }
@@ -693,7 +757,7 @@ function FileInlineActions({
         <form action={importFileAction}>
           <input type="hidden" name="file_id" value={file.id} />
           <input type="hidden" name="import_type" value="kpi" />
-          <CompactActionButton pendingLabel="Importing...">Import</CompactActionButton>
+          <CompactActionButton pendingLabel="Preparing review...">Review KPI Import</CompactActionButton>
         </form>
       ) : null}
       {canAnalyze ? (
@@ -753,6 +817,22 @@ function FileActionCenter({
         </div>
       </div>
 
+      {canImport ? (
+        <div className="rounded-lg border border-cyan-400/40 bg-cyan-950/70 p-4 text-cyan-50">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Vaeroex found structured data in this file.</p>
+              <p className="mt-1 text-xs leading-5">
+                You can import it as KPI data after review. Vaeroex will stage rows, suggest mappings, and wait for your approval before saving KPI history.
+              </p>
+            </div>
+            <Link href="#file-import-actions" className="w-fit rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
+              Review KPI Import
+            </Link>
+          </div>
+        </div>
+      ) : null}
+
       <section id="file-analysis-form" className="rounded-lg border border-line bg-white p-4">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
           <div>
@@ -801,7 +881,7 @@ function FileActionCenter({
           These actions extract rows and show a mapping review first. Nothing is saved to KPI, CRM, or business history until you approve it.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
-          <ImportActionForm file={file} importType="kpi" label={`Import ${file.display_name} as KPI Data`} />
+          <ImportActionForm file={file} importType="kpi" label="Review KPI Import" />
           <ImportActionForm file={file} importType="crm" label={`Import ${file.display_name} as CRM Leads`} />
           <ImportActionForm file={file} importType="metrics" label={`Import ${file.display_name} as Business Metrics`} />
         </div>
@@ -1060,6 +1140,7 @@ function MappingReview({
   const fields = IMPORT_FIELDS[importType];
   const columns = columnsForRows(rows);
   const previewRows = rows.slice(0, 5);
+  const kpiConfidence = importType === "kpi" ? kpiMappingConfidence(importRecord) : null;
 
   if (!rows.length) {
     return (
@@ -1080,6 +1161,27 @@ function MappingReview({
           Vaeroex found {importRecord.rows_total} row{importRecord.rows_total === 1 ? "" : "s"} for {importTypeLabel(importType)}. Nothing is added to your dashboards until you approve these mappings.
         </p>
       </div>
+
+      {kpiConfidence ? (
+        <div className="space-y-3 rounded-lg border border-line bg-white p-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-ink">KPI import readiness</p>
+              <p className="mt-1 text-xs leading-5 text-muted">
+                {rows.length} row{rows.length === 1 ? "" : "s"} staged for review. Vaeroex will not save KPI history until you approve these mappings.
+              </p>
+            </div>
+            <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${kpiConfidence.tone}`}>{kpiConfidence.label}</span>
+          </div>
+          <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">{kpiConfidence.help}</p>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <DetectedColumnCard label="Detected KPI name column" value={kpiConfidence.nameColumn} required />
+            <DetectedColumnCard label="Detected actual value column" value={kpiConfidence.actualValueColumn} required />
+            <DetectedColumnCard label="Detected date column" value={kpiConfidence.dateColumn} />
+            <DetectedColumnCard label="Detected target column" value={kpiConfidence.targetColumn} />
+          </div>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         {fields.map((field) => (
@@ -1103,7 +1205,9 @@ function MappingReview({
       </div>
 
       <div className="overflow-hidden rounded-lg border border-line bg-white">
-        <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">Preview rows</div>
+        <div className="border-b border-line px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted">
+          Sample preview rows
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs">
             <thead className="bg-slate-50 text-muted">
