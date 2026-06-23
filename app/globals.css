@@ -337,8 +337,8 @@ button.bg-vaeroex-blue:hover {
   pointer-events: none;
   content: "";
   background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.16), transparent);
-  transform: translate3d(-35%, 0, 0);
-  animation: vaeroex-panel-sheen 7.5s ease-in-out infinite;
+  opacity: 0.16;
+  transform: translate3d(0, 0, 0);
 }
 
 .vaeroex-dashboard-preview > *,
@@ -350,7 +350,7 @@ button.bg-vaeroex-blue:hover {
 }
 
 .vaeroex-network-line {
-  animation: vaeroex-line-flow 4.5s linear infinite;
+  animation: none;
 }
 
 .vaeroex-intelligence-flow::before {
@@ -388,7 +388,7 @@ button.bg-vaeroex-blue:hover {
   border-radius: 9999px;
   background: #38bdf8;
   box-shadow: 0 0 22px rgba(56, 189, 248, 0.9);
-  animation: vaeroex-flow-dot-horizontal 2.4s ease-in-out infinite;
+  animation: vaeroex-flow-dot-horizontal 1.8s ease-out 1;
 }
 
 .vaeroex-signal-stream span:nth-child(2) {
@@ -765,7 +765,8 @@ button.bg-vaeroex-blue:hover {
 .pulsar .vaeroex-form-intro::before {
   width: 52%;
   background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.22), rgba(240, 171, 252, 0.16), transparent);
-  animation: vaeroex-pulsar-sweep 8.5s ease-in-out infinite;
+  animation: none;
+  opacity: 0.18;
 }
 
 .pulsar .vaeroex-network-line {

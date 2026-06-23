@@ -94,7 +94,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
             <div className="mt-6 flex flex-wrap gap-3">
               <a href="/api/stripe/checkout" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Start With Operations Intelligence
+                Start With Vaeroex
               </a>
               <Link href="/operations-intelligence" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
                 Learn More
