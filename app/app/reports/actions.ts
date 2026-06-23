@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
+import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -384,7 +385,22 @@ async function fetchReportSource(
   range: DateRange,
   category: string
 ) {
-  const [tasks, issues, checklistRuns, sops, submissions, assets, kpis, vaeroexRuns, files, fileImports, crmLeads, crmLeadHistory, operationalMetrics] = await Promise.all([
+  const [
+    tasks,
+    issues,
+    checklistRuns,
+    sops,
+    submissions,
+    assets,
+    kpis,
+    kpiSettings,
+    vaeroexRuns,
+    files,
+    fileImports,
+    crmLeads,
+    crmLeadHistory,
+    operationalMetrics
+  ] = await Promise.all([
     supabase
       .from("tasks")
       .select("id,title,description,status,priority,category,due_date,created_at,updated_at")
@@ -427,6 +443,7 @@ async function fetchReportSource(
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
       .limit(300),
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase
       .from("ai_agent_runs")
       .select("id,agent_type,input_json,output_json,status,error_message,created_at")
@@ -473,7 +490,10 @@ async function fetchReportSource(
   const sopRows = ((sops.data ?? []) as SopRow[]).filter((sop) => matchesCategory(category, sop, "SOPs"));
   const submissionRows = ((submissions.data ?? []) as FormSubmissionRow[]).filter(() => matchesCategory(category, {}, "Forms"));
   const assetRows = ((assets.data ?? []) as AssetRow[]).filter(() => matchesCategory(category, {}, "Assets"));
-  const kpiRows = ((kpis.data ?? []) as KpiRow[]).filter((kpi) => matchesCategory(category, kpi, "KPIs"));
+  const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
+  const kpiRows = (sortKpiRowsBySettings(applyKpiSettingsToRows((kpis.data ?? []) as KpiRow[], kpiSettingRows), kpiSettingRows) as KpiRow[]).filter((kpi) =>
+    matchesCategory(category, kpi, "KPIs")
+  );
   const runRows = ((vaeroexRuns.data ?? []) as VaeroexRunRow[]).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
   const fileRows = ((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));

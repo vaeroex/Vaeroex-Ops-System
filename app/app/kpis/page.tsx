@@ -11,12 +11,31 @@ import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
+import {
+  applyKpiSettingsToRows,
+  getConfiguredMetricNames,
+  kpiColor,
+  kpiDefinition,
+  kpiSettingForName,
+  kpiWeight,
+  sortKpiRowsBySettings,
+  type KpiSettingRow
+} from "@/lib/kpis/settings";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import type { Database } from "@/lib/supabase/types";
 
 type KpisPageProps = {
-  searchParams?: Promise<{ error?: string; message?: string; metric?: string | string[]; section?: string; sort?: string }>;
+  searchParams?: Promise<{
+    error?: string;
+    message?: string;
+    metric?: string | string[];
+    section?: string;
+    sort?: string;
+    timeline?: string;
+    start?: string;
+    end?: string;
+  }>;
 };
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
@@ -44,17 +63,15 @@ const numberFormatter = new Intl.NumberFormat("en-US", {
   maximumFractionDigits: 2
 });
 
-const chartColors = ["#1E6BFF", "#38BDF8", "#0B1F4D", "#059669", "#f59e0b", "#dc2626", "#9CA3AF"];
 const kpiEditFields: ManagedRecordEditField[] = [
   { name: "name", label: "Name", required: true },
   { name: "category", label: "Category" },
-  { name: "target", label: "Target", type: "number" },
-  { name: "actual_value", label: "Actual Value", type: "number" },
-  { name: "metric_date", label: "Date", type: "date" },
   { name: "owner", label: "Owner" },
   { name: "source", label: "Source" },
   { name: "notes", label: "Notes", type: "textarea", rows: 4 }
 ];
+const KPI_TIMELINES = ["7D", "30D", "90D", "6M", "12M", "YTD", "All Time", "Custom Range"] as const;
+type KpiTimeline = (typeof KPI_TIMELINES)[number];
 
 function lower(value: string | null | undefined) {
   return (value || "").toLowerCase();
@@ -165,6 +182,66 @@ function SuccessNotice({ message }: { message?: string | null }) {
   return <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>;
 }
 
+function TimelineControls({
+  timeline,
+  range
+}: {
+  timeline: KpiTimeline;
+  range: { label: string; startDate: string; endDate: string };
+}) {
+  return (
+    <section className="rounded-lg border border-line bg-white p-4 shadow-panel">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-ink">Timeline</p>
+          <p className="mt-1 text-xs leading-5 text-muted">
+            {range.label}: {range.startDate} to {range.endDate}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {KPI_TIMELINES.map((item) => (
+            <Link
+              key={item}
+              href={timelineHref(item)}
+              className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                item === timeline
+                  ? "border-vaeroex-blue bg-vaeroex-blue text-white"
+                  : "border-line bg-white text-slate-700 hover:border-vaeroex-accent hover:bg-cyan-950/10 hover:text-vaeroex-blue"
+              }`}
+            >
+              {item}
+            </Link>
+          ))}
+        </div>
+      </div>
+      <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        <input type="hidden" name="timeline" value="Custom Range" />
+        <label className="block text-xs font-semibold uppercase tracking-wide text-muted">
+          Start
+          <input
+            name="start"
+            type="date"
+            defaultValue={timeline === "Custom Range" ? range.startDate : ""}
+            className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:border-vaeroex-blue"
+          />
+        </label>
+        <label className="block text-xs font-semibold uppercase tracking-wide text-muted">
+          End
+          <input
+            name="end"
+            type="date"
+            defaultValue={timeline === "Custom Range" ? range.endDate : ""}
+            className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 text-sm normal-case tracking-normal text-ink outline-none focus:border-vaeroex-blue"
+          />
+        </label>
+        <button className="self-end rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+          Apply custom range
+        </button>
+      </form>
+    </section>
+  );
+}
+
 function MetricCard({
   label,
   value,
@@ -200,10 +277,6 @@ function average(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function getMetricNames(kpis: KpiRow[]) {
-  return Array.from(new Set(kpis.map((kpi) => kpi.name).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-}
-
 function paramValues(value: string | string[] | undefined) {
   if (!value) {
     return [];
@@ -222,11 +295,86 @@ function getSelectedMetrics(value: string | string[] | undefined, metricNames: s
   return metricNames.slice(0, Math.min(metricNames.length, 3));
 }
 
+function isKpiTimeline(value: string | undefined): value is KpiTimeline {
+  return KPI_TIMELINES.includes(value as KpiTimeline);
+}
+
+function dateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function startOfDay(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function addMonths(date: Date, months: number) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + months, date.getUTCDate()));
+}
+
+function startOfYear(date: Date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+}
+
+function validDateParam(value: string | undefined) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
+}
+
+function timelineRange(timeline: KpiTimeline, rows: KpiRow[], customStart?: string, customEnd?: string) {
+  const today = startOfDay(new Date());
+  const todayDate = dateOnly(today);
+  const allDates = rows.map((row) => row.metric_date).filter(Boolean).sort();
+  const earliest = allDates[0] || dateOnly(addMonths(today, -12));
+
+  if (timeline === "Custom Range") {
+    const startDate = validDateParam(customStart) || earliest;
+    const endDate = validDateParam(customEnd) || todayDate;
+
+    return {
+      label: "Custom Range",
+      startDate: startDate <= endDate ? startDate : endDate,
+      endDate: startDate <= endDate ? endDate : startDate
+    };
+  }
+
+  if (timeline === "All Time") {
+    return { label: "All Time", startDate: earliest, endDate: todayDate };
+  }
+
+  if (timeline === "YTD") {
+    return { label: "Year to Date", startDate: dateOnly(startOfYear(today)), endDate: todayDate };
+  }
+
+  if (timeline === "12M") {
+    return { label: "Last 12 months", startDate: dateOnly(addMonths(today, -12)), endDate: todayDate };
+  }
+
+  if (timeline === "6M") {
+    return { label: "Last 6 months", startDate: dateOnly(addMonths(today, -6)), endDate: todayDate };
+  }
+
+  const days = timeline === "7D" ? 7 : timeline === "30D" ? 30 : 90;
+  return { label: `Last ${days} days`, startDate: dateOnly(addDays(today, -(days - 1))), endDate: todayDate };
+}
+
+function filterKpisByTimeline(rows: KpiRow[], range: { startDate: string; endDate: string }) {
+  return rows.filter((row) => row.metric_date >= range.startDate && row.metric_date <= range.endDate);
+}
+
+function timelineHref(timeline: KpiTimeline) {
+  return `/app/kpis?timeline=${encodeURIComponent(timeline)}` as Route;
+}
+
 function getTrendRows(kpis: KpiRow[], metricName: string) {
   return kpis
     .filter((kpi) => kpi.name === metricName)
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`))
-    .slice(-12);
+    .slice(-24);
 }
 
 function getMetricHistoryRows(kpis: KpiRow[], metricName: string) {
@@ -235,7 +383,7 @@ function getMetricHistoryRows(kpis: KpiRow[], metricName: string) {
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`));
 }
 
-function buildTrends(kpis: KpiRow[], metricNames: string[]) {
+function buildTrends(kpis: KpiRow[], metricNames: string[], settings: KpiSettingRow[]) {
   return metricNames.map((name, index) => {
     const rows = getTrendRows(kpis, name);
     const latest = rows[rows.length - 1];
@@ -251,7 +399,7 @@ function buildTrends(kpis: KpiRow[], metricNames: string[]) {
     return {
       name,
       rows,
-      color: chartColors[index % chartColors.length],
+      color: kpiColor(name, settings, index),
       latest,
       previous,
       change,
@@ -301,20 +449,6 @@ function TrendSummaryCard({ label, value, detail }: { label: string; value: stri
   );
 }
 
-function dateOnly(date: Date) {
-  return date.toISOString().slice(0, 10);
-}
-
-function startOfDay(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 0, 0, 0, 0));
-}
-
-function addDays(date: Date, days: number) {
-  const next = new Date(date);
-  next.setUTCDate(next.getUTCDate() + days);
-  return next;
-}
-
 function startOfWeek(date: Date) {
   const day = date.getUTCDay();
   return startOfDay(addDays(date, -((day + 6) % 7)));
@@ -326,10 +460,6 @@ function startOfMonth(date: Date) {
 
 function startOfQuarter(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1));
-}
-
-function startOfYear(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
 }
 
 function comparisonRange(label: string, currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date) {
@@ -701,7 +831,7 @@ function ComparisonAnalysis({ trends }: { trends: KpiTrend[] }) {
   );
 }
 
-function TrendAnalysis({ rows, metricName }: { rows: KpiRow[]; metricName: string }) {
+function TrendAnalysis({ rows, metricName, settings }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[] }) {
   if (!metricName) {
     return (
       <EmptyState
@@ -720,9 +850,13 @@ function TrendAnalysis({ rows, metricName }: { rows: KpiRow[]; metricName: strin
   const movement = trendDeltaLabel(latest, previous, metricName);
   const latestValue = formatNumericValue(latest?.actual_value, metricName);
   const averageValue = formatNumericValue(averageActual, metricName, "Not enough data");
+  const definition = kpiDefinition(metricName, settings);
+  const weight = kpiWeight(metricName, settings);
 
   const insights = [
     latest ? `Latest result is ${latestValue} for ${formatShortDate(latest.metric_date)}.` : "",
+    definition ? `Definition: ${definition}` : "",
+    `Leadership weight: ${numberFormatter.format(weight)} out of 10.`,
     latest?.target === null || latest?.target === undefined
       ? "Add a target to show whether this KPI is on pace."
       : `Current target status: ${targetStatus.toLowerCase()}.`,
@@ -799,7 +933,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     crmResult,
     fileResult,
     reportResult,
-    notificationResult
+    notificationResult,
+    kpiSettingsResult
   ] = await Promise.all([
     supabase
       .from("kpis")
@@ -819,10 +954,17 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(20),
-    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50)
+    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
 
-  const kpis = (kpiResult.data || []) as KpiRow[];
+  const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
+  const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
+  const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
+  const selectedTimelineRange = timelineRange(timeline, adjustedKpis.length ? adjustedKpis : rawKpis, params?.start, params?.end);
+  const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);
+  const allVisibleKpis = adjustedKpis;
   const people = (peopleResult.data || []) as TeamPersonOption[];
   const alertRules = (alertRulesResult.data || []) as KpiAlertRuleRow[];
   const shares = (shareResult.data || []) as ShareRow[];
@@ -890,16 +1032,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     },
     {
       label: "Custom Metrics",
-      value: kpis.length,
-      detail: "KPIs tracked in this workspace",
-      tone: kpis.length > 0 ? "green" : "yellow"
+      value: getConfiguredMetricNames(allVisibleKpis, kpiSettings).length,
+      detail: "Visible KPI definitions tracked in this workspace",
+      tone: allVisibleKpis.length > 0 ? "green" : "yellow"
     }
   ] satisfies Array<{ label: string; value: string | number; detail: string; tone: KpiTone }>;
-  const metricNames = getMetricNames(kpis);
+  const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
   const trendRows = primaryMetric ? getMetricHistoryRows(kpis, primaryMetric) : [];
-  const selectedTrends = buildTrends(kpis, selectedMetrics);
+  const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
   const hasComparison = selectedMetrics.length > 1;
   const managedKpis = kpis.map((kpi) => {
     const management = managedValues(kpi);
@@ -932,9 +1074,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       editValues: {
         name: kpi.name,
         category: kpi.category,
-        target: kpi.target,
-        actual_value: kpi.actual_value,
-        metric_date: kpi.metric_date,
         owner: kpi.owner,
         source: kpi.source,
         notes: kpi.notes
@@ -973,7 +1112,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           { label: "Comparisons", href: "/app/kpis?metric=compare" as Route, active: params?.metric === "compare" },
           { label: "History", href: "/app/kpis?sort=last_updated" as Route, active: params?.sort === "last_updated" },
           { label: "Imports", href: "/app/files?status=Imported" as Route },
-          { label: "Settings", href: "/app/kpis?section=settings" as Route, active: params?.section === "settings" }
+          { label: "Settings", href: "/app/kpis/settings" as Route }
         ]}
       />
 
@@ -983,20 +1122,23 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           kpiResult.error?.message ||
           completedTasksResult.error?.message ||
           openTasksResult.error?.message ||
-          folderResult.error?.message ||
-          peopleResult.error?.message ||
-          alertRulesResult.error?.message ||
-          shareResult.error?.message ||
+    folderResult.error?.message ||
+    peopleResult.error?.message ||
+    alertRulesResult.error?.message ||
+    shareResult.error?.message ||
           taskResult.error?.message ||
           issueResult.error?.message ||
           checklistRunResult.error?.message ||
-          crmResult.error?.message ||
-          fileResult.error?.message ||
-          reportResult.error?.message ||
-          notificationResult.error?.message
+    crmResult.error?.message ||
+    fileResult.error?.message ||
+    reportResult.error?.message ||
+    notificationResult.error?.message ||
+    kpiSettingsResult.error?.message
         }
       />
       <SuccessNotice message={params?.message} />
+
+      <TimelineControls timeline={timeline} range={selectedTimelineRange} />
 
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {metricCards.map((card) => (
@@ -1041,12 +1183,21 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         {metricNames.length ? (
           <div className="space-y-5">
             <form method="get" className="space-y-3 rounded-lg border border-line bg-slate-50 p-4">
+              <input type="hidden" name="timeline" value={timeline} />
+              {timeline === "Custom Range" ? (
+                <>
+                  <input type="hidden" name="start" value={selectedTimelineRange.startDate} />
+                  <input type="hidden" name="end" value={selectedTimelineRange.endDate} />
+                </>
+              ) : null}
               <div>
                 <p className="text-sm font-semibold text-ink">Compare KPIs</p>
-                <p className="mt-1 text-xs leading-5 text-muted">Check or uncheck KPI lines, then update the chart.</p>
+                <p className="mt-1 text-xs leading-5 text-muted">
+                  Check or uncheck KPI lines for this view. Workspace visibility, colors, targets, definitions, and weights are managed in KPI Settings.
+                </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {metricNames.map((metric) => (
+                {metricNames.map((metric, index) => (
                   <label key={metric} className="flex items-center gap-2 rounded-lg border border-line bg-white px-3 py-2 text-sm">
                     <input
                       name="metric"
@@ -1055,14 +1206,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                       defaultChecked={selectedMetrics.includes(metric)}
                       className="h-4 w-4 rounded border-line text-vaeroex-blue"
                     />
-                    <span>{metric}</span>
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: kpiColor(metric, kpiSettings, index) }} />
+                    <span className="min-w-0 flex-1 truncate">{metric}</span>
+                    <span className="text-xs text-muted">W {numberFormatter.format(kpiWeight(metric, kpiSettings))}</span>
                   </label>
                 ))}
               </div>
               <PrimaryButton>Update chart</PrimaryButton>
             </form>
 
-            <TrendAnalysis rows={trendRows} metricName={primaryMetric} />
+            <TrendAnalysis rows={trendRows} metricName={primaryMetric} settings={kpiSettings} />
 
             {hasComparison ? (
               <section className="space-y-3">

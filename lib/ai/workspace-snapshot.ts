@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import type { Database } from "@/lib/supabase/types";
 
 function uniqueStrings(values: Array<string | null | undefined>) {
@@ -45,6 +46,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     assetCount,
     peopleCount,
     recentKpis,
+    kpiSettings,
     recentFileImports,
     recentFiles,
     recentCrmLeads,
@@ -140,6 +142,12 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .order("metric_date", { ascending: false })
       .limit(120),
     supabase
+      .from("kpi_settings")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("sort_order", { ascending: true })
+      .order("weight", { ascending: false }),
+    supabase
       .from("file_imports")
       .select("id,file_upload_id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
       .eq("workspace_id", workspaceId)
@@ -170,7 +178,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .order("metric_date", { ascending: false })
       .limit(80)
   ]);
-  const recentKpiRows = recentKpis.data ?? [];
+  const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
+  const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(recentKpis.data ?? [], kpiSettingRows), kpiSettingRows);
   const recentFileRows = recentFiles.data ?? [];
   const recentLeadRows = recentCrmLeads.data ?? [];
   const recentTaskRows = recentTasks.data ?? [];
@@ -192,6 +201,13 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       records: kpiCount.count ?? 0,
       metric_names: uniqueStrings(recentKpiRows.map((kpi) => kpi.name)),
       categories: uniqueStrings(recentKpiRows.map((kpi) => kpi.category)),
+      settings: kpiSettingRows.map((setting) => ({
+        kpi_name: setting.kpi_name,
+        target: setting.target,
+        weight: setting.weight,
+        is_visible: setting.is_visible,
+        definition: setting.definition
+      })),
       guidance: "The KPI Dashboard already exists. Recommend adding, cleaning, reviewing, or comparing KPI records instead of creating a KPI dashboard."
     },
     crm_pipeline: {
@@ -310,6 +326,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     reports: recentReportRows,
     recent_vaeroex_results: vaeroexRuns.data ?? [],
     kpi_history: recentKpiRows,
+    kpi_settings: kpiSettingRows,
     file_import_history: recentFileImports.data ?? [],
     files: recentFileRows,
     file_analyses: analyzedFiles,

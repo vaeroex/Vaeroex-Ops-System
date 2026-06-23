@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { categoryConfig, categoryLabel, type ReportSubscriptionCategory } from "@/lib/reports/subscriptions";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -85,11 +86,12 @@ function list(values: string[], fallback: string) {
 }
 
 async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: string, start: Date, end: Date) {
-  const [tasks, issues, checklists, kpis, crm, insights, assignments, files] = await Promise.all([
+  const [tasks, issues, checklists, kpis, kpiSettings, crm, insights, assignments, files] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(300),
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true }).limit(100),
@@ -99,7 +101,8 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const taskRows = tasks.data || [];
   const issueRows = issues.data || [];
   const checklistRows = checklists.data || [];
-  const kpiRows = kpis.data || [];
+  const kpiSettingRows = (kpiSettings.data || []) as KpiSettingRow[];
+  const kpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(kpis.data || [], kpiSettingRows), kpiSettingRows);
   const crmRows = crm.data || [];
   const insightRows = insights.data || [];
   const assignmentRows = assignments.data || [];

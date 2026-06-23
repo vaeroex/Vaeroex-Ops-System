@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
+import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -401,9 +402,6 @@ export async function updateKpiAction(formData: FormData) {
     .update({
       name,
       category,
-      target: optionalNumber(path, "Target", text(formData, "target")),
-      actual_value: optionalNumber(path, "Actual value", text(formData, "actual_value")),
-      metric_date: metricDateOrToday(path, text(formData, "metric_date")),
       owner,
       notes,
       source
@@ -424,6 +422,56 @@ export async function updateKpiAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app/reports");
   redirectWithMessage(path, "KPI updated.");
+}
+
+export async function updateKpiSettingAction(formData: FormData) {
+  const path = returnPath(formData, "/app/kpis/settings");
+  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const kpiName = text(formData, "kpi_name");
+  const category = text(formData, "category");
+  const definition = text(formData, "definition");
+  const color = approvedKpiColor(text(formData, "color"));
+  const target = optionalNumber(path, "Target", text(formData, "target"));
+  const weight = optionalNumber(path, "Weight", text(formData, "weight")) ?? 1;
+  const sortOrder = optionalNumber(path, "Sort order", text(formData, "sort_order")) ?? 0;
+
+  requireValue(path, "KPI name", kpiName);
+  validateLength(path, "Category", category, 100);
+  validateLength(path, "Definition", definition, 1200);
+
+  if (!KPI_COLOR_PALETTE.some((item) => item.value === color)) {
+    redirectWithError(path, "Choose an approved KPI color.");
+  }
+
+  if (weight < 0 || weight > 10) {
+    redirectWithError(path, "KPI weight must be between 0 and 10.");
+  }
+
+  const { error } = await supabase.from("kpi_settings").upsert(
+    {
+      workspace_id: workspaceId,
+      kpi_name: kpiName,
+      category: category || null,
+      target,
+      weight,
+      definition: definition || null,
+      color,
+      is_visible: bool(formData, "is_visible"),
+      sort_order: Math.round(sortOrder),
+      created_by: user.id
+    },
+    { onConflict: "workspace_id,kpi_name" }
+  );
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/kpis/settings");
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "KPI settings updated.");
 }
 
 export async function deleteKpiAction(formData: FormData) {

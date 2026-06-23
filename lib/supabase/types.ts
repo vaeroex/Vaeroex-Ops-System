@@ -713,6 +713,40 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["kpis"]["Insert"]>;
         Relationships: [];
       };
+      kpi_settings: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          kpi_name: string;
+          category: string | null;
+          target: number | null;
+          weight: number;
+          definition: string | null;
+          color: string;
+          is_visible: boolean;
+          sort_order: number;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          kpi_name: string;
+          category?: string | null;
+          target?: number | null;
+          weight?: number;
+          definition?: string | null;
+          color?: string;
+          is_visible?: boolean;
+          sort_order?: number;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["kpi_settings"]["Insert"]>;
+        Relationships: [];
+      };
       issues: {
         Row: {
           id: string;
