@@ -1,8 +1,18 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { OperationsIntelligenceEngineDemo } from "@/components/motion/OperationsIntelligenceEngineDemo";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { operationsIntelligenceJsonLd, publicPageMetadata } from "@/lib/seo/public-seo";
+
+export const metadata: Metadata = publicPageMetadata({
+  title: "Operations Intelligence by Vaeroex",
+  description: "Operations Intelligence by Vaeroex helps organizations improve visibility, accountability, execution, reporting, and decision support.",
+  path: "/operations-intelligence"
+});
+
+const operationsIntelligenceSchema = JSON.stringify(operationsIntelligenceJsonLd);
 
 const productCapabilities = [
   ["Executive Dashboard", "A leadership view of performance, risks, priorities, open work, and recommended next actions."],
@@ -41,6 +51,7 @@ const workflowSteps = [
 export default function OperationsIntelligencePage() {
   return (
     <main className="min-h-screen bg-[#030712] text-white">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: operationsIntelligenceSchema }} />
       <PublicSiteHeader />
 
       <section className="vaeroex-ambient relative overflow-hidden px-6 py-14 text-white">

@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "https://vaeroex.com"),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || PUBLIC_SITE_URL),
   title: "Vaeroex — Intelligence Platform",
-  description: "Vaeroex is an Intelligence Platform for growing businesses. Operations Intelligence helps leaders improve visibility, accountability, execution, decision support, business memory, and operational performance.",
+  description: "Vaeroex helps organizations transform scattered information into visibility, awareness, prediction, and action.",
   openGraph: {
     title: "Vaeroex — Intelligence Platform",
-    description: "Vaeroex is an Intelligence Platform for growing businesses. Operations Intelligence helps leaders improve visibility, accountability, execution, decision support, business memory, and operational performance.",
+    description: "Vaeroex helps organizations transform scattered information into visibility, awareness, prediction, and action.",
+    url: PUBLIC_SITE_URL,
     siteName: "Vaeroex",
     type: "website",
     images: [
@@ -63,10 +65,13 @@ export default function RootLayout({
 }: Readonly<{
   children: ReactNode;
 }>) {
+  const organizationSchema = JSON.stringify(organizationJsonLd);
+
   return (
     <html lang="en" className="dark pulsar" data-theme="pulsar" data-theme-preference="pulsar" style={{ colorScheme: "dark" }} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: organizationSchema }} />
       </head>
       <body>{children}</body>
     </html>

@@ -1,9 +1,17 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { NetworkGraph } from "@/components/motion/NetworkGraph";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
+import { publicPageMetadata } from "@/lib/seo/public-seo";
+
+export const metadata: Metadata = publicPageMetadata({
+  title: "Vaeroex Network",
+  description: "The Vaeroex Network connects business leaders, operators, advisors, partners, and strategic relationships around visibility, accountability, and execution.",
+  path: "/networking"
+});
 
 const networkGroups = [
   ["Business Owners", "Leaders building stronger visibility, accountability, and execution inside growing companies."],

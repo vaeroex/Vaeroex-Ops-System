@@ -1,11 +1,19 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { Route } from "next";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { legalDocuments } from "@/lib/legal/content";
+import { publicPageMetadata } from "@/lib/seo/public-seo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+export const metadata: Metadata = publicPageMetadata({
+  title: "Vaeroex Help",
+  description: "Find Vaeroex account access, billing, subscription, trust, legal, and support resources.",
+  path: "/help"
+});
 
 type SupportCard = {
   title: string;
