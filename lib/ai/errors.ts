@@ -1,0 +1,21 @@
+const SECRET_KEY_PATTERN = /\bsk-[a-zA-Z0-9_-]+/g;
+
+export function cleanVaeroexErrorMessage(message: string | undefined, fallback = "Vaeroex could not complete the request.") {
+  const value = String(message || "").trim();
+
+  if (!value || value === "NEXT_REDIRECT" || value.includes("NEXT_REDIRECT;")) {
+    return fallback;
+  }
+
+  const redacted = value.replace(SECRET_KEY_PATTERN, "the configured API key");
+
+  if (/incorrect api key|invalid api key|api key provided|authentication|authorization/i.test(redacted)) {
+    return "Vaeroex is not connected yet. The account owner needs to update the server OpenAI connection before Vaeroex can answer.";
+  }
+
+  if (/rate limit/i.test(redacted)) {
+    return "Vaeroex is temporarily busy. Please try again in a few minutes.";
+  }
+
+  return redacted;
+}

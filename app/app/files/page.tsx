@@ -21,6 +21,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -1237,7 +1238,7 @@ function AnalysisHistory({
               <div className="rounded-lg bg-slate-50 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted">Short summary</p>
                 <p className="mt-1 line-clamp-3 text-sm leading-6 text-slate-700">
-                  {run.status === "failed" ? run.error_message || "Analysis failed." : runSummary(run)}
+                  {run.status === "failed" ? cleanVaeroexErrorMessage(run.error_message || undefined, "Analysis failed.") : runSummary(run)}
                 </p>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import "server-only";
 import { createHash, randomUUID } from "crypto";
+import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import type { Json } from "@/lib/supabase/types";
@@ -136,17 +137,13 @@ function parseVaeroexJson(content: string): Json {
 }
 
 function cleanOpenAIError(message: string | undefined, status: number) {
-  const providerMessage = message || "";
+  const cleaned = cleanVaeroexErrorMessage(message);
 
-  if (status === 401 || /api key|authentication|authorization/i.test(providerMessage)) {
+  if (status === 401 || /api key|authentication|authorization/i.test(message || "")) {
     return "Vaeroex is not connected yet. The account owner needs to update the server OpenAI connection before Vaeroex can answer.";
   }
 
-  if (/rate limit/i.test(providerMessage)) {
-    return "Vaeroex is temporarily busy. Please try again in a few minutes.";
-  }
-
-  return providerMessage.replace(/sk-[a-zA-Z0-9_-]+/g, "the configured API key") || "Vaeroex could not complete the request.";
+  return cleaned;
 }
 
 function keyFingerprint(value: string | undefined) {

@@ -353,6 +353,18 @@ async function sendWelcomeEmailOnce(admin: AdminClient, event: StripeEvent, resu
     result: emailResult
   });
 
+  console.log(
+    JSON.stringify({
+      level: emailResult.status === "failed" ? "warning" : "info",
+      component: "vaeroex-email",
+      event: "welcome_email_processed",
+      status: emailResult.status,
+      stripeEventId: event.id,
+      stripeSubscriptionId: result.stripeSubscriptionId,
+      subscriptionRecordId: result.subscriptionRecordId
+    })
+  );
+
   return emailResult;
 }
 

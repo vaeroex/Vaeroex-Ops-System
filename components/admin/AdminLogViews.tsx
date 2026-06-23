@@ -1,5 +1,6 @@
 import { EmptyState } from "@/components/operations/EmptyState";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 
 export type AdminRunLog = {
   id: string;
@@ -55,7 +56,7 @@ function normalizedErrorMessage(message?: string | null) {
     return "NEXT_REDIRECT routing event";
   }
 
-  return message?.trim() || "Vaeroex run failed.";
+  return cleanVaeroexErrorMessage(message || undefined, "Vaeroex run failed.");
 }
 
 function shortMessage(message?: string | null, length = 150) {

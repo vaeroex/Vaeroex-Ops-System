@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { TruncatedLogMessage } from "@/components/admin/AdminLogViews";
+import { GroupedErrorRuns, TruncatedLogMessage, type AdminRunLog } from "@/components/admin/AdminLogViews";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -21,12 +21,12 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
     return <ErrorNotice message={params?.error || access.error} />;
   }
 
-  const [profiles, workspaces, activeSubscriptions, supportRequests, failedRuns, subscriptionErrors, recentSupport, legalAcceptances] = await Promise.all([
+  const [profiles, workspaces, activeSubscriptions, supportRequests, failedRuns, subscriptionErrors, recentSupport, legalAcceptances, workspaceRows] = await Promise.all([
     access.admin.from("profiles").select("id", { count: "exact", head: true }),
     access.admin.from("workspaces").select("id", { count: "exact", head: true }),
     access.admin.from("customer_subscriptions").select("id", { count: "exact", head: true }).in("status", ["active", "trialing", "demo"]),
     access.admin.from("support_requests").select("id", { count: "exact", head: true }).in("status", ["open", "in_review"]),
-    access.admin.from("ai_agent_runs").select("id,agent_type,error_message,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(5),
+    access.admin.from("ai_agent_runs").select("id,workspace_id,agent_type,error_message,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(15),
     access.admin.from("subscription_events").select("id,event_type,customer_email,processing_error,created_at").not("processing_error", "is", null).order("created_at", { ascending: false }).limit(5),
     access.admin.from("support_requests").select("*").order("created_at", { ascending: false }).limit(5),
     access.admin
@@ -35,8 +35,11 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
       .eq("terms_version", LEGAL_DOCUMENT_VERSIONS.terms)
       .eq("privacy_version", LEGAL_DOCUMENT_VERSIONS.privacy)
       .eq("ai_disclaimer_version", LEGAL_DOCUMENT_VERSIONS.aiDisclaimer)
-      .eq("sensitive_data_policy_version", LEGAL_DOCUMENT_VERSIONS.sensitiveData)
+      .eq("sensitive_data_policy_version", LEGAL_DOCUMENT_VERSIONS.sensitiveData),
+    access.admin.from("workspaces").select("id,name").limit(500)
   ]);
+  const workspaceName = new Map((workspaceRows.data || []).map((workspace) => [workspace.id, workspace.name]));
+  const failedRunRows = (failedRuns.data || []).map((run) => ({ ...run, status: "failed" })) as AdminRunLog[];
 
   const cards: { label: string; value: number; href: Route }[] = [
     { label: "Customers", value: profiles.count ?? 0, href: "/app/admin/customers" },
@@ -110,19 +113,13 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
           </div>
         </SectionCard>
 
-        <SectionCard title="Recent Vaeroex errors">
-          <div className="space-y-3">
-            {failedRuns.data?.length ? failedRuns.data.map((run) => (
-              <article key={run.id} className="rounded-lg border border-line p-3">
-                <p className="text-sm font-semibold">{run.agent_type}</p>
-                <div className="mt-2">
-                  <TruncatedLogMessage message={run.error_message || "Vaeroex run failed."} />
-                </div>
-              </article>
-            )) : (
-              <EmptyState title="No recent Vaeroex errors" description="Failed Vaeroex runs will appear here for investigation." />
-            )}
-          </div>
+        <SectionCard title="Recent Vaeroex errors" description="Grouped by repeated message so the admin dashboard stays compact.">
+          <GroupedErrorRuns
+            runs={failedRunRows}
+            workspaceNames={workspaceName}
+            emptyTitle="No recent Vaeroex errors"
+            emptyDescription="Failed Vaeroex runs will appear here for investigation."
+          />
         </SectionCard>
 
         <SectionCard title="Recent subscription errors">

@@ -120,7 +120,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
   const workspaceDisplayName = isDemoWorkspace ? "Demo Workspace" : activeWorkspace?.name || "Setup required";
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-ink">
+    <div className="vaeroex-app-shell min-h-screen bg-[#f8fafc] text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />

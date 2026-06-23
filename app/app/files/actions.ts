@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { runVaeroexCompletion, type VaeroexFileAttachment } from "@/lib/ai/vaeroex-client";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
@@ -102,13 +103,7 @@ function text(formData: FormData, key: string) {
 }
 
 function cleanNoticeMessage(message: string, fallback: string) {
-  const trimmed = message.trim();
-
-  if (!trimmed || trimmed === "NEXT_REDIRECT" || trimmed.includes("NEXT_REDIRECT;")) {
-    return fallback;
-  }
-
-  return trimmed;
+  return cleanVaeroexErrorMessage(message, fallback);
 }
 
 function redirectWithError(message: string): never {
