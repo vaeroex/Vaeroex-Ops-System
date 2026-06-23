@@ -17,7 +17,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
-import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
+import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -79,11 +79,20 @@ type DashboardSignal = {
   source: string;
   status?: string | null;
   context: string;
+  evidence?: string;
+  reasoning?: string;
+  confidence?: "High" | "Medium" | "Low";
+  recommendedAction?: string;
   href: Route;
 };
 
 const PERIODS: DashboardPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
-const DASHBOARD_MODES: DashboardMode[] = ["Executive View", "Operations View", "Intelligence View"];
+const DASHBOARD_MODES: DashboardMode[] = ["Intelligence View", "Executive View", "Operations View"];
+const DASHBOARD_MODE_PROMPTS: Record<DashboardMode, string> = {
+  "Executive View": "How are we performing?",
+  "Operations View": "What is happening?",
+  "Intelligence View": "What should leadership know?"
+};
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const currencyFormatter = new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 0, style: "currency" });
 const chartColors = ["#1E6BFF", "#38BDF8", "#0B1F4D", "#059669", "#f59e0b", "#dc2626"];
@@ -766,7 +775,10 @@ function DashboardModeSelector({ mode, period }: { mode: DashboardMode; period: 
                 : "text-slate-700 hover:bg-blue-950/10 hover:text-vaeroex-blue"
             }`}
           >
-            {item}
+            <span className="block">{item}</span>
+            <span className={`mt-1 block text-[0.68rem] font-medium leading-4 ${item === mode ? "text-blue-50" : "text-slate-500"}`}>
+              {DASHBOARD_MODE_PROMPTS[item]}
+            </span>
           </Link>
         ))}
       </div>
@@ -871,6 +883,165 @@ function WeeklyTrendCard({ trends }: { trends: MetricTrend[] }) {
   );
 }
 
+function confidenceForSignal(item: DashboardSignal, tone: "risk" | "opportunity" | "action") {
+  if (item.confidence) {
+    return item.confidence;
+  }
+
+  const normalized = lower(item.status);
+
+  if (normalized.includes("urgent") || normalized.includes("high") || normalized.includes("below") || normalized.includes("declin") || normalized.includes("failed")) {
+    return "High";
+  }
+
+  if (normalized.includes("medium") || normalized.includes("needs") || normalized.includes("recommended") || tone === "action") {
+    return "Medium";
+  }
+
+  return tone === "opportunity" ? "Medium" : "Low";
+}
+
+function confidenceTone(confidence: "High" | "Medium" | "Low") {
+  if (confidence === "High") return "border-cyan-300/40 bg-cyan-400/15 text-cyan-100";
+  if (confidence === "Medium") return "border-blue-300/30 bg-blue-500/15 text-blue-100";
+  return "border-slate-400/30 bg-slate-500/15 text-slate-100";
+}
+
+function signalEvidence(item: DashboardSignal) {
+  return item.evidence || item.context;
+}
+
+function signalReasoning(item: DashboardSignal, tone: "risk" | "opportunity" | "action") {
+  if (item.reasoning) {
+    return item.reasoning;
+  }
+
+  if (tone === "risk") {
+    return `Vaeroex surfaced this because ${item.source.toLowerCase()} activity may create execution risk if it remains unresolved.`;
+  }
+
+  if (tone === "opportunity") {
+    return `Vaeroex surfaced this because ${item.source.toLowerCase()} activity may be converted into clearer follow-up, revenue, or process improvement.`;
+  }
+
+  return `Vaeroex surfaced this because the related records point to a next decision or owner action.`;
+}
+
+function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportunity" | "action") {
+  if (item.recommendedAction) {
+    return item.recommendedAction;
+  }
+
+  if (tone === "risk") {
+    return "Open the source record, confirm the owner, and decide whether a follow-up or escalation is needed.";
+  }
+
+  if (tone === "opportunity") {
+    return "Open the source record and decide whether this should become a follow-up, report item, or management priority.";
+  }
+
+  return "Review the recommended action, then assign ownership or create the follow-up inside Vaeroex.";
+}
+
+function confidenceForPriority(priority: string | undefined) {
+  if (priority === "Urgent" || priority === "High") return "High";
+  if (priority === "Medium") return "Medium";
+  return "Low";
+}
+
+function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeIntelligence }) {
+  const recommendation = intelligence.recommendationTracking.approvalQueue[0];
+  const profitLeak = intelligence.profitLeaks[0];
+  const memory = intelligence.memoryTimeline[0];
+  const risk = intelligence.riskSimulation[0];
+  const decision = intelligence.decisions.reviewDue[0] || intelligence.decisions.recent[0];
+  const benchmark = intelligence.benchmarkMode[0];
+  const tools = [
+    {
+      title: "Recommendation Queue",
+      href: recommendation?.href || ("/app/tasks" as Route),
+      evidence: recommendation?.evidence || `${intelligence.recommendationTracking.approvalQueue.length} recommendation${intelligence.recommendationTracking.approvalQueue.length === 1 ? "" : "s"} waiting for review.`,
+      reasoning: recommendation?.why || "Vaeroex only turns recommendations into work after a human reviews and approves them.",
+      confidence: confidenceForPriority(recommendation?.priority),
+      action: recommendation?.action || "Review the queue and approve only the follow-ups that should become accountable work."
+    },
+    {
+      title: "Profit Leak Detector",
+      href: profitLeak?.href || ("/app/crm" as Route),
+      evidence: profitLeak?.evidence || `${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`,
+      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled follow-up, unresolved issues, and work without ownership.",
+      confidence: confidenceForPriority(profitLeak?.priority),
+      action: profitLeak?.action || "Review CRM, KPI, and issue records for avoidable leakage before the next leadership review."
+    },
+    {
+      title: "Business Memory",
+      href: memory?.href || ("/app/reports" as Route),
+      evidence: memory?.whatHappened || `${intelligence.memoryTimeline.length} memory record${intelligence.memoryTimeline.length === 1 ? "" : "s"} stored.`,
+      reasoning: memory?.cause || "Vaeroex uses prior reports, decisions, imports, and outcomes to explain why current signals matter.",
+      confidence: memory ? "Medium" : "Low",
+      action: memory?.actionTaken || "Log decisions, reports, and outcomes so future briefings can compare what changed."
+    },
+    {
+      title: "Risk Simulation",
+      href: risk?.href || ("/app/issues" as Route),
+      evidence: risk?.evidence || `${intelligence.riskSimulation.length} forward-looking risk scenario${intelligence.riskSimulation.length === 1 ? "" : "s"} generated.`,
+      reasoning: risk?.why || "Vaeroex projects unresolved signals forward so leaders can decide before the issue becomes normal.",
+      confidence: confidenceForPriority(risk?.priority),
+      action: risk?.action || "Review the scenario and decide whether to assign an owner, create a follow-up, or escalate."
+    },
+    {
+      title: "Decision Journal",
+      href: "/app" as Route,
+      evidence: decision?.reason || decision?.expected_outcome || `${intelligence.decisions.recent.length} recent decision${intelligence.decisions.recent.length === 1 ? "" : "s"} available.`,
+      reasoning: decision ? "A saved leadership decision can be reviewed against later outcomes and business memory." : "No decision record is available yet, so Vaeroex has less context for why actions were taken.",
+      confidence: decision ? "Medium" : "Low",
+      action: decision ? "Review whether the expected outcome happened, then update the decision status." : "Log the next leadership decision so Vaeroex can track the reason and outcome."
+    },
+    {
+      title: "Benchmark Mode",
+      href: "/app/kpis" as Route,
+      evidence: benchmark?.evidence || `${intelligence.benchmarkMode.length} operating benchmark${intelligence.benchmarkMode.length === 1 ? "" : "s"} available.`,
+      reasoning: "Vaeroex compares this workspace against default operating standards, not anonymous customer data.",
+      confidence: benchmark?.status === "Missing data" ? "Low" : "Medium",
+      action: benchmark?.recommendedAction || "Use benchmark gaps to decide which KPI, checklist, or report needs stronger structure."
+    }
+  ];
+
+  return (
+    <section className="grid gap-4 xl:grid-cols-3">
+      {tools.map((tool) => (
+        <Link
+          key={tool.title}
+          href={tool.href}
+          className="group block rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/45 hover:bg-blue-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+        >
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-sm font-semibold text-white">{tool.title}</h3>
+            <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(tool.confidence as "High" | "Medium" | "Low")}`}>
+              {tool.confidence} confidence
+            </span>
+          </div>
+          <dl className="mt-3 grid gap-2 text-xs leading-5 text-slate-300">
+            <div>
+              <dt className="font-semibold text-slate-100">Evidence</dt>
+              <dd className="mt-1">{tool.evidence}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-100">Reasoning</dt>
+              <dd className="mt-1">{tool.reasoning}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-slate-100">Recommended action</dt>
+              <dd className="mt-1">{tool.action}</dd>
+            </div>
+          </dl>
+          <span className="mt-4 inline-flex text-xs font-semibold text-vaeroex-accent group-hover:text-cyan-200">Open related context</span>
+        </Link>
+      ))}
+    </section>
+  );
+}
+
 function SignalList({
   items,
   empty,
@@ -904,12 +1075,139 @@ function SignalList({
               <p className="font-semibold">{item.title}</p>
               <p className="mt-1 text-xs opacity-80">{item.source}</p>
             </div>
-            {item.status ? <StatusBadge value={item.status} /> : null}
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              {item.status ? <StatusBadge value={item.status} /> : null}
+              <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidenceForSignal(item, tone))}`}>
+                {confidenceForSignal(item, tone)} confidence
+              </span>
+            </div>
           </div>
-          <p className="mt-2 text-xs leading-5 opacity-90">{item.context}</p>
+          <dl className="mt-3 grid gap-2 text-xs leading-5">
+            <div>
+              <dt className="font-semibold opacity-95">Evidence</dt>
+              <dd className="mt-1 opacity-90">{signalEvidence(item)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold opacity-95">Reasoning</dt>
+              <dd className="mt-1 opacity-90">{signalReasoning(item, tone)}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold opacity-95">Recommended action</dt>
+              <dd className="mt-1 opacity-90">{signalRecommendedAction(item, tone)}</dd>
+            </div>
+          </dl>
         </Link>
       )}
     />
+  );
+}
+
+function IntelligenceBriefingHero({
+  risk,
+  opportunity,
+  attention,
+  action,
+  period
+}: {
+  risk?: DashboardSignal;
+  opportunity?: DashboardSignal;
+  attention?: DashboardSignal;
+  action?: DashboardSignal;
+  period: DashboardPeriod;
+}) {
+  const briefingItems = [
+    {
+      id: "risk",
+      question: "Biggest risk",
+      fallback: "No major risk is visible yet.",
+      item: risk,
+      tone: "risk" as const
+    },
+    {
+      id: "opportunity",
+      question: "Biggest opportunity",
+      fallback: "No clear opportunity is visible yet.",
+      item: opportunity,
+      tone: "opportunity" as const
+    },
+    {
+      id: "attention",
+      question: "Requires attention",
+      fallback: "No immediate attention item is visible yet.",
+      item: attention,
+      tone: "risk" as const
+    },
+    {
+      id: "action",
+      question: "Recommended action",
+      fallback: "Keep adding records so Vaeroex can build a stronger recommendation queue.",
+      item: action,
+      tone: "action" as const
+    }
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#061225] text-white shadow-command">
+      <div className="border-b border-white/10 bg-[radial-gradient(circle_at_15%_0%,rgba(56,189,248,0.22),transparent_34%),linear-gradient(135deg,rgba(30,107,255,0.18),transparent_58%)] p-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Leadership Intelligence Briefing</p>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">What should leadership know that is not immediately obvious?</h2>
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-200">
+              Vaeroex is reading the {period.toLowerCase()} workspace context for risk, opportunity, attention, and the next decision.
+            </p>
+          </div>
+          <Link href="/app/agents" className="w-fit rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+            Ask Vaeroex
+          </Link>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-5 xl:grid-cols-4">
+        {briefingItems.map(({ id, question, fallback, item, tone }) => {
+          const confidence = item ? confidenceForSignal(item, tone) : "Low";
+
+          return (
+            <article key={id} className="rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-silver">{question}</p>
+                  <h3 className="mt-3 text-lg font-semibold leading-6">{item?.title || fallback}</h3>
+                  {item ? <p className="mt-1 text-xs text-slate-300">{item.source}</p> : null}
+                </div>
+                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidence)}`}>
+                  {confidence}
+                </span>
+              </div>
+
+              {item ? (
+                <>
+                  <dl className="mt-4 space-y-3 text-xs leading-5 text-slate-200">
+                    <div>
+                      <dt className="font-semibold text-white">Evidence</dt>
+                      <dd className="mt-1 text-slate-300">{signalEvidence(item)}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-white">Reasoning</dt>
+                      <dd className="mt-1 text-slate-300">{signalReasoning(item, tone)}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-white">Recommended action</dt>
+                      <dd className="mt-1 text-slate-300">{signalRecommendedAction(item, tone)}</dd>
+                    </div>
+                  </dl>
+                  <Link href={item.href} className="mt-4 inline-flex rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
+                    Open source
+                  </Link>
+                </>
+              ) : (
+                <p className="mt-4 text-xs leading-5 text-slate-300">Add more workspace records, imports, decisions, and outcomes to strengthen this signal.</p>
+              )}
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1095,7 +1393,7 @@ function DemoWorkspaceBanner({
 export default async function AppDashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const period = isDashboardPeriod(params?.period) ? params.period : "Weekly";
-  const dashboardMode = isDashboardMode(params?.view) ? params.view : "Executive View";
+  const dashboardMode = isDashboardMode(params?.view) ? params.view : "Intelligence View";
   const range = rangeForPeriod(period);
   const { supabase, context, workspaceId } = await requireWorkspacePage();
   const {
@@ -1672,6 +1970,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisions,
     recommendationOutcomes
   });
+  const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
   const isIntelligenceView = dashboardMode === "Intelligence View";
@@ -1681,10 +1980,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     : "Workspace setup is complete enough for ongoing review.";
   const modeDescription =
     dashboardMode === "Executive View"
-      ? "A concise briefing focused on health, alerts, priorities, actions, and the weekly trend."
+      ? "How are we performing? A concise view of health, alerts, priorities, actions, and trend direction."
       : dashboardMode === "Operations View"
-        ? `A ${period.toLowerCase()} operating view of KPIs, follow-ups, issues, checklists, ownership, CRM, and reports.`
-        : `A ${period.toLowerCase()} intelligence view of business memory, trends, benchmarks, data quality, profit leaks, and signals.`;
+        ? `What is happening? A ${period.toLowerCase()} operating view of KPIs, follow-ups, issues, checklists, ownership, CRM, and reports.`
+        : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and recommended action.`;
 
   return (
     <div className="space-y-6">
@@ -1773,14 +2072,61 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       ) : null}
 
       {isIntelligenceView ? (
-        <PrestigeOperationsPanel
-          intelligence={prestigeIntelligence}
-          returnPath="/app"
-          dateRangeStart={range.startDate}
-          dateRangeEnd={range.endDate}
-          isDemoWorkspace={isViewingDemoWorkspace}
-          showHealthHero={false}
-        />
+        <>
+          <IntelligenceBriefingHero
+            risk={riskSignals[0]}
+            opportunity={opportunitySignals[0]}
+            attention={topAttentionSignal}
+            action={recommendedActionSignals[0]}
+            period={period}
+          />
+
+          <DashboardAccordion
+            title="Intelligence signals"
+            summary={`${riskSignals.length} actionable risk signal${riskSignals.length === 1 ? "" : "s"}, ${opportunitySignals.length} opportunit${opportunitySignals.length === 1 ? "y" : "ies"}, and ${recommendedActionSignals.length} recommended action${recommendedActionSignals.length === 1 ? "" : "s"} are available for review.`}
+            defaultOpen
+          >
+            <section className="grid gap-4 xl:grid-cols-3">
+              <SectionCard title="Risks" description="Top source records behind the current risk summary.">
+                <SignalList items={riskSignals} empty="No major risks found for this period." tone="risk" />
+              </SectionCard>
+
+              <SectionCard title="Opportunities" description="Specific leads, KPI gains, imports, or analyses worth acting on.">
+                <SignalList items={opportunitySignals} empty="No clear opportunities found yet." tone="opportunity" />
+              </SectionCard>
+
+              <SectionCard title="Recommendation queue" description="Each action points to the module where the work should happen.">
+                <SignalList
+                  items={recommendedActionSignals}
+                  empty="Keep the current cadence and review again after more activity is recorded."
+                  tone="action"
+                />
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
+                    Review files
+                  </Link>
+                  <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+                    Review CRM
+                  </Link>
+                  <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+                    Generate report
+                  </Link>
+                </div>
+              </SectionCard>
+            </section>
+          </DashboardAccordion>
+
+          <IntelligencePriorityTools intelligence={prestigeIntelligence} />
+
+          <PrestigeOperationsPanel
+            intelligence={prestigeIntelligence}
+            returnPath="/app"
+            dateRangeStart={range.startDate}
+            dateRangeEnd={range.endDate}
+            isDemoWorkspace={isViewingDemoWorkspace}
+            showHealthHero={false}
+          />
+        </>
       ) : null}
 
       {isOperationsView ? (
@@ -2228,42 +2574,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
           </DashboardAccordion>
         </>
-      ) : null}
-
-      {isIntelligenceView ? (
-        <DashboardAccordion
-          title="Intelligence signals"
-          summary={`${riskSignals.length} actionable risk signal${riskSignals.length === 1 ? "" : "s"}, ${opportunitySignals.length} opportunit${opportunitySignals.length === 1 ? "y" : "ies"}, and ${recommendedActionSignals.length} recommended action${recommendedActionSignals.length === 1 ? "" : "s"} are available for review.`}
-        >
-      <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Risks" description="Top source records behind the current risk summary.">
-          <SignalList items={riskSignals} empty="No major risks found for this period." tone="risk" />
-        </SectionCard>
-
-        <SectionCard title="Opportunities" description="Specific leads, KPI gains, imports, or analyses worth acting on.">
-          <SignalList items={opportunitySignals} empty="No clear opportunities found yet." tone="opportunity" />
-        </SectionCard>
-
-        <SectionCard title="Recommended actions" description="Each action points to the module where the work should happen.">
-          <SignalList
-            items={recommendedActionSignals}
-            empty="Keep the current cadence and review again after more activity is recorded."
-            tone="action"
-          />
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
-              Review files
-            </Link>
-            <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Review CRM
-            </Link>
-            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Generate report
-            </Link>
-          </div>
-        </SectionCard>
-      </section>
-        </DashboardAccordion>
       ) : null}
     </div>
   );

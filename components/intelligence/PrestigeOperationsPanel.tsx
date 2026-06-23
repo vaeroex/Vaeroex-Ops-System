@@ -41,6 +41,18 @@ function priorityTone(priority: string) {
   return "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue";
 }
 
+function confidenceForAction(priority: PrestigeAction["priority"]) {
+  if (priority === "Urgent" || priority === "High") return "High";
+  if (priority === "Medium") return "Medium";
+  return "Low";
+}
+
+function confidenceTone(confidence: "High" | "Medium" | "Low") {
+  if (confidence === "High") return "border-cyan-300/50 bg-cyan-950/80 text-cyan-100";
+  if (confidence === "Medium") return "border-blue-300/40 bg-blue-950/80 text-blue-100";
+  return "border-slate-400/40 bg-slate-950/70 text-slate-100";
+}
+
 function scoreLabel(score: number) {
   if (score >= 90) return "Excellent";
   if (score >= 80) return "Strong";
@@ -243,6 +255,8 @@ function ActionCard({
   showReport?: boolean;
   showAlert?: boolean;
 }) {
+  const confidence = confidenceForAction(item.priority);
+
   return (
     <article className={`rounded-lg border p-4 ${priorityTone(item.priority)}`}>
       <div className="flex items-start justify-between gap-3">
@@ -250,10 +264,27 @@ function ActionCard({
           <p className="text-sm font-semibold">{item.title}</p>
           <p className="mt-1 text-xs opacity-80">{item.relatedModule}</p>
         </div>
-        <StatusBadge value={item.priority} />
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <StatusBadge value={item.priority} />
+          <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidence)}`}>
+            {confidence} confidence
+          </span>
+        </div>
       </div>
-      <p className="mt-3 text-sm leading-6">{item.why}</p>
-      <p className="mt-2 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">{item.evidence}</p>
+      <dl className="mt-3 grid gap-2 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">
+        <div>
+          <dt className="font-semibold text-ink">Evidence</dt>
+          <dd className="mt-1">{item.evidence}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-ink">Reasoning</dt>
+          <dd className="mt-1">{item.why}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-ink">Recommended action</dt>
+          <dd className="mt-1">{item.action}</dd>
+        </div>
+      </dl>
       {children}
       <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
         <div>
@@ -265,7 +296,6 @@ function ActionCard({
           <dd className="mt-1">{item.dueDate}</dd>
         </div>
       </dl>
-      <p className="mt-3 text-xs leading-5">{item.action}</p>
       <div className="mt-4">
         <ActionButtons item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showReport={showReport} showAlert={showAlert} />
       </div>
