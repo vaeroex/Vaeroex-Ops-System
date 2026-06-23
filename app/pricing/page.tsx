@@ -1,10 +1,18 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { VAEROEX_PLAN_LIMITS, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
+import { publicPageMetadata } from "@/lib/seo/public-seo";
+
+export const metadata: Metadata = publicPageMetadata({
+  title: "Vaeroex Pricing",
+  description: "Review Vaeroex subscription pricing for Operations Intelligence.",
+  path: "/pricing"
+});
 
 const buyingSummary = [
   ["Workspace", `${VAEROEX_PLAN_LIMITS.max_workspaces} included`],

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Metadata } from "next";
 import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { PublicFooter } from "@/components/legal/PublicFooter";
@@ -9,6 +10,13 @@ import { IntelligenceLoopShowcase } from "@/components/motion/IntelligenceLoopSh
 import { MarketingDashboardPreview } from "@/components/motion/MarketingDashboardPreview";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { SignalProductionDemo } from "@/components/motion/SignalProductionDemo";
+import { publicPageMetadata } from "@/lib/seo/public-seo";
+
+export const metadata: Metadata = publicPageMetadata({
+  title: "Vaeroex — Intelligence Platform",
+  description: "Vaeroex helps organizations transform scattered information into visibility, awareness, prediction, and action.",
+  path: "/"
+});
 
 const intelligenceDomains = [
   ["Operations Intelligence", "Current", "Helps organizations understand execution, accountability, performance signals, reviews, and operational decisions."],
