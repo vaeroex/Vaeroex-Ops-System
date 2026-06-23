@@ -168,6 +168,10 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
             <Link href="/app/admin/ai-usage?usage=all" className="mt-3 inline-flex text-sm font-semibold text-vaeroex-blue">
               Show all workspace usage
             </Link>
+          ) : showAllUsage && usageRows.length > 10 ? (
+            <Link href="/app/admin/ai-usage" className="mt-3 inline-flex text-sm font-semibold text-vaeroex-blue">
+              Show fewer workspace rows
+            </Link>
           ) : null}
         </SectionCard>
 

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { runVaeroexCompletion } from "@/lib/ai/vaeroex-client";
 import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
@@ -208,7 +209,7 @@ export async function runVaeroexAction(formData: FormData) {
     revalidatePath("/app/agents");
     destination = `/app/agents?run=${data.id}`;
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Vaeroex could not complete the request.";
+    const message = cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined);
     const failedRunId = await storeFailedRun({
       workspaceId,
       userId: user.id,

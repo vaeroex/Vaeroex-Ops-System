@@ -41,6 +41,78 @@ button.bg-vaeroex-blue:hover {
   color: #0b1f4d;
 }
 
+.pulsar .vaeroex-app-shell {
+  background:
+    radial-gradient(circle at 12% 0%, rgba(30, 107, 255, 0.15), transparent 30%),
+    #0b1220;
+  color: #f8fafc;
+}
+
+.pulsar .vaeroex-app-shell .bg-white,
+.pulsar .vaeroex-app-shell .bg-slate-50,
+.pulsar .vaeroex-app-shell .bg-slate-50\/80 {
+  background-color: rgba(26, 35, 50, 0.92);
+}
+
+.pulsar .vaeroex-app-shell .bg-vaeroex-soft {
+  background-color: rgba(30, 107, 255, 0.14);
+}
+
+.pulsar .vaeroex-app-shell .text-ink,
+.pulsar .vaeroex-app-shell .text-slate-700 {
+  color: #f8fafc;
+}
+
+.pulsar .vaeroex-app-shell .text-muted,
+.pulsar .vaeroex-app-shell .text-slate-600,
+.pulsar .vaeroex-app-shell .text-slate-500 {
+  color: #94a3b8;
+}
+
+.pulsar .vaeroex-app-shell .border-line,
+.pulsar .vaeroex-app-shell .border-vaeroex-silver,
+.pulsar .vaeroex-app-shell .border-vaeroex-silver\/80,
+.pulsar .vaeroex-app-shell .border-line\/80 {
+  border-color: rgba(148, 163, 184, 0.24);
+}
+
+.pulsar .vaeroex-app-shell input,
+.pulsar .vaeroex-app-shell textarea,
+.pulsar .vaeroex-app-shell select {
+  background-color: rgba(17, 24, 39, 0.96);
+  border-color: rgba(148, 163, 184, 0.28);
+  color: #f8fafc;
+}
+
+.pulsar .vaeroex-app-shell input::placeholder,
+.pulsar .vaeroex-app-shell textarea::placeholder {
+  color: #64748b;
+}
+
+.pulsar .vaeroex-app-shell tr:hover,
+.pulsar .vaeroex-app-shell a:hover,
+.pulsar .vaeroex-app-shell button:hover,
+.pulsar .vaeroex-app-shell summary:hover {
+  color: #f8fafc;
+}
+
+.pulsar .vaeroex-app-shell .hover\:bg-blue-950\/5:hover,
+.pulsar .vaeroex-app-shell .hover\:bg-blue-950\/10:hover,
+.pulsar .vaeroex-app-shell .hover\:bg-slate-50:hover,
+.pulsar .vaeroex-app-shell .hover\:bg-gray-50:hover,
+.pulsar .vaeroex-app-shell .hover\:bg-gray-100:hover {
+  background-color: rgba(30, 64, 175, 0.22);
+}
+
+.pulsar .vaeroex-app-shell .hover\:text-vaeroex-blue:hover {
+  color: #38bdf8;
+}
+
+.pulsar .vaeroex-app-shell .shadow-panel,
+.pulsar .vaeroex-app-shell .shadow-command {
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.28);
+}
+
 @keyframes vaeroex-fade-up {
   from {
     opacity: 0;
