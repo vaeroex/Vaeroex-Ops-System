@@ -41,6 +41,7 @@ const baseNavSections = [
     label: "Data & Intelligence",
     items: [
       { href: "/app/kpis", label: "KPIs" },
+      { href: "/app/kpis/settings", label: "KPI Settings" },
       { href: "/app/files", label: "Files" },
       { href: "/app/reports", label: "Reports" }
     ]

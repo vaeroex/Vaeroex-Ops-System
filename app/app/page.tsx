@@ -18,6 +18,14 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
+import {
+  applyKpiSettingsToRows,
+  getConfiguredMetricNames,
+  kpiColor,
+  kpiWeight,
+  sortKpiRowsBySettings,
+  type KpiSettingRow
+} from "@/lib/kpis/settings";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -60,6 +68,8 @@ type DateRange = {
 type MetricTrend = {
   name: string;
   rows: KpiRow[];
+  color: string;
+  weight: number;
   current: number | null;
   previous: number | null;
   change: number | null;
@@ -95,7 +105,6 @@ const DASHBOARD_MODE_PROMPTS: Record<DashboardMode, string> = {
 };
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const currencyFormatter = new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 0, style: "currency" });
-const chartColors = ["#1E6BFF", "#38BDF8", "#0B1F4D", "#059669", "#f59e0b", "#dc2626"];
 
 function isDashboardPeriod(value: string | undefined): value is DashboardPeriod {
   return PERIODS.includes(value as DashboardPeriod);
@@ -305,7 +314,7 @@ function aggregateKpi(rows: KpiRow[], name: string, startDate: string, endDate: 
   return normalized.includes("rate") || normalized.includes("conversion") || normalized.includes("utilization") ? total / values.length : total;
 }
 
-function buildMetricTrend(kpis: KpiRow[], name: string, range: DateRange): MetricTrend {
+function buildMetricTrend(kpis: KpiRow[], name: string, range: DateRange, settings: KpiSettingRow[], fallbackIndex = 0): MetricTrend {
   const current = aggregateKpi(kpis, name, range.startDate, range.endDate);
   const previous = aggregateKpi(kpis, name, range.previousStartDate, range.previousEndDate);
   const change = current !== null && previous !== null ? current - previous : null;
@@ -314,6 +323,8 @@ function buildMetricTrend(kpis: KpiRow[], name: string, range: DateRange): Metri
   return {
     name,
     rows: rowsForMetric(kpis, name),
+    color: kpiColor(name, settings, fallbackIndex),
+    weight: kpiWeight(name, settings),
     current,
     previous,
     change,
@@ -468,9 +479,9 @@ function MultiKpiComparison({ trends }: { trends: MetricTrend[] }) {
           <p className="mt-1 text-xs leading-5 text-muted">Indexed trend lines compare different metric types without mixing units.</p>
         </div>
         <div className="flex flex-wrap gap-3 text-xs text-muted">
-          {usable.map((trend, index) => (
+          {usable.map((trend) => (
             <span key={trend.name} className="inline-flex items-center gap-2">
-              <span className="h-2 w-5 rounded-full" style={{ backgroundColor: chartColors[index % chartColors.length] }} />
+              <span className="h-2 w-5 rounded-full" style={{ backgroundColor: trend.color }} />
               {trend.name}
             </span>
           ))}
@@ -482,7 +493,7 @@ function MultiKpiComparison({ trends }: { trends: MetricTrend[] }) {
             const y = paddingTop + (line / 4) * plotHeight;
             return <line key={line} x1={paddingX} x2={width - paddingX} y1={y} y2={y} stroke="#e5e7eb" strokeWidth="1" />;
           })}
-          {usable.map((trend, index) => {
+          {usable.map((trend) => {
             const rows = trend.rows.slice(-12);
             const values = rows.map((row) => row.actual_value as number);
             const points = rows.map((row, rowIndex) => `${xFor(rowIndex, rows.length)},${yFor(normalizedValue(row.actual_value as number, values))}`).join(" ");
@@ -492,7 +503,7 @@ function MultiKpiComparison({ trends }: { trends: MetricTrend[] }) {
                 key={trend.name}
                 fill="none"
                 points={points}
-                stroke={chartColors[index % chartColors.length]}
+                stroke={trend.color}
                 strokeLinecap="round"
                 strokeLinejoin="round"
                 strokeWidth="4"
@@ -1411,6 +1422,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
   const [
     kpiResult,
+    kpiSettingsResult,
     taskResult,
     issueResult,
     checklistResult,
@@ -1438,6 +1450,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false })
       .limit(500),
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(500),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("checklists").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
@@ -1472,7 +1485,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       .limit(40)
   ]);
 
-  const kpis = (kpiResult.data || []) as KpiRow[];
+  const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
+  const kpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
   const tasks = (taskResult.data || []) as TaskRow[];
   const issues = (issueResult.data || []) as IssueRow[];
   const checklists = (checklistResult.data || []) as ChecklistRow[];
@@ -1494,6 +1509,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const recommendationOutcomes = (recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[];
   const errors = [
     kpiResult.error,
+    kpiSettingsResult.error,
     taskResult.error,
     issueResult.error,
     checklistResult.error,
@@ -1516,7 +1532,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
-  const names = metricNames(kpis);
+  const names = getConfiguredMetricNames(kpis, kpiSettings);
   const revenueMetric = latestMetric(kpis, ["revenue", "sales"])?.name || names.find((name) => lower(name).includes("revenue")) || "Revenue";
   const leadsMetric = latestMetric(kpis, ["lead"])?.name || names.find((name) => lower(name).includes("lead")) || "Leads";
   const customMetric =
@@ -1525,12 +1541,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     "Custom KPI";
   const primaryTrends = [revenueMetric, leadsMetric, customMetric]
     .filter((name, index, array) => array.indexOf(name) === index)
-    .map((name) => buildMetricTrend(kpis, name, range));
+    .map((name, index) => buildMetricTrend(kpis, name, range, kpiSettings, index));
   const weeklyRange = rangeForPeriod("Weekly");
   const weeklyTrends = [revenueMetric, leadsMetric, customMetric]
     .filter((name, index, array) => array.indexOf(name) === index)
-    .map((name) => buildMetricTrend(kpis, name, weeklyRange));
-  const comparisonTrends = names.slice(0, 6).map((name) => buildMetricTrend(kpis, name, range));
+    .map((name, index) => buildMetricTrend(kpis, name, weeklyRange, kpiSettings, index));
+  const comparisonTrends = names.slice(0, 6).map((name, index) => buildMetricTrend(kpis, name, range, kpiSettings, index));
   const openTasks = tasks.filter(isOpenTask);
   const overdueTasks = openTasks.filter((task) => Boolean(task.due_date && task.due_date <= range.endDate));
   const openIssues = issues.filter(isOpenIssue);
@@ -1553,11 +1569,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   }, {});
   const positiveTrends = comparisonTrends
     .filter((trend) => (trend.change ?? 0) > 0)
-    .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))
+    .sort((a, b) => (b.changePercent ?? 0) * b.weight - (a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const negativeTrends = comparisonTrends
     .filter((trend) => (trend.change ?? 0) < 0)
-    .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))
+    .sort((a, b) => Math.abs(b.changePercent ?? 0) * b.weight - Math.abs(a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const risks = [
     overdueTasks.length ? `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"} need owner attention.` : "",
@@ -1651,7 +1667,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       title: kpi.name,
       source: "KPI risk",
       status: "Below target",
-      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs target ${formatMetricValue(kpi.target, kpi.name)}.`,
+      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs target ${formatMetricValue(kpi.target, kpi.name)}. Leadership weight: ${numberFormatter.format(kpiWeight(kpi.name, kpiSettings))}/10.`,
       href: "/app/kpis" as Route
     })),
     ...checklistFailures.slice(0, 3).map((run) => ({
@@ -1675,7 +1691,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       title: trend.name,
       source: "KPI trend",
       status: "Declining",
-      context: `${trend.name} is down ${numberFormatter.format(Math.abs(trend.changePercent || 0))}% vs the previous period.`,
+      context: `${trend.name} is down ${numberFormatter.format(Math.abs(trend.changePercent || 0))}% vs the previous period. Leadership weight: ${numberFormatter.format(trend.weight)}/10.`,
       href: "/app/kpis" as Route
     }))
   ].slice(0, 3);
@@ -1693,7 +1709,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       title: trend.name,
       source: "KPI trend",
       status: "Improving",
-      context: `${trend.name} improved ${percentLabel(trend.changePercent)} compared with the previous period.`,
+      context: `${trend.name} improved ${percentLabel(trend.changePercent)} compared with the previous period. Leadership weight: ${numberFormatter.format(trend.weight)}/10.`,
       href: "/app/kpis" as Route
     })),
     ...recentImports.slice(0, 3).map((item) => ({
@@ -2344,9 +2360,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
-        <LineChart title="Revenue trend" rows={rowsForMetric(kpis, revenueMetric)} color="#1E6BFF" />
-        <LineChart title="Leads trend" rows={rowsForMetric(kpis, leadsMetric)} color="#38BDF8" />
-        <LineChart title={`${customMetric} trend`} rows={rowsForMetric(kpis, customMetric)} color="#0B1F4D" />
+        <LineChart title="Revenue trend" rows={rowsForMetric(kpis, revenueMetric)} color={kpiColor(revenueMetric, kpiSettings, 0)} />
+        <LineChart title="Leads trend" rows={rowsForMetric(kpis, leadsMetric)} color={kpiColor(leadsMetric, kpiSettings, 1)} />
+        <LineChart title={`${customMetric} trend`} rows={rowsForMetric(kpis, customMetric)} color={kpiColor(customMetric, kpiSettings, 2)} />
       </section>
 
       <section className="grid gap-6 xl:grid-cols-[1.15fr_.85fr]">

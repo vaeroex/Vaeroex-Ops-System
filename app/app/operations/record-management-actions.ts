@@ -196,9 +196,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
     fields: [
       { name: "name", kind: "requiredText", maxLength: 180 },
       { name: "category", kind: "text", maxLength: 100 },
-      { name: "target", kind: "number" },
-      { name: "actual_value", kind: "number" },
-      { name: "metric_date", kind: "date" },
       { name: "owner", kind: "text", maxLength: 120 },
       { name: "notes", kind: "textarea", maxLength: 1500 },
       { name: "source", kind: "text", maxLength: 160 }
