@@ -1,4 +1,6 @@
 const SECRET_KEY_PATTERN = /\bsk-[a-zA-Z0-9_-]+/g;
+export const VAEROEX_INTELLIGENCE_UNAVAILABLE_MESSAGE =
+  "Vaeroex intelligence is temporarily unavailable. Please try again later or contact support@vaeroex.com.";
 
 export function cleanVaeroexErrorMessage(message: string | undefined, fallback = "Vaeroex could not complete the request.") {
   const value = String(message || "").trim();
@@ -10,7 +12,7 @@ export function cleanVaeroexErrorMessage(message: string | undefined, fallback =
   const redacted = value.replace(SECRET_KEY_PATTERN, "the configured API key");
 
   if (/incorrect api key|invalid api key|api key provided|authentication|authorization/i.test(redacted)) {
-    return "Vaeroex is not connected yet. The account owner needs to update the server OpenAI connection before Vaeroex can answer.";
+    return VAEROEX_INTELLIGENCE_UNAVAILABLE_MESSAGE;
   }
 
   if (/rate limit/i.test(redacted)) {
