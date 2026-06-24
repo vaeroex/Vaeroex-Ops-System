@@ -33,11 +33,11 @@ export function StartWithVaeroexMenu({ align = "left", className = "", size = "d
   const menuSurfaceClass =
     "absolute z-30 mt-2 grid w-[min(20rem,calc(100vw-3rem))] gap-2 rounded-lg border border-vaeroex-accent/25 bg-[#07111f] p-2 text-slate-100 shadow-command";
   const menuItemClass =
-    "rounded-lg border border-white/10 bg-[#0b1628] px-3 py-3 text-slate-100 outline-none transition hover:border-vaeroex-accent/45 hover:bg-[linear-gradient(135deg,rgba(20,35,70,0.96),rgba(12,21,42,0.98))] hover:shadow-[0_0_22px_rgba(56,189,248,0.14)] focus-visible:border-vaeroex-accent focus-visible:bg-[linear-gradient(135deg,rgba(20,35,70,0.96),rgba(12,21,42,0.98))] focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 active:border-vaeroex-blue";
+    "min-h-11 rounded-lg border border-white/10 bg-[#0b1628] px-3 py-3 text-slate-100 outline-none transition hover:border-vaeroex-accent/45 hover:bg-[linear-gradient(135deg,rgba(20,35,70,0.96),rgba(12,21,42,0.98))] hover:shadow-[0_0_22px_rgba(56,189,248,0.14)] focus-visible:border-vaeroex-accent focus-visible:bg-[linear-gradient(135deg,rgba(20,35,70,0.96),rgba(12,21,42,0.98))] focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 active:border-vaeroex-blue";
 
   return (
     <details className={`group relative ${className}`}>
-      <summary className={`cursor-pointer list-none rounded-lg bg-vaeroex-blue ${summarySize} text-sm font-semibold text-white shadow-sm hover:bg-vaeroex-accent hover:text-vaeroex-navy focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/40 [&::-webkit-details-marker]:hidden`}>
+      <summary className={`flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue ${summarySize} text-sm font-semibold text-white shadow-sm hover:bg-vaeroex-accent hover:text-vaeroex-navy focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/40 [&::-webkit-details-marker]:hidden`}>
         Start With Vaeroex
       </summary>
       <div className={`${menuSurfaceClass} ${menuAlignment}`}>

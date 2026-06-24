@@ -55,7 +55,7 @@ function DesktopSection({ section, notificationUnreadCount, pathname }: { sectio
             <Link
               key={`${item.href}-${item.label}`}
               href={item.href as Route}
-              className={`mx-2 flex items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium ${
+              className={`mx-2 flex min-h-10 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium ${
                 active ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/20" : "text-slate-100 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
               }`}
             >
@@ -72,7 +72,7 @@ function DesktopSection({ section, notificationUnreadCount, pathname }: { sectio
 function MobileSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
   return (
     <details className="shrink-0 rounded-md border border-line bg-white px-3 py-2 shadow-sm">
-      <summary className="cursor-pointer list-none whitespace-nowrap text-sm font-semibold text-slate-700">{section.label}</summary>
+      <summary className="flex min-h-11 cursor-pointer list-none items-center whitespace-nowrap text-sm font-semibold text-slate-700">{section.label}</summary>
       <div className="mt-2 grid gap-1">
         {section.items.map((item) => {
           const active = isActivePath(pathname, item.href);
@@ -81,7 +81,7 @@ function MobileSection({ section, notificationUnreadCount, pathname }: { section
             <Link
               key={`${section.label}-${item.label}`}
               href={item.href as Route}
-              className={`flex items-center justify-between gap-3 whitespace-nowrap rounded-md px-2 py-1 text-sm ${
+              className={`flex min-h-11 items-center justify-between gap-3 whitespace-nowrap rounded-md px-2 py-2 text-sm ${
                 active ? "bg-vaeroex-blue text-white" : "text-slate-700 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
               }`}
             >
@@ -100,7 +100,7 @@ export function AppNavigation({ sections, notificationUnreadCount, mobile = fals
 
   if (mobile) {
     return (
-      <div className="flex gap-2 overflow-x-auto">
+      <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
         {sections.map((section) => (
           <MobileSection key={section.label} section={section} notificationUnreadCount={notificationUnreadCount} pathname={pathname} />
         ))}

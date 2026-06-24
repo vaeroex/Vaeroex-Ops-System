@@ -121,7 +121,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
   const workspaceDisplayName = isDemoWorkspace ? "Demo Workspace" : activeWorkspace?.name || "Setup required";
 
   return (
-    <div className="vaeroex-app-shell min-h-screen bg-[#f8fafc] text-ink">
+    <div className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />
@@ -173,23 +173,23 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
       </aside>
 
       <div className="lg:pl-72">
-        <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-4 py-3 text-white shadow-command lg:px-8">
+        <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-3 py-3 text-white shadow-command sm:px-4 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-lg border border-white/15 bg-white/10 shadow-sm shadow-black/10">
                 <VaeroexLogo variant="symbol" size="xs" />
               </span>
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                   {activeWorkspace?.name || "Setup required"} · {accessLabel}
                 </p>
                 <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Intelligence Hub</h1>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link
                 href="/app/agents"
-                className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
+                className="inline-flex items-center justify-center rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
               >
                 Ask Vaeroex
               </Link>
@@ -201,18 +201,18 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
                 <NotificationBadge count={notificationUnreadCount} />
               </Link>
               <ThemeControls variant="compact" />
-              <div className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-100">
+              <div className="max-w-full truncate rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-100">
                 {profile?.full_name || profile?.email || "User"}
               </div>
             </div>
           </div>
         </header>
 
-        <nav className="border-b border-line bg-white px-4 py-2 lg:hidden">
+        <nav className="border-b border-line bg-white px-3 py-2 sm:px-4 lg:hidden">
           <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} mobile />
         </nav>
 
-        <main className="mx-auto w-full max-w-[1480px] space-y-5 p-4 lg:p-6">
+        <main className="mx-auto w-full max-w-[1480px] space-y-5 overflow-x-hidden p-3 sm:p-4 lg:p-6">
           <ComplianceNotice compact />
           {children}
           <footer className="flex flex-col gap-2 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">

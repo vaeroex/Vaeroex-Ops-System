@@ -39,7 +39,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
               key={label}
               type="button"
               onClick={() => setStep(index)}
-              className={`rounded-full px-3 py-1.5 text-sm font-medium ${
+              className={`min-h-11 rounded-full px-3 py-2 text-sm font-medium ${
                 step === index ? "bg-vaeroex-blue text-white" : "bg-slate-100 text-muted"
               }`}
             >
@@ -140,7 +140,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
                 key={category.id}
                 type="button"
                 onClick={() => setCategoryId(category.id)}
-                className={`rounded-lg border p-4 text-left ${
+                className={`min-h-11 rounded-lg border p-4 text-left ${
                   categoryId === category.id ? "border-vaeroex-blue bg-vaeroex-soft" : "border-line bg-white"
                 }`}
               >
@@ -176,24 +176,24 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
           ) : null}
           <ConfirmSubmitButton
             message="Generate this workspace now? Vaeroex will create the first records for review before you use them with real activity."
-            className="mt-6 rounded-lg bg-vaeroex-blue px-5 py-2.5 text-sm font-semibold text-white"
+            className="mt-6 min-h-11 rounded-lg bg-vaeroex-blue px-5 py-2.5 text-sm font-semibold text-white"
           >
             Generate workspace
           </ConfirmSubmitButton>
       </section>
 
-      <div className="flex justify-between">
+      <div className="grid gap-3 sm:flex sm:justify-between">
         <button
           type="button"
           onClick={() => setStep((current) => Math.max(0, current - 1))}
-          className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium"
+          className="min-h-11 rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium"
         >
           Back
         </button>
         <button
           type="button"
           onClick={() => setStep((current) => Math.min(steps.length - 1, current + 1))}
-          className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium"
+          className="min-h-11 rounded-lg border border-line bg-white px-4 py-2 text-sm font-medium"
         >
           Next
         </button>

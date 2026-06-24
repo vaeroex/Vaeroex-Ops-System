@@ -36,16 +36,16 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
             name="q"
             defaultValue={query}
             placeholder="Search Vaeroex help..."
-            className="min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
           />
-          <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
+          <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
         </form>
         <div className="mt-4 flex flex-wrap gap-2">
           {helpCategories.map((category) => (
             <Link
               key={category}
               href={`/app/help?category=${encodeURIComponent(category)}`}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold ${
+              className={`inline-flex min-h-10 items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${
                 selectedCategory === category ? "border-vaeroex-blue bg-vaeroex-soft text-vaeroex-blue" : "border-line text-slate-600"
               }`}
             >
@@ -62,6 +62,29 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
           </div>
         </SectionCard>
       ) : null}
+
+      <SectionCard
+        title="Add Vaeroex to your iPhone Home Screen"
+        description="Vaeroex can be saved from Safari as a lightweight installable web app for faster access to your workspace."
+      >
+        <ol className="grid gap-3 text-sm leading-6 text-slate-600 sm:grid-cols-3">
+          <li className="rounded-lg border border-line bg-slate-50 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Step 1</span>
+            <p className="mt-2 font-semibold text-ink">Open Vaeroex in Safari.</p>
+            <p className="mt-1">Use Safari on your iPhone and sign in to your Vaeroex workspace.</p>
+          </li>
+          <li className="rounded-lg border border-line bg-slate-50 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Step 2</span>
+            <p className="mt-2 font-semibold text-ink">Tap Share.</p>
+            <p className="mt-1">Use the Safari share button at the bottom of the screen.</p>
+          </li>
+          <li className="rounded-lg border border-line bg-slate-50 p-4">
+            <span className="text-xs font-semibold uppercase tracking-wide text-vaeroex-blue">Step 3</span>
+            <p className="mt-2 font-semibold text-ink">Choose Add to Home Screen.</p>
+            <p className="mt-1">Vaeroex will open like an app while staying powered by the secure website.</p>
+          </li>
+        </ol>
+      </SectionCard>
 
       {!query && activeCategory ? (
         <SectionCard title={activeCategory} description="Focused guides for this help category.">

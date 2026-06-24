@@ -30,7 +30,7 @@ export function TextInput({
         placeholder={placeholder}
         step={step}
         min={min}
-        className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
+        className="mt-2 min-h-11 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
       />
     </label>
   );
@@ -60,7 +60,7 @@ export function TextArea({
         defaultValue={defaultValue ?? ""}
         placeholder={placeholder}
         rows={rows}
-        className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
+        className="mt-2 min-h-11 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
       />
     </label>
   );
@@ -86,7 +86,7 @@ export function SelectInput({
         name={name}
         required={required}
         defaultValue={defaultValue ?? ""}
-        className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
+        className="mt-2 min-h-11 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue focus:ring-2 focus:ring-vaeroex-blue/15"
       >
         <option value="">Choose...</option>
         {options.map((option) => (
@@ -98,5 +98,5 @@ export function SelectInput({
 }
 
 export function PrimaryButton({ children }: { children: ReactNode }) {
-  return <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">{children}</button>;
+  return <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">{children}</button>;
 }
