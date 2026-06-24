@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { AppNavigation } from "@/components/app/AppNavigation";
+import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { ThemeControls } from "@/components/app/ThemeControls";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
@@ -174,7 +175,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
 
       <div className="lg:pl-72">
         <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-3 py-3 text-white shadow-command sm:px-4 lg:px-8">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(320px,560px)_auto] lg:items-center">
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-lg border border-white/15 bg-white/10 shadow-sm shadow-black/10">
                 <VaeroexLogo variant="symbol" size="xs" />
@@ -186,7 +187,8 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
                 <h1 className="mt-1 text-lg font-semibold tracking-wide">Vaeroex Intelligence Hub</h1>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <GlobalSearch className="lg:justify-self-center" />
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3 lg:justify-end">
               <Link
                 href="/app/agents"
                 className="inline-flex items-center justify-center rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
