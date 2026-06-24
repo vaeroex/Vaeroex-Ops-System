@@ -17,6 +17,61 @@ function authRedirect(path: string, type: "message" | "error", text: string): ne
   redirect(`${path}?${type}=${encodeURIComponent(text)}` as Route);
 }
 
+function validatePasswordUpdate(password: string, confirmPassword: string, errorPath: string) {
+  if (!password || !confirmPassword) {
+    authRedirect(errorPath, "error", "Enter and confirm your new password.");
+  }
+
+  if (password.length < 8) {
+    authRedirect(errorPath, "error", "Use at least 8 characters for the new password.");
+  }
+
+  if (password !== confirmPassword) {
+    authRedirect(errorPath, "error", "The passwords do not match.");
+  }
+}
+
+async function updateCurrentUserPassword({
+  formData,
+  errorPath,
+  successPath,
+  successMessage,
+  missingSessionMessage
+}: {
+  formData: FormData;
+  errorPath: string;
+  successPath: string;
+  successMessage: string;
+  missingSessionMessage: string;
+}) {
+  const password = value(formData, "password");
+  const confirmPassword = value(formData, "confirm_password");
+  const supabase = await createSupabaseServerClient();
+
+  if (!supabase) {
+    authRedirect(errorPath, "error", "Password management is not configured yet.");
+  }
+
+  validatePasswordUpdate(password, confirmPassword, errorPath);
+
+  const {
+    data: { user },
+    error: userError
+  } = await supabase.auth.getUser();
+
+  if (userError || !user) {
+    authRedirect(errorPath, "error", missingSessionMessage);
+  }
+
+  const { error } = await supabase.auth.updateUser({ password });
+
+  if (error) {
+    authRedirect(errorPath, "error", "Vaeroex could not update your password. Request a new reset link and try again.");
+  }
+
+  authRedirect(successPath, "message", successMessage);
+}
+
 export async function signInAction(formData: FormData) {
   const email = value(formData, "email");
   const password = value(formData, "password");
@@ -106,14 +161,34 @@ export async function forgotPasswordAction(formData: FormData) {
   }
 
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${getAppUrl()}/auth/callback?next=/app`
+    redirectTo: `${getAppUrl()}/auth/callback?next=/reset-password`
   });
 
   if (error) {
-    authRedirect("/forgot-password", "error", error.message);
+    authRedirect("/forgot-password", "error", "Password reset instructions could not be sent. Check the email address and try again.");
   }
 
   authRedirect("/forgot-password", "message", "Password reset instructions sent.");
+}
+
+export async function resetPasswordAction(formData: FormData) {
+  await updateCurrentUserPassword({
+    formData,
+    errorPath: "/reset-password",
+    successPath: "/login",
+    successMessage: "Password updated. Sign in with your new password.",
+    missingSessionMessage: "Your reset link is expired or invalid. Request a new password reset email."
+  });
+}
+
+export async function changePasswordAction(formData: FormData) {
+  await updateCurrentUserPassword({
+    formData,
+    errorPath: "/app/settings",
+    successPath: "/app/settings",
+    successMessage: "Password updated.",
+    missingSessionMessage: "Your session expired. Sign in again before changing your password."
+  });
 }
 
 export async function acceptInviteAction(formData: FormData) {
