@@ -108,7 +108,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   }, [trimmedQuery]);
 
   return (
-    <div className={isIconVariant ? className : `w-full max-w-xl ${className}`}>
+    <div className={isIconVariant ? className : `${className || "w-full"} max-w-xl`}>
       <button
         type="button"
         className={
