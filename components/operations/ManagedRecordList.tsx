@@ -325,9 +325,9 @@ const inactiveFilterLinkClass =
 const inactivePagePillClass =
   "border border-white/10 bg-white/5 text-slate-200 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
 const recordRowInactiveClass = "hover:bg-cyan-950/20 hover:ring-1 hover:ring-inset hover:ring-vaeroex-accent/20";
-const actionMenuPanelClass = "absolute right-0 z-20 mt-2 w-72 rounded-lg border border-line bg-white p-3 shadow-lg";
+const actionMenuPanelClass = "absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-3 shadow-lg";
 const menuItemClass =
-  "block w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
+  "block min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
 
 function FolderQuickFilters({
   folders,
@@ -352,10 +352,10 @@ function FolderQuickFilters({
           All {records.length}
         </Link>
       </div>
-      <div className="mt-3 flex gap-2 overflow-x-auto lg:block lg:space-y-1">
+      <div className="vaeroex-mobile-safe-scroll mt-3 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:pb-0">
         <Link
           href={listHref(returnPath, { folder: "" }) as Route}
-          className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${!activeFolder ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
+          className={`flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${!activeFolder ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
         >
           <span>All records</span>
           <span className="text-xs opacity-80">{records.length}</span>
@@ -364,7 +364,7 @@ function FolderQuickFilters({
           <Link
             key={folder.id}
             href={listHref(returnPath, { folder: folder.id }) as Route}
-            className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === folder.id ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
+            className={`flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === folder.id ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
           >
             <span className="truncate">{folder.name}</span>
             <span className="text-xs opacity-80">{counts[folder.id] || 0}</span>
@@ -373,7 +373,7 @@ function FolderQuickFilters({
         {unfiledCount ? (
           <Link
             href={listHref(returnPath, { folder: "unfiled" }) as Route}
-            className={`flex shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === "unfiled" ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
+            className={`flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === "unfiled" ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
           >
             <span>Unfiled</span>
             <span className="text-xs opacity-80">{unfiledCount}</span>
@@ -409,7 +409,7 @@ function RecordEditForm({
         </label>
       ))}
       <div className="sm:col-span-2">
-        <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Save changes</button>
+        <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Save changes</button>
       </div>
     </form>
   );
@@ -485,7 +485,7 @@ function RecordActionsMenu({
   return (
     <details className="relative">
       <summary
-        className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-lg font-semibold text-slate-600 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
+        className="grid h-11 w-11 cursor-pointer list-none place-items-center rounded-md border border-line bg-white text-lg font-semibold text-slate-600 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 lg:h-9 lg:w-9"
         aria-label={`Actions for ${record.title}`}
       >
         ...
@@ -527,13 +527,13 @@ function RecordActionsMenu({
               <input type="hidden" name="record_id" value={record.id} />
               <input type="hidden" name="record_action" value="move" />
               <input type="hidden" name="return_path" value={returnPath} />
-              <select name="target_folder_id" defaultValue={record.folderId || ""} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="target_folder_id" defaultValue={record.folderId || ""} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">No folder</option>
                 {activeFolders.map((folder) => (
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
                 ))}
               </select>
-              <button className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">Move</button>
+              <button className="min-h-11 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">Move</button>
             </form>
           </details>
 
@@ -564,7 +564,7 @@ function RecordActionsMenu({
             <input type="hidden" name="return_path" value={returnPath} />
             <ConfirmSubmitButton
               message={`Delete "${record.title}"? It will be hidden from active views.`}
-              className="w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-950/35 hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/40"
+              className="min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-950/35 hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/40"
             >
               Delete
             </ConfirmSubmitButton>
@@ -615,9 +615,9 @@ export function ManagedRecordList({
             name="q"
             defaultValue={param(searchParams?.q)}
             placeholder="Search records"
-            className="min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
+            className="min-h-11 min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
           />
-          <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
+          <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
         </form>
       </div>
 
@@ -631,40 +631,40 @@ export function ManagedRecordList({
 
         <div className="space-y-3">
           <details className="rounded-lg border border-line bg-white p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Filters</summary>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-slate-700">Filters</summary>
             <form method="get" className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
               <input type="hidden" name="q" value={param(searchParams?.q)} />
-              <select name="folder" defaultValue={activeFolder} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="folder" defaultValue={activeFolder} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">All folders</option>
                 <option value="unfiled">Unfiled</option>
                 {activeFolders.map((folder) => (
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
                 ))}
               </select>
-              <select name="status" defaultValue={param(searchParams?.status)} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="status" defaultValue={param(searchParams?.status)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">All statuses</option>
                 {statusOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="owner" defaultValue={param(searchParams?.owner)} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="owner" defaultValue={param(searchParams?.owner)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">All owners</option>
                 {ownerOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="category" defaultValue={param(searchParams?.category)} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="category" defaultValue={param(searchParams?.category)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">All categories</option>
                 {categoryOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="sort" defaultValue={sort} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="sort" defaultValue={sort} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 {sortOptions.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
-              <select name="view" defaultValue={param(searchParams?.view) || "active"} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="active">Active</option>
                 <option value="archived">Archived</option>
                 <option value="deleted">Deleted</option>
@@ -675,16 +675,16 @@ export function ManagedRecordList({
                 name="date_from"
                 defaultValue={param(searchParams?.date_from)}
                 aria-label="Updated after"
-                className="rounded-lg border border-line px-3 py-2 text-sm"
+                className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm"
               />
               <input
                 type="date"
                 name="date_to"
                 defaultValue={param(searchParams?.date_to)}
                 aria-label="Updated before"
-                className="rounded-lg border border-line px-3 py-2 text-sm"
+                className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm"
               />
-              <select name="limit" defaultValue={limitValue || "10"} className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="limit" defaultValue={limitValue || "10"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 {pageSizeOptions.map((option) => (
                   <option key={option} value={option}>
                     Show {option}
@@ -692,25 +692,25 @@ export function ManagedRecordList({
                 ))}
                 <option value="all">View all</option>
               </select>
-              <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white md:col-span-2 xl:col-span-1">
+              <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white md:col-span-2 xl:col-span-1">
                 Apply filters
               </button>
             </form>
           </details>
 
           <details className="rounded-lg border border-line bg-white p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Bulk actions</summary>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-slate-700">Bulk actions</summary>
             <form id={bulkFormId} action={bulkManageRecordsAction} className="mt-3 grid gap-3 md:grid-cols-[1fr_220px_auto]">
               <input type="hidden" name="collection" value={collection} />
               <input type="hidden" name="return_path" value={returnPath} />
-              <select name="bulk_action" className="rounded-lg border border-line px-3 py-2 text-sm" required>
+              <select name="bulk_action" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm" required>
                 <option value="">Bulk action</option>
                 <option value="archive">Archive selected</option>
                 <option value="delete">Delete selected</option>
                 <option value="move">Move selected to folder</option>
                 <option value="restore">Restore selected</option>
               </select>
-              <select name="target_folder_id" className="rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="target_folder_id" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">No folder</option>
                 {activeFolders.map((folder) => (
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
@@ -734,14 +734,14 @@ export function ManagedRecordList({
                     <Link
                       key={option}
                       href={listHref(returnPath, { ...baseParams, limit: option }) as Route}
-                      className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${String(visibleLimit) === option && limitValue !== "all" ? "bg-vaeroex-blue text-white" : inactivePagePillClass}`}
+                      className={`inline-flex min-h-10 items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ${String(visibleLimit) === option && limitValue !== "all" ? "bg-vaeroex-blue text-white" : inactivePagePillClass}`}
                     >
                       {option}
                     </Link>
                   ))}
                   <Link
                     href={listHref(returnPath, { ...baseParams, limit: "all" }) as Route}
-                    className={`rounded-md px-2.5 py-1.5 text-xs font-semibold ${limitValue === "all" ? "bg-vaeroex-blue text-white" : inactivePagePillClass}`}
+                    className={`inline-flex min-h-10 items-center rounded-md px-2.5 py-1.5 text-xs font-semibold ${limitValue === "all" ? "bg-vaeroex-blue text-white" : inactivePagePillClass}`}
                   >
                     View All
                   </Link>

@@ -4,6 +4,13 @@
 
 :root {
   color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html {
+  min-width: 0;
+  overflow-x: clip;
 }
 
 body {
@@ -11,10 +18,21 @@ body {
   background: #f8fafc;
   color: #0b1f4d;
   text-rendering: geometricPrecision;
+  min-width: 0;
+  overflow-x: clip;
+  touch-action: manipulation;
 }
 
 * {
   box-sizing: border-box;
+  min-width: 0;
+}
+
+@supports not (overflow: clip) {
+  html,
+  body {
+    overflow-x: hidden;
+  }
 }
 
 ::selection {
@@ -24,15 +42,46 @@ body {
 
 button,
 a,
+summary,
 select,
 input,
 textarea {
+  -webkit-tap-highlight-color: rgba(56, 189, 248, 0.22);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
     box-shadow 160ms ease,
     color 160ms ease,
     transform 160ms ease;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
+}
+
+.vaeroex-mobile-safe-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.vaeroex-touch-target {
+  min-height: 44px;
+}
+
+@media (pointer: coarse) {
+  button,
+  summary,
+  select,
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  textarea,
+  a.rounded-lg,
+  a.rounded-md,
+  a.rounded-full {
+    min-height: 44px;
+  }
 }
 
 a.bg-vaeroex-blue:hover,

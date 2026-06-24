@@ -97,7 +97,7 @@ type DashboardSignal = {
 };
 
 const PERIODS: DashboardPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
-const DASHBOARD_MODES: DashboardMode[] = ["Intelligence View", "Executive View", "Operations View"];
+const DASHBOARD_MODES: DashboardMode[] = ["Executive View", "Intelligence View", "Operations View"];
 const DASHBOARD_MODE_PROMPTS: Record<DashboardMode, string> = {
   "Executive View": "How are we performing?",
   "Operations View": "What is happening?",
@@ -775,12 +775,12 @@ function SmartAlerts({
 function DashboardModeSelector({ mode, period }: { mode: DashboardMode; period: DashboardPeriod }) {
   return (
     <div className="rounded-lg border border-vaeroex-silver/70 bg-white p-1 shadow-sm">
-      <div className="grid gap-1 sm:grid-cols-3">
+      <div className="grid gap-1 md:grid-cols-3">
         {DASHBOARD_MODES.map((item) => (
           <Link
             key={item}
             href={dashboardHref(period, item)}
-            className={`rounded-md px-3 py-2 text-center text-sm font-semibold transition ${
+            className={`min-h-11 rounded-md px-3 py-2 text-center text-sm font-semibold transition ${
               item === mode
                 ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
                 : "text-slate-700 hover:bg-blue-950/10 hover:text-vaeroex-blue"
@@ -799,12 +799,12 @@ function DashboardModeSelector({ mode, period }: { mode: DashboardMode; period: 
 
 function PeriodSelector({ period, mode }: { period: DashboardPeriod; mode: DashboardMode }) {
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
       {PERIODS.map((item) => (
         <Link
           key={item}
           href={dashboardHref(item, mode)}
-          className={`rounded-lg px-3 py-2 text-sm font-semibold ${
+          className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-semibold ${
             item === period
               ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
               : "border border-line bg-white text-slate-700 hover:border-vaeroex-accent hover:text-vaeroex-blue"
@@ -830,7 +830,7 @@ function DashboardAccordion({
 }) {
   return (
     <details open={defaultOpen} className="group rounded-lg border border-vaeroex-silver/80 bg-white shadow-panel">
-      <summary className="flex cursor-pointer list-none flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <summary className="flex min-h-11 cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
           <h3 className="text-base font-semibold text-ink">{title}</h3>
           <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">{summary}</p>
@@ -1404,7 +1404,7 @@ function DemoWorkspaceBanner({
 export default async function AppDashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const period = isDashboardPeriod(params?.period) ? params.period : "Weekly";
-  const dashboardMode = isDashboardMode(params?.view) ? params.view : "Intelligence View";
+  const dashboardMode = isDashboardMode(params?.view) ? params.view : "Executive View";
   const range = rangeForPeriod(period);
   const { supabase, context, workspaceId } = await requireWorkspacePage();
   const {
@@ -2100,7 +2100,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <DashboardAccordion
             title="Intelligence signals"
             summary={`${riskSignals.length} actionable risk signal${riskSignals.length === 1 ? "" : "s"}, ${opportunitySignals.length} opportunit${opportunitySignals.length === 1 ? "y" : "ies"}, and ${recommendedActionSignals.length} recommended action${recommendedActionSignals.length === 1 ? "" : "s"} are available for review.`}
-            defaultOpen
           >
             <section className="grid gap-4 xl:grid-cols-3">
               <SectionCard title="Risks" description="Top source records behind the current risk summary.">

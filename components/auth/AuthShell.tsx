@@ -30,9 +30,9 @@ const intelligenceFeatures = [
 
 export function AuthShell({ title, subtitle, children }: AuthShellProps) {
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f8fafc] px-5 py-8 text-ink sm:px-6 lg:py-10">
+    <main className="min-h-dvh overflow-x-hidden bg-[#f8fafc] px-4 py-6 text-ink sm:px-6 sm:py-8 lg:py-10">
       <div className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_12%_8%,rgba(30,107,255,0.20),transparent_30%),radial-gradient(circle_at_86%_12%,rgba(56,189,248,0.16),transparent_26%),linear-gradient(135deg,#030712_0%,#07111f_46%,#11112b_100%)]" />
-      <div className="mx-auto grid min-h-[calc(100vh-4rem)] max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_430px]">
+      <div className="mx-auto grid min-h-[calc(100dvh-3rem)] max-w-6xl items-center gap-8 lg:grid-cols-[minmax(0,1fr)_430px]">
         <section className="relative hidden overflow-hidden rounded-2xl border border-cyan-300/20 bg-vaeroex-navy p-8 text-white shadow-command lg:block">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_84%_74%,rgba(124,58,237,0.20),transparent_32%)]" />
           <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-vaeroex-accent/70 to-transparent" />
@@ -70,7 +70,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
             <span>Action</span>
           </div>
         </section>
-        <section className="rounded-2xl border border-line/80 bg-white/95 p-6 shadow-panel backdrop-blur md:p-7">
+        <section className="rounded-2xl border border-line/80 bg-white/95 p-5 shadow-panel backdrop-blur sm:p-6 md:p-7">
           <div className="mb-7">
             <div className="mb-5 flex justify-center">
               <VaeroexLogo variant="full" size="hero" priority className="max-w-full" />

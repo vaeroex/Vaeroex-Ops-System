@@ -1,5 +1,6 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { PwaServiceWorker } from "@/components/app/PwaServiceWorker";
 import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import "./globals.css";
 
@@ -25,7 +26,27 @@ export const metadata: Metadata = {
   icons: {
     apple: "/apple-touch-icon.png",
     icon: "/favicon.png"
+  },
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "Vaeroex",
+    statusBarStyle: "black-translucent"
+  },
+  other: {
+    "application-name": "Vaeroex",
+    "apple-mobile-web-app-title": "Vaeroex",
+    "apple-mobile-web-app-capable": "yes",
+    "apple-mobile-web-app-status-bar-style": "black-translucent",
+    "mobile-web-app-capable": "yes"
   }
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0B1220"
 };
 
 const themeScript = `
@@ -73,7 +94,10 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: organizationSchema }} />
       </head>
-      <body>{children}</body>
+      <body>
+        <PwaServiceWorker />
+        {children}
+      </body>
     </html>
   );
 }
