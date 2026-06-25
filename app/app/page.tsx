@@ -954,6 +954,38 @@ function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportun
   return "Review the recommended action, then assign ownership or create the follow-up inside Vaeroex.";
 }
 
+function EvidenceDisclosure({
+  evidence,
+  why,
+  action,
+  compact = false
+}: {
+  evidence: string;
+  why: string;
+  action: string;
+  compact?: boolean;
+}) {
+  return (
+    <details className={`mt-3 rounded-lg border border-white/10 bg-slate-950/35 ${compact ? "p-3" : "p-4"}`}>
+      <summary className="cursor-pointer text-xs font-semibold text-vaeroex-accent">View evidence and confidence</summary>
+      <dl className="mt-3 grid gap-2 text-xs leading-5 text-slate-300">
+        <div>
+          <dt className="font-semibold text-slate-100">Data used</dt>
+          <dd className="mt-1">{evidence}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-100">Why Vaeroex surfaced it</dt>
+          <dd className="mt-1">{why}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-100">Recommended action</dt>
+          <dd className="mt-1">{action}</dd>
+        </div>
+      </dl>
+    </details>
+  );
+}
+
 function confidenceForPriority(priority: string | undefined) {
   if (priority === "Urgent" || priority === "High") return "High";
   if (priority === "Medium") return "Medium";
@@ -1021,10 +1053,9 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
   return (
     <section className="grid gap-4 xl:grid-cols-3">
       {tools.map((tool) => (
-        <Link
+        <article
           key={tool.title}
-          href={tool.href}
-          className="group block rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/45 hover:bg-blue-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/45 hover:bg-blue-950/25"
         >
           <div className="flex items-start justify-between gap-3">
             <h3 className="text-sm font-semibold text-white">{tool.title}</h3>
@@ -1032,22 +1063,17 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
               {tool.confidence} confidence
             </span>
           </div>
-          <dl className="mt-3 grid gap-2 text-xs leading-5 text-slate-300">
-            <div>
-              <dt className="font-semibold text-slate-100">Evidence</dt>
-              <dd className="mt-1">{tool.evidence}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-100">Reasoning</dt>
-              <dd className="mt-1">{tool.reasoning}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold text-slate-100">Recommended action</dt>
-              <dd className="mt-1">{tool.action}</dd>
-            </div>
-          </dl>
-          <span className="mt-4 inline-flex text-xs font-semibold text-vaeroex-accent group-hover:text-cyan-200">Open related context</span>
-        </Link>
+          <p className="mt-3 text-xs leading-5 text-slate-300">
+            <span className="font-semibold text-slate-100">Recommended:</span> {tool.action}
+          </p>
+          <EvidenceDisclosure evidence={tool.evidence} why={tool.reasoning} action={tool.action} compact />
+          <Link
+            href={tool.href}
+            className="mt-4 inline-flex rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-vaeroex-accent hover:border-cyan-200 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          >
+            Open related context
+          </Link>
+        </article>
       ))}
     </section>
   );
@@ -1076,10 +1102,9 @@ function SignalList({
       items={items}
       empty={empty}
       render={(item: DashboardSignal) => (
-        <Link
+        <article
           key={item.id}
-          href={item.href}
-          className={`block rounded-lg border p-3 text-sm transition hover:underline hover:decoration-current hover:underline-offset-4 ${toneClasses[tone]}`}
+          className={`rounded-lg border p-3 text-sm transition ${toneClasses[tone]}`}
         >
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -1093,21 +1118,22 @@ function SignalList({
               </span>
             </div>
           </div>
-          <dl className="mt-3 grid gap-2 text-xs leading-5">
-            <div>
-              <dt className="font-semibold opacity-95">Evidence</dt>
-              <dd className="mt-1 opacity-90">{signalEvidence(item)}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold opacity-95">Reasoning</dt>
-              <dd className="mt-1 opacity-90">{signalReasoning(item, tone)}</dd>
-            </div>
-            <div>
-              <dt className="font-semibold opacity-95">Recommended action</dt>
-              <dd className="mt-1 opacity-90">{signalRecommendedAction(item, tone)}</dd>
-            </div>
-          </dl>
-        </Link>
+          <p className="mt-3 text-xs leading-5 opacity-90">
+            <span className="font-semibold opacity-95">Recommended:</span> {signalRecommendedAction(item, tone)}
+          </p>
+          <EvidenceDisclosure
+            evidence={signalEvidence(item)}
+            why={signalReasoning(item, tone)}
+            action={signalRecommendedAction(item, tone)}
+            compact
+          />
+          <Link
+            href={item.href}
+            className="mt-3 inline-flex rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+          >
+            Open source record
+          </Link>
+        </article>
       )}
     />
   );
@@ -1193,20 +1219,15 @@ function IntelligenceBriefingHero({
 
               {item ? (
                 <>
-                  <dl className="mt-4 space-y-3 text-xs leading-5 text-slate-200">
-                    <div>
-                      <dt className="font-semibold text-white">Evidence</dt>
-                      <dd className="mt-1 text-slate-300">{signalEvidence(item)}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-white">Reasoning</dt>
-                      <dd className="mt-1 text-slate-300">{signalReasoning(item, tone)}</dd>
-                    </div>
-                    <div>
-                      <dt className="font-semibold text-white">Recommended action</dt>
-                      <dd className="mt-1 text-slate-300">{signalRecommendedAction(item, tone)}</dd>
-                    </div>
-                  </dl>
+                  <p className="mt-4 text-xs leading-5 text-slate-300">
+                    <span className="font-semibold text-white">Recommended:</span> {signalRecommendedAction(item, tone)}
+                  </p>
+                  <EvidenceDisclosure
+                    evidence={signalEvidence(item)}
+                    why={signalReasoning(item, tone)}
+                    action={signalRecommendedAction(item, tone)}
+                    compact
+                  />
                   <Link href={item.href} className="mt-4 inline-flex rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
                     Open source
                   </Link>
@@ -2121,7 +2142,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                     Review files
                   </Link>
                   <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-                    Review CRM
+                    Review customer context
                   </Link>
                   <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
                     Generate report
@@ -2133,14 +2154,19 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
           <IntelligencePriorityTools intelligence={prestigeIntelligence} />
 
-          <PrestigeOperationsPanel
-            intelligence={prestigeIntelligence}
-            returnPath="/app"
-            dateRangeStart={range.startDate}
-            dateRangeEnd={range.endDate}
-            isDemoWorkspace={isViewingDemoWorkspace}
-            showHealthHero={false}
-          />
+          <DashboardAccordion
+            title="Advanced intelligence tools"
+            summary="Risk simulation, profit leak detection, business memory, decision review, benchmarks, and recommendation tracking stay here when leadership wants deeper context."
+          >
+            <PrestigeOperationsPanel
+              intelligence={prestigeIntelligence}
+              returnPath="/app"
+              dateRangeStart={range.startDate}
+              dateRangeEnd={range.endDate}
+              isDemoWorkspace={isViewingDemoWorkspace}
+              showHealthHero={false}
+            />
+          </DashboardAccordion>
         </>
       ) : null}
 

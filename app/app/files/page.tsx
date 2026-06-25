@@ -22,6 +22,7 @@ import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
+import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -725,12 +726,51 @@ function ImportActionForm({ file, importType, label }: { file: FileUploadRow; im
   );
 }
 
+function FileSourceActions({
+  file,
+  access,
+  compact = false
+}: {
+  file: FileUploadRow;
+  access?: FileAccessLinks | null;
+  compact?: boolean;
+}) {
+  if (!access?.viewUrl && !access?.downloadUrl) {
+    return (
+      <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+        {access?.error || "Original file access is unavailable. Try refreshing the page or uploading the file again."}
+      </p>
+    );
+  }
+
+  const buttonClass = compact
+    ? "rounded-md border border-line bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent"
+    : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent";
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {access.viewUrl ? (
+        <a href={access.viewUrl} target="_blank" rel="noreferrer" className={buttonClass}>
+          View Original
+        </a>
+      ) : null}
+      {access.downloadUrl ? (
+        <a href={access.downloadUrl} download={file.original_name} className={buttonClass}>
+          Download Source
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
 function FileInlineActions({
   file,
-  analysisRuns
+  analysisRuns,
+  access
 }: {
   file: FileUploadRow;
   analysisRuns: VaeroexRunRow[];
+  access?: FileAccessLinks | null;
 }) {
   const canImport = isSpreadsheet(file);
   const canAnalyze = canAnalyzeFile(file);
@@ -742,6 +782,7 @@ function FileInlineActions({
       <Link href={`/app/files?file=${file.id}`} className="rounded-md bg-vaeroex-blue px-2.5 py-1.5 text-xs font-semibold text-white">
         Select
       </Link>
+      <FileSourceActions file={file} access={access} compact />
       {canAnalyze ? (
         <form action={analyzeFileAction}>
           <input type="hidden" name="file_id" value={file.id} />
@@ -774,12 +815,14 @@ function FileActionCenter({
   file,
   reports,
   analysisRuns = [],
-  compact = false
+  compact = false,
+  access
 }: {
   file: FileUploadRow;
   reports: ReportRow[];
   analysisRuns?: VaeroexRunRow[];
   compact?: boolean;
+  access?: FileAccessLinks | null;
 }) {
   const canImport = isSpreadsheet(file);
   const canAnalyze = canAnalyzeFile(file);
@@ -796,6 +839,7 @@ function FileActionCenter({
         <Link href={`/app/files?file=${file.id}#analysis-result`} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
           View latest analysis
         </Link>
+        <FileSourceActions file={file} access={access} />
       </>
     );
   }
@@ -812,6 +856,9 @@ function FileActionCenter({
             </p>
             <p className="mt-2 text-xs font-semibold text-slate-700">{support.title}</p>
             <p className="mt-1 text-xs leading-5 text-slate-600">{support.body}</p>
+            <div className="mt-3">
+              <FileSourceActions file={file} access={access} />
+            </div>
           </div>
           <span className="rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-700">{fileStatusLabel(file)}</span>
         </div>
@@ -1037,12 +1084,14 @@ function SelectedFileBanner({
   file,
   folders,
   reports,
-  analysisRuns
+  analysisRuns,
+  access
 }: {
   file: FileUploadRow;
   folders: Pick<FolderRow, "id" | "name">[];
   reports: ReportRow[];
   analysisRuns: VaeroexRunRow[];
+  access?: FileAccessLinks | null;
 }) {
   const fileReports = reportsForFile(reports, file.id);
   const status = analysisStatus(file, analysisRuns);
@@ -1080,6 +1129,7 @@ function SelectedFileBanner({
             </Link>
           </div>
         </div>
+        <FileSourceActions file={file} access={access} />
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">File type</p>
@@ -1420,13 +1470,15 @@ function FileDetails({
   imports,
   importRows,
   latestRun,
-  people
+  people,
+  access
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   importRows: FileImportDataRow[];
   latestRun?: VaeroexRunRow | null;
   people: TeamPersonOption[];
+  access?: FileAccessLinks | null;
 }) {
   const lines = analysisLines(file.analysis_summary);
   const hasCleanAnalysis = Boolean(latestAnalysisResult(file) || latestRun?.status === "completed");
@@ -1436,6 +1488,17 @@ function FileDetails({
 
   return (
     <div className="space-y-5">
+      <section className="rounded-lg border border-line bg-white p-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-ink">Original file</h4>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Secure links expire automatically. If a link stops working, refresh this page to generate a new one.
+            </p>
+          </div>
+          <FileSourceActions file={file} access={access} />
+        </div>
+      </section>
       <FileAnalysisResult file={file} latestRun={latestRun} people={people} />
       {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
       <ImportHistory imports={imports} />
@@ -1484,6 +1547,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   const reports = (reportResult.data || []) as ReportRow[];
   const analysisRuns = (analysisRunResult.data || []) as VaeroexRunRow[];
   const people = (peopleResult.data || []) as TeamPersonOption[];
+  const fileAccessById = await createFileAccessLinkMap(supabase, files);
   const folderOptions = folderResult.folders;
   const importedRows = files.reduce((sum, file) => sum + file.imported_rows, 0);
   const spreadsheetCount = files.filter(isSpreadsheet).length;
@@ -1491,6 +1555,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   const pendingReviewCount = imports.filter((item) => item.status === "needs_review" || item.status === "extracted").length;
   const selectedFile = params?.file ? files.find((file) => file.id === params.file) || null : null;
   const selectedFileRuns = selectedFile ? analysisRuns.filter((run) => runFileId(run) === selectedFile.id) : [];
+  const selectedFileAccess = selectedFile ? fileAccessById.get(selectedFile.id) : null;
   const errorMessage = cleanNoticeMessage(
     params?.error ||
       fileResult.error?.message ||
@@ -1525,7 +1590,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       preview: shortPreview(file.analysis_summary, `${file.original_name} · ${fileSizeLabel(file.file_size_bytes)}`),
       href: `/app/files?file=${file.id}` as Route,
       selectLabel: "Select file",
-      inlineActions: <FileInlineActions file={file} analysisRuns={fileAnalysisRuns} />,
+      inlineActions: <FileInlineActions file={file} analysisRuns={fileAnalysisRuns} access={fileAccessById.get(file.id)} />,
       meta: [
         { label: "Original name", value: file.original_name },
         { label: "Processing", value: fileStatusLabel(file) },
@@ -1538,14 +1603,23 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         { label: "Reports from file", value: fileReports.length },
         { label: "File size", value: fileSizeLabel(file.file_size_bytes) }
       ],
-      quickActions: <FileActionCenter file={file} reports={reports} analysisRuns={fileAnalysisRuns} compact />,
+      quickActions: <FileActionCenter file={file} reports={reports} analysisRuns={fileAnalysisRuns} access={fileAccessById.get(file.id)} compact />,
       editFields: fileEditFields,
       editValues: {
         display_name: file.display_name,
         import_type: file.import_type,
         analysis_summary: file.analysis_summary
       },
-      children: <FileDetails file={file} imports={fileImports} importRows={fileImportRows} latestRun={fileAnalysisRuns[0]} people={people} />
+      children: (
+        <FileDetails
+          file={file}
+          imports={fileImports}
+          importRows={fileImportRows}
+          latestRun={fileAnalysisRuns[0]}
+          people={people}
+          access={fileAccessById.get(file.id)}
+        />
+      )
     };
   });
 
@@ -1608,9 +1682,9 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       <SectionCard title="Selected file actions" description="Choose what to do next with the uploaded file. Imports always go to review before anything is saved.">
         {selectedFile ? (
           <div className="space-y-4">
-            <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} />
+            <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
             <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} people={people} />
-            <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} />
+            <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
           </div>
         ) : (
           <NoSelectedFilePanel />
