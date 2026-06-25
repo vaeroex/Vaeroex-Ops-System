@@ -3,14 +3,16 @@ import type { Route } from "next";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { CopyVaeroexResultButton } from "@/components/ai/CopyVaeroexResultButton";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { PrimaryButton, TextArea, TextInput } from "@/components/operations/FormControls";
+import { TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
@@ -66,6 +68,41 @@ const WORKFLOW_GROUPS: Array<{
     keys: ["sop_generator", "weekly_report", "daily_summary", "form_builder", "checklist_builder", "file_analysis"]
   }
 ];
+const QUICK_ACTIONS: Array<{
+  label: string;
+  workflowKey: VaeroexWorkflowKey;
+  prompt: string;
+}> = [
+  {
+    label: "Ask CEO view",
+    workflowKey: "ceo_mode",
+    prompt: "If I were the CEO, what would I do this week?"
+  },
+  {
+    label: "Find focus",
+    workflowKey: "focus_priorities",
+    prompt: "What should I focus on this week?"
+  },
+  {
+    label: "Simulate risks",
+    workflowKey: "risk_simulation",
+    prompt: "What could go wrong next month?"
+  },
+  {
+    label: "Run meeting mode",
+    workflowKey: "weekly_management_meeting",
+    prompt: "Run Weekly Management Meeting."
+  },
+  {
+    label: "Business Review Package",
+    workflowKey: "business_review_package",
+    prompt: "Prepare Business Review Package."
+  }
+];
+const vaeroexSubmitClass =
+  "min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 disabled:cursor-not-allowed disabled:opacity-70";
+const vaeroexPillSubmitClass =
+  "rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 disabled:cursor-not-allowed disabled:opacity-70";
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -85,6 +122,51 @@ function str(value: unknown, fallback = "") {
 
 function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function getRunInput(run: { input_json?: Json }) {
+  return asRecord(run.input_json);
+}
+
+function getRunExtraInputs(run: { input_json?: Json }) {
+  return asRecord(getRunInput(run).extra_inputs);
+}
+
+function getWorkspaceSnapshotFromInput(input: JsonRecord) {
+  return asRecord(input.workspace_snapshot);
+}
+
+function snapshotMetrics(input: JsonRecord) {
+  return asRecord(getWorkspaceSnapshotFromInput(input).metrics);
+}
+
+function dataUsedSummary(input: JsonRecord) {
+  const snapshot = getWorkspaceSnapshotFromInput(input);
+  const metrics = snapshotMetrics(input);
+
+  return [
+    { label: "KPIs", value: numberValue(metrics.kpi_history_records) || asArray(snapshot.kpi_history).length },
+    { label: "Reports", value: numberValue(metrics.reports) || asArray(snapshot.reports).length },
+    { label: "Files", value: numberValue(metrics.uploaded_files) || asArray(snapshot.files).length },
+    { label: "Issues", value: numberValue(metrics.open_issues) || asArray(snapshot.recent_issues).length },
+    { label: "Business Memory", value: asArray(snapshot.recent_vaeroex_results).length + asArray(snapshot.reports).length },
+    { label: "Follow-ups", value: numberValue(metrics.open_tasks) || asArray(snapshot.recent_tasks).length },
+    { label: "Decisions", value: asArray(snapshot.business_decisions).length }
+  ];
+}
+
+function dataUsedText(input: JsonRecord) {
+  const items = dataUsedSummary(input);
+
+  if (!items.some((item) => item.value > 0)) {
+    return "No workspace records were available beyond basic workspace context.";
+  }
+
+  return items.map((item) => `${item.label}: ${item.value}`).join(" | ");
 }
 
 function parseStructuredText(value: unknown): JsonRecord | null {
@@ -247,6 +329,92 @@ function businessSections(output: JsonRecord) {
     actions: actions.length ? actions : ["Review the draft, choose the first priority, and assign an owner."],
     systems: systems.length ? systems : ["Accountability dashboard", "Follow-up system", "Weekly management review"]
   };
+}
+
+function outputEvidenceItems(output: JsonRecord) {
+  const items = collectItems(output, [
+    "evidence",
+    "evidence_used",
+    "supporting_evidence",
+    "data_used",
+    "source_records",
+    "signals_used"
+  ]);
+
+  if (items.length) {
+    return items.slice(0, 6);
+  }
+
+  const sections = businessSections(output);
+  return [...sections.problems, ...sections.actions].slice(0, 4);
+}
+
+function outputReasoning(output: JsonRecord) {
+  return (
+    str(output.reasoning) ||
+    str(output.why_this_recommendation) ||
+    str(output.why_vaeroex_surfaced_this) ||
+    str(output.why_it_matters) ||
+    "Vaeroex surfaced this because the available workspace context points to a practical visibility, accountability, risk, or execution decision."
+  );
+}
+
+function outputConfidence(output: JsonRecord, runStatus: string) {
+  const explicit = str(output.confidence);
+
+  if (["High", "Medium", "Low"].includes(explicit)) {
+    return explicit;
+  }
+
+  if (runStatus === "failed") {
+    return "Low";
+  }
+
+  const evidenceCount = outputEvidenceItems(output).length;
+  if (evidenceCount >= 4) return "High";
+  if (evidenceCount >= 2) return "Medium";
+  return "Low";
+}
+
+function confidenceClasses(confidence: string) {
+  if (confidence === "High") return "border-emerald-400/40 bg-emerald-950/35 text-emerald-100";
+  if (confidence === "Medium") return "border-amber-400/40 bg-amber-950/35 text-amber-100";
+  return "border-slate-500/40 bg-slate-950/60 text-slate-200";
+}
+
+function resultCopyText(title: string, output: JsonRecord, run: { agent_type: string; status: string; input_json?: Json }) {
+  const sections = businessSections(output);
+  const evidence = outputEvidenceItems(output);
+  const confidence = outputConfidence(output, run.status);
+
+  return [
+    `# ${title}`,
+    "",
+    `Workflow: ${vaeroexResultLabel(run.agent_type)}`,
+    `Status: ${run.status}`,
+    `Confidence: ${confidence}`,
+    "",
+    "## Executive Summary",
+    sections.executiveSummary,
+    "",
+    "## Problems Identified",
+    ...sections.problems.map((item) => `- ${item}`),
+    "",
+    "## Recommended Actions",
+    ...sections.actions.map((item) => `- ${item}`),
+    "",
+    "## Suggested Systems",
+    ...sections.systems.map((item) => `- ${item}`),
+    "",
+    "## Evidence Used",
+    ...evidence.map((item) => `- ${item}`),
+    "",
+    "## Why This Recommendation",
+    outputReasoning(output),
+    "",
+    "## Data Used",
+    dataUsedText(getRunInput(run))
+  ].join("\n");
 }
 
 function inferRelatedModule(text: string) {
@@ -869,6 +1037,154 @@ function AdminDebugOutput({ enabled, output }: { enabled: boolean; output: Json 
   );
 }
 
+function DataUsedPanel({ input }: { input: JsonRecord }) {
+  const items = dataUsedSummary(input);
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold">Data used</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">Workspace context Vaeroex gathered before generating this result.</p>
+        </div>
+        <span className="w-fit rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-100">
+          Tenant-safe workspace data
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <div key={item.label} className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+            <p className="text-lg font-semibold text-white">{item.value}</p>
+            <p className="mt-1 text-xs text-slate-400">{item.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EvidencePanel({ output, status }: { output: JsonRecord; status: string }) {
+  const evidence = outputEvidenceItems(output);
+  const confidence = outputConfidence(output, status);
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_.55fr]">
+      <div className="rounded-lg border border-line bg-white p-4">
+        <h4 className="text-sm font-semibold">Why this recommendation?</h4>
+        <p className="mt-2 text-sm leading-6 text-muted">{outputReasoning(output)}</p>
+        <div className="mt-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Evidence used</p>
+          <ul className="mt-2 space-y-2 text-sm leading-6 text-muted">
+            {evidence.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+      <div className={`rounded-lg border p-4 ${confidenceClasses(confidence)}`}>
+        <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Confidence</p>
+        <p className="mt-2 text-3xl font-semibold">{confidence}</p>
+        <p className="mt-2 text-xs leading-5 opacity-85">
+          Confidence reflects available workspace context, evidence quantity, and whether Vaeroex completed the run successfully.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function failureReasons(input: JsonRecord, message?: string | null) {
+  const reasons = [];
+  const lowerMessage = (message || "").toLowerCase();
+  const metrics = snapshotMetrics(input);
+  const hasAnyData = dataUsedSummary(input).some((item) => item.value > 0);
+
+  if (/temporarily unavailable|api key|openai|authentication|authorization/.test(lowerMessage)) {
+    reasons.push("Vaeroex intelligence is temporarily unavailable or the OpenAI runtime rejected the request.");
+  }
+
+  if (!hasAnyData) {
+    reasons.push("This workspace has little or no KPI, report, file, issue, follow-up, or business-memory context yet.");
+  }
+
+  if (!numberValue(metrics.kpi_history_records)) {
+    reasons.push("No KPI history was available for trend-based analysis.");
+  }
+
+  if (!numberValue(metrics.reports)) {
+    reasons.push("No saved reports were available for business memory.");
+  }
+
+  if (!reasons.length) {
+    reasons.push("Vaeroex could not complete the request. Retry once, then review technical details if you are an admin.");
+  }
+
+  return unique(reasons).slice(0, 4);
+}
+
+function FailurePanel({
+  run,
+  canViewDebug
+}: {
+  run: { id: string; agent_type: string; status: string; error_message: string | null; input_json?: Json };
+  canViewDebug: boolean;
+}) {
+  const input = getRunInput(run);
+  const extraInputs = getRunExtraInputs(run);
+  const reasons = failureReasons(input, run.error_message);
+
+  return (
+    <div className="space-y-4 rounded-lg border border-red-400/35 bg-red-950/25 p-4 text-red-50">
+      <div>
+        <p className="text-lg font-semibold">We couldn&apos;t generate this analysis.</p>
+        <p className="mt-2 text-sm leading-6 text-red-100/85">Vaeroex saved the failed run so an admin can review it. No workspace records were created.</p>
+      </div>
+      <ul className="space-y-2 text-sm leading-6 text-red-100/85">
+        {reasons.map((reason) => (
+          <li key={reason} className="flex gap-2">
+            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-red-300" />
+            <span>{reason}</span>
+          </li>
+        ))}
+      </ul>
+      <form action={runVaeroexAction} className="flex flex-wrap gap-2">
+        <input type="hidden" name="workflow_key" value={run.agent_type} />
+        <input type="hidden" name="user_prompt" value={str(input.user_prompt)} />
+        <input type="hidden" name="date_range_start" value={str(extraInputs.date_range_start)} />
+        <input type="hidden" name="date_range_end" value={str(extraInputs.date_range_end)} />
+        <input type="hidden" name="subject" value={str(extraInputs.subject)} />
+        <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying...">
+          Retry
+        </PendingSubmitButton>
+        <Link href="/app/agents" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
+          Start a new request
+        </Link>
+      </form>
+      {canViewDebug ? (
+        <details className="rounded-lg border border-red-300/20 bg-slate-950/80 p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-red-50">View technical details</summary>
+          <dl className="mt-3 grid gap-2 text-xs leading-5 text-red-100/80 sm:grid-cols-2">
+            <div>
+              <dt className="font-semibold text-red-50">Run ID</dt>
+              <dd className="break-all">{run.id}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-red-50">Workflow</dt>
+              <dd>{vaeroexResultLabel(run.agent_type)}</dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="font-semibold text-red-50">Error</dt>
+              <dd>{friendlyHubError(run.error_message) || "No error message was recorded."}</dd>
+            </div>
+          </dl>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function SelectedResult({
   run,
   output,
@@ -876,7 +1192,7 @@ function SelectedResult({
   debugMode,
   people
 }: {
-  run: { id: string; agent_type: string; status: string; created_at: string; error_message: string | null; output_json: Json };
+  run: { id: string; agent_type: string; status: string; created_at: string; error_message: string | null; input_json: Json; output_json: Json };
   output: JsonRecord;
   canViewDebug: boolean;
   debugMode: boolean;
@@ -884,6 +1200,7 @@ function SelectedResult({
 }) {
   const display = displayOutput(output);
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
+  const input = getRunInput(run);
 
   return (
     <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into workspace records until you confirm.">
@@ -898,8 +1215,38 @@ function SelectedResult({
           <StatusBadge value={run.status} />
         </div>
 
-        {run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
-        {run.status === "completed" ? <BusinessResult output={output} runId={run.id} runTitle={title} people={people} /> : null}
+        <DataUsedPanel input={input} />
+
+        {run.status === "failed" ? <FailurePanel run={run} canViewDebug={canViewDebug} /> : null}
+        {run.status !== "failed" && run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
+        {run.status === "completed" ? (
+          <>
+            <BusinessResult output={output} runId={run.id} runTitle={title} people={people} />
+            <EvidencePanel output={display} status={run.status} />
+            <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
+              <p className="text-sm font-semibold">Result actions</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Copy this result, save approved drafts, or turn the recommendation into accountable workspace work.</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <CopyVaeroexResultButton text={resultCopyText(title, display, run)} />
+                <Link href="/app/tasks" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Create follow-up
+                </Link>
+                <Link href="/app/reports" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Create report
+                </Link>
+                <Link href="/app/issues" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Create issue
+                </Link>
+                <Link
+                  href={`/app/agents?prompt=${encodeURIComponent(`Follow up on this Vaeroex result: ${title}`)}` as Route}
+                  className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20"
+                >
+                  Ask follow-up
+                </Link>
+              </div>
+            </div>
+          </>
+        ) : null}
 
         {run.status === "completed" ? (
           <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -959,7 +1306,9 @@ function WorkflowCard({ workflowKey }: { workflowKey: VaeroexWorkflowKey }) {
             <TextInput label="End date" name="date_range_end" type="date" />
           </div>
         ) : null}
-        <PrimaryButton>{workflow.actionLabel}</PrimaryButton>
+        <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating...">
+          {workflow.actionLabel}
+        </PendingSubmitButton>
       </form>
     </article>
   );
@@ -1061,20 +1410,14 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <section className="space-y-6">
         <SectionCard title="Ask Vaeroex for an executive recommendation" description="Use this for a direct business question. The response is saved for review and shown as a clean business recommendation.">
           <div className="mb-4 flex flex-wrap gap-2">
-            {[
-              "If I were the CEO, what would I do?",
-              "What should I focus on this week?",
-              "What could go wrong next month?",
-              "Run Weekly Management Meeting",
-              "Prepare Business Review Package"
-            ].map((prompt) => (
-              <Link
-                key={prompt}
-                href={`/app/agents?prompt=${encodeURIComponent(prompt)}` as Route}
-                className="rounded-full border border-vaeroex-silver bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent hover:text-vaeroex-blue"
-              >
-                {prompt}
-              </Link>
+            {QUICK_ACTIONS.map((action) => (
+              <form key={action.workflowKey} action={runVaeroexAction}>
+                <input type="hidden" name="workflow_key" value={action.workflowKey} />
+                <input type="hidden" name="user_prompt" value={action.prompt} />
+                <PendingSubmitButton className={vaeroexPillSubmitClass} pendingLabel="Generating...">
+                  {action.label}
+                </PendingSubmitButton>
+              </form>
             ))}
           </div>
           <form action={runVaeroexAction} className="space-y-4">
@@ -1087,7 +1430,9 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
               defaultValue={promptDefault}
               placeholder="Ask about missed follow-ups, ownership gaps, handoffs, SOPs, forms, checklists, reporting, or next actions."
             />
-            <PrimaryButton>Ask Vaeroex</PrimaryButton>
+            <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating...">
+              Ask Vaeroex
+            </PendingSubmitButton>
           </form>
         </SectionCard>
 
