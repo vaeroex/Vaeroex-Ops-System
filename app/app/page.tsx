@@ -2152,12 +2152,13 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             </section>
           </DashboardAccordion>
 
-          <IntelligencePriorityTools intelligence={prestigeIntelligence} />
-
           <DashboardAccordion
-            title="Advanced intelligence tools"
+            title="Advanced Intelligence"
             summary="Risk simulation, profit leak detection, business memory, decision review, benchmarks, and recommendation tracking stay here when leadership wants deeper context."
           >
+            <div className="mb-4">
+              <IntelligencePriorityTools intelligence={prestigeIntelligence} />
+            </div>
             <PrestigeOperationsPanel
               intelligence={prestigeIntelligence}
               returnPath="/app"

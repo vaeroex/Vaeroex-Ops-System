@@ -68,41 +68,55 @@ const WORKFLOW_GROUPS: Array<{
     keys: ["sop_generator", "weekly_report", "daily_summary", "form_builder", "checklist_builder", "file_analysis"]
   }
 ];
-const QUICK_ACTIONS: Array<{
+const WORKFLOW_CHOICES: Array<{
   label: string;
-  workflowKey: VaeroexWorkflowKey;
-  prompt: string;
+  description: string;
+  workflowKey?: VaeroexWorkflowKey;
+  href?: Route;
 }> = [
   {
-    label: "Ask CEO view",
-    workflowKey: "ceo_mode",
-    prompt: "If I were the CEO, what would I do this week?"
+    label: "Executive Brief",
+    description: "What should leadership know right now?",
+    workflowKey: "ceo_mode"
   },
   {
-    label: "Find focus",
-    workflowKey: "focus_priorities",
-    prompt: "What should I focus on this week?"
+    label: "Find Focus",
+    description: "Top priorities with evidence and ownership.",
+    workflowKey: "focus_priorities"
   },
   {
-    label: "Simulate risks",
-    workflowKey: "risk_simulation",
-    prompt: "What could go wrong next month?"
+    label: "Simulate Risks",
+    description: "Likely problems before they become normal.",
+    workflowKey: "risk_simulation"
   },
   {
-    label: "Run meeting mode",
-    workflowKey: "weekly_management_meeting",
-    prompt: "Run Weekly Management Meeting."
+    label: "Prepare Meeting",
+    description: "Weekly agenda, decisions, and assignments.",
+    workflowKey: "weekly_management_meeting"
   },
   {
-    label: "Business Review Package",
-    workflowKey: "business_review_package",
-    prompt: "Prepare Business Review Package."
+    label: "Review File",
+    description: "Analyze uploaded files from the Files page.",
+    href: "/app/files"
+  },
+  {
+    label: "Create Report",
+    description: "Generate a clean management report draft.",
+    workflowKey: "weekly_report"
+  },
+  {
+    label: "Create Follow-ups",
+    description: "Turn loose concerns into accountable work.",
+    workflowKey: "follow_up"
+  },
+  {
+    label: "Ask Anything",
+    description: "Ask a direct question with workspace context.",
+    workflowKey: "ask_vaeroex"
   }
 ];
 const vaeroexSubmitClass =
   "min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 disabled:cursor-not-allowed disabled:opacity-70";
-const vaeroexPillSubmitClass =
-  "rounded-full border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 disabled:cursor-not-allowed disabled:opacity-70";
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -1297,20 +1311,43 @@ function WorkflowCard({ workflowKey }: { workflowKey: VaeroexWorkflowKey }) {
           <span className="font-semibold text-ink">Data used:</span> {workflowDataUsed(workflow.key)}
         </p>
       </div>
-      <form action={runVaeroexAction} className="mt-4 space-y-3">
-        <input type="hidden" name="workflow_key" value={workflow.key} />
-        <TextArea label="Context for Vaeroex" name="user_prompt" placeholder={workflow.promptPlaceholder} rows={4} />
-        {workflow.key === "weekly_report" || workflow.key === "daily_summary" ? (
-          <div className="grid gap-3 sm:grid-cols-2">
-            <TextInput label="Start date" name="date_range_start" type="date" />
-            <TextInput label="End date" name="date_range_end" type="date" />
-          </div>
-        ) : null}
-        <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating...">
-          {workflow.actionLabel}
-        </PendingSubmitButton>
-      </form>
+      <WorkflowRunForm workflowKey={workflow.key} />
     </article>
+  );
+}
+
+function WorkflowRunForm({
+  workflowKey,
+  defaultPrompt = "",
+  compact = false
+}: {
+  workflowKey: VaeroexWorkflowKey;
+  defaultPrompt?: string;
+  compact?: boolean;
+}) {
+  const workflow = getVaeroexWorkflow(workflowKey);
+
+  return (
+    <form action={runVaeroexAction} className={compact ? "mt-4 space-y-4" : "mt-4 space-y-3"}>
+      <input type="hidden" name="workflow_key" value={workflow.key} />
+      <TextArea
+        label={workflow.key === "ask_vaeroex" ? "Question" : "Context for Vaeroex"}
+        name="user_prompt"
+        required={workflow.key === "ask_vaeroex"}
+        defaultValue={defaultPrompt}
+        placeholder={workflow.promptPlaceholder}
+        rows={compact ? 4 : 3}
+      />
+      {workflow.key === "weekly_report" || workflow.key === "daily_summary" || workflow.key === "business_review_package" ? (
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextInput label="Start date" name="date_range_start" type="date" />
+          <TextInput label="End date" name="date_range_end" type="date" />
+        </div>
+      ) : null}
+      <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating...">
+        {workflow.actionLabel}
+      </PendingSubmitButton>
+    </form>
   );
 }
 
@@ -1336,6 +1373,8 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
   const promptDefault = typeof params?.prompt === "string" ? params.prompt : "";
+  const requestedWorkflowKey = typeof params?.workflow === "string" ? params.workflow : promptDefault ? "ask_vaeroex" : "";
+  const selectedWorkflow = requestedWorkflowKey ? getVaeroexWorkflow(requestedWorkflowKey) : null;
   const managedRuns = (runs || []).map((run) => {
     const management = managedValues(run);
     const output = asRecord(run.output_json);
@@ -1408,32 +1447,60 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       </section>
 
       <section className="space-y-6">
-        <SectionCard title="Ask Vaeroex for an executive recommendation" description="Use this for a direct business question. The response is saved for review and shown as a clean business recommendation.">
-          <div className="mb-4 flex flex-wrap gap-2">
-            {QUICK_ACTIONS.map((action) => (
-              <form key={action.workflowKey} action={runVaeroexAction}>
-                <input type="hidden" name="workflow_key" value={action.workflowKey} />
-                <input type="hidden" name="user_prompt" value={action.prompt} />
-                <PendingSubmitButton className={vaeroexPillSubmitClass} pendingLabel="Generating...">
-                  {action.label}
-                </PendingSubmitButton>
-              </form>
-            ))}
+        <SectionCard title="What do you want help with?">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {WORKFLOW_CHOICES.map((choice) => {
+              const isActive = selectedWorkflow?.key === choice.workflowKey;
+              const className = `rounded-lg border p-4 text-left transition ${
+                isActive
+                  ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-50"
+                  : "border-white/10 bg-[#08111f] text-slate-100 hover:border-cyan-300/45 hover:bg-blue-950/30"
+              }`;
+
+              if (choice.href) {
+                return (
+                  <Link key={choice.label} href={choice.href} className={className}>
+                    <span className="block text-sm font-semibold">{choice.label}</span>
+                    <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
+                  </Link>
+                );
+              }
+
+              return (
+                <Link
+                  key={choice.label}
+                  href={`/app/agents?workflow=${choice.workflowKey}` as Route}
+                  className={className}
+                >
+                  <span className="block text-sm font-semibold">{choice.label}</span>
+                  <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
+                </Link>
+              );
+            })}
           </div>
-          <form action={runVaeroexAction} className="space-y-4">
-            <input type="hidden" name="workflow_key" value="ask_vaeroex" />
-            <TextArea
-              label="Question"
-              name="user_prompt"
-              required
-              rows={5}
-              defaultValue={promptDefault}
-              placeholder="Ask about missed follow-ups, ownership gaps, handoffs, SOPs, forms, checklists, reporting, or next actions."
-            />
-            <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating...">
-              Ask Vaeroex
-            </PendingSubmitButton>
-          </form>
+
+          {selectedWorkflow ? (
+            <div className="mt-5 rounded-lg border border-cyan-300/25 bg-[#071526] p-4 text-slate-100">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Selected workflow</p>
+                  <h3 className="mt-2 text-lg font-semibold text-white">{selectedWorkflow.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">{selectedWorkflow.description}</p>
+                </div>
+                <Link href="/app/agents" className="w-fit rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-cyan-400/10">
+                  Change
+                </Link>
+              </div>
+              <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs leading-5 text-slate-300">
+                <span className="font-semibold text-white">Data used:</span> {workflowDataUsed(selectedWorkflow.key)}
+              </p>
+              <WorkflowRunForm workflowKey={selectedWorkflow.key} defaultPrompt={promptDefault} compact />
+            </div>
+          ) : (
+            <p className="mt-4 text-sm leading-6 text-muted">
+              Choose a workflow above. Vaeroex will show one focused input area, then generate an answer with evidence and confidence.
+            </p>
+          )}
         </SectionCard>
 
         {selectedRun ? (
@@ -1445,12 +1512,12 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         )}
 
         <SectionCard
-          title="Vaeroex intelligence workflows"
-          description="Choose the type of intelligence you need. Each workflow uses active workspace context and saves the output as a draft result first."
+          title="Advanced workflow catalog"
+          description="Use this only when you want to inspect every workflow form."
         >
           <div className="space-y-4">
-            {WORKFLOW_GROUPS.map((group, index) => (
-              <details key={group.title} open={index === 0} className="rounded-lg border border-line bg-slate-50">
+            {WORKFLOW_GROUPS.map((group) => (
+              <details key={group.title} className="rounded-lg border border-line bg-slate-50">
                 <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="font-semibold text-ink">{group.title}</h3>

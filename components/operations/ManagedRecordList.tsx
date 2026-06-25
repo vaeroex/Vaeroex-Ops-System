@@ -9,6 +9,7 @@ import {
   renameRecordFolderAction,
   updateManagedRecordAction
 } from "@/app/app/operations/record-management-actions";
+import { CompactSummaryChips } from "@/components/operations/CompactSummaryChips";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
@@ -598,32 +599,28 @@ export function ManagedRecordList({
   const deletedCount = records.filter((record) => record.deletedAt).length;
   const chips = activeFilterChips({ params: baseParams, folders, returnPath });
   const askPrompt = `Review these ${collectionLabel(collection)} and tell me what needs attention.`;
+  const summaryChips = [
+    { label: "Active", value: activeCount },
+    { label: "Showing", value: visibleRecords.length },
+    archivedCount ? { label: "Archived", value: archivedCount, tone: "muted" as const } : null,
+    deletedCount ? { label: "Hidden", value: deletedCount, tone: "muted" as const } : null
+  ].filter(Boolean) as Array<{ label: string; value: string | number; tone?: "default" | "attention" | "good" | "muted" }>;
 
   return (
     <div className="managed-record-list space-y-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
-          {description ? <p className="mt-1 line-clamp-1 text-sm leading-6 text-muted">{description}</p> : null}
-        </div>
-        <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
-          {[
-            { label: "All", value: records.length },
-            { label: "Active", value: activeCount },
-            { label: "Archived", value: archivedCount },
-            { label: "Showing", value: visibleRecords.length }
-          ].map((item) => (
-            <span key={item.label} className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-              {item.label}
-              <span className="text-ink">{item.value}</span>
-            </span>
-          ))}
-          {deletedCount ? (
-            <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-              Hidden <span className="text-ink">{deletedCount}</span>
-            </span>
+          {description ? (
+            <details className="mt-1">
+              <summary className="cursor-pointer list-none text-xs font-semibold text-muted hover:text-vaeroex-blue">
+                What is this?
+              </summary>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{description}</p>
+            </details>
           ) : null}
         </div>
+        <CompactSummaryChips items={summaryChips} />
       </div>
 
       {successMessage ? (
@@ -718,17 +715,17 @@ export function ManagedRecordList({
           ))}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            href={`/app/agents?prompt=${encodeURIComponent(askPrompt)}` as Route}
-            className="inline-flex min-h-10 items-center rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white"
-          >
-            Ask Vaeroex about this page
-          </Link>
           <details className="relative">
-            <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white">
-              Folders
+            <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-300/50 hover:bg-cyan-400/20">
+              More
             </summary>
-            <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-3 shadow-lg">
+            <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-line bg-white p-3 shadow-lg">
+              <Link
+                href={`/app/agents?prompt=${encodeURIComponent(askPrompt)}` as Route}
+                className="block rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white"
+              >
+                Ask Vaeroex about this page
+              </Link>
               <FolderManager collection={collection} folders={folders} returnPath={returnPath} />
             </div>
           </details>

@@ -81,24 +81,26 @@ function KpiSettingCard({
   const sortOrder = setting?.sort_order ?? 0;
 
   return (
-    <article className="rounded-lg border border-line bg-white p-4 shadow-panel">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-            <h2 className="truncate text-base font-semibold text-ink">{metric}</h2>
+    <article className="rounded-lg border border-line bg-white shadow-panel">
+      <details>
+        <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 transition hover:bg-cyan-950/30 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+              <h2 className="truncate text-base font-semibold text-ink">{metric}</h2>
+            </div>
+            <p className="mt-1 text-xs leading-5 text-muted">
+              Target {target === null ? "not set" : target} · {category || "General"} · {isVisible ? "Visible" : "Hidden"}
+            </p>
           </div>
-          <p className="mt-1 text-xs leading-5 text-muted">
-            {isVisible ? "Visible in dashboards and Vaeroex intelligence." : "Hidden from dashboards and Vaeroex intelligence."}
-          </p>
-        </div>
-        <span className="w-fit rounded-full border border-vaeroex-blue/30 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue">
-          Weight {weight}/10
-        </span>
-      </div>
+          <span className="w-fit rounded-full border border-vaeroex-blue/30 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue">
+            Weight {weight}/10
+          </span>
+        </summary>
 
-      {canManage ? (
-        <form action={updateKpiSettingAction} className="mt-4 grid gap-4 lg:grid-cols-2">
+        <div className="border-t border-line bg-slate-50/60 p-4">
+          {canManage ? (
+        <form action={updateKpiSettingAction} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="return_path" value="/app/kpis/settings" />
           <input type="hidden" name="kpi_name" value={metric} />
           <label className="block text-sm font-medium">
@@ -173,7 +175,7 @@ function KpiSettingCard({
             </button>
           </div>
         </form>
-      ) : (
+          ) : (
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
           <p className="rounded-lg border border-line bg-slate-50 p-3">
             <span className="block text-xs uppercase tracking-wide text-muted">Target</span>
@@ -188,7 +190,9 @@ function KpiSettingCard({
             {definition || "No definition set yet."}
           </p>
         </div>
-      )}
+          )}
+        </div>
+      </details>
     </article>
   );
 }
