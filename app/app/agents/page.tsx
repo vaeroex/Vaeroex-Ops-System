@@ -3,10 +3,8 @@ import type { Route } from "next";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { AskVaeroexNotice } from "@/components/ai/AskVaeroexNotice";
 import { CopyVaeroexResultButton } from "@/components/ai/CopyVaeroexResultButton";
-import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
-import { EmptyState } from "@/components/operations/EmptyState";
-import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput } from "@/components/operations/FormControls";
@@ -646,9 +644,9 @@ function SaveButtons({ runId, workflowKey, output }: { runId: string; workflowKe
 
 function ResultList({ title, items }: { title: string; items: string[] }) {
   return (
-    <div className="rounded-lg border border-vaeroex-silver bg-white p-4 shadow-sm">
-      <h4 className="text-sm font-semibold text-vaeroex-navy">{title}</h4>
-      <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
+    <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4 shadow-sm">
+      <h4 className="text-sm font-semibold text-white">{title}</h4>
+      <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
         {items.map((item) => (
           <li key={item} className="flex gap-2">
             <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
@@ -657,6 +655,89 @@ function ResultList({ title, items }: { title: string; items: string[] }) {
         ))}
       </ul>
     </div>
+  );
+}
+
+function RecommendationCard({
+  recommendation,
+  runId,
+  runTitle,
+  people
+}: {
+  recommendation: ReturnType<typeof getActionableRecommendations>[number];
+  runId: string;
+  runTitle: string;
+  people: TeamPersonOption[];
+}) {
+  return (
+    <article className="rounded-lg border border-cyan-300/20 bg-cyan-400/10 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-cyan-50">{recommendation.title}</p>
+          <p className="mt-1 text-xs text-slate-400">{recommendation.relatedModule}</p>
+        </div>
+        <StatusBadge value={recommendation.priority} />
+      </div>
+      <dl className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
+        <div>
+          <dt className="font-semibold text-slate-100">Suggested owner</dt>
+          <dd className="mt-1">{recommendation.owner}</dd>
+        </div>
+        <div>
+          <dt className="font-semibold text-slate-100">Suggested due date</dt>
+          <dd className="mt-1">{recommendation.dueDate}</dd>
+        </div>
+      </dl>
+      <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">
+          Create Follow-up
+        </Link>
+        <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          Open {recommendation.relatedModule}
+        </Link>
+        <Link href="/app/reports" className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          Add to Report
+        </Link>
+        <form action={dismissRecommendationAction}>
+          <input type="hidden" name="return_path" value={`/app/agents?run=${runId}`} />
+          <input type="hidden" name="source_type" value="vaeroex_recommendation" />
+          <input type="hidden" name="source_id" value={runId} />
+          <input type="hidden" name="source_title" value={runTitle} />
+          <input type="hidden" name="assignment_title" value={recommendation.title} />
+          <button className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+            Dismiss
+          </button>
+        </form>
+      </div>
+      <details className="mt-4 rounded-lg border border-white/10 bg-slate-950/45 p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-slate-200">Assign or share this recommendation</summary>
+        <div className="mt-3 grid gap-3">
+          <AssignmentPanel
+            sourceType="vaeroex_recommendation"
+            sourceId={runId}
+            sourceTitle={recommendation.title}
+            relatedModule={recommendation.relatedModule}
+            returnPath={`/app/agents?run=${runId}`}
+            actionHref={`/app/agents?run=${runId}`}
+            people={people}
+            defaultTitle={recommendation.title}
+            defaultDescription={recommendation.why}
+            defaultRole={recommendation.owner}
+            compact
+          />
+          <ShareRecordPanel
+            sourceType="vaeroex_recommendation"
+            sourceId={runId}
+            sourceTitle={recommendation.title}
+            relatedModule={recommendation.relatedModule}
+            returnPath={`/app/agents?run=${runId}`}
+            actionHref={`/app/agents?run=${runId}`}
+            people={people}
+          />
+        </div>
+      </details>
+    </article>
   );
 }
 
@@ -675,85 +756,36 @@ function RecommendationActionCards({
     return null;
   }
 
+  const [primary, ...remaining] = recommendations;
+
   return (
-    <div className="rounded-lg border border-line bg-white p-4">
+    <div className="rounded-lg border border-white/10 bg-[#08111f] p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h4 className="text-sm font-semibold">Recommended Next Actions</h4>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            Vaeroex drafts are not saved until you confirm. Use these actions to turn insight into workspace records.
+          <h4 className="text-sm font-semibold text-white">Top Recommendation</h4>
+          <p className="mt-1 text-sm leading-6 text-slate-400">
+            Vaeroex drafts are not saved until you confirm.
           </p>
         </div>
-        <Link href="/app/agents" className="text-xs font-semibold text-muted underline">
+        <Link href="/app/agents" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
           Dismiss for now
         </Link>
       </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        {recommendations.map((recommendation) => (
-          <article key={recommendation.id} className="rounded-lg border border-line bg-slate-50 p-4">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-sm font-semibold text-ink">{recommendation.title}</p>
-                <p className="mt-1 text-xs text-muted">{recommendation.relatedModule}</p>
-              </div>
-              <StatusBadge value={recommendation.priority} />
-            </div>
-            <dl className="mt-3 grid gap-2 text-xs text-muted sm:grid-cols-2">
-              <div>
-                <dt className="font-semibold text-ink">Suggested owner</dt>
-                <dd className="mt-1">{recommendation.owner}</dd>
-              </div>
-              <div>
-                <dt className="font-semibold text-ink">Suggested due date</dt>
-                <dd className="mt-1">{recommendation.dueDate}</dd>
-              </div>
-            </dl>
-            <p className="mt-3 text-sm leading-6 text-slate-700">{recommendation.why}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create Follow-up</Link>
-              <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-                Open {recommendation.relatedModule}
-              </Link>
-              <Link href="/app/reports" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Add to Report</Link>
-              <form action={dismissRecommendationAction}>
-                <input type="hidden" name="return_path" value={`/app/agents?run=${runId}`} />
-                <input type="hidden" name="source_type" value="vaeroex_recommendation" />
-                <input type="hidden" name="source_id" value={runId} />
-                <input type="hidden" name="source_title" value={runTitle} />
-                <input type="hidden" name="assignment_title" value={recommendation.title} />
-                <button className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Dismiss</button>
-              </form>
-            </div>
-            <details className="mt-4 rounded-lg border border-line bg-white p-3">
-              <summary className="cursor-pointer text-xs font-semibold text-slate-700">Assign or share this recommendation</summary>
-              <div className="mt-3 grid gap-3">
-                <AssignmentPanel
-                  sourceType="vaeroex_recommendation"
-                  sourceId={runId}
-                  sourceTitle={recommendation.title}
-                  relatedModule={recommendation.relatedModule}
-                  returnPath={`/app/agents?run=${runId}`}
-                  actionHref={`/app/agents?run=${runId}`}
-                  people={people}
-                  defaultTitle={recommendation.title}
-                  defaultDescription={recommendation.why}
-                  defaultRole={recommendation.owner}
-                  compact
-                />
-                <ShareRecordPanel
-                  sourceType="vaeroex_recommendation"
-                  sourceId={runId}
-                  sourceTitle={recommendation.title}
-                  relatedModule={recommendation.relatedModule}
-                  returnPath={`/app/agents?run=${runId}`}
-                  actionHref={`/app/agents?run=${runId}`}
-                  people={people}
-                />
-              </div>
-            </details>
-          </article>
-        ))}
+      <div className="mt-4">
+        <RecommendationCard recommendation={primary} runId={runId} runTitle={runTitle} people={people} />
       </div>
+      {remaining.length ? (
+        <details className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+            View remaining recommendations ({remaining.length})
+          </summary>
+          <div className="mt-3 grid gap-3 lg:grid-cols-2">
+            {remaining.map((recommendation) => (
+              <RecommendationCard key={recommendation.id} recommendation={recommendation} runId={runId} runTitle={runTitle} people={people} />
+            ))}
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
@@ -976,35 +1008,63 @@ function BusinessResult({ output, runId, runTitle, people }: { output: JsonRecor
   const reports = getReportDrafts(visibleOutput);
   const recommendations = getActionableRecommendations(visibleOutput);
   const detail = cleanReadableText(visibleOutput.response_markdown);
+  const topProblems = sections.problems.slice(0, 3);
+  const topAction = recommendations[0]?.title || sections.actions[0];
+  const topActionWhy = recommendations[0]?.why || outputReasoning(visibleOutput);
+  const hasRecordDrafts = Boolean(tasks.length || checklists.length || forms.length || sops.length);
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4 shadow-sm">
-        <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Executive Summary</p>
-        <p className="mt-2 text-sm leading-6 text-vaeroex-navy">{sections.executiveSummary}</p>
+      <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-4 shadow-sm">
+        <p className="text-sm font-semibold uppercase tracking-wide text-cyan-100">Executive Summary</p>
+        <p className="mt-2 text-sm leading-6 text-slate-100">{sections.executiveSummary}</p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <ResultList title="Problems Identified" items={sections.problems} />
-        <ResultList title="Recommended Actions" items={sections.actions} />
-        <ResultList title="Suggested Systems" items={sections.systems} />
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_.7fr]">
+        <ResultList title="Top Problems" items={topProblems} />
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+          <h4 className="text-sm font-semibold text-white">Top Recommended Action</h4>
+          <p className="mt-3 text-sm font-semibold leading-6 text-cyan-100">{topAction}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{topActionWhy}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
+          <h4 className="text-sm font-semibold text-white">Why Vaeroex Surfaced This</h4>
+          <p className="mt-3 text-sm leading-6 text-slate-300">{outputReasoning(visibleOutput)}</p>
+        </div>
       </div>
 
       <RecommendationActionCards recommendations={recommendations} runId={runId} runTitle={runTitle} people={people} />
 
-      <TaskDraftSection tasks={tasks} />
-      <ChecklistDraftSection checklists={checklists} />
-      <FormDraftSection forms={forms} />
-      <SopDraftSection sops={sops} />
-      <ReportDraftSection reports={reports} />
+      {hasRecordDrafts ? (
+        <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+            View suggested follow-ups, SOPs, forms, or checklists
+          </summary>
+          <div className="mt-4 space-y-4">
+            <TaskDraftSection tasks={tasks} />
+            <ChecklistDraftSection checklists={checklists} />
+            <FormDraftSection forms={forms} />
+            <SopDraftSection sops={sops} />
+          </div>
+        </details>
+      ) : null}
+
+      {reports.length ? (
+        <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">View full report draft</summary>
+          <div className="mt-3">
+            <ReportDraftSection reports={reports} />
+          </div>
+        </details>
+      ) : null}
 
       {detail && detail !== sections.executiveSummary ? (
-        <div className="rounded-lg border border-line bg-white p-4">
-          <h4 className="text-sm font-semibold">Additional Notes</h4>
-          <div className="mt-3">
+        <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">View additional notes</summary>
+          <div className="mt-3 rounded-lg border border-white/10 bg-white/[0.04] p-3">
             <ReadableText value={detail} />
           </div>
-        </div>
+        </details>
       ) : null}
     </div>
   );
@@ -1215,6 +1275,7 @@ function SelectedResult({
   const display = displayOutput(output);
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
   const input = getRunInput(run);
+  const confidence = outputConfidence(display, run.status);
 
   return (
     <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into workspace records until you confirm.">
@@ -1226,17 +1287,26 @@ function SelectedResult({
               {vaeroexResultLabel(run.agent_type)} - {new Date(run.created_at).toLocaleString()}
             </p>
           </div>
-          <StatusBadge value={run.status} />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClasses(confidence)}`}>
+              Confidence: {confidence}
+            </span>
+            <StatusBadge value={run.status} />
+          </div>
         </div>
-
-        <DataUsedPanel input={input} />
 
         {run.status === "failed" ? <FailurePanel run={run} canViewDebug={canViewDebug} /> : null}
         {run.status !== "failed" && run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
         {run.status === "completed" ? (
           <>
             <BusinessResult output={output} runId={run.id} runTitle={title} people={people} />
-            <EvidencePanel output={display} status={run.status} />
+            <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-100">View evidence</summary>
+              <div className="mt-4 space-y-4">
+                <DataUsedPanel input={input} />
+                <EvidencePanel output={display} status={run.status} />
+              </div>
+            </details>
             <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
               <p className="text-sm font-semibold">Result actions</p>
               <p className="mt-1 text-xs leading-5 text-slate-400">Copy this result, save approved drafts, or turn the recommendation into accountable workspace work.</p>
@@ -1368,13 +1438,17 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
   ]);
   const people = (peopleResult.data || []) as TeamPersonOption[];
-  const selectedRun = runs?.find((run) => run.id === params?.run) ?? runs?.[0] ?? null;
+  const runParam = typeof params?.run === "string" ? params.run : "";
+  const selectedRun = runParam ? runs?.find((run) => run.id === runParam) ?? null : null;
   const selectedOutput = selectedRun ? asRecord(selectedRun.output_json) : {};
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
   const promptDefault = typeof params?.prompt === "string" ? params.prompt : "";
   const requestedWorkflowKey = typeof params?.workflow === "string" ? params.workflow : promptDefault ? "ask_vaeroex" : "";
   const selectedWorkflow = requestedWorkflowKey ? getVaeroexWorkflow(requestedWorkflowKey) : null;
+  const pageErrorMessage = friendlyHubError(
+    (selectedRun ? undefined : (params?.error as string | undefined)) || error?.message || folderResult.error?.message || peopleResult.error?.message
+  );
   const managedRuns = (runs || []).map((run) => {
     const management = managedValues(run);
     const output = asRecord(run.output_json);
@@ -1417,37 +1491,16 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
     <div className="space-y-6">
       <PageHeader
         eyebrow="Ask Vaeroex"
-        title="Vaeroex Intelligence"
-        description="Ask direct questions, run focused briefings, and convert approved recommendations into accountable work only after manager review."
+        title="Ask Vaeroex"
+        description="What do you want help with today?"
       />
 
-      <ErrorNotice message={friendlyHubError((params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message)} />
+      <ErrorNotice message={pageErrorMessage} />
       <SuccessNotice message={params?.saved as string | undefined} />
-      <ComplianceNotice />
-      <LegalSafetyNotice tone="ai" compact />
-
-      <section className="rounded-lg border border-vaeroex-navy bg-vaeroex-navy p-5 text-white shadow-command">
-        <div className="grid gap-5 xl:grid-cols-[0.95fr_1.05fr] xl:items-end">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-silver">Executive Intelligence</p>
-            <h2 className="mt-3 text-3xl font-semibold">Ask Vaeroex what deserves leadership attention.</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-100">
-              Vaeroex reviews the active workspace and returns decision support tied to priorities, risks, accountability, and next actions.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            {["Focus priorities", "Risk summary", "Action plan"].map((item) => (
-              <div key={item} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">{item}</p>
-                <p className="mt-2 text-sm text-slate-100">Prepared from workspace context</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <AskVaeroexNotice />
 
       <section className="space-y-6">
-        <SectionCard title="What do you want help with?">
+        <SectionCard title="What do you want help with today?">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {WORKFLOW_CHOICES.map((choice) => {
               const isActive = selectedWorkflow?.key === choice.workflowKey;
@@ -1498,58 +1551,57 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
             </div>
           ) : (
             <p className="mt-4 text-sm leading-6 text-muted">
-              Choose a workflow above. Vaeroex will show one focused input area, then generate an answer with evidence and confidence.
+              Choose one workflow. Vaeroex will show one focused input area, then return an answer with evidence available when you need it.
             </p>
           )}
         </SectionCard>
 
         {selectedRun ? (
           <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} people={people} />
-        ) : (
-          <SectionCard title="Vaeroex answer" description="Your next Vaeroex response will appear here.">
-            <EmptyState title="No Vaeroex answer yet" description="Ask Vaeroex a question above or run one of the tools below." />
-          </SectionCard>
-        )}
+        ) : null}
 
-        <SectionCard
-          title="Advanced workflow catalog"
-          description="Use this only when you want to inspect every workflow form."
-        >
-          <div className="space-y-4">
-            {WORKFLOW_GROUPS.map((group) => (
-              <details key={group.title} className="rounded-lg border border-line bg-slate-50">
-                <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h3 className="font-semibold text-ink">{group.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-muted">{group.description}</p>
+        <div className="grid gap-4 lg:grid-cols-2">
+          <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">History</summary>
+            <div className="mt-4">
+              <ManagedRecordList
+                collection="ai_agent_runs"
+                records={managedRuns}
+                folders={folderResult.folders}
+                title="Vaeroex result records"
+                description="Organize previous Vaeroex outputs without showing raw structured data to normal users."
+                emptyTitle="No Vaeroex results yet"
+                emptyDescription="Ask Vaeroex or run a workflow to create the first saved result."
+                returnPath="/app/agents"
+                searchParams={params}
+              />
+            </div>
+          </details>
+
+          <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced workflows</summary>
+            <div className="mt-4 space-y-4">
+              {WORKFLOW_GROUPS.map((group) => (
+                <details key={group.title} className="rounded-lg border border-white/10 bg-white/[0.04]">
+                  <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-semibold text-white">{group.title}</h3>
+                      <p className="mt-1 text-sm leading-6 text-slate-400">{group.description}</p>
+                    </div>
+                    <span className="w-fit rounded-full border border-cyan-300/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                      {group.keys.length} tool{group.keys.length === 1 ? "" : "s"}
+                    </span>
+                  </summary>
+                  <div className="grid gap-4 border-t border-white/10 p-4 lg:grid-cols-2">
+                    {group.keys.map((workflowKey) => (
+                      <WorkflowCard key={workflowKey} workflowKey={workflowKey} />
+                    ))}
                   </div>
-                  <span className="w-fit rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-700">
-                    {group.keys.length} tool{group.keys.length === 1 ? "" : "s"}
-                  </span>
-                </summary>
-                <div className="grid gap-4 border-t border-line p-4 lg:grid-cols-2">
-                  {group.keys.map((workflowKey) => (
-                    <WorkflowCard key={workflowKey} workflowKey={workflowKey} />
-                  ))}
-                </div>
-              </details>
-            ))}
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Run history" description="Recent Vaeroex results for this workspace.">
-          <ManagedRecordList
-            collection="ai_agent_runs"
-            records={managedRuns}
-            folders={folderResult.folders}
-            title="Vaeroex result records"
-            description="Organize previous Vaeroex outputs without showing raw structured data to normal users."
-            emptyTitle="No Vaeroex results yet"
-            emptyDescription="Ask Vaeroex or run a workflow to create the first saved result."
-            returnPath="/app/agents"
-            searchParams={params}
-          />
-        </SectionCard>
+                </details>
+              ))}
+            </div>
+          </details>
+        </div>
       </section>
     </div>
   );
