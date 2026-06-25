@@ -117,19 +117,17 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm text-muted">Open</p>
-          <p className="mt-2 text-3xl font-semibold">{openTasks.length}</p>
-        </article>
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm text-muted">Done</p>
-          <p className="mt-2 text-3xl font-semibold">{doneTasks.length}</p>
-        </article>
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm text-muted">Urgent or high</p>
-          <p className="mt-2 text-3xl font-semibold">{(tasks || []).filter((task) => ["Urgent", "High"].includes(task.priority)).length}</p>
-        </article>
+      <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
+        {[
+          { label: "Open", value: openTasks.length },
+          { label: "Done", value: doneTasks.length },
+          { label: "Urgent or high", value: (tasks || []).filter((task) => ["Urgent", "High"].includes(task.priority)).length }
+        ].map((item) => (
+          <span key={item.label} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
+            {item.label}
+            <span className="text-ink">{item.value}</span>
+          </span>
+        ))}
       </section>
 
       <section className="space-y-6">

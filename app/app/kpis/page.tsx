@@ -1201,6 +1201,39 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         ))}
       </section>
 
+      <section className="space-y-4">
+        <CreateDrawer title="Create KPI" description="Use one metric per row so trends stay easy to review." triggerLabel="New KPI">
+          <form action={createKpiAction} className="grid gap-4 lg:grid-cols-2">
+            <TextInput label="Name" name="name" placeholder="Revenue, Leads, Conversion Rate" required />
+            <TextInput label="Category" name="category" placeholder="Sales, Operations, Finance" />
+            <TextInput label="Target" name="target" type="number" step="0.01" />
+            <TextInput label="Actual Value" name="actual_value" type="number" step="0.01" />
+            <TextInput label="Date" name="metric_date" type="date" defaultValue={today} />
+            <TextInput label="Owner" name="owner" placeholder="Manager or department" />
+            <TextInput label="Source" name="source" placeholder="POS, CRM, spreadsheet, manual" />
+            <div className="lg:col-span-2">
+              <TextArea label="Notes" name="notes" rows={4} />
+            </div>
+            <div className="lg:col-span-2">
+              <PrimaryButton>Save KPI</PrimaryButton>
+            </div>
+          </form>
+        </CreateDrawer>
+
+        <SectionCard title="KPI records" description="Workspace metrics appear first. Use filters, folders, bulk actions, and chart details only when needed.">
+          <ManagedRecordList
+            collection="kpis"
+            records={managedKpis}
+            folders={folderResult.folders}
+            title="KPI records"
+            description="Search, filter, group, edit, archive, duplicate, or bulk-manage KPI rows."
+            emptyTitle="No KPIs yet"
+            emptyDescription="Create your first KPI for revenue, leads, conversion rate, follow-up completion, or any custom metric your team reviews."
+            searchParams={params}
+          />
+        </SectionCard>
+      </section>
+
       <KpiDetailPanel
         title="Alerts and ownership"
         summary={`${alertRules.length} KPI alert rule${alertRules.length === 1 ? "" : "s"} configured. Expand to add alert rules or review active thresholds.`}
@@ -1305,39 +1338,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       </div>
       </KpiDetailPanel>
 
-      <section className="space-y-6">
-        <CreateDrawer title="Create KPI" description="Use one metric per row so trends stay easy to review." triggerLabel="New KPI">
-          <form action={createKpiAction} className="grid gap-4 lg:grid-cols-2">
-            <TextInput label="Name" name="name" placeholder="Revenue, Leads, Conversion Rate" required />
-            <TextInput label="Category" name="category" placeholder="Sales, Operations, Finance" />
-            <TextInput label="Target" name="target" type="number" step="0.01" />
-            <TextInput label="Actual Value" name="actual_value" type="number" step="0.01" />
-            <TextInput label="Date" name="metric_date" type="date" defaultValue={today} />
-            <TextInput label="Owner" name="owner" placeholder="Manager or department" />
-            <TextInput label="Source" name="source" placeholder="POS, CRM, spreadsheet, manual" />
-            <div className="lg:col-span-2">
-              <TextArea label="Notes" name="notes" rows={4} />
-            </div>
-            <div className="lg:col-span-2">
-              <PrimaryButton>Save KPI</PrimaryButton>
-            </div>
-          </form>
-        </CreateDrawer>
-
-        <SectionCard title="KPI log" description="Each metric is scoped to the current workspace and can use its own target.">
-          <ManagedRecordList
-            collection="kpis"
-            records={managedKpis}
-            folders={folderResult.folders}
-            title="KPI records"
-            description="KPI rows can be edited, grouped, duplicated, archived, soft-deleted, or moved in bulk."
-            emptyTitle="No KPIs yet"
-            emptyDescription="Create your first KPI for revenue, leads, conversion rate, follow-up completion, or any custom metric your team reviews."
-            searchParams={params}
-          />
-        </SectionCard>
-
-      </section>
     </div>
   );
 }

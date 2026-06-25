@@ -1,5 +1,4 @@
 import type { Route } from "next";
-import type { ReactNode } from "react";
 import { runReportSubscriptionNowAction, saveReportSubscriptionPreferenceAction } from "@/app/app/report-subscriptions/actions";
 import { generateReportAction } from "@/app/app/reports/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
@@ -188,16 +187,6 @@ function ReportBody({ body }: { body: string | null }) {
         </section>
       ))}
     </div>
-  );
-}
-
-function MetricCard({ label, value, note }: { label: string; value: ReactNode; note?: string }) {
-  return (
-    <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-      <p className="text-sm text-muted">{label}</p>
-      <p className="mt-2 text-3xl font-semibold">{value}</p>
-      {note ? <p className="mt-2 text-xs leading-5 text-muted">{note}</p> : null}
-    </article>
   );
 }
 
@@ -902,64 +891,21 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       />
       <SuccessNotice message={params?.message} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Open follow-ups" value={openTaskCount.count ?? 0} note="Current active follow-up work." />
-        <MetricCard label="Overdue follow-ups" value={overdueTaskCount.count ?? 0} note="Follow-ups due before today." />
-        <MetricCard label="Open issues" value={openIssueCount.count ?? 0} note="Unresolved risks and blockers." />
-        <MetricCard label="Checklist completions" value={checklistCompletionCount.count ?? 0} note={`${sopCount.count ?? 0} SOPs available for reference.`} />
+      <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
+        {[
+          { label: "Open follow-ups", value: openTaskCount.count ?? 0 },
+          { label: "Overdue", value: overdueTaskCount.count ?? 0 },
+          { label: "Open issues", value: openIssueCount.count ?? 0 },
+          { label: "Checklist completions", value: checklistCompletionCount.count ?? 0 }
+        ].map((item) => (
+          <span key={item.label} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
+            {item.label}
+            <span className="text-ink">{item.value}</span>
+          </span>
+        ))}
       </section>
 
-      <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} canRunNow={canRunScheduledReports} />
-
-      <SectionCard title="Business Review Package" description="Prepare a board, owner, bank, investor, franchise, monthly, or quarterly review package from the same workspace data Vaeroex uses for reports.">
-        <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
-          <div className="grid gap-3 md:grid-cols-2">
-            {reportIntelligence.businessReviewPackage.sections.map((section) => (
-              <article key={section.title} className="rounded-lg border border-line bg-white p-4">
-                <p className="text-sm font-semibold text-ink">{section.title}</p>
-                <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                  {section.lines.slice(0, 3).map((line) => (
-                    <li key={line} className="flex gap-2">
-                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
-                      <span>{line}</span>
-                    </li>
-                  ))}
-                </ul>
-              </article>
-            ))}
-          </div>
-          <div className="space-y-4">
-            <div className="rounded-lg border border-line bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-ink">Recommendation outcomes</p>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                {reportIntelligence.recommendationTracking.outcomeNotes.map((note) => (
-                  <p key={note}>{note}</p>
-                ))}
-              </div>
-            </div>
-            <div className="rounded-lg border border-line bg-slate-50 p-4">
-              <p className="text-sm font-semibold text-ink">Decisions and outcomes</p>
-              <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
-                {reportIntelligence.decisions.outcomeNotes.length ? (
-                  reportIntelligence.decisions.outcomeNotes.map((note) => <p key={note}>{note}</p>)
-                ) : (
-                  <p>No decisions logged yet.</p>
-                )}
-              </div>
-            </div>
-            <form action={createBusinessReviewPackageAction}>
-              <input type="hidden" name="return_path" value="/app/reports" />
-              <input type="hidden" name="title" value={reportIntelligence.businessReviewPackage.title} />
-              <input type="hidden" name="body_markdown" value={reportIntelligence.businessReviewPackage.body} />
-              <input type="hidden" name="date_range_start" value={filterStart || todayDate()} />
-              <input type="hidden" name="date_range_end" value={filterEnd || todayDate()} />
-              <ConfirmSubmitButton message="Save this Business Review Package to Reports?">Prepare Business Review Package</ConfirmSubmitButton>
-            </form>
-          </div>
-        </div>
-      </SectionCard>
-
-      <section className="space-y-6">
+      <section className="space-y-4">
         <div className="grid gap-4 lg:grid-cols-2">
           <CreateDrawer title="Generate report" description="Choose a reporting period and Vaeroex will summarize the matching workspace signals." triggerLabel="Generate Report">
             <form action={generateReportAction} className="grid gap-4">
@@ -1020,6 +966,56 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           />
         </SectionCard>
       </section>
+
+      <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} canRunNow={canRunScheduledReports} />
+
+      <SectionCard title="Business Review Package" description="Prepare a board, owner, bank, investor, franchise, monthly, or quarterly review package from the same workspace data Vaeroex uses for reports.">
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="grid gap-3 md:grid-cols-2">
+            {reportIntelligence.businessReviewPackage.sections.map((section) => (
+              <article key={section.title} className="rounded-lg border border-line bg-white p-4">
+                <p className="text-sm font-semibold text-ink">{section.title}</p>
+                <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                  {section.lines.slice(0, 3).map((line) => (
+                    <li key={line} className="flex gap-2">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
+                      <span>{line}</span>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ))}
+          </div>
+          <div className="space-y-4">
+            <div className="rounded-lg border border-line bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-ink">Recommendation outcomes</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                {reportIntelligence.recommendationTracking.outcomeNotes.map((note) => (
+                  <p key={note}>{note}</p>
+                ))}
+              </div>
+            </div>
+            <div className="rounded-lg border border-line bg-slate-50 p-4">
+              <p className="text-sm font-semibold text-ink">Decisions and outcomes</p>
+              <div className="mt-3 space-y-2 text-sm leading-6 text-muted">
+                {reportIntelligence.decisions.outcomeNotes.length ? (
+                  reportIntelligence.decisions.outcomeNotes.map((note) => <p key={note}>{note}</p>)
+                ) : (
+                  <p>No decisions logged yet.</p>
+                )}
+              </div>
+            </div>
+            <form action={createBusinessReviewPackageAction}>
+              <input type="hidden" name="return_path" value="/app/reports" />
+              <input type="hidden" name="title" value={reportIntelligence.businessReviewPackage.title} />
+              <input type="hidden" name="body_markdown" value={reportIntelligence.businessReviewPackage.body} />
+              <input type="hidden" name="date_range_start" value={filterStart || todayDate()} />
+              <input type="hidden" name="date_range_end" value={filterEnd || todayDate()} />
+              <ConfirmSubmitButton message="Save this Business Review Package to Reports?">Prepare Business Review Package</ConfirmSubmitButton>
+            </form>
+          </div>
+        </div>
+      </SectionCard>
     </div>
   );
 }

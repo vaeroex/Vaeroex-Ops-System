@@ -1047,39 +1047,6 @@ function FileActionCenter({
   );
 }
 
-function DisabledActionPill({ children }: { children: ReactNode }) {
-  return (
-    <button
-      type="button"
-      disabled
-      className="rounded-lg border border-line bg-slate-100 px-3 py-2 text-sm font-semibold text-muted opacity-70"
-    >
-      {children}
-    </button>
-  );
-}
-
-function NoSelectedFilePanel() {
-  return (
-    <div className="rounded-lg border border-dashed border-line bg-white p-4">
-      <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Selected File</p>
-          <h3 className="mt-1 text-base font-semibold text-ink">No file selected.</h3>
-          <p className="mt-2 text-sm leading-6 text-muted">
-            No file selected. Choose a file from the list to review, import, or create a report.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <DisabledActionPill>Analyze</DisabledActionPill>
-          <DisabledActionPill>Import</DisabledActionPill>
-          <DisabledActionPill>Create Report</DisabledActionPill>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function SelectedFileBanner({
   file,
   folders,
@@ -1641,8 +1608,8 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         ]}
       />
 
-      <section className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">File workflow</p>
+      <details className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3">
+        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">File workflow</summary>
         <ol className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-3 xl:grid-cols-6">
           {["Upload file", "Select file", "Analyze or import", "Review results", "Create report/KPI/follow-up", "Intelligence updates"].map((step, index) => (
             <li key={step} className="flex items-center gap-2 rounded-md bg-white px-3 py-2">
@@ -1651,48 +1618,36 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
             </li>
           ))}
         </ol>
-      </section>
+      </details>
 
       <ErrorNotice message={errorMessage} />
       <SuccessNotice message={successMessage} />
 
-      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+      <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
+        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
           <p className="text-sm text-muted">Files stored</p>
-          <p className="mt-2 text-3xl font-semibold">{files.length}</p>
+          <p className="text-ink">{files.length}</p>
         </article>
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
           <p className="text-sm text-muted">Import-ready files</p>
-          <p className="mt-2 text-3xl font-semibold">{spreadsheetCount}</p>
+          <p className="text-ink">{spreadsheetCount}</p>
         </article>
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
           <p className="text-sm text-muted">Rows imported</p>
-          <p className="mt-2 text-3xl font-semibold">{importedRows}</p>
+          <p className="text-ink">{importedRows}</p>
         </article>
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
           <p className="text-sm text-muted">Pending review</p>
-          <p className="mt-2 text-3xl font-semibold">{pendingReviewCount}</p>
+          <p className="text-ink">{pendingReviewCount}</p>
         </article>
-        <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
+        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
           <p className="text-sm text-muted">Vaeroex analyses</p>
-          <p className="mt-2 text-3xl font-semibold">{analyzedCount}</p>
+          <p className="text-ink">{analyzedCount}</p>
         </article>
       </section>
 
-      <SectionCard title="Selected file actions" description="Choose what to do next with the uploaded file. Imports always go to review before anything is saved.">
-        {selectedFile ? (
-          <div className="space-y-4">
-            <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
-            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} people={people} />
-            <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
-          </div>
-        ) : (
-          <NoSelectedFilePanel />
-        )}
-      </SectionCard>
-
-      <section className="space-y-6">
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <section className="space-y-4">
+        <div className="max-w-xl">
           <CreateDrawer title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX imports always go through review before saving." triggerLabel="Upload File">
             <form action={uploadFileAction} encType="multipart/form-data" className="grid gap-4">
               <label className="block text-sm font-medium">
@@ -1713,17 +1668,6 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
               <ActionButton tone="primary" pendingLabel="Uploading file...">Upload file</ActionButton>
             </form>
           </CreateDrawer>
-
-          <details className="rounded-lg border border-line bg-white p-4 shadow-sm">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Default folders</summary>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {DEFAULT_FILE_FOLDERS.map((folder) => (
-                <span key={folder} className="rounded-full border border-line bg-slate-50 px-3 py-1.5 text-sm font-medium text-slate-700">
-                  {folder}
-                </span>
-              ))}
-            </div>
-          </details>
         </div>
 
         <SectionCard title="File library" description="Files are collapsed by default and can be renamed, moved, duplicated, archived, deleted, searched, filtered, and managed in bulk.">
@@ -1741,6 +1685,16 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           />
         </SectionCard>
       </section>
+
+      {selectedFile ? (
+        <SectionCard title="Selected file actions" description="Choose what to do next with the selected file. Imports always go to review before anything is saved.">
+          <div className="space-y-4">
+            <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
+            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} people={people} />
+            <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
+          </div>
+        </SectionCard>
+      ) : null}
 
       <SectionCard
         title="Analysis history"

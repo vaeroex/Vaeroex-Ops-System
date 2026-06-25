@@ -71,6 +71,10 @@ canvas {
   min-height: 44px;
 }
 
+.managed-record-list:has(input[name="record_id"]:checked) .bulk-action-bar {
+  display: block;
+}
+
 @media (pointer: coarse) {
   button,
   summary,
