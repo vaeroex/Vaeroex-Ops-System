@@ -121,14 +121,6 @@ function folderOptions(folders: ManagedRecordFolder[]) {
   return folders.filter((folder) => !folder.archived_at);
 }
 
-function folderCounts(records: ManagedRecord[]) {
-  return records.reduce<Record<string, number>>((counts, record) => {
-    const key = record.folderId || "unfiled";
-    counts[key] = (counts[key] || 0) + 1;
-    return counts;
-  }, {});
-}
-
 function uniqueOptions(records: ManagedRecord[], key: "status" | "owner" | "category") {
   return Array.from(new Set(records.map((record) => record[key]).filter(Boolean) as string[])).sort((a, b) => a.localeCompare(b));
 }
@@ -158,6 +150,62 @@ function listParams(searchParams?: ManagedRecordListProps["searchParams"]) {
     date_from: param(searchParams?.date_from),
     date_to: param(searchParams?.date_to)
   };
+}
+
+function collectionLabel(collection: ManagedRecordCollection) {
+  const labels: Record<ManagedRecordCollection, string> = {
+    sops: "SOPs",
+    tasks: "follow-ups",
+    checklists: "checklists",
+    checklist_runs: "checklist runs",
+    issues: "issues",
+    reports: "reports",
+    kpis: "KPIs",
+    forms: "forms",
+    form_submissions: "form submissions",
+    ai_agent_runs: "Vaeroex results",
+    assets: "assets",
+    asset_checks: "asset checks",
+    crm_leads: "customer context",
+    files: "files",
+    people: "people",
+    support_requests: "support requests"
+  };
+
+  return labels[collection];
+}
+
+function removeParam(params: ReturnType<typeof listParams>, key: keyof ReturnType<typeof listParams>) {
+  return {
+    ...params,
+    [key]: ""
+  };
+}
+
+function activeFilterChips({
+  params,
+  folders,
+  returnPath
+}: {
+  params: ReturnType<typeof listParams>;
+  folders: ManagedRecordFolder[];
+  returnPath: string;
+}) {
+  const chips: Array<{ key: keyof typeof params; label: string; value: string }> = [];
+
+  if (params.q) chips.push({ key: "q", label: "Search", value: params.q });
+  if (params.folder) chips.push({ key: "folder", label: "Folder", value: params.folder === "unfiled" ? "Unfiled" : getFolderName(folders, params.folder) });
+  if (params.status) chips.push({ key: "status", label: "Status", value: params.status });
+  if (params.owner) chips.push({ key: "owner", label: "Owner", value: params.owner });
+  if (params.category) chips.push({ key: "category", label: "Category", value: params.category });
+  if (params.view && params.view !== "active") chips.push({ key: "view", label: "View", value: params.view });
+  if (params.date_from) chips.push({ key: "date_from", label: "From", value: params.date_from });
+  if (params.date_to) chips.push({ key: "date_to", label: "To", value: params.date_to });
+
+  return chips.map((chip) => ({
+    ...chip,
+    href: listHref(returnPath, removeParam(params, chip.key)) as Route
+  }));
 }
 
 function pageLimit(value: string, total: number) {
@@ -320,69 +368,12 @@ function FolderManager({
   );
 }
 
-const inactiveFilterLinkClass =
-  "border border-transparent bg-white/5 text-slate-200 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
 const inactivePagePillClass =
   "border border-white/10 bg-white/5 text-slate-200 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
 const recordRowInactiveClass = "hover:bg-cyan-950/20 hover:ring-1 hover:ring-inset hover:ring-vaeroex-accent/20";
 const actionMenuPanelClass = "absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-3 shadow-lg";
 const menuItemClass =
   "block min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
-
-function FolderQuickFilters({
-  folders,
-  records,
-  activeFolder,
-  returnPath
-}: {
-  folders: ManagedRecordFolder[];
-  records: ManagedRecord[];
-  activeFolder: string;
-  returnPath: string;
-}) {
-  const counts = folderCounts(records);
-  const activeFolders = folderOptions(folders);
-  const unfiledCount = counts.unfiled || 0;
-
-  return (
-    <aside className="rounded-lg border border-line bg-white p-3">
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-muted">Folders</p>
-        <Link href={listHref(returnPath, {}) as Route} className="text-xs font-semibold text-vaeroex-blue">
-          All {records.length}
-        </Link>
-      </div>
-      <div className="vaeroex-mobile-safe-scroll mt-3 flex gap-2 overflow-x-auto pb-1 lg:block lg:space-y-1 lg:pb-0">
-        <Link
-          href={listHref(returnPath, { folder: "" }) as Route}
-          className={`flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${!activeFolder ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
-        >
-          <span>All records</span>
-          <span className="text-xs opacity-80">{records.length}</span>
-        </Link>
-        {activeFolders.map((folder) => (
-          <Link
-            key={folder.id}
-            href={listHref(returnPath, { folder: folder.id }) as Route}
-            className={`flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === folder.id ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
-          >
-            <span className="truncate">{folder.name}</span>
-            <span className="text-xs opacity-80">{counts[folder.id] || 0}</span>
-          </Link>
-        ))}
-        {unfiledCount ? (
-          <Link
-            href={listHref(returnPath, { folder: "unfiled" }) as Route}
-            className={`flex min-h-11 shrink-0 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm lg:w-full ${activeFolder === "unfiled" ? "bg-vaeroex-blue text-white" : inactiveFilterLinkClass}`}
-          >
-            <span>Unfiled</span>
-            <span className="text-xs opacity-80">{unfiledCount}</span>
-          </Link>
-        ) : null}
-      </div>
-    </aside>
-  );
-}
 
 function RecordEditForm({
   collection,
@@ -602,23 +593,37 @@ export function ManagedRecordList({
   const baseParams = listParams(searchParams);
   const successMessage = param(searchParams?.message);
   const errorMessage = param(searchParams?.error);
+  const activeCount = records.filter((record) => !record.deletedAt && !record.archivedAt).length;
+  const archivedCount = records.filter((record) => record.archivedAt && !record.deletedAt).length;
+  const deletedCount = records.filter((record) => record.deletedAt).length;
+  const chips = activeFilterChips({ params: baseParams, folders, returnPath });
+  const askPrompt = `Review these ${collectionLabel(collection)} and tell me what needs attention.`;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 border-b border-line pb-3 lg:flex-row lg:items-end lg:justify-between">
-        <div>
+    <div className="managed-record-list space-y-3">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
-          {description ? <p className="mt-1 text-sm leading-6 text-muted">{description}</p> : null}
+          {description ? <p className="mt-1 line-clamp-1 text-sm leading-6 text-muted">{description}</p> : null}
         </div>
-        <form method="get" className="flex w-full gap-2 lg:max-w-md">
-          <input
-            name="q"
-            defaultValue={param(searchParams?.q)}
-            placeholder="Search records"
-            className="min-h-11 min-w-0 flex-1 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
-          />
-          <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Search</button>
-        </form>
+        <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
+          {[
+            { label: "All", value: records.length },
+            { label: "Active", value: activeCount },
+            { label: "Archived", value: archivedCount },
+            { label: "Showing", value: visibleRecords.length }
+          ].map((item) => (
+            <span key={item.label} className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
+              {item.label}
+              <span className="text-ink">{item.value}</span>
+            </span>
+          ))}
+          {deletedCount ? (
+            <span className="inline-flex min-h-9 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
+              Hidden <span className="text-ink">{deletedCount}</span>
+            </span>
+          ) : null}
+        </div>
       </div>
 
       {successMessage ? (
@@ -626,21 +631,35 @@ export function ManagedRecordList({
       ) : null}
       {errorMessage ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</div> : null}
 
-      <div className="grid gap-4 2xl:grid-cols-[220px_minmax(0,1fr)]">
-        <FolderQuickFilters folders={folders} records={records} activeFolder={activeFolder} returnPath={returnPath} />
-
-        <div className="space-y-3">
-          <details className="rounded-lg border border-line bg-white p-3">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-slate-700">Filters</summary>
-            <form method="get" className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-6">
-              <input type="hidden" name="q" value={param(searchParams?.q)} />
-              <select name="folder" defaultValue={activeFolder} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
-                <option value="">All folders</option>
-                <option value="unfiled">Unfiled</option>
-                {activeFolders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>{folder.name}</option>
-                ))}
-              </select>
+      <form method="get" className="rounded-lg border border-line bg-white p-3">
+        <div className="grid gap-2 lg:grid-cols-[minmax(180px,1fr)_160px_140px_130px_auto_auto] lg:items-center">
+          <input
+            name="q"
+            defaultValue={param(searchParams?.q)}
+            placeholder="Search records..."
+            className="min-h-11 min-w-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
+          />
+          <select name="folder" defaultValue={activeFolder} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+            <option value="">Folder: All</option>
+            <option value="unfiled">Folder: Unfiled</option>
+            {activeFolders.map((folder) => (
+              <option key={folder.id} value={folder.id}>{folder.name}</option>
+            ))}
+          </select>
+          <select name="sort" defaultValue={sort} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+            {sortOptions.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+            <option value="active">Active</option>
+            <option value="archived">Archived</option>
+            <option value="deleted">Hidden</option>
+            <option value="all">All</option>
+          </select>
+          <details className="relative rounded-lg border border-line bg-slate-50">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center px-3 py-2 text-sm font-semibold text-slate-700">Filters</summary>
+            <div className="mt-2 grid gap-2 border-t border-line p-3 md:grid-cols-2 xl:absolute xl:right-0 xl:z-20 xl:w-[42rem] xl:rounded-lg xl:border xl:border-line xl:bg-white xl:shadow-lg">
               <select name="status" defaultValue={param(searchParams?.status)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
                 <option value="">All statuses</option>
                 {statusOptions.map((option) => (
@@ -659,16 +678,13 @@ export function ManagedRecordList({
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="sort" defaultValue={sort} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
-                {sortOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
+              <select name="limit" defaultValue={limitValue || "10"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+                {pageSizeOptions.map((option) => (
+                  <option key={option} value={option}>
+                    Show {option}
+                  </option>
                 ))}
-              </select>
-              <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
-                <option value="active">Active</option>
-                <option value="archived">Archived</option>
-                <option value="deleted">Deleted</option>
-                <option value="all">All</option>
+                <option value="all">View all</option>
               </select>
               <input
                 type="date"
@@ -684,43 +700,62 @@ export function ManagedRecordList({
                 aria-label="Updated before"
                 className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm"
               />
-              <select name="limit" defaultValue={limitValue || "10"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
-                {pageSizeOptions.map((option) => (
-                  <option key={option} value={option}>
-                    Show {option}
-                  </option>
-                ))}
-                <option value="all">View all</option>
-              </select>
-              <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white md:col-span-2 xl:col-span-1">
-                Apply filters
-              </button>
-            </form>
+            </div>
           </details>
+          <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+            Apply
+          </button>
+        </div>
+      </form>
 
-          <details className="rounded-lg border border-line bg-white p-3">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center text-sm font-semibold text-slate-700">Bulk actions</summary>
-            <form id={bulkFormId} action={bulkManageRecordsAction} className="mt-3 grid gap-3 md:grid-cols-[1fr_220px_auto]">
-              <input type="hidden" name="collection" value={collection} />
-              <input type="hidden" name="return_path" value={returnPath} />
-              <select name="bulk_action" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm" required>
-                <option value="">Bulk action</option>
-                <option value="archive">Archive selected</option>
-                <option value="delete">Delete selected</option>
-                <option value="move">Move selected to folder</option>
-                <option value="restore">Restore selected</option>
-              </select>
-              <select name="target_folder_id" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
-                <option value="">No folder</option>
-                {activeFolders.map((folder) => (
-                  <option key={folder.id} value={folder.id}>{folder.name}</option>
-                ))}
-              </select>
-              <ConfirmSubmitButton message="Apply this action to the selected records?">Apply</ConfirmSubmitButton>
-            </form>
+      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+        <div className="flex min-w-0 flex-wrap gap-2">
+          {chips.map((chip) => (
+            <Link key={`${chip.key}-${chip.value}`} href={chip.href} className="inline-flex min-h-9 items-center gap-2 rounded-full border border-vaeroex-accent/30 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue">
+              {chip.label}: {chip.value}
+              <span aria-hidden="true">x</span>
+            </Link>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link
+            href={`/app/agents?prompt=${encodeURIComponent(askPrompt)}` as Route}
+            className="inline-flex min-h-10 items-center rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white"
+          >
+            Ask Vaeroex about this page
+          </Link>
+          <details className="relative">
+            <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white">
+              Folders
+            </summary>
+            <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-3 shadow-lg">
+              <FolderManager collection={collection} folders={folders} returnPath={returnPath} />
+            </div>
           </details>
+        </div>
+      </div>
 
-          <FolderManager collection={collection} folders={folders} returnPath={returnPath} />
+      <div className="bulk-action-bar hidden rounded-lg border border-vaeroex-accent/35 bg-vaeroex-soft p-3">
+        <form id={bulkFormId} action={bulkManageRecordsAction} className="grid w-full gap-3 md:grid-cols-[auto_1fr_220px_auto] md:items-center">
+          <input type="hidden" name="collection" value={collection} />
+          <input type="hidden" name="return_path" value={returnPath} />
+          <p className="text-sm font-semibold text-vaeroex-blue">Selected records</p>
+          <select name="bulk_action" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm" required>
+            <option value="">Bulk action</option>
+            <option value="archive">Archive selected</option>
+            <option value="delete">Delete selected</option>
+            <option value="move">Move selected to folder</option>
+            <option value="restore">Restore selected</option>
+          </select>
+          <select name="target_folder_id" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+            <option value="">No folder</option>
+            {activeFolders.map((folder) => (
+              <option key={folder.id} value={folder.id}>{folder.name}</option>
+            ))}
+          </select>
+          <ConfirmSubmitButton message="Apply this action to the selected records?">Apply</ConfirmSubmitButton>
+        </form>
+      </div>
 
           {visibleRecords.length ? (
             <div className="rounded-lg border border-line bg-white">
@@ -834,8 +869,6 @@ export function ManagedRecordList({
           ) : (
             <EmptyState title={emptyTitle} description={emptyDescription} />
           )}
-        </div>
-      </div>
     </div>
   );
 }
