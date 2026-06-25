@@ -51,7 +51,9 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     recentFiles,
     recentCrmLeads,
     recentCrmLeadHistory,
-    recentOperationalMetrics
+    recentOperationalMetrics,
+    recentDecisions,
+    recentRecommendationOutcomes
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
@@ -176,7 +178,21 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .select("id,metric_name,category,value,metric_date,owner,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
       .order("metric_date", { ascending: false })
-      .limit(80)
+      .limit(80),
+    supabase
+      .from("business_decisions")
+      .select("id,title,reason,expected_outcome,actual_outcome,owner,status,related_kpi,review_date,created_at")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20),
+    supabase
+      .from("vaeroex_recommendation_outcomes")
+      .select("id,title,source_type,source_id,decision,status,owner,outcome_summary,review_date,created_at")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(20)
   ]);
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
   const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(recentKpis.data ?? [], kpiSettingRows), kpiSettingRows);
@@ -332,6 +348,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     file_analyses: analyzedFiles,
     crm_leads: recentLeadRows,
     crm_lead_history: recentCrmLeadHistory.data ?? [],
-    operational_metrics: recentOperationalMetrics.data ?? []
+    operational_metrics: recentOperationalMetrics.data ?? [],
+    business_decisions: recentDecisions.data ?? [],
+    recommendation_outcomes: recentRecommendationOutcomes.data ?? []
   };
 }
