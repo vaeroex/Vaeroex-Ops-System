@@ -33,7 +33,7 @@ const baseNavSections = [
   {
     label: "Relationships",
     items: [
-      { href: "/app/crm", label: "CRM" },
+      { href: "/app/crm", label: "Customer Context" },
       { href: "/app/forms", label: "Forms" },
       { href: "/app/form-submissions", label: "Form Submissions" }
     ]

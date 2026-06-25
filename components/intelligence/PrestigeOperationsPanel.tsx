@@ -271,20 +271,26 @@ function ActionCard({
           </span>
         </div>
       </div>
-      <dl className="mt-3 grid gap-2 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">
-        <div>
-          <dt className="font-semibold text-ink">Evidence</dt>
-          <dd className="mt-1">{item.evidence}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-ink">Reasoning</dt>
-          <dd className="mt-1">{item.why}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-ink">Recommended action</dt>
-          <dd className="mt-1">{item.action}</dd>
-        </div>
-      </dl>
+      <p className="mt-3 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">
+        <span className="font-semibold text-ink">Recommended:</span> {item.action}
+      </p>
+      <details className="mt-3 rounded-lg border border-white/60 bg-white/70 p-3 text-xs leading-5 text-slate-700">
+        <summary className="cursor-pointer font-semibold text-ink">View evidence and reasoning</summary>
+        <dl className="mt-3 grid gap-2">
+          <div>
+            <dt className="font-semibold text-ink">Data used</dt>
+            <dd className="mt-1">{item.evidence}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-ink">Why Vaeroex surfaced it</dt>
+            <dd className="mt-1">{item.why}</dd>
+          </div>
+          <div>
+            <dt className="font-semibold text-ink">Recommended action</dt>
+            <dd className="mt-1">{item.action}</dd>
+          </div>
+        </dl>
+      </details>
       {children}
       <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
         <div>

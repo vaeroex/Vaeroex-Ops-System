@@ -14,7 +14,8 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
-import { VAEROEX_WORKFLOWS, getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
+import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
+import { getVaeroexWorkflow, type VaeroexSaveTarget, type VaeroexWorkflowKey } from "@/lib/ai/vaeroex-workflows";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -43,6 +44,27 @@ const saveDestinations: Record<string, { label: string; href: Route }> = {
 const vaeroexRunEditFields: ManagedRecordEditField[] = [
   { name: "status", label: "Status", type: "select", options: ["queued", "running", "completed", "failed"] },
   { name: "error_message", label: "Error message", type: "textarea", rows: 4 }
+];
+const WORKFLOW_GROUPS: Array<{
+  title: string;
+  description: string;
+  keys: VaeroexWorkflowKey[];
+}> = [
+  {
+    title: "Leadership Briefings",
+    description: "Condensed intelligence for owners and managers deciding what deserves attention.",
+    keys: ["ceo_mode", "focus_priorities", "risk_simulation", "weekly_management_meeting", "business_review_package"]
+  },
+  {
+    title: "Operations Reviews",
+    description: "Find bottlenecks, accountability gaps, and practical follow-up work in the active workspace.",
+    keys: ["operations_audit", "bottleneck_detector", "follow_up"]
+  },
+  {
+    title: "Drafts, Reports, and Builders",
+    description: "Turn workspace context into draft SOPs, reports, forms, checklists, and file analysis for review.",
+    keys: ["sop_generator", "weekly_report", "daily_summary", "form_builder", "checklist_builder", "file_analysis"]
+  }
 ];
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -114,6 +136,30 @@ function displayOutput(output: JsonRecord) {
 
 function vaeroexResultLabel(value: string) {
   return getVaeroexWorkflow(value).title;
+}
+
+function friendlyHubError(message?: string | null) {
+  return message ? cleanVaeroexErrorMessage(message, "Vaeroex could not complete that request. Please try again.") : undefined;
+}
+
+function workflowDataUsed(key: VaeroexWorkflowKey) {
+  if (key === "file_analysis") {
+    return "Selected file content, prior imports, KPIs, reports";
+  }
+
+  if (key === "weekly_report" || key === "daily_summary" || key === "business_review_package") {
+    return "KPIs, follow-ups, issues, CRM context, reports, Vaeroex runs";
+  }
+
+  if (key === "sop_generator" || key === "form_builder" || key === "checklist_builder") {
+    return "Existing SOPs, forms, checklists, issues, follow-ups";
+  }
+
+  if (key === "ceo_mode" || key === "focus_priorities" || key === "risk_simulation" || key === "weekly_management_meeting") {
+    return "Workspace health, risks, KPIs, decisions, ownership, business memory";
+  }
+
+  return "Workspace records, ownership, issues, follow-ups, files, reports";
 }
 
 function resultTitle(output: JsonRecord, fallback: string) {
@@ -852,7 +898,7 @@ function SelectedResult({
           <StatusBadge value={run.status} />
         </div>
 
-        {run.error_message ? <ErrorNotice message={run.error_message} /> : null}
+        {run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
         {run.status === "completed" ? <BusinessResult output={output} runId={run.id} runTitle={title} people={people} /> : null}
 
         {run.status === "completed" ? (
@@ -887,14 +933,22 @@ function SelectedResult({
   );
 }
 
-function WorkflowCard({ workflowKey }: { workflowKey: string }) {
+function WorkflowCard({ workflowKey }: { workflowKey: VaeroexWorkflowKey }) {
   const workflow = getVaeroexWorkflow(workflowKey);
 
   return (
     <article className="rounded-lg border border-vaeroex-silver bg-white p-4 shadow-sm hover:border-vaeroex-accent">
       <div>
-        <h3 className="font-semibold text-vaeroex-navy">{workflow.title}</h3>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <h3 className="font-semibold text-vaeroex-navy">{workflow.title}</h3>
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[0.68rem] font-semibold text-emerald-800">
+            Ready
+          </span>
+        </div>
         <p className="mt-2 text-sm leading-6 text-muted">{workflow.description}</p>
+        <p className="mt-3 rounded-lg border border-line bg-slate-50 p-3 text-xs leading-5 text-muted">
+          <span className="font-semibold text-ink">Data used:</span> {workflowDataUsed(workflow.key)}
+        </p>
       </div>
       <form action={runVaeroexAction} className="mt-4 space-y-3">
         <input type="hidden" name="workflow_key" value={workflow.key} />
@@ -930,7 +984,6 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const people = (peopleResult.data || []) as TeamPersonOption[];
   const selectedRun = runs?.find((run) => run.id === params?.run) ?? runs?.[0] ?? null;
   const selectedOutput = selectedRun ? asRecord(selectedRun.output_json) : {};
-  const workflows = VAEROEX_WORKFLOWS.filter((workflow) => workflow.key !== "ask_vaeroex");
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
   const promptDefault = typeof params?.prompt === "string" ? params.prompt : "";
@@ -967,7 +1020,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         run.status === "completed" ? (
           <BusinessResult output={display} runId={run.id} runTitle={resultTitle(display, vaeroexResultLabel(run.agent_type))} people={people} />
         ) : (
-          <ErrorNotice message={run.error_message || "This run has not completed yet."} />
+          <ErrorNotice message={friendlyHubError(run.error_message) || "This run has not completed yet."} />
         )
     };
   });
@@ -976,11 +1029,11 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
     <div className="space-y-6">
       <PageHeader
         eyebrow="Ask Vaeroex"
-        title="Your Operations Intelligence Advisor"
-        description="Ask Vaeroex for business health, visibility gaps, accountability risks, execution priorities, and boardroom-ready decision support before saving anything into workspace records."
+        title="Vaeroex Intelligence"
+        description="Ask direct questions, run focused briefings, and convert approved recommendations into accountable work only after manager review."
       />
 
-      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
+      <ErrorNotice message={friendlyHubError((params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message)} />
       <SuccessNotice message={params?.saved as string | undefined} />
       <ComplianceNotice />
       <LegalSafetyNotice tone="ai" compact />
@@ -1048,11 +1101,26 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
 
         <SectionCard
           title="Vaeroex intelligence workflows"
-          description="Each workflow uses the active workspace context and saves the output as a draft result first."
+          description="Choose the type of intelligence you need. Each workflow uses active workspace context and saves the output as a draft result first."
         >
-          <div className="grid gap-4 lg:grid-cols-2">
-            {workflows.map((workflow) => (
-              <WorkflowCard key={workflow.key} workflowKey={workflow.key} />
+          <div className="space-y-4">
+            {WORKFLOW_GROUPS.map((group, index) => (
+              <details key={group.title} open={index === 0} className="rounded-lg border border-line bg-slate-50">
+                <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-semibold text-ink">{group.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-muted">{group.description}</p>
+                  </div>
+                  <span className="w-fit rounded-full border border-line bg-white px-3 py-1 text-xs font-semibold text-slate-700">
+                    {group.keys.length} tool{group.keys.length === 1 ? "" : "s"}
+                  </span>
+                </summary>
+                <div className="grid gap-4 border-t border-line p-4 lg:grid-cols-2">
+                  {group.keys.map((workflowKey) => (
+                    <WorkflowCard key={workflowKey} workflowKey={workflowKey} />
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
         </SectionCard>

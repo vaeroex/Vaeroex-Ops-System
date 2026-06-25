@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createSopAction } from "@/app/app/operations/actions";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -63,7 +64,25 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
         version: sop.version,
         body_markdown: sop.body_markdown
       },
-      children: <div className="whitespace-pre-wrap text-sm leading-6 text-muted">{sop.body_markdown || "No SOP body yet."}</div>
+      children: (
+        <div className="space-y-4">
+          <div className="rounded-lg border border-line bg-white p-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Source file</p>
+            <p className="mt-2 text-sm leading-6 text-muted">
+              No source file is linked to this SOP record. If this procedure came from a file review, open the related file or Vaeroex result to view the original source.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/app/files" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
+                View Files
+              </Link>
+              <Link href="/app/agents" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
+                View Vaeroex Results
+              </Link>
+            </div>
+          </div>
+          <div className="whitespace-pre-wrap text-sm leading-6 text-muted">{sop.body_markdown || "No SOP body yet."}</div>
+        </div>
+      )
     };
   });
 

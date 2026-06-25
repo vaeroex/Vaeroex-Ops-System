@@ -168,9 +168,9 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="CRM"
-        title="CRM Visibility"
-        description="Track leads manually or import them later. The dashboard and reports use CRM records either way, so no spreadsheet is required to start."
+        eyebrow="Customer Context"
+        title="Customer & Pipeline Context"
+        description="Track leads, customer follow-up, pipeline movement, and relationship signals that help Vaeroex explain opportunities and risks."
       />
       <ModuleTabs
         tabs={[
@@ -188,7 +188,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
       <SuccessNotice message={params?.message as string | undefined} />
 
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Active leads" value={activeLeads.length} note="Current CRM records in this workspace." />
+        <MetricCard label="Active leads" value={activeLeads.length} note="Current customer context records in this workspace." />
         <MetricCard label="Open pipeline" value={openLeads.length} note="Not converted or lost." />
         <MetricCard label="Converted" value={convertedLeads.length} note="Leads marked converted, won, or customer." />
         <MetricCard label="Pipeline value" value={formatMoney(pipelineValue)} note="Estimated value for open leads." />
@@ -213,7 +213,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="CRM records" description="Leads are collapsed by default and can be searched, edited, archived, duplicated, grouped, or moved in bulk.">
+        <SectionCard title="Customer context records" description="Leads are collapsed by default and can be searched, edited, archived, duplicated, grouped, or moved in bulk.">
           <ManagedRecordList
             collection="crm_leads"
             records={managedLeads}

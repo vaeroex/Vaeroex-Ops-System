@@ -1,5 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { createKpiAction } from "@/app/app/operations/actions";
 import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
@@ -246,23 +247,63 @@ function MetricCard({
   label,
   value,
   detail,
-  tone
+  tone,
+  href
 }: {
   label: string;
   value: string | number;
   detail: string;
   tone: KpiTone;
+  href: Route;
 }) {
   return (
     <article className={`rounded-lg border p-4 shadow-panel ${toneClasses(tone)}`}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] opacity-80">{label}</p>
         <span className="rounded-full bg-white/70 px-2 py-1 text-[11px] font-semibold">{statusLabel(tone)}</span>
       </div>
-      <p className="mt-3 text-2xl font-semibold">{value}</p>
-      <p className="mt-2 text-xs leading-5 opacity-80">{detail}</p>
+      <p className="mt-3 text-3xl font-semibold">{value}</p>
+      <p className="mt-2 min-h-10 text-xs leading-5 opacity-80">{detail}</p>
+      <Link href={href} className="mt-4 inline-flex text-xs font-semibold underline underline-offset-4">
+        View details
+      </Link>
     </article>
   );
+}
+
+function KpiDetailPanel({
+  title,
+  summary,
+  children,
+  defaultOpen = false
+}: {
+  title: string;
+  summary: string;
+  children: ReactNode;
+  defaultOpen?: boolean;
+}) {
+  return (
+    <details open={defaultOpen} className="rounded-lg border border-line bg-white shadow-panel">
+      <summary className="flex cursor-pointer list-none flex-col gap-3 p-5 md:flex-row md:items-center md:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-ink">{title}</h2>
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-muted">{summary}</p>
+        </div>
+        <span className="w-fit rounded-full border border-line px-3 py-1 text-xs font-semibold text-slate-600 group-open:bg-vaeroex-soft group-open:text-vaeroex-blue">
+          Expand
+        </span>
+      </summary>
+      <div className="border-t border-line p-5">{children}</div>
+    </details>
+  );
+}
+
+function metricDetailsHref(metric: KpiRow | null | undefined): Route {
+  if (!metric?.name) {
+    return "/app/kpis?section=charts#trend-analysis" as Route;
+  }
+
+  return `/app/kpis?metric=${encodeURIComponent(metric.name)}&section=charts#trend-analysis` as Route;
 }
 
 function formatShortDate(value: string) {
@@ -1004,39 +1045,45 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       label: "Revenue",
       value: formatMetricValue(revenue),
       detail: formatTarget(revenue),
-      tone: metricTone(revenue?.actual_value ?? null, revenue?.target ?? null)
+      tone: metricTone(revenue?.actual_value ?? null, revenue?.target ?? null),
+      href: metricDetailsHref(revenue)
     },
     {
       label: "Leads",
       value: formatMetricValue(leads),
       detail: formatTarget(leads),
-      tone: metricTone(leads?.actual_value ?? null, leads?.target ?? null)
+      tone: metricTone(leads?.actual_value ?? null, leads?.target ?? null),
+      href: metricDetailsHref(leads)
     },
     {
       label: "Conversion Rate",
       value: formatMetricValue(conversionRate),
       detail: formatTarget(conversionRate),
-      tone: metricTone(conversionRate?.actual_value ?? null, conversionRate?.target ?? null)
+      tone: metricTone(conversionRate?.actual_value ?? null, conversionRate?.target ?? null),
+      href: metricDetailsHref(conversionRate)
     },
     {
       label: "Follow-ups Completed",
       value: completedTasks,
       detail: "All completed follow-ups in this workspace",
-      tone: completedTasks > 0 ? "green" : "yellow"
+      tone: completedTasks > 0 ? "green" : "yellow",
+      href: "/app/tasks?status=Completed" as Route
     },
     {
       label: "Open Follow-ups",
       value: openTasks,
       detail: "Lower is better for daily accountability",
-      tone: openTaskTone(openTasks)
+      tone: openTaskTone(openTasks),
+      href: "/app/tasks" as Route
     },
     {
       label: "Custom Metrics",
       value: getConfiguredMetricNames(allVisibleKpis, kpiSettings).length,
       detail: "Visible KPI definitions tracked in this workspace",
-      tone: allVisibleKpis.length > 0 ? "green" : "yellow"
+      tone: allVisibleKpis.length > 0 ? "green" : "yellow",
+      href: "/app/kpis/settings" as Route
     }
-  ] satisfies Array<{ label: string; value: string | number; detail: string; tone: KpiTone }>;
+  ] satisfies Array<{ label: string; value: string | number; detail: string; tone: KpiTone; href: Route }>;
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
@@ -1103,7 +1150,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       <PageHeader
         eyebrow="Visibility"
         title="KPI Visibility"
-        description="Track practical business metrics by workspace, compare actual results to targets, and keep owners accountable."
+        description="Track actuals, targets, owners, and trend movement. Open details only when you need the supporting analysis."
       />
       <ModuleTabs
         tabs={[
@@ -1140,46 +1187,69 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
       <TimelineControls timeline={timeline} range={selectedTimelineRange} />
 
+      <details className="rounded-lg border border-line bg-white p-4 text-sm shadow-sm">
+        <summary className="cursor-pointer font-semibold text-ink">How Vaeroex uses KPI data</summary>
+        <p className="mt-3 max-w-4xl leading-6 text-muted">
+          KPI records can be created manually or imported from reviewed CSV/XLSX files. Vaeroex uses targets, weights, owners, and history to
+          shape dashboard health, reports, risk signals, and recommendations.
+        </p>
+      </details>
+
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {metricCards.map((card) => (
           <MetricCard key={card.label} {...card} />
         ))}
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
-        <KpiAlertRulePanel kpiNames={metricNames} people={people} />
-        <AlertRuleList rules={alertRules} />
-      </section>
+      <KpiDetailPanel
+        title="Alerts and ownership"
+        summary={`${alertRules.length} KPI alert rule${alertRules.length === 1 ? "" : "s"} configured. Expand to add alert rules or review active thresholds.`}
+      >
+        <section className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
+          <KpiAlertRulePanel kpiNames={metricNames} people={people} />
+          <AlertRuleList rules={alertRules} />
+        </section>
+      </KpiDetailPanel>
 
-      <section className="grid gap-4 xl:grid-cols-2">
-        <SectionCard title="Benchmark comparisons" description="Vaeroex compares this workspace against default operating standards, not anonymous customer data.">
-          <div className="grid gap-3 md:grid-cols-2">
-            {intelligence.benchmarkMode.map((item) => (
-              <article key={item.title} className="rounded-lg border border-line bg-white p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold text-ink">{item.title}</p>
-                  <KpiStatusBadge tone={item.status === "On track" ? "green" : item.status === "Needs attention" ? "yellow" : "neutral"} />
-                </div>
-                <p className="mt-2 text-sm leading-6 text-muted">{item.evidence}</p>
-                <p className="mt-2 text-xs leading-5 text-muted">{item.recommendedAction}</p>
-              </article>
-            ))}
-          </div>
-        </SectionCard>
-        <SectionCard title="KPI risk and data quality" description={`Data Quality Score: ${intelligence.dataQuality.score}/100.`}>
-          <div className="space-y-3">
-            {intelligence.dataQuality.gaps.slice(0, 6).map((gap) => (
-              <Link key={gap.id} href={gap.href} className="block rounded-lg border border-line bg-white p-3 text-sm">
-                <span className="font-semibold text-ink">{gap.title}</span>
-                <span className="mt-1 block text-xs leading-5 text-muted">{gap.why}</span>
-              </Link>
-            ))}
-            {!intelligence.dataQuality.gaps.length ? <p className="text-sm leading-6 text-muted">No major KPI data gaps found.</p> : null}
-          </div>
-        </SectionCard>
-      </section>
+      <KpiDetailPanel
+        title="Benchmarks and data quality"
+        summary={`Data Quality Score: ${intelligence.dataQuality.score}/100. ${intelligence.dataQuality.gaps.length} gap${intelligence.dataQuality.gaps.length === 1 ? "" : "s"} need review.`}
+      >
+        <section className="grid gap-4 xl:grid-cols-2">
+          <SectionCard title="Benchmark comparisons" description="Vaeroex compares this workspace against default operating standards, not anonymous customer data.">
+            <div className="grid gap-3 md:grid-cols-2">
+              {intelligence.benchmarkMode.map((item) => (
+                <article key={item.title} className="rounded-lg border border-line bg-white p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-sm font-semibold text-ink">{item.title}</p>
+                    <KpiStatusBadge tone={item.status === "On track" ? "green" : item.status === "Needs attention" ? "yellow" : "neutral"} />
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-muted">{item.evidence}</p>
+                  <p className="mt-2 text-xs leading-5 text-muted">{item.recommendedAction}</p>
+                </article>
+              ))}
+            </div>
+          </SectionCard>
+          <SectionCard title="KPI risk and data quality" description={`Data Quality Score: ${intelligence.dataQuality.score}/100.`}>
+            <div className="space-y-3">
+              {intelligence.dataQuality.gaps.slice(0, 6).map((gap) => (
+                <Link key={gap.id} href={gap.href} className="block rounded-lg border border-line bg-white p-3 text-sm">
+                  <span className="font-semibold text-ink">{gap.title}</span>
+                  <span className="mt-1 block text-xs leading-5 text-muted">{gap.why}</span>
+                </Link>
+              ))}
+              {!intelligence.dataQuality.gaps.length ? <p className="text-sm leading-6 text-muted">No major KPI data gaps found.</p> : null}
+            </div>
+          </SectionCard>
+        </section>
+      </KpiDetailPanel>
 
-      <SectionCard title="Trend analysis" description="Select one or more KPIs to review movement, target performance, and comparison notes.">
+      <KpiDetailPanel
+        title="Charts and comparisons"
+        summary={metricNames.length ? `${selectedMetrics.length} KPI line${selectedMetrics.length === 1 ? "" : "s"} selected for trend review.` : "Create KPI history to unlock charts."}
+        defaultOpen={params?.section === "charts" || Boolean(params?.metric)}
+      >
+      <div id="trend-analysis">
         {metricNames.length ? (
           <div className="space-y-5">
             <form method="get" className="space-y-3 rounded-lg border border-line bg-slate-50 p-4">
@@ -1232,7 +1302,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         ) : (
           <EmptyState title="No trend data yet" description="Create KPI records over time to unlock charts and trend summaries." />
         )}
-      </SectionCard>
+      </div>
+      </KpiDetailPanel>
 
       <section className="space-y-6">
         <CreateDrawer title="Create KPI" description="Use one metric per row so trends stay easy to review." triggerLabel="New KPI">
