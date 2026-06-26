@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { generatedOutputHref, type GeneratedOutputType } from "@/lib/intelligence/generated-output";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -23,6 +24,7 @@ type ActionItem = {
   why: string;
   nextStep: string;
   href: Route;
+  outputType: GeneratedOutputType;
 };
 
 function isClosed(value: string | null | undefined) {
@@ -45,7 +47,7 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
   if (!items.length) {
     return (
       <div className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-sm leading-6 text-slate-300">
-        No active action queue is visible yet. Review Intelligence or add source data so Vaeroex can recommend accountable work.
+        No active recommendation queue is visible yet. Review Intelligence or add source data so Vaeroex can generate useful decision outputs.
       </div>
     );
   }
@@ -66,16 +68,39 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
             </div>
           </div>
           <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm leading-6 text-slate-300">
-            <span className="font-semibold text-white">Next step:</span> {item.nextStep}
+            <span className="font-semibold text-white">Recommended remedy:</span> {item.nextStep}
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href={item.href} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-              Open action source
+            <Link
+              href={generatedOutputHref({ type: item.outputType, title: item.title, summary: item.why, remedy: item.nextStep })}
+              className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white"
+            >
+              {item.outputType === "risk_brief" ? "Generate Risk Brief" : "Generate Action Plan"}
+            </Link>
+            <Link
+              href={generatedOutputHref({ type: "checklist", title: item.title, summary: item.why, remedy: item.nextStep })}
+              className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20"
+            >
+              Generate Checklist
             </Link>
             <Link href="/app/ask" className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
               Ask Vaeroex
             </Link>
           </div>
+          <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/35 p-3">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: internal record options</summary>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href={item.href} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+                Open source record area
+              </Link>
+              <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+                Convert to internal follow-up
+              </Link>
+              <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+                Convert to internal issue
+              </Link>
+            </div>
+          </details>
         </article>
       ))}
     </div>
@@ -97,7 +122,7 @@ function ActionSystemCard({
 }) {
   return (
     <Link href={href} className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/40 hover:bg-blue-950/25">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Action system</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Supporting system</p>
       <h2 className="mt-2 text-base font-semibold text-white">{title}</h2>
       <p className="mt-3 text-3xl font-semibold text-white">{count}</p>
       <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
@@ -139,8 +164,9 @@ export default async function ActionsPage() {
       status: task.status,
       priority: task.priority,
       why: task.description || "This follow-up is overdue and needs ownership review.",
-      nextStep: task.assigned_role || task.assigned_to ? "Confirm progress and close or reschedule the follow-up." : "Assign an owner before the next review.",
-      href: "/app/tasks" as Route
+      nextStep: "Review whether this follow-up still matters and decide the simplest next action.",
+      href: "/app/tasks" as Route,
+      outputType: "action_plan" as const
     })),
     ...openIssues.slice(0, 4).map((issue) => ({
       id: `issue-${issue.id}`,
@@ -149,8 +175,9 @@ export default async function ActionsPage() {
       status: issue.status,
       priority: issue.severity,
       why: issue.recommended_fix || issue.description || "This risk is open and should be reviewed before it becomes normal.",
-      nextStep: issue.assigned_role || issue.assigned_to ? "Confirm owner and target resolution." : "Assign an owner and decide whether a follow-up is needed.",
-      href: "/app/issues" as Route
+      nextStep: issue.recommended_fix || "Generate a risk brief, review evidence, and decide whether to convert it into internal work.",
+      href: "/app/issues" as Route,
+      outputType: "risk_brief" as const
     })),
     ...overdueAssignments.slice(0, 3).map((assignment) => ({
       id: `assignment-${assignment.id}`,
@@ -159,8 +186,9 @@ export default async function ActionsPage() {
       status: assignment.status,
       priority: assignment.priority,
       why: assignment.description || "This assignment is overdue.",
-      nextStep: "Review the assigned role, due date, and completion status.",
-      href: "/app/people" as Route
+      nextStep: "Generate an action plan to clarify the decision and next step before assigning more tracking.",
+      href: "/app/people" as Route,
+      outputType: "action_plan" as const
     })),
     ...acceptedRecommendations.slice(0, 3).map((outcome) => ({
       id: `outcome-${outcome.id}`,
@@ -169,8 +197,9 @@ export default async function ActionsPage() {
       status: outcome.status,
       priority: outcome.priority,
       why: outcome.evidence || "This recommendation was approved for action.",
-      nextStep: outcome.outcome_summary || "Review whether the expected outcome happened.",
-      href: "/app/tasks" as Route
+      nextStep: outcome.outcome_summary || "Generate a brief and decide whether leadership needs a follow-up record.",
+      href: "/app/tasks" as Route,
+      outputType: "action_plan" as const
     }))
   ].slice(0, 8);
 
@@ -178,8 +207,8 @@ export default async function ActionsPage() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Actions"
-        title="Accountable Work"
-        description="Where reviewed intelligence becomes follow-up, ownership, issue resolution, and repeatable execution. Vaeroex should recommend actions; people approve them."
+        title="Recommended Outputs"
+        description="Turn Vaeroex recommendations into action plans, risk briefs, checklists, SOPs, or executive briefings before deciding whether anything needs to become an internal record."
         actions={
           <Link href="/app/intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             Review Intelligence
@@ -197,7 +226,7 @@ export default async function ActionsPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Action philosophy</p>
         <h2 className="mt-3 text-2xl font-semibold text-white">Actions are outputs, not the product surface.</h2>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300">
-          Vaeroex keeps follow-ups, issues, checklists, and assignments available, but the leadership flow starts with intelligence and evidence. Create or accept actions only after review.
+          Vaeroex keeps follow-ups, issues, checklists, and assignments available as supporting systems, but the leadership flow starts with intelligence and a clear generated output. Convert only when you want internal tracking.
         </p>
       </section>
 
@@ -242,16 +271,25 @@ export default async function ActionsPage() {
         </div>
 
         <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-          <h2 className="text-base font-semibold text-white">Create after review</h2>
+          <h2 className="text-base font-semibold text-white">Generate optional outputs</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Use these supporting systems when leadership has confirmed the recommendation and wants accountable follow-through.
+            Use these to turn a recommendation into a portable document before creating any internal follow-up fields.
           </p>
           <div className="mt-4 grid gap-2">
-            <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Create follow-up</Link>
-            <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Log issue</Link>
-            <Link href="/app/checklists" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Create checklist</Link>
-            <Link href="/app/briefings" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate briefing</Link>
+            <Link href={generatedOutputHref({ type: "action_plan" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Action Plan</Link>
+            <Link href={generatedOutputHref({ type: "risk_brief" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Risk Brief</Link>
+            <Link href={generatedOutputHref({ type: "checklist" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Checklist</Link>
+            <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Executive Briefing</Link>
           </div>
+          <details className="mt-4 rounded-lg border border-white/10 bg-slate-950/40 p-3">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: supporting record systems</summary>
+            <div className="mt-3 grid gap-2">
+              <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open follow-ups</Link>
+              <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open issues</Link>
+              <Link href="/app/checklists" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open checklists</Link>
+              <Link href="/app/briefings" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open saved briefings</Link>
+            </div>
+          </details>
         </div>
       </section>
     </div>

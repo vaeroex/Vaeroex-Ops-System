@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { generatedOutputHref, outputTypeForInsight } from "@/lib/intelligence/generated-output";
 import {
   buildIntelligenceLayer,
   type IntelligenceConfidence,
@@ -35,6 +36,9 @@ function groupInsights(insights: IntelligenceInsight[], type: IntelligenceInsigh
 }
 
 function InsightCard({ insight }: { insight: IntelligenceInsight }) {
+  const primaryOutputType = outputTypeForInsight(insight);
+  const primaryOutputLabel = primaryOutputType === "risk_brief" ? "Generate Risk Brief" : primaryOutputType === "executive_briefing" ? "Generate Executive Briefing" : "Generate Action Plan";
+
   return (
     <article className={`rounded-lg border p-4 shadow-panel ${typeClass(insight.type)}`}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -80,16 +84,36 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
       </details>
 
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={insight.sourceHref as Route} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
-          Open source
+        <Link href={generatedOutputHref({ type: primaryOutputType, source: insight.id })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
+          {primaryOutputLabel}
         </Link>
-        <Link href="/app/actions" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-          Create action
+        {primaryOutputType !== "action_plan" ? (
+          <Link href={generatedOutputHref({ type: "action_plan", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+            Generate Action Plan
+          </Link>
+        ) : null}
+        <Link href={generatedOutputHref({ type: "executive_briefing", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          Generate Executive Briefing
         </Link>
         <Link href={askHref(insight)} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
           Ask Vaeroex
         </Link>
       </div>
+
+      <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/30 p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced source options</summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href={insight.sourceHref as Route} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
+            Open source record area
+          </Link>
+          <Link href={generatedOutputHref({ type: "checklist", source: insight.id })} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
+            Generate Checklist
+          </Link>
+          <Link href={generatedOutputHref({ type: "sop", source: insight.id })} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
+            Generate SOP
+          </Link>
+        </div>
+      </details>
     </article>
   );
 }
@@ -197,7 +221,12 @@ export default async function IntelligencePage() {
           <div className="mt-5 grid gap-3 md:grid-cols-3">
             <SummaryPanel title="Top risk" value={topRisk?.title || "None visible"} detail={topRisk?.summary || "No active risk signal is strong enough yet."} href={(topRisk?.sourceHref || "/app/sources") as Route} />
             <SummaryPanel title="Top opportunity" value={topOpportunity?.title || "Needs context"} detail={topOpportunity?.summary || "Add customer, KPI, file, or report history."} href={(topOpportunity?.sourceHref || "/app/sources") as Route} />
-            <SummaryPanel title="Recommended action" value={topRecommendation?.recommendedAction || "Add source data"} detail={topRecommendation?.summary || "Vaeroex generates stronger recommendations as evidence improves."} href="/app/actions" />
+            <SummaryPanel
+              title="Recommended action"
+              value={topRecommendation?.recommendedAction || "Add source data"}
+              detail={topRecommendation?.summary || "Vaeroex generates stronger recommendations as evidence improves."}
+              href={topRecommendation ? generatedOutputHref({ type: "action_plan", source: topRecommendation.id }) : "/app/actions"}
+            />
           </div>
         </div>
 
@@ -266,8 +295,8 @@ export default async function IntelligencePage() {
           <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
             Review sources
           </Link>
-          <Link href="/app/actions" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-            Review actions
+          <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+            Generate Executive Briefing
           </Link>
           <Link href={`/app/agents?prompt=${encodeURIComponent(`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`)}` as Route} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
             Ask for briefing
