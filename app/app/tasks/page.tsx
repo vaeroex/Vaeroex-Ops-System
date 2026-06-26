@@ -5,7 +5,6 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -149,18 +148,16 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="Follow-up records" description="All follow-up data is scoped to the current workspace.">
-          <ManagedRecordList
-            collection="tasks"
-            records={managedTasks}
-            folders={folderResult.folders}
-            title="Execution records"
-            description="Search, group, edit, archive, duplicate, or bulk-manage follow-up work."
-            emptyTitle="No follow-ups yet"
-            emptyDescription="Create a follow-up manually or convert a submission or issue into accountable work."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="tasks"
+          records={managedTasks}
+          folders={folderResult.folders}
+          title="Execution records"
+          description="Search, group, edit, archive, duplicate, or bulk-manage follow-up work."
+          emptyTitle="No follow-ups yet"
+          emptyDescription="Create a follow-up manually or convert a submission or issue into accountable work."
+          searchParams={params}
+        />
 
       </section>
     </div>

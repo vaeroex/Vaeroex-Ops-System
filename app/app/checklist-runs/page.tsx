@@ -8,7 +8,6 @@ import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/op
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { ReadableData } from "@/components/operations/ReadableData";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, jsonLines, managedValues, shortPreview } from "@/lib/records/management";
 import { PRIORITIES } from "@/lib/team/options";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -169,19 +168,17 @@ export default async function ChecklistRunsPage({ searchParams }: ChecklistRunsP
           )}
         </CreateDrawer>
 
-        <SectionCard title="Runs" description="All checklist run records for this workspace.">
-          <ManagedRecordList
-            collection="checklist_runs"
-            records={managedRuns}
-            folders={folderResult.folders}
-            title="Checklist run records"
-            description="Review completion history without expanding every response by default."
-            emptyTitle="No checklist runs yet"
-            emptyDescription="Run a checklist to create completion history and manager visibility."
-            returnPath="/app/checklist-runs"
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="checklist_runs"
+          records={managedRuns}
+          folders={folderResult.folders}
+          title="Checklist run records"
+          description="Review completion history without expanding every response by default."
+          emptyTitle="No checklist runs yet"
+          emptyDescription="Run a checklist to create completion history and manager visibility."
+          returnPath="/app/checklist-runs"
+          searchParams={params}
+        />
 
       </section>
     </div>

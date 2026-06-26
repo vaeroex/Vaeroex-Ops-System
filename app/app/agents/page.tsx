@@ -3,7 +3,6 @@ import type { Route } from "next";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
 import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
-import { AskVaeroexNotice } from "@/components/ai/AskVaeroexNotice";
 import { CopyVaeroexResultButton } from "@/components/ai/CopyVaeroexResultButton";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -1497,7 +1496,6 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
 
       <ErrorNotice message={pageErrorMessage} />
       <SuccessNotice message={params?.saved as string | undefined} />
-      <AskVaeroexNotice />
 
       <section className="space-y-6">
         <SectionCard title="What do you want help with today?">

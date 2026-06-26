@@ -8,7 +8,6 @@ import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/op
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { ReadableData } from "@/components/operations/ReadableData";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -144,19 +143,17 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
           )}
         </CreateDrawer>
 
-        <SectionCard title="All submissions" description="Recent submissions from the active workspace.">
-          <ManagedRecordList
-            collection="form_submissions"
-            records={managedSubmissions}
-            folders={folderResult.folders}
-            title="Submission records"
-            description="Submissions stay compact until a manager needs details or follow-up actions."
-            emptyTitle="No submissions yet"
-            emptyDescription="Capture a submission from a form detail page or add one here after creating a form."
-            returnPath="/app/form-submissions"
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="form_submissions"
+          records={managedSubmissions}
+          folders={folderResult.folders}
+          title="Submission records"
+          description="Submissions stay compact until a manager needs details or follow-up actions."
+          emptyTitle="No submissions yet"
+          emptyDescription="Capture a submission from a form detail page or add one here after creating a form."
+          returnPath="/app/form-submissions"
+          searchParams={params}
+        />
 
       </section>
     </div>

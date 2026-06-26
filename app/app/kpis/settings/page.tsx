@@ -26,7 +26,7 @@ function SuccessNotice({ message }: { message?: string | null }) {
     return null;
   }
 
-  return <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{message}</div>;
+  return <div className="rounded-lg border border-emerald-400/35 bg-emerald-950/30 p-3 text-sm text-emerald-100">{message}</div>;
 }
 
 function canManageKpiSettings(role: string | null | undefined) {
@@ -81,24 +81,27 @@ function KpiSettingCard({
   const sortOrder = setting?.sort_order ?? 0;
 
   return (
-    <article className="rounded-lg border border-line bg-white shadow-panel">
+    <article className="rounded-lg border border-white/10 bg-[#08111f] text-slate-100">
       <details>
-        <summary className="flex cursor-pointer list-none flex-col gap-3 p-4 transition hover:bg-cyan-950/30 sm:flex-row sm:items-center sm:justify-between">
+        <summary className="grid cursor-pointer list-none gap-3 p-3 transition hover:border-cyan-300/35 hover:bg-cyan-950/25 sm:grid-cols-[minmax(180px,1.4fr)_120px_90px_90px_90px] sm:items-center">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-              <h2 className="truncate text-base font-semibold text-ink">{metric}</h2>
+              <h2 className="truncate text-sm font-semibold text-white">{metric}</h2>
             </div>
-            <p className="mt-1 text-xs leading-5 text-muted">
-              Target {target === null ? "not set" : target} · {category || "General"} · {isVisible ? "Visible" : "Hidden"}
+            <p className="mt-1 line-clamp-1 text-xs leading-5 text-slate-400">
+              {definition || "No definition set yet."}
             </p>
           </div>
-          <span className="w-fit rounded-full border border-vaeroex-blue/30 bg-vaeroex-soft px-3 py-1 text-xs font-semibold text-vaeroex-blue">
-            Weight {weight}/10
+          <span className="text-xs text-slate-300">Target <span className="font-semibold text-white">{target === null ? "not set" : target}</span></span>
+          <span className="text-xs text-slate-300">Weight <span className="font-semibold text-white">{weight}/10</span></span>
+          <span className="text-xs text-slate-300">{category || "General"}</span>
+          <span className={`w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${isVisible ? "border-emerald-400/35 bg-emerald-950/30 text-emerald-100" : "border-slate-600/40 bg-slate-950/50 text-slate-300"}`}>
+            {isVisible ? "Visible" : "Hidden"}
           </span>
         </summary>
 
-        <div className="border-t border-line bg-slate-50/60 p-4">
+        <div className="border-t border-white/10 bg-slate-950/45 p-4">
           {canManage ? (
         <form action={updateKpiSettingAction} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="return_path" value="/app/kpis/settings" />
@@ -110,7 +113,7 @@ function KpiSettingCard({
               type="number"
               step="0.01"
               defaultValue={formatNumber(target)}
-              className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent"
             />
           </label>
           <label className="block text-sm font-medium">
@@ -122,7 +125,7 @@ function KpiSettingCard({
               max="10"
               step="0.1"
               defaultValue={weight}
-              className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent"
             />
           </label>
           <label className="block text-sm font-medium">
@@ -130,7 +133,7 @@ function KpiSettingCard({
             <input
               name="category"
               defaultValue={category}
-              className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent"
             />
           </label>
           <label className="block text-sm font-medium">
@@ -140,7 +143,7 @@ function KpiSettingCard({
               type="number"
               step="1"
               defaultValue={sortOrder}
-              className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent"
             />
           </label>
           <label className="block text-sm font-medium lg:col-span-2">
@@ -150,14 +153,14 @@ function KpiSettingCard({
               rows={3}
               defaultValue={definition}
               placeholder="Define how this KPI should be interpreted by leadership."
-              className="mt-2 w-full rounded-lg border border-line bg-white px-3 py-2 outline-none focus:border-vaeroex-blue"
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
             />
           </label>
           <fieldset className="space-y-2 lg:col-span-2">
-            <legend className="text-sm font-semibold text-ink">Approved high-contrast color</legend>
+            <legend className="text-sm font-semibold text-white">Approved high-contrast color</legend>
             <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
               {KPI_COLOR_PALETTE.map((option) => (
-                <label key={option.value} className="flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold">
+                <label key={option.value} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200">
                   <input name="color" type="radio" value={option.value} defaultChecked={color === option.value} />
                   <span className="h-3 w-3 rounded-full" style={{ backgroundColor: option.value }} />
                   <span>{option.label}</span>
@@ -165,7 +168,7 @@ function KpiSettingCard({
               ))}
             </div>
           </fieldset>
-          <label className="flex items-center gap-2 rounded-lg border border-line bg-slate-50 px-3 py-2 text-sm font-semibold lg:col-span-2">
+          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 lg:col-span-2">
             <input name="is_visible" type="checkbox" defaultChecked={isVisible} className="h-4 w-4 rounded border-line text-vaeroex-blue" />
             Show this KPI in dashboards, reports, and Vaeroex intelligence
           </label>
@@ -177,16 +180,16 @@ function KpiSettingCard({
         </form>
           ) : (
         <div className="mt-4 grid gap-3 text-sm md:grid-cols-2">
-          <p className="rounded-lg border border-line bg-slate-50 p-3">
-            <span className="block text-xs uppercase tracking-wide text-muted">Target</span>
+          <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+            <span className="block text-xs uppercase tracking-wide text-slate-400">Target</span>
             {target === null ? "Not set" : target}
           </p>
-          <p className="rounded-lg border border-line bg-slate-50 p-3">
-            <span className="block text-xs uppercase tracking-wide text-muted">Category</span>
+          <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+            <span className="block text-xs uppercase tracking-wide text-slate-400">Category</span>
             {category || "General"}
           </p>
-          <p className="rounded-lg border border-line bg-slate-50 p-3 md:col-span-2">
-            <span className="block text-xs uppercase tracking-wide text-muted">Definition</span>
+          <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3 md:col-span-2">
+            <span className="block text-xs uppercase tracking-wide text-slate-400">Definition</span>
             {definition || "No definition set yet."}
           </p>
         </div>
@@ -220,7 +223,7 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
       <PageHeader
         eyebrow="Workspace KPI Configuration"
         title="KPI Settings"
-        description="Workspace administrators manage KPI targets, weights, definitions, visibility, and colors here. Historical KPI values are not edited from this page."
+        description="Manage KPI targets, weights, visibility, and definitions. Historical values stay locked."
         actions={
           <Link href="/app/kpis" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:border-vaeroex-accent hover:text-vaeroex-blue">
             Back to KPIs
@@ -241,33 +244,22 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
       <SuccessNotice message={params?.message} />
 
       {!canManage ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
+        <div className="rounded-lg border border-amber-400/35 bg-amber-950/30 p-3 text-sm leading-6 text-amber-100">
           KPI settings are read-only for your role. Ask a workspace owner or admin to change targets, weights, colors, definitions, or visibility.
         </div>
       ) : null}
 
-      <SectionCard
-        title="Configuration rules"
-        description="Targets and weights guide dashboards, reports, and Vaeroex intelligence. They do not rewrite historical KPI values."
-      >
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-line bg-slate-50 p-3 text-sm">
-            <p className="font-semibold text-ink">Targets</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Used to decide whether current performance is on pace.</p>
-          </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-3 text-sm">
-            <p className="font-semibold text-ink">Weights</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Higher weights make a KPI more prominent in Vaeroex risk and opportunity signals.</p>
-          </div>
-          <div className="rounded-lg border border-line bg-slate-50 p-3 text-sm">
-            <p className="font-semibold text-ink">Visibility</p>
-            <p className="mt-1 text-xs leading-5 text-muted">Hidden KPIs remain in history but are removed from dashboards and Vaeroex intelligence.</p>
-          </div>
+      <details className="rounded-lg border border-white/10 bg-[#08111f] p-3 text-sm text-slate-300">
+        <summary className="cursor-pointer font-semibold text-slate-100">How KPI settings affect intelligence</summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <p>Targets define whether performance is on pace.</p>
+          <p>Weights make important KPIs more prominent in risk and opportunity signals.</p>
+          <p>Hidden KPIs remain in history but stay out of dashboards and Vaeroex intelligence.</p>
         </div>
-      </SectionCard>
+      </details>
 
       {names.length ? (
-        <section className="grid gap-4 xl:grid-cols-2">
+        <section className="space-y-2">
           {names.map((metric) => (
             <KpiSettingCard
               key={metric}

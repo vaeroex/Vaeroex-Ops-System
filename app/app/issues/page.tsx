@@ -6,7 +6,6 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -151,18 +150,16 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="Risk and issue log" description="Open risks, blockers, and improvement opportunities.">
-          <ManagedRecordList
-            collection="issues"
-            records={managedIssues}
-            folders={folderResult.folders}
-            title="Issue records"
-            description="Keep risks organized by folder, severity, status, owner, or due date."
-            emptyTitle="No issues logged"
-            emptyDescription="Add a bottleneck, missed handoff, equipment problem, quality concern, or follow-up gap."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="issues"
+          records={managedIssues}
+          folders={folderResult.folders}
+          title="Issue records"
+          description="Keep risks organized by folder, severity, status, owner, or due date."
+          emptyTitle="No issues logged"
+          emptyDescription="Add a bottleneck, missed handoff, equipment problem, quality concern, or follow-up gap."
+          searchParams={params}
+        />
 
       </section>
     </div>

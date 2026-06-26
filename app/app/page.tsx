@@ -774,7 +774,7 @@ function SmartAlerts({
 
 function DashboardModeSelector({ mode, period }: { mode: DashboardMode; period: DashboardPeriod }) {
   return (
-    <div className="rounded-lg border border-vaeroex-silver/70 bg-white p-1 shadow-sm">
+    <div className="rounded-lg border border-white/10 bg-[#08111f] p-1 shadow-sm">
       <div className="grid gap-1 md:grid-cols-3">
         {DASHBOARD_MODES.map((item) => (
           <Link
@@ -783,11 +783,11 @@ function DashboardModeSelector({ mode, period }: { mode: DashboardMode; period: 
             className={`min-h-11 rounded-md px-3 py-2 text-center text-sm font-semibold transition ${
               item === mode
                 ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
-                : "text-slate-700 hover:bg-blue-950/10 hover:text-vaeroex-blue"
+                : "text-slate-200 hover:bg-cyan-950/35 hover:text-vaeroex-accent"
             }`}
           >
             <span className="block">{item}</span>
-            <span className={`mt-1 block text-[0.68rem] font-medium leading-4 ${item === mode ? "text-blue-50" : "text-slate-500"}`}>
+            <span className={`mt-1 block text-[0.68rem] font-medium leading-4 ${item === mode ? "text-blue-50" : "text-slate-400"}`}>
               {DASHBOARD_MODE_PROMPTS[item]}
             </span>
           </Link>
@@ -807,7 +807,7 @@ function PeriodSelector({ period, mode }: { period: DashboardPeriod; mode: Dashb
           className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-semibold ${
             item === period
               ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
-              : "border border-line bg-white text-slate-700 hover:border-vaeroex-accent hover:text-vaeroex-blue"
+              : "border border-white/10 bg-[#08111f] text-slate-200 hover:border-vaeroex-accent/50 hover:bg-cyan-950/35 hover:text-vaeroex-accent"
           }`}
         >
           {item}
@@ -829,17 +829,17 @@ function DashboardAccordion({
   defaultOpen?: boolean;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-lg border border-vaeroex-silver/80 bg-white shadow-panel">
+    <details open={defaultOpen} className="group rounded-lg border border-white/10 bg-[#08111f] shadow-panel">
       <summary className="flex min-h-11 cursor-pointer list-none flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
         <div>
-          <h3 className="text-base font-semibold text-ink">{title}</h3>
-          <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-600">{summary}</p>
+          <h3 className="text-base font-semibold text-white">{title}</h3>
+          <p className="mt-1 max-w-4xl text-sm leading-6 text-slate-400">{summary}</p>
         </div>
-        <span className="inline-flex w-fit rounded-full border border-line px-3 py-1 text-xs font-semibold text-slate-600 group-open:bg-vaeroex-soft group-open:text-vaeroex-blue">
-          Expand
+        <span className="inline-flex w-fit rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-300 group-open:bg-cyan-400/10 group-open:text-cyan-100">
+          Details
         </span>
       </summary>
-      <div className="space-y-4 border-t border-vaeroex-silver p-5">{children}</div>
+      <div className="space-y-4 border-t border-white/10 p-5">{children}</div>
     </details>
   );
 }
