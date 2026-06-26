@@ -81,10 +81,10 @@ function latestSources({
     ...reports.slice(0, 5).map((item) => ({
       id: `report-${item.id}`,
       title: item.title,
-      type: "Report",
+      type: "Briefing",
       detail: item.report_type,
       createdAt: item.created_at,
-      href: "/app/reports" as Route
+      href: "/app/briefings" as Route
     })),
     ...sops.slice(0, 4).map((item) => ({
       id: `sop-${item.id}`,
@@ -188,12 +188,12 @@ export default async function SourcesPage() {
           examples={["KPI data", "Customer context", "Operational metrics"]}
         />
         <SourceCard
-          title="Documents and reports"
-          description="PDFs, DOCX files, saved reports, and analysis-ready business documents."
+          title="Documents and briefings"
+          description="PDFs, DOCX files, saved briefings, and analysis-ready business documents."
           count={documents.length + reports.length}
-          href="/app/reports"
+          href={"/app/briefings" as Route}
           status={reports.length || documents.length ? "Available" : "Developing"}
-          examples={["Reports", "Briefings", "Uploaded documents"]}
+          examples={["Briefings", "Uploaded documents", "Meeting notes"]}
         />
         <SourceCard
           title="Process knowledge"

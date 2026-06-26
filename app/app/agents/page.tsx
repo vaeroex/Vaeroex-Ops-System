@@ -26,19 +26,19 @@ type VaeroexHubPageProps = {
 type JsonRecord = Record<string, unknown>;
 
 const saveLabels: Record<VaeroexSaveTarget, string> = {
-  tasks: "suggested follow-ups",
+  tasks: "recommended actions",
   sop: "SOP draft",
   form: "form draft",
   checklist: "checklist draft",
-  report: "report draft"
+  report: "briefing draft"
 };
 
 const saveDestinations: Record<string, { label: string; href: Route }> = {
-  tasks: { label: "Follow-ups", href: "/app/tasks" },
+  tasks: { label: "Actions", href: "/app/actions" },
   sop: { label: "SOPs", href: "/app/sops" },
   form: { label: "Forms", href: "/app/forms" },
   checklist: { label: "Checklists", href: "/app/checklists" },
-  report: { label: "Reports", href: "/app/reports" }
+  report: { label: "Briefings", href: "/app/briefings" as Route }
 };
 const vaeroexRunEditFields: ManagedRecordEditField[] = [
   { name: "status", label: "Status", type: "select", options: ["queued", "running", "completed", "failed"] },
@@ -60,8 +60,8 @@ const WORKFLOW_GROUPS: Array<{
     keys: ["operations_audit", "bottleneck_detector", "follow_up"]
   },
   {
-    title: "Drafts, Reports, and Builders",
-    description: "Turn workspace context into draft SOPs, reports, forms, checklists, and file analysis for review.",
+    title: "Optional Outputs",
+    description: "Turn workspace context into draft SOPs, briefings, forms, checklists, and source analysis for review.",
     keys: ["sop_generator", "weekly_report", "daily_summary", "form_builder", "checklist_builder", "file_analysis"]
   }
 ];
@@ -93,16 +93,16 @@ const WORKFLOW_CHOICES: Array<{
   },
   {
     label: "Review File",
-    description: "Analyze uploaded files from the Files page.",
-    href: "/app/files"
+    description: "Analyze uploaded source material.",
+    href: "/app/sources"
   },
   {
-    label: "Create Report",
-    description: "Generate a clean management report draft.",
+    label: "Create Briefing",
+    description: "Generate a clean leadership briefing draft.",
     workflowKey: "weekly_report"
   },
   {
-    label: "Create Follow-ups",
+    label: "Create Actions",
     description: "Turn loose concerns into accountable work.",
     workflowKey: "follow_up"
   },
@@ -161,11 +161,11 @@ function dataUsedSummary(input: JsonRecord) {
 
   return [
     { label: "KPIs", value: numberValue(metrics.kpi_history_records) || asArray(snapshot.kpi_history).length },
-    { label: "Reports", value: numberValue(metrics.reports) || asArray(snapshot.reports).length },
-    { label: "Files", value: numberValue(metrics.uploaded_files) || asArray(snapshot.files).length },
+    { label: "Briefings", value: numberValue(metrics.reports) || asArray(snapshot.reports).length },
+    { label: "Sources", value: numberValue(metrics.uploaded_files) || asArray(snapshot.files).length },
     { label: "Issues", value: numberValue(metrics.open_issues) || asArray(snapshot.recent_issues).length },
     { label: "Business Memory", value: asArray(snapshot.recent_vaeroex_results).length + asArray(snapshot.reports).length },
-    { label: "Follow-ups", value: numberValue(metrics.open_tasks) || asArray(snapshot.recent_tasks).length },
+    { label: "Actions", value: numberValue(metrics.open_tasks) || asArray(snapshot.recent_tasks).length },
     { label: "Decisions", value: asArray(snapshot.business_decisions).length }
   ];
 }
@@ -432,13 +432,13 @@ function inferRelatedModule(text: string) {
   const normalized = text.toLowerCase();
 
   if (normalized.includes("kpi") || normalized.includes("metric") || normalized.includes("revenue")) return "KPIs";
-  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "CRM";
+  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "Customer Context";
   if (normalized.includes("sop") || normalized.includes("procedure")) return "SOPs";
   if (normalized.includes("checklist")) return "Checklists";
-  if (normalized.includes("report")) return "Reports";
-  if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Files";
+  if (normalized.includes("report") || normalized.includes("briefing")) return "Briefings";
+  if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Sources";
   if (normalized.includes("issue") || normalized.includes("risk")) return "Issues";
-  return "Follow-ups";
+  return "Actions";
 }
 
 function moduleHref(moduleName: string): Route {
@@ -446,13 +446,14 @@ function moduleHref(moduleName: string): Route {
 
   if (normalized.includes("kpi")) return "/app/kpis";
   if (normalized.includes("crm")) return "/app/crm";
+  if (normalized.includes("customer")) return "/app/crm";
   if (normalized.includes("sop")) return "/app/sops";
   if (normalized.includes("checklist")) return "/app/checklists";
-  if (normalized.includes("report")) return "/app/reports";
-  if (normalized.includes("file")) return "/app/files";
+  if (normalized.includes("report") || normalized.includes("briefing")) return "/app/briefings" as Route;
+  if (normalized.includes("file") || normalized.includes("source")) return "/app/sources";
   if (normalized.includes("issue")) return "/app/issues";
   if (normalized.includes("form")) return "/app/forms";
-  return "/app/tasks";
+  return "/app/actions";
 }
 
 function getActionableRecommendations(output: JsonRecord) {
@@ -689,17 +690,17 @@ function RecommendationCard({
       </dl>
       <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">
-          Create Follow-up
+        <Link href="/app/actions" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">
+          Create Action
         </Link>
         <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
           Open {recommendation.relatedModule}
         </Link>
-        <Link href="/app/reports" className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Add to Report
+        <Link href="/app/briefings" className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          Add to Briefing
         </Link>
         <form action={dismissRecommendationAction}>
-          <input type="hidden" name="return_path" value={`/app/agents?run=${runId}`} />
+          <input type="hidden" name="return_path" value={`/app/ask?run=${runId}`} />
           <input type="hidden" name="source_type" value="vaeroex_recommendation" />
           <input type="hidden" name="source_id" value={runId} />
           <input type="hidden" name="source_title" value={runTitle} />
@@ -717,8 +718,8 @@ function RecommendationCard({
             sourceId={runId}
             sourceTitle={recommendation.title}
             relatedModule={recommendation.relatedModule}
-            returnPath={`/app/agents?run=${runId}`}
-            actionHref={`/app/agents?run=${runId}`}
+            returnPath={`/app/ask?run=${runId}`}
+            actionHref={`/app/ask?run=${runId}`}
             people={people}
             defaultTitle={recommendation.title}
             defaultDescription={recommendation.why}
@@ -730,8 +731,8 @@ function RecommendationCard({
             sourceId={runId}
             sourceTitle={recommendation.title}
             relatedModule={recommendation.relatedModule}
-            returnPath={`/app/agents?run=${runId}`}
-            actionHref={`/app/agents?run=${runId}`}
+            returnPath={`/app/ask?run=${runId}`}
+            actionHref={`/app/ask?run=${runId}`}
             people={people}
           />
         </div>
@@ -766,7 +767,7 @@ function RecommendationActionCards({
             Vaeroex drafts are not saved until you confirm.
           </p>
         </div>
-        <Link href="/app/agents" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
+        <Link href="/app/ask" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
           Dismiss for now
         </Link>
       </div>
@@ -1231,7 +1232,7 @@ function FailurePanel({
         <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying...">
           Retry
         </PendingSubmitButton>
-        <Link href="/app/agents" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
+        <Link href="/app/ask" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
           Start a new request
         </Link>
       </form>
@@ -1311,17 +1312,17 @@ function SelectedResult({
               <p className="mt-1 text-xs leading-5 text-slate-400">Copy this result, save approved drafts, or turn the recommendation into accountable workspace work.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <CopyVaeroexResultButton text={resultCopyText(title, display, run)} />
-                <Link href="/app/tasks" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Create follow-up
+                <Link href="/app/actions" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Create action
                 </Link>
-                <Link href="/app/reports" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Create report
+                <Link href="/app/briefings" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Create briefing
                 </Link>
                 <Link href="/app/issues" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
                   Create issue
                 </Link>
                 <Link
-                  href={`/app/agents?prompt=${encodeURIComponent(`Follow up on this Vaeroex result: ${title}`)}` as Route}
+                  href={`/app/ask?prompt=${encodeURIComponent(`Follow up on this Vaeroex result: ${title}`)}` as Route}
                   className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20"
                 >
                   Ask follow-up
@@ -1353,7 +1354,7 @@ function SelectedResult({
         ) : null}
 
         {canViewDebug && !debugMode ? (
-          <Link href={{ pathname: "/app/agents", query: { run: run.id, debug: "1" } }} className="inline-flex text-xs font-semibold text-muted underline">
+          <Link href={{ pathname: "/app/ask", query: { run: run.id, debug: "1" } }} className="inline-flex text-xs font-semibold text-muted underline">
             Open admin debug output
           </Link>
         ) : null}
@@ -1467,7 +1468,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       archivedAt: management.archivedAt,
       deletedAt: management.deletedAt,
       preview: shortPreview(sections.executiveSummary || run.error_message, "No output yet."),
-      href: `/app/agents?run=${run.id}` as Route,
+      href: `/app/ask?run=${run.id}` as Route,
       meta: [
         { label: "Workflow", value: vaeroexResultLabel(run.agent_type) },
         { label: "Status", value: run.status }
@@ -1542,7 +1543,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
                 return (
                   <Link
                     key={choice.label}
-                    href={`/app/agents?workflow=${choice.workflowKey}` as Route}
+                    href={`/app/ask?workflow=${choice.workflowKey}` as Route}
                     className={className}
                   >
                     <span className="block text-sm font-semibold">{choice.label}</span>
@@ -1570,7 +1571,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
                 description="Organize previous Vaeroex outputs without showing raw structured data to normal users."
                 emptyTitle="No Vaeroex results yet"
                 emptyDescription="Ask Vaeroex or run a workflow to create the first saved result."
-                returnPath="/app/agents"
+                returnPath="/app/ask"
                 searchParams={params}
               />
             </div>

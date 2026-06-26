@@ -2,20 +2,15 @@ import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
 import {
-  createDemoWorkspaceAction,
-  createFreshDemoWorkspaceAction,
   exitDemoWorkspaceAction,
-  openDemoWorkspaceAction,
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
-import { OnboardingChecklist, type OnboardingChecklistItem } from "@/components/app/OnboardingChecklist";
-import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
-import { BusinessHealthHero, PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
+import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
-import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
@@ -99,11 +94,6 @@ type DashboardSignal = {
 
 const PERIODS: DashboardPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const DASHBOARD_MODES: DashboardMode[] = ["Executive View", "Intelligence View", "Operations View"];
-const DASHBOARD_MODE_PROMPTS: Record<DashboardMode, string> = {
-  "Executive View": "How are we performing?",
-  "Operations View": "What is happening?",
-  "Intelligence View": "What should leadership know?"
-};
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 const currencyFormatter = new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 0, style: "currency" });
 
@@ -213,14 +203,6 @@ function rangeForPeriod(period: DashboardPeriod, today = new Date()): DateRange 
 
 function lower(value: string | null | undefined) {
   return (value || "").toLowerCase();
-}
-
-function workspaceStatusLabel(workspace: Database["public"]["Tables"]["workspaces"]["Row"] | null) {
-  if (!workspace) return "Setup required";
-  if (workspace.subscription_status === "demo") return "Demo workspace";
-  if (!workspace.subscription_required || workspace.manually_unlocked || ["active", "trialing"].includes(workspace.subscription_status)) return "Active";
-  if (workspace.subscription_status === "manual_review") return "Pending activation";
-  return "Subscription required";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -682,142 +664,6 @@ function buildSmartAlerts({
   ].filter(Boolean) as DashboardAlert[];
 }
 
-function ExecutiveBriefingCard({
-  period,
-  whatChanged,
-  improved,
-  declined,
-  attention,
-  recommendation
-}: {
-  period: DashboardPeriod;
-  whatChanged: string;
-  improved: string;
-  declined: string;
-  attention: string;
-  recommendation: string;
-}) {
-  return (
-    <section className="rounded-lg border border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <VaeroexLogo variant="symbol" size="sm" />
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Executive briefing</p>
-          </div>
-          <h2 className="mt-3 text-2xl font-semibold text-white">What changed and what to do next</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-100">
-            A {period.toLowerCase()} owner-ready readout from KPIs, CRM, follow-ups, risks, files, checklists, SOPs, reports, and Vaeroex insights.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45">Create Follow-up</Link>
-          <Link href="/app/reports" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">Generate Report</Link>
-          <Link href="/app/issues" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">Review Issues</Link>
-          <Link href="/app/kpis" className="rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">Review KPIs</Link>
-        </div>
-      </div>
-      <div className="mt-5 grid gap-3 lg:grid-cols-5">
-        {[
-          ["What changed", whatChanged],
-          ["Improved", improved],
-          ["Declined", declined],
-          ["Needs attention", attention],
-          ["Vaeroex recommends", recommendation]
-        ].map(([label, value]) => (
-          <article key={label} className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
-            <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">{label}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-100">{value}</p>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function SmartAlerts({
-  alerts,
-  title = "Smart alerts",
-  description = "In-app alerts from the current workspace. Start here when deciding what needs attention."
-}: {
-  alerts: DashboardAlert[];
-  title?: string;
-  description?: string;
-}) {
-  if (!alerts.length) {
-    return (
-      <section className="rounded-lg border border-emerald-100 bg-emerald-50 p-5 text-emerald-800">
-        <p className="text-sm font-semibold">No urgent alerts right now.</p>
-        <p className="mt-1 text-sm leading-6">Vaeroex did not find overdue follow-ups, stale reviews, or missing reports that need immediate attention.</p>
-      </section>
-    );
-  }
-
-  return (
-    <SectionCard title={title} description={description}>
-      <div className="grid gap-3 lg:grid-cols-3">
-        {alerts.slice(0, 6).map((alert) => (
-          <article key={alert.id} className={`rounded-lg border p-4 shadow-sm ${severityTone(alert.severity)}`}>
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-semibold">{alert.title}</p>
-              <span className="rounded-full bg-white/80 px-2.5 py-1 text-xs font-semibold">{alert.severity}</span>
-            </div>
-            <p className="mt-2 text-sm leading-6 opacity-90">{alert.why}</p>
-            <Link href={alert.href as Route} className="mt-4 inline-flex rounded-lg bg-white px-3 py-2 text-xs font-semibold text-ink shadow-sm hover:border-vaeroex-accent hover:text-vaeroex-blue">
-              {alert.action}
-            </Link>
-          </article>
-        ))}
-      </div>
-    </SectionCard>
-  );
-}
-
-function DashboardModeSelector({ mode, period }: { mode: DashboardMode; period: DashboardPeriod }) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-[#08111f] p-1 shadow-sm">
-      <div className="grid gap-1 md:grid-cols-3">
-        {DASHBOARD_MODES.map((item) => (
-          <Link
-            key={item}
-            href={dashboardHref(period, item)}
-            className={`min-h-11 rounded-md px-3 py-2 text-center text-sm font-semibold transition ${
-              item === mode
-                ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
-                : "text-slate-200 hover:bg-cyan-950/35 hover:text-vaeroex-accent"
-            }`}
-          >
-            <span className="block">{item}</span>
-            <span className={`mt-1 block text-[0.68rem] font-medium leading-4 ${item === mode ? "text-blue-50" : "text-slate-400"}`}>
-              {DASHBOARD_MODE_PROMPTS[item]}
-            </span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function PeriodSelector({ period, mode }: { period: DashboardPeriod; mode: DashboardMode }) {
-  return (
-    <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
-      {PERIODS.map((item) => (
-        <Link
-          key={item}
-          href={dashboardHref(item, mode)}
-          className={`inline-flex min-h-11 shrink-0 items-center rounded-lg px-3 py-2 text-sm font-semibold ${
-            item === period
-              ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"
-              : "border border-white/10 bg-[#08111f] text-slate-200 hover:border-vaeroex-accent/50 hover:bg-cyan-950/35 hover:text-vaeroex-accent"
-          }`}
-        >
-          {item}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
 function DashboardAccordion({
   title,
   summary,
@@ -842,56 +688,6 @@ function DashboardAccordion({
       </summary>
       <div className="space-y-4 border-t border-white/10 p-5">{children}</div>
     </details>
-  );
-}
-
-function RecommendedActionsCard({ actions }: { actions: string[] }) {
-  return (
-    <SectionCard title="Recommended actions" description="The shortest action list Vaeroex found for the current workspace.">
-      <SimpleList
-        items={actions.slice(0, 5).map((item, index) => ({ id: `${index}`, label: item }))}
-        empty="Keep the current cadence and review again after more activity is recorded."
-        render={(item: { id: string; label: string }) => (
-          <p key={item.id} className="rounded-lg border border-line bg-slate-50 p-3 text-sm text-slate-700">{item.label}</p>
-        )}
-      />
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
-          Create follow-up
-        </Link>
-        <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-          Generate report
-        </Link>
-      </div>
-    </SectionCard>
-  );
-}
-
-function WeeklyTrendCard({ trends }: { trends: MetricTrend[] }) {
-  const visibleTrends = trends.filter((trend) => trend.current !== null).slice(0, 4);
-
-  return (
-    <SectionCard title="Weekly trend" description="A compact readout of the current week against the prior week.">
-      <SimpleList
-        items={visibleTrends.map((trend) => ({ ...trend, id: trend.name }))}
-        empty="No weekly KPI movement is visible yet."
-        render={(trend: MetricTrend & { id: string }) => (
-          <div key={trend.id} className="rounded-lg border border-line p-3">
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm font-semibold text-ink">{trend.name}</p>
-              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                (trend.change ?? 0) >= 0 ? "bg-emerald-50 text-emerald-800" : "bg-red-50 text-red-700"
-              }`}>
-                {percentLabel(trend.changePercent)}
-              </span>
-            </div>
-            <p className="mt-1 text-xs text-muted">
-              Current: {formatMetricValue(trend.current, trend.name)} · Previous: {formatMetricValue(trend.previous, trend.name)}
-            </p>
-          </div>
-        )}
-      />
-    </SectionCard>
   );
 }
 
@@ -1225,7 +1021,7 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
             <Link href="/app/intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
               Open Intelligence
             </Link>
-            <Link href="/app/agents" className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
+            <Link href="/app/ask" className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
               Ask Vaeroex
             </Link>
             <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
@@ -1293,7 +1089,7 @@ function IntelligenceBriefingHero({
               Vaeroex is reading the {period.toLowerCase()} workspace context for risk, opportunity, attention, and the next decision.
             </p>
           </div>
-          <Link href="/app/agents" className="w-fit rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+          <Link href="/app/ask" className="w-fit rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
             Ask Vaeroex
           </Link>
         </div>
@@ -1351,65 +1147,6 @@ function DemoActionButton({ children, tone = "secondary" }: { children: ReactNod
         : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink";
 
   return <button className={className}>{children}</button>;
-}
-
-function DemoWorkspaceControls({
-  demoWorkspaceExists,
-  isViewingDemoWorkspace,
-  canUseAdminTools
-}: {
-  demoWorkspaceExists: boolean;
-  isViewingDemoWorkspace: boolean;
-  canUseAdminTools: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      {demoWorkspaceExists ? (
-        <p className="text-xs leading-5 text-amber-900">Demo workspace already exists. Open it, reset it, or create a fresh demo.</p>
-      ) : (
-        <p className="text-xs leading-5 text-muted">Create a separate demo workspace with realistic sample data for testing Vaeroex.</p>
-      )}
-      <div className="flex flex-wrap gap-2">
-        {demoWorkspaceExists && !isViewingDemoWorkspace ? (
-          <form action={openDemoWorkspaceAction}>
-            <DemoActionButton tone="primary">Open Demo Workspace</DemoActionButton>
-          </form>
-        ) : null}
-        <form action={createDemoWorkspaceAction}>
-          <DemoActionButton tone={demoWorkspaceExists ? "secondary" : "primary"}>
-            {demoWorkspaceExists ? "Check demo workspace" : "Create demo workspace"}
-          </DemoActionButton>
-        </form>
-        {canUseAdminTools && demoWorkspaceExists ? (
-          <form action={resetDemoWorkspaceAction}>
-            <DemoActionButton tone="danger">Reset demo workspace</DemoActionButton>
-          </form>
-        ) : null}
-        {canUseAdminTools ? (
-          <form action={createFreshDemoWorkspaceAction}>
-            <DemoActionButton>Create fresh demo</DemoActionButton>
-          </form>
-        ) : null}
-        {isViewingDemoWorkspace ? (
-          <form action={exitDemoWorkspaceAction}>
-            <DemoActionButton>Switch back to my workspace</DemoActionButton>
-          </form>
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-function AdminToolsBadge({ source }: { source: string }) {
-  return (
-    <section className="flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-950 shadow-panel md:flex-row md:items-center md:justify-between">
-      <div>
-        <p className="text-sm font-semibold">Admin tools enabled</p>
-        <p className="mt-1 text-xs leading-5">Admin access detected by {source}. Normal customers do not see this panel.</p>
-      </div>
-      <span className="inline-flex w-fit rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-900">Vaeroex admin</span>
-    </section>
-  );
 }
 
 function DemoWorkspaceBanner({
@@ -1531,10 +1268,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     data: { user }
   } = await supabase.auth.getUser();
   const canUseAdminOnboardingTools = isVaeroexAdminUser(user);
-  const adminDetectionSource = isVaeroexAdminEmail(user?.email) ? "VAEROEX_ADMIN_EMAILS" : "Supabase user metadata";
-  const currentWorkspaceStatus = workspaceStatusLabel(context.activeWorkspace);
   const isViewingDemoWorkspace = isDemoWorkspaceRecord(context.activeWorkspace);
-  const demoWorkspace = context.workspaces.find(isDemoWorkspaceRecord) ?? null;
 
   if (isViewingDemoWorkspace && user) {
     await ensureDemoWorkspacePopulated(supabase, workspaceId, user);
@@ -1946,93 +1680,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     alerts: smartAlerts.length,
     insights: demoWorkspaceCounts?.vaeroexInsights ?? vaeroexRuns.filter((run) => run.status === "completed").length
   };
-  const onboardingItems: OnboardingChecklistItem[] = [
-    {
-      id: "profile",
-      title: "Complete workspace context",
-      helpText: "Confirm workspace name, contact, team size, and organization details so Vaeroex has the right context.",
-      href: "/app/setup",
-      completed: Boolean(context.activeWorkspace?.primary_contact_email || context.activeWorkspace?.size)
-    },
-    {
-      id: "business-type",
-      title: "Choose operational environment",
-      helpText: "The environment helps Vaeroex suggest practical visibility, accountability, execution, KPI, and report structure.",
-      href: "/app/setup",
-      completed: Boolean(context.activeWorkspace?.industry)
-    },
-    {
-      id: "kpi",
-      title: "Add first KPI",
-      helpText: "Start with one number the owner cares about, such as revenue, leads, jobs completed, or customer issues.",
-      href: "/app/kpis",
-      completed: Boolean(kpis.length)
-    },
-    {
-      id: "crm",
-      title: "Add first CRM lead",
-      helpText: "A single lead is enough to make the dashboard and reports start reflecting sales follow-up.",
-      href: "/app/crm",
-      completed: Boolean(crmLeads.length)
-    },
-    {
-      id: "file",
-      title: "Upload first file",
-      helpText: "Optional: upload CSV, XLSX, PDF, DOCX, PNG, or JPG when you already have business data to review.",
-      href: "/app/files",
-      completed: Boolean(files.length),
-      optional: true
-    },
-    {
-      id: "task",
-      title: "Create first follow-up",
-      helpText: "Create one accountable next action with a priority and due date.",
-      href: "/app/tasks",
-      completed: Boolean(tasks.length)
-    },
-    {
-      id: "vaeroex",
-      title: "Run first Vaeroex review",
-      helpText: "Ask Vaeroex what needs attention using the records already in this workspace.",
-      href: "/app/agents",
-      completed: vaeroexRuns.some((run) => run.status === "completed")
-    },
-    {
-      id: "report",
-      title: "Generate first report",
-      helpText: "Save a clean management summary so the owner can see what changed and what to do next.",
-      href: "/app/reports",
-      completed: Boolean(reports.length)
-    }
-  ];
-  const briefing = isViewingDemoWorkspace
-    ? {
-        whatChanged:
-          "The demo history runs from January through the current month. January started okay, February improved, March dipped, April recovered partially, May improved, and the current month is mixed.",
-        improved:
-          "May recovered above target after SOP review, checklist follow-up, CRM accountability, and clearer response-time ownership.",
-        declined:
-          "March revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and checklist completion fell to 78%.",
-        attention:
-          "The current month still shows softer conversion, slower response time, overdue follow-ups, and checklist completion below target.",
-        recommendation:
-          "Create a CRM follow-up, update the customer follow-up SOP, run a checklist review, create a KPI review follow-up, and generate a monthly recovery report."
-      }
-    : {
-        whatChanged: recentImports.length
-          ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} updated workspace history.`
-          : leadsCreated.length
-            ? `${leadsCreated.length} CRM lead${leadsCreated.length === 1 ? "" : "s"} were created this period.`
-            : "No major new data changes were found for this period yet.",
-        improved: positiveTrends[0]
-          ? `${positiveTrends[0].name} improved ${percentLabel(positiveTrends[0].changePercent)} compared with the previous period.`
-          : "No positive KPI movement is visible yet.",
-        declined: negativeTrends[0]
-          ? `${negativeTrends[0].name} declined ${percentLabel(negativeTrends[0].changePercent)} compared with the previous period.`
-          : "No declining KPI trend is visible yet.",
-        attention: smartAlerts[0]?.title || risks[0] || "No urgent attention area was detected.",
-        recommendation: recommendedActions[0] || "Keep adding real records, then generate a report after the next management review."
-      };
   const hasWorkspaceData = Boolean(kpis.length || tasks.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
   const todayDate = dateOnly(new Date());
   const dueWindowEndDate = dateOnly(addDays(new Date(), 14));
@@ -2125,13 +1772,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
   const isIntelligenceView = dashboardMode === "Intelligence View";
-  const incompleteOnboardingCount = onboardingItems.filter((item) => !item.completed && !item.optional).length;
-  const onboardingSummary = incompleteOnboardingCount
-    ? `${incompleteOnboardingCount} required setup item${incompleteOnboardingCount === 1 ? "" : "s"} remaining.`
-    : "Workspace setup is complete enough for ongoing review.";
   const modeDescription =
     dashboardMode === "Executive View"
-      ? "How are we performing? A concise view of health, alerts, priorities, actions, and trend direction."
+      ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next recommended action."
       : dashboardMode === "Operations View"
         ? `What is happening? A ${period.toLowerCase()} operating view of KPIs, follow-ups, issues, checklists, ownership, CRM, and reports.`
         : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and recommended action.`;
@@ -2143,39 +1786,19 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         title={context.activeWorkspace?.name ?? "Vaeroex workspace"}
         description={modeDescription}
         actions={
-          <div className="flex flex-col gap-3">
-            <DashboardModeSelector mode={dashboardMode} period={period} />
-            <PeriodSelector period={period} mode={dashboardMode} />
+          <div className="flex flex-wrap gap-2">
+            <Link href="/app/ask" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+              Ask Vaeroex
+            </Link>
+            <Link href="/app/intelligence" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+              View Intelligence
+            </Link>
           </div>
         }
       />
 
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{params.message}</div> : null}
       {params?.error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{params.error}</div> : null}
-
-      {canUseAdminOnboardingTools ? (
-        <DashboardAccordion
-          title="Admin Tools"
-          summary={`Hidden from customer dashboards. Onboarding: ${onboardingItems.filter((item) => item.completed).length}/${onboardingItems.length} complete. Skipped: ${onboardingItems.filter((item) => item.optional && !item.completed).length}. Workspace status: ${currentWorkspaceStatus}.`}
-        >
-          <div className="space-y-4">
-            <AdminToolsBadge source={adminDetectionSource} />
-            <OnboardingChecklist
-              workspaceId={workspaceId}
-              items={onboardingItems}
-              adminControls
-              workspaceStatus={currentWorkspaceStatus}
-              demoWorkspaceForm={
-                <DemoWorkspaceControls
-                  demoWorkspaceExists={Boolean(demoWorkspace)}
-                  isViewingDemoWorkspace={isViewingDemoWorkspace}
-                  canUseAdminTools={canUseAdminOnboardingTools}
-                />
-              }
-            />
-          </div>
-        </DashboardAccordion>
-      ) : null}
 
       {errors.length ? (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -2185,42 +1808,27 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       {isViewingDemoWorkspace ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
 
-      {!canUseAdminOnboardingTools && incompleteOnboardingCount ? (
-        <DashboardAccordion title="Workspace setup" summary={onboardingSummary}>
-          <OnboardingChecklist
-            workspaceId={workspaceId}
-            items={onboardingItems}
-            adminControls={false}
-            workspaceStatus={currentWorkspaceStatus}
-          />
-        </DashboardAccordion>
-      ) : null}
-
       {isExecutiveView ? (
         <>
           <IntelligenceLayerSummary intelligence={intelligenceLayer} />
 
-          <BusinessHealthHero intelligence={prestigeIntelligence} periodLabel={period} />
-
-          <SmartAlerts
-            alerts={smartAlerts.slice(0, 3)}
-            title="Top 3 alerts"
-            description="The highest-priority signals Vaeroex found for this workspace."
-          />
-
-          <ExecutiveBriefingCard
-            period={period}
-            whatChanged={briefing.whatChanged}
-            improved={briefing.improved}
-            declined={briefing.declined}
-            attention={briefing.attention}
-            recommendation={briefing.recommendation}
-          />
-
-          <section className="grid gap-4 xl:grid-cols-[1fr_.85fr]">
-            <RecommendedActionsCard actions={recommendedActions} />
-            <WeeklyTrendCard trends={weeklyTrends} />
-          </section>
+          <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced workspace views</summary>
+            <div className="mt-4 grid gap-3 sm:grid-cols-3">
+              <Link href={dashboardHref(period, "Intelligence View")} className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                Intelligence View
+                <span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Signals, memory, benchmarks, and evidence.</span>
+              </Link>
+              <Link href={dashboardHref(period, "Operations View")} className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                Operations View
+                <span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Supporting records when deeper detail is needed.</span>
+              </Link>
+              <Link href="/app/settings" className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                Business Profile
+                <span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Update context, setup, billing, and workspace preferences.</span>
+              </Link>
+            </div>
+          </details>
         </>
       ) : null}
 
@@ -2260,8 +1868,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
                     Review customer context
                   </Link>
-                  <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-                    Generate report
+                  <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+                    Generate briefing
                   </Link>
                 </div>
               </SectionCard>
@@ -2313,8 +1921,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               Review assignments
             </Link>
-            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Shared reports
+            <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              Shared briefings
             </Link>
           </div>
           <div className="mt-5">
@@ -2479,8 +2087,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {files.length ? "Review files" : "Upload files"}
             </Link>
-            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {reports.length ? "Review reports" : "Generate report"}
+            <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              {reports.length ? "Review briefings" : "Generate briefing"}
             </Link>
           </div>
         </article>

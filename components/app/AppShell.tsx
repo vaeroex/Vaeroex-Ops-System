@@ -14,51 +14,22 @@ import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
   {
-    label: "Intelligence Layer",
+    label: "Vaeroex",
     defaultOpen: true,
     items: [
       { href: "/app", label: "Home" },
       { href: "/app/intelligence", label: "Intelligence" },
+      { href: "/app/ask", label: "Ask Vaeroex" },
       { href: "/app/sources", label: "Sources" },
-      { href: "/app/actions", label: "Actions" },
-      { href: "/app/agents", label: "Ask Vaeroex" }
+      { href: "/app/briefings", label: "Briefings" },
+      { href: "/app/settings", label: "Settings" }
     ]
   },
   {
-    label: "Supporting Systems",
+    label: "Optional Outputs",
     defaultOpen: false,
     items: [
-      { href: "/app/files", label: "Files & Imports" },
-      { href: "/app/reports", label: "Reports" },
-      { href: "/app/kpis", label: "KPI Signals" },
-      { href: "/app/crm", label: "Customer Context" },
-      { href: "/app/sops", label: "Process Knowledge" },
-      { href: "/app/forms", label: "Intake Forms" },
-      { href: "/app/form-submissions", label: "Form Submissions" }
-    ]
-  },
-  {
-    label: "Action Records",
-    defaultOpen: false,
-    items: [
-      { href: "/app/tasks", label: "Follow-ups" },
-      { href: "/app/issues", label: "Issues & Risks" },
-      { href: "/app/checklists", label: "Checklists" },
-      { href: "/app/checklist-runs", label: "Checklist Runs" },
-      { href: "/app/assets", label: "Assets" },
-      { href: "/app/people", label: "Ownership" }
-    ]
-  },
-  {
-    label: "Settings",
-    defaultOpen: false,
-    items: [
-      { href: "/app/settings", label: "Settings" },
-      { href: "/app/kpis/settings", label: "KPI Settings" },
-      { href: "/app/account/subscription", label: "Subscription" },
-      { href: "/app/notifications", label: "Notifications" },
-      { href: "/app/help", label: "Help Center" },
-      { href: "/app/support", label: "Support" }
+      { href: "/app/actions", label: "Recommended Actions" }
     ]
   }
 ] satisfies Array<{ label: string; defaultOpen?: boolean; items: Array<{ href: string; label: string }> }>;
@@ -189,7 +160,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
               <GlobalSearch className="hidden w-52 shrink-0 2xl:block" />
               <GlobalSearch variant="icon" className="2xl:hidden" />
               <Link
-                href="/app/agents"
+                href="/app/ask"
                 className="hidden items-center justify-center rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 lg:inline-flex"
               >
                 Ask Vaeroex
