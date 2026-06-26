@@ -1592,9 +1592,14 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Files"
+        eyebrow="Sources"
         title="Files & Imports"
-        description="What information has been added?"
+        description="Source material for Vaeroex intelligence. Upload, analyze, import, and review business evidence before it influences dashboards and reports."
+        actions={
+          <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+            Sources overview
+          </Link>
+        }
       />
       <LegalSafetyNotice tone="sensitive" compact />
 
