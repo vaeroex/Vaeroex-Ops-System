@@ -10,17 +10,17 @@ type CreateDrawerProps = {
 
 export function CreateDrawer({ title, description, triggerLabel, children, defaultOpen = false }: CreateDrawerProps) {
   return (
-    <details open={defaultOpen} className="group rounded-lg border border-line bg-white shadow-sm">
+    <details open={defaultOpen} className="group rounded-lg border border-white/10 bg-[#08111f] text-slate-100 shadow-sm">
       <summary className="flex cursor-pointer list-none flex-col gap-3 px-4 py-4 outline-none transition hover:bg-cyan-950/30 focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 sm:flex-row sm:items-center sm:justify-between">
         <span>
-          <span className="block text-sm font-semibold text-ink">{title}</span>
-          {description ? <span className="mt-1 block max-w-3xl text-sm leading-6 text-muted">{description}</span> : null}
+          <span className="block text-sm font-semibold text-white">{title}</span>
+          {description ? <span className="mt-1 block max-w-3xl text-sm leading-6 text-slate-400">{description}</span> : null}
         </span>
         <span className="inline-flex w-fit items-center rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white transition group-open:bg-slate-900 group-open:text-white">
           {triggerLabel}
         </span>
       </summary>
-      <div className="border-t border-line bg-slate-50/70 p-4">{children}</div>
+      <div className="border-t border-white/10 bg-slate-950/35 p-4">{children}</div>
     </details>
   );
 }

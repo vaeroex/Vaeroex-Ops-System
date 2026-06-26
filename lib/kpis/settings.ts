@@ -16,6 +16,7 @@ export const KPI_COLOR_PALETTE = [
 ] as const;
 
 const DEFAULT_KPI_COLOR = KPI_COLOR_PALETTE[0].value;
+const AUTO_KPI_COLOR_PALETTE = KPI_COLOR_PALETTE.filter((color) => color.value !== "#0B1F4D");
 
 export function normalizeKpiName(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -41,7 +42,7 @@ export function kpiColor(name: string, settings: KpiSettingRow[], fallbackIndex 
     return approvedKpiColor(setting.color);
   }
 
-  return KPI_COLOR_PALETTE[fallbackIndex % KPI_COLOR_PALETTE.length]?.value || DEFAULT_KPI_COLOR;
+  return AUTO_KPI_COLOR_PALETTE[fallbackIndex % AUTO_KPI_COLOR_PALETTE.length]?.value || DEFAULT_KPI_COLOR;
 }
 
 export function kpiWeight(name: string, settings: KpiSettingRow[]) {
@@ -56,9 +57,35 @@ export function kpiDefinition(name: string, settings: KpiSettingRow[]) {
   return kpiSettingForName(settings, name)?.definition || "";
 }
 
+export function kpiDisplayUnit(name: string, settings: KpiSettingRow[]) {
+  return kpiSettingForName(settings, name)?.display_unit || "";
+}
+
+export function kpiValueFormat(name: string, settings: KpiSettingRow[]) {
+  return kpiSettingForName(settings, name)?.value_format || "";
+}
+
+export function kpiXAxisLabel(name: string, settings: KpiSettingRow[]) {
+  return kpiSettingForName(settings, name)?.x_axis_label || "Date";
+}
+
+export function kpiYAxisLabel(name: string, settings: KpiSettingRow[]) {
+  const setting = kpiSettingForName(settings, name);
+  return setting?.y_axis_label || setting?.display_unit || name;
+}
+
+export function kpiPreferredChartType(name: string, settings: KpiSettingRow[]) {
+  const value = kpiSettingForName(settings, name)?.preferred_chart_type;
+  return value === "bar" || value === "mixed" ? value : "line";
+}
+
 export function configuredKpiTarget(name: string, settings: KpiSettingRow[]) {
   const target = kpiSettingForName(settings, name)?.target;
   return target === undefined ? null : target;
+}
+
+export function kpiColorMayBeLowContrast(value: string | null | undefined) {
+  return value === "#0B1F4D";
 }
 
 export function getConfiguredMetricNames<T extends { name: string }>(rows: T[], settings: KpiSettingRow[], includeHidden = false) {

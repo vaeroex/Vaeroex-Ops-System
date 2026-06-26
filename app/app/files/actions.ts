@@ -12,6 +12,7 @@ import { requireActiveSubscription } from "@/lib/billing/require-active-subscrip
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { cleanExtractedText, extractDocxText, extractPdfText } from "@/lib/imports/document-text";
 import { parseSpreadsheetRows, previewRows, type ImportCellValue, type ImportRow } from "@/lib/imports/spreadsheets";
+import { approvedKpiColor } from "@/lib/kpis/settings";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -23,6 +24,16 @@ type JsonRecord = Record<string, unknown>;
 type JsonObject = { [key: string]: Json | undefined };
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type ImportMapping = Record<string, string>;
+type KpiImportChartType = "line" | "bar" | "mixed";
+type KpiImportInterpretation = {
+  unit_type: string | null;
+  display_unit: string | null;
+  value_format: string | null;
+  x_axis_label: string | null;
+  y_axis_label: string | null;
+  color: string;
+  preferred_chart_type: KpiImportChartType;
+};
 type FileContentKind = "spreadsheet" | "pdf_text" | "docx_text" | "image_vision" | "unsupported";
 type FileContentExtraction = {
   supported: boolean;
@@ -52,6 +63,7 @@ const MAX_REPORT_ROWS = 100;
 const MAX_EXTRACTED_TEXT_CHARS = 18_000;
 const MAX_TEXT_PREVIEW_CHARS = 4_000;
 const ALLOWED_EXTENSIONS = ["csv", "xlsx", "pdf", "png", "jpg", "jpeg", "docx"];
+const KPI_IMPORT_CHART_TYPES = ["line", "bar", "mixed"] as const;
 const MIME_BY_EXTENSION: Record<string, string> = {
   csv: "text/csv",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -383,6 +395,27 @@ function mappingFromForm(formData: FormData, importType: ImportType, fallback: J
   }, {});
 }
 
+function limitedText(formData: FormData, key: string, maxLength: number) {
+  const value = text(formData, key);
+  return value ? value.slice(0, maxLength) : "";
+}
+
+function validKpiImportChartType(value: string): KpiImportChartType {
+  return KPI_IMPORT_CHART_TYPES.includes(value as KpiImportChartType) ? (value as KpiImportChartType) : "line";
+}
+
+function kpiImportInterpretationFromForm(formData: FormData): KpiImportInterpretation {
+  return {
+    unit_type: limitedText(formData, "unit_type", 80) || null,
+    display_unit: limitedText(formData, "display_unit", 80) || null,
+    value_format: limitedText(formData, "value_format", 80) || null,
+    x_axis_label: limitedText(formData, "x_axis_label", 80) || null,
+    y_axis_label: limitedText(formData, "y_axis_label", 80) || null,
+    color: approvedKpiColor(text(formData, "color")),
+    preferred_chart_type: validKpiImportChartType(text(formData, "preferred_chart_type"))
+  };
+}
+
 function mappedCell(row: ImportRow, mapping: ImportMapping, field: ImportField) {
   const mappedHeader = mapping[field.key];
 
@@ -518,6 +551,86 @@ function buildKpiRecords(
 
 function kpiDedupeKey(name: string, metricDate: string) {
   return `${name.trim().toLowerCase()}::${metricDate}`;
+}
+
+async function upsertImportedKpiSettings({
+  supabase,
+  rows,
+  workspaceId,
+  userId,
+  interpretation
+}: {
+  supabase: SupabaseServerClient;
+  rows: ReturnType<typeof buildKpiRecords>;
+  workspaceId: string;
+  userId: string;
+  interpretation: KpiImportInterpretation;
+}): Promise<boolean> {
+  const settingsByName = new Map<
+    string,
+    {
+      workspace_id: string;
+      kpi_name: string;
+      category: string | null;
+      target: number | null;
+      unit_type: string | null;
+      display_unit: string | null;
+      value_format: string | null;
+      x_axis_label: string | null;
+      y_axis_label: string | null;
+      color: string;
+      preferred_chart_type: KpiImportChartType;
+      created_by: string;
+    }
+  >();
+
+  for (const row of rows) {
+    const existing = settingsByName.get(row.record.name);
+
+    if (!existing) {
+      settingsByName.set(row.record.name, {
+        workspace_id: workspaceId,
+        kpi_name: row.record.name,
+        category: row.record.category || "Imported",
+        target: row.record.target,
+        unit_type: interpretation.unit_type,
+        display_unit: interpretation.display_unit,
+        value_format: interpretation.value_format,
+        x_axis_label: interpretation.x_axis_label,
+        y_axis_label: interpretation.y_axis_label,
+        color: interpretation.color,
+        preferred_chart_type: interpretation.preferred_chart_type,
+        created_by: userId
+      });
+      continue;
+    }
+
+    if (existing.target === null && row.record.target !== null) {
+      existing.target = row.record.target;
+    }
+
+    if (!existing.category && row.record.category) {
+      existing.category = row.record.category;
+    }
+  }
+
+  const settings = Array.from(settingsByName.values());
+
+  if (!settings.length) {
+    return false;
+  }
+
+  const { error } = await supabase.from("kpi_settings").upsert(settings, { onConflict: "workspace_id,kpi_name" });
+
+  if (error) {
+    if (/row-level security|permission denied|not authorized|not allowed/i.test(error.message)) {
+      return false;
+    }
+
+    throw new Error(error.message);
+  }
+
+  return true;
 }
 
 async function removeDuplicateKpiRows({
@@ -1697,6 +1810,15 @@ export async function saveExtractedImportAction(formData: FormData) {
 
   const importType = validImportType(text(formData, "import_type") || importRecord.import_type);
   const mapping = mappingFromForm(formData, importType, importRecord.mapping_json);
+  const kpiInterpretation = importType === "kpi" ? kpiImportInterpretationFromForm(formData) : null;
+  const savedMappingJson = (
+    kpiInterpretation
+      ? {
+          ...mapping,
+          kpi_interpretation: kpiInterpretation
+        }
+      : mapping
+  ) as Json;
   const { data: stagedRows, error: rowsError } = await supabase
     .from("file_import_rows")
     .select("id,data_json,row_number")
@@ -1718,6 +1840,7 @@ export async function saveExtractedImportAction(formData: FormData) {
   let duplicateKpiRowCount = 0;
   let importedKpiImportRowIds: string[] = [];
   let duplicateKpiImportRowIds: string[] = [];
+  let kpiSettingsSkippedForPermission = false;
 
   try {
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
@@ -1741,6 +1864,17 @@ export async function saveExtractedImportAction(formData: FormData) {
         if (error) {
           throw new Error(error.message);
         }
+      }
+
+      if (targetRows.length && kpiInterpretation) {
+        const kpiSettingsSaved = await upsertImportedKpiSettings({
+          supabase,
+          rows: targetRows,
+          workspaceId,
+          userId: user.id,
+          interpretation: kpiInterpretation
+        });
+        kpiSettingsSkippedForPermission = !kpiSettingsSaved;
       }
     } else if (importType === "crm") {
       const targetRows = buildCrmLeadRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
@@ -1816,7 +1950,7 @@ export async function saveExtractedImportAction(formData: FormData) {
       .update({
         status: "completed",
         rows_imported: importedRowCount,
-        mapping_json: mapping,
+        mapping_json: savedMappingJson,
         reviewed_at: importedAt,
         imported_at: importedAt,
         extraction_summary: extractionSummary(importType, stagedRows.map((row) => jsonToImportRow(row.data_json)), mapping)
@@ -1862,11 +1996,14 @@ export async function saveExtractedImportAction(formData: FormData) {
     const duplicateNote = duplicateKpiRowCount
       ? ` ${duplicateKpiRowCount} duplicate row${duplicateKpiRowCount === 1 ? "" : "s"} skipped.`
       : "";
+    const settingsNote = kpiSettingsSkippedForPermission
+      ? " KPI display settings were not changed because only workspace owners/admins can manage KPI settings."
+      : "";
 
     redirectWithMessage(
       importedRowCount
-        ? `KPI history updated. Dashboard and reports now include this data. ${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved.${duplicateNote}`
-        : `KPI history already included this data. No duplicate KPI rows were saved.${duplicateNote}`,
+        ? `KPI history updated. Dashboard and reports now include this data. ${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved.${duplicateNote}${settingsNote}`
+        : `KPI history already included this data. No duplicate KPI rows were saved.${duplicateNote}${settingsNote}`,
       file.id
     );
   }

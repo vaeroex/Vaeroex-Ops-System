@@ -430,6 +430,12 @@ export async function updateKpiSettingAction(formData: FormData) {
   const kpiName = text(formData, "kpi_name");
   const category = text(formData, "category");
   const definition = text(formData, "definition");
+  const unitType = text(formData, "unit_type");
+  const displayUnit = text(formData, "display_unit");
+  const valueFormat = text(formData, "value_format");
+  const xAxisLabel = text(formData, "x_axis_label");
+  const yAxisLabel = text(formData, "y_axis_label");
+  const preferredChartType = text(formData, "preferred_chart_type") || "line";
   const color = approvedKpiColor(text(formData, "color"));
   const target = optionalNumber(path, "Target", text(formData, "target"));
   const weight = optionalNumber(path, "Weight", text(formData, "weight")) ?? 1;
@@ -438,6 +444,11 @@ export async function updateKpiSettingAction(formData: FormData) {
   requireValue(path, "KPI name", kpiName);
   validateLength(path, "Category", category, 100);
   validateLength(path, "Definition", definition, 1200);
+  validateLength(path, "Unit/type", unitType, 80);
+  validateLength(path, "Display unit", displayUnit, 80);
+  validateLength(path, "Value format", valueFormat, 80);
+  validateLength(path, "X-axis label", xAxisLabel, 80);
+  validateLength(path, "Y-axis label", yAxisLabel, 80);
 
   if (!KPI_COLOR_PALETTE.some((item) => item.value === color)) {
     redirectWithError(path, "Choose an approved KPI color.");
@@ -445,6 +456,10 @@ export async function updateKpiSettingAction(formData: FormData) {
 
   if (weight < 0 || weight > 10) {
     redirectWithError(path, "KPI weight must be between 0 and 10.");
+  }
+
+  if (!["line", "bar", "mixed"].includes(preferredChartType)) {
+    redirectWithError(path, "Choose line, bar, or mixed as the chart type.");
   }
 
   const { error } = await supabase.from("kpi_settings").upsert(
@@ -458,6 +473,12 @@ export async function updateKpiSettingAction(formData: FormData) {
       color,
       is_visible: bool(formData, "is_visible"),
       sort_order: Math.round(sortOrder),
+      unit_type: unitType || null,
+      display_unit: displayUnit || null,
+      value_format: valueFormat || null,
+      x_axis_label: xAxisLabel || null,
+      y_axis_label: yAxisLabel || null,
+      preferred_chart_type: preferredChartType,
       created_by: user.id
     },
     { onConflict: "workspace_id,kpi_name" }

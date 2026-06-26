@@ -19,6 +19,7 @@ const baseNavSections = [
     items: [
       { href: "/app", label: "Home" },
       { href: "/app/intelligence", label: "Intelligence" },
+      { href: "/app/kpis", label: "KPIs" },
       { href: "/app/ask", label: "Ask Vaeroex" },
       { href: "/app/sources", label: "Sources" },
       { href: "/app/briefings", label: "Briefings" },
