@@ -17,6 +17,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminEmail, isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import {
   applyKpiSettingsToRows,
@@ -1139,6 +1140,104 @@ function SignalList({
   );
 }
 
+function intelligenceHealthTone(status: IntelligenceLayerResult["businessHealth"]["status"]) {
+  if (status === "Strong") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-100";
+  if (status === "Watch") return "border-amber-300/35 bg-amber-400/10 text-amber-100";
+  if (status === "At Risk") return "border-red-300/35 bg-red-400/10 text-red-100";
+  return "border-slate-300/25 bg-white/[0.05] text-slate-100";
+}
+
+function IntelligenceLayerSummary({ intelligence }: { intelligence: IntelligenceLayerResult }) {
+  const briefingCards = [
+    {
+      label: "Top risk",
+      title: intelligence.topRisk?.title || "No major risk visible",
+      body: intelligence.topRisk?.summary || "Vaeroex does not see a strong active risk signal yet.",
+      href: (intelligence.topRisk?.sourceHref || "/app/intelligence") as Route,
+      tone: "border-red-400/30 bg-red-950/25"
+    },
+    {
+      label: "Top opportunity",
+      title: intelligence.topOpportunity?.title || "Needs more context",
+      body: intelligence.topOpportunity?.summary || "Add customer, KPI, file, or report history to reveal stronger opportunities.",
+      href: (intelligence.topOpportunity?.sourceHref || "/app/sources") as Route,
+      tone: "border-emerald-400/30 bg-emerald-950/25"
+    },
+    {
+      label: "Recommended action",
+      title: intelligence.topRecommendation?.recommendedAction || "Add source data",
+      body: intelligence.topRecommendation?.why || "Vaeroex recommends adding business context before creating more work.",
+      href: "/app/actions" as Route,
+      tone: "border-cyan-400/30 bg-cyan-950/25"
+    }
+  ];
+
+  return (
+    <section className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#061225] text-white shadow-command">
+      <div className="grid gap-5 p-5 xl:grid-cols-[.78fr_1.22fr] xl:p-6">
+        <div className="rounded-lg border border-white/10 bg-white/[0.05] p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Business health</p>
+            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${intelligenceHealthTone(intelligence.businessHealth.status)}`}>
+              {intelligence.businessHealth.status}
+            </span>
+          </div>
+          <div className="mt-5 flex items-end gap-3">
+            <p className="text-6xl font-semibold tracking-tight">{intelligence.businessHealth.score}</p>
+            <p className="pb-2 text-lg font-semibold text-slate-300">/ 100</p>
+          </div>
+          <dl className="mt-5 grid gap-3 text-sm">
+            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
+              <dt className="text-slate-400">Trend</dt>
+              <dd className="font-semibold text-slate-100">{intelligence.businessHealth.trend}</dd>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
+              <dt className="text-slate-400">Data confidence</dt>
+              <dd className="font-semibold text-slate-100">{intelligence.dataQuality.confidence}</dd>
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
+              <dt className="text-slate-400">Business memory</dt>
+              <dd className="font-semibold text-slate-100">{intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords} signals</dd>
+            </div>
+          </dl>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Vaeroex briefing</p>
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight md:text-3xl">What leadership should know now</h2>
+            <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300">{intelligence.executiveSummary}</p>
+          </div>
+          <div className="grid gap-3 lg:grid-cols-3">
+            {briefingCards.map((card) => (
+              <Link
+                key={card.label}
+                href={card.href}
+                className={`rounded-lg border p-4 text-slate-100 transition hover:border-cyan-300/50 hover:bg-blue-950/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50 ${card.tone}`}
+              >
+                <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-300">{card.label}</p>
+                <h3 className="mt-3 line-clamp-2 text-base font-semibold text-white">{card.title}</h3>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-300">{card.body}</p>
+              </Link>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Link href="/app/intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+              Open Intelligence
+            </Link>
+            <Link href="/app/agents" className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
+              Ask Vaeroex
+            </Link>
+            <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+              Add evidence
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function IntelligenceBriefingHero({
   risk,
   opportunity,
@@ -2007,6 +2106,21 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisions,
     recommendationOutcomes
   });
+  const intelligenceLayer = buildIntelligenceLayer({
+    workspace: context.activeWorkspace,
+    kpis,
+    tasks,
+    issues,
+    files,
+    reports,
+    vaeroexRuns,
+    crmLeads,
+    imports,
+    sops,
+    people,
+    decisions,
+    recommendationOutcomes
+  });
   const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
@@ -2025,8 +2139,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Operations Intelligence"
-        title={context.activeWorkspace?.name ?? "Vaeroex intelligence dashboard"}
+        eyebrow="Home"
+        title={context.activeWorkspace?.name ?? "Vaeroex workspace"}
         description={modeDescription}
         actions={
           <div className="flex flex-col gap-3">
@@ -2084,6 +2198,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       {isExecutiveView ? (
         <>
+          <IntelligenceLayerSummary intelligence={intelligenceLayer} />
+
           <BusinessHealthHero intelligence={prestigeIntelligence} periodLabel={period} />
 
           <SmartAlerts
