@@ -48,11 +48,25 @@ function requireValue(path: string, label: string, value: string, maxLength = 16
 }
 
 function redirectWithError(path: string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(message)}` as Route);
+  redirect(pathWithParams(path, { error: message }) as Route);
+}
+
+function pathWithParams(path: string, params: Record<string, string>) {
+  const hashIndex = path.indexOf("#");
+  const pathWithoutHash = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const hash = hashIndex >= 0 ? path.slice(hashIndex) : "";
+  const separator = pathWithoutHash.includes("?") ? "&" : "?";
+  const query = new URLSearchParams(params).toString();
+
+  return `${pathWithoutHash}${separator}${query}${hash}`;
 }
 
 function redirectWithMessage(path: string, message: string): never {
-  redirect(`${path}?message=${encodeURIComponent(message)}` as Route);
+  redirect(pathWithParams(path, { message }) as Route);
+}
+
+function redirectWithMessageParams(path: string, message: string, params: Record<string, string>): never {
+  redirect(pathWithParams(path, { message, ...params }) as Route);
 }
 
 function returnPath(formData: FormData, fallback: string) {
@@ -424,6 +438,49 @@ export async function updateKpiAction(formData: FormData) {
   redirectWithMessage(path, "KPI updated.");
 }
 
+export async function updateKpiValueAction(formData: FormData) {
+  const path = returnPath(formData, "/app/kpis");
+  const { supabase, workspaceId } = await requireWorkspace(path);
+  const kpiId = text(formData, "kpi_id");
+  const actualValue = optionalNumber(path, "Actual value", text(formData, "actual_value"));
+  const target = optionalNumber(path, "Target", text(formData, "target"));
+  const metricDate = metricDateOrToday(path, text(formData, "metric_date"));
+  const notes = text(formData, "notes");
+  const source = text(formData, "source");
+
+  requireValue(path, "KPI", kpiId, 80);
+  validateLength(path, "Notes", notes, 1500);
+  validateLength(path, "Source", source, 160);
+
+  const { data, error } = await supabase
+    .from("kpis")
+    .update({
+      actual_value: actualValue,
+      target,
+      metric_date: metricDate,
+      notes,
+      source
+    })
+    .eq("id", kpiId)
+    .eq("workspace_id", workspaceId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  if (!data) {
+    redirectWithError(path, "KPI value not found, or you do not have permission to edit it.");
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "KPI value updated.");
+}
+
 export async function updateKpiSettingAction(formData: FormData) {
   const path = returnPath(formData, "/app/kpis/settings");
   const { supabase, user, workspaceId } = await requireWorkspace(path);
@@ -492,6 +549,18 @@ export async function updateKpiSettingAction(formData: FormData) {
   revalidatePath("/app/kpis");
   revalidatePath("/app/kpis/settings");
   revalidatePath("/app/reports");
+  if (text(formData, "target_change_context") === "recommended") {
+    redirectWithMessageParams(path, "Recommended target applied.", {
+      target_applied: "true",
+      undo_kpi: kpiName,
+      undo_target: text(formData, "previous_target")
+    });
+  }
+
+  if (text(formData, "target_change_context") === "undo") {
+    redirectWithMessage(path, "Previous target restored.");
+  }
+
   redirectWithMessage(path, "KPI settings updated.");
 }
 

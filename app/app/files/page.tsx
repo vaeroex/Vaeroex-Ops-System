@@ -351,7 +351,7 @@ function DetectedColumnCard({ label, value, required = false }: { label: string;
 }
 
 function KpiImportInterpretationControls({ mappingJson }: { mappingJson: unknown }) {
-  const color = kpiInterpretationValue(mappingJson, "color", "#1E6BFF");
+  const color = kpiInterpretationValue(mappingJson, "color", "#10B981");
   const lowContrastColor = kpiColorMayBeLowContrast(color);
   const inputClass =
     "mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/80 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent focus:ring-2 focus:ring-vaeroex-accent/20";
