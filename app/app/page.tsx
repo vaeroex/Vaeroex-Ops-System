@@ -5,6 +5,7 @@ import {
   exitDemoWorkspaceAction,
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
+import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -12,6 +13,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
@@ -1788,6 +1790,25 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisions,
     recommendationOutcomes
   });
+  const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
+    kpis,
+    tasks,
+    issues,
+    checklists,
+    checklistRuns,
+    files,
+    imports,
+    sops,
+    crmLeads,
+    crmHistory,
+    reports,
+    vaeroexRuns,
+    operationalMetrics,
+    assets,
+    people,
+    decisions,
+    recommendationOutcomes
+  });
   const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
@@ -1831,6 +1852,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       {isExecutiveView ? (
         <>
           <IntelligenceLayerSummary intelligence={intelligenceLayer} />
+          <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} compact />
 
           <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
             <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced workspace views</summary>

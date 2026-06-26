@@ -1,7 +1,9 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { generatedOutputHref, outputTypeForInsight } from "@/lib/intelligence/generated-output";
 import {
   buildIntelligenceLayer,
@@ -140,7 +142,7 @@ function SummaryPanel({
 
 export default async function IntelligencePage() {
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult] = await Promise.all([
+  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, crmHistoryResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, checklistsResult, checklistRunsResult, metricsResult, assetsResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
@@ -148,13 +150,18 @@ export default async function IntelligencePage() {
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
     supabase.from("forms").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("form_submissions").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false })
+    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("checklists").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }),
+    supabase.from("assets").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("updated_at", { ascending: false })
   ]);
 
   const errors = [
@@ -165,13 +172,18 @@ export default async function IntelligencePage() {
     reportsResult.error,
     runsResult.error,
     crmResult.error,
+    crmHistoryResult.error,
     importsResult.error,
     sopsResult.error,
     formsResult.error,
     submissionsResult.error,
     peopleResult.error,
     decisionsResult.error,
-    outcomesResult.error
+    outcomesResult.error,
+    checklistsResult.error,
+    checklistRunsResult.error,
+    metricsResult.error,
+    assetsResult.error
   ].filter(Boolean);
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
@@ -189,6 +201,27 @@ export default async function IntelligencePage() {
     people: peopleResult.data || [],
     decisions: decisionsResult.data || [],
     recommendationOutcomes: outcomesResult.data || []
+  });
+  const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
+    tasks: tasksResult.data || [],
+    issues: issuesResult.data || [],
+    kpis: kpisResult.data || [],
+    files: filesResult.data || [],
+    reports: reportsResult.data || [],
+    vaeroexRuns: runsResult.data || [],
+    crmLeads: crmResult.data || [],
+    crmHistory: crmHistoryResult.data || [],
+    imports: importsResult.data || [],
+    sops: sopsResult.data || [],
+    forms: formsResult.data || [],
+    submissions: submissionsResult.data || [],
+    people: peopleResult.data || [],
+    decisions: decisionsResult.data || [],
+    recommendationOutcomes: outcomesResult.data || [],
+    checklists: checklistsResult.data || [],
+    checklistRuns: checklistRunsResult.data || [],
+    operationalMetrics: metricsResult.data || [],
+    assets: assetsResult.data || []
   });
   const { topRisk, topOpportunity, topRecommendation } = intelligence;
 
@@ -252,6 +285,8 @@ export default async function IntelligencePage() {
           </dl>
         </div>
       </section>
+
+      <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} />
 
       <section className="grid gap-4 xl:grid-cols-2">
         {(["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"] as IntelligenceInsightType[]).map((type) => {

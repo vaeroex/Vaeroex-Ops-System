@@ -33,6 +33,16 @@ export type GeneratedOutput = {
   markdown: string;
 };
 
+export type GeneratedOutputCoverageSummary = {
+  overallCoverage: number;
+  overallConfidenceLabel: string;
+  recommendedNextUpload: string;
+  forecastReadiness: {
+    label: string;
+    reason: string;
+  };
+};
+
 const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
   action_plan: "Generated Action Plan",
   risk_brief: "Generated Risk Brief",
@@ -302,12 +312,14 @@ export function buildGeneratedOutput({
   type,
   source,
   intelligence,
-  workspaceName
+  workspaceName,
+  coverage
 }: {
   type: GeneratedOutputType;
   source: GeneratedOutputSource;
   intelligence: IntelligenceLayerResult;
   workspaceName?: string | null;
+  coverage?: GeneratedOutputCoverageSummary;
 }): GeneratedOutput {
   const label = generatedOutputLabel(type);
   const name = OUTPUT_NAMES[type];
@@ -331,6 +343,16 @@ export function buildGeneratedOutput({
     "",
     outputBody(type, source, intelligence),
     "",
+    ...(coverage
+      ? [
+          "## Business Intelligence Coverage",
+          `Current coverage: ${coverage.overallCoverage}% (${coverage.overallConfidenceLabel})`,
+          `Forecast readiness: ${coverage.forecastReadiness.label}`,
+          coverage.forecastReadiness.reason,
+          `Recommended next upload: ${coverage.recommendedNextUpload}`,
+          ""
+        ]
+      : []),
     "## Data Quality and Limitations",
     limitations,
     "",
