@@ -1220,18 +1220,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="KPI records" description="Workspace metrics appear first. Use filters, folders, bulk actions, and chart details only when needed.">
-          <ManagedRecordList
-            collection="kpis"
-            records={managedKpis}
-            folders={folderResult.folders}
-            title="KPI records"
-            description="Search, filter, group, edit, archive, duplicate, or bulk-manage KPI rows."
-            emptyTitle="No KPIs yet"
-            emptyDescription="Create your first KPI for revenue, leads, conversion rate, follow-up completion, or any custom metric your team reviews."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="kpis"
+          records={managedKpis}
+          folders={folderResult.folders}
+          title="KPI records"
+          description="Search, filter, group, edit, archive, duplicate, or bulk-manage KPI rows."
+          emptyTitle="No KPIs yet"
+          emptyDescription="Create your first KPI for revenue, leads, conversion rate, follow-up completion, or any custom metric your team reviews."
+          searchParams={params}
+        />
       </section>
 
       <KpiDetailPanel

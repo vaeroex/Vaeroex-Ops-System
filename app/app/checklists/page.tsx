@@ -153,18 +153,16 @@ export default async function ChecklistsPage({ searchParams }: ChecklistsPagePro
           </CreateDrawer>
         </div>
 
-        <SectionCard title="Checklist library" description="Repeatable routines that make completion visible.">
-          <ManagedRecordList
-            collection="checklists"
-            records={managedChecklists}
-            folders={folderResult.folders}
-            title="Checklist records"
-            description="Collapse long item lists by default and organize templates into folders."
-            emptyTitle="No checklists yet"
-            emptyDescription="Create a recurring readiness, opening, closing, inspection, or manager review checklist."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="checklists"
+          records={managedChecklists}
+          folders={folderResult.folders}
+          title="Checklist records"
+          description="Collapse long item lists by default and organize templates into folders."
+          emptyTitle="No checklists yet"
+          emptyDescription="Create a recurring readiness, opening, closing, inspection, or manager review checklist."
+          searchParams={params}
+        />
 
         <SectionCard title="Checklist runs" description="Recent completions and in-progress runs.">
           {runs?.length ? (

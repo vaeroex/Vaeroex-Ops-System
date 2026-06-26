@@ -204,19 +204,17 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="People directory" description="Operational contacts for the current workspace.">
-          <ManagedRecordList
-            collection="people"
-            records={managedPeople}
-            folders={folderResult.folders}
-            title="People records"
-            description="Keep team contacts compact, searchable, and easy to manage without exposing long notes by default."
-            emptyTitle="No people yet"
-            emptyDescription="Add team members, contractors, managers, or operational contacts."
-            returnPath="/app/people"
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="people"
+          records={managedPeople}
+          folders={folderResult.folders}
+          title="People records"
+          description="Keep team contacts compact, searchable, and easy to manage without exposing long notes by default."
+          emptyTitle="No people yet"
+          emptyDescription="Add team members, contractors, managers, or operational contacts."
+          returnPath="/app/people"
+          searchParams={params}
+        />
       </section>
     </div>
   );

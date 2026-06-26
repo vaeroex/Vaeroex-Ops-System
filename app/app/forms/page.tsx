@@ -6,7 +6,6 @@ import { TextArea, TextInput, PrimaryButton } from "@/components/operations/Form
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { ReadableData } from "@/components/operations/ReadableData";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { createFormAction } from "@/app/app/operations/actions";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -100,18 +99,16 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="Form library" description="Tenant-safe forms for the active workspace.">
-          <ManagedRecordList
-            collection="forms"
-            records={managedForms}
-            folders={folderResult.folders}
-            title="Form records"
-            description="Forms stay collapsed until you need to inspect fields or open the detail page."
-            emptyTitle="No forms yet"
-            emptyDescription="Create your first form to collect visibility data and follow-up needs."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="forms"
+          records={managedForms}
+          folders={folderResult.folders}
+          title="Form records"
+          description="Forms stay collapsed until you need to inspect fields or open the detail page."
+          emptyTitle="No forms yet"
+          emptyDescription="Create your first form to collect visibility data and follow-up needs."
+          searchParams={params}
+        />
 
       </section>
     </div>

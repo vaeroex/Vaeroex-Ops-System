@@ -12,12 +12,23 @@ const copy = {
 };
 
 export function LegalSafetyNotice({ tone = "review", compact = false }: LegalSafetyNoticeProps) {
+  if (compact) {
+    return (
+      <p className="text-xs leading-5 text-amber-100/85">
+        {copy[tone]}{" "}
+        <Link href="/sensitive-data-policy" className="font-semibold text-amber-100 underline">
+          Sensitive data policy
+        </Link>
+      </p>
+    );
+  }
+
   return (
-    <div className={`rounded-lg border border-amber-200 bg-amber-50 text-amber-950 ${compact ? "p-3 text-xs" : "p-4 text-sm"} leading-6`}>
+    <div className="rounded-lg border border-amber-300/30 bg-amber-950/20 p-4 text-sm leading-6 text-amber-50">
       <p>{copy[tone]}</p>
       <div className="mt-2 flex flex-wrap gap-3">
-        <Link href="/ai-disclaimer" className="font-semibold underline">Vaeroex Disclaimer</Link>
-        <Link href="/sensitive-data-policy" className="font-semibold underline">Sensitive Data Policy</Link>
+        <Link href="/ai-disclaimer" className="font-semibold text-amber-100 underline">Vaeroex Disclaimer</Link>
+        <Link href="/sensitive-data-policy" className="font-semibold text-amber-100 underline">Sensitive Data Policy</Link>
       </div>
     </div>
   );

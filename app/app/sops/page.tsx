@@ -5,7 +5,6 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -118,18 +117,16 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
           </form>
         </CreateDrawer>
 
-        <SectionCard title="SOP library" description="Versioned procedures that support consistent execution.">
-          <ManagedRecordList
-            collection="sops"
-            records={managedSops}
-            folders={folderResult.folders}
-            title="SOP records"
-            description="Keep procedures collapsed until a manager needs to view or edit the details."
-            emptyTitle="No SOPs yet"
-            emptyDescription="Create a procedure for recurring work, handoffs, quality review, onboarding, or customer follow-up."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="sops"
+          records={managedSops}
+          folders={folderResult.folders}
+          title="SOP records"
+          description="Keep procedures collapsed until a manager needs to view or edit the details."
+          emptyTitle="No SOPs yet"
+          emptyDescription="Create a procedure for recurring work, handoffs, quality review, onboarding, or customer follow-up."
+          searchParams={params}
+        />
 
       </section>
     </div>

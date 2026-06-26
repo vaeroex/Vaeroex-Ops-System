@@ -5,7 +5,6 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -157,32 +156,28 @@ export default async function AssetsPage({ searchParams }: AssetsPageProps) {
           </CreateDrawer>
         </div>
 
-        <SectionCard title="Asset register" description="Current equipment and tracked assets for this workspace.">
-          <ManagedRecordList
-            collection="assets"
-            records={managedAssets}
-            folders={assetFolders.folders}
-            title="Asset records"
-            description="Track readiness and organize equipment without a long open table."
-            emptyTitle="No assets yet"
-            emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked business assets."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="assets"
+          records={managedAssets}
+          folders={assetFolders.folders}
+          title="Asset records"
+          description="Track readiness and organize equipment without a long open table."
+          emptyTitle="No assets yet"
+          emptyDescription="Add equipment, vehicles, kits, devices, rooms, or other tracked business assets."
+          searchParams={params}
+        />
 
-        <SectionCard title="Recent asset checks" description="Status checks submitted by workspace members.">
-          <ManagedRecordList
-            collection="asset_checks"
-            records={managedChecks}
-            folders={checkFolders.folders}
-            title="Asset check records"
-            description="Recent checks can also be archived, moved, duplicated, or deleted."
-            emptyTitle="No asset checks"
-            emptyDescription="Run a quick asset check to document readiness or needed repairs."
-            returnPath="/app/assets"
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="asset_checks"
+          records={managedChecks}
+          folders={checkFolders.folders}
+          title="Asset check records"
+          description="Recent checks can also be archived, moved, duplicated, or deleted."
+          emptyTitle="No asset checks"
+          emptyDescription="Run a quick asset check to document readiness or needed repairs."
+          returnPath="/app/assets"
+          searchParams={params}
+        />
       </section>
     </div>
   );

@@ -953,18 +953,16 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           </CreateDrawer>
         </div>
 
-        <SectionCard title="Report history" description="Customer-ready summaries for the active workspace.">
-          <ManagedRecordList
-            collection="reports"
-            records={managedReports}
-            folders={folderResult.folders}
-            title="Report records"
-            description="Saved reports are collapsed by default and can be grouped, archived, duplicated, or edited."
-            emptyTitle="No reports match these filters"
-            emptyDescription="Generate a period report or adjust the filters to review saved summaries for this workspace."
-            searchParams={params}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="reports"
+          records={managedReports}
+          folders={folderResult.folders}
+          title="Report records"
+          description="Saved reports are collapsed by default and can be grouped, archived, duplicated, or edited."
+          emptyTitle="No reports match these filters"
+          emptyDescription="Generate a period report or adjust the filters to review saved summaries for this workspace."
+          searchParams={params}
+        />
       </section>
 
       <ReportSubscriptionPreferences preferences={preferences} people={people} scheduledRuns={scheduledRuns} canRunNow={canRunScheduledReports} />

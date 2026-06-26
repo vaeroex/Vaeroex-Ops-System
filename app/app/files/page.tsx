@@ -12,14 +12,13 @@ import {
 import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
+import { CompactSummaryChips } from "@/components/operations/CompactSummaryChips";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
-import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
-import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
@@ -1595,56 +1594,33 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       <PageHeader
         eyebrow="Files"
         title="Files & Imports"
-        description="Upload, select, analyze, import, review, and turn file findings into reports or follow-up work. Files are optional: you can still create KPIs, CRM leads, follow-ups, checklists, SOPs, and reports manually."
+        description="What information has been added?"
       />
       <LegalSafetyNotice tone="sensitive" compact />
-      <ModuleTabs
-        tabs={[
-          { label: "All Files", href: "/app/files", active: !params?.status && !params?.folder },
-          { label: "Analyses", href: "/app/files?status=Ready" as Route, active: params?.status === "Ready" },
-          { label: "Imports", href: "/app/files?status=Imported" as Route, active: params?.status === "Imported" },
-          { label: "Reports From Files", href: "/app/reports?report_type=File%20Review" as Route },
-          { label: "Folders", href: "/app/files?folder=unfiled" as Route, active: Boolean(params?.folder) }
-        ]}
-      />
 
-      <details className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3">
-        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-muted">File workflow</summary>
-        <ol className="mt-3 grid gap-2 text-sm text-slate-700 md:grid-cols-3 xl:grid-cols-6">
-          {["Upload file", "Select file", "Analyze or import", "Review results", "Create report/KPI/follow-up", "Intelligence updates"].map((step, index) => (
-            <li key={step} className="flex items-center gap-2 rounded-md bg-white px-3 py-2">
-              <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-vaeroex-blue text-xs font-semibold text-white">{index + 1}</span>
-              <span>{step}</span>
-            </li>
-          ))}
-        </ol>
+      <details className="rounded-lg border border-white/10 bg-[#08111f] p-3 text-sm text-slate-300">
+        <summary className="cursor-pointer font-semibold text-slate-100">More file views</summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link href="/app/files" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">All files</Link>
+          <Link href="/app/files?status=Ready" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Analyses</Link>
+          <Link href="/app/files?status=Imported" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Imports</Link>
+          <Link href="/app/reports?report_type=File%20Review" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Reports from files</Link>
+          <Link href="/app/files?folder=unfiled" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Unfiled</Link>
+        </div>
       </details>
 
       <ErrorNotice message={errorMessage} />
       <SuccessNotice message={successMessage} />
 
-      <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
-        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-          <p className="text-sm text-muted">Files stored</p>
-          <p className="text-ink">{files.length}</p>
-        </article>
-        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-          <p className="text-sm text-muted">Import-ready files</p>
-          <p className="text-ink">{spreadsheetCount}</p>
-        </article>
-        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-          <p className="text-sm text-muted">Rows imported</p>
-          <p className="text-ink">{importedRows}</p>
-        </article>
-        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-          <p className="text-sm text-muted">Pending review</p>
-          <p className="text-ink">{pendingReviewCount}</p>
-        </article>
-        <article className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-          <p className="text-sm text-muted">Vaeroex analyses</p>
-          <p className="text-ink">{analyzedCount}</p>
-        </article>
-      </section>
+      <CompactSummaryChips
+        items={[
+          { label: "Files", value: files.length },
+          { label: "Import-ready", value: spreadsheetCount },
+          { label: "Rows imported", value: importedRows, tone: importedRows ? "good" : "muted" },
+          { label: "Pending review", value: pendingReviewCount, tone: pendingReviewCount ? "attention" : "muted" },
+          { label: "Analyses", value: analyzedCount, tone: analyzedCount ? "good" : "muted" }
+        ]}
+      />
 
       <section className="space-y-4">
         <div className="max-w-xl">
@@ -1670,38 +1646,42 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           </CreateDrawer>
         </div>
 
-        <SectionCard title="File library" description="Files are collapsed by default and can be renamed, moved, duplicated, archived, deleted, searched, filtered, and managed in bulk.">
-          <ManagedRecordList
-            collection="files"
-            records={managedFiles}
-            folders={folderOptions}
-            title="Workspace files"
-            description="Use folders for KPI files, reports, SOPs, CRM files, execution files, and custom collections."
-            emptyTitle="No files uploaded yet"
-            emptyDescription="Upload a CSV, XLSX, PDF, image, or DOCX file to start building a workspace file library."
-            returnPath="/app/files"
-            searchParams={params}
-            activeRecordId={selectedFile?.id}
-          />
-        </SectionCard>
+        <ManagedRecordList
+          collection="files"
+          records={managedFiles}
+          folders={folderOptions}
+          title="Workspace files"
+          description="Search, select, organize, and review files in this workspace."
+          emptyTitle="No files uploaded yet"
+          emptyDescription="Upload a CSV, XLSX, PDF, image, or DOCX file to start building a workspace file library."
+          returnPath="/app/files"
+          searchParams={params}
+          activeRecordId={selectedFile?.id}
+        />
       </section>
 
       {selectedFile ? (
-        <SectionCard title="Selected file actions" description="Choose what to do next with the selected file. Imports always go to review before anything is saved.">
+        <section className="space-y-4 rounded-lg border border-white/10 bg-[#08111f] p-4">
+          <div>
+            <h2 className="text-base font-semibold text-white">Selected file actions</h2>
+            <p className="mt-1 text-sm text-slate-400">Imports always go to review before anything is saved.</p>
+          </div>
           <div className="space-y-4">
             <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
             <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} people={people} />
             <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
           </div>
-        </SectionCard>
+        </section>
       ) : null}
 
-      <SectionCard
-        title="Analysis history"
-        description={selectedFile ? `Saved Vaeroex review runs for ${selectedFile.display_name}.` : "Recent file reviews saved for this workspace."}
-      >
-        <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={selectedFile?.id} showAll={params?.section === "all-analyses"} />
-      </SectionCard>
+      <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+          Analysis history{selectedFile ? ` for ${selectedFile.display_name}` : ""}
+        </summary>
+        <div className="mt-4">
+          <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={selectedFile?.id} showAll={params?.section === "all-analyses"} />
+        </div>
+      </details>
     </div>
   );
 }

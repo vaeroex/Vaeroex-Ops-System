@@ -322,16 +322,16 @@ function FolderManager({
   returnPath: string;
 }) {
   return (
-    <details className="rounded-lg border border-line bg-slate-50 p-4">
-      <summary className="cursor-pointer text-sm font-semibold">Folders and collections</summary>
-      <div className="mt-4 space-y-4">
+    <details className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+      <summary className="cursor-pointer text-sm font-semibold text-slate-100">Folders</summary>
+      <div className="mt-3 space-y-3">
         <form action={createRecordFolderAction} className="grid gap-3 md:grid-cols-[1fr_auto]">
           <input type="hidden" name="collection" value={collection} />
           <input type="hidden" name="return_path" value={returnPath} />
           <input
             name="folder_name"
             placeholder="New folder name"
-            className="rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
+            className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
             required
           />
           <button className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">Create folder</button>
@@ -340,7 +340,7 @@ function FolderManager({
         {folderOptions(folders).length ? (
           <div className="space-y-2">
             {folderOptions(folders).map((folder) => (
-              <div key={folder.id} className="grid gap-2 rounded-lg border border-line bg-white p-3 md:grid-cols-[1fr_auto_auto]">
+              <div key={folder.id} className="grid gap-2 rounded-lg border border-white/10 bg-slate-950/45 p-3 md:grid-cols-[1fr_auto_auto]">
                 <form action={renameRecordFolderAction} className="grid gap-2 md:grid-cols-[1fr_auto]">
                   <input type="hidden" name="collection" value={collection} />
                   <input type="hidden" name="folder_id" value={folder.id} />
@@ -348,9 +348,9 @@ function FolderManager({
                   <input
                     name="folder_name"
                     defaultValue={folder.name}
-                    className="rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
+                    className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none focus:border-vaeroex-accent"
                   />
-                  <button className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">Rename</button>
+                  <button className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30">Rename</button>
                 </form>
                 <form action={archiveRecordFolderAction}>
                   <input type="hidden" name="collection" value={collection} />
@@ -362,7 +362,7 @@ function FolderManager({
             ))}
           </div>
         ) : (
-          <p className="text-sm text-muted">No folders yet.</p>
+          <p className="text-sm text-slate-400">No folders yet.</p>
         )}
       </div>
     </details>
@@ -372,9 +372,9 @@ function FolderManager({
 const inactivePagePillClass =
   "border border-white/10 bg-white/5 text-slate-200 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
 const recordRowInactiveClass = "hover:bg-cyan-950/20 hover:ring-1 hover:ring-inset hover:ring-vaeroex-accent/20";
-const actionMenuPanelClass = "absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-3 shadow-lg";
+const actionMenuPanelClass = "absolute right-0 z-20 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-2xl shadow-black/30";
 const menuItemClass =
-  "block min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
+  "block min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45";
 
 function RecordEditForm({
   collection,
@@ -506,26 +506,26 @@ function RecordActionsMenu({
           ) : null}
 
           {record.quickActions ? (
-            <details className="rounded-md border border-line bg-slate-50 p-2">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-700">File or module actions</summary>
+            <details className="rounded-md border border-white/10 bg-white/[0.04] p-2">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-100">File or module actions</summary>
               <div className="mt-2 flex flex-wrap gap-2">{record.quickActions}</div>
             </details>
           ) : null}
 
-          <details className="rounded-md border border-line bg-slate-50 p-2">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-700">Move</summary>
+          <details className="rounded-md border border-white/10 bg-white/[0.04] p-2">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Move</summary>
             <form action={manageRecordAction} className="mt-3 grid gap-2">
               <input type="hidden" name="collection" value={collection} />
               <input type="hidden" name="record_id" value={record.id} />
               <input type="hidden" name="record_action" value="move" />
               <input type="hidden" name="return_path" value={returnPath} />
-              <select name="target_folder_id" defaultValue={record.folderId || ""} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="target_folder_id" defaultValue={record.folderId || ""} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
                 <option value="">No folder</option>
                 {activeFolders.map((folder) => (
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
                 ))}
               </select>
-              <button className="min-h-11 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">Move</button>
+              <button className="min-h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">Move</button>
             </form>
           </details>
 
@@ -610,13 +610,13 @@ export function ManagedRecordList({
     <div className="managed-record-list space-y-3">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-ink">{title}</h2>
+          <h2 className="text-base font-semibold text-slate-100">{title}</h2>
           {description ? (
             <details className="mt-1">
-              <summary className="cursor-pointer list-none text-xs font-semibold text-muted hover:text-vaeroex-blue">
+              <summary className="cursor-pointer list-none text-xs font-semibold text-slate-400 hover:text-vaeroex-accent">
                 What is this?
               </summary>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{description}</p>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">{description}</p>
             </details>
           ) : null}
         </div>
@@ -624,58 +624,58 @@ export function ManagedRecordList({
       </div>
 
       {successMessage ? (
-        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{successMessage}</div>
+        <div className="rounded-lg border border-emerald-400/35 bg-emerald-950/30 p-3 text-sm text-emerald-100">{successMessage}</div>
       ) : null}
-      {errorMessage ? <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{errorMessage}</div> : null}
+      {errorMessage ? <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm text-red-100">{errorMessage}</div> : null}
 
-      <form method="get" className="rounded-lg border border-line bg-white p-3">
+      <form method="get" className="rounded-lg border border-white/10 bg-[#08111f] p-3 shadow-sm">
         <div className="grid gap-2 lg:grid-cols-[minmax(180px,1fr)_160px_140px_130px_auto_auto] lg:items-center">
           <input
             name="q"
             defaultValue={param(searchParams?.q)}
             placeholder="Search records..."
-            className="min-h-11 min-w-0 rounded-lg border border-line px-3 py-2 text-sm outline-none focus:border-vaeroex-blue"
+            className="min-h-11 min-w-0 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
           />
-          <select name="folder" defaultValue={activeFolder} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+          <select name="folder" defaultValue={activeFolder} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
             <option value="">Folder: All</option>
             <option value="unfiled">Folder: Unfiled</option>
             {activeFolders.map((folder) => (
               <option key={folder.id} value={folder.id}>{folder.name}</option>
             ))}
           </select>
-          <select name="sort" defaultValue={sort} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+          <select name="sort" defaultValue={sort} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
             {sortOptions.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-          <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+          <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
             <option value="active">Active</option>
             <option value="archived">Archived</option>
             <option value="deleted">Hidden</option>
             <option value="all">All</option>
           </select>
-          <details className="relative rounded-lg border border-line bg-slate-50">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center px-3 py-2 text-sm font-semibold text-slate-700">Filters</summary>
-            <div className="mt-2 grid gap-2 border-t border-line p-3 md:grid-cols-2 xl:absolute xl:right-0 xl:z-20 xl:w-[42rem] xl:rounded-lg xl:border xl:border-line xl:bg-white xl:shadow-lg">
-              <select name="status" defaultValue={param(searchParams?.status)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+          <details className="relative rounded-lg border border-white/10 bg-white/[0.04]">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center px-3 py-2 text-sm font-semibold text-slate-100">Filters</summary>
+            <div className="mt-2 grid gap-2 border-t border-white/10 p-3 md:grid-cols-2 xl:absolute xl:right-0 xl:z-20 xl:w-[42rem] xl:rounded-lg xl:border xl:border-white/10 xl:bg-[#08111f] xl:shadow-2xl xl:shadow-black/30">
+              <select name="status" defaultValue={param(searchParams?.status)} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
                 <option value="">All statuses</option>
                 {statusOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="owner" defaultValue={param(searchParams?.owner)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="owner" defaultValue={param(searchParams?.owner)} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
                 <option value="">All owners</option>
                 {ownerOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="category" defaultValue={param(searchParams?.category)} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="category" defaultValue={param(searchParams?.category)} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
                 <option value="">All categories</option>
                 {categoryOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
-              <select name="limit" defaultValue={limitValue || "10"} className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+              <select name="limit" defaultValue={limitValue || "10"} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
                 {pageSizeOptions.map((option) => (
                   <option key={option} value={option}>
                     Show {option}
@@ -688,19 +688,22 @@ export function ManagedRecordList({
                 name="date_from"
                 defaultValue={param(searchParams?.date_from)}
                 aria-label="Updated after"
-                className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm"
+                className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100"
               />
               <input
                 type="date"
                 name="date_to"
                 defaultValue={param(searchParams?.date_to)}
                 aria-label="Updated before"
-                className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm"
+                className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100"
               />
+              <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white md:col-span-2">
+                Apply filters
+              </button>
             </div>
           </details>
           <button className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            Apply
+            Search
           </button>
         </div>
       </form>
@@ -719,10 +722,10 @@ export function ManagedRecordList({
             <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-300/50 hover:bg-cyan-400/20">
               More
             </summary>
-            <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-line bg-white p-3 shadow-lg">
+            <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-2xl shadow-black/30">
               <Link
                 href={`/app/agents?prompt=${encodeURIComponent(askPrompt)}` as Route}
-                className="block rounded-lg border border-line bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white"
+                className="block rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white"
               >
                 Ask Vaeroex about this page
               </Link>
@@ -737,14 +740,14 @@ export function ManagedRecordList({
           <input type="hidden" name="collection" value={collection} />
           <input type="hidden" name="return_path" value={returnPath} />
           <p className="text-sm font-semibold text-vaeroex-blue">Selected records</p>
-          <select name="bulk_action" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm" required>
+          <select name="bulk_action" className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100" required>
             <option value="">Bulk action</option>
             <option value="archive">Archive selected</option>
             <option value="delete">Delete selected</option>
             <option value="move">Move selected to folder</option>
             <option value="restore">Restore selected</option>
           </select>
-          <select name="target_folder_id" className="min-h-11 rounded-lg border border-line px-3 py-2 text-sm">
+          <select name="target_folder_id" className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
             <option value="">No folder</option>
             {activeFolders.map((folder) => (
               <option key={folder.id} value={folder.id}>{folder.name}</option>
