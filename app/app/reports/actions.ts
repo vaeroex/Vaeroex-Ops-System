@@ -42,12 +42,16 @@ function text(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function redirectWithError(message: string): never {
-  redirect(`/app/reports?error=${encodeURIComponent(message)}` as Route);
+function safeReportsReturnPath(value: string) {
+  return value === "/app/briefings" ? "/app/briefings" : "/app/reports";
 }
 
-function redirectWithMessage(message: string): never {
-  redirect(`/app/reports?message=${encodeURIComponent(message)}` as Route);
+function redirectWithError(message: string, returnPath = "/app/reports"): never {
+  redirect(`${safeReportsReturnPath(returnPath)}?error=${encodeURIComponent(message)}` as Route);
+}
+
+function redirectWithMessage(message: string, returnPath = "/app/reports"): never {
+  redirect(`${safeReportsReturnPath(returnPath)}?message=${encodeURIComponent(message)}` as Route);
 }
 
 async function requireWorkspace() {
@@ -747,6 +751,7 @@ Comparison period: ${previousRange.startDate} to ${previousRange.endDate}`;
 
 export async function generateReportAction(formData: FormData) {
   const { supabase, user, workspace, workspaceId } = await requireWorkspace();
+  const returnPath = safeReportsReturnPath(text(formData, "return_path"));
   const periodValue = text(formData, "report_period");
   const period = isReportPeriod(periodValue) ? periodValue : "Weekly";
   const reportType = text(formData, "report_type") || "Intelligence Summary";
@@ -801,9 +806,10 @@ export async function generateReportAction(formData: FormData) {
   });
 
   if (error) {
-    redirectWithError(error.message);
+    redirectWithError(error.message, returnPath);
   }
 
   revalidatePath("/app/reports");
-  redirectWithMessage(`${period} report generated.`);
+  revalidatePath("/app/briefings");
+  redirectWithMessage(`${period} briefing generated.`, returnPath);
 }
