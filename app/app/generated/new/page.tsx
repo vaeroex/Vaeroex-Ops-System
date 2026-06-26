@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { saveGeneratedOutputToBriefingsAction } from "@/app/app/generated/actions";
+import { BusinessIntelligenceCoverageSummary } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { GeneratedOutputControls } from "@/components/generated/GeneratedOutputControls";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import {
   buildGeneratedOutput,
   parseGeneratedOutputType,
@@ -62,7 +64,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
   const error = params.get("error");
   const outputType = parseGeneratedOutputType(params.get("type"));
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult] = await Promise.all([
+  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, crmHistoryResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, checklistsResult, checklistRunsResult, metricsResult, assetsResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
@@ -70,13 +72,18 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
     supabase.from("forms").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("form_submissions").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false })
+    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("checklists").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+    supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }),
+    supabase.from("assets").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("updated_at", { ascending: false })
   ]);
   const errors = [
     tasksResult.error,
@@ -86,13 +93,18 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     reportsResult.error,
     runsResult.error,
     crmResult.error,
+    crmHistoryResult.error,
     importsResult.error,
     sopsResult.error,
     formsResult.error,
     submissionsResult.error,
     peopleResult.error,
     decisionsResult.error,
-    outcomesResult.error
+    outcomesResult.error,
+    checklistsResult.error,
+    checklistRunsResult.error,
+    metricsResult.error,
+    assetsResult.error
   ].filter(Boolean);
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
@@ -111,12 +123,34 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     decisions: decisionsResult.data || [],
     recommendationOutcomes: outcomesResult.data || []
   });
+  const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
+    tasks: tasksResult.data || [],
+    issues: issuesResult.data || [],
+    kpis: kpisResult.data || [],
+    files: filesResult.data || [],
+    reports: reportsResult.data || [],
+    vaeroexRuns: runsResult.data || [],
+    crmLeads: crmResult.data || [],
+    crmHistory: crmHistoryResult.data || [],
+    imports: importsResult.data || [],
+    sops: sopsResult.data || [],
+    forms: formsResult.data || [],
+    submissions: submissionsResult.data || [],
+    people: peopleResult.data || [],
+    decisions: decisionsResult.data || [],
+    recommendationOutcomes: outcomesResult.data || [],
+    checklists: checklistsResult.data || [],
+    checklistRuns: checklistRunsResult.data || [],
+    operationalMetrics: metricsResult.data || [],
+    assets: assetsResult.data || []
+  });
   const source = sourceFromSearchParams({ params, intelligence });
   const output = buildGeneratedOutput({
     type: outputType,
     source,
     intelligence,
-    workspaceName: context.activeWorkspace?.name
+    workspaceName: context.activeWorkspace?.name,
+    coverage: businessIntelligenceCoverage
   });
   const askPrompt = `Review this Vaeroex generated output and answer with evidence, confidence, and the first practical step: ${output.title}`;
   const sourceDataJson = outputSourceData(output);
@@ -165,6 +199,8 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
           <GeneratedOutputControls title={output.title} markdown={output.markdown} />
         </div>
       </section>
+
+      <BusinessIntelligenceCoverageSummary coverage={businessIntelligenceCoverage} />
 
       <section className="grid gap-4 xl:grid-cols-[.75fr_1.25fr]">
         <div className="space-y-4">
