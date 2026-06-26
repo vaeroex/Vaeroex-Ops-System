@@ -11,6 +11,7 @@ type NavItem = {
 
 type NavSection = {
   label: string;
+  defaultOpen?: boolean;
   items: NavItem[];
 };
 
@@ -42,7 +43,7 @@ function isActivePath(pathname: string, href: string) {
 
 function DesktopSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
   return (
-    <details open className="group rounded-lg border border-white/10 bg-white/[0.04] shadow-sm shadow-black/10">
+    <details open={section.defaultOpen} className="group rounded-lg border border-white/10 bg-white/[0.04] shadow-sm shadow-black/10">
       <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-silver">
         {section.label}
         <span className="text-vaeroex-accent transition group-open:rotate-90">&gt;</span>

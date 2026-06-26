@@ -14,60 +14,58 @@ import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
   {
-    label: "Home",
+    label: "Intelligence Layer",
+    defaultOpen: true,
     items: [
-      { href: "/app", label: "Operations Intelligence" },
-      { href: "/app/notifications", label: "Notifications" }
+      { href: "/app", label: "Home" },
+      { href: "/app/intelligence", label: "Intelligence" },
+      { href: "/app/sources", label: "Sources" },
+      { href: "/app/actions", label: "Actions" },
+      { href: "/app/agents", label: "Ask Vaeroex" }
     ]
   },
   {
-    label: "Execution",
+    label: "Supporting Systems",
+    defaultOpen: false,
     items: [
-      { href: "/app/tasks", label: "Follow-ups" },
-      { href: "/app/checklists", label: "Checklists" },
-      { href: "/app/issues", label: "Issues" },
-      { href: "/app/assets", label: "Assets" },
-      { href: "/app/people", label: "People" }
-    ]
-  },
-  {
-    label: "Relationships",
-    items: [
+      { href: "/app/files", label: "Files & Imports" },
+      { href: "/app/reports", label: "Reports" },
+      { href: "/app/kpis", label: "KPI Signals" },
       { href: "/app/crm", label: "Customer Context" },
-      { href: "/app/forms", label: "Forms" },
+      { href: "/app/sops", label: "Process Knowledge" },
+      { href: "/app/forms", label: "Intake Forms" },
       { href: "/app/form-submissions", label: "Form Submissions" }
     ]
   },
   {
-    label: "Data & Intelligence",
+    label: "Action Records",
+    defaultOpen: false,
     items: [
-      { href: "/app/kpis", label: "KPIs" },
-      { href: "/app/kpis/settings", label: "KPI Settings" },
-      { href: "/app/files", label: "Files" },
-      { href: "/app/reports", label: "Reports" }
+      { href: "/app/tasks", label: "Follow-ups" },
+      { href: "/app/issues", label: "Issues & Risks" },
+      { href: "/app/checklists", label: "Checklists" },
+      { href: "/app/checklist-runs", label: "Checklist Runs" },
+      { href: "/app/assets", label: "Assets" },
+      { href: "/app/people", label: "Ownership" }
     ]
   },
   {
-    label: "Knowledge Base",
-    items: [{ href: "/app/sops", label: "SOPs" }]
-  },
-  {
-    label: "Vaeroex",
-    items: [{ href: "/app/agents", label: "Ask Vaeroex" }]
-  },
-  {
-    label: "Account",
+    label: "Settings",
+    defaultOpen: false,
     items: [
       { href: "/app/settings", label: "Settings" },
+      { href: "/app/kpis/settings", label: "KPI Settings" },
       { href: "/app/account/subscription", label: "Subscription" },
+      { href: "/app/notifications", label: "Notifications" },
       { href: "/app/help", label: "Help Center" },
       { href: "/app/support", label: "Support" }
     ]
   }
-] satisfies Array<{ label: string; items: Array<{ href: string; label: string }> }>;
+] satisfies Array<{ label: string; defaultOpen?: boolean; items: Array<{ href: string; label: string }> }>;
 
 const adminNavSection = {
   label: "Admin",
+  defaultOpen: false,
   items: [
     { href: "/app/admin", label: "Admin Dashboard" },
     { href: "/app/admin/customers", label: "Customers" },
@@ -77,7 +75,7 @@ const adminNavSection = {
     { href: "/app/admin/support-requests", label: "Support Requests" },
     { href: "/app/admin/audit-logs", label: "Audit Logs" }
   ]
-} satisfies { label: string; items: Array<{ href: string; label: string }> };
+} satisfies { label: string; defaultOpen?: boolean; items: Array<{ href: string; label: string }> };
 
 type AppShellProps = {
   children: ReactNode;
@@ -184,7 +182,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                   {activeWorkspace?.name || "Setup required"} · {accessLabel}
                 </p>
-                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Vaeroex Intelligence Hub</h1>
+                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Vaeroex Intelligence Layer</h1>
               </div>
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">

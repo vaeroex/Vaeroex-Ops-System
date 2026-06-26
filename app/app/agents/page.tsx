@@ -1443,7 +1443,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
   const promptDefault = typeof params?.prompt === "string" ? params.prompt : "";
-  const requestedWorkflowKey = typeof params?.workflow === "string" ? params.workflow : promptDefault ? "ask_vaeroex" : "";
+  const requestedWorkflowKey = typeof params?.workflow === "string" ? params.workflow : "ask_vaeroex";
   const selectedWorkflow = requestedWorkflowKey ? getVaeroexWorkflow(requestedWorkflowKey) : null;
   const pageErrorMessage = friendlyHubError(
     (selectedRun ? undefined : (params?.error as string | undefined)) || error?.message || folderResult.error?.message || peopleResult.error?.message
@@ -1491,56 +1491,22 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <PageHeader
         eyebrow="Ask Vaeroex"
         title="Ask Vaeroex"
-        description="What do you want help with today?"
+        description="Question, answer, why, evidence, action. Ask Vaeroex to explain what changed, why it matters, and what leadership should do next."
       />
 
       <ErrorNotice message={pageErrorMessage} />
       <SuccessNotice message={params?.saved as string | undefined} />
 
       <section className="space-y-6">
-        <SectionCard title="What do you want help with today?">
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {WORKFLOW_CHOICES.map((choice) => {
-              const isActive = selectedWorkflow?.key === choice.workflowKey;
-              const className = `rounded-lg border p-4 text-left transition ${
-                isActive
-                  ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-50"
-                  : "border-white/10 bg-[#08111f] text-slate-100 hover:border-cyan-300/45 hover:bg-blue-950/30"
-              }`;
-
-              if (choice.href) {
-                return (
-                  <Link key={choice.label} href={choice.href} className={className}>
-                    <span className="block text-sm font-semibold">{choice.label}</span>
-                    <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
-                  </Link>
-                );
-              }
-
-              return (
-                <Link
-                  key={choice.label}
-                  href={`/app/agents?workflow=${choice.workflowKey}` as Route}
-                  className={className}
-                >
-                  <span className="block text-sm font-semibold">{choice.label}</span>
-                  <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
-                </Link>
-              );
-            })}
-          </div>
-
+        <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
           {selectedWorkflow ? (
-            <div className="mt-5 rounded-lg border border-cyan-300/25 bg-[#071526] p-4 text-slate-100">
+            <div className="rounded-lg border border-cyan-300/25 bg-[#071526] p-4 text-slate-100">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Selected workflow</p>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Question first</p>
                   <h3 className="mt-2 text-lg font-semibold text-white">{selectedWorkflow.title}</h3>
                   <p className="mt-1 text-sm leading-6 text-slate-300">{selectedWorkflow.description}</p>
                 </div>
-                <Link href="/app/agents" className="w-fit rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-cyan-400/10">
-                  Change
-                </Link>
               </div>
               <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs leading-5 text-slate-300">
                 <span className="font-semibold text-white">Data used:</span> {workflowDataUsed(selectedWorkflow.key)}
@@ -1552,7 +1518,41 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
               Choose one workflow. Vaeroex will show one focused input area, then return an answer with evidence available when you need it.
             </p>
           )}
-        </SectionCard>
+
+          <details className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Change workflow</summary>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              {WORKFLOW_CHOICES.map((choice) => {
+                const isActive = selectedWorkflow?.key === choice.workflowKey;
+                const className = `rounded-lg border p-4 text-left transition ${
+                  isActive
+                    ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-50"
+                    : "border-white/10 bg-[#08111f] text-slate-100 hover:border-cyan-300/45 hover:bg-blue-950/30"
+                }`;
+
+                if (choice.href) {
+                  return (
+                    <Link key={choice.label} href={choice.href} className={className}>
+                      <span className="block text-sm font-semibold">{choice.label}</span>
+                      <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
+                    </Link>
+                  );
+                }
+
+                return (
+                  <Link
+                    key={choice.label}
+                    href={`/app/agents?workflow=${choice.workflowKey}` as Route}
+                    className={className}
+                  >
+                    <span className="block text-sm font-semibold">{choice.label}</span>
+                    <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </details>
+        </section>
 
         {selectedRun ? (
           <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} people={people} />
