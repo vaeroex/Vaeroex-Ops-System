@@ -126,7 +126,7 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
           <div className="space-y-3">
             {subscriptionErrors.data?.length ? subscriptionErrors.data.map((event) => (
               <article key={event.id} className="rounded-lg border border-line p-3">
-                <p className="text-sm font-semibold">{event.event_type || "Squarespace event"}</p>
+                <p className="text-sm font-semibold">{event.event_type || "Subscription event"}</p>
                 <p className="mt-1 text-xs text-muted">{event.customer_email || "No customer email"}</p>
                 <div className="mt-2">
                   <TruncatedLogMessage message={event.processing_error} />

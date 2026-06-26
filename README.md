@@ -83,15 +83,14 @@ Phase 5 is now implemented in the scaffold:
 
 Phase 6 is now implemented in the scaffold:
 
-- Stripe checkout for new Operations Intelligence subscriptions, with legacy Squarespace/manual subscription support retained
+- Stripe checkout for new Operations Intelligence subscriptions, with manual subscription support retained
 - Subscription plans, customer subscriptions, subscription events, manual activation requests, and Vaeroex usage tracking
 - Billing-required page with manual activation request flow
 - Account subscription page with status, plan, usage, Stripe portal access when available, and contact links
 - Owner/admin subscription management page for manual activations, status changes, notes, requests, and event payload review
-- Squarespace webhook endpoint that stores order events and maps product names/SKUs to the Vaeroex plan
 - Plan limits for workspaces, users, forms, checklists, and monthly Vaeroex runs
 - Pricing page buttons that start Stripe Checkout
-- Stripe checkout, webhook, portal, and success routes, plus legacy Squarespace setup docs
+- Stripe checkout, webhook, portal, and success routes
 - Acceptance review in `docs/phase-6-acceptance.md`
 
 Phase 7 admin and support tools are now implemented in the scaffold:
@@ -162,13 +161,6 @@ VAEROEX_ADMIN_EMAILS=
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
 STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY=
-
-# Legacy Squarespace support only. Not required for new Stripe checkout.
-SQUARESPACE_API_KEY=
-SQUARESPACE_WEBHOOK_SECRET=
-SQUARESPACE_VAEROEX_PRODUCT_ID=
-SQUARESPACE_VAEROEX_SKU=
-NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL=
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must only be used in server-side code. Never expose it to the browser.
@@ -205,13 +197,13 @@ The webhook updates `customer_subscriptions` with Stripe customer, subscription,
 
 Customers can open the Stripe customer portal from `/app/account/subscription` when their subscription has a Stripe customer ID.
 
-## Legacy Squarespace And Manual Access
+## Manual Access
 
-Existing Squarespace and manual subscription records remain supported. Manual activations can still be created in `/app/admin/subscriptions`, and the legacy Squarespace webhook at `/api/squarespace/webhook` still stores incoming events for existing workflows.
+Manual activations can still be created in `/app/admin/subscriptions` for verified customers, admin testing, and support exceptions.
 
 The Vaeroex app handles account login, workspace creation, product access, usage limits, and subscription status checks. Customers should create their Vaeroex app account with the same email address they used at checkout so the app can match their purchase to `customer_subscriptions`.
 
-The app remains usable when legacy Squarespace webhook credentials are not configured. Customers without active, demo, or manually unlocked access are sent to `/billing-required`.
+Customers without active, demo, or manually unlocked access are sent to `/billing-required`.
 
 ## Internal Admin And Support
 
@@ -355,7 +347,7 @@ Add this notice anywhere users enter operational information, especially setup, 
 - Tenant-scoped data access for dashboard, forms, submissions, checklists, checklist runs, follow-ups, issues, assets, asset checks, people, SOPs, and reports
 - Phase 4 Vaeroex Hub, OpenAI wrapper, workspace snapshot, run storage, and confirmation save flow
 - Phase 5 polish pass with demo data, loading/error/empty states, toast notifications, confirmations, validation, compliance notices, acceptance review, and Vercel instructions
-- Phase 6 subscription access with Stripe checkout, manual activation, legacy Squarespace webhook scaffolding, usage limits, account subscription status, admin review tools, pricing links, and setup docs
+- Phase 6 subscription access with Stripe checkout, manual activation, usage limits, account subscription status, admin review tools, pricing links, and setup docs
 - Phase 7 internal admin and support tools with customer search, workspace access controls, subscription controls, Vaeroex usage review, support queue, audit log review, and support request forms
 
 ## What Is Placeholder
@@ -368,7 +360,7 @@ Add this notice anywhere users enter operational information, especially setup, 
 - Integrations
 - Edit/delete flows and richer filters
 - Vaeroex result editing before confirmed save
-- Live Stripe webhook payloads and legacy Squarespace webhook payloads still need to be verified against production events
+- Live Stripe webhook payloads still need to be verified against production events
 - Impersonation is a placeholder only
 - Screenshot/file upload for support requests is a placeholder only
 - Automated tests

@@ -45,7 +45,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
 
   return (
     <div className="space-y-6">
-      <SectionCard title="Subscription admin" description="Manually activate Vaeroex customers and review Stripe, Squarespace, and manual subscription events.">
+      <SectionCard title="Subscription admin" description="Manually activate Vaeroex customers and review Stripe and manual subscription events.">
         {params?.message ? <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
         <ErrorNotice message={params?.error} />
         <form className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -88,10 +88,6 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
               Workspace ID
               <input name="workspace_id" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
             </label>
-            <label className="block text-sm font-medium">
-              Legacy order ID
-              <input name="squarespace_order_id" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
-            </label>
             <label className="block text-sm font-medium lg:col-span-2">
               Notes
               <textarea name="notes" rows={4} className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
@@ -130,7 +126,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                 </form>
               </article>
             )) : (
-              <EmptyState title="No customer subscriptions found" description="Create a manual activation after confirming a purchase, or wait for a Stripe or legacy billing event." />
+              <EmptyState title="No customer subscriptions found" description="Create a manual activation after confirming a purchase, or wait for a Stripe billing event." />
             )}
           </div>
         </SectionCard>
@@ -185,7 +181,7 @@ export default async function AdminSubscriptionsPage({ searchParams }: AdminSubs
                 </div>
               </article>
             )) : (
-              <EmptyState title="No subscription events yet" description="When Stripe or legacy billing webhooks are configured, received events and processing details will appear here." />
+              <EmptyState title="No subscription events yet" description="When Stripe webhooks are configured, received events and processing details will appear here." />
             )}
           </div>
         </SectionCard>
