@@ -725,6 +725,12 @@ export type Database = {
           color: string;
           is_visible: boolean;
           sort_order: number;
+          unit_type: string | null;
+          display_unit: string | null;
+          value_format: string | null;
+          x_axis_label: string | null;
+          y_axis_label: string | null;
+          preferred_chart_type: string;
           created_by: string | null;
           created_at: string;
           updated_at: string;
@@ -740,6 +746,12 @@ export type Database = {
           color?: string;
           is_visible?: boolean;
           sort_order?: number;
+          unit_type?: string | null;
+          display_unit?: string | null;
+          value_format?: string | null;
+          x_axis_label?: string | null;
+          y_axis_label?: string | null;
+          preferred_chart_type?: string;
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;

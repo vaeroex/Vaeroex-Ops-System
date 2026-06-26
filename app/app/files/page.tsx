@@ -23,6 +23,7 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
+import { KPI_COLOR_PALETTE, kpiColorMayBeLowContrast } from "@/lib/kpis/settings";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -66,6 +67,19 @@ const SUGGESTED_PROMPTS = [
   "Create recommended actions."
 ];
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting content", "Sending to Vaeroex", "Preparing findings", "Saving review", "Done"];
+const KPI_IMPORT_CHART_TYPES = [
+  { value: "line", label: "Line chart" },
+  { value: "bar", label: "Bar chart" },
+  { value: "mixed", label: "Mixed chart" }
+];
+const KPI_VALUE_FORMAT_OPTIONS = [
+  { value: "", label: "Standard number" },
+  { value: "currency", label: "Currency" },
+  { value: "percentage", label: "Percentage" },
+  { value: "duration", label: "Duration" },
+  { value: "count", label: "Count" },
+  { value: "decimal", label: "Decimal" }
+];
 const IMPORT_FIELDS: Record<ImportType, Array<{ key: string; label: string; required?: boolean }>> = {
   kpi: [
     { key: "name", label: "KPI name", required: true },
@@ -263,6 +277,15 @@ function mappingValue(mappingJson: unknown, key: string) {
   return typeof value === "string" ? value : "";
 }
 
+function kpiInterpretationValue(mappingJson: unknown, key: string, fallback = "") {
+  if (!isRecord(mappingJson) || !isRecord(mappingJson.kpi_interpretation)) {
+    return fallback;
+  }
+
+  const value = mappingJson.kpi_interpretation[key];
+  return typeof value === "string" ? value : fallback;
+}
+
 function rowValues(row: FileImportDataRow) {
   return isRecord(row.data_json) ? row.data_json : {};
 }
@@ -323,6 +346,110 @@ function DetectedColumnCard({ label, value, required = false }: { label: string;
     <div className={`rounded-lg border p-3 ${detected ? "border-line bg-white" : required ? "border-red-200 bg-red-50 text-red-700" : "border-amber-200 bg-amber-50 text-amber-900"}`}>
       <p className="text-xs font-semibold uppercase tracking-wide opacity-80">{label}</p>
       <p className="mt-1 text-sm font-semibold">{detected ? value : "Not detected"}</p>
+    </div>
+  );
+}
+
+function KpiImportInterpretationControls({ mappingJson }: { mappingJson: unknown }) {
+  const color = kpiInterpretationValue(mappingJson, "color", "#1E6BFF");
+  const lowContrastColor = kpiColorMayBeLowContrast(color);
+  const inputClass =
+    "mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/80 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent focus:ring-2 focus:ring-vaeroex-accent/20";
+
+  return (
+    <div className="space-y-4 rounded-lg border border-vaeroex-blue/30 bg-slate-950 p-4 text-slate-100 shadow-sm shadow-blue-950/30">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-sm font-semibold">KPI interpretation settings</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            These settings shape charts, legends, and Vaeroex summaries after approval. Historical KPI values stay locked as imported records.
+          </p>
+        </div>
+        <span className="w-fit rounded-full border border-cyan-400/30 bg-cyan-950/40 px-3 py-1 text-xs font-semibold text-cyan-100">
+          Review before saving
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <label className="block text-sm font-medium text-slate-200">
+          Unit/type
+          <input
+            name="unit_type"
+            defaultValue={kpiInterpretationValue(mappingJson, "unit_type")}
+            placeholder="Revenue, percentage, count, hours"
+            className={inputClass}
+          />
+        </label>
+        <label className="block text-sm font-medium text-slate-200">
+          Display unit
+          <input
+            name="display_unit"
+            defaultValue={kpiInterpretationValue(mappingJson, "display_unit")}
+            placeholder="$, %, hours, leads"
+            className={inputClass}
+          />
+        </label>
+        <label className="block text-sm font-medium text-slate-200">
+          Value format
+          <select name="value_format" defaultValue={kpiInterpretationValue(mappingJson, "value_format")} className={inputClass}>
+            {KPI_VALUE_FORMAT_OPTIONS.map((option) => (
+              <option key={option.value || "standard"} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="block text-sm font-medium text-slate-200">
+          X-axis label
+          <input
+            name="x_axis_label"
+            defaultValue={kpiInterpretationValue(mappingJson, "x_axis_label", "Date")}
+            placeholder="Date"
+            className={inputClass}
+          />
+        </label>
+        <label className="block text-sm font-medium text-slate-200">
+          Y-axis label
+          <input
+            name="y_axis_label"
+            defaultValue={kpiInterpretationValue(mappingJson, "y_axis_label")}
+            placeholder="Revenue, conversion rate, response time"
+            className={inputClass}
+          />
+        </label>
+        <label className="block text-sm font-medium text-slate-200">
+          Preferred chart
+          <select name="preferred_chart_type" defaultValue={kpiInterpretationValue(mappingJson, "preferred_chart_type", "line")} className={inputClass}>
+            {KPI_IMPORT_CHART_TYPES.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+
+      <div className="rounded-lg border border-white/10 bg-slate-900/70 p-3">
+        <label className="block text-sm font-medium text-slate-200">
+          KPI color
+          <select name="color" defaultValue={color} className={inputClass}>
+            {KPI_COLOR_PALETTE.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label} ({option.value})
+              </option>
+            ))}
+          </select>
+        </label>
+        <div className="mt-3 flex items-center gap-3 text-xs text-slate-400">
+          <span className="h-3 w-8 rounded-full" style={{ backgroundColor: color }} aria-hidden />
+          <span>Auto-selected imports default to a high-contrast Vaeroex color. Deep Navy is kept only when selected intentionally.</span>
+        </div>
+        {lowContrastColor ? (
+          <p className="mt-3 rounded-lg border border-amber-400/30 bg-amber-950/40 p-3 text-xs leading-5 text-amber-100">
+            Deep Navy can be low contrast on Pulsar surfaces. Use it only when this KPI has a strong visual reason to keep that historic/manual color.
+          </p>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1199,6 +1326,8 @@ function MappingReview({
           </div>
         </div>
       ) : null}
+
+      {importType === "kpi" ? <KpiImportInterpretationControls mappingJson={importRecord.mapping_json} /> : null}
 
       <div className="grid gap-3 md:grid-cols-2">
         {fields.map((field) => (
