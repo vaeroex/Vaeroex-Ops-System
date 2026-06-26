@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
-import { mapSquarespaceProductToPlan } from "@/lib/billing/squarespace-plan-map";
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import type { Json } from "@/lib/supabase/types";
 
@@ -19,7 +18,7 @@ async function requireSubscriptionAdmin() {
 export async function createManualSubscriptionAction(formData: FormData) {
   const { admin, user } = await requireSubscriptionAdmin();
   const email = text(formData, "customer_email").toLowerCase();
-  const planSlug = normalizePlanSlug(text(formData, "plan_slug") || mapSquarespaceProductToPlan(text(formData, "plan_purchased"))) || VAEROEX_PLAN_SLUG;
+  const planSlug = normalizePlanSlug(text(formData, "plan_slug")) || VAEROEX_PLAN_SLUG;
   const status = text(formData, "status") || "active";
   const workspaceId = text(formData, "workspace_id") || null;
 
@@ -46,7 +45,6 @@ export async function createManualSubscriptionAction(formData: FormData) {
     billing_provider: "manual",
     plan_slug: planSlug,
     status,
-    squarespace_order_id: text(formData, "squarespace_order_id") || null,
     raw_payload_json: { manual: true } satisfies Json,
     manually_activated: true,
     manually_activated_by: user.id,

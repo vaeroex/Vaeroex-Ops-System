@@ -92,7 +92,7 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                   </div>
                   <StatusBadge value={subscription.status} />
                 </div>
-                <p className="mt-2 text-xs text-muted">{subscription.source} · {subscription.squarespace_order_id || "No order ID"}</p>
+                <p className="mt-2 text-xs text-muted">{subscription.billing_provider || subscription.source || "subscription"} · {subscription.stripe_subscription_id || subscription.stripe_customer_id || "No Stripe ID"}</p>
               </article>
             )) : (
               <EmptyState title="No subscriptions found" description="No customer subscriptions matched the current search." />
