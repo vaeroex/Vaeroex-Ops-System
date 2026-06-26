@@ -15,6 +15,7 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getVaeroexWorkflow, type VaeroexSaveTarget, type VaeroexWorkflowKey } from "@/lib/ai/vaeroex-workflows";
+import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -97,13 +98,13 @@ const WORKFLOW_CHOICES: Array<{
     href: "/app/sources"
   },
   {
-    label: "Create Briefing",
+    label: "Generate Briefing",
     description: "Generate a clean leadership briefing draft.",
     workflowKey: "weekly_report"
   },
   {
-    label: "Create Actions",
-    description: "Turn loose concerns into accountable work.",
+    label: "Generate Action Plan",
+    description: "Turn loose concerns into a reviewable action plan.",
     workflowKey: "follow_up"
   },
   {
@@ -669,6 +670,15 @@ function RecommendationCard({
   runTitle: string;
   people: TeamPersonOption[];
 }) {
+  const recommendationOutputType = recommendation.relatedModule.toLowerCase().includes("issue") || recommendation.relatedModule.toLowerCase().includes("risk") ? "risk_brief" : "action_plan";
+  const outputHref = generatedOutputHref({
+    type: recommendationOutputType,
+    title: recommendation.title,
+    summary: recommendation.why,
+    remedy: recommendation.why,
+    run: runId
+  });
+
   return (
     <article className="rounded-lg border border-cyan-300/20 bg-cyan-400/10 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -680,24 +690,24 @@ function RecommendationCard({
       </div>
       <dl className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
         <div>
-          <dt className="font-semibold text-slate-100">Suggested owner</dt>
-          <dd className="mt-1">{recommendation.owner}</dd>
+          <dt className="font-semibold text-slate-100">Output path</dt>
+          <dd className="mt-1">Generate and review first</dd>
         </div>
         <div>
-          <dt className="font-semibold text-slate-100">Suggested due date</dt>
-          <dd className="mt-1">{recommendation.dueDate}</dd>
+          <dt className="font-semibold text-slate-100">Internal tracking</dt>
+          <dd className="mt-1">Optional after review</dd>
         </div>
       </dl>
       <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href="/app/actions" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-500">
-          Create Action
+        <Link href={outputHref} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70">
+          {recommendationOutputType === "risk_brief" ? "Generate Risk Brief" : "Generate Action Plan"}
         </Link>
-        <Link href={moduleHref(recommendation.relatedModule)} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Open {recommendation.relatedModule}
+        <Link href={generatedOutputHref({ type: "executive_briefing", title: recommendation.title, summary: recommendation.why, remedy: recommendation.why, run: runId })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          Generate Executive Briefing
         </Link>
-        <Link href="/app/briefings" className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Add to Briefing
+        <Link href={generatedOutputHref({ type: "checklist", title: recommendation.title, summary: recommendation.why, remedy: recommendation.why, run: runId })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+          Generate Checklist
         </Link>
         <form action={dismissRecommendationAction}>
           <input type="hidden" name="return_path" value={`/app/ask?run=${runId}`} />
@@ -711,8 +721,11 @@ function RecommendationCard({
         </form>
       </div>
       <details className="mt-4 rounded-lg border border-white/10 bg-slate-950/45 p-3">
-        <summary className="cursor-pointer text-xs font-semibold text-slate-200">Assign or share this recommendation</summary>
+        <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: convert to internal action record</summary>
         <div className="mt-3 grid gap-3">
+          <Link href={moduleHref(recommendation.relatedModule)} className="w-fit rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+            Open {recommendation.relatedModule}
+          </Link>
           <AssignmentPanel
             sourceType="vaeroex_recommendation"
             sourceId={runId}
@@ -764,7 +777,7 @@ function RecommendationActionCards({
         <div>
           <h4 className="text-sm font-semibold text-white">Top Recommendation</h4>
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            Vaeroex drafts are not saved until you confirm.
+            Generate a clear output first. Saving or converting records is optional.
           </p>
         </div>
         <Link href="/app/ask" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
@@ -1276,6 +1289,10 @@ function SelectedResult({
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
   const input = getRunInput(run);
   const confidence = outputConfidence(display, run.status);
+  const sections = businessSections(display);
+  const resultSummary = sections.executiveSummary;
+  const resultRemedy = sections.actions[0] || "Review this output and decide the first practical next step.";
+  const resultWhy = outputReasoning(display);
 
   return (
     <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into workspace records until you confirm.">
@@ -1309,17 +1326,17 @@ function SelectedResult({
             </details>
             <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
               <p className="text-sm font-semibold">Result actions</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Copy this result, save approved drafts, or turn the recommendation into accountable workspace work.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Generate a clean output from this result, copy it, or ask a follow-up. Internal records are optional.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <CopyVaeroexResultButton text={resultCopyText(title, display, run)} />
-                <Link href="/app/actions" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Create action
+                <Link href={generatedOutputHref({ type: "action_plan", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Generate Action Plan
                 </Link>
-                <Link href="/app/briefings" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Create briefing
+                <Link href={generatedOutputHref({ type: "executive_briefing", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Generate Executive Briefing
                 </Link>
-                <Link href="/app/issues" className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Create issue
+                <Link href={generatedOutputHref({ type: "risk_brief", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+                  Generate Risk Brief
                 </Link>
                 <Link
                   href={`/app/ask?prompt=${encodeURIComponent(`Follow up on this Vaeroex result: ${title}`)}` as Route}
@@ -1333,15 +1350,15 @@ function SelectedResult({
         ) : null}
 
         {run.status === "completed" ? (
-          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
-            <p className="text-sm font-semibold text-amber-900">Manager confirmation required</p>
-            <p className="mt-1 text-sm leading-6 text-amber-900">
-              Review this Vaeroex draft before saving it into workspace records.
+          <details className="rounded-lg border border-white/10 bg-slate-950/45 p-4">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced: save structured drafts into workspace records</summary>
+            <p className="mt-2 text-sm leading-6 text-slate-400">
+              Use this only after reviewing the Vaeroex output and deciding that a draft should become an internal record.
             </p>
             <div className="mt-4">
               <SaveButtons runId={run.id} workflowKey={run.agent_type} output={displayOutput(output)} />
             </div>
-          </div>
+          </details>
         ) : null}
 
         {savedRecords(output).length ? (

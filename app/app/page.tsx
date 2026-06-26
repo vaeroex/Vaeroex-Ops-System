@@ -12,6 +12,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import {
@@ -924,12 +925,31 @@ function SignalList({
             action={signalRecommendedAction(item, tone)}
             compact
           />
-          <Link
-            href={item.href}
-            className="mt-3 inline-flex rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-          >
-            Open source record
-          </Link>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Link
+              href={generatedOutputHref({
+                type: tone === "risk" ? "risk_brief" : tone === "opportunity" ? "executive_briefing" : "action_plan",
+                title: item.title,
+                summary: item.context,
+                why: signalReasoning(item, tone),
+                remedy: signalRecommendedAction(item, tone)
+              })}
+              className="inline-flex rounded-md border border-current/20 bg-slate-950/25 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+            >
+              {tone === "risk" ? "Generate Risk Brief" : tone === "opportunity" ? "Generate Executive Briefing" : "Generate Action Plan"}
+            </Link>
+            <details className="inline-block">
+              <summary className="cursor-pointer rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25">
+                Advanced
+              </summary>
+              <Link
+                href={item.href}
+                className="mt-2 inline-flex rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+              >
+                Open source record
+              </Link>
+            </details>
+          </div>
         </article>
       )}
     />
@@ -949,21 +969,21 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
       label: "Top risk",
       title: intelligence.topRisk?.title || "No major risk visible",
       body: intelligence.topRisk?.summary || "Vaeroex does not see a strong active risk signal yet.",
-      href: (intelligence.topRisk?.sourceHref || "/app/intelligence") as Route,
+      href: intelligence.topRisk ? generatedOutputHref({ type: "risk_brief", source: intelligence.topRisk.id }) : ("/app/intelligence" as Route),
       tone: "border-red-400/30 bg-red-950/25"
     },
     {
       label: "Top opportunity",
       title: intelligence.topOpportunity?.title || "Needs more context",
       body: intelligence.topOpportunity?.summary || "Add customer, KPI, file, or report history to reveal stronger opportunities.",
-      href: (intelligence.topOpportunity?.sourceHref || "/app/sources") as Route,
+      href: intelligence.topOpportunity ? generatedOutputHref({ type: "executive_briefing", source: intelligence.topOpportunity.id }) : ("/app/sources" as Route),
       tone: "border-emerald-400/30 bg-emerald-950/25"
     },
     {
       label: "Recommended action",
       title: intelligence.topRecommendation?.recommendedAction || "Add source data",
       body: intelligence.topRecommendation?.why || "Vaeroex recommends adding business context before creating more work.",
-      href: "/app/actions" as Route,
+      href: intelligence.topRecommendation ? generatedOutputHref({ type: "action_plan", source: intelligence.topRecommendation.id }) : ("/app/actions" as Route),
       tone: "border-cyan-400/30 bg-cyan-950/25"
     }
   ];
@@ -1868,8 +1888,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
                     Review customer context
                   </Link>
-                  <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-                    Generate briefing
+                  <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+                    Generate Executive Briefing
                   </Link>
                 </div>
               </SectionCard>
@@ -2087,8 +2107,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {files.length ? "Review files" : "Upload files"}
             </Link>
-            <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {reports.length ? "Review briefings" : "Generate briefing"}
+            <Link href={reports.length ? "/app/briefings" : generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              {reports.length ? "Review briefings" : "Generate Executive Briefing"}
             </Link>
           </div>
         </article>

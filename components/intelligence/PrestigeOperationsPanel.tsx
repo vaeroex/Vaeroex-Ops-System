@@ -15,6 +15,7 @@ import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import type { PrestigeAction, PrestigeIntelligence, ProfitLeak } from "@/lib/intelligence/prestige";
 
 type PrestigeOperationsPanelProps = {
@@ -194,26 +195,12 @@ function ActionButtons({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <form action={acceptPrestigeRecommendationAction}>
-        <input type="hidden" name="return_path" value={returnPath} />
-        <input type="hidden" name="title" value={item.title} />
-        <input type="hidden" name="description" value={item.why} />
-        <input type="hidden" name="evidence" value={item.evidence} />
-        <input type="hidden" name="owner" value={item.owner} />
-        <input type="hidden" name="priority" value={item.priority} />
-        <input type="hidden" name="due_date" value={item.dueDate} />
-        <input type="hidden" name="related_module" value={item.relatedModule} />
-        <input type="hidden" name="expected_outcome" value={item.action} />
-        <ConfirmSubmitButton message={`Create a follow-up for "${item.title}"?`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-          Create follow-up
-        </ConfirmSubmitButton>
-      </form>
-      <Link href={item.href} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-        Assign
+      <Link href={generatedOutputHref({ type: "action_plan", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
+        Generate Action Plan
       </Link>
       {showReport ? (
-        <Link href="/app/reports" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-          Create report
+        <Link href={generatedOutputHref({ type: "executive_briefing", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
+          Generate Executive Briefing
         </Link>
       ) : null}
       {showAlert ? (
@@ -236,6 +223,28 @@ function ActionButtons({
         <input type="hidden" name="related_module" value={item.relatedModule} />
         <button className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Dismiss</button>
       </form>
+      <details className="w-full rounded-lg border border-line bg-white/70 p-3">
+        <summary className="cursor-pointer text-xs font-semibold text-ink">Advanced: convert to internal follow-up</summary>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <form action={acceptPrestigeRecommendationAction}>
+            <input type="hidden" name="return_path" value={returnPath} />
+            <input type="hidden" name="title" value={item.title} />
+            <input type="hidden" name="description" value={item.why} />
+            <input type="hidden" name="evidence" value={item.evidence} />
+            <input type="hidden" name="owner" value={item.owner} />
+            <input type="hidden" name="priority" value={item.priority} />
+            <input type="hidden" name="due_date" value={item.dueDate} />
+            <input type="hidden" name="related_module" value={item.relatedModule} />
+            <input type="hidden" name="expected_outcome" value={item.action} />
+            <ConfirmSubmitButton message={`Create an internal follow-up for "${item.title}"?`} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
+              Create internal follow-up
+            </ConfirmSubmitButton>
+          </form>
+          <Link href={item.href} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
+            Open source area
+          </Link>
+        </div>
+      </details>
     </div>
   );
 }
@@ -625,8 +634,8 @@ export function PrestigeOperationsPanel({
         >
           <MiniList items={intelligence.meetingMode.agenda} empty="No agenda available." />
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/tasks" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Create follow-ups</Link>
-            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold">Generate weekly report</Link>
+            <Link href={generatedOutputHref({ type: "action_plan", title: "Weekly meeting follow-up plan", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Generate Action Plan</Link>
+            <Link href={generatedOutputHref({ type: "executive_briefing", title: "Weekly meeting briefing", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold">Generate Executive Briefing</Link>
           </div>
         </IntelligenceAccordion>
 

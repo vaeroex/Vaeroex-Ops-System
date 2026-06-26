@@ -22,6 +22,7 @@ import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
+import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -1375,8 +1376,17 @@ function AnalysisHistory({
                   </form>
                 </>
               ) : null}
-              <Link href={`/app/agents?run=${run.id}` as Route} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
-                Create follow-ups
+              <Link
+                href={generatedOutputHref({
+                  type: "action_plan",
+                  title: file ? `File analysis action plan - ${file.display_name}` : runQuestion(run),
+                  summary: runSummary(run),
+                  remedy: "Review the file analysis and decide what leadership should do next.",
+                  run: run.id
+                })}
+                className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent"
+              >
+                Generate Action Plan
               </Link>
               {hasKpis ? (
                 <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
