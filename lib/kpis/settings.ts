@@ -15,8 +15,9 @@ export const KPI_COLOR_PALETTE = [
   { value: "#D1D5DB", label: "Premium Silver" }
 ] as const;
 
-const DEFAULT_KPI_COLOR = KPI_COLOR_PALETTE[0].value;
-const AUTO_KPI_COLOR_PALETTE = KPI_COLOR_PALETTE.filter((color) => color.value !== "#0B1F4D");
+const HIGH_CONTRAST_DEFAULT_COLORS = new Set(["#10B981", "#38BDF8", "#F59E0B", "#EF4444", "#8B5CF6", "#F97316", "#14B8A6", "#D1D5DB"]);
+const AUTO_KPI_COLOR_PALETTE = KPI_COLOR_PALETTE.filter((color) => HIGH_CONTRAST_DEFAULT_COLORS.has(color.value));
+const DEFAULT_KPI_COLOR = AUTO_KPI_COLOR_PALETTE[0]?.value || KPI_COLOR_PALETTE[0].value;
 
 export function normalizeKpiName(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();

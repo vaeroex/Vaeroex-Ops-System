@@ -1,7 +1,7 @@
 import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { createKpiAction, updateKpiSettingAction } from "@/app/app/operations/actions";
+import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
 import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -15,7 +15,9 @@ import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import {
   applyKpiSettingsToRows,
   getConfiguredMetricNames,
+  KPI_COLOR_PALETTE,
   kpiColor,
+  kpiColorMayBeLowContrast,
   kpiDefinition,
   kpiDisplayUnit,
   kpiPreferredChartType,
@@ -40,6 +42,11 @@ type KpisPageProps = {
     sort?: string;
     timeline?: string;
     mode?: string;
+    status?: string;
+    show?: string;
+    target_applied?: string;
+    undo_kpi?: string;
+    undo_target?: string;
     start?: string;
     end?: string;
   }>;
@@ -50,6 +57,7 @@ type KpiAlertRuleRow = Database["public"]["Tables"]["kpi_alert_rules"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
 type ComparisonMode = "actual" | "percent" | "normalized";
+type KpiStatusFilter = "all" | "on-track" | "behind-target" | "missing-data" | "updated-this-month";
 type KpiTargetRecommendation = {
   value: number | null;
   confidence: "Low" | "Medium" | "Higher" | "Unavailable";
@@ -288,25 +296,32 @@ function SuccessNotice({ message }: { message?: string | null }) {
 
 function TimelineControls({
   timeline,
-  range
+  range,
+  status
 }: {
   timeline: KpiTimeline;
   range: { label: string; startDate: string; endDate: string };
+  status: KpiStatusFilter;
 }) {
   return (
-    <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+    <details open={timeline !== "90D"} className="rounded-lg border border-white/10 bg-[#08111f] text-slate-100 shadow-panel">
+      <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-white">Timeline</p>
+          <p className="text-sm font-semibold text-white">Timeline: {timeline}</p>
           <p className="mt-1 text-xs leading-5 text-slate-400">
             {range.label}: {range.startDate} to {range.endDate}
           </p>
         </div>
+        <span className="w-fit rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100">
+          Change range
+        </span>
+      </summary>
+      <div className="border-t border-white/10 p-4">
         <div className="flex flex-wrap gap-2">
           {KPI_TIMELINES.map((item) => (
             <Link
               key={item}
-              href={timelineHref(item)}
+              href={timelineHref(item, status)}
               className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
                 item === timeline
                   ? "border-vaeroex-blue bg-vaeroex-blue text-white"
@@ -317,32 +332,33 @@ function TimelineControls({
             </Link>
           ))}
         </div>
+        <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+          <input type="hidden" name="timeline" value="Custom Range" />
+          {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+            Start
+            <input
+              name="start"
+              type="date"
+              defaultValue={timeline === "Custom Range" ? range.startDate : ""}
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+            />
+          </label>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+            End
+            <input
+              name="end"
+              type="date"
+              defaultValue={timeline === "Custom Range" ? range.endDate : ""}
+              className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+            />
+          </label>
+          <button className="self-end rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+            Apply custom range
+          </button>
+        </form>
       </div>
-      <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
-        <input type="hidden" name="timeline" value="Custom Range" />
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-          Start
-          <input
-            name="start"
-            type="date"
-            defaultValue={timeline === "Custom Range" ? range.startDate : ""}
-            className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
-          />
-        </label>
-        <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-          End
-          <input
-            name="end"
-            type="date"
-            defaultValue={timeline === "Custom Range" ? range.endDate : ""}
-            className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
-          />
-        </label>
-        <button className="self-end rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
-          Apply custom range
-        </button>
-      </form>
-    </section>
+    </details>
   );
 }
 
@@ -384,6 +400,38 @@ function SummaryStat({ label, value, detail, tone = "neutral" }: { label: string
   );
 }
 
+function StatusFilterCard({
+  label,
+  value,
+  detail,
+  tone,
+  active,
+  href
+}: {
+  label: string;
+  value: string | number;
+  detail: string;
+  tone: KpiTone;
+  active: boolean;
+  href: Route;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "true" : undefined}
+      className={`block rounded-lg border p-3 transition ${
+        active
+          ? "border-vaeroex-accent bg-cyan-950/45 text-cyan-50 shadow-panel ring-1 ring-vaeroex-accent/40"
+          : `${toneClasses(tone)} hover:border-vaeroex-accent/50 hover:bg-cyan-950/30 hover:text-cyan-50`
+      }`}
+    >
+      <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">{label}</span>
+      <span className="mt-2 block text-2xl font-semibold">{value}</span>
+      <span className="mt-1 block text-xs leading-5 opacity-80">{detail}</span>
+    </Link>
+  );
+}
+
 function KpiTile({
   kpi,
   rows,
@@ -398,23 +446,21 @@ function KpiTile({
   index: number;
 }) {
   const tone = metricTone(kpi.actual_value, kpi.target);
-  const recommendation = recommendedTargetForMetric(kpi.name, rows);
   const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
 
   return (
-    <article className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+    <article className="rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-panel">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="h-3 w-3 shrink-0 rounded-full" style={{ backgroundColor: color }} />
             <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
-          <p className="mt-1 text-xs leading-5 text-slate-400">{kpi.category || "General"} · {kpi.owner || "Unassigned"}</p>
         </div>
         <KpiStatusBadge tone={tone} />
       </div>
-      <p className="mt-4 text-3xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
-      <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-2">
+      <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
+      <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
         <p>
           <span className="block text-slate-500">Target</span>
           {kpi.target === null ? "Not set" : formatSettingValue(kpi.target, kpi.name, settings)}
@@ -427,12 +473,8 @@ function KpiTile({
           <span className="block text-slate-500">Last updated</span>
           {kpi.updated_at ? formatShortDate(kpi.updated_at.slice(0, 10)) : formatShortDate(kpi.metric_date)}
         </p>
-        <p>
-          <span className="block text-slate-500">Target guidance</span>
-          {recommendation.value === null ? "Needs history" : `${recommendation.confidence} confidence`}
-        </p>
       </div>
-      <Link href={href} className="mt-4 inline-flex min-h-10 items-center rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
+      <Link href={href} className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
         View details
       </Link>
       <span className="sr-only">KPI tile {index + 1}</span>
@@ -513,6 +555,51 @@ function isComparisonMode(value: string | undefined): value is ComparisonMode {
   return value === "actual" || value === "percent" || value === "normalized";
 }
 
+function isKpiStatusFilter(value: string | undefined): value is KpiStatusFilter {
+  return value === "all" || value === "on-track" || value === "behind-target" || value === "missing-data" || value === "updated-this-month";
+}
+
+function statusFilterLabel(filter: KpiStatusFilter) {
+  if (filter === "on-track") return "On Track";
+  if (filter === "behind-target") return "Behind Target";
+  if (filter === "missing-data") return "Missing Data";
+  if (filter === "updated-this-month") return "Updated This Month";
+  return "Total";
+}
+
+function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter) {
+  if (filter === "all") return true;
+  if (filter === "updated-this-month") return updatedThisMonth(row);
+
+  const tone = metricTone(row.actual_value, row.target);
+  if (filter === "on-track") return tone === "green";
+  if (filter === "behind-target") return tone === "red";
+  return row.actual_value === null;
+}
+
+function kpiHref(params: Record<string, string | number | null | undefined>) {
+  const search = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== null && value !== undefined && value !== "" && value !== "all") {
+      search.set(key, String(value));
+    }
+  });
+
+  const query = search.toString();
+  return (query ? `/app/kpis?${query}` : "/app/kpis") as Route;
+}
+
+function timelineQueryParams(timeline: KpiTimeline, range: { startDate: string; endDate: string }) {
+  return timeline === "Custom Range"
+    ? {
+        timeline,
+        start: range.startDate,
+        end: range.endDate
+      }
+    : { timeline };
+}
+
 function dateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
@@ -580,8 +667,8 @@ function filterKpisByTimeline(rows: KpiRow[], range: { startDate: string; endDat
   return rows.filter((row) => row.metric_date >= range.startDate && row.metric_date <= range.endDate);
 }
 
-function timelineHref(timeline: KpiTimeline) {
-  return `/app/kpis?timeline=${encodeURIComponent(timeline)}` as Route;
+function timelineHref(timeline: KpiTimeline, status: KpiStatusFilter) {
+  return kpiHref({ timeline, status });
 }
 
 function getTrendRows(kpis: KpiRow[], metricName: string) {
@@ -861,6 +948,7 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
   const lastDate = chartRows[chartRows.length - 1]?.metric_date;
   const axisX = kpiXAxisLabel(metricName, settings);
   const axisY = kpiYAxisLabel(metricName, settings);
+  const chartColor = kpiColor(metricName, settings);
 
   return (
     <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/35">
@@ -897,9 +985,9 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
           {targetRows.length >= 2 ? (
             <polyline fill="none" points={targetPoints} stroke="#f59e0b" strokeDasharray="8 7" strokeLinecap="round" strokeWidth="3" />
           ) : null}
-          <polyline fill="none" points={actualPoints} stroke="#1E6BFF" strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
+          <polyline fill="none" points={actualPoints} stroke={chartColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
           {chartRows.map((row, index) => (
-            <circle key={row.id} cx={xFor(index)} cy={yFor(row.actual_value as number)} r="5" fill="#1E6BFF" stroke="#ffffff" strokeWidth="2" />
+            <circle key={row.id} cx={xFor(index)} cy={yFor(row.actual_value as number)} r="5" fill={chartColor} stroke="#ffffff" strokeWidth="2" />
           ))}
           {firstDate ? (
             <text x={paddingX} y={height - 14} className="fill-slate-500 text-[11px]">
@@ -1113,6 +1201,78 @@ function ComparisonAnalysis({ trends, mode }: { trends: KpiTrend[]; mode: Compar
   );
 }
 
+function kpiDetailReturnPath(metricName: string) {
+  return `/app/kpis?metric=${encodeURIComponent(metricName)}&section=detail`;
+}
+
+function KpiSettingHiddenFields({
+  metricName,
+  setting,
+  latest,
+  target,
+  includeTarget = true
+}: {
+  metricName: string;
+  setting: KpiSettingRow | undefined;
+  latest: KpiRow | undefined;
+  target?: number | string | null;
+  includeTarget?: boolean;
+}) {
+  return (
+    <>
+      <input type="hidden" name="kpi_name" value={metricName} />
+      {includeTarget ? <input type="hidden" name="target" value={target ?? setting?.target ?? latest?.target ?? ""} /> : null}
+      <input type="hidden" name="weight" value={setting?.weight ?? 1} />
+      <input type="hidden" name="category" value={setting?.category ?? latest?.category ?? ""} />
+      <input type="hidden" name="definition" value={setting?.definition ?? ""} />
+      <input type="hidden" name="color" value={setting?.color ?? "#10B981"} />
+      <input type="hidden" name="sort_order" value={setting?.sort_order ?? 0} />
+      <input type="hidden" name="unit_type" value={setting?.unit_type ?? ""} />
+      <input type="hidden" name="display_unit" value={setting?.display_unit ?? ""} />
+      <input type="hidden" name="value_format" value={setting?.value_format ?? ""} />
+      <input type="hidden" name="x_axis_label" value={setting?.x_axis_label ?? "Date"} />
+      <input type="hidden" name="y_axis_label" value={setting?.y_axis_label ?? metricName} />
+      <input type="hidden" name="preferred_chart_type" value={setting?.preferred_chart_type ?? "line"} />
+      <input type="hidden" name="is_visible" value={(setting?.is_visible ?? true) ? "true" : "false"} />
+    </>
+  );
+}
+
+function ManualTargetForm({
+  metricName,
+  setting,
+  latest
+}: {
+  metricName: string;
+  setting: KpiSettingRow | undefined;
+  latest: KpiRow | undefined;
+}) {
+  return (
+    <form action={updateKpiSettingAction} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+      <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+      <KpiSettingHiddenFields metricName={metricName} setting={setting} latest={latest} includeTarget={false} />
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Manual target
+        <input
+          name="target"
+          type="number"
+          step="0.01"
+          defaultValue={setting?.target ?? latest?.target ?? ""}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+          Save target
+        </button>
+        <Link href={(`/app/kpis?metric=${encodeURIComponent(metricName)}&section=detail#kpi-detail`) as Route} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
+          Cancel
+        </Link>
+      </div>
+    </form>
+  );
+}
+
 function KpiTargetRecommendationPanel({
   metricName,
   recommendation,
@@ -1126,10 +1286,13 @@ function KpiTargetRecommendationPanel({
 }) {
   if (recommendation.value === null) {
     return (
-      <div className="rounded-lg border border-amber-400/35 bg-amber-950/25 p-4 text-sm leading-6 text-amber-100">
-        <p className="font-semibold">Not enough history to recommend a reliable target.</p>
-        <p className="mt-2">{recommendation.limitation}</p>
-        <p className="mt-2">Suggested next data: upload 6-12 months of KPI history or prior monthly reports.</p>
+      <div className="space-y-3 rounded-lg border border-amber-400/35 bg-amber-950/25 p-4 text-sm leading-6 text-amber-100">
+        <div>
+          <p className="font-semibold">Not enough history to recommend a reliable target.</p>
+          <p className="mt-2">{recommendation.limitation}</p>
+          <p className="mt-2">Suggested next data: upload 6-12 months of KPI history or prior monthly reports.</p>
+        </div>
+        <ManualTargetForm metricName={metricName} setting={setting} latest={latest} />
       </div>
     );
   }
@@ -1142,7 +1305,7 @@ function KpiTargetRecommendationPanel({
           <p className="mt-2 text-2xl font-semibold text-white">{numberFormatter.format(recommendation.value)}</p>
         </div>
         <span className="w-fit rounded-full border border-cyan-300/35 bg-cyan-950/40 px-3 py-1 text-xs font-semibold text-cyan-100">
-          Confidence: {recommendation.confidence}
+          Confidence: {recommendation.confidence === "Higher" ? "High" : recommendation.confidence}
         </span>
       </div>
       <p className="mt-3 leading-6">{recommendation.reason}</p>
@@ -1164,23 +1327,13 @@ function KpiTargetRecommendationPanel({
           <dd className="mt-1 text-slate-300">{recommendation.outliers}</dd>
         </div>
       </dl>
+      <ManualTargetForm metricName={metricName} setting={setting} latest={latest} />
       <div className="mt-4 flex flex-wrap gap-2">
         <form action={updateKpiSettingAction}>
-          <input type="hidden" name="return_path" value="/app/kpis" />
-          <input type="hidden" name="kpi_name" value={metricName} />
-          <input type="hidden" name="target" value={recommendation.value} />
-          <input type="hidden" name="weight" value={setting?.weight ?? 1} />
-          <input type="hidden" name="category" value={setting?.category ?? latest?.category ?? ""} />
-          <input type="hidden" name="definition" value={setting?.definition ?? ""} />
-          <input type="hidden" name="color" value={setting?.color ?? "#1E6BFF"} />
-          <input type="hidden" name="sort_order" value={setting?.sort_order ?? 0} />
-          <input type="hidden" name="unit_type" value={setting?.unit_type ?? ""} />
-          <input type="hidden" name="display_unit" value={setting?.display_unit ?? ""} />
-          <input type="hidden" name="value_format" value={setting?.value_format ?? ""} />
-          <input type="hidden" name="x_axis_label" value={setting?.x_axis_label ?? "Date"} />
-          <input type="hidden" name="y_axis_label" value={setting?.y_axis_label ?? metricName} />
-          <input type="hidden" name="preferred_chart_type" value={setting?.preferred_chart_type ?? "line"} />
-          <input type="hidden" name="is_visible" value={(setting?.is_visible ?? true) ? "true" : "false"} />
+          <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+          <KpiSettingHiddenFields metricName={metricName} setting={setting} latest={latest} target={recommendation.value} />
+          <input type="hidden" name="target_change_context" value="recommended" />
+          <input type="hidden" name="previous_target" value={setting?.target ?? latest?.target ?? ""} />
           <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
             Apply recommended target
           </button>
@@ -1190,6 +1343,233 @@ function KpiTargetRecommendationPanel({
         </Link>
       </div>
     </div>
+  );
+}
+
+function TargetUndoNotice({
+  metricName,
+  previousTarget,
+  setting,
+  latest
+}: {
+  metricName?: string;
+  previousTarget?: string;
+  setting: KpiSettingRow | undefined;
+  latest: KpiRow | undefined;
+}) {
+  if (!metricName || previousTarget === undefined) {
+    return null;
+  }
+
+  return (
+    <div className="flex flex-col gap-3 rounded-lg border border-cyan-400/35 bg-cyan-950/30 p-4 text-sm text-cyan-50 md:flex-row md:items-center md:justify-between">
+      <p>
+        Recommended target applied to <span className="font-semibold text-white">{metricName}</span>. Previous target:{" "}
+        <span className="font-semibold text-white">{previousTarget ? numberFormatter.format(Number(previousTarget)) : "No target"}</span>.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <form action={updateKpiSettingAction}>
+          <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+          <KpiSettingHiddenFields metricName={metricName} setting={setting} latest={latest} target={previousTarget} />
+          <input type="hidden" name="target_change_context" value="undo" />
+          <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+            Undo
+          </button>
+        </form>
+        <Link href="/app/kpis/settings" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
+          View target settings
+        </Link>
+      </div>
+    </div>
+  );
+}
+
+function KpiValueEditForm({
+  row,
+  metricName,
+  settings,
+  title = "Edit KPI value"
+}: {
+  row: KpiRow;
+  metricName: string;
+  settings: KpiSettingRow[];
+  title?: string;
+}) {
+  return (
+    <form action={updateKpiValueAction} className="grid gap-3 rounded-lg border border-white/10 bg-slate-950/35 p-3 sm:grid-cols-2">
+      <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+      <input type="hidden" name="kpi_id" value={row.id} />
+      <div className="sm:col-span-2">
+        <p className="text-sm font-semibold text-white">{title}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-400">
+          Original imported references are preserved. Use this only when the visible KPI value, date, target, notes, or source label needs correction.
+        </p>
+      </div>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Value
+        <input
+          name="actual_value"
+          type="number"
+          step="0.01"
+          defaultValue={row.actual_value ?? ""}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Date
+        <input
+          name="metric_date"
+          type="date"
+          defaultValue={row.metric_date}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Row target
+        <input
+          name="target"
+          type="number"
+          step="0.01"
+          defaultValue={row.target ?? ""}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Source label
+        <input
+          name="source"
+          defaultValue={row.source ?? ""}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 sm:col-span-2">
+        Notes
+        <textarea
+          name="notes"
+          defaultValue={row.notes ?? ""}
+          rows={3}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+          Save value
+        </button>
+        <span className="text-xs text-slate-500">Current: {formatSettingValue(row.actual_value, row.name, settings)} · {row.metric_date}</span>
+      </div>
+    </form>
+  );
+}
+
+function KpiChartSettingsForm({
+  metricName,
+  setting,
+  latest
+}: {
+  metricName: string;
+  setting: KpiSettingRow | undefined;
+  latest: KpiRow | undefined;
+}) {
+  const selectedColor = setting?.color ?? "#10B981";
+  const lowContrastColor = kpiColorMayBeLowContrast(selectedColor);
+
+  return (
+    <form action={updateKpiSettingAction} className="grid gap-3 rounded-lg border border-white/10 bg-slate-950/35 p-3 sm:grid-cols-2">
+      <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+      <input type="hidden" name="kpi_name" value={metricName} />
+      <input type="hidden" name="weight" value={setting?.weight ?? 1} />
+      <input type="hidden" name="category" value={setting?.category ?? latest?.category ?? ""} />
+      <input type="hidden" name="definition" value={setting?.definition ?? ""} />
+      <input type="hidden" name="sort_order" value={setting?.sort_order ?? 0} />
+      <input type="hidden" name="unit_type" value={setting?.unit_type ?? ""} />
+      <input type="hidden" name="is_visible" value={(setting?.is_visible ?? true) ? "true" : "false"} />
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Target
+        <input
+          name="target"
+          type="number"
+          step="0.01"
+          defaultValue={setting?.target ?? latest?.target ?? ""}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Display unit
+        <input
+          name="display_unit"
+          defaultValue={setting?.display_unit ?? ""}
+          placeholder="$, %, hours, leads"
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        X-axis label
+        <input
+          name="x_axis_label"
+          defaultValue={setting?.x_axis_label ?? "Date"}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Y-axis label
+        <input
+          name="y_axis_label"
+          defaultValue={setting?.y_axis_label ?? metricName}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        />
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Value format
+        <select
+          name="value_format"
+          defaultValue={setting?.value_format ?? ""}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        >
+          <option value="">Standard number</option>
+          <option value="currency">Currency</option>
+          <option value="percentage">Percentage</option>
+          <option value="duration">Duration</option>
+          <option value="count">Count</option>
+          <option value="decimal">Decimal</option>
+        </select>
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+        Preferred chart
+        <select
+          name="preferred_chart_type"
+          defaultValue={setting?.preferred_chart_type ?? "line"}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        >
+          <option value="line">Line</option>
+          <option value="bar">Bar</option>
+          <option value="mixed">Mixed</option>
+        </select>
+      </label>
+      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400 sm:col-span-2">
+        Color
+        <select
+          name="color"
+          defaultValue={selectedColor}
+          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+        >
+          {KPI_COLOR_PALETTE.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label} ({option.value})
+            </option>
+          ))}
+        </select>
+      </label>
+      {lowContrastColor ? (
+        <p className="rounded-lg border border-amber-400/35 bg-amber-950/30 p-3 text-xs leading-5 text-amber-100 sm:col-span-2">
+          This color may be difficult to see in the current theme.
+        </p>
+      ) : null}
+      <div className="sm:col-span-2">
+        <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+          Save chart settings
+        </button>
+      </div>
+    </form>
   );
 }
 
@@ -1328,6 +1708,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
   const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
   const selectedTimelineRange = timelineRange(timeline, adjustedKpis.length ? adjustedKpis : rawKpis, params?.start, params?.end);
+  const activeStatusFilter = isKpiStatusFilter(params?.status) ? params.status : "all";
+  const showAllTiles = params?.show === "all";
   const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);
   const allVisibleKpis = adjustedKpis;
   const people = (peopleResult.data || []) as TeamPersonOption[];
@@ -1371,6 +1753,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const onTrackCount = latestKpiRows.filter((kpi) => metricTone(kpi.actual_value, kpi.target) === "green").length;
   const missingDataCount = metricNames.length - latestKpiRows.filter((kpi) => kpi.actual_value !== null).length;
   const updatedThisMonthCount = latestKpiRows.filter(updatedThisMonth).length;
+  const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter));
+  const filteredMetricNames = new Set(filteredLatestKpiRows.map((kpi) => kpi.name));
+  const filteredKpis = activeStatusFilter === "all" ? kpis : kpis.filter((kpi) => filteredMetricNames.has(kpi.name));
+  const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, 6);
+  const hiddenTileCount = Math.max(0, filteredLatestKpiRows.length - visibleTileRows.length);
+  const filterCount = activeStatusFilter === "all" ? metricNames.length : filteredLatestKpiRows.length;
   const topAttentionKpi = latestKpiRows.find((kpi) => metricTone(kpi.actual_value, kpi.target) === "red") || latestKpiRows.find((kpi) => metricTone(kpi.actual_value, kpi.target) === "yellow") || latestKpiRows[0];
   const kpiSummary =
     latestKpiRows.length === 0
@@ -1398,7 +1786,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedLatestKpi = selectedMetricRows.at(-1);
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
   const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis) : null;
-  const managedKpis = kpis.map((kpi) => {
+  const undoMetricName = params?.target_applied === "true" ? params.undo_kpi : undefined;
+  const undoSetting = undoMetricName ? kpiSettingForName(kpiSettings, undoMetricName) : undefined;
+  const undoLatestKpi = undoMetricName ? getMetricHistoryRows(allVisibleKpis, undoMetricName).at(-1) : undefined;
+  const managedKpis = filteredKpis.map((kpi) => {
     const management = managedValues(kpi);
     const tone = metricTone(kpi.actual_value, kpi.target);
     const kpiShares = shares.filter((share) => share.source_id === kpi.id);
@@ -1475,9 +1866,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       />
       <ModuleTabs
         tabs={[
-          { label: "Overview", href: "/app/kpis", active: activeSection === "overview" || activeSection === "detail" },
+          { label: "Overview", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter }), active: activeSection === "overview" || activeSection === "detail" },
           { label: "Compare", href: "/app/kpis?section=compare" as Route, active: activeSection === "compare" },
-          { label: "Records", href: "/app/kpis?section=records" as Route, active: activeSection === "records" },
+          { label: "Records", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, section: "records" }), active: activeSection === "records" },
           { label: "Imports", href: "/app/files?status=Imported" as Route },
           { label: "Settings", href: "/app/kpis/settings" as Route }
         ]}
@@ -1504,22 +1895,74 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         }
       />
       <SuccessNotice message={params?.message} />
+      <TargetUndoNotice
+        metricName={undoMetricName}
+        previousTarget={params?.undo_target}
+        setting={undoSetting}
+        latest={undoLatestKpi}
+      />
 
-      <TimelineControls timeline={timeline} range={selectedTimelineRange} />
+      <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} />
 
       {activeSection === "overview" || activeSection === "detail" ? (
         <>
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <SummaryStat label="Total KPIs" value={metricNames.length} detail="Visible measurement definitions" tone={metricNames.length ? "green" : "yellow"} />
-            <SummaryStat label="On Track" value={onTrackCount} detail="Latest value meets target" tone={onTrackCount ? "green" : "neutral"} />
-            <SummaryStat label="Behind Target" value={behindTargetCount} detail="Needs management review" tone={behindTargetCount ? "red" : "green"} />
-            <SummaryStat label="Missing Data" value={missingDataCount} detail="Needs a current value" tone={missingDataCount ? "yellow" : "green"} />
-            <SummaryStat label="Updated This Month" value={updatedThisMonthCount} detail="Fresh KPI signals" tone={updatedThisMonthCount ? "green" : "yellow"} />
+            <StatusFilterCard
+              label="Total KPIs"
+              value={metricNames.length}
+              detail="Show all visible KPIs"
+              tone={metricNames.length ? "green" : "yellow"}
+              active={activeStatusFilter === "all"}
+              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "all" })}
+            />
+            <StatusFilterCard
+              label="On Track"
+              value={onTrackCount}
+              detail="Latest value meets target"
+              tone={onTrackCount ? "green" : "neutral"}
+              active={activeStatusFilter === "on-track"}
+              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "on-track" })}
+            />
+            <StatusFilterCard
+              label="Behind Target"
+              value={behindTargetCount}
+              detail="Needs management review"
+              tone={behindTargetCount ? "red" : "green"}
+              active={activeStatusFilter === "behind-target"}
+              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "behind-target" })}
+            />
+            <StatusFilterCard
+              label="Missing Data"
+              value={missingDataCount}
+              detail="Needs a current value"
+              tone={missingDataCount ? "yellow" : "green"}
+              active={activeStatusFilter === "missing-data"}
+              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "missing-data" })}
+            />
+            <StatusFilterCard
+              label="Updated This Month"
+              value={updatedThisMonthCount}
+              detail="Fresh KPI signals"
+              tone={updatedThisMonthCount ? "green" : "yellow"}
+              active={activeStatusFilter === "updated-this-month"}
+              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "updated-this-month" })}
+            />
           </section>
 
-          {latestKpiRows.length ? (
+          <div className="flex flex-col gap-2 rounded-lg border border-white/10 bg-[#08111f] px-4 py-3 text-sm text-slate-300 sm:flex-row sm:items-center sm:justify-between">
+            <p>
+              Showing <span className="font-semibold text-white">{filterCount}</span> {statusFilterLabel(activeStatusFilter)} KPI{filterCount === 1 ? "" : "s"}.
+            </p>
+            {activeStatusFilter !== "all" ? (
+              <Link href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "all" })} className="w-fit text-xs font-semibold text-vaeroex-accent underline underline-offset-4">
+                Clear filter
+              </Link>
+            ) : null}
+          </div>
+
+          {filteredLatestKpiRows.length ? (
             <section className="grid gap-4 lg:grid-cols-2 2xl:grid-cols-3">
-              {latestKpiRows.slice(0, 9).map((kpi, index) => (
+              {visibleTileRows.map((kpi, index) => (
                 <KpiTile
                   key={kpi.id}
                   kpi={kpi}
@@ -1531,8 +1974,19 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
               ))}
             </section>
           ) : (
-            <EmptyState title="No KPIs yet" description="Create your first KPI manually or import reviewed CSV/XLSX data to start measuring what matters." />
+            <EmptyState title="No KPIs match this filter" description="Clear the filter, create a KPI manually, or import reviewed CSV/XLSX data to continue building the measurement layer." />
           )}
+
+          {hiddenTileCount ? (
+            <div className="flex justify-center">
+              <Link
+                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: "all" })}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
+              >
+                Show all {filteredLatestKpiRows.length} KPIs
+              </Link>
+            </div>
+          ) : null}
 
           <section className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
             <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
@@ -1566,7 +2020,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           </section>
 
           {activeSection === "detail" && primaryMetric ? (
-            <section id="kpi-detail" className="grid gap-4 xl:grid-cols-[1.1fr_.9fr]">
+            <section id="kpi-detail" className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
               <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div>
@@ -1576,8 +2030,33 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   </div>
                   <KpiStatusBadge tone={metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null)} />
                 </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                  <TrendSummaryCard
+                    label="Current"
+                    value={formatSettingValue(selectedLatestKpi?.actual_value, primaryMetric, kpiSettings)}
+                    detail={selectedLatestKpi ? `Recorded ${formatShortDate(selectedLatestKpi.metric_date)}` : "No value yet"}
+                  />
+                  <TrendSummaryCard
+                    label="Target"
+                    value={formatSettingValue(selectedLatestKpi?.target ?? selectedKpiSetting?.target, primaryMetric, kpiSettings)}
+                    detail={selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined ? "Current target setting" : selectedKpiSetting?.target !== null && selectedKpiSetting?.target !== undefined ? "Current target setting" : "No target set"}
+                  />
+                  <TrendSummaryCard
+                    label="Trend"
+                    value={trendLabelForRows(selectedMetricRows)}
+                    detail="Latest movement from history"
+                  />
+                </div>
                 <div className="mt-4">
-                  <TrendAnalysis rows={selectedMetricRows} metricName={primaryMetric} settings={kpiSettings} />
+                  <TrendChart rows={selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} />
+                </div>
+                <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-4">
+                  <p className="text-sm font-semibold text-white">Vaeroex summary</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    {selectedLatestKpi
+                      ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedLatestKpi.target)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful management review."}`
+                      : "Add a current value to unlock status, trend, and target guidance."}
+                  </p>
                 </div>
               </div>
               <div className="space-y-4">
@@ -1589,15 +2068,44 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     latest={selectedLatestKpi}
                   />
                 ) : null}
+                {selectedLatestKpi ? (
+                  <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
+                    <summary className="cursor-pointer font-semibold text-white">Edit latest value</summary>
+                    <div className="mt-3">
+                      <KpiValueEditForm row={selectedLatestKpi} metricName={primaryMetric} settings={kpiSettings} title="Edit latest value" />
+                    </div>
+                  </details>
+                ) : null}
                 <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
                   <summary className="cursor-pointer font-semibold text-white">Evidence and history</summary>
-                  <div className="mt-3 space-y-2">
-                    {selectedMetricRows.slice(-8).reverse().map((row) => (
-                      <div key={row.id} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-                        <p className="font-semibold text-white">{formatSettingValue(row.actual_value, row.name, kpiSettings)} · {row.metric_date}</p>
-                        <p className="mt-1 text-xs leading-5 text-slate-400">{row.source || "Manual"}{row.notes ? ` · ${row.notes}` : ""}</p>
-                      </div>
+                  <div className="mt-3 space-y-3">
+                    {selectedMetricRows.slice(-10).reverse().map((row) => (
+                      <details key={row.id} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+                        <summary className="cursor-pointer">
+                          <span className="font-semibold text-white">{formatSettingValue(row.actual_value, row.name, kpiSettings)} · {row.metric_date}</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-400">{row.source || "Manual"}{row.notes ? ` · ${row.notes}` : ""}</span>
+                        </summary>
+                        <div className="mt-3">
+                          <KpiValueEditForm row={row} metricName={primaryMetric} settings={kpiSettings} title="Edit historical value" />
+                        </div>
+                      </details>
                     ))}
+                    {!selectedMetricRows.length ? <p>No history records yet.</p> : null}
+                  </div>
+                </details>
+                <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
+                  <summary className="cursor-pointer font-semibold text-white">Chart settings</summary>
+                  <div className="mt-3">
+                    <KpiChartSettingsForm metricName={primaryMetric} setting={selectedKpiSetting} latest={selectedLatestKpi} />
+                  </div>
+                </details>
+                <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
+                  <summary className="cursor-pointer font-semibold text-white">Source/import information</summary>
+                  <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
+                    <p>Latest source: {selectedLatestKpi?.source || "Manual or not provided"}</p>
+                    <p>Source file: {selectedLatestKpi?.source_file_id || "None"}</p>
+                    <p>Import ID: {selectedLatestKpi?.import_id || "None"}</p>
+                    <p>Import row: {selectedLatestKpi?.import_row_id || "None"}</p>
                   </div>
                 </details>
               </div>
