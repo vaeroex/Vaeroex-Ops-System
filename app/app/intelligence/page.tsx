@@ -36,7 +36,7 @@ function groupInsights(insights: IntelligenceInsight[], type: IntelligenceInsigh
 
 function InsightCard({ insight }: { insight: IntelligenceInsight }) {
   const primaryOutputType = outputTypeForInsight(insight);
-  const primaryOutputLabel = primaryOutputType === "risk_brief" ? "Generate Risk Brief" : primaryOutputType === "executive_briefing" ? "Generate Executive Briefing" : "Generate Improvement Plan";
+  const primaryOutputLabel = primaryOutputType === "risk_brief" ? "Generate Investigation Summary" : primaryOutputType === "executive_briefing" ? "Generate Executive Briefing" : "Generate Improvement Plan";
 
   return (
     <article className={`rounded-lg border p-4 shadow-panel ${typeClass(insight.type)}`}>

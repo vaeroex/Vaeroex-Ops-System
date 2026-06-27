@@ -168,7 +168,7 @@ function reportBody({
     source.counts.checklist_exceptions ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.` : ""
   ].filter(Boolean);
   const actions = [
-    source.counts.overdue_tasks ? "Review overdue source-system signals with the responsible manager before the next leadership check-in." : "",
+    source.counts.overdue_tasks ? "Review the workflow behind overdue source-system signals before the next leadership check-in." : "",
     source.counts.below_target_kpis ? "Review below-target KPIs and decide whether leadership needs an improvement plan for each key metric." : "",
     source.counts.open_issues ? "Review the most important unresolved issues with leadership." : "",
     source.counts.vaeroex_insights ? "Review recent Vaeroex insights and decide which recommendations need an executive report, SOP, checklist, meeting agenda, or improvement plan." : "",
@@ -181,7 +181,7 @@ Period: ${startDate} to ${endDate}
 Workspace: ${workspaceName}
 
 ## Executive Summary
-Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, responsibility signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} completed source-system signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
+Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, source-system signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} completed source-system signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
 
 ## What Needs Attention
 ${list(risks, "No urgent risks were detected for this scheduled report.")}
@@ -202,7 +202,7 @@ ${list(source.items.below_target_kpis, "No below-target KPIs were found for this
 ${list(source.items.crm_leads, "No new customer pipeline records were found in this period.")}
 
 ## Open Responsibility Signals
-${list(source.items.open_assignments, "No open responsibility signals were found.")}
+${list(source.items.open_assignments, "No open source-system context signals were found.")}
 
 ## Recent Files
 ${list(source.items.uploaded_files, "No files were uploaded in this period.")}

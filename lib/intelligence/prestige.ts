@@ -423,7 +423,7 @@ function buildDataQuality(input: PrestigeInput) {
       .map((asset) => ({
         id: `asset-${asset.id}`,
         title: `${asset.asset_name} needs asset record review`,
-        why: "Assets that affect operations should have recent checks and clear responsibility signals.",
+        why: "Assets that affect operations should have recent checks and clear source context.",
         href: "/app/assets" as Route,
         severity: "Low" as const
       }))
@@ -462,7 +462,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       explanation: `${openIssues.length} open issues, ${overdueTasks.length} overdue source-system signals, and checklist completion at ${formatMetric(checkRate, "Checklist Completion Rate")}.`,
       improved: checkRate && checkRate >= 90 ? "Checklist discipline is improving execution visibility." : "Core business records are now centralized enough to review.",
       declined: overdueTasks.length ? "Overdue source-system signals are pulling execution health down." : "No major execution decline is visible.",
-      nextAction: overdueTasks.length ? "Review overdue signals with the responsible manager before the next leadership meeting." : "Keep reviewing checklist completion weekly."
+      nextAction: overdueTasks.length ? "Review the workflow behind overdue signals before the next leadership meeting." : "Keep reviewing checklist completion weekly."
     }),
     healthCategory({
       name: "Sales Health",
@@ -470,13 +470,13 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       explanation: `${revenue ? `Revenue is ${formatMetric(revenue.actual_value, revenue.name)} against target ${formatMetric(revenue.target, revenue.name)}.` : "Revenue KPI is missing."} ${conversion ? `Conversion is ${formatMetric(conversion.actual_value, conversion.name)}.` : ""}`,
       improved: revenue && metricOnTarget(revenue) ? "Revenue is at or above target." : "Lead records are available for response-process review.",
       declined: conversion && metricOnTarget(conversion) === false ? "Conversion is below target." : leadsWithoutFollowUp.length ? "Some leads show response gaps." : "No major sales decline is visible.",
-      nextAction: leadsWithoutFollowUp.length ? "Review stalled customer pipeline records with the responsible sales manager." : "Review conversion against recent lead quality."
+      nextAction: leadsWithoutFollowUp.length ? "Review stalled customer pipeline records as a leadership workflow issue." : "Review conversion against recent lead quality."
     }),
     healthCategory({
-      name: "Responsibility Visibility",
+      name: "Source Visibility",
       score: accountabilityScore,
-      explanation: `${Math.round(assignedRate)}% of open source-system signals show visible responsibility; ${overdueTasks.length} are overdue.`,
-      improved: assignedRate >= 85 ? "Most open signals show clear responsibility." : "Responsibility signals are available for leadership review.",
+      explanation: `${Math.round(assignedRate)}% of open source-system signals include enough context for review; ${overdueTasks.length} are unresolved.`,
+      improved: assignedRate >= 85 ? "Most open signals include clear source context." : "Source-system signals are available for leadership review.",
       declined: overdueTasks.length ? "Overdue source-system signals are the biggest drag." : "No overdue drag is visible.",
       nextAction: "Review the top Vaeroex priority and decide whether leadership needs an executive report, meeting agenda, or improvement plan."
     }),
@@ -486,7 +486,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       explanation: `${satisfaction ? `Satisfaction is ${formatMetric(satisfaction.actual_value, satisfaction.name)}.` : "Customer satisfaction is not fully tracked."} ${responseTime ? `Response time is ${formatMetric(responseTime.actual_value, responseTime.name)}.` : ""}`,
       improved: satisfaction && metricOnTarget(satisfaction) ? "Customer satisfaction is at or above target." : "Customer signals are available for review.",
       declined: responseTime && metricOnTarget(responseTime) === false ? "Response time is above target." : "No major customer experience decline is visible.",
-      nextAction: responseTime && metricOnTarget(responseTime) === false ? "Review the response-time process with the responsible manager." : "Keep tracking satisfaction and response time."
+      nextAction: responseTime && metricOnTarget(responseTime) === false ? "Review the response-time workflow as a leadership issue." : "Keep tracking satisfaction and response time."
     }),
     healthCategory({
       name: "Process Health",
@@ -501,16 +501,16 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       score: dataQuality.score,
       explanation: `${dataQuality.gaps.length} data gap${dataQuality.gaps.length === 1 ? "" : "s"} are currently visible.`,
       improved: dataQuality.score >= 80 ? "Workspace data is structured enough for useful analysis." : "Vaeroex can identify exactly which data gaps to fix.",
-      declined: dataQuality.gaps.length ? "Missing responsibility signals, targets, activity history, or analyses reduce confidence." : "No major data quality decline is visible.",
+      declined: dataQuality.gaps.length ? "Missing source context, targets, activity history, or analyses reduce confidence." : "No major data quality decline is visible.",
       nextAction: dataQuality.gaps[0]?.title || "Keep records complete as work is created."
     }),
     healthCategory({
-      name: "Team Execution Health",
+      name: "Team Context Health",
       score: teamScore,
       explanation: `${input.people.length} people are recorded; ${overdueTasks.length} source-system signals are overdue.`,
-      improved: input.people.length ? "People records allow role and department briefings." : "Team execution can improve once people records are added.",
-      declined: overdueTasks.length ? "Overdue source-system signals suggest execution risk." : "No major team execution decline is visible.",
-      nextAction: "Use responsibility visibility to review overloaded areas with leadership."
+      improved: input.people.length ? "People records add role and area context to leadership briefings." : "Team context can improve once people records are added.",
+      declined: overdueTasks.length ? "Overdue source-system signals suggest workflow risk." : "No major team-context decline is visible.",
+      nextAction: "Use source visibility to review overloaded areas with leadership."
     })
   ];
   const score = clampScore(categories.reduce((sum, category) => sum + category.score, 0) / categories.length);
@@ -543,7 +543,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatMetric(conversion.target, conversion.name)}.`,
       owner: "Sales Manager",
       dueDate: addDays(todayDate(), 3),
-      action: "Review recent proposal-stage leads with the responsible sales manager.",
+      action: "Review proposal-stage lead quality and conversion workflow with leadership.",
       priority: "High",
       relatedModule: "Customer Pipeline",
       href: "/app/crm"
@@ -573,7 +573,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       evidence: `${responseTime.name}: ${formatMetric(responseTime.actual_value, responseTime.name)} vs target ${formatMetric(responseTime.target, responseTime.name)}.`,
       owner: "Customer Service Manager",
       dueDate: addDays(todayDate(), 2),
-      action: "Review the response process and escalation SOP with the responsible manager.",
+      action: "Review the response process and escalation SOP as a leadership issue.",
       priority: "High",
       relatedModule: "SOPs",
       href: "/app/sops"
@@ -588,7 +588,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       evidence: `${overdueTasks.length} open source-system signal${overdueTasks.length === 1 ? "" : "s"} are past due.`,
       owner: "Execution Manager",
       dueDate: addDays(todayDate(), 2),
-      action: "Review overdue signals, close stale records in the source system, and decide whether an improvement plan is needed.",
+      action: "Review why these source-system signals remain unresolved and decide whether an improvement plan is needed.",
       priority: overdueTasks.length > 5 ? "Urgent" : "High",
       relatedModule: "Tasks",
       href: "/app/tasks"
@@ -614,7 +614,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
     priorities.push(action({
       id: "fix-data-gaps",
       title: "Fix the highest data gaps",
-      why: "Vaeroex can be more decisive when records have responsibility signals, targets, dates, and source context.",
+      why: "Vaeroex can be more decisive when records have source context, targets, activity history, and supporting analysis.",
       evidence: `${dataQuality.gaps.length} gap${dataQuality.gaps.length === 1 ? "" : "s"} found; first gap: ${dataQuality.gaps[0].title}.`,
       owner: "Coordinator",
       dueDate: addDays(todayDate(), 7),
@@ -666,7 +666,7 @@ function buildProfitLeaks(input: PrestigeInput) {
         evidence: `${staleProposalLeads.length} proposal-stage lead${staleProposalLeads.length === 1 ? "" : "s"} are stale.`,
         owner: "Sales Manager",
         dueDate: addDays(todayDate(), 3),
-        action: "Review proposal-stage leads with the responsible sales manager.",
+        action: "Review proposal-stage movement and response quality as a leadership concern.",
         priority: "High",
         relatedModule: "Customer Pipeline",
         href: "/app/crm"
@@ -723,7 +723,7 @@ function buildProfitLeaks(input: PrestigeInput) {
         evidence: `${highValueOverdue.length} high-priority source-system signal${highValueOverdue.length === 1 ? "" : "s"} are overdue.`,
         owner: "Execution Manager",
         dueDate: addDays(todayDate(), 2),
-        action: "Review overdue high-priority signals and document blockers for leadership.",
+      action: "Review overdue high-priority signals and summarize blockers for leadership.",
         priority: "High",
         relatedModule: "Tasks",
         href: "/app/tasks"
@@ -742,7 +742,7 @@ function buildProfitLeaks(input: PrestigeInput) {
         evidence: `Checklist completion is ${numberFormatter.format(checklistRate)}%.`,
         owner: "Supervisor",
         dueDate: addDays(todayDate(), 5),
-        action: "Run a checklist compliance review and document the likely operational cause.",
+      action: "Review checklist compliance evidence and document the likely operational cause.",
         priority: "Medium",
         relatedModule: "Checklists",
         href: "/app/checklists"
@@ -968,7 +968,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
       title: "Lead response activity should be visible within 24 hours",
       status: responseTime ? (metricOnTarget(responseTime) ? "On track" : "Needs attention") : "Missing data",
       evidence: responseTime ? `${responseTime.name}: ${formatMetric(responseTime.actual_value, responseTime.name)}` : "No response-time KPI found.",
-      recommendedAction: "Track average response time and review delayed records with the responsible manager."
+      recommendedAction: "Track average response time and review delayed records as a leadership workflow issue."
     },
     {
       title: "SOPs should be reviewed every 90 days",
@@ -980,7 +980,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
       title: "Critical issues should show clear responsibility",
       status: openIssues.some((issue) => !issue.assigned_person_id && !issue.assigned_role && !issue.assigned_department) ? "Needs attention" : openIssues.length ? "On track" : "Missing data",
       evidence: `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} found.`,
-      recommendedAction: "Review unresolved critical issues with leadership and the responsible manager."
+      recommendedAction: "Review unresolved critical issues with leadership and prepare an investigation summary if needed."
     },
     {
       title: "High-priority source-system signals should have dates",
@@ -1043,8 +1043,8 @@ function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: Pr
     {
       role: "Coordinator / Staff",
       title: "Staff briefing",
-      summary: "Focus on visible source-system signals, due dates, shared reports, and checklist items.",
-      focus: ["Review source-system signals", "Check due dates", "Open shared reports"]
+      summary: "Focus on visible source-system signals, shared reports, and checklist evidence.",
+      focus: ["Review source-system signals", "Open shared reports", "Review checklist evidence"]
     },
     {
       role: "Viewer",
@@ -1137,12 +1137,12 @@ function buildMeetingMode(input: PrestigeInput, focus: PrestigeAction[]) {
     "Customer pipeline review: inspect stalled leads, proposal-stage records, and response gaps.",
     `Open issues: review ${input.issues.filter(isOpenIssue).length} active issue${input.issues.filter(isOpenIssue).length === 1 ? "" : "s"}.`,
     `Overdue source-system signals: review ${overdue.length} overdue signal${overdue.length === 1 ? "" : "s"}.`,
-    "Checklist compliance: confirm missed runs, failed runs, and responsibility signals.",
+    "Checklist compliance: confirm missed runs, failed runs, and source-system signals.",
     "SOP review: identify stale or weak procedures affecting current performance.",
     "Department risks: review department scorecards and workload imbalance.",
     "Vaeroex recommendations: review, save, dismiss, or schedule outcome review.",
     "Decisions needed: log leadership decisions and expected outcomes.",
-    "Leadership follow-through: confirm responsible managers, dates, and review cadence."
+    "Leadership follow-through: confirm what changed, what evidence supports it, and what review cadence is appropriate."
   ];
 
   return { agenda, nextAssignments: focus.slice(0, 5) };

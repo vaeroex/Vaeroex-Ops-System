@@ -281,16 +281,6 @@ function ActionCard({
         </dl>
       </details>
       {children}
-      <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
-        <div>
-          <dt className="font-semibold">Responsible manager</dt>
-          <dd className="mt-1">{item.owner}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold">Due</dt>
-          <dd className="mt-1">{item.dueDate}</dd>
-        </div>
-      </dl>
       <div className="mt-4">
         <ActionButtons item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showReport={showReport} showAlert={showAlert} />
       </div>
@@ -445,7 +435,7 @@ export function PrestigeOperationsPanel({
                 </ActionCard>
               ))
             ) : (
-              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer pipeline records, KPI targets, and responsibility signals current.</p>
+              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer pipeline records, KPI targets, and source-system signals current.</p>
             )}
           </div>
         </IntelligenceAccordion>
@@ -501,7 +491,7 @@ export function PrestigeOperationsPanel({
 
       <section className="grid gap-4 xl:grid-cols-3">
         <IntelligenceAccordion
-          title="Department Scorecards"
+          title="Area Scorecards"
           summary={`${intelligence.departmentScorecards.length} department scorecard${intelligence.departmentScorecards.length === 1 ? "" : "s"} generated from current workspace activity.`}
         >
           <div className="space-y-3">

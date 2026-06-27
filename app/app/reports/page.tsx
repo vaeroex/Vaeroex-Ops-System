@@ -793,10 +793,10 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
       preview: shortPreview(report.body_markdown, "No report body yet."),
       meta: [
         { label: "Date range", value: reportDateLabel(report) },
-        { label: "Completed follow-ups", value: numberFromSource(report.source_data_json, "completed_tasks") },
+        { label: "Reviewed source signals", value: numberFromSource(report.source_data_json, "completed_tasks") },
         { label: "Checklist completions", value: numberFromSource(report.source_data_json, "checklist_completions") },
         { label: "Open issues", value: numberFromSource(report.source_data_json, "open_issues") },
-        { label: "Overdue follow-ups", value: numberFromSource(report.source_data_json, "overdue_tasks") },
+        { label: "Unresolved source signals", value: numberFromSource(report.source_data_json, "overdue_tasks") },
         { label: "Shared with", value: reportShares.length ? `${reportShares.length} recipient record${reportShares.length === 1 ? "" : "s"}` : "Not shared" }
       ],
       editFields: reportEditFields,
@@ -893,7 +893,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
 
       <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
         {[
-          { label: "Open follow-ups", value: openTaskCount.count ?? 0 },
+          { label: "Open source signals", value: openTaskCount.count ?? 0 },
           { label: "Overdue", value: overdueTaskCount.count ?? 0 },
           { label: "Open issues", value: openIssueCount.count ?? 0 },
           { label: "Checklist completions", value: checklistCompletionCount.count ?? 0 }

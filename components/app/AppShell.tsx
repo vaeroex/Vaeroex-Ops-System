@@ -30,7 +30,7 @@ const baseNavSections = [
     label: "Optional Outputs",
     defaultOpen: false,
     items: [
-      { href: "/app/actions", label: "Recommended Actions" }
+      { href: "/app/actions", label: "Generated Outputs" }
     ]
   }
 ] satisfies Array<{ label: string; defaultOpen?: boolean; items: Array<{ href: string; label: string }> }>;

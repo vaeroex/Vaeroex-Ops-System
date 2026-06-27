@@ -67,7 +67,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       <PageHeader
         eyebrow="Forms"
         title="Visibility forms"
-        description="Create intake, completion, issue, shift handoff, and follow-up forms. Submissions can become accountable follow-ups after manager review."
+        description="Create intake, completion, issue, shift handoff, and source-evidence forms. Submissions can become source signals for Vaeroex intelligence."
       />
       <LegalSafetyNotice tone="sensitive" compact />
 
@@ -77,7 +77,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         <CreateDrawer title="Create form" description="Start simple. You can refine fields later." triggerLabel="New Form">
           <form action={createFormAction} className="grid gap-4 lg:grid-cols-2">
             <TextInput label="Form name" name="name" required />
-            <TextInput label="Form type" name="form_type" placeholder="intake, completion, issue, follow-up" />
+            <TextInput label="Form type" name="form_type" placeholder="intake, completion, issue, source signal" />
             <div className="lg:col-span-2">
               <TextArea label="Description" name="description" />
             </div>
@@ -85,7 +85,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
               <TextArea
                 label="Fields, one per line"
                 name="fields"
-                placeholder={"Submitted by\nBusiness details\nPriority\nFollow-up date"}
+                placeholder={"Submitted by\nBusiness details\nPriority\nReview context"}
                 rows={5}
               />
             </div>
@@ -106,7 +106,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
           title="Form records"
           description="Forms stay collapsed until you need to inspect fields or open the detail page."
           emptyTitle="No forms yet"
-          emptyDescription="Create your first form to collect visibility data and follow-up needs."
+          emptyDescription="Create your first form to collect visibility data and source evidence."
           searchParams={params}
         />
 

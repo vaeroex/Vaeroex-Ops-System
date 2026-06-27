@@ -735,8 +735,8 @@ function FileAnalysisResult({
         <AnalysisSection title="KPIs Detected" items={sections.kpis} empty="No KPI suggestions were found yet." />
         <AnalysisSection title="Risks" items={sections.risks} empty="No clear risks were identified." />
         <AnalysisSection title="Opportunities" items={sections.opportunities} empty="No clear opportunities were identified." />
-        <AnalysisSection title="Recommended Actions" items={sections.actions} empty="No recommended actions were returned." />
-        <AnalysisSection title="Suggested Follow-ups" items={sections.tasks} empty="No follow-up drafts were suggested." />
+        <AnalysisSection title="Executive Recommendations" items={sections.actions} empty="No executive recommendations were returned." />
+        <AnalysisSection title="Suggested Outputs" items={sections.tasks} empty="No supporting outputs were suggested." />
         <AnalysisSection title="Suggested Reports" items={sections.reports} empty="No additional reports were suggested." />
         <AnalysisSection title="Suggested KPI Records" items={sections.kpiRecords} empty="No KPI records were suggested." />
         <div className="lg:col-span-2">
@@ -1436,7 +1436,7 @@ function AnalysisHistory({
       <div id="analysis-history" className="rounded-lg border border-dashed border-line bg-white p-4">
         <p className="text-sm font-semibold text-ink">No review history yet</p>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Analyze a file and Vaeroex will save the result here so you can review it later, create reports, or confirm follow-up work.
+          Analyze a file and Vaeroex will save the result here so you can review it later, create reports, or generate supporting executive documents.
         </p>
       </div>
     );

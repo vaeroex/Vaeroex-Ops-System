@@ -7,23 +7,23 @@ const engineScenarios = [
   {
     title: "Business Health Score",
     signal: "92 / 100",
-    summary: "Leadership signal combining performance, risk, execution, and operational movement.",
-    flow: ["Business Health Score", "Trend detected", "Ownership gap identified", "Recommendation generated"],
-    output: "Review sales pipeline ownership and confirm next-week follow-up coverage."
+    summary: "Leadership signal combining performance, risk, evidence, and operational movement.",
+    flow: ["Business Health Score", "Trend detected", "Source gap identified", "Recommendation generated"],
+    output: "Review sales pipeline response quality and decide whether an executive brief is needed."
   },
   {
     title: "Profit Leak",
     signal: "7 items",
-    summary: "Execution gaps, missed follow-ups, unresolved issues, and stalled recovery work become visible.",
-    flow: ["Issue detected", "Context matched", "Impact estimated", "Recovery action suggested"],
-    output: "Assign an owner to the issue review and create a recovery report."
+    summary: "Response gaps, unresolved issues, and stalled recovery patterns become visible.",
+    flow: ["Issue detected", "Context matched", "Impact estimated", "Review output suggested"],
+    output: "Generate an investigation summary or improvement plan for leadership review."
   },
   {
-    title: "CRM Follow-up",
-    signal: "Owner needed",
-    summary: "Pipeline risk is connected to responsible ownership and next action.",
-    flow: ["Risk surfaced", "Responsible owner identified", "Action assigned", "Follow-up tracked"],
-    output: "Create a follow-up task and review the lead source trend."
+    title: "Customer Pipeline",
+    signal: "Review needed",
+    summary: "Pipeline risk is connected to response quality, conversion movement, and evidence.",
+    flow: ["Risk surfaced", "Evidence linked", "Confidence scored", "Decision framed"],
+    output: "Review the lead source trend and generate an executive brief if needed."
   }
 ] as const;
 
@@ -36,7 +36,7 @@ export function OperationsIntelligenceEngineDemo() {
       <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence Engine Preview</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">Operations signals becoming action</h2>
+          <h2 className="mt-1 text-xl font-semibold text-white">Operations signals becoming intelligence</h2>
         </div>
         <span className="rounded-full border border-vaeroex-accent/35 bg-vaeroex-accent/10 px-3 py-1 text-xs font-semibold text-vaeroex-accent">Live flow</span>
       </div>

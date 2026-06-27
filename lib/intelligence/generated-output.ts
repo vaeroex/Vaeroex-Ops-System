@@ -45,7 +45,7 @@ export type GeneratedOutputCoverageSummary = {
 
 const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
   action_plan: "Generated Improvement Plan",
-  risk_brief: "Generated Risk Brief",
+  risk_brief: "Generated Investigation Summary",
   checklist: "Generated Checklist Draft",
   sop: "Generated SOP Draft",
   executive_briefing: "Generated Executive Briefing"
@@ -53,7 +53,7 @@ const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
 
 const OUTPUT_NAMES: Record<GeneratedOutputType, string> = {
   action_plan: "Improvement Plan",
-  risk_brief: "Risk Brief",
+  risk_brief: "Investigation Summary",
   checklist: "Checklist Draft",
   sop: "SOP Draft",
   executive_briefing: "Executive Briefing"
@@ -210,7 +210,7 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
       source.summary,
       "",
       "## When To Use It",
-      "Use this when leadership wants a repeatable review before discussing the recommendation with the responsible manager or source-system owner.",
+      "Use this when leadership wants a repeatable review before deciding how the recommendation should be handled in existing systems.",
       "",
       "## Checklist Steps",
       numberedList([

@@ -13,14 +13,14 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     title: "Workflow Builder",
     whatItWillDo: [
       "Map repeatable business processes from trigger to completion.",
-      "Assign owners, handoffs, review points, forms, checklists, and follow-ups.",
-      "Connect workflow steps to reports so managers can see where work gets stuck."
+      "Map handoffs, review points, evidence capture, forms, and checklists.",
+      "Connect workflow signals to reports so leaders can see where patterns emerge."
     ],
     whyItMatters:
       "Many small teams know the work, but the steps live in heads, texts, spreadsheets, and side conversations. A workflow builder will turn that into visible business structure.",
     futureCapability: [
       "Visual workflow maps",
-      "Step ownership and due dates",
+      "Source evidence and review points",
       "Workflow templates by industry",
       "Vaeroex recommendations for bottlenecks and missed handoffs"
     ]
@@ -45,7 +45,7 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     title: "Business Intake",
     whatItWillDo: [
       "Capture business context before setup.",
-      "Identify recurring headaches, missed follow-ups, and spreadsheet-driven processes.",
+      "Identify recurring headaches, missed source-system signals, and spreadsheet-driven processes.",
       "Use answers to recommend starter workflows, KPIs, forms, SOPs, and reports."
     ],
     whyItMatters:
