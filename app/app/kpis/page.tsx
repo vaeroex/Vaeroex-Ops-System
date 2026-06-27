@@ -671,6 +671,54 @@ function timelineHref(timeline: KpiTimeline, status: KpiStatusFilter) {
   return kpiHref({ timeline, status });
 }
 
+function compareHref({
+  timeline,
+  range,
+  metrics,
+  mode
+}: {
+  timeline: KpiTimeline;
+  range: { startDate: string; endDate: string };
+  metrics: string[];
+  mode: ComparisonMode;
+}) {
+  const search = new URLSearchParams();
+  search.set("section", "compare");
+  search.set("timeline", timeline);
+  search.set("mode", mode);
+
+  metrics.forEach((metric) => {
+    if (metric) {
+      search.append("metric", metric);
+    }
+  });
+
+  if (timeline === "Custom Range") {
+    search.set("start", range.startDate);
+    search.set("end", range.endDate);
+  }
+
+  return `/app/kpis?${search.toString()}` as Route;
+}
+
+function formatLongDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  }).format(new Date(`${value}T12:00:00.000Z`));
+}
+
+function timeframeDisplay(range: { label: string; startDate: string; endDate: string }) {
+  const dateRange = `${formatLongDate(range.startDate)} - ${formatLongDate(range.endDate)}`;
+
+  if (range.label === "Custom Range") {
+    return `Showing ${dateRange}`;
+  }
+
+  return `${range.label}: ${dateRange}`;
+}
+
 function getTrendRows(kpis: KpiRow[], metricName: string) {
   return kpis
     .filter((kpi) => kpi.name === metricName)
@@ -1016,6 +1064,124 @@ function trendDirection(trend: KpiTrend) {
   return "flat";
 }
 
+function trendActualValues(trend: KpiTrend) {
+  return trend.rows.map((row) => row.actual_value).filter((value): value is number => value !== null);
+}
+
+function trendDateRange(trends: KpiTrend[]) {
+  const dates = trends.flatMap((trend) => trend.rows.map((row) => row.metric_date)).filter(Boolean).sort();
+
+  if (!dates.length) {
+    return null;
+  }
+
+  return { startDate: dates[0], endDate: dates[dates.length - 1] };
+}
+
+function monthsBetween(startDate: string, endDate: string) {
+  const start = new Date(`${startDate}T12:00:00.000Z`);
+  const end = new Date(`${endDate}T12:00:00.000Z`);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return 0;
+  }
+
+  return Math.max(1, (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth() + 1);
+}
+
+function comparisonConfidence({
+  trends,
+  dataQualityScore,
+  memoryCount
+}: {
+  trends: KpiTrend[];
+  dataQualityScore: number;
+  memoryCount: number;
+}) {
+  const usableTrends = trends.filter((trend) => trendActualValues(trend).length >= 2);
+  const recordCount = trends.reduce((count, trend) => count + trendActualValues(trend).length, 0);
+  const range = trendDateRange(usableTrends);
+  const coverageMonths = range ? monthsBetween(range.startDate, range.endDate) : 0;
+  const recordDepthScore = Math.min(30, recordCount * 2);
+  const breadthScore = Math.min(20, usableTrends.length * 6);
+  const historyScore = Math.min(25, coverageMonths * 4);
+  const qualityScore = Math.min(15, dataQualityScore * 0.15);
+  const memoryScore = Math.min(10, memoryCount * 2);
+  const score = Math.round(Math.min(90, recordDepthScore + breadthScore + historyScore + qualityScore + memoryScore));
+  const label = score >= 70 ? "Good" : score >= 55 ? "Moderate" : score >= 35 ? "Limited" : "Low";
+  const forecastConfidence =
+    score >= 70 && coverageMonths >= 4 && recordCount >= 12
+      ? "Good"
+      : score >= 55 && coverageMonths >= 3 && recordCount >= 8
+        ? "Moderate"
+        : "Low";
+  const limitations = [
+    usableTrends.length < 2 ? "At least two KPIs need usable history for reliable comparison." : "",
+    recordCount < 8 ? "The comparison has fewer than 8 dated KPI values." : "",
+    coverageMonths < 3 ? "Historical coverage is under 3 months, so seasonality and forecasting are limited." : "",
+    dataQualityScore < 60 ? "Workspace data quality is still developing." : "",
+    memoryCount < 3 ? "Business Memory coverage is limited." : ""
+  ].filter(Boolean);
+
+  return {
+    score,
+    label,
+    forecastConfidence,
+    coverageMonths,
+    limitations: limitations.length ? limitations.join(" ") : "Enough KPI history exists for a useful leadership review, though forecasts should still be treated as directional."
+  };
+}
+
+function comparisonContext({
+  trends,
+  range,
+  dataQualityScore,
+  memoryCount
+}: {
+  trends: KpiTrend[];
+  range: { label: string; startDate: string; endDate: string };
+  dataQualityScore: number;
+  memoryCount: number;
+}) {
+  const recordCount = trends.reduce((count, trend) => count + trendActualValues(trend).length, 0);
+  const actualRange = trendDateRange(trends);
+  const confidence = comparisonConfidence({ trends, dataQualityScore, memoryCount });
+  const comparedKpis = trends.map((trend) => trend.name).filter(Boolean);
+  const historicalCoverage = actualRange
+    ? `${monthsBetween(actualRange.startDate, actualRange.endDate)} month${monthsBetween(actualRange.startDate, actualRange.endDate) === 1 ? "" : "s"} (${formatLongDate(actualRange.startDate)} - ${formatLongDate(actualRange.endDate)})`
+    : "No dated KPI history in this range";
+
+  return {
+    timeframe: timeframeDisplay(range),
+    recordCount,
+    comparedKpis,
+    historicalCoverage,
+    forecastConfidence: confidence.forecastConfidence,
+    confidenceLabel: confidence.label,
+    confidenceScore: confidence.score,
+    dataLimitations: confidence.limitations,
+    businessMemoryCoverage: `${memoryCount} memory signal${memoryCount === 1 ? "" : "s"} available; data quality ${dataQualityScore}/100`
+  };
+}
+
+function percentChangeLabel(trend: KpiTrend) {
+  if (trend.changePercent === null) {
+    return "not enough comparable history";
+  }
+
+  const direction = trend.changePercent > 0 ? "up" : trend.changePercent < 0 ? "down" : "flat";
+  return `${direction} ${numberFormatter.format(Math.abs(trend.changePercent))}%`;
+}
+
+function metricMatches(trend: KpiTrend | undefined, keywords: string[]) {
+  if (!trend) {
+    return false;
+  }
+
+  const name = lower(trend.name);
+  return keywords.some((keyword) => name.includes(keyword));
+}
+
 function comparisonNotes(trends: KpiTrend[]) {
   const usable = trends.filter((trend) => trend.rows.filter((row) => row.actual_value !== null).length >= 2);
 
@@ -1034,15 +1200,20 @@ function comparisonNotes(trends: KpiTrend[]) {
     .sort((a, b) => (b.volatility ?? 0) - (a.volatility ?? 0))[0];
   const revenue = usable.find((trend) => lower(trend.name).includes("revenue") || lower(trend.name).includes("sales"));
   const leads = usable.find((trend) => lower(trend.name).includes("lead"));
+  const conversion = usable.find((trend) => metricMatches(trend, ["conversion", "close rate"]));
+  const responseTime = usable.find((trend) => metricMatches(trend, ["response", "reply time", "speed"]));
+  const satisfaction = usable.find((trend) => metricMatches(trend, ["satisfaction", "csat", "nps"]));
+  const issues = usable.find((trend) => metricMatches(trend, ["issue", "complaint", "risk"]));
+  const overdue = usable.find((trend) => metricMatches(trend, ["overdue", "late", "backlog"]));
   const notes = [
     improving && improving.changePercent !== null
-      ? `${improving.name} is improving fastest at ${numberFormatter.format(improving.changePercent)}% across the selected history.`
+      ? `Biggest positive movement: ${improving.name} is ${percentChangeLabel(improving)}. This matters because it may be the KPI creating the most operating leverage right now.`
       : "No KPI has enough positive movement to identify a clear fastest improver.",
     declining && declining.changePercent !== null
-      ? `${declining.name} is declining most at ${numberFormatter.format(Math.abs(declining.changePercent))}%.`
+      ? `Biggest risk signal: ${declining.name} is ${percentChangeLabel(declining)}. Leadership should check whether this is an isolated dip or a downstream effect from staffing, follow-up, service quality, or demand.`
       : "No selected KPI is currently declining across its available history.",
     volatile && volatile.volatility !== null
-      ? `${volatile.name} is the most volatile, with an average move of ${formatNumericValue(volatile.volatility, volatile.name)} between entries.`
+      ? `Most volatile KPI: ${volatile.name} moves by about ${formatNumericValue(volatile.volatility, volatile.name)} between entries. Volatility matters because it makes planning less reliable even when the latest value looks acceptable.`
       : "Volatility needs more dated values before it becomes useful."
   ];
 
@@ -1051,28 +1222,134 @@ function comparisonNotes(trends: KpiTrend[]) {
     const leadsDirection = trendDirection(leads);
 
     if (leadsDirection === "up" && revenueDirection === "down") {
-      notes.push("Leads are rising while revenue is falling, which may point to conversion, pricing, or follow-up issues.");
+      notes.push("Leads are rising while revenue is falling, which points to a possible conversion, pricing, qualification, or follow-up bottleneck rather than a demand problem.");
     } else if (leadsDirection === "down" && revenueDirection === "up") {
-      notes.push("Revenue is rising while leads are falling, which may mean larger deals are offsetting a weaker pipeline.");
+      notes.push("Revenue is rising while leads are falling, which may mean larger deals are offsetting a weaker pipeline. That can be healthy short term, but pipeline quality should be watched.");
     } else if (leadsDirection === revenueDirection && leadsDirection !== "flat") {
       notes.push(`Leads and revenue are both moving ${leadsDirection}, which suggests pipeline volume and sales results are currently aligned.`);
     }
   }
 
+  if (leads && conversion && trendDirection(leads) === "up" && trendDirection(conversion) === "down") {
+    notes.push("Lead volume is improving while conversion is declining. Vaeroex would treat this as a follow-up quality, qualification, or sales process signal.");
+  }
+
+  if (responseTime && (conversion || revenue) && trendDirection(responseTime) === "up") {
+    const paired = (conversion || revenue) as KpiTrend;
+    notes.push(
+      `${responseTime.name} is rising while ${paired.name} is ${percentChangeLabel(paired)}. If higher response time means slower service, this may be creating a customer or sales bottleneck.`
+    );
+  }
+
+  if (satisfaction && revenue && trendDirection(revenue) === "up" && trendDirection(satisfaction) === "down") {
+    notes.push("Revenue is improving while customer satisfaction is declining. Growth may be creating service strain that should be corrected before it becomes churn or complaints.");
+  }
+
+  const executionRisk = issues || overdue;
+
+  if (executionRisk && revenue && trendDirection(revenue) === "up" && trendDirection(executionRisk) === "up") {
+    notes.push("Operating demand appears to be rising while issues or overdue work are also increasing. That pattern often means execution capacity is becoming the constraint.");
+  }
+
   return notes;
 }
 
-function ComparisonAnalysis({ trends, mode }: { trends: KpiTrend[]; mode: ComparisonMode }) {
+function ComparisonDataContext({
+  context
+}: {
+  context: ReturnType<typeof comparisonContext>;
+}) {
+  return (
+    <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
+      <p className="text-sm font-semibold text-white">Data Context</p>
+      <dl className="mt-3 grid gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">Timeframe analyzed</dt>
+          <dd className="mt-1 text-white">{context.timeframe}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">KPI records</dt>
+          <dd className="mt-1 text-white">{context.recordCount}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">KPIs compared</dt>
+          <dd className="mt-1 text-white">{context.comparedKpis.join(", ") || "None selected"}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">Historical coverage</dt>
+          <dd className="mt-1 text-white">{context.historicalCoverage}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">Forecast confidence</dt>
+          <dd className="mt-1 text-white">{context.forecastConfidence} ({context.confidenceScore}/100)</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">Business Memory used</dt>
+          <dd className="mt-1 text-white">{context.businessMemoryCoverage}</dd>
+        </div>
+      </dl>
+      <p className="mt-3 text-xs leading-5 text-slate-400">{context.dataLimitations}</p>
+    </div>
+  );
+}
+
+function ComparisonAnalysis({
+  trends,
+  mode,
+  context
+}: {
+  trends: KpiTrend[];
+  mode: ComparisonMode;
+  context: ReturnType<typeof comparisonContext>;
+}) {
   const notes = comparisonNotes(trends);
+  const evidence = [
+    `Timeframe: ${context.timeframe}`,
+    `KPIs compared: ${context.comparedKpis.join(", ") || "None"}`,
+    `Comparison mode: ${mode}`,
+    `KPI records: ${context.recordCount}`,
+    `Historical coverage: ${context.historicalCoverage}`,
+    `Forecast confidence: ${context.forecastConfidence}; confidence score ${context.confidenceScore}/100`,
+    `Business Memory coverage: ${context.businessMemoryCoverage}`,
+    `Data limitations: ${context.dataLimitations}`,
+    ...trends.map((trend) => `${trend.name}: ${percentChangeLabel(trend)}; latest ${formatNumericValue(trend.latest?.actual_value, trend.name)}; records ${trendActualValues(trend).length}`)
+  ];
 
   return (
     <div className="space-y-4">
+      <div className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Timeframe analyzed</p>
+        <p className="mt-2 text-base font-semibold text-white">{context.timeframe}</p>
+        <p className="mt-1 text-xs leading-5 text-slate-300">
+          Preset ranges update immediately. Custom ranges apply after you choose dates.
+        </p>
+      </div>
       <OverlayTrendChart trends={trends} mode={mode} />
+      <div className="rounded-lg border border-cyan-400/25 bg-[#08111f] p-4">
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-white">Ask Vaeroex About This Comparison</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            Generate an inline leadership readout using this chart, timeframe, selected KPIs, and available Business Memory.
+          </p>
+        </div>
+        <ContextualAskVaeroex
+          label="Ask Vaeroex About This Comparison"
+          prompt="Analyze this KPI comparison for leadership. Return a concise executive analytics briefing with: Executive Summary, Key Relationships, Biggest Trend, Biggest Risk, Biggest Opportunity, Forecast only if confidence is sufficient, Confidence Score, Data Limitations, Recommended Actions, and Follow-up Questions. Explain why the relationships matter for business decisions. Do not overstate certainty when the data is limited."
+          contextType="kpi_comparison"
+          contextId={`kpi-comparison-${context.comparedKpis.join("-")}-${mode}`}
+          sourceTitle="KPI comparison"
+          sourceSummary={`Comparing ${context.comparedKpis.join(", ") || "selected KPIs"} across ${context.timeframe} in ${mode} mode.`}
+          evidence={evidence}
+          compact
+          defaultCollapsed={false}
+        />
+      </div>
+      <ComparisonDataContext context={context} />
       <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
         <p className="text-sm font-semibold text-white">Comparison Insights</p>
         <div className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-          {notes.map((note) => (
-            <div key={note} className="flex gap-2">
+          {notes.map((note, index) => (
+            <div key={`${note}-${index}`} className="flex gap-2">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
               <p>{note}</p>
             </div>
@@ -1609,6 +1886,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
   const hasComparison = selectedMetrics.length > 1;
   const comparisonMode = isComparisonMode(params?.mode) ? params.mode : defaultComparisonMode(selectedTrends);
+  const selectedComparisonContext = comparisonContext({
+    trends: selectedTrends,
+    range: selectedTimelineRange,
+    dataQualityScore: intelligence.dataQuality.score,
+    memoryCount: intelligence.memoryTimeline.length
+  });
   const activeSection =
     params?.section === "compare" || params?.metric === "compare"
       ? "compare"
@@ -1973,96 +2256,143 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <section id="trend-analysis" className="space-y-5">
           {metricNames.length ? (
             <>
-              <form method="get" className="space-y-5 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-                <input type="hidden" name="section" value="compare" />
-                <div>
-                  <p className="text-sm font-semibold text-white">Select KPIs</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Choose two or more KPI lines to compare. Overview stays focused on one KPI at a time.
-                  </p>
+              <div className="space-y-5 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-white">Compare KPIs</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Preset ranges update the chart immediately. Use Custom Range only when you need exact dates.
+                    </p>
+                  </div>
+                  <span className="w-fit rounded-full border border-cyan-400/25 bg-cyan-950/30 px-3 py-1 text-xs font-semibold text-cyan-100">
+                    Applied: {selectedComparisonContext.timeframe}
+                  </span>
                 </div>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                  {metricNames.map((metric, index) => (
-                    <label key={metric} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
+
+                <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Date Range</p>
+                      <p className="mt-1 text-sm font-semibold text-white">{selectedComparisonContext.timeframe}</p>
+                    </div>
+                    <p className="text-xs leading-5 text-slate-400">Preset changes apply immediately.</p>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {KPI_TIMELINES.filter((item) => item !== "Custom Range").map((item) => (
+                      <Link
+                        key={item}
+                        href={compareHref({ timeline: item, range: selectedTimelineRange, metrics: selectedMetrics, mode: comparisonMode })}
+                        aria-current={item === timeline ? "true" : undefined}
+                        className={`min-h-10 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                          item === timeline
+                            ? "border-vaeroex-blue bg-vaeroex-blue text-white shadow-panel ring-1 ring-vaeroex-accent/35"
+                            : "border-white/10 bg-slate-950/50 text-slate-200 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
+                        }`}
+                      >
+                        {item}
+                      </Link>
+                    ))}
+                    <span
+                      className={`min-h-10 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                        timeline === "Custom Range"
+                          ? "border-vaeroex-blue bg-vaeroex-blue text-white shadow-panel ring-1 ring-vaeroex-accent/35"
+                          : "border-white/10 bg-slate-950/50 text-slate-300"
+                      }`}
+                    >
+                      Custom Range
+                    </span>
+                  </div>
+                  <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                    <input type="hidden" name="section" value="compare" />
+                    <input type="hidden" name="timeline" value="Custom Range" />
+                    <input type="hidden" name="mode" value={comparisonMode} />
+                    {selectedMetrics.map((metric) => (
+                      <input key={metric} type="hidden" name="metric" value={metric} />
+                    ))}
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Custom start
                       <input
-                        name="metric"
-                        type="checkbox"
-                        value={metric}
-                        defaultChecked={selectedMetrics.includes(metric)}
-                        className="h-4 w-4 rounded border-white/20 text-vaeroex-blue"
+                        name="start"
+                        type="date"
+                        defaultValue={selectedTimelineRange.startDate}
+                        className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
                       />
-                      <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: kpiColor(metric, kpiSettings, index) }} />
-                      <span className="min-w-0 flex-1 truncate">{metric}</span>
-                      <span className="text-xs text-slate-400">W {numberFormatter.format(kpiWeight(metric, kpiSettings))}</span>
                     </label>
-                  ))}
+                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                      Custom end
+                      <input
+                        name="end"
+                        type="date"
+                        defaultValue={selectedTimelineRange.endDate}
+                        className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+                      />
+                    </label>
+                    <PrimaryButton>Apply custom range</PrimaryButton>
+                  </form>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
-                  <fieldset>
-                    <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Date Range</legend>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {KPI_TIMELINES.map((item) => (
-                        <label
-                          key={item}
-                          className={`flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                            item === timeline
-                              ? "border-vaeroex-blue bg-vaeroex-blue text-white"
-                              : "border-white/10 bg-slate-950/50 text-slate-200 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
-                          }`}
-                        >
-                          <input name="timeline" type="radio" value={item} defaultChecked={item === timeline} className="sr-only" />
-                          {item}
-                        </label>
-                      ))}
-                    </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Custom start
+                <form method="get" className="space-y-5">
+                  <input type="hidden" name="section" value="compare" />
+                  <input type="hidden" name="timeline" value={timeline} />
+                  {timeline === "Custom Range" ? (
+                    <>
+                      <input type="hidden" name="start" value={selectedTimelineRange.startDate} />
+                      <input type="hidden" name="end" value={selectedTimelineRange.endDate} />
+                    </>
+                  ) : null}
+                  <div>
+                    <p className="text-sm font-semibold text-white">Select KPIs</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Choose two or more KPI lines to compare. Overview stays focused on one KPI at a time.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    {metricNames.map((metric, index) => (
+                      <label key={metric} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
                         <input
-                          name="start"
-                          type="date"
-                          defaultValue={selectedTimelineRange.startDate}
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+                          name="metric"
+                          type="checkbox"
+                          value={metric}
+                          defaultChecked={selectedMetrics.includes(metric)}
+                          className="h-4 w-4 rounded border-white/20 text-vaeroex-blue"
                         />
+                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: kpiColor(metric, kpiSettings, index) }} />
+                        <span className="min-w-0 flex-1 truncate">{metric}</span>
+                        <span className="text-xs text-slate-400">W {numberFormatter.format(kpiWeight(metric, kpiSettings))}</span>
                       </label>
-                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                        Custom end
-                        <input
-                          name="end"
-                          type="date"
-                          defaultValue={selectedTimelineRange.endDate}
-                          className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
-                        />
-                      </label>
-                    </div>
-                  </fieldset>
+                    ))}
+                  </div>
 
-                  <fieldset>
-                    <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Compare Mode</legend>
-                    <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                      {[
-                        ["actual", "Actual"],
-                        ["normalized", "Normalized"],
-                        ["percent", "Percent Change"]
-                      ].map(([value, label]) => (
-                        <label key={value} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
-                          <input
-                            name="mode"
-                            type="radio"
-                            value={value}
-                            defaultChecked={comparisonMode === value}
-                            className="h-4 w-4 rounded border-white/20 text-vaeroex-blue"
-                          />
-                          {label}
-                        </label>
-                      ))}
-                    </div>
-                  </fieldset>
+                  <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-end">
+                    <fieldset>
+                      <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Compare Mode</legend>
+                      <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                        {[
+                          ["actual", "Actual"],
+                          ["normalized", "Normalized"],
+                          ["percent", "Percent Change"]
+                        ].map(([value, label]) => (
+                          <label key={value} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
+                            <input
+                              name="mode"
+                              type="radio"
+                              value={value}
+                              defaultChecked={comparisonMode === value}
+                              className="h-4 w-4 rounded border-white/20 text-vaeroex-blue"
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
 
-                  <PrimaryButton>Update chart</PrimaryButton>
-                </div>
-              </form>
+                    <div className="flex flex-col gap-2">
+                      <PrimaryButton>Update KPIs & Mode</PrimaryButton>
+                      <p className="max-w-xs text-xs leading-5 text-slate-400">Applied range stays {selectedTimelineRange.label} unless you choose a preset or apply a custom range.</p>
+                    </div>
+                  </div>
+                </form>
+              </div>
 
               <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
                 <div className="mb-4">
@@ -2073,7 +2403,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                       : "Select at least two KPIs to compare trend lines."}
                   </p>
                 </div>
-                <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} />
+                <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} context={selectedComparisonContext} />
               </div>
             </>
           ) : (
