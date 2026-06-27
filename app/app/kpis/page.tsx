@@ -21,7 +21,6 @@ import {
   kpiColorMayBeLowContrast,
   kpiDefinition,
   kpiDisplayUnit,
-  kpiPreferredChartType,
   kpiSettingForName,
   kpiWeight,
   kpiXAxisLabel,
@@ -795,124 +794,6 @@ function TrendSummaryCard({ label, value, detail }: { label: string; value: stri
   );
 }
 
-function startOfWeek(date: Date) {
-  const day = date.getUTCDay();
-  return startOfDay(addDays(date, -((day + 6) % 7)));
-}
-
-function startOfMonth(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
-}
-
-function startOfQuarter(date: Date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), Math.floor(date.getUTCMonth() / 3) * 3, 1));
-}
-
-function comparisonRange(label: string, currentStart: Date, currentEnd: Date, previousStart: Date, previousEnd: Date) {
-  return {
-    label,
-    currentStart: dateOnly(startOfDay(currentStart)),
-    currentEnd: dateOnly(startOfDay(currentEnd)),
-    previousStart: dateOnly(startOfDay(previousStart)),
-    previousEnd: dateOnly(startOfDay(previousEnd))
-  };
-}
-
-function periodComparisonRanges(today = new Date()) {
-  const currentDay = startOfDay(today);
-  const currentWeekStart = startOfWeek(currentDay);
-  const currentMonthStart = startOfMonth(currentDay);
-  const currentQuarterStart = startOfQuarter(currentDay);
-  const currentYearStart = startOfYear(currentDay);
-  const previousYearSameDay = new Date(Date.UTC(currentDay.getUTCFullYear() - 1, currentDay.getUTCMonth(), currentDay.getUTCDate()));
-
-  return [
-    comparisonRange("Day over Day", currentDay, currentDay, addDays(currentDay, -1), addDays(currentDay, -1)),
-    comparisonRange("Week over Week", currentWeekStart, currentDay, addDays(currentWeekStart, -7), addDays(currentDay, -7)),
-    comparisonRange("Month over Month", currentMonthStart, currentDay, new Date(Date.UTC(currentDay.getUTCFullYear(), currentDay.getUTCMonth() - 1, 1)), new Date(Date.UTC(currentDay.getUTCFullYear(), currentDay.getUTCMonth() - 1, currentDay.getUTCDate()))),
-    comparisonRange("Quarter over Quarter", currentQuarterStart, currentDay, new Date(Date.UTC(currentQuarterStart.getUTCFullYear(), currentQuarterStart.getUTCMonth() - 3, 1)), new Date(Date.UTC(currentDay.getUTCFullYear(), currentDay.getUTCMonth() - 3, currentDay.getUTCDate()))),
-    comparisonRange("Year over Year", currentYearStart, currentDay, startOfYear(previousYearSameDay), previousYearSameDay),
-    comparisonRange("Year to Date", currentYearStart, currentDay, startOfYear(previousYearSameDay), previousYearSameDay)
-  ];
-}
-
-function aggregateRows(rows: KpiRow[], metricName: string, startDate: string, endDate: string) {
-  const values = rows
-    .filter((row) => row.metric_date >= startDate && row.metric_date <= endDate && row.actual_value !== null)
-    .map((row) => row.actual_value as number);
-
-  if (!values.length) {
-    return null;
-  }
-
-  const label = lower(metricName);
-  const total = values.reduce((sum, value) => sum + value, 0);
-
-  if (label.includes("rate") || label.includes("conversion") || label.includes("utilization")) {
-    return total / values.length;
-  }
-
-  return total;
-}
-
-function comparisonRows(rows: KpiRow[], metricName: string) {
-  return periodComparisonRanges().map((range) => {
-    const current = aggregateRows(rows, metricName, range.currentStart, range.currentEnd);
-    const previous = aggregateRows(rows, metricName, range.previousStart, range.previousEnd);
-    const change = current !== null && previous !== null ? current - previous : null;
-    const changePercent = change !== null && previous !== null && previous !== 0 ? (change / Math.abs(previous)) * 100 : null;
-
-    return {
-      ...range,
-      current,
-      previous,
-      change,
-      changePercent
-    };
-  });
-}
-
-function PeriodComparisonTable({ rows, metricName }: { rows: KpiRow[]; metricName: string }) {
-  const comparisons = comparisonRows(rows, metricName);
-
-  return (
-    <div className="overflow-hidden rounded-lg border border-white/10 bg-slate-950/35">
-      <div className="border-b border-white/10 px-4 py-3">
-        <p className="text-sm font-semibold text-white">Period comparisons</p>
-        <p className="mt-1 text-xs leading-5 text-slate-400">Aggregated movement for this KPI across common management reporting windows.</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="bg-slate-950/60 text-xs uppercase tracking-wide text-slate-400">
-            <tr>
-              <th className="px-4 py-3">Period</th>
-              <th className="px-4 py-3">Current</th>
-              <th className="px-4 py-3">Previous</th>
-              <th className="px-4 py-3">Change</th>
-            </tr>
-          </thead>
-          <tbody>
-            {comparisons.map((item) => (
-              <tr key={item.label} className="border-t border-white/10">
-                <td className="px-4 py-3 font-medium text-white">{item.label}</td>
-                <td className="px-4 py-3 text-slate-300">{formatNumericValue(item.current, metricName, "No data")}</td>
-                <td className="px-4 py-3 text-slate-300">{formatNumericValue(item.previous, metricName, "No data")}</td>
-                <td className="px-4 py-3 text-slate-300">
-                  {item.change === null
-                    ? "Needs history"
-                    : `${item.change > 0 ? "+" : ""}${formatNumericValue(item.change, metricName)}${
-                        item.changePercent === null ? "" : ` (${numberFormatter.format(item.changePercent)}%)`
-                      }`}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
 function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[] }) {
   const chartRows = rows.filter((row) => row.actual_value !== null);
 
@@ -1188,7 +1069,7 @@ function ComparisonAnalysis({ trends, mode }: { trends: KpiTrend[]; mode: Compar
     <div className="space-y-4">
       <OverlayTrendChart trends={trends} mode={mode} />
       <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-        <p className="text-sm font-semibold text-white">Comparison notes</p>
+        <p className="text-sm font-semibold text-white">Comparison Insights</p>
         <div className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
           {notes.map((note) => (
             <div key={note} className="flex gap-2">
@@ -1591,69 +1472,6 @@ function KpiChartSettingsForm({
   );
 }
 
-function TrendAnalysis({ rows, metricName, settings }: { rows: KpiRow[]; metricName: string; settings: KpiSettingRow[] }) {
-  if (!metricName) {
-    return (
-      <EmptyState
-        title="No trends yet"
-        description="Save two or more KPI records with dates to unlock trend charts and movement summaries."
-      />
-    );
-  }
-
-  const latest = rows[rows.length - 1];
-  const previous = rows[rows.length - 2];
-  const actualValues = rows.map((row) => row.actual_value).filter((value): value is number => value !== null);
-  const averageActual = average(actualValues);
-  const latestTone = metricTone(latest?.actual_value ?? null, latest?.target ?? null);
-  const targetStatus = statusLabel(latestTone);
-  const movement = trendDeltaLabel(latest, previous, metricName);
-  const latestValue = formatNumericValue(latest?.actual_value, metricName);
-  const averageValue = formatNumericValue(averageActual, metricName, "Not enough data");
-  const definition = kpiDefinition(metricName, settings);
-  const weight = kpiWeight(metricName, settings);
-  const chartType = kpiPreferredChartType(metricName, settings);
-  const yAxisLabel = kpiYAxisLabel(metricName, settings);
-
-  const insights = [
-    latest ? `Latest result is ${latestValue} for ${formatShortDate(latest.metric_date)}.` : "",
-    definition ? `Definition: ${definition}` : "",
-    `Leadership weight: ${numberFormatter.format(weight)} out of 10.`,
-    `Preferred chart: ${chartType}. Y-axis: ${yAxisLabel}.`,
-    latest?.target === null || latest?.target === undefined
-      ? "Add a target to show whether this KPI is on pace."
-      : `Current target status: ${targetStatus.toLowerCase()}.`,
-    previous ? `Movement from the previous entry: ${movement.toLowerCase()}.` : "Add another entry to compare movement.",
-    rows.length < 4 ? "Four or more entries will make the trend more reliable." : "There is enough history here for a useful management review."
-  ].filter(Boolean);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <TrendSummaryCard label="Latest Value" value={latestValue} detail={latest ? `Recorded ${formatShortDate(latest.metric_date)}` : "No value yet"} />
-        <TrendSummaryCard label="Change" value={movement} detail="Latest entry compared with the previous entry" />
-        <TrendSummaryCard label="Average" value={averageValue} detail={`Average across ${actualValues.length} recorded value${actualValues.length === 1 ? "" : "s"}`} />
-        <TrendSummaryCard label="Target Hit Rate" value={targetHitRate(rows)} detail="Share of records that met or beat target" />
-      </div>
-
-      <TrendChart rows={rows.slice(-12)} metricName={metricName} settings={settings} />
-      <PeriodComparisonTable rows={rows} metricName={metricName} />
-
-      <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-        <p className="text-sm font-semibold text-white">KPI summary</p>
-        <div className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-          {insights.map((insight) => (
-            <div key={insight} className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
-              <p>{insight}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function AlertRuleList({ rules }: { rules: KpiAlertRuleRow[] }) {
   if (!rules.length) {
     return <p className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-3 text-sm text-slate-300">No KPI alert rules yet.</p>;
@@ -1788,7 +1606,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           : "Visible KPIs are currently on track or waiting for more history. Continue adding dated values so trends become more reliable.";
   const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
-  const trendRows = primaryMetric ? getMetricHistoryRows(kpis, primaryMetric) : [];
   const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
   const hasComparison = selectedMetrics.length > 1;
   const comparisonMode = isComparisonMode(params?.mode) ? params.mode : defaultComparisonMode(selectedTrends);
@@ -1801,6 +1618,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           ? "detail"
           : "overview";
   const selectedMetricRows = primaryMetric ? getMetricHistoryRows(allVisibleKpis, primaryMetric) : [];
+  const selectedMetricActualValues = selectedMetricRows.map((row) => row.actual_value).filter((value): value is number => value !== null);
   const selectedLatestKpi = selectedMetricRows.at(-1);
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
   const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis) : null;
@@ -1920,10 +1738,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         latest={undoLatestKpi}
       />
 
-      <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} />
-
       {activeSection === "overview" || activeSection === "detail" ? (
         <>
+          <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} />
+
           <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <StatusFilterCard
               label="Total KPIs"
@@ -2006,50 +1824,36 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             </div>
           ) : null}
 
-          <section className="grid gap-4 xl:grid-cols-[1.25fr_.75fr]">
-            <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-white">KPI Comparison</h2>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">
-                    {selectedMetrics.length > 1 ? `Comparing ${selectedMetrics.join(", ")}.` : "Select multiple KPIs in Compare to overlay trend lines."}
-                  </p>
-                </div>
-                <Link href="/app/kpis?section=compare" className="w-fit rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-                  Compare KPIs
-                </Link>
-              </div>
-              <div className="mt-4">
-                {hasComparison ? <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} /> : <TrendAnalysis rows={trendRows} metricName={primaryMetric} settings={kpiSettings} />}
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Vaeroex KPI Summary</p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{kpiSummary}</p>
-              <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-3 text-sm leading-6 text-slate-300">
+          <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Vaeroex KPI Summary</p>
+            <p className="mt-3 text-sm leading-6 text-slate-300">{kpiSummary}</p>
+            <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-300 md:grid-cols-[1fr_auto] md:items-center">
+              <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
                 <p className="font-semibold text-white">Top KPI needing attention</p>
                 <p className="mt-1">{topAttentionKpi ? `${topAttentionKpi.name}: ${statusLabel(metricTone(topAttentionKpi.actual_value, topAttentionKpi.target))}` : "No KPI has enough data yet."}</p>
               </div>
-              <div className="mt-4">
-                <ContextualAskVaeroex
-                  label="Ask Vaeroex about these KPIs"
-                  prompt="Review these KPI trends and recommend the next leadership action."
-                  contextType="kpi_summary"
-                  contextId={topAttentionKpi?.id || "kpi-summary"}
-                  sourceTitle="KPI summary"
-                  sourceSummary={kpiSummary}
-                  evidence={[
-                    `${onTrackCount} on track`,
-                    `${behindTargetCount} behind target`,
-                    `${missingDataCount} missing data`,
-                    `${updatedThisMonthCount} updated this month`,
-                    topAttentionKpi ? `Top attention KPI: ${topAttentionKpi.name}` : "No top attention KPI yet"
-                  ]}
-                  compact
-                  defaultCollapsed={false}
-                />
-              </div>
+              <Link href="/app/kpis?section=compare" className="w-fit rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
+                Compare multiple KPIs
+              </Link>
+            </div>
+            <div className="mt-4">
+              <ContextualAskVaeroex
+                label="Ask Vaeroex about these KPIs"
+                prompt="Review these KPI trends and recommend the next leadership action."
+                contextType="kpi_summary"
+                contextId={topAttentionKpi?.id || "kpi-summary"}
+                sourceTitle="KPI summary"
+                sourceSummary={kpiSummary}
+                evidence={[
+                  `${onTrackCount} on track`,
+                  `${behindTargetCount} behind target`,
+                  `${missingDataCount} missing data`,
+                  `${updatedThisMonthCount} updated this month`,
+                  topAttentionKpi ? `Top attention KPI: ${topAttentionKpi.name}` : "No top attention KPI yet"
+                ]}
+                compact
+                defaultCollapsed={false}
+              />
             </div>
           </section>
 
@@ -2079,6 +1883,23 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     label="Trend"
                     value={trendLabelForRows(selectedMetricRows)}
                     detail="Latest movement from history"
+                  />
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <TrendSummaryCard
+                    label="Average"
+                    value={formatNumericValue(average(selectedMetricActualValues), primaryMetric, "Not enough data")}
+                    detail={`Across ${selectedMetricActualValues.length} recorded value${selectedMetricActualValues.length === 1 ? "" : "s"}`}
+                  />
+                  <TrendSummaryCard
+                    label="Target Hit Rate"
+                    value={targetHitRate(selectedMetricRows)}
+                    detail="Share of history at or above target"
+                  />
+                  <TrendSummaryCard
+                    label="Records"
+                    value={String(selectedMetricRows.length)}
+                    detail="Historical KPI values stored"
                   />
                 </div>
                 <div className="mt-4">
@@ -2152,39 +1973,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <section id="trend-analysis" className="space-y-5">
           {metricNames.length ? (
             <>
-              <form method="get" className="space-y-3 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+              <form method="get" className="space-y-5 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
                 <input type="hidden" name="section" value="compare" />
-                <input type="hidden" name="timeline" value={timeline} />
-                {timeline === "Custom Range" ? (
-                  <>
-                    <input type="hidden" name="start" value={selectedTimelineRange.startDate} />
-                    <input type="hidden" name="end" value={selectedTimelineRange.endDate} />
-                  </>
-                ) : null}
                 <div>
-                  <p className="text-sm font-semibold text-white">Compare KPIs</p>
+                  <p className="text-sm font-semibold text-white">Select KPIs</p>
                   <p className="mt-1 text-xs leading-5 text-slate-400">
-                    Select KPI lines for this view. Colors, targets, definitions, and axis labels are managed in KPI Settings.
+                    Choose two or more KPI lines to compare. Overview stays focused on one KPI at a time.
                   </p>
                 </div>
-                <fieldset className="grid gap-2 sm:grid-cols-3">
-                  {[
-                    ["actual", "Actual values"],
-                    ["percent", "Percent change"],
-                    ["normalized", "Normalized 0-100"]
-                  ].map(([value, label]) => (
-                    <label key={value} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
-                      <input
-                        name="mode"
-                        type="radio"
-                        value={value}
-                        defaultChecked={comparisonMode === value}
-                        className="h-4 w-4 rounded border-white/20 text-vaeroex-blue"
-                      />
-                      {label}
-                    </label>
-                  ))}
-                </fieldset>
                 <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {metricNames.map((metric, index) => (
                     <label key={metric} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
@@ -2201,11 +1997,84 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     </label>
                   ))}
                 </div>
-                <PrimaryButton>Update chart</PrimaryButton>
+
+                <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto] lg:items-end">
+                  <fieldset>
+                    <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Date Range</legend>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {KPI_TIMELINES.map((item) => (
+                        <label
+                          key={item}
+                          className={`flex min-h-10 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+                            item === timeline
+                              ? "border-vaeroex-blue bg-vaeroex-blue text-white"
+                              : "border-white/10 bg-slate-950/50 text-slate-200 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
+                          }`}
+                        >
+                          <input name="timeline" type="radio" value={item} defaultChecked={item === timeline} className="sr-only" />
+                          {item}
+                        </label>
+                      ))}
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Custom start
+                        <input
+                          name="start"
+                          type="date"
+                          defaultValue={selectedTimelineRange.startDate}
+                          className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+                        />
+                      </label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Custom end
+                        <input
+                          name="end"
+                          type="date"
+                          defaultValue={selectedTimelineRange.endDate}
+                          className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
+                        />
+                      </label>
+                    </div>
+                  </fieldset>
+
+                  <fieldset>
+                    <legend className="text-xs font-semibold uppercase tracking-wide text-slate-400">Compare Mode</legend>
+                    <div className="mt-2 grid gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                      {[
+                        ["actual", "Actual"],
+                        ["normalized", "Normalized"],
+                        ["percent", "Percent Change"]
+                      ].map(([value, label]) => (
+                        <label key={value} className="flex min-h-11 items-center gap-2 rounded-lg border border-white/10 bg-slate-950/45 px-3 py-2 text-sm text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/30">
+                          <input
+                            name="mode"
+                            type="radio"
+                            value={value}
+                            defaultChecked={comparisonMode === value}
+                            className="h-4 w-4 rounded border-white/20 text-vaeroex-blue"
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+
+                  <PrimaryButton>Update chart</PrimaryButton>
+                </div>
               </form>
 
-              <TrendAnalysis rows={trendRows} metricName={primaryMetric} settings={kpiSettings} />
-              {hasComparison ? <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} /> : null}
+              <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+                <div className="mb-4">
+                  <h2 className="text-base font-semibold text-white">KPI comparison</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">
+                    {hasComparison
+                      ? `Comparing ${selectedMetrics.join(", ")} across ${selectedTimelineRange.label.toLowerCase()}.`
+                      : "Select at least two KPIs to compare trend lines."}
+                  </p>
+                </div>
+                <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} />
+              </div>
             </>
           ) : (
             <EmptyState title="No trend data yet" description="Create KPI records over time to unlock charts and trend summaries." />
