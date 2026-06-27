@@ -135,7 +135,7 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
     },
     items: {
       completed_tasks: completedTasks.slice(0, 8).map((task) => task.title),
-      overdue_tasks: overdueTasks.slice(0, 8).map((task) => `${task.title}${task.due_date ? ` due ${task.due_date}` : ""}`),
+      overdue_tasks: overdueTasks.slice(0, 8).map((task) => task.title),
       open_issues: openIssues.slice(0, 8).map((issue) => `${issue.title}${issue.severity ? ` (${issue.severity})` : ""}`),
       checklist_exceptions: checklistExceptions.slice(0, 8).map((run) => run.notes || `Checklist run ${run.id.slice(0, 8)} needs review`),
       below_target_kpis: belowTargetKpis.slice(0, 8).map((kpi) => `${kpi.name}: ${kpi.actual_value} vs target ${kpi.target}`),
@@ -162,13 +162,13 @@ function reportBody({
 }) {
   const title = categoryLabel(category);
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} overdue source-system signal${source.counts.overdue_tasks === 1 ? "" : "s"} need leadership attention.` : "",
+    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} source-system observation${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, or service friction.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} are still unresolved.` : "",
     source.counts.below_target_kpis ? `${source.counts.below_target_kpis} KPI${source.counts.below_target_kpis === 1 ? "" : "s"} are below target.` : "",
     source.counts.checklist_exceptions ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.` : ""
   ].filter(Boolean);
   const actions = [
-    source.counts.overdue_tasks ? "Review the workflow behind overdue source-system signals before the next leadership check-in." : "",
+    source.counts.overdue_tasks ? "Review the source-system observation pattern before the next leadership check-in." : "",
     source.counts.below_target_kpis ? "Review below-target KPIs and decide whether leadership needs an improvement plan for each key metric." : "",
     source.counts.open_issues ? "Review the most important unresolved issues with leadership." : "",
     source.counts.vaeroex_insights ? "Review recent Vaeroex insights and decide which recommendations need an executive report, SOP, checklist, meeting agenda, or improvement plan." : "",
@@ -181,19 +181,19 @@ Period: ${startDate} to ${endDate}
 Workspace: ${workspaceName}
 
 ## Executive Summary
-Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, source-system signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} completed source-system signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
+Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, source-system signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} reviewed source-system signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
 
 ## What Needs Attention
 ${list(risks, "No urgent risks were detected for this scheduled report.")}
 
-## Completed Source-System Signals
-${list(source.items.completed_tasks, "No completed source-system signals were found in this period.")}
+## Reviewed Source-System Signals
+${list(source.items.completed_tasks, "No reviewed source-system signals were found in this period.")}
 
 ## Open Issues
 ${list(source.items.open_issues, "No open issues were found.")}
 
-## Overdue Source-System Signals
-${list(source.items.overdue_tasks, "No overdue source-system signals were found.")}
+## Source-System Observations
+${list(source.items.overdue_tasks, "No source-system observations needing review were found.")}
 
 ## KPI Signals
 ${list(source.items.below_target_kpis, "No below-target KPIs were found for this period.")}

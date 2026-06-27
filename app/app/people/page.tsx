@@ -147,7 +147,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       />
 
       <section className="space-y-6">
-        <SectionCard title="Accountability Map" description="Who owns what, where work is stuck, and which roles or departments need attention.">
+        <SectionCard title="Accountability Map" description="Where source-system evidence connects to roles, departments, and leadership review areas.">
           <div className="grid gap-3 lg:grid-cols-3">
             {intelligence.accountabilityMap.slice(0, 9).map((item) => (
               <article key={item.id} className="rounded-lg border border-line bg-white p-4">
@@ -159,10 +159,10 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
                   <StatusBadge value={item.riskLevel} />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-muted">
-                  <span>{item.assignedWork} assigned</span>
-                  <span>{item.overdueWork} overdue</span>
+                  <span>{item.assignedWork} source links</span>
+                  <span>{item.overdueWork} need review</span>
                   <span>{item.openIssues} issues</span>
-                  <span>{item.completedWork} completed</span>
+                  <span>{item.completedWork} reviewed</span>
                 </div>
                 <p className="mt-3 text-xs leading-5 text-muted">{item.explanation}</p>
               </article>

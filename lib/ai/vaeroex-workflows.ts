@@ -72,6 +72,7 @@ const workspaceAwareInstructions = `
 Workspace-aware recommendation rules:
 - First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
 - Treat existing modules as source context for analysis, not as systems Vaeroex owns.
+- Treat Source Signals as evidence and observations from existing systems, not as Vaeroex-owned tasks, assignments, follow-ups, or work items.
 - Do not recommend replacing Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or other customer systems.
 - Never say "Create CRM", "Create follow-up tracking", or "Assign owners" as generic advice.
 - Prefer recommendations like "customer pipeline completion declined", "leadership should review the current workflow", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
@@ -274,7 +275,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional planning horizon, such as next month or next quarter.",
     saveTargets: ["report"],
     instructions: `
-Analyze declining KPIs, overdue source-system signals, repeated issues, stale SOPs, customer pipeline weakness, checklist misses, and open risks.
+Analyze declining KPIs, source-system observation patterns, repeated issues, stale SOPs, customer pipeline weakness, checklist misses, and open risks.
 Return predicted risks, why each may happen, evidence, confidence, potential business impact, and what leadership should review.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
@@ -288,7 +289,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional team or department focus.",
     saveTargets: ["report"],
     instructions: `
-Generate a weekly leadership meeting agenda with these sections: KPI review, customer pipeline review, open issues, overdue source-system signals, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
+Generate a weekly leadership meeting agenda with these sections: KPI review, customer pipeline review, open issues, source-system observation patterns, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
 Do not build video or chat. This is a leadership meeting agenda, not a task-management workflow.
 Include a report draft.
 ${workspaceAwareInstructions}

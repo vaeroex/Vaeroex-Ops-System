@@ -577,11 +577,11 @@ function buildSmartAlerts({
   return [
     overdueTasks.length
       ? {
-          id: "overdue-tasks",
+          id: "source-signal-pattern",
           severity: "High",
-          title: `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"}`,
-          why: "Overdue signals usually mean responsibility, capacity, or handoff problems need leadership review.",
-          action: "Review the current workflow behind these signals",
+          title: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} need review`,
+          why: "Source signals are evidence from existing systems. A concentrated pattern may indicate slower response speed, customer friction, or process drift.",
+          action: "Review the source-system pattern with leadership",
           href: "/app/tasks"
         }
       : null,
@@ -589,9 +589,9 @@ function buildSmartAlerts({
       ? {
           id: "unassigned-tasks",
           severity: "Medium",
-          title: `${unassignedTasks.length} source-system signal${unassignedTasks.length === 1 ? "" : "s"} with unclear responsibility`,
-          why: "Signals without clear responsibility are easy to miss even when the team is busy.",
-          action: "Review responsibility gaps",
+          title: `${unassignedTasks.length} source-system signal${unassignedTasks.length === 1 ? "" : "s"} with limited context`,
+          why: "Signals with limited context make it harder for leadership to understand whether the pattern is isolated or systemic.",
+          action: "Review source context",
           href: "/app/tasks"
         }
       : null,
@@ -1309,7 +1309,7 @@ function DemoWorkspaceBanner({
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">Current month signals</p>
           <p className="mt-2 text-xs leading-5">
-            Revenue is healthy, but response time, conversion, overdue source-system signals, and checklist completion still need leadership attention.
+            Revenue is healthy, but response time, conversion, source-system observations, and checklist completion still need leadership attention.
           </p>
         </article>
       </div>
@@ -1508,7 +1508,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .sort((a, b) => Math.abs(b.changePercent ?? 0) * b.weight - Math.abs(a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const risks = [
-    overdueTasks.length ? `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"} need leadership attention.` : "",
+    overdueTasks.length ? `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} may indicate response, handoff, or service friction.` : "",
     openIssues.length ? `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} remain unresolved.` : "",
     checklistFailures.length ? `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"} failed or need review.` : "",
     pendingImports.length ? `${pendingImports.length} extracted file import${pendingImports.length === 1 ? "" : "s"} are waiting for mapping review.` : "",
@@ -1521,7 +1521,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
-    overdueTasks.length ? "Review the workflow behind overdue source-system signals before the next leadership check-in." : "",
+    overdueTasks.length ? "Review the source-system pattern before the next leadership check-in." : "",
     openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
@@ -1569,7 +1569,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: "demo-current-month-mixed",
           severity: "Medium",
           title: "Current month has mixed signals",
-          why: "Revenue is above target, but conversion, response time, overdue source-system signals, and checklist completion still need leadership review.",
+          why: "Revenue is above target, but conversion, response time, source-system observations, and checklist completion still need leadership review.",
           action: "Review executive intelligence",
           href: "/app/intelligence"
         }
@@ -1586,14 +1586,22 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       context: issue.recommended_fix || `Status: ${issue.status || "Open"}`,
       href: "/app/issues" as Route
     })),
-    ...overdueTasks.slice(0, 3).map((task) => ({
-      id: `task-${task.id}`,
-      title: task.title,
-      source: "Source-system signal",
-      status: task.priority || task.status,
-      context: `Priority ${task.priority || "not labeled"} · status ${task.status || "open"}. Review why this signal remains unresolved in the source system.`,
-      href: "/app/tasks" as Route
-    })),
+    ...(overdueTasks.length
+      ? [
+          {
+            id: "source-signal-pattern",
+            title: "Source-system activity needs review",
+            source: "Source evidence",
+            status: overdueTasks.some((task) => ["High", "Urgent"].includes(task.priority)) ? "High" : "Medium",
+            context: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} suggest a possible pattern in response speed, handoffs, or service quality. Example: ${overdueTasks[0]?.title || "source signal"}.`,
+            evidence: `${overdueTasks.length} source signal${overdueTasks.length === 1 ? "" : "s"} from existing systems; Vaeroex is treating them as evidence, not work items.`,
+            reasoning: "A recurring source-system pattern may point to operational friction even when the underlying work is managed elsewhere.",
+            confidence: overdueTasks.length >= 3 ? ("High" as const) : ("Medium" as const),
+            recommendedAction: "Leadership should review the current workflow and decide whether an executive brief or improvement plan is needed.",
+            href: "/app/tasks" as Route
+          }
+        ]
+      : []),
     ...belowTargetKpis.slice(0, 3).map((kpi) => ({
       id: `kpi-${kpi.id}`,
       title: kpi.name,
@@ -1664,11 +1672,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const recommendedActionSignals: DashboardSignal[] = [
     overdueTasks.length
       ? {
-          id: "action-overdue-tasks",
-          title: "Review overdue source-system signals",
-          source: `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"}`,
+          id: "action-source-signal-pattern",
+          title: "Review source-system observation pattern",
+          source: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"}`,
           status: "High",
-          context: `Start with: ${overdueTasks[0]?.title || "the oldest overdue source-system signal"}.`,
+          context: `Use the source evidence to determine whether response speed, handoffs, or service quality need leadership review. Example: ${overdueTasks[0]?.title || "source signal"}.`,
+          evidence: `${overdueTasks.length} source signal${overdueTasks.length === 1 ? "" : "s"} currently support this recommendation.`,
+          reasoning: "Vaeroex is not assigning work; it is surfacing a pattern from existing systems for executive review.",
+          confidence: overdueTasks.length >= 3 ? ("High" as const) : ("Medium" as const),
+          recommendedAction: "Review the current workflow with leadership and generate an improvement plan only if the evidence is material.",
           href: "/app/tasks" as Route
         }
       : null,
@@ -2193,7 +2205,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         {primaryTrends.map((trend) => (
           <KpiCard key={trend.name} trend={trend} />
         ))}
-        <StatCard label="Source Signals" value={openTasks.length} detail={`${overdueTasks.length} overdue`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
+        <StatCard label="Source Signals" value={openTasks.length} detail={`${overdueTasks.length} need review`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Open Risks" value={openIssues.length} detail="Active risks and blockers" tone={openIssues.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Recent Imports" value={recentImports.length} detail={`${pendingImports.length} waiting for review`} tone={pendingImports.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-line bg-white text-ink"} />
       </section>

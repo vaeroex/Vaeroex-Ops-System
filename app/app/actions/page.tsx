@@ -225,19 +225,19 @@ export default async function ActionsPage() {
   const outcomes = (outcomesResult.data || []) as RecommendationOutcomeRow[];
   const errors = [tasksResult.error, issuesResult.error, checklistsResult.error, runsResult.error, outcomesResult.error].filter(Boolean);
   const openSignals = tasks.filter((task) => !isClosed(task.status));
-  const overdueSignals = openSignals.filter((task) => isOverdue(task.due_date));
+  const reviewSignals = openSignals.filter((task) => isOverdue(task.due_date));
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const openRuns = runs.filter((run) => !isClosed(run.status));
   const savedRecommendations = outcomes.filter((outcome) => outcome.status === "accepted" || outcome.status === "reviewed" || outcome.status === "assigned");
   const candidates: OutputCandidate[] = [
-    ...overdueSignals.slice(0, 4).map((signal) => ({
+    ...reviewSignals.slice(0, 4).map((signal) => ({
       id: `signal-${signal.id}`,
       title: signal.title,
-      source: signal.ai_generated ? "Vaeroex source signal" : "Source-system signal",
-      status: signal.status,
+      source: signal.ai_generated ? "Vaeroex observation" : "Source-system evidence",
+      status: "Evidence",
       priority: signal.priority,
-      evidence: signal.description || `This source-system signal remains incomplete${signal.due_date ? ` since ${signal.due_date}` : ""}.`,
-      reviewFocus: "Leadership should review whether the underlying workflow is still producing missed response, handoff, or service signals.",
+      evidence: signal.description || "This source-system observation may indicate response, handoff, service, or operational friction.",
+      reviewFocus: "Leadership should review whether the underlying workflow is producing a pattern worth documenting in an executive brief or improvement plan.",
       href: "/app/tasks" as Route,
       outputType: "action_plan" as const,
       label: "Generate Improvement Plan"
