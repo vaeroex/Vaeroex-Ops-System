@@ -1248,7 +1248,7 @@ function comparisonNotes(trends: KpiTrend[]) {
   const executionRisk = issues || overdue;
 
   if (executionRisk && revenue && trendDirection(revenue) === "up" && trendDirection(executionRisk) === "up") {
-    notes.push("Operating demand appears to be rising while issues or overdue work are also increasing. That pattern often means execution capacity is becoming the constraint.");
+    notes.push("Operating demand appears to be rising while issues or source-system observations are also increasing. That pattern can indicate capacity, response, or service-quality pressure.");
   }
 
   return notes;

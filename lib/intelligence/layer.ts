@@ -243,27 +243,37 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         lastUpdated: issue.updated_at || issue.created_at
       };
     }),
-    ...overdueTasks.slice(0, 4).map((task) => {
-      const priority = priorityFrom(task.priority);
-      const evidence = [`Priority: ${task.priority}`, `Status: ${task.status}`, "Source-system signal remains unresolved"];
+    overdueTasks.length
+      ? (() => {
+          const highestPriority = overdueTasks.some((task) => ["High", "Urgent"].includes(task.priority)) ? "High" : "Medium";
+          const examples = overdueTasks
+            .slice(0, 3)
+            .map((task) => task.title)
+            .join(", ");
+          const evidence = [
+            `Source signals needing review: ${overdueTasks.length}`,
+            examples ? `Examples: ${examples}` : "Examples: no titles available",
+            "Source signals are evidence from connected business systems, not Vaeroex-owned tasks"
+          ];
 
-      return {
-        id: `task-${task.id}`,
-        type: "Risk" as const,
-        title: `${task.title} is overdue`,
-        summary: "A source-system signal remains unresolved.",
-        why: "Unresolved source-system signals can hide slower response speed, unresolved customer needs, or process friction.",
-        impact: "If ignored, leadership may miss a developing retention, conversion, or service-quality risk.",
-        recommendedAction: "Leadership should review the current workflow and decide whether a meeting agenda or improvement plan is needed.",
-        confidence: confidenceFromEvidence(evidence.length, priority),
-        evidence,
-        evidenceCount: evidence.length,
-        sourceTypes: ["Source-system signals"],
-        sourceHref: "/app/tasks",
-        priority,
-        lastUpdated: task.updated_at || task.created_at
-      };
-    }),
+          return {
+            id: "source-signal-review-pattern",
+            type: "Risk" as const,
+            title: "Source-system activity needs leadership review",
+            summary: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} suggest a pattern that may affect customer response, conversion, service quality, or operational reliability.`,
+            why: "Vaeroex treats source signals as evidence from the systems a business already uses. The pattern matters because it may reveal slower response speed, unresolved customer needs, or process friction.",
+            impact: "If ignored, leadership may miss a developing retention, conversion, or service-quality risk.",
+            recommendedAction: "Leadership should review the current source-system workflow and decide whether an executive brief, meeting agenda, or improvement plan is needed.",
+            confidence: confidenceFromEvidence(evidence.length, highestPriority),
+            evidence,
+            evidenceCount: evidence.length,
+            sourceTypes: ["Source-system evidence"],
+            sourceHref: "/app/tasks",
+            priority: highestPriority,
+            lastUpdated: latestDate(overdueTasks.map((task) => task.updated_at || task.created_at))
+          };
+        })()
+      : null,
     ownerlessTasks.length
       ? {
           id: "unclear-source-signals",
