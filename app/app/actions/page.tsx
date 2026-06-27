@@ -75,7 +75,7 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
               href={generatedOutputHref({ type: item.outputType, title: item.title, summary: item.why, remedy: item.nextStep })}
               className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white"
             >
-              {item.outputType === "risk_brief" ? "Generate Risk Brief" : "Generate Action Plan"}
+              {item.outputType === "risk_brief" ? "Generate Risk Brief" : "Generate Improvement Plan"}
             </Link>
             <Link
               href={generatedOutputHref({ type: "checklist", title: item.title, summary: item.why, remedy: item.nextStep })}
@@ -87,20 +87,11 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
               Ask Vaeroex
             </Link>
           </div>
-          <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/35 p-3">
-            <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: internal record options</summary>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link href={item.href} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-                Open source record area
-              </Link>
-              <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-                Convert to internal follow-up
-              </Link>
-              <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-                Convert to internal issue
-              </Link>
-            </div>
-          </details>
+          <div className="mt-3">
+            <Link href={item.href} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+              Open source record area
+            </Link>
+          </div>
         </article>
       ))}
     </div>
@@ -160,11 +151,11 @@ export default async function ActionsPage() {
     ...overdueTasks.slice(0, 4).map((task) => ({
       id: `task-${task.id}`,
       title: task.title,
-      source: task.ai_generated ? "Vaeroex follow-up" : "Follow-up",
+      source: task.ai_generated ? "Vaeroex source signal" : "Source-system signal",
       status: task.status,
       priority: task.priority,
-      why: task.description || "This follow-up is overdue and needs ownership review.",
-      nextStep: "Review whether this follow-up still matters and decide the simplest next action.",
+      why: task.description || "This source-system signal is overdue and needs leadership review.",
+      nextStep: "Review whether this signal still matters and decide what leadership should review.",
       href: "/app/tasks" as Route,
       outputType: "action_plan" as const
     })),
@@ -175,7 +166,7 @@ export default async function ActionsPage() {
       status: issue.status,
       priority: issue.severity,
       why: issue.recommended_fix || issue.description || "This risk is open and should be reviewed before it becomes normal.",
-      nextStep: issue.recommended_fix || "Generate a risk brief, review evidence, and decide whether to convert it into internal work.",
+      nextStep: issue.recommended_fix || "Generate a risk brief, review evidence, and decide whether leadership needs an improvement plan.",
       href: "/app/issues" as Route,
       outputType: "risk_brief" as const
     })),
@@ -185,19 +176,19 @@ export default async function ActionsPage() {
       source: assignment.source_title || "Assignment",
       status: assignment.status,
       priority: assignment.priority,
-      why: assignment.description || "This assignment is overdue.",
-      nextStep: "Generate an action plan to clarify the decision and next step before assigning more tracking.",
+      why: assignment.description || "This source-system responsibility signal is overdue.",
+      nextStep: "Generate an improvement plan to clarify what leadership should review.",
       href: "/app/people" as Route,
       outputType: "action_plan" as const
     })),
     ...acceptedRecommendations.slice(0, 3).map((outcome) => ({
       id: `outcome-${outcome.id}`,
       title: outcome.title,
-      source: "Accepted Vaeroex recommendation",
+      source: "Saved Vaeroex recommendation",
       status: outcome.status,
       priority: outcome.priority,
-      why: outcome.evidence || "This recommendation was approved for action.",
-      nextStep: outcome.outcome_summary || "Generate a brief and decide whether leadership needs a follow-up record.",
+      why: outcome.evidence || "This recommendation was saved after review.",
+      nextStep: outcome.outcome_summary || "Generate a brief and decide what leadership should review next.",
       href: "/app/tasks" as Route,
       outputType: "action_plan" as const
     }))
@@ -208,7 +199,7 @@ export default async function ActionsPage() {
       <PageHeader
         eyebrow="Actions"
         title="Recommended Outputs"
-        description="Turn Vaeroex recommendations into action plans, risk briefs, checklists, SOPs, or executive briefings before deciding whether anything needs to become an internal record."
+        description="Turn Vaeroex recommendations into improvement plans, risk briefs, checklists, SOPs, meeting agendas, or executive briefings for leadership review."
         actions={
           <Link href="/app/intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             Review Intelligence
@@ -223,25 +214,25 @@ export default async function ActionsPage() {
       ) : null}
 
       <section className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-slate-100 shadow-panel">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Action philosophy</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence philosophy</p>
         <h2 className="mt-3 text-2xl font-semibold text-white">Actions are outputs, not the product surface.</h2>
         <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-300">
-          Vaeroex keeps follow-ups, issues, checklists, and assignments available as supporting systems, but the leadership flow starts with intelligence and a clear generated output. Convert only when you want internal tracking.
+          Vaeroex analyzes source-system signals and produces clear outputs for leadership. It does not replace Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or the systems your company already uses to execute.
         </p>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-4">
         <ActionSystemCard
-          title="Follow-ups"
+          title="Source signals"
           count={openTasks.length}
-          detail={`${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"} need review.`}
+          detail={`${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"} need review.`}
           href="/app/tasks"
-          cta="Open follow-ups"
+          cta="Open source signals"
         />
         <ActionSystemCard
           title="Issues and risks"
           count={openIssues.length}
-          detail="Risk records that may require owner review or escalation."
+          detail="Risk records that may require leadership review or escalation."
           href="/app/issues"
           cta="Open issues"
         />
@@ -253,11 +244,11 @@ export default async function ActionsPage() {
           cta="Open checklists"
         />
         <ActionSystemCard
-          title="Ownership"
+          title="Responsibility signals"
           count={openAssignments.length}
-          detail={`${overdueAssignments.length} overdue assignment${overdueAssignments.length === 1 ? "" : "s"} across the workspace.`}
+          detail={`${overdueAssignments.length} overdue responsibility signal${overdueAssignments.length === 1 ? "" : "s"} across the workspace.`}
           href="/app/people"
-          cta="Open ownership"
+          cta="Open responsibility view"
         />
       </section>
 
@@ -273,18 +264,18 @@ export default async function ActionsPage() {
         <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
           <h2 className="text-base font-semibold text-white">Generate optional outputs</h2>
           <p className="mt-2 text-sm leading-6 text-slate-300">
-            Use these to turn a recommendation into a portable document before creating any internal follow-up fields.
+            Use these to turn a recommendation into a portable document for leadership review.
           </p>
           <div className="mt-4 grid gap-2">
-            <Link href={generatedOutputHref({ type: "action_plan" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Action Plan</Link>
+            <Link href={generatedOutputHref({ type: "action_plan" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Improvement Plan</Link>
             <Link href={generatedOutputHref({ type: "risk_brief" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Risk Brief</Link>
             <Link href={generatedOutputHref({ type: "checklist" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Checklist</Link>
             <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Generate Executive Briefing</Link>
           </div>
           <details className="mt-4 rounded-lg border border-white/10 bg-slate-950/40 p-3">
-            <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: supporting record systems</summary>
+            <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: source record areas</summary>
             <div className="mt-3 grid gap-2">
-              <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open follow-ups</Link>
+              <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open source signals</Link>
               <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open issues</Link>
               <Link href="/app/checklists" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open checklists</Link>
               <Link href="/app/briefings" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Open saved briefings</Link>

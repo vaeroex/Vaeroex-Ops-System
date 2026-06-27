@@ -36,7 +36,7 @@ function groupInsights(insights: IntelligenceInsight[], type: IntelligenceInsigh
 
 function InsightCard({ insight }: { insight: IntelligenceInsight }) {
   const primaryOutputType = outputTypeForInsight(insight);
-  const primaryOutputLabel = primaryOutputType === "risk_brief" ? "Generate Risk Brief" : primaryOutputType === "executive_briefing" ? "Generate Executive Briefing" : "Generate Action Plan";
+  const primaryOutputLabel = primaryOutputType === "risk_brief" ? "Generate Risk Brief" : primaryOutputType === "executive_briefing" ? "Generate Executive Briefing" : "Generate Improvement Plan";
 
   return (
     <article className={`rounded-lg border p-4 shadow-panel ${typeClass(insight.type)}`}>
@@ -57,7 +57,7 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
           <dd className="mt-1 opacity-85">{insight.why}</dd>
         </div>
         <div>
-          <dt className="font-semibold text-white">Recommended action</dt>
+          <dt className="font-semibold text-white">Executive recommendation</dt>
           <dd className="mt-1 opacity-85">{insight.recommendedAction}</dd>
         </div>
       </dl>
@@ -88,7 +88,7 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
         </Link>
         {primaryOutputType !== "action_plan" ? (
           <Link href={generatedOutputHref({ type: "action_plan", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-            Generate Action Plan
+            Generate Improvement Plan
           </Link>
         ) : null}
         <Link href={generatedOutputHref({ type: "executive_briefing", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
@@ -96,11 +96,11 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
         </Link>
         <ContextualAskVaeroex
           label="Explain This"
-          prompt={`Explain why this ${insight.type.toLowerCase()} matters and what leadership should do next.`}
+          prompt={`Explain why this ${insight.type.toLowerCase()} matters, what evidence supports it, what could happen next, and what leadership should review.`}
           contextType={`intelligence_${insight.type.toLowerCase()}`}
           contextId={insight.id}
           sourceTitle={insight.title}
-          sourceSummary={`${insight.summary} Recommended action: ${insight.recommendedAction}`}
+          sourceSummary={`${insight.summary} Executive recommendation: ${insight.recommendedAction}`}
           evidence={[
             insight.why,
             ...insight.evidence,
@@ -240,7 +240,7 @@ export default async function IntelligencePage() {
       <PageHeader
         eyebrow="Intelligence"
         title="Leadership Intelligence"
-        description="What should leadership know that is not immediately obvious? Vaeroex turns workspace context into risks, opportunities, recommendations, and evidence."
+        description="What should leadership know that is not immediately obvious? Vaeroex turns workspace context into risks, opportunities, business impact, evidence, and executive recommendations."
         actions={
           <Link href="/app/agents" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             Ask Vaeroex
@@ -265,7 +265,7 @@ export default async function IntelligencePage() {
             <SummaryPanel title="Top risk" value={topRisk?.title || "None visible"} detail={topRisk?.summary || "No active risk signal is strong enough yet."} href={(topRisk?.sourceHref || "/app/sources") as Route} />
             <SummaryPanel title="Top opportunity" value={topOpportunity?.title || "Needs context"} detail={topOpportunity?.summary || "Add customer, KPI, file, or report history."} href={(topOpportunity?.sourceHref || "/app/sources") as Route} />
             <SummaryPanel
-              title="Recommended action"
+              title="Executive recommendation"
               value={topRecommendation?.recommendedAction || "Add source data"}
               detail={topRecommendation?.summary || "Vaeroex generates stronger recommendations as evidence improves."}
               href={topRecommendation ? generatedOutputHref({ type: "action_plan", source: topRecommendation.id }) : "/app/actions"}

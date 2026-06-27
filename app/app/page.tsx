@@ -579,9 +579,9 @@ function buildSmartAlerts({
       ? {
           id: "overdue-tasks",
           severity: "High",
-          title: `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"}`,
-          why: "Overdue work usually means ownership, capacity, or handoff problems need review.",
-          action: "Review overdue follow-ups",
+          title: `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"}`,
+          why: "Overdue signals usually mean responsibility, capacity, or handoff problems need leadership review.",
+          action: "Review overdue signals with the responsible manager",
           href: "/app/tasks"
         }
       : null,
@@ -589,9 +589,9 @@ function buildSmartAlerts({
       ? {
           id: "unassigned-tasks",
           severity: "Medium",
-          title: `${unassignedTasks.length} follow-up${unassignedTasks.length === 1 ? "" : "s"} without an owner`,
-          why: "Follow-ups without clear ownership are easy to miss even when the team is busy.",
-          action: "Assign owners",
+          title: `${unassignedTasks.length} source-system signal${unassignedTasks.length === 1 ? "" : "s"} with unclear responsibility`,
+          why: "Signals without clear responsibility are easy to miss even when the team is busy.",
+          action: "Review responsibility gaps",
           href: "/app/tasks"
         }
       : null,
@@ -600,7 +600,7 @@ function buildSmartAlerts({
           id: "kpis-below-target",
           severity: "High",
           title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} below target`,
-          why: "Below-target metrics should be reviewed against recent follow-ups, CRM activity, and open risks.",
+          why: "Below-target metrics should be reviewed against source-system activity, customer pipeline activity, and open risks.",
           action: "Review KPIs",
           href: "/app/kpis"
         }
@@ -609,9 +609,9 @@ function buildSmartAlerts({
       ? {
           id: "crm-followup",
           severity: "Medium",
-          title: `${crmLeadsWithoutFollowup.length} CRM lead${crmLeadsWithoutFollowup.length === 1 ? "" : "s"} need follow-up review`,
+          title: `${crmLeadsWithoutFollowup.length} customer pipeline record${crmLeadsWithoutFollowup.length === 1 ? "" : "s"} show response gaps`,
           why: "Leads without recent activity or next-step notes can quietly stall revenue.",
-          action: "Review CRM",
+          action: "Review customer pipeline",
           href: "/app/crm"
         }
       : null,
@@ -650,7 +650,7 @@ function buildSmartAlerts({
           id: "missing-report",
           severity: "Low",
           title: "No report generated for this period",
-          why: "A saved report gives the owner a clean management summary and a record of decisions.",
+          why: "A saved report gives leadership a clean management summary and a record of decisions.",
           action: "Generate report",
           href: "/app/reports"
         }
@@ -660,7 +660,7 @@ function buildSmartAlerts({
           id: "checklist-runs",
           severity: "Medium",
           title: `${checklistsWithoutRecentRuns.length} checklist${checklistsWithoutRecentRuns.length === 1 ? "" : "s"} have no recent run`,
-          why: "Checklists only create accountability when they are actually completed and reviewed.",
+          why: "Checklists only improve intelligence when they are actually completed and reviewed.",
           action: "Run checklists",
           href: "/app/checklists"
         }
@@ -733,10 +733,10 @@ function signalReasoning(item: DashboardSignal, tone: "risk" | "opportunity" | "
   }
 
   if (tone === "opportunity") {
-    return `Vaeroex surfaced this because ${item.source.toLowerCase()} activity may be converted into clearer follow-up, revenue, or process improvement.`;
+    return `Vaeroex surfaced this because ${item.source.toLowerCase()} activity may indicate clearer revenue, process, or leadership improvement potential.`;
   }
 
-  return `Vaeroex surfaced this because the related records point to a next decision or owner action.`;
+  return `Vaeroex surfaced this because the related records point to a leadership decision or source-system review.`;
 }
 
 function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportunity" | "action") {
@@ -745,14 +745,14 @@ function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportun
   }
 
   if (tone === "risk") {
-    return "Open the source record, confirm the owner, and decide whether a follow-up or escalation is needed.";
+    return "Open the source record, review the responsible manager or source system, and decide whether an executive report or improvement plan is needed.";
   }
 
   if (tone === "opportunity") {
-    return "Open the source record and decide whether this should become a follow-up, report item, or management priority.";
+    return "Open the source record and decide whether leadership needs a report, meeting agenda, or improvement plan.";
   }
 
-  return "Review the recommended action, then assign ownership or create the follow-up inside Vaeroex.";
+  return "Review the executive recommendation and decide what leadership should discuss with the responsible manager.";
 }
 
 function EvidenceDisclosure({
@@ -779,7 +779,7 @@ function EvidenceDisclosure({
           <dd className="mt-1">{why}</dd>
         </div>
         <div>
-          <dt className="font-semibold text-slate-100">Recommended action</dt>
+          <dt className="font-semibold text-slate-100">Executive recommendation</dt>
           <dd className="mt-1">{action}</dd>
         </div>
       </dl>
@@ -805,17 +805,17 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       title: "Recommendation Queue",
       href: recommendation?.href || ("/app/tasks" as Route),
       evidence: recommendation?.evidence || `${intelligence.recommendationTracking.approvalQueue.length} recommendation${intelligence.recommendationTracking.approvalQueue.length === 1 ? "" : "s"} waiting for review.`,
-      reasoning: recommendation?.why || "Vaeroex only turns recommendations into work after a human reviews and approves them.",
+      reasoning: recommendation?.why || "Vaeroex produces recommendations for human review; execution stays in the systems and teams the business already uses.",
       confidence: confidenceForPriority(recommendation?.priority),
-      action: recommendation?.action || "Review the queue and approve only the follow-ups that should become accountable work."
+      action: recommendation?.action || "Review the queue and choose which recommendation needs an executive report, meeting agenda, or improvement plan."
     },
     {
       title: "Profit Leak Detector",
       href: profitLeak?.href || ("/app/crm" as Route),
       evidence: profitLeak?.evidence || `${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`,
-      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled follow-up, unresolved issues, and work without ownership.",
+      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and unclear responsibility signals.",
       confidence: confidenceForPriority(profitLeak?.priority),
-      action: profitLeak?.action || "Review CRM, KPI, and issue records for avoidable leakage before the next leadership review."
+      action: profitLeak?.action || "Review customer pipeline, KPI, and issue records for avoidable leakage before the next leadership review."
     },
     {
       title: "Business Memory",
@@ -831,7 +831,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       evidence: risk?.evidence || `${intelligence.riskSimulation.length} forward-looking risk scenario${intelligence.riskSimulation.length === 1 ? "" : "s"} generated.`,
       reasoning: risk?.why || "Vaeroex projects unresolved signals forward so leaders can decide before the issue becomes normal.",
       confidence: confidenceForPriority(risk?.priority),
-      action: risk?.action || "Review the scenario and decide whether to assign an owner, create a follow-up, or escalate."
+      action: risk?.action || "Review the scenario and decide whether leadership needs an executive report, meeting agenda, or escalation discussion."
     },
     {
       title: "Decision Journal",
@@ -865,7 +865,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
             </span>
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-300">
-            <span className="font-semibold text-slate-100">Recommended:</span> {tool.action}
+            <span className="font-semibold text-slate-100">Executive recommendation:</span> {tool.action}
           </p>
           <EvidenceDisclosure evidence={tool.evidence} why={tool.reasoning} action={tool.action} compact />
           <Link
@@ -939,7 +939,7 @@ function SignalList({
               })}
               className="inline-flex rounded-md border border-current/20 bg-slate-950/25 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
             >
-              {tone === "risk" ? "Generate Risk Brief" : tone === "opportunity" ? "Generate Executive Briefing" : "Generate Action Plan"}
+              {tone === "risk" ? "Generate Risk Brief" : tone === "opportunity" ? "Generate Executive Briefing" : "Generate Improvement Plan"}
             </Link>
             <details className="inline-block">
               <summary className="cursor-pointer rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25">
@@ -983,9 +983,9 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
       tone: "border-emerald-400/30 bg-emerald-950/25"
     },
     {
-      label: "Recommended action",
+      label: "Executive recommendation",
       title: intelligence.topRecommendation?.recommendedAction || "Add source data",
-      body: intelligence.topRecommendation?.why || "Vaeroex recommends adding business context before creating more work.",
+      body: intelligence.topRecommendation?.why || "Vaeroex recommends adding business context before making stronger executive recommendations.",
       href: intelligence.topRecommendation ? generatedOutputHref({ type: "action_plan", source: intelligence.topRecommendation.id }) : ("/app/actions" as Route),
       tone: "border-cyan-400/30 bg-cyan-950/25"
     }
@@ -1003,8 +1003,8 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
       ? `Top Opportunity: ${intelligence.topOpportunity.title}. ${intelligence.topOpportunity.summary} Evidence: ${intelligence.topOpportunity.evidence.join("; ")}`
       : "Top Opportunity: more context needed",
     intelligence.topRecommendation
-      ? `Recommended Action: ${intelligence.topRecommendation.recommendedAction}. Why: ${intelligence.topRecommendation.why}`
-      : "Recommended Action: add source data",
+      ? `Executive Recommendation: ${intelligence.topRecommendation.recommendedAction}. Why: ${intelligence.topRecommendation.why}`
+      : "Executive Recommendation: add source data",
     intelligence.topForecast
       ? `Forecast signal: ${intelligence.topForecast.title}. Confidence: ${intelligence.topForecast.confidence}`
       : "Forecast signal: not enough history for a reliable forecast"
@@ -1076,7 +1076,7 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
             </div>
             <ContextualAskVaeroex
               label="Explain This"
-              prompt="Explain the current Home briefing for leadership. Include these sections: Executive Interpretation; Business Relationships connecting Top Risk, Top Opportunity, and Recommended Action; Root Cause; Business Impact if ignored; Confidence with High, Medium, or Low and why; Evidence Used from KPIs, Business Memory, uploaded files, reports, and signals; Predicted Trend for 30 days, 90 days, and 6 months only if confidence supports it, otherwise state there is not enough historical data to produce a reliable forecast; Recommended Executive Decision with one clear recommendation. Keep it concise, practical, and tied to the current briefing."
+              prompt="Explain the current Home briefing for leadership. Include these sections: Executive Interpretation; Business Relationships connecting Top Risk, Top Opportunity, and Executive Recommendation; Root Cause; Business Impact if ignored; Confidence with High, Medium, or Low and why; Evidence Used from KPIs, Business Memory, uploaded files, reports, and signals; Predicted Trend for 30 days, 90 days, and 6 months only if confidence supports it, otherwise state there is not enough historical data to produce a reliable forecast; What Leadership Should Review with one clear recommendation. Keep it concise, practical, and tied to the current briefing."
               contextType="home_leadership_briefing"
               contextId="home-what-leadership-should-know-now"
               sourceTitle="What leadership should know now"
@@ -1129,7 +1129,7 @@ function IntelligenceBriefingHero({
     },
     {
       id: "action",
-      question: "Recommended action",
+      question: "Executive recommendation",
       fallback: "Keep adding records so Vaeroex can build a stronger recommendation queue.",
       item: action,
       tone: "action" as const
@@ -1145,8 +1145,8 @@ function IntelligenceBriefingHero({
       ? `Requires attention: ${attention.title}. ${attention.context}. Recommended: ${signalRecommendedAction(attention, "risk")}`
       : "Requires attention: no immediate attention item visible",
     action
-      ? `Recommended action: ${action.title}. ${action.context}. Recommended: ${signalRecommendedAction(action, "action")}`
-      : "Recommended action: keep adding records for stronger recommendations"
+      ? `Executive recommendation: ${action.title}. ${action.context}. Recommended: ${signalRecommendedAction(action, "action")}`
+      : "Executive recommendation: keep adding records for stronger recommendations"
   ];
 
   return (
@@ -1163,11 +1163,11 @@ function IntelligenceBriefingHero({
           <div className="w-full max-w-md rounded-lg border border-cyan-300/20 bg-slate-950/30 p-3 lg:w-auto">
             <ContextualAskVaeroex
               label="Explain This"
-              prompt="Explain this Leadership Intelligence Briefing. Include Executive Interpretation, Business Relationships, Root Cause, Business Impact, Confidence, Evidence Used, Predicted Trend only when confidence supports it, and one Recommended Executive Decision. Keep it concise and tied to the current risk, opportunity, attention item, and recommended action."
+              prompt="Explain this Leadership Intelligence Briefing. Include Executive Interpretation, Business Relationships, Root Cause, Business Impact, Confidence, Evidence Used, Predicted Trend only when confidence supports it, and one Recommended Executive Decision. Keep it concise and tied to the current risk, opportunity, attention item, and executive recommendation."
               contextType="home_intelligence_briefing"
               contextId={`home-intelligence-briefing-${period}`}
               sourceTitle="Leadership Intelligence Briefing"
-              sourceSummary={`Risk: ${risk?.title || "none visible"}. Opportunity: ${opportunity?.title || "none visible"}. Recommended action: ${action?.title || "keep adding context"}.`}
+              sourceSummary={`Risk: ${risk?.title || "none visible"}. Opportunity: ${opportunity?.title || "none visible"}. Executive recommendation: ${action?.title || "keep adding context"}.`}
               evidence={briefingEvidence}
               compact
               defaultCollapsed={false}
@@ -1254,15 +1254,15 @@ function DemoWorkspaceBanner({
   const summaryItems = [
     ["Demo KPIs", counts.kpis],
     ["Demo Leads", counts.crm],
-    ["Demo Follow-ups", counts.tasks],
+    ["Demo Source Signals", counts.tasks],
     ["Demo Reports", counts.reports],
     ["Demo Issues", counts.issues]
   ];
   const countItems = [
     ["KPIs", counts.kpis],
     ["Business metrics", counts.operationalMetrics],
-    ["CRM leads", counts.crm],
-    ["Open follow-ups", counts.tasks],
+    ["Customer pipeline records", counts.crm],
+    ["Open source signals", counts.tasks],
     ["Open issues", counts.issues],
     ["Reports", counts.reports],
     ["SOPs", counts.sops],
@@ -1282,7 +1282,7 @@ function DemoWorkspaceBanner({
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
             Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails or customer notifications are sent.
-            It includes YTD KPI movement, CRM activity, weak-month alerts, reports, follow-ups, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
+            It includes YTD KPI movement, customer pipeline activity, weak-month alerts, reports, source-system signals, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1306,13 +1306,13 @@ function DemoWorkspaceBanner({
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">April and May recovery</p>
           <p className="mt-2 text-xs leading-5">
-            SOP review, checklist follow-up, and CRM accountability helped the business recover from the weak month.
+            SOP review, checklist review, and customer pipeline visibility helped the business recover from the weak month.
           </p>
         </article>
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">Current month signals</p>
           <p className="mt-2 text-xs leading-5">
-            Revenue is healthy, but response time, conversion, overdue follow-ups, and checklist completion still need owner attention.
+            Revenue is healthy, but response time, conversion, overdue source-system signals, and checklist completion still need leadership attention.
           </p>
         </article>
       </div>
@@ -1511,26 +1511,26 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .sort((a, b) => Math.abs(b.changePercent ?? 0) * b.weight - Math.abs(a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const risks = [
-    overdueTasks.length ? `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"} need owner attention.` : "",
+    overdueTasks.length ? `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"} need leadership attention.` : "",
     openIssues.length ? `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} remain unresolved.` : "",
     checklistFailures.length ? `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"} failed or need review.` : "",
     pendingImports.length ? `${pendingImports.length} extracted file import${pendingImports.length === 1 ? "" : "s"} are waiting for mapping review.` : "",
     negativeTrends[0] ? `${negativeTrends[0].name} is down ${numberFormatter.format(Math.abs(negativeTrends[0].changePercent || 0))}% vs the previous period.` : ""
   ].filter(Boolean);
   const opportunities = [
-    leadsCreated.length ? `${leadsCreated.length} new lead${leadsCreated.length === 1 ? "" : "s"} can be reviewed for follow-up or conversion.` : "",
+    leadsCreated.length ? `${leadsCreated.length} new lead${leadsCreated.length === 1 ? "" : "s"} can be reviewed for response quality or conversion.` : "",
     positiveTrends[0] ? `${positiveTrends[0].name} is showing the strongest improvement this period.` : "",
     recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex review.` : "",
     operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
-    overdueTasks.length ? "Assign due dates and owners for overdue follow-ups before the next management check-in." : "",
-    openIssues.length ? "Sort open issues by severity and convert unresolved items into accountable follow-ups." : "",
+    overdueTasks.length ? "Review overdue source-system signals with the responsible manager before the next leadership check-in." : "",
+    openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
-    negativeTrends.length ? "Review declining KPIs against recent imports, CRM activity, and follow-up workload." : "",
-    !kpis.length ? "Create your first KPI manually, or import existing KPI data if you already have a spreadsheet." : "",
-    !crmLeads.length ? "Add a CRM lead manually, or import a lead list later when one is available." : "",
+    negativeTrends.length ? "Review declining KPIs against recent imports, customer pipeline activity, and source-system workload." : "",
+    !kpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
+    !crmLeads.length ? "Connect or import customer pipeline context when available." : "",
     !reports.length ? "Generate a report for this period so the management summary is saved." : ""
   ].filter(Boolean);
   const latestKpiRows = latestKpisByName(kpis);
@@ -1572,9 +1572,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: "demo-current-month-mixed",
           severity: "Medium",
           title: "Current month has mixed signals",
-          why: "Revenue is above target, but conversion, response time, overdue follow-ups, and checklist completion still need owner follow-up.",
-          action: "Review recommended actions",
-          href: "/app/tasks"
+          why: "Revenue is above target, but conversion, response time, overdue source-system signals, and checklist completion still need leadership review.",
+          action: "Review executive recommendations",
+          href: "/app/intelligence"
         }
       ]
     : [];
@@ -1592,9 +1592,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...overdueTasks.slice(0, 3).map((task) => ({
       id: `task-${task.id}`,
       title: task.title,
-      source: "Follow-up",
+      source: "Source-system signal",
       status: task.priority || task.status,
-      context: `Due ${task.due_date || "not set"} · ${task.assigned_to ? `Owner: ${task.assigned_to}` : "Owner not assigned"}`,
+      context: `Due ${task.due_date || "not set"} · ${task.assigned_to ? `Responsible: ${task.assigned_to}` : "Responsible manager not visible"}`,
       href: "/app/tasks" as Route
     })),
     ...belowTargetKpis.slice(0, 3).map((kpi) => ({
@@ -1634,7 +1634,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...leadsCreated.slice(0, 3).map((lead) => ({
       id: `lead-${lead.id}`,
       title: lead.lead_name,
-      source: lead.company ? `CRM · ${lead.company}` : "CRM",
+      source: lead.company ? `Customer pipeline · ${lead.company}` : "Customer pipeline",
       status: lead.status,
       context: `${formatMetricValue(lead.estimated_value, "revenue", "No value set")} estimated value · ${lead.last_activity_at ? `Last activity ${new Date(lead.last_activity_at).toLocaleDateString()}` : "No recent activity recorded"}.`,
       href: "/app/crm" as Route
@@ -1668,10 +1668,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     overdueTasks.length
       ? {
           id: "action-overdue-tasks",
-          title: "Assign overdue follow-ups",
-          source: `${overdueTasks.length} overdue follow-up${overdueTasks.length === 1 ? "" : "s"}`,
+          title: "Review overdue source-system signals",
+          source: `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"}`,
           status: "High",
-          context: `Start with: ${overdueTasks[0]?.title || "the oldest overdue follow-up"}.`,
+          context: `Start with: ${overdueTasks[0]?.title || "the oldest overdue source-system signal"}.`,
           href: "/app/tasks" as Route
         }
       : null,
@@ -1691,7 +1691,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: "Review failed checklist runs",
           source: `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"}`,
           status: checklistFailures[0]?.status || "Needs review",
-          context: "Update the process, owner, or escalation rule if the failure repeats.",
+          context: "Review the process, responsible manager, or escalation rule if the failure repeats.",
           href: "/app/checklists" as Route
         }
       : null,
@@ -1711,27 +1711,27 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: `Review ${negativeTrends[0].name}`,
           source: "KPI trend",
           status: "Declining",
-          context: "Compare this KPI against recent CRM activity, imports, issues, and follow-up workload.",
+          context: "Compare this KPI against recent customer pipeline activity, imports, issues, and source-system workload.",
           href: "/app/kpis" as Route
         }
       : null,
     !kpis.length
       ? {
           id: "action-first-kpi",
-          title: "Create your first KPI",
+          title: "Connect a KPI source",
           source: "KPI setup",
           status: "Start here",
-          context: "Add one owner-level metric such as revenue, leads, jobs completed, or customer issues.",
+          context: "Add one leadership-level metric such as revenue, leads, jobs completed, or customer issues.",
           href: "/app/kpis" as Route
         }
       : null,
     !crmLeads.length
       ? {
           id: "action-first-crm",
-          title: "Add your first CRM lead",
-          source: "CRM setup",
+          title: "Connect customer pipeline context",
+          source: "Customer pipeline setup",
           status: "Start here",
-          context: "A single lead is enough to connect sales follow-up to reports and dashboard context.",
+          context: "Even a small customer pipeline sample can improve revenue and response-quality intelligence.",
           href: "/app/crm" as Route
         }
       : null,
@@ -1741,7 +1741,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: "Generate a report",
           source: "Reports",
           status: "Recommended",
-          context: "Save a management summary so decisions and follow-up work have a record.",
+          context: "Save a management summary so decisions and intelligence findings have a record.",
           href: "/app/reports" as Route
         }
       : null
@@ -1793,7 +1793,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const alertsByDepartment = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_department)));
   const assignmentOwnerLabel = (assignment: AssignmentRow) => {
     if (assignment.assigned_person_id && peopleById.has(assignment.assigned_person_id)) {
-      return peopleById.get(assignment.assigned_person_id)?.full_name || "Assigned person";
+      return peopleById.get(assignment.assigned_person_id)?.full_name || "Responsible person";
     }
 
     if (assignment.assigned_role) return assignment.assigned_role;
@@ -1874,10 +1874,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const isIntelligenceView = dashboardMode === "Intelligence View";
   const modeDescription =
     dashboardMode === "Executive View"
-      ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next recommended action."
+      ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next executive recommendation."
       : dashboardMode === "Operations View"
-        ? `What is happening? A ${period.toLowerCase()} operating view of KPIs, follow-ups, issues, checklists, ownership, CRM, and reports.`
-        : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and recommended action.`;
+        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, source-system signals, issues, checklists, responsibility visibility, customer pipeline context, and reports.`
+        : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and executive recommendations.`;
 
   return (
     <div className="space-y-6">
@@ -1945,18 +1945,18 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
           <DashboardAccordion
             title="Intelligence signals"
-            summary={`${riskSignals.length} actionable risk signal${riskSignals.length === 1 ? "" : "s"}, ${opportunitySignals.length} opportunit${opportunitySignals.length === 1 ? "y" : "ies"}, and ${recommendedActionSignals.length} recommended action${recommendedActionSignals.length === 1 ? "" : "s"} are available for review.`}
+            summary={`${riskSignals.length} actionable risk signal${riskSignals.length === 1 ? "" : "s"}, ${opportunitySignals.length} opportunit${opportunitySignals.length === 1 ? "y" : "ies"}, and ${recommendedActionSignals.length} executive recommendation${recommendedActionSignals.length === 1 ? "" : "s"} are available for review.`}
           >
             <section className="grid gap-4 xl:grid-cols-3">
               <SectionCard title="Risks" description="Top source records behind the current risk summary.">
                 <SignalList items={riskSignals} empty="No major risks found for this period." tone="risk" />
               </SectionCard>
 
-              <SectionCard title="Opportunities" description="Specific leads, KPI gains, imports, or analyses worth acting on.">
+              <SectionCard title="Opportunities" description="Specific pipeline records, KPI gains, imports, or analyses worth reviewing.">
                 <SignalList items={opportunitySignals} empty="No clear opportunities found yet." tone="opportunity" />
               </SectionCard>
 
-              <SectionCard title="Recommendation queue" description="Each action points to the module where the work should happen.">
+              <SectionCard title="Recommendation queue" description="Each recommendation points to evidence and the related source context.">
                 <SignalList
                   items={recommendedActionSignals}
                   empty="Keep the current cadence and review again after more activity is recorded."
@@ -1999,28 +1999,28 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       {isOperationsView ? (
         <>
           <DashboardAccordion
-            title="Ownership"
-            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} overdue assignment${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
+            title="Responsibility visibility"
+            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} overdue responsibility signal${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
         <SectionCard
-          title="Team accountability"
-          description="Notifications, shared reports, KPI alerts, and assigned follow-up work for this workspace."
+          title="Responsibility visibility"
+          description="Notifications, shared reports, KPI alerts, and responsibility signals for this workspace."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue" : undefined} />
             <StatCard label="KPI alerts" value={kpiAlertNotifications.length} detail="Rules triggered" tone={kpiAlertNotifications.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
             <StatCard label="Shared reports" value={recentReportShares.length} detail="Recent in-app shares" />
             <StatCard label="Due soon" value={dueSoonAssignments.length} detail="Next 14 days" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
-            <StatCard label="Overdue" value={overdueOperationalAssignments.length} detail="Assignments past due" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
-            <StatCard label="Assigned recs" value={recommendationAssignments.length} detail="Vaeroex follow-ups" />
+            <StatCard label="Overdue" value={overdueOperationalAssignments.length} detail="Responsibility signals past due" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
+            <StatCard label="Saved recs" value={recommendationAssignments.length} detail="Vaeroex recommendations" />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/notifications" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               Open notifications
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Review assignments
+              Review source signals
             </Link>
             <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               Shared briefings
@@ -2047,13 +2047,13 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-        <SectionCard title="Accountability assignments" description="Follow-ups can be assigned to a person, role, or department without changing app permissions.">
+        <SectionCard title="Responsibility signals" description="Source-system signals can indicate a person, role, or department without changing app permissions.">
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
-              <h3 className="text-sm font-semibold text-ink">Assigned to me</h3>
+              <h3 className="text-sm font-semibold text-ink">Connected to me</h3>
               <SimpleList
                 items={assignedToMe}
-                empty={currentUserPerson ? "No assignments are directed to you." : "No matching person record found for your login email."}
+                empty={currentUserPerson ? "No responsibility signals are directed to you." : "No matching person record found for your login email."}
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-line p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -2066,10 +2066,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-ink">Assigned to my role</h3>
+              <h3 className="text-sm font-semibold text-ink">Connected to my role</h3>
               <SimpleList
                 items={assignedToMyRole}
-                empty={currentUserPerson?.role_title ? `No assignments for ${currentUserPerson.role_title}.` : "Add your role on the People page to see role-based assignments."}
+                empty={currentUserPerson?.role_title ? `No responsibility signals for ${currentUserPerson.role_title}.` : "Add your role on the People page to see role-based signals."}
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-line p-3">
                     <p className="text-sm font-semibold">{assignment.title}</p>
@@ -2079,10 +2079,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-ink">Assigned to my department</h3>
+              <h3 className="text-sm font-semibold text-ink">Connected to my department</h3>
               <SimpleList
                 items={assignedToMyDepartment}
-                empty={currentUserPerson?.department ? `No assignments for ${currentUserPerson.department}.` : "Add your department on the People page to see department work."}
+                empty={currentUserPerson?.department ? `No responsibility signals for ${currentUserPerson.department}.` : "Add your department on the People page to see department signals."}
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-line p-3">
                     <p className="text-sm font-semibold">{assignment.title}</p>
@@ -2092,14 +2092,14 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-ink">Overdue assignments</h3>
+              <h3 className="text-sm font-semibold text-ink">Overdue responsibility signals</h3>
               <SimpleList
                 items={overdueOperationalAssignments}
-                empty="No overdue team assignments."
+                empty="No overdue responsibility signals."
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-red-100 bg-red-50 p-3 text-red-700">
                     <p className="text-sm font-semibold">{assignment.title}</p>
-                    <p className="mt-1 text-xs">Owner: {assignmentOwnerLabel(assignment)} · Due {assignment.due_date}</p>
+                    <p className="mt-1 text-xs">Responsible: {assignmentOwnerLabel(assignment)} · Due {assignment.due_date}</p>
                   </div>
                 )}
               />
@@ -2124,7 +2124,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           />
         </SectionCard>
 
-        <SectionCard title="KPI alerts by role" description="Who is receiving KPI follow-up signals.">
+        <SectionCard title="KPI alerts by role" description="Who is receiving KPI alert signals.">
           <SimpleList
             items={alertsByRole.map(([label, count]) => ({ id: label, label, count }))}
             empty="No role-based KPI alerts have triggered yet."
@@ -2162,26 +2162,26 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve current structure" : "Build your first structure"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Your workspace already has activity. Focus on improving existing KPIs, CRM records, follow-ups, checklists, SOPs, and reports instead of creating duplicate systems."
-              : "Add KPIs, CRM leads, follow-ups, checklists, and SOPs directly in Vaeroex. The dashboard and reports work as soon as records are created."}
+              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer pipeline records, source-system signals, SOPs, and reports instead of creating duplicate systems."
+              : "Add KPI sources, customer pipeline samples, source-system signals, SOPs, and reports only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/kpis" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {kpis.length ? "Review KPIs" : "Add KPI"}
             </Link>
             <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {crmLeads.length ? "Review CRM" : "Add CRM lead"}
+              {crmLeads.length ? "Review pipeline context" : "Add pipeline sample"}
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {tasks.length ? "Review follow-ups" : "Add follow-up"}
+              {tasks.length ? "Review source signals" : "Add source signal"}
             </Link>
           </div>
         </article>
         <article className="rounded-lg border border-line bg-white p-5 shadow-panel">
-          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Turn visibility into execution" : "Import existing data"}</p>
+          <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Turn visibility into leadership review" : "Import existing data"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Use recent files, imports, reports, and Vaeroex findings to update existing dashboards, assign follow-up work, and keep reports current."
+              ? "Use recent files, imports, reports, and Vaeroex findings to update leadership reviews and keep reports current."
               : "Upload CSV or XLSX files when you already have data to bring in. Vaeroex stages mappings for review before saving anything to history."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -2205,7 +2205,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         {primaryTrends.map((trend) => (
           <KpiCard key={trend.name} trend={trend} />
         ))}
-        <StatCard label="Open Follow-ups" value={openTasks.length} detail={`${overdueTasks.length} overdue`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
+        <StatCard label="Source Signals" value={openTasks.length} detail={`${overdueTasks.length} overdue`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Open Risks" value={openIssues.length} detail="Active risks and blockers" tone={openIssues.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Recent Imports" value={recentImports.length} detail={`${pendingImports.length} waiting for review`} tone={pendingImports.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-line bg-white text-ink"} />
       </section>
@@ -2254,14 +2254,14 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Follow-ups, issues, and checklists"
-            summary={`${openTasks.length} open follow-up${openTasks.length === 1 ? "" : "s"}, ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"}, and ${checklistFailures.length} checklist failure${checklistFailures.length === 1 ? "" : "s"} in this period.`}
+            title="Source signals, issues, and checklists"
+            summary={`${openTasks.length} open source-system signal${openTasks.length === 1 ? "" : "s"}, ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"}, and ${checklistFailures.length} checklist failure${checklistFailures.length === 1 ? "" : "s"} in this period.`}
           >
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Follow-up ownership" description="Open follow-ups and overdue accountability.">
+        <SectionCard title="Responsibility visibility" description="Open source-system signals and overdue responsibility indicators.">
           <SimpleList
             items={openTasks.slice(0, 6)}
-            empty="No open follow-ups."
+            empty="No open source-system signals."
             render={(task: TaskRow) => (
               <div key={task.id} className="rounded-lg border border-line p-3">
                 <div className="flex items-start justify-between gap-3">
@@ -2310,7 +2310,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Files, SOPs, CRM, and reports"
+            title="Files, SOPs, customer pipeline, and reports"
             summary={`${recentFiles.length} recent file${recentFiles.length === 1 ? "" : "s"}, ${sopUpdates.length} SOP update${sopUpdates.length === 1 ? "" : "s"}, ${leadsCreated.length} new lead${leadsCreated.length === 1 ? "" : "s"}, and ${reports.length} saved report${reports.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-4">
@@ -2383,7 +2383,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
-        <SectionCard title="CRM pipeline" description="Lead status and value from current CRM records plus imported history.">
+        <SectionCard title="Customer pipeline context" description="Lead status and value from current customer pipeline records plus imported history.">
           <div className="space-y-3">
             {Object.entries(pipeline).length ? (
               Object.entries(pipeline).map(([status, value]) => (
@@ -2394,7 +2394,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted">No CRM leads yet.</p>
+              <p className="text-sm text-muted">No customer pipeline records yet.</p>
             )}
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">

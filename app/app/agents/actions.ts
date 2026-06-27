@@ -247,18 +247,18 @@ function taskDrafts(output: JsonRecord) {
     ...asArray(output.follow_up_tasks)
   ].map((task, index) => {
     const record = asRecord(task);
-    const title = str(record.title, typeof task === "string" ? task : `Vaeroex follow-up ${index + 1}`);
+    const title = str(record.title, typeof task === "string" ? task : `Vaeroex review ${index + 1}`);
     const description =
       str(record.description) ||
       str(record.reason_this_matters) ||
       str(record.recommended_action) ||
-      "Review this Vaeroex recommendation and assign an owner.";
+      "Review this Vaeroex recommendation with the responsible manager.";
 
     return {
       title,
       description,
       priority: priority(record.priority),
-      category: str(record.category, "Vaeroex follow-up"),
+      category: str(record.category, "Vaeroex review"),
       due_date: dateOrNull(record.due_date) ?? dateOrNull(record.recommended_due_date)
     };
   });
@@ -310,7 +310,7 @@ function checklistDrafts(output: JsonRecord) {
       category: str(record.category, "Operations"),
       frequency: str(record.frequency, "As needed"),
       assigned_role: str(record.assigned_role, str(record.owner_role, "Manager")),
-      items_json: (items.length ? items : ["Confirm owner", "Complete work", "Log exceptions", "Submit for manager review"]) as Json
+      items_json: (items.length ? items : ["Review evidence", "Confirm responsible manager", "Document decision", "Submit for manager review"]) as Json
     };
   });
 }

@@ -201,11 +201,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const customerContextWithoutFollowup = crmLeads.filter((lead) => !isClosed(lead.status) && (!lead.last_activity_at || isOverdue(lead.last_activity_at)));
   const sourceRecords = files.length + reports.length + sops.length + forms.length + submissions.length + crmLeads.length;
   const suggestedNextData = [
-    !kpis.length ? "Upload KPI history or create one owner-level KPI." : "",
+    !kpis.length ? "Upload KPI history or connect one leadership-level KPI source." : "",
     !reports.length ? "Upload or generate prior management reports." : "",
     !files.length ? "Upload a recent spreadsheet, report, meeting note, or SOP." : "",
     !crmLeads.length ? "Add customer context or import a customer/lead list." : "",
-    !people.length ? "Add ownership context so Vaeroex can identify accountability gaps." : ""
+    !people.length ? "Add leadership or department context so Vaeroex can interpret responsibility signals." : ""
   ].filter(Boolean);
   const dataQualityScore = Math.min(
     100,
@@ -230,10 +230,10 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         id: `issue-${issue.id}`,
         type: "Risk" as const,
         title: issue.title,
-        summary: issue.recommended_fix || issue.description || `Issue is currently ${issue.status}.`,
+        summary: issue.description || issue.recommended_fix || `Issue is currently ${issue.status}.`,
         why: "Open issues indicate unresolved risk or a process gap leadership may need to prioritize.",
         impact: "Work can stall, repeat, or spread when the same issue remains unresolved.",
-        recommendedAction: issue.recommended_fix || "Confirm the owner, severity, and next follow-up.",
+        recommendedAction: "Review this issue with the responsible manager and decide whether an executive report or improvement plan is needed.",
         confidence: confidenceFromEvidence(evidence.length, priority),
         evidence,
         evidenceCount: evidence.length,
@@ -245,20 +245,20 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     }),
     ...overdueTasks.slice(0, 4).map((task) => {
       const priority = priorityFrom(task.priority);
-      const evidence = [`Priority: ${task.priority}`, `Status: ${task.status}`, task.assigned_role || task.assigned_to ? `Owner: ${task.assigned_role || task.assigned_to}` : "No owner recorded"];
+      const evidence = [`Priority: ${task.priority}`, `Status: ${task.status}`, task.assigned_role || task.assigned_to ? `Responsible role: ${task.assigned_role || task.assigned_to}` : "No responsible role recorded"];
 
       return {
         id: `task-${task.id}`,
         type: "Risk" as const,
-        title: task.title,
-        summary: `Follow-up is overdue${task.due_date ? ` since ${task.due_date}` : ""}.`,
-        why: "Overdue follow-ups reduce accountability and can hide recurring execution gaps.",
-        impact: "Leadership loses visibility into whether the recommended work actually happened.",
-        recommendedAction: "Assign or confirm an owner and decide whether this still matters.",
+        title: `${task.title} is overdue`,
+        summary: `A source-system follow-up remains incomplete${task.due_date ? ` since ${task.due_date}` : ""}.`,
+        why: "Incomplete follow-up signals can hide slower response speed, unresolved customer needs, or process friction.",
+        impact: "If ignored, leadership may miss a developing retention, conversion, or service-quality risk.",
+        recommendedAction: "Review the follow-up process with the responsible manager and decide whether a meeting agenda or improvement plan is needed.",
         confidence: confidenceFromEvidence(evidence.length, priority),
         evidence,
         evidenceCount: evidence.length,
-        sourceTypes: ["Follow-ups"],
+        sourceTypes: ["Source-system follow-ups"],
         sourceHref: "/app/tasks",
         priority,
         lastUpdated: task.updated_at || task.created_at
@@ -266,17 +266,17 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     }),
     ownerlessTasks.length
       ? {
-          id: "ownerless-follow-ups",
+          id: "unattributed-follow-up-signals",
           type: "Bottleneck" as const,
-          title: "Ownerless follow-ups are creating accountability risk",
-          summary: `${ownerlessTasks.length} open follow-up${ownerlessTasks.length === 1 ? " has" : "s have"} no clear owner.`,
-          why: "Vaeroex looks for work that exists without responsibility attached.",
-          impact: "Work can stall because nobody is accountable for the next decision.",
-          recommendedAction: "Assign owners to the oldest or highest-priority ownerless follow-ups.",
+          title: "Follow-up responsibility is unclear",
+          summary: `${ownerlessTasks.length} open follow-up signal${ownerlessTasks.length === 1 ? " has" : "s have"} no responsible role visible in the source data.`,
+          why: "Vaeroex looks for operational signals where responsibility is unclear because those patterns can weaken execution confidence.",
+          impact: "If ignored, customer response, issue recovery, or internal decision speed may slow without leadership noticing.",
+          recommendedAction: "Review the underlying process with the responsible manager and decide whether clearer reporting or a meeting agenda is needed.",
           confidence: ownerlessTasks.length >= 5 ? "High" : "Medium",
-          evidence: [`Ownerless follow-ups: ${ownerlessTasks.length}`, `Open follow-ups: ${openTasks.length}`, ownerlessTasks[0]?.title ? `Oldest example: ${ownerlessTasks[0].title}` : "No example available"],
+          evidence: [`Unattributed follow-up signals: ${ownerlessTasks.length}`, `Open follow-up signals: ${openTasks.length}`, ownerlessTasks[0]?.title ? `Oldest example: ${ownerlessTasks[0].title}` : "No example available"],
           evidenceCount: 3,
-          sourceTypes: ["Follow-ups", "Ownership"],
+          sourceTypes: ["Source-system follow-ups", "Responsibility signals"],
           sourceHref: "/app/tasks",
           priority: ownerlessTasks.length >= 5 ? "High" : "Medium",
           lastUpdated: latestDate(ownerlessTasks.map((task) => task.updated_at || task.created_at))
@@ -293,7 +293,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
         why: "A below-target KPI is a signal that performance changed or the target needs leadership review.",
         impact: "The metric may point to execution risk, weak process, or a target that needs a management decision.",
-        recommendedAction: "Review related reports, files, and follow-ups before changing the target.",
+        recommendedAction: "Review related reports, files, customer activity, and source-system follow-up history before making a leadership decision.",
         confidence: history >= 3 ? "High" : "Medium",
         evidence,
         evidenceCount: evidence.length,
@@ -304,16 +304,16 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       };
     }),
     ...customerContextWithoutFollowup.slice(0, 3).map((lead) => {
-      const evidence = [`Customer status: ${lead.status}`, lead.owner ? `Owner: ${lead.owner}` : "No owner recorded", lead.last_activity_at ? `Last activity: ${lead.last_activity_at}` : "No recent activity recorded"];
+      const evidence = [`Customer status: ${lead.status}`, lead.owner ? `Responsible role: ${lead.owner}` : "No responsible role recorded", lead.last_activity_at ? `Last activity: ${lead.last_activity_at}` : "No recent activity recorded"];
 
       return {
         id: `customer-risk-${lead.id}`,
         type: "Opportunity" as const,
         title: lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name,
-        summary: `${formatMetric(lead.estimated_value, "revenue")} estimated value with weak follow-up context.`,
-        why: "Customer context can reveal revenue opportunities when follow-up and ownership are visible.",
-        impact: "Revenue can leak when customer context exists but follow-up discipline is unclear.",
-        recommendedAction: "Review the next follow-up and decide whether this opportunity belongs in the leadership review.",
+        summary: `${formatMetric(lead.estimated_value, "revenue")} estimated value with limited recent customer activity.`,
+        why: "Customer context can reveal revenue opportunities when response speed and process health are visible.",
+        impact: "Revenue can leak when customer activity exists but follow-through patterns are weak or unclear.",
+        recommendedAction: "Review the CRM process with the responsible manager and decide whether this belongs in the leadership review.",
         confidence: lead.estimated_value ? "Medium" : "Low",
         evidence,
         evidenceCount: evidence.length,
@@ -333,7 +333,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
         why: "Positive KPI movement can point to a repeatable practice worth preserving.",
         impact: "Leadership can identify what changed and protect the practice that produced the result.",
-        recommendedAction: "Capture what changed and decide whether to turn it into a SOP, checklist, or report note.",
+        recommendedAction: "Review what changed and decide whether leadership needs an executive report, SOP, checklist, or improvement plan.",
         confidence: history >= 3 ? "High" : "Medium",
         evidence: [`Metric date: ${kpi.metric_date}`, `Historical records: ${history}`, kpi.source ? `Source: ${kpi.source}` : "Source not recorded"],
         evidenceCount: 3,
@@ -381,9 +381,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           type: "Recommendation" as const,
           title: "Process knowledge may be stale",
           summary: `${staleSops.length} SOP${staleSops.length === 1 ? " is" : "s are"} older than 90 days.`,
-          why: "Vaeroex uses process knowledge as source context for recommendations.",
-          impact: "Old source knowledge can lower confidence in process recommendations.",
-          recommendedAction: "Review stale SOPs and update the ones that describe active work.",
+          why: "Vaeroex uses process knowledge as source context for executive intelligence.",
+          impact: "Old source knowledge can lower confidence in process-related intelligence.",
+          recommendedAction: "Review stale process documents and decide whether a refreshed SOP or improvement plan is needed.",
           confidence: "Medium",
           evidence: [`Stale SOPs: ${staleSops.length}`, staleSops[0]?.title ? `Oldest example: ${staleSops[0].title}` : "No example available"],
           evidenceCount: 2,
@@ -399,8 +399,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       title: `Vaeroex run failed: ${run.agent_type.replace(/_/g, " ")}`,
       summary: run.error_message || "The run did not complete.",
       why: "Failed intelligence runs reduce confidence until the underlying data or service issue is resolved.",
-      impact: "The workspace may be missing a recent answer or generated recommendation.",
-      recommendedAction: "Retry from Ask Vaeroex or review technical details if you are an admin.",
+      impact: "The workspace may be missing a recent intelligence answer.",
+      recommendedAction: "Retry the analysis or review technical details if you are an admin.",
       confidence: "High" as const,
       evidence: [`Run status: ${run.status}`, `Created: ${new Date(run.created_at).toLocaleString()}`, run.error_message || "No error message recorded"],
       evidenceCount: 3,
