@@ -8,31 +8,25 @@ export function PwaServiceWorker() {
       return;
     }
 
-    let cancelled = false;
+    const clearStaleServiceWorkerState = async () => {
+      try {
+        const registrations = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(
+          registrations
+            .filter((registration) => registration.scope.startsWith(window.location.origin))
+            .map((registration) => registration.unregister())
+        );
 
-    const register = () => {
-      if (cancelled) {
-        return;
+        if ("caches" in window) {
+          const keys = await window.caches.keys();
+          await Promise.all(keys.filter((key) => key.startsWith("vaeroex-pwa")).map((key) => window.caches.delete(key)));
+        }
+      } catch {
+        // Emergency cache cleanup should never interrupt the Vaeroex user flow.
       }
-
-      navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {
-        // PWA install support should never interrupt the Vaeroex user flow.
-      });
     };
 
-    if (document.readyState === "complete") {
-      register();
-      return () => {
-        cancelled = true;
-      };
-    }
-
-    window.addEventListener("load", register, { once: true });
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener("load", register);
-    };
+    void clearStaleServiceWorkerState();
   }, []);
 
   return null;

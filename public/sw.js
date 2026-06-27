@@ -1,35 +1,28 @@
-const VAEROEX_CACHE = "vaeroex-pwa-v1";
-const OFFLINE_URL = "/offline";
-const STATIC_ASSETS = [OFFLINE_URL, "/favicon.png", "/icon-192.png", "/apple-touch-icon.png"];
+const VAEROEX_CACHE_PREFIX = "vaeroex-pwa";
+
+async function clearVaeroexCaches() {
+  if (!self.caches) {
+    return;
+  }
+
+  const keys = await caches.keys();
+  await Promise.all(keys.filter((key) => key.startsWith(VAEROEX_CACHE_PREFIX)).map((key) => caches.delete(key)));
+}
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(VAEROEX_CACHE).then((cache) => cache.addAll(STATIC_ASSETS)).catch(() => undefined)
-  );
+  event.waitUntil(clearVaeroexCaches());
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== VAEROEX_CACHE).map((key) => caches.delete(key)))
-    )
+    clearVaeroexCaches().then(() => {
+      if (self.registration.navigationPreload) {
+        return self.registration.navigationPreload.disable();
+      }
+
+      return undefined;
+    })
   );
   self.clients.claim();
-});
-
-self.addEventListener("fetch", (event) => {
-  const request = event.request;
-
-  if (request.method !== "GET" || request.mode !== "navigate") {
-    return;
-  }
-
-  const url = new URL(request.url);
-
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api")) {
-    return;
-  }
-
-  event.respondWith(fetch(request).catch(() => caches.match(OFFLINE_URL)));
 });
