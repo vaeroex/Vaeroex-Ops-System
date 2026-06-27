@@ -254,7 +254,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
             </ConfirmSubmitButton>
           </form>
           <ContextualAskVaeroex
-            label="Ask Vaeroex"
+            label="Explain This"
             prompt={askPrompt}
             contextType="generated_output"
             contextId={`${output.type}-${output.sourceHref}`}

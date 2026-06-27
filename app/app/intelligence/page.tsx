@@ -95,7 +95,7 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
           Generate Executive Briefing
         </Link>
         <ContextualAskVaeroex
-          label="Ask Vaeroex"
+          label="Explain This"
           prompt={`Explain why this ${insight.type.toLowerCase()} matters and what leadership should do next.`}
           contextType={`intelligence_${insight.type.toLowerCase()}`}
           contextId={insight.id}
@@ -344,7 +344,7 @@ export default async function IntelligencePage() {
             Generate Executive Briefing
           </Link>
           <ContextualAskVaeroex
-            label="Ask for briefing"
+            label="Explain This Briefing"
             prompt={`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`}
             contextType="business_memory_summary"
             contextId={context.activeWorkspace?.id || "workspace"}

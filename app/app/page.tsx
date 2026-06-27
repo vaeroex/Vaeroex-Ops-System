@@ -5,6 +5,7 @@ import {
   exitDemoWorkspaceAction,
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -989,6 +990,25 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
       tone: "border-cyan-400/30 bg-cyan-950/25"
     }
   ];
+  const memorySignals = intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords;
+  const briefingEvidence = [
+    `Business health: ${intelligence.businessHealth.score}/100 (${intelligence.businessHealth.status})`,
+    `Trend: ${intelligence.businessHealth.trend}`,
+    `Data confidence: ${intelligence.dataQuality.confidence} (${intelligence.dataQuality.score}/100)`,
+    `Business Memory signals: ${memorySignals}`,
+    intelligence.topRisk
+      ? `Top Risk: ${intelligence.topRisk.title}. ${intelligence.topRisk.summary} Evidence: ${intelligence.topRisk.evidence.join("; ")}`
+      : "Top Risk: no major risk visible",
+    intelligence.topOpportunity
+      ? `Top Opportunity: ${intelligence.topOpportunity.title}. ${intelligence.topOpportunity.summary} Evidence: ${intelligence.topOpportunity.evidence.join("; ")}`
+      : "Top Opportunity: more context needed",
+    intelligence.topRecommendation
+      ? `Recommended Action: ${intelligence.topRecommendation.recommendedAction}. Why: ${intelligence.topRecommendation.why}`
+      : "Recommended Action: add source data",
+    intelligence.topForecast
+      ? `Forecast signal: ${intelligence.topForecast.title}. Confidence: ${intelligence.topForecast.confidence}`
+      : "Forecast signal: not enough history for a reliable forecast"
+  ];
 
   return (
     <section className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#061225] text-white shadow-command">
@@ -1043,12 +1063,28 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
             <Link href="/app/intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
               Open Intelligence
             </Link>
-            <Link href="/app/ask" className="rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
-              Ask Vaeroex
-            </Link>
             <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
               Add evidence
             </Link>
+          </div>
+          <div className="rounded-lg border border-cyan-300/20 bg-slate-950/35 p-4">
+            <div className="mb-3">
+              <p className="text-sm font-semibold text-white">Explain this briefing</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">
+                Generate an inline explanation of this recommendation without leaving Home.
+              </p>
+            </div>
+            <ContextualAskVaeroex
+              label="Explain This"
+              prompt="Explain the current Home briefing for leadership. Include these sections: Executive Interpretation; Business Relationships connecting Top Risk, Top Opportunity, and Recommended Action; Root Cause; Business Impact if ignored; Confidence with High, Medium, or Low and why; Evidence Used from KPIs, Business Memory, uploaded files, reports, and signals; Predicted Trend for 30 days, 90 days, and 6 months only if confidence supports it, otherwise state there is not enough historical data to produce a reliable forecast; Recommended Executive Decision with one clear recommendation. Keep it concise, practical, and tied to the current briefing."
+              contextType="home_leadership_briefing"
+              contextId="home-what-leadership-should-know-now"
+              sourceTitle="What leadership should know now"
+              sourceSummary={intelligence.executiveSummary}
+              evidence={briefingEvidence}
+              compact
+              defaultCollapsed={false}
+            />
           </div>
         </div>
       </div>
@@ -1099,6 +1135,19 @@ function IntelligenceBriefingHero({
       tone: "action" as const
     }
   ];
+  const briefingEvidence = [
+    `Period: ${period}`,
+    risk ? `Biggest risk: ${risk.title}. ${risk.context}. Evidence: ${signalEvidence(risk)}` : "Biggest risk: no major risk visible",
+    opportunity
+      ? `Biggest opportunity: ${opportunity.title}. ${opportunity.context}. Evidence: ${signalEvidence(opportunity)}`
+      : "Biggest opportunity: no clear opportunity visible",
+    attention
+      ? `Requires attention: ${attention.title}. ${attention.context}. Recommended: ${signalRecommendedAction(attention, "risk")}`
+      : "Requires attention: no immediate attention item visible",
+    action
+      ? `Recommended action: ${action.title}. ${action.context}. Recommended: ${signalRecommendedAction(action, "action")}`
+      : "Recommended action: keep adding records for stronger recommendations"
+  ];
 
   return (
     <section className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#061225] text-white shadow-command">
@@ -1111,9 +1160,19 @@ function IntelligenceBriefingHero({
               Vaeroex is reading the {period.toLowerCase()} workspace context for risk, opportunity, attention, and the next decision.
             </p>
           </div>
-          <Link href="/app/ask" className="w-fit rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-            Ask Vaeroex
-          </Link>
+          <div className="w-full max-w-md rounded-lg border border-cyan-300/20 bg-slate-950/30 p-3 lg:w-auto">
+            <ContextualAskVaeroex
+              label="Explain This"
+              prompt="Explain this Leadership Intelligence Briefing. Include Executive Interpretation, Business Relationships, Root Cause, Business Impact, Confidence, Evidence Used, Predicted Trend only when confidence supports it, and one Recommended Executive Decision. Keep it concise and tied to the current risk, opportunity, attention item, and recommended action."
+              contextType="home_intelligence_briefing"
+              contextId={`home-intelligence-briefing-${period}`}
+              sourceTitle="Leadership Intelligence Briefing"
+              sourceSummary={`Risk: ${risk?.title || "none visible"}. Opportunity: ${opportunity?.title || "none visible"}. Recommended action: ${action?.title || "keep adding context"}.`}
+              evidence={briefingEvidence}
+              compact
+              defaultCollapsed={false}
+            />
+          </div>
         </div>
       </div>
 
