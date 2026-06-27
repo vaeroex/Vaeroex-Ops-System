@@ -162,16 +162,16 @@ function reportBody({
 }) {
   const title = categoryLabel(category);
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} overdue follow-up${source.counts.overdue_tasks === 1 ? "" : "s"} need owner attention.` : "",
+    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} overdue source-system signal${source.counts.overdue_tasks === 1 ? "" : "s"} need leadership attention.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} are still unresolved.` : "",
     source.counts.below_target_kpis ? `${source.counts.below_target_kpis} KPI${source.counts.below_target_kpis === 1 ? "" : "s"} are below target.` : "",
     source.counts.checklist_exceptions ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.` : ""
   ].filter(Boolean);
   const actions = [
-    source.counts.overdue_tasks ? "Assign owners and dates to overdue follow-ups before the next leadership check-in." : "",
-    source.counts.below_target_kpis ? "Review below-target KPIs and create one recovery action for each key metric." : "",
-    source.counts.open_issues ? "Convert the most important unresolved issues into assigned follow-ups." : "",
-    source.counts.vaeroex_insights ? "Review recent Vaeroex insights and decide which recommendations should become follow-ups or SOP updates." : "",
+    source.counts.overdue_tasks ? "Review overdue source-system signals with the responsible manager before the next leadership check-in." : "",
+    source.counts.below_target_kpis ? "Review below-target KPIs and decide whether leadership needs an improvement plan for each key metric." : "",
+    source.counts.open_issues ? "Review the most important unresolved issues with leadership." : "",
+    source.counts.vaeroex_insights ? "Review recent Vaeroex insights and decide which recommendations need an executive report, SOP, checklist, meeting agenda, or improvement plan." : "",
     source.counts.uploaded_files ? "Review recent uploads and approve any mappings that should feed KPI history." : ""
   ].filter(Boolean);
 
@@ -181,28 +181,28 @@ Period: ${startDate} to ${endDate}
 Workspace: ${workspaceName}
 
 ## Executive Summary
-Vaeroex generated this scheduled report from current workspace activity, KPI history, CRM records, assignments, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} completed follow-up${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new CRM lead${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
+Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, responsibility signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} completed source-system signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
 
 ## What Needs Attention
 ${list(risks, "No urgent risks were detected for this scheduled report.")}
 
-## Completed Follow-ups
-${list(source.items.completed_tasks, "No completed follow-ups were found in this period.")}
+## Completed Source-System Signals
+${list(source.items.completed_tasks, "No completed source-system signals were found in this period.")}
 
 ## Open Issues
 ${list(source.items.open_issues, "No open issues were found.")}
 
-## Overdue Follow-ups
-${list(source.items.overdue_tasks, "No overdue follow-ups were found.")}
+## Overdue Source-System Signals
+${list(source.items.overdue_tasks, "No overdue source-system signals were found.")}
 
 ## KPI Signals
 ${list(source.items.below_target_kpis, "No below-target KPIs were found for this period.")}
 
-## CRM and Follow-Up
-${list(source.items.crm_leads, "No new CRM leads were found in this period.")}
+## Customer Pipeline Context
+${list(source.items.crm_leads, "No new customer pipeline records were found in this period.")}
 
-## Open Assignments
-${list(source.items.open_assignments, "No open accountability assignments were found.")}
+## Open Responsibility Signals
+${list(source.items.open_assignments, "No open responsibility signals were found.")}
 
 ## Recent Files
 ${list(source.items.uploaded_files, "No files were uploaded in this period.")}

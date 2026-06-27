@@ -241,7 +241,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
       <section className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-slate-100 shadow-panel print:hidden">
         <h2 className="text-base font-semibold text-white">Optional next steps</h2>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          This draft is portable. Save it, copy it, ask a follow-up, or convert it to an internal action only when you want Vaeroex to track the work.
+          This draft is portable. Save it, copy it, or ask Vaeroex to explain the evidence before leadership reviews it in your existing operating systems.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <form action={saveGeneratedOutputToBriefingsAction}>
@@ -259,7 +259,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
             contextType="generated_output"
             contextId={`${output.type}-${output.sourceHref}`}
             sourceTitle={output.title}
-            sourceSummary={`${output.summary} Recommended remedy: ${output.recommendedRemedy}`}
+            sourceSummary={`${output.summary} Executive recommendation: ${output.recommendedRemedy}`}
             evidence={[
               output.whyMatters,
               ...output.evidence,
@@ -275,26 +275,15 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
           </Link>
         </div>
 
-        <details className="mt-5 rounded-lg border border-white/10 bg-slate-950/45 p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced: convert to internal action record</summary>
+        <div className="mt-5 rounded-lg border border-white/10 bg-slate-950/45 p-4">
+          <p className="text-sm font-semibold text-slate-100">Source context</p>
           <p className="mt-2 text-sm leading-6 text-slate-400">
-            Use these only when you want Vaeroex to act like a supporting record system for this output.
+            Vaeroex produced this as decision support. Review the source context before using the output in Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or another system of record.
           </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-              Create internal follow-up
-            </Link>
-            <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-              Create internal issue
-            </Link>
-            <Link href="/app/checklists" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-              Create internal checklist
-            </Link>
-            <Link href={output.sourceHref as Route} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-              Open source record area
-            </Link>
-          </div>
-        </details>
+          <Link href={output.sourceHref as Route} className="mt-4 inline-flex rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+            Open source record area
+          </Link>
+        </div>
       </section>
 
       <section className="grid gap-3 md:grid-cols-2 print:hidden">

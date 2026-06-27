@@ -230,38 +230,38 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       exists: true,
       records: crmLeadCount.count ?? 0,
       statuses: countByStatus(recentLeadRows),
-      guidance: "The CRM Pipeline already exists. Recommend improving lead data, follow-up cadence, status quality, source tracking, or estimated value."
+      guidance: "Customer pipeline records already exist as source context. Recommend reviewing response gaps, status quality, source tracking, or estimated value with the responsible manager."
     },
     task_tracking: {
       exists: true,
       open_records: openTasks.count ?? 0,
       overdue_records: overdueTasks.count ?? 0,
       statuses: countByStatus(recentTaskRows),
-      guidance: "Follow-up ownership already exists. Recommend assigning owners, due dates, priorities, or converting recommendations into follow-ups."
+      guidance: "Source-system signals already exist. Recommend reviewing overdue signals, unclear responsibility, dates, priorities, or whether leadership needs an executive report or improvement plan."
     },
     issue_tracking: {
       exists: true,
       open_records: openIssues.count ?? 0,
       statuses: countByStatus(recentIssueRows),
-      guidance: "Issue tracking already exists. Recommend resolving, categorizing, converting, or reviewing issues instead of creating an issue log."
+      guidance: "Issue records already exist as source context. Recommend categorizing, reviewing, and escalating issues in leadership discussion instead of creating a new issue log."
     },
     checklist_library: {
       exists: true,
       records: checklistCount.count ?? 0,
       names: uniqueStrings(recentChecklistRows.map((checklist) => checklist.name)),
-      guidance: "Checklists already exist as a module. Recommend adding missing checklist items, assigning roles, running checklists, or reviewing failed runs."
+      guidance: "Checklists already exist as source context. Recommend reviewing failed runs, evidence, completion standards, or whether a checklist draft needs leadership approval."
     },
     sop_library: {
       exists: true,
       records: sopCount.count ?? 0,
       names: uniqueStrings(recentSopRows.map((sop) => sop.title)),
-      guidance: "The SOP Library already exists. Recommend owners, review cadence, approvals, and updates to specific SOPs instead of creating an SOP system."
+      guidance: "The SOP Library already exists as source context. Recommend responsible review cadence, approvals, and updates to specific SOPs instead of creating an SOP system."
     },
     reports: {
       exists: true,
       records: reportCount.count ?? 0,
       names: uniqueStrings(recentReportRows.map((report) => report.title)),
-      guidance: "Reports already exist. Recommend generating a specific follow-up report, updating report inputs, or attaching file analysis to a report."
+      guidance: "Reports already exist. Recommend generating a specific executive report, updating report inputs, or attaching file analysis to a report."
     },
     files: {
       exists: true,
@@ -275,29 +275,29 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       exists: true,
       records: formCount.count ?? 0,
       names: uniqueStrings(recentFormRows.map((form) => form.name)),
-      guidance: "Forms already exist. Recommend improving fields, public status, follow-up rules, or submission review."
+      guidance: "Forms already exist as source context. Recommend improving fields, public status, escalation cues, or submission review."
     },
     assets: {
       exists: true,
       records: assetCount.count ?? 0,
       flagged_records: flaggedAssets.count ?? 0,
-      guidance: "Assets already exist. Recommend checks, maintenance follow-up, owners, locations, or readiness review."
+      guidance: "Assets already exist as source context. Recommend checks, maintenance review, responsibility signals, locations, or readiness review."
     },
     people: {
       exists: true,
       records: peopleCount.count ?? 0,
       departments: uniqueStrings(recentPeopleRows.map((person) => person.department)),
-      guidance: "People records already exist. Recommend improving ownership, role clarity, departments, and accountability assignments."
+      guidance: "People records already exist as source context. Recommend improving responsibility visibility, role clarity, and department context."
     }
   };
   const gaps = [
     !(kpiCount.count ?? 0) ? "KPI Dashboard exists but has no KPI records yet." : "",
-    !(crmLeadCount.count ?? 0) ? "CRM Pipeline exists but has no lead records yet." : "",
+    !(crmLeadCount.count ?? 0) ? "Customer pipeline context exists but has no lead records yet." : "",
     !(sopCount.count ?? 0) ? "SOP Library exists but has no SOP records yet." : "",
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
     pendingImports.length ? `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"} are waiting for review or approval.` : "",
-    (overdueTasks.count ?? 0) ? `${overdueTasks.count} follow-up${overdueTasks.count === 1 ? "" : "s"} are overdue.` : "",
+    (overdueTasks.count ?? 0) ? `${overdueTasks.count} source-system signal${overdueTasks.count === 1 ? "" : "s"} are overdue.` : "",
     (openIssues.count ?? 0) ? `${openIssues.count} issue${openIssues.count === 1 ? "" : "s"} are open.` : ""
   ].filter(Boolean);
 
@@ -306,10 +306,10 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     workspace: workspace.data,
     workspace_awareness_rules: [
       "Do not recommend creating a Vaeroex module that already exists in module_state.",
-      "If a module exists, recommend improving, filling, reviewing, cleaning, converting, assigning, or using existing records.",
-      "Mention the specific existing workspace records, counts, gaps, overdue work, stale items, file analyses, reports, KPIs, CRM records, SOPs, checklists, issues, follow-ups, assets, or people records that support the recommendation.",
-      "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Convert Insight Into Action, Operational Risk, Dashboard / KPI Improvement, CRM / Revenue Improvement, SOP / Process Improvement, or File / Report Follow-up.",
-      "Never say 'Create KPI Dashboard', 'Create CRM', 'Create follow-up tracking', 'Create SOPs', 'Create reports', or 'Upload files' as a generic recommendation. Vaeroex already has those modules."
+      "If a module exists, treat it as source context for analysis and recommend leadership review, evidence gathering, or portable documents.",
+      "Mention the specific existing workspace records, counts, gaps, overdue source-system signals, stale items, file analyses, reports, KPIs, customer pipeline records, SOPs, checklists, issues, assets, or people records that support the recommendation.",
+      "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Leadership Review, Business Risk, Dashboard / KPI Improvement, Customer Pipeline / Revenue Improvement, SOP / Process Improvement, or File / Report Review.",
+      "Never say 'Create KPI Dashboard', 'Create CRM', 'Create follow-up tracking', 'Assign owners', 'Create SOPs', 'Create reports', or 'Upload files' as a generic recommendation. Vaeroex is an intelligence layer, not the system of record."
     ],
     module_state: moduleState,
     workspace_gaps: gaps,

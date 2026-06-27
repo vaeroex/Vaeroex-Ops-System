@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Route } from "next";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
-import { AssignmentPanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CopyVaeroexResultButton } from "@/components/ai/CopyVaeroexResultButton";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -57,7 +56,7 @@ const WORKFLOW_GROUPS: Array<{
   },
   {
     title: "Operations Reviews",
-    description: "Find bottlenecks, accountability gaps, and practical follow-up work in the active workspace.",
+    description: "Find bottlenecks, responsibility gaps, evidence, and executive review needs in the active workspace.",
     keys: ["operations_audit", "bottleneck_detector", "follow_up"]
   },
   {
@@ -79,7 +78,7 @@ const WORKFLOW_CHOICES: Array<{
   },
   {
     label: "Find Focus",
-    description: "Top priorities with evidence and ownership.",
+    description: "Top priorities with evidence and confidence.",
     workflowKey: "focus_priorities"
   },
   {
@@ -89,7 +88,7 @@ const WORKFLOW_CHOICES: Array<{
   },
   {
     label: "Prepare Meeting",
-    description: "Weekly agenda, decisions, and assignments.",
+    description: "Weekly agenda, decisions, and review questions.",
     workflowKey: "weekly_management_meeting"
   },
   {
@@ -103,8 +102,8 @@ const WORKFLOW_CHOICES: Array<{
     workflowKey: "weekly_report"
   },
   {
-    label: "Generate Action Plan",
-    description: "Turn loose concerns into a reviewable action plan.",
+    label: "Generate Improvement Plan",
+    description: "Turn loose concerns into a reviewable improvement plan.",
     workflowKey: "follow_up"
   },
   {
@@ -242,18 +241,18 @@ function workflowDataUsed(key: VaeroexWorkflowKey) {
   }
 
   if (key === "weekly_report" || key === "daily_summary" || key === "business_review_package") {
-    return "KPIs, follow-ups, issues, CRM context, reports, Vaeroex runs";
+    return "KPIs, source-system signals, issues, customer pipeline context, reports, Vaeroex runs";
   }
 
   if (key === "sop_generator" || key === "form_builder" || key === "checklist_builder") {
-    return "Existing SOPs, forms, checklists, issues, follow-ups";
+    return "Existing SOPs, forms, checklists, issues, source-system signals";
   }
 
   if (key === "ceo_mode" || key === "focus_priorities" || key === "risk_simulation" || key === "weekly_management_meeting") {
-    return "Workspace health, risks, KPIs, decisions, ownership, business memory";
+    return "Workspace health, risks, KPIs, decisions, responsibility signals, business memory";
   }
 
-  return "Workspace records, ownership, issues, follow-ups, files, reports";
+  return "Workspace records, responsibility signals, issues, source-system signals, files, reports";
 }
 
 function resultTitle(output: JsonRecord, fallback: string) {
@@ -284,7 +283,7 @@ function formatBusinessItem(item: unknown, fallback: string) {
     str(record.notes);
   const owner = str(record.owner) || str(record.assigned_role);
   const timing = str(record.timing) || str(record.due_date_recommendation) || str(record.frequency);
-  const tail = unique([owner ? `Owner: ${owner}` : "", timing ? `Timing: ${timing}` : ""]).join(" - ");
+  const tail = unique([owner ? `Responsible: ${owner}` : "", timing ? `Review timing: ${timing}` : ""]).join(" - ");
 
   if (detail && detail !== title) {
     return tail ? `${title}: ${detail} (${tail})` : `${title}: ${detail}`;
@@ -313,12 +312,12 @@ function businessSections(output: JsonRecord) {
     "main_bottlenecks",
     "bottlenecks",
     "accountability_gaps",
+    "responsibility_gaps",
     "risks"
   ]);
   const actions = collectItems(output, [
     "recommended_actions",
     "suggested_tasks",
-    "follow_up_tasks",
     "tasks",
     "thirty_day_action_plan",
     "manager_actions"
@@ -338,8 +337,8 @@ function businessSections(output: JsonRecord) {
   return {
     executiveSummary,
     problems: problems.length ? problems : ["No major problems were identified from the available workspace context."],
-    actions: actions.length ? actions : ["Review the draft, choose the first priority, and assign an owner."],
-    systems: systems.length ? systems : ["Accountability dashboard", "Follow-up system", "Weekly management review"]
+    actions: actions.length ? actions : ["Review the draft, choose the first executive recommendation, and discuss it with the responsible manager."],
+    systems: systems.length ? systems : ["Executive briefing", "Improvement plan", "Weekly leadership review"]
   };
 }
 
@@ -367,7 +366,7 @@ function outputReasoning(output: JsonRecord) {
     str(output.why_this_recommendation) ||
     str(output.why_vaeroex_surfaced_this) ||
     str(output.why_it_matters) ||
-    "Vaeroex surfaced this because the available workspace context points to a practical visibility, accountability, risk, or execution decision."
+    "Vaeroex surfaced this because the available workspace context points to a practical visibility, responsibility, risk, or executive decision."
   );
 }
 
@@ -412,7 +411,7 @@ function resultCopyText(title: string, output: JsonRecord, run: { agent_type: st
     "## Problems Identified",
     ...sections.problems.map((item) => `- ${item}`),
     "",
-    "## Recommended Actions",
+    "## Executive Recommendations",
     ...sections.actions.map((item) => `- ${item}`),
     "",
     "## Suggested Systems",
@@ -439,7 +438,7 @@ function inferRelatedModule(text: string) {
   if (normalized.includes("report") || normalized.includes("briefing")) return "Briefings";
   if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Sources";
   if (normalized.includes("issue") || normalized.includes("risk")) return "Issues";
-  return "Actions";
+  return "Executive Review";
 }
 
 function moduleHref(moduleName: string): Route {
@@ -479,14 +478,14 @@ function getActionableRecommendations(output: JsonRecord) {
       str(record.reason_this_matters) ||
       str(record.impact) ||
       str(record.description) ||
-      "This recommendation can improve accountability, visibility, or follow-through.";
+      "This recommendation can improve visibility, decision quality, or leadership review.";
     const relatedModule = str(record.related_module) || str(record.module) || inferRelatedModule(`${title} ${why} ${str(record.category)}`);
 
     return {
       id: `${title}-${index}`,
       title,
       priority: str(record.priority, "Medium"),
-      owner: str(record.suggested_owner) || str(record.owner) || str(record.assigned_role, "Manager"),
+      owner: str(record.suggested_owner) || str(record.owner) || str(record.assigned_role, "Responsible manager"),
       dueDate:
         str(record.suggested_due_date) ||
         str(record.recommended_due_date) ||
@@ -507,12 +506,12 @@ function getTaskDrafts(output: JsonRecord) {
     const record = asRecord(task);
 
     return {
-      title: str(record.title, typeof task === "string" ? task : `Recommended follow-up ${index + 1}`),
+      title: str(record.title, typeof task === "string" ? task : `Recommended review ${index + 1}`),
       description:
         str(record.description) ||
         str(record.reason_this_matters) ||
         str(record.recommended_action) ||
-        "Review this recommendation and assign an owner.",
+        "Review this recommendation with the responsible manager.",
       priority: str(record.priority, "Medium"),
       category: str(record.category, "Execution"),
       timing: str(record.due_date_recommendation) || str(record.recommended_due_date) || str(record.due_date)
@@ -662,13 +661,11 @@ function ResultList({ title, items }: { title: string; items: string[] }) {
 function RecommendationCard({
   recommendation,
   runId,
-  runTitle,
-  people
+  runTitle
 }: {
   recommendation: ReturnType<typeof getActionableRecommendations>[number];
   runId: string;
   runTitle: string;
-  people: TeamPersonOption[];
 }) {
   const recommendationOutputType = recommendation.relatedModule.toLowerCase().includes("issue") || recommendation.relatedModule.toLowerCase().includes("risk") ? "risk_brief" : "action_plan";
   const outputHref = generatedOutputHref({
@@ -695,13 +692,13 @@ function RecommendationCard({
         </div>
         <div>
           <dt className="font-semibold text-slate-100">Internal tracking</dt>
-          <dd className="mt-1">Optional after review</dd>
+          <dd className="mt-1">Handled in your existing systems</dd>
         </div>
       </dl>
       <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Link href={outputHref} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70">
-          {recommendationOutputType === "risk_brief" ? "Generate Risk Brief" : "Generate Action Plan"}
+          {recommendationOutputType === "risk_brief" ? "Generate Risk Brief" : "Generate Improvement Plan"}
         </Link>
         <Link href={generatedOutputHref({ type: "executive_briefing", title: recommendation.title, summary: recommendation.why, remedy: recommendation.why, run: runId })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
           Generate Executive Briefing
@@ -720,36 +717,9 @@ function RecommendationCard({
           </button>
         </form>
       </div>
-      <details className="mt-4 rounded-lg border border-white/10 bg-slate-950/45 p-3">
-        <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: convert to internal action record</summary>
-        <div className="mt-3 grid gap-3">
-          <Link href={moduleHref(recommendation.relatedModule)} className="w-fit rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-            Open {recommendation.relatedModule}
-          </Link>
-          <AssignmentPanel
-            sourceType="vaeroex_recommendation"
-            sourceId={runId}
-            sourceTitle={recommendation.title}
-            relatedModule={recommendation.relatedModule}
-            returnPath={`/app/ask?run=${runId}`}
-            actionHref={`/app/ask?run=${runId}`}
-            people={people}
-            defaultTitle={recommendation.title}
-            defaultDescription={recommendation.why}
-            defaultRole={recommendation.owner}
-            compact
-          />
-          <ShareRecordPanel
-            sourceType="vaeroex_recommendation"
-            sourceId={runId}
-            sourceTitle={recommendation.title}
-            relatedModule={recommendation.relatedModule}
-            returnPath={`/app/ask?run=${runId}`}
-            actionHref={`/app/ask?run=${runId}`}
-            people={people}
-          />
-        </div>
-      </details>
+      <Link href={moduleHref(recommendation.relatedModule)} className="mt-4 inline-flex w-fit rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
+        Open related source context
+      </Link>
     </article>
   );
 }
@@ -758,12 +728,10 @@ function RecommendationActionCards({
   recommendations,
   runId,
   runTitle,
-  people
 }: {
   recommendations: ReturnType<typeof getActionableRecommendations>;
   runId: string;
   runTitle: string;
-  people: TeamPersonOption[];
 }) {
   if (!recommendations.length) {
     return null;
@@ -775,9 +743,9 @@ function RecommendationActionCards({
     <div className="rounded-lg border border-white/10 bg-[#08111f] p-4">
       <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
         <div>
-          <h4 className="text-sm font-semibold text-white">Top Recommendation</h4>
+          <h4 className="text-sm font-semibold text-white">Top Executive Recommendation</h4>
           <p className="mt-1 text-sm leading-6 text-slate-400">
-            Generate a clear output first. Saving or converting records is optional.
+            Generate a clear output first. Execution should stay in the systems your company already uses.
           </p>
         </div>
         <Link href="/app/ask" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
@@ -785,7 +753,7 @@ function RecommendationActionCards({
         </Link>
       </div>
       <div className="mt-4">
-        <RecommendationCard recommendation={primary} runId={runId} runTitle={runTitle} people={people} />
+        <RecommendationCard recommendation={primary} runId={runId} runTitle={runTitle} />
       </div>
       {remaining.length ? (
         <details className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3">
@@ -794,7 +762,7 @@ function RecommendationActionCards({
           </summary>
           <div className="mt-3 grid gap-3 lg:grid-cols-2">
             {remaining.map((recommendation) => (
-              <RecommendationCard key={recommendation.id} recommendation={recommendation} runId={runId} runTitle={runTitle} people={people} />
+              <RecommendationCard key={recommendation.id} recommendation={recommendation} runId={runId} runTitle={runTitle} />
             ))}
           </div>
         </details>
@@ -866,7 +834,7 @@ function TaskDraftSection({ tasks }: { tasks: ReturnType<typeof getTaskDrafts> }
 
   return (
     <div className="rounded-lg border border-line bg-white p-4">
-      <h4 className="text-sm font-semibold">Follow-up Drafts</h4>
+      <h4 className="text-sm font-semibold">Review Drafts</h4>
       <div className="mt-3 space-y-3">
         {tasks.map((task) => (
           <article key={`${task.title}-${task.description}`} className="rounded-lg border border-line bg-slate-50 p-3">
@@ -1011,7 +979,7 @@ function ReportDraftSection({ reports }: { reports: ReturnType<typeof getReportD
   );
 }
 
-function BusinessResult({ output, runId, runTitle, people }: { output: JsonRecord; runId: string; runTitle: string; people: TeamPersonOption[] }) {
+function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId: string; runTitle: string }) {
   const visibleOutput = displayOutput(output);
   const sections = businessSections(visibleOutput);
   const tasks = getTaskDrafts(visibleOutput);
@@ -1036,7 +1004,7 @@ function BusinessResult({ output, runId, runTitle, people }: { output: JsonRecor
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr_.7fr]">
         <ResultList title="Top Problems" items={topProblems} />
         <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-          <h4 className="text-sm font-semibold text-white">Top Recommended Action</h4>
+          <h4 className="text-sm font-semibold text-white">Top Executive Recommendation</h4>
           <p className="mt-3 text-sm font-semibold leading-6 text-cyan-100">{topAction}</p>
           <p className="mt-2 text-sm leading-6 text-slate-300">{topActionWhy}</p>
         </div>
@@ -1046,12 +1014,12 @@ function BusinessResult({ output, runId, runTitle, people }: { output: JsonRecor
         </div>
       </div>
 
-      <RecommendationActionCards recommendations={recommendations} runId={runId} runTitle={runTitle} people={people} />
+      <RecommendationActionCards recommendations={recommendations} runId={runId} runTitle={runTitle} />
 
       {hasRecordDrafts ? (
         <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
           <summary className="cursor-pointer text-sm font-semibold text-slate-100">
-            View suggested follow-ups, SOPs, forms, or checklists
+            View suggested documents, SOPs, forms, or checklists
           </summary>
           <div className="mt-4 space-y-4">
             <TaskDraftSection tasks={tasks} />
@@ -1277,13 +1245,11 @@ function SelectedResult({
   output,
   canViewDebug,
   debugMode,
-  people
 }: {
   run: { id: string; agent_type: string; status: string; created_at: string; error_message: string | null; input_json: Json; output_json: Json };
   output: JsonRecord;
   canViewDebug: boolean;
   debugMode: boolean;
-  people: TeamPersonOption[];
 }) {
   const display = displayOutput(output);
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
@@ -1316,7 +1282,7 @@ function SelectedResult({
         {run.status !== "failed" && run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
         {run.status === "completed" ? (
           <>
-            <BusinessResult output={output} runId={run.id} runTitle={title} people={people} />
+            <BusinessResult output={output} runId={run.id} runTitle={title} />
             <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
               <summary className="cursor-pointer text-sm font-semibold text-slate-100">View evidence</summary>
               <div className="mt-4 space-y-4">
@@ -1326,11 +1292,11 @@ function SelectedResult({
             </details>
             <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
               <p className="text-sm font-semibold">Result actions</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Generate a clean output from this result, copy it, or ask a follow-up. Internal records are optional.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Generate a clean output from this result, copy it, or ask a follow-up. Execution stays in your existing systems.</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <CopyVaeroexResultButton text={resultCopyText(title, display, run)} />
                 <Link href={generatedOutputHref({ type: "action_plan", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Generate Action Plan
+                  Generate Improvement Plan
                 </Link>
                 <Link href={generatedOutputHref({ type: "executive_briefing", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
                   Generate Executive Briefing
@@ -1444,17 +1410,15 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const [{ data: runs, error }, folderResult, peopleResult] = await Promise.all([
+  const [{ data: runs, error }, folderResult] = await Promise.all([
     supabase
       .from("ai_agent_runs")
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(30),
-    getRecordFolders(supabase, workspaceId, "ai_agent_runs"),
-    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
+    getRecordFolders(supabase, workspaceId, "ai_agent_runs")
   ]);
-  const people = (peopleResult.data || []) as TeamPersonOption[];
   const runParam = typeof params?.run === "string" ? params.run : "";
   const selectedRun = runParam ? runs?.find((run) => run.id === runParam) ?? null : null;
   const selectedOutput = selectedRun ? asRecord(selectedRun.output_json) : {};
@@ -1464,7 +1428,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const requestedWorkflowKey = typeof params?.workflow === "string" ? params.workflow : "ask_vaeroex";
   const selectedWorkflow = requestedWorkflowKey ? getVaeroexWorkflow(requestedWorkflowKey) : null;
   const pageErrorMessage = friendlyHubError(
-    (selectedRun ? undefined : (params?.error as string | undefined)) || error?.message || folderResult.error?.message || peopleResult.error?.message
+    (selectedRun ? undefined : (params?.error as string | undefined)) || error?.message || folderResult.error?.message
   );
   const managedRuns = (runs || []).map((run) => {
     const management = managedValues(run);
@@ -1497,7 +1461,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       },
       children:
         run.status === "completed" ? (
-          <BusinessResult output={display} runId={run.id} runTitle={resultTitle(display, vaeroexResultLabel(run.agent_type))} people={people} />
+          <BusinessResult output={display} runId={run.id} runTitle={resultTitle(display, vaeroexResultLabel(run.agent_type))} />
         ) : (
           <ErrorNotice message={friendlyHubError(run.error_message) || "This run has not completed yet."} />
         )
@@ -1573,7 +1537,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         </section>
 
         {selectedRun ? (
-          <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} people={people} />
+          <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">

@@ -44,7 +44,7 @@ export type GeneratedOutputCoverageSummary = {
 };
 
 const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
-  action_plan: "Generated Action Plan",
+  action_plan: "Generated Improvement Plan",
   risk_brief: "Generated Risk Brief",
   checklist: "Generated Checklist Draft",
   sop: "Generated SOP Draft",
@@ -52,7 +52,7 @@ const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
 };
 
 const OUTPUT_NAMES: Record<GeneratedOutputType, string> = {
-  action_plan: "Action Plan",
+  action_plan: "Improvement Plan",
   risk_brief: "Risk Brief",
   checklist: "Checklist Draft",
   sop: "SOP Draft",
@@ -210,7 +210,7 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
       source.summary,
       "",
       "## When To Use It",
-      "Use this when leadership wants a repeatable review before turning the recommendation into internal work.",
+      "Use this when leadership wants a repeatable review before discussing the recommendation with the responsible manager or source-system owner.",
       "",
       "## Checklist Steps",
       numberedList([
@@ -218,7 +218,7 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
         "Check the supporting evidence before making a decision.",
         "Decide whether the issue is urgent, important, or informational.",
         "Identify the simplest remedy that reduces risk or improves visibility.",
-        "Record the outcome in a briefing or convert it to an internal action only if follow-through must be tracked."
+        "Record the outcome in a briefing or document the decision in your existing operating system."
       ]),
       "",
       "## Evidence",
@@ -272,7 +272,7 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
       "## Top Opportunity",
       topOpportunity ? `${topOpportunity.title}: ${topOpportunity.summary}` : "No clear opportunity signal is strong enough yet.",
       "",
-      "## Recommended Actions",
+      "## Executive Recommendations",
       bulletList(
         [topRecommendation?.recommendedAction, source.recommendedAction]
           .filter((item): item is string => Boolean(item))
@@ -291,10 +291,10 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
     "## Why It Matters",
     source.why,
     "",
-    "## Recommended Steps",
+    "## Executive Review Steps",
     numberedList([
       "Review the evidence behind this Vaeroex recommendation.",
-      "Decide whether the recommendation should become an internal action or remain as a leadership note.",
+      "Decide whether the recommendation should become an executive report, meeting agenda, SOP, checklist, or improvement plan.",
       source.recommendedAction,
       "Save the final output to Briefings if leadership needs a record.",
       "Review the outcome during the next leadership check-in."

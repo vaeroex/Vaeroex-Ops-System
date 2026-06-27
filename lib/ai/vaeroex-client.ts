@@ -88,7 +88,7 @@ function normalizeVaeroexOutput(value: Json): Json {
           ...asArray(output.suggested_tasks),
           ...asArray(output.thirty_day_action_plan)
         ]
-      : ["Review this draft, choose the highest-priority next action, and assign an owner."];
+      : ["Review this draft, identify the highest-priority executive recommendation, and discuss it with the responsible manager."];
   const suggestedSystems =
     asArray(output.suggested_systems).length ||
     asArray(output.recommended_systems_to_build).length ||
@@ -100,7 +100,7 @@ function normalizeVaeroexOutput(value: Json): Json {
           ...asArray(output.suggested_forms),
           ...asArray(output.suggested_checklists)
         ]
-      : ["Accountability dashboard", "Follow-up system", "Manager review cadence"];
+      : ["Executive briefing", "Improvement plan", "Manager review cadence"];
 
   return {
     ...output,

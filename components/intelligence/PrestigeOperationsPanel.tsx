@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import {
-  acceptPrestigeRecommendationAction,
   createBusinessDecisionAction,
   createBusinessReviewPackageAction,
   createKpiAlertFromPrestigeAction,
@@ -143,7 +142,7 @@ export function BusinessHealthHero({
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Primary focus</p>
             <p className="mt-3 text-2xl font-semibold">{focus}</p>
-            <p className="mt-1 text-sm text-slate-100">Start here before adding more work to the team.</p>
+            <p className="mt-1 text-sm text-slate-100">Start here before asking teams to review source-system problems.</p>
           </article>
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Weekly change</p>
@@ -153,7 +152,7 @@ export function BusinessHealthHero({
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4 sm:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Monthly change</p>
             <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.label}</p>
-            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, CRM movement, follow-ups, issues, files, and reports before calling a trend.</p>
+            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, customer pipeline movement, source-system activity, issues, files, and reports before calling a trend.</p>
           </article>
         </div>
       </div>
@@ -196,7 +195,7 @@ function ActionButtons({
   return (
     <div className="flex flex-wrap gap-2">
       <Link href={generatedOutputHref({ type: "action_plan", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-        Generate Action Plan
+        Generate Improvement Plan
       </Link>
       {showReport ? (
         <Link href={generatedOutputHref({ type: "executive_briefing", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
@@ -206,7 +205,7 @@ function ActionButtons({
       {showAlert ? (
         <form action={createKpiAlertFromPrestigeAction}>
           <input type="hidden" name="return_path" value={returnPath} />
-          <input type="hidden" name="kpi_name" value={item.relatedModule === "CRM" ? "Conversion Rate" : item.relatedModule} />
+          <input type="hidden" name="kpi_name" value={item.relatedModule === "Customer Pipeline" ? "Conversion Rate" : item.relatedModule} />
           <input type="hidden" name="owner" value={item.owner} />
           <input type="hidden" name="priority" value={item.priority} />
           <ConfirmSubmitButton message={`Create a KPI alert from "${item.title}"?`} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
@@ -223,28 +222,9 @@ function ActionButtons({
         <input type="hidden" name="related_module" value={item.relatedModule} />
         <button className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">Dismiss</button>
       </form>
-      <details className="w-full rounded-lg border border-line bg-white/70 p-3">
-        <summary className="cursor-pointer text-xs font-semibold text-ink">Advanced: convert to internal follow-up</summary>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <form action={acceptPrestigeRecommendationAction}>
-            <input type="hidden" name="return_path" value={returnPath} />
-            <input type="hidden" name="title" value={item.title} />
-            <input type="hidden" name="description" value={item.why} />
-            <input type="hidden" name="evidence" value={item.evidence} />
-            <input type="hidden" name="owner" value={item.owner} />
-            <input type="hidden" name="priority" value={item.priority} />
-            <input type="hidden" name="due_date" value={item.dueDate} />
-            <input type="hidden" name="related_module" value={item.relatedModule} />
-            <input type="hidden" name="expected_outcome" value={item.action} />
-            <ConfirmSubmitButton message={`Create an internal follow-up for "${item.title}"?`} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-              Create internal follow-up
-            </ConfirmSubmitButton>
-          </form>
-          <Link href={item.href} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-            Open source area
-          </Link>
-        </div>
-      </details>
+      <Link href={item.href} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
+        Open source area
+      </Link>
     </div>
   );
 }
@@ -281,7 +261,7 @@ function ActionCard({
         </div>
       </div>
       <p className="mt-3 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">
-        <span className="font-semibold text-ink">Recommended:</span> {item.action}
+        <span className="font-semibold text-ink">Executive recommendation:</span> {item.action}
       </p>
       <details className="mt-3 rounded-lg border border-white/60 bg-white/70 p-3 text-xs leading-5 text-slate-700">
         <summary className="cursor-pointer font-semibold text-ink">View evidence and reasoning</summary>
@@ -295,7 +275,7 @@ function ActionCard({
             <dd className="mt-1">{item.why}</dd>
           </div>
           <div>
-            <dt className="font-semibold text-ink">Recommended action</dt>
+            <dt className="font-semibold text-ink">Executive recommendation</dt>
             <dd className="mt-1">{item.action}</dd>
           </div>
         </dl>
@@ -303,7 +283,7 @@ function ActionCard({
       {children}
       <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
         <div>
-          <dt className="font-semibold">Owner</dt>
+          <dt className="font-semibold">Responsible manager</dt>
           <dd className="mt-1">{item.owner}</dd>
         </div>
         <div>
@@ -449,7 +429,7 @@ export function PrestigeOperationsPanel({
 
         <IntelligenceAccordion
           title="Profit Leak Detector"
-          description="Revenue and opportunity leakage signals from CRM, KPIs, follow-ups, issues, checklists, SOPs, and files."
+          description="Revenue and opportunity leakage signals from customer pipeline records, KPIs, source-system activity, issues, checklists, SOPs, and files."
           summary={`${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`}
         >
           <div className="mb-4">
@@ -465,7 +445,7 @@ export function PrestigeOperationsPanel({
                 </ActionCard>
               ))
             ) : (
-              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep CRM follow-ups, KPI targets, and ownership records current.</p>
+              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer pipeline records, KPI targets, and responsibility signals current.</p>
             )}
           </div>
         </IntelligenceAccordion>
@@ -487,7 +467,7 @@ export function PrestigeOperationsPanel({
                 <dl className="mt-3 grid gap-2 text-xs leading-5 text-muted">
                   <div><dt className="font-semibold text-ink">What happened?</dt><dd>{moment.whatHappened}</dd></div>
                   <div><dt className="font-semibold text-ink">Cause</dt><dd>{moment.cause}</dd></div>
-                  <div><dt className="font-semibold text-ink">Action taken</dt><dd>{moment.actionTaken}</dd></div>
+                <div><dt className="font-semibold text-ink">Leadership review</dt><dd>{moment.actionTaken}</dd></div>
                   <div><dt className="font-semibold text-ink">Outcome</dt><dd>{moment.outcome}</dd></div>
                 </dl>
                 <Link href={moment.href} className="mt-3 inline-flex text-xs font-semibold text-vaeroex-blue">Open source</Link>
@@ -532,7 +512,7 @@ export function PrestigeOperationsPanel({
                   <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">{card.score}/100</span>
                 </div>
                 <p className="mt-2 text-xs leading-5">{card.explanation}</p>
-                <p className="mt-2 text-xs">Open follow-ups: {card.openTasks} · Overdue: {card.overdueTasks} · Issues: {card.openIssues}</p>
+                <p className="mt-2 text-xs">Open signals: {card.openTasks} · Overdue: {card.overdueTasks} · Issues: {card.openIssues}</p>
               </article>
             ))}
           </div>
@@ -590,7 +570,7 @@ export function PrestigeOperationsPanel({
             <form action={createBusinessDecisionAction} className="grid gap-4 lg:grid-cols-2">
               <input type="hidden" name="return_path" value={returnPath} />
               <TextInput label="Decision title" name="title" required />
-              <TextInput label="Owner" name="owner" />
+              <TextInput label="Responsible leader" name="owner" />
               <TextInput label="Related KPI" name="related_kpi" />
               <TextInput label="Review date" name="review_date" type="date" />
               <SelectInput label="Status" name="status" options={decisionStatuses} defaultValue="open" />
@@ -614,7 +594,7 @@ export function PrestigeOperationsPanel({
                     <StatusBadge value={decision.status} />
                   </div>
                   <p className="mt-2 text-muted">{decision.reason || decision.expected_outcome || "Outcome review pending."}</p>
-                  <p className="mt-2 text-xs text-muted">Owner: {decision.owner || "Not set"} · Review: {decision.review_date || "Not scheduled"}</p>
+                  <p className="mt-2 text-xs text-muted">Responsible leader: {decision.owner || "Not set"} · Review: {decision.review_date || "Not scheduled"}</p>
                 </article>
               ))
             ) : (
@@ -647,7 +627,7 @@ export function PrestigeOperationsPanel({
         >
           <MiniList items={intelligence.meetingMode.agenda} empty="No agenda available." />
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href={generatedOutputHref({ type: "action_plan", title: "Weekly meeting follow-up plan", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Generate Action Plan</Link>
+            <Link href={generatedOutputHref({ type: "action_plan", title: "Weekly leadership improvement plan", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Generate Improvement Plan</Link>
             <Link href={generatedOutputHref({ type: "executive_briefing", title: "Weekly meeting briefing", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold">Generate Executive Briefing</Link>
           </div>
         </IntelligenceAccordion>
@@ -696,7 +676,7 @@ export function PrestigeOperationsPanel({
 
         <IntelligenceAccordion
           title="Business Review Package"
-          description="Owner, leadership, bank, investor, franchise, or quarterly review package."
+          description="Executive, leadership, bank, investor, franchise, or quarterly review package."
           summary={`${intelligence.businessReviewPackage.sections.length} review section${intelligence.businessReviewPackage.sections.length === 1 ? "" : "s"} ready to prepare.`}
         >
           <div className="grid gap-3 md:grid-cols-2">
