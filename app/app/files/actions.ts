@@ -1258,7 +1258,7 @@ ${risks.length ? risks.map((item) => `- ${item}`).join("\n") : "- No clear risks
 ## Issues
 ${issues.length ? issues.map((item) => `- ${item}`).join("\n") : "- No specific issues were found in the extracted content."}
 
-## Recommended Actions
+## Executive Recommendations
 ${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the findings and decide which actions should be assigned."}
 
 ## Suggested Systems
@@ -1279,15 +1279,15 @@ function ensureFileReportSections(body: string, file: FileUploadRow, extraction:
     },
     {
       heading: "Risks",
-      body: "- Review the report body for customer, staffing, revenue, follow-up, quality, or process risks."
+      body: "- Review the report body for customer, staffing, revenue, response quality, service quality, or process risks."
     },
     {
       heading: "Issues",
-      body: "- Review the report body for bottlenecks, missing ownership, unclear follow-up, delays, or repeated process gaps."
+      body: "- Review the report body for bottlenecks, unclear source context, response delays, or repeated process gaps."
     },
     {
-      heading: "Recommended Actions",
-      body: "- Assign the highest-priority follow-ups and save approved metrics into Vaeroex history when useful."
+      heading: "Executive Recommendations",
+      body: "- Identify the highest-priority leadership review items and save approved metrics into Vaeroex history when useful."
     },
     {
       heading: "Source File",
@@ -1354,7 +1354,7 @@ ${analysisSummary || "Vaeroex reviewed this file and prepared a report from the 
 - Confirm any high-impact findings before assigning work or changing records.
 
 ## Issues
-- Look for repeated delays, missed follow-up, unclear ownership, missing checklists, or untracked metrics.
+- Look for repeated delays, response gaps, unclear source context, missing checklists, or untracked metrics.
 
 ## File Details
 - Original name: ${file.original_name}

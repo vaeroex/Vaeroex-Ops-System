@@ -249,10 +249,10 @@ function workflowDataUsed(key: VaeroexWorkflowKey) {
   }
 
   if (key === "ceo_mode" || key === "focus_priorities" || key === "risk_simulation" || key === "weekly_management_meeting") {
-    return "Workspace health, risks, KPIs, decisions, responsibility signals, business memory";
+    return "Workspace health, risks, KPIs, decisions, source-system signals, business memory";
   }
 
-  return "Workspace records, responsibility signals, issues, source-system signals, files, reports";
+  return "Workspace records, source-system signals, issues, files, reports";
 }
 
 function resultTitle(output: JsonRecord, fallback: string) {
@@ -281,9 +281,9 @@ function formatBusinessItem(item: unknown, fallback: string) {
     str(record.evidence) ||
     str(record.root_cause) ||
     str(record.notes);
-  const owner = str(record.owner) || str(record.assigned_role);
-  const timing = str(record.timing) || str(record.due_date_recommendation) || str(record.frequency);
-  const tail = unique([owner ? `Responsible: ${owner}` : "", timing ? `Review timing: ${timing}` : ""]).join(" - ");
+  const evidence = str(record.evidence) || str(record.reasoning);
+  const confidence = str(record.confidence);
+  const tail = unique([evidence ? `Evidence: ${evidence}` : "", confidence ? `Confidence: ${confidence}` : ""]).join(" - ");
 
   if (detail && detail !== title) {
     return tail ? `${title}: ${detail} (${tail})` : `${title}: ${detail}`;
@@ -337,7 +337,7 @@ function businessSections(output: JsonRecord) {
   return {
     executiveSummary,
     problems: problems.length ? problems : ["No major problems were identified from the available workspace context."],
-    actions: actions.length ? actions : ["Review the draft, choose the first executive recommendation, and discuss it with the responsible manager."],
+    actions: actions.length ? actions : ["Review the draft, choose the first executive recommendation, and decide what leadership should examine next."],
     systems: systems.length ? systems : ["Executive briefing", "Improvement plan", "Weekly leadership review"]
   };
 }
@@ -511,10 +511,10 @@ function getTaskDrafts(output: JsonRecord) {
         str(record.description) ||
         str(record.reason_this_matters) ||
         str(record.recommended_action) ||
-        "Review this recommendation with the responsible manager.",
+        "Review this recommendation as an executive intelligence signal.",
       priority: str(record.priority, "Medium"),
-      category: str(record.category, "Execution"),
-      timing: str(record.due_date_recommendation) || str(record.recommended_due_date) || str(record.due_date)
+      category: str(record.category, "Executive review"),
+      timing: str(record.timing) || str(record.review_cadence)
     };
   });
 }
@@ -698,7 +698,7 @@ function RecommendationCard({
       <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Link href={outputHref} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70">
-          {recommendationOutputType === "risk_brief" ? "Generate Risk Brief" : "Generate Improvement Plan"}
+          {recommendationOutputType === "risk_brief" ? "Generate Investigation Summary" : "Generate Improvement Plan"}
         </Link>
         <Link href={generatedOutputHref({ type: "executive_briefing", title: recommendation.title, summary: recommendation.why, remedy: recommendation.why, run: runId })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
           Generate Executive Briefing
@@ -1161,7 +1161,7 @@ function failureReasons(input: JsonRecord, message?: string | null) {
   }
 
   if (!hasAnyData) {
-    reasons.push("This workspace has little or no KPI, report, file, issue, follow-up, or business-memory context yet.");
+    reasons.push("This workspace has little or no KPI, report, file, issue, source-signal, or business-memory context yet.");
   }
 
   if (!numberValue(metrics.kpi_history_records)) {
@@ -1302,7 +1302,7 @@ function SelectedResult({
                   Generate Executive Briefing
                 </Link>
                 <Link href={generatedOutputHref({ type: "risk_brief", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Generate Risk Brief
+                  Generate Investigation Summary
                 </Link>
                 <Link
                   href={`/app/ask?prompt=${encodeURIComponent(`Follow up on this Vaeroex result: ${title}`)}` as Route}

@@ -252,7 +252,7 @@ function taskDrafts(output: JsonRecord) {
       str(record.description) ||
       str(record.reason_this_matters) ||
       str(record.recommended_action) ||
-      "Review this Vaeroex recommendation with the responsible manager.";
+      "Review this Vaeroex recommendation as an executive intelligence signal.";
 
     return {
       title,
@@ -310,7 +310,7 @@ function checklistDrafts(output: JsonRecord) {
       category: str(record.category, "Operations"),
       frequency: str(record.frequency, "As needed"),
       assigned_role: str(record.assigned_role, str(record.owner_role, "Manager")),
-      items_json: (items.length ? items : ["Review evidence", "Confirm responsible manager", "Document decision", "Submit for manager review"]) as Json
+      items_json: (items.length ? items : ["Review evidence", "Document decision", "Identify source-system implications", "Prepare leadership review"]) as Json
     };
   });
 }

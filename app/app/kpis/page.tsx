@@ -1334,7 +1334,7 @@ function ComparisonAnalysis({
         </div>
         <ContextualAskVaeroex
           label="Explain This Comparison"
-          prompt="Analyze this KPI comparison for leadership. Return a concise executive analytics briefing with: Executive Summary, Key Relationships, Biggest Trend, Biggest Risk, Biggest Opportunity, Forecast only if confidence is sufficient, Confidence Score, Data Limitations, Recommended Actions, and Follow-up Questions. Explain why the relationships matter for business decisions. Do not overstate certainty when the data is limited."
+          prompt="Analyze this KPI comparison for leadership. Return a concise executive analytics briefing with: Executive Summary, Key Relationships, Biggest Trend, Biggest Risk, Biggest Opportunity, Forecast only if confidence is sufficient, Confidence Score, Data Limitations, Executive Recommendations, and Follow-up Questions. Explain why the relationships matter for business decisions. Do not overstate certainty when the data is limited."
           contextType="kpi_comparison"
           contextId={`kpi-comparison-${context.comparedKpis.join("-")}-${mode}`}
           sourceTitle="KPI comparison"

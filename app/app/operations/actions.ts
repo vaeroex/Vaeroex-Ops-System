@@ -228,11 +228,11 @@ export async function convertSubmissionToTaskAction(formData: FormData) {
 
   const { error } = await supabase.from("tasks").insert({
     workspace_id: workspaceId,
-    title: `Follow up: ${submission.submitter_name || "Form submission"}`,
-    description: submission.ai_summary || "Review form submission and confirm next action.",
+    title: `Source signal: ${submission.submitter_name || "Form submission"}`,
+    description: submission.ai_summary || "Review form submission as source evidence.",
     status: "To Do",
     priority: submission.ai_detected_priority || "Medium",
-    category: "Form follow-up",
+    category: "Form source signal",
     related_type: "form_submission",
     related_id: submission.id,
     ai_generated: true,
@@ -246,7 +246,7 @@ export async function convertSubmissionToTaskAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app/form-submissions");
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Follow-up created.");
+  redirectWithMessage(path, "Source signal created.");
 }
 
 export async function createChecklistAction(formData: FormData) {
@@ -314,8 +314,8 @@ export async function createTaskAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace(path);
   const title = text(formData, "title");
 
-  requireValue(path, "Follow-up title", title);
-  validateLength(path, "Follow-up description", text(formData, "description"), 2000);
+  requireValue(path, "Signal title", title);
+  validateLength(path, "Signal description", text(formData, "description"), 2000);
 
   const { error } = await supabase.from("tasks").insert({
     workspace_id: workspaceId,
@@ -336,7 +336,7 @@ export async function createTaskAction(formData: FormData) {
   }
 
   revalidatePath(path);
-  redirectWithMessage(path, "Follow-up created.");
+  redirectWithMessage(path, "Source signal created.");
 }
 
 export async function updateTaskStatusAction(formData: FormData) {
@@ -731,7 +731,7 @@ export async function convertIssueToTaskAction(formData: FormData) {
 
   revalidatePath(path);
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Resolution follow-up created.");
+  redirectWithMessage(path, "Source signal created.");
 }
 
 export async function createAssetAction(formData: FormData) {

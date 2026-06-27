@@ -230,7 +230,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       exists: true,
       records: crmLeadCount.count ?? 0,
       statuses: countByStatus(recentLeadRows),
-      guidance: "Customer pipeline records already exist as source context. Recommend reviewing response gaps, status quality, source tracking, or estimated value with the responsible manager."
+      guidance: "Customer pipeline records already exist as source context. Recommend reviewing response gaps, status quality, source tracking, or estimated value with leadership."
     },
     task_tracking: {
       exists: true,
@@ -281,7 +281,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       exists: true,
       records: assetCount.count ?? 0,
       flagged_records: flaggedAssets.count ?? 0,
-      guidance: "Assets already exist as source context. Recommend checks, maintenance review, responsibility signals, locations, or readiness review."
+      guidance: "Assets already exist as source context. Recommend checks, maintenance review, location context, or readiness review."
     },
     people: {
       exists: true,

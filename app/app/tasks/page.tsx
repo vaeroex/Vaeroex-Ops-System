@@ -1,5 +1,4 @@
 import { createTaskAction } from "@/app/app/operations/actions";
-import { AssignmentPanel, AssignmentTargetFields, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -15,51 +14,42 @@ type TasksPageProps = {
 const taskStatuses = ["To Do", "In Progress", "Waiting", "Done"];
 const priorities = ["Low", "Medium", "High", "Urgent"];
 const taskEditFields: ManagedRecordEditField[] = [
-  { name: "title", label: "Follow-up title", required: true },
-  { name: "description", label: "Description", type: "textarea", rows: 4 },
+  { name: "title", label: "Signal title", required: true },
+  { name: "description", label: "Evidence or context", type: "textarea", rows: 4 },
   { name: "status", label: "Status", type: "select", options: taskStatuses },
   { name: "priority", label: "Priority", type: "select", options: priorities },
-  { name: "category", label: "Category" },
-  { name: "assigned_role", label: "Assigned role" },
-  { name: "assigned_department", label: "Assigned department" },
-  { name: "due_date", label: "Due date", type: "date" }
+  { name: "category", label: "Category" }
 ];
 
-function ownerLabel(task: { assigned_person_id?: string | null; assigned_role?: string | null; assigned_department?: string | null; assigned_to?: string | null }, peopleById: Map<string, string>) {
-  if (task.assigned_person_id) return peopleById.get(task.assigned_person_id) || "Assigned person";
-  if (task.assigned_role) return task.assigned_role;
-  if (task.assigned_department) return task.assigned_department;
-  if (task.assigned_to) return "App user";
-  return "Unassigned";
+function sourceLabel(task: { ai_generated?: boolean | null; related_type?: string | null }) {
+  if (task.ai_generated) return "Vaeroex signal";
+  return task.related_type || "Manual source";
 }
 
 export default async function TasksPage({ searchParams }: TasksPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [{ data: tasks, error }, folderResult, peopleResult] = await Promise.all([
+  const [{ data: tasks, error }, folderResult] = await Promise.all([
     supabase
       .from("tasks")
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
-    getRecordFolders(supabase, workspaceId, "tasks"),
-    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
+    getRecordFolders(supabase, workspaceId, "tasks")
   ]);
 
-  const people = (peopleResult.data || []) as TeamPersonOption[];
-  const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
   const openTasks = (tasks || []).filter((task) => task.status !== "Done");
   const doneTasks = (tasks || []).filter((task) => task.status === "Done");
   const managedTasks = (tasks || []).map((task) => {
     const management = managedValues(task);
-    const owner = ownerLabel(task, peopleById);
+    const source = sourceLabel(task);
 
     return {
       id: task.id,
       title: task.title,
-      type: task.ai_generated ? "Vaeroex follow-up" : "Follow-up",
+      type: task.ai_generated ? "Vaeroex signal" : "Source signal",
       status: task.status,
-      owner,
+      owner: source,
       category: task.category || "General",
       createdAt: task.created_at,
       updatedAt: management.updatedAt || task.updated_at,
@@ -68,12 +58,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       deletedAt: management.deletedAt,
       preview: shortPreview(task.description, "No description."),
       meta: [
-        { label: "Assigned to", value: owner },
-        { label: "Role", value: task.assigned_role || "Not set" },
-        { label: "Department", value: task.assigned_department || "Not set" },
         { label: "Priority", value: task.priority },
-        { label: "Due date", value: task.due_date || "Not set" },
-        { label: "Source", value: task.ai_generated ? "Drafted by Vaeroex" : task.related_type || "Manual" }
+        { label: "Source", value: source },
+        { label: "Status", value: task.status }
       ],
       editFields: taskEditFields,
       editValues: {
@@ -81,26 +68,14 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         description: task.description,
         status: task.status,
         priority: task.priority,
-        category: task.category,
-        assigned_role: task.assigned_role,
-        assigned_department: task.assigned_department,
-        due_date: task.due_date
+        category: task.category
       },
       children: (
         <div className="space-y-4">
           <p className="text-sm leading-6 text-muted">{task.description || "No description."}</p>
-          <AssignmentPanel
-            sourceType="task"
-            sourceId={task.id}
-            sourceTitle={task.title}
-            relatedModule="Tasks"
-            returnPath="/app/tasks"
-            actionHref="/app/tasks"
-            people={people}
-            defaultTitle={task.title}
-            defaultDescription={task.description || ""}
-            defaultRole={task.assigned_role || "Manager"}
-          />
+          <p className="rounded-lg border border-line bg-white p-3 text-sm leading-6 text-muted">
+            Vaeroex treats this as source context for intelligence. Use your existing operating system if this signal requires execution tracking.
+          </p>
         </div>
       )
     };
@@ -109,17 +84,17 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Execution"
-        title="Follow-up Ownership"
-        description="Track accountable follow-ups from manual entry, form submissions, issue logs, setup plans, and Vaeroex-reviewed decision support."
+        eyebrow="Source Context"
+        title="Source Signals"
+        description="Review source-system signals that help Vaeroex understand patterns, risks, and evidence. Execution stays in the systems your business already uses."
       />
 
-      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
       <section className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
         {[
           { label: "Open", value: openTasks.length },
-          { label: "Done", value: doneTasks.length },
+          { label: "Reviewed", value: doneTasks.length },
           { label: "Urgent or high", value: (tasks || []).filter((task) => ["Urgent", "High"].includes(task.priority)).length }
         ].map((item) => (
           <span key={item.label} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
@@ -130,20 +105,15 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       </section>
 
       <section className="space-y-6">
-        <CreateDrawer title="Create follow-up" description="Use follow-ups for the next concrete action, not long notes." triggerLabel="New Follow-up">
+        <CreateDrawer title="Add source signal" description="Capture evidence Vaeroex should consider. Do not use this as a task-management system." triggerLabel="New Signal">
           <form action={createTaskAction} className="grid gap-4 lg:grid-cols-2">
-            <TextInput label="Follow-up title" name="title" required />
-            <TextArea label="Description" name="description" rows={4} />
+            <TextInput label="Signal title" name="title" required />
+            <TextArea label="Evidence or context" name="description" rows={4} />
             <SelectInput label="Status" name="status" defaultValue="To Do" options={taskStatuses} />
             <SelectInput label="Priority" name="priority" defaultValue="Medium" options={priorities} />
-            <TextInput label="Category" name="category" placeholder="Follow-up, safety, onboarding, customer" />
-            <TextInput label="Due date" name="due_date" type="date" />
+            <TextInput label="Category" name="category" placeholder="Customer, risk, operations, financial, process" />
             <div className="lg:col-span-2">
-              <p className="mb-2 text-sm font-medium">Assignment</p>
-              <AssignmentTargetFields people={people} defaultRole="Manager" />
-            </div>
-            <div className="lg:col-span-2">
-              <PrimaryButton>Create follow-up</PrimaryButton>
+              <PrimaryButton>Add source signal</PrimaryButton>
             </div>
           </form>
         </CreateDrawer>
@@ -152,10 +122,10 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           collection="tasks"
           records={managedTasks}
           folders={folderResult.folders}
-          title="Execution records"
-          description="Search, group, edit, archive, duplicate, or bulk-manage follow-up work."
-          emptyTitle="No follow-ups yet"
-          emptyDescription="Create a follow-up manually or convert a submission or issue into accountable work."
+          title="Source signals"
+          description="Search, group, edit, archive, duplicate, or bulk-manage evidence Vaeroex can analyze."
+          emptyTitle="No source signals yet"
+          emptyDescription="Add source context only when it helps Vaeroex understand the business. Use your existing systems for execution."
           searchParams={params}
         />
 

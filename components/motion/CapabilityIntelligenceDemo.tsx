@@ -9,7 +9,7 @@ const capabilities = [
     status: "Current",
     summary: "Structure scattered signals into a clearer view of what is happening.",
     generated: ["Signals grouped", "Source mapped", "Priority surfaced", "Current state summarized"],
-    examples: ["Open items", "KPI movement", "activity changes", "ownership gaps"],
+    examples: ["Open items", "KPI movement", "activity changes", "source gaps"],
     relationship: "Connects raw information to what leaders can actually see."
   },
   {
@@ -25,7 +25,7 @@ const capabilities = [
     status: "Current",
     summary: "Surface changing conditions, repeated friction, unresolved signals, and emerging exposure.",
     generated: ["Risk pattern detected", "Severity estimated", "Affected area found", "Review path suggested"],
-    examples: ["missed follow-ups", "open issues", "delayed work", "below-target metrics"],
+    examples: ["response gaps", "open issues", "delayed signals", "below-target metrics"],
     relationship: "Connects changes to the risk they may create."
   },
   {
@@ -40,17 +40,17 @@ const capabilities = [
     title: "Decision Support",
     status: "Current",
     summary: "Turn context into review-ready recommendations, priorities, and next-step options.",
-    generated: ["Options generated", "Tradeoff framed", "Owner suggested", "Decision queued"],
-    examples: ["review items", "recommended actions", "assignment paths", "leadership decisions"],
+    generated: ["Options generated", "Tradeoff framed", "Evidence summarized", "Decision framed"],
+    examples: ["review items", "executive recommendations", "supporting outputs", "leadership decisions"],
     relationship: "Connects intelligence to human review."
   },
   {
-    title: "Accountability Systems",
+    title: "Source Accountability",
     status: "Current",
-    summary: "Clarify responsibility, response paths, unresolved items, and execution status.",
-    generated: ["Owner located", "Gap identified", "Follow-up prepared", "Status tracked"],
-    examples: ["assigned tasks", "shared reports", "overdue items", "role-based follow-up"],
-    relationship: "Connects action to responsible ownership."
+    summary: "Clarify source context, response paths, unresolved items, and review status.",
+    generated: ["Source located", "Gap identified", "Review prepared", "Outcome compared"],
+    examples: ["shared reports", "unresolved signals", "response gaps", "leadership review"],
+    relationship: "Connects intelligence to evidence and leadership review."
   },
   {
     title: "Performance Intelligence",
@@ -64,8 +64,8 @@ const capabilities = [
     title: "Operational Intelligence",
     status: "Current",
     summary: "Apply intelligence to organizational execution, reviews, workflows, and recurring decisions.",
-    generated: ["Workflow signal read", "Execution gap found", "Process context matched", "Action suggested"],
-    examples: ["SOP reviews", "checklist misses", "task drift", "operating reports"],
+    generated: ["Workflow signal read", "Execution pattern found", "Process context matched", "Output suggested"],
+    examples: ["SOP reviews", "checklist misses", "source drift", "operating reports"],
     relationship: "Connects daily work to the intelligence layer."
   },
   {

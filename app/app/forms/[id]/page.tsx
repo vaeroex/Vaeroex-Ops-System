@@ -39,7 +39,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
       <PageHeader
         eyebrow="Form detail"
         title={form.name}
-        description={form.description || "Review schema, capture submissions, and create follow-ups."}
+        description={form.description || "Review schema, capture submissions, and preserve source evidence."}
         actions={
           <Link href="/app/forms" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Back to forms
@@ -61,7 +61,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
             </div>
             <SelectInput label="Priority" name="priority" defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
             <div className="lg:col-span-2">
-              <TextArea label="Follow-up items, one per line" name="follow_up" rows={4} />
+              <TextArea label="Signals or evidence, one per line" name="follow_up" rows={4} />
             </div>
             <div className="lg:col-span-2">
               <PrimaryButton>Save submission</PrimaryButton>
@@ -73,7 +73,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
           <ReadableData value={form.schema_json} empty="No fields saved." />
         </SectionCard>
 
-        <SectionCard title="Submissions" description="Vaeroex summaries are drafts until a manager confirms the follow-up.">
+        <SectionCard title="Submissions" description="Vaeroex summaries are drafts until leadership reviews the source evidence.">
           {submissions?.length ? (
             <div className="space-y-4">
               {submissions.map((submission) => (
@@ -92,8 +92,8 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
                   <form action={convertSubmissionToTaskAction} className="mt-4">
                     <input type="hidden" name="form_id" value={form.id} />
                     <input type="hidden" name="submission_id" value={submission.id} />
-                    <ConfirmSubmitButton message="Create a follow-up from this submission?">
-                      Create follow-up
+                    <ConfirmSubmitButton message="Create a source signal from this submission?">
+                      Create source signal
                     </ConfirmSubmitButton>
                   </form>
                 </article>

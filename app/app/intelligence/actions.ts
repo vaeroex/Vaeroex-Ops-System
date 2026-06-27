@@ -120,7 +120,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
   const description = text(formData, "description") || text(formData, "evidence") || "Review this Vaeroex recommendation and confirm next action.";
   const priority = text(formData, "priority") || "Medium";
   const dueDate = nullableText(formData, "due_date");
-  const relatedModule = text(formData, "related_module") || "Follow-ups";
+  const relatedModule = text(formData, "related_module") || "Source Signals";
   const owner = nullableText(formData, "owner");
   const { data: task, error: taskError } = await supabase
     .from("tasks")
@@ -141,7 +141,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
     .single();
 
   if (taskError || !task) {
-    redirectWithError(path, taskError?.message || "Follow-up could not be created.");
+    redirectWithError(path, taskError?.message || "Source signal could not be created.");
   }
 
   const { error } = await supabase.from("vaeroex_recommendation_outcomes").insert({
@@ -170,7 +170,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
 
   revalidatePath("/app");
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Recommendation accepted and follow-up created.");
+  redirectWithMessage(path, "Recommendation saved as source context.");
 }
 
 export async function dismissPrestigeRecommendationAction(formData: FormData) {

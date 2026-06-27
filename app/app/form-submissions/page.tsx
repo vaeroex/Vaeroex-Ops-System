@@ -76,7 +76,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
             <input type="hidden" name="return_path" value="/app/form-submissions" />
             <input type="hidden" name="form_id" value={submission.form_id} />
             <input type="hidden" name="submission_id" value={submission.id} />
-            <ConfirmSubmitButton message="Create a follow-up from this submission?">Create follow-up</ConfirmSubmitButton>
+            <ConfirmSubmitButton message="Create a source signal from this submission?">Create source signal</ConfirmSubmitButton>
           </form>
         </div>
       )
@@ -88,7 +88,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       <PageHeader
         eyebrow="Form submissions"
         title="Submission inbox"
-        description="Review business submissions across every form, inspect Vaeroex summary drafts, and create follow-ups when a manager confirms the next action."
+        description="Review business submissions across every form, inspect Vaeroex summary drafts, and capture source signals when the evidence should inform intelligence."
         actions={
           <Link href="/app/forms" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Manage forms
@@ -148,7 +148,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
           records={managedSubmissions}
           folders={folderResult.folders}
           title="Submission records"
-          description="Submissions stay compact until a manager needs details or follow-up actions."
+          description="Submissions stay compact until leadership needs details or source evidence."
           emptyTitle="No submissions yet"
           emptyDescription="Capture a submission from a form detail page or add one here after creating a form."
           returnPath="/app/form-submissions"

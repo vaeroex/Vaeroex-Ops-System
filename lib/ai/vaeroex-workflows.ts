@@ -34,26 +34,17 @@ Use this root shape whenever possible:
   "title": "Short title",
   "summary": "Plain-language summary",
   "response_markdown": "Readable draft or answer for the user",
-  "suggested_tasks": [
-    {
-      "title": "Legacy compatibility only - prefer recommended_actions",
-      "description": "Use only if the UI explicitly asks for a draft source-system record",
-      "priority": "Low | Medium | High | Urgent",
-      "category": "Category",
-      "suggested_owner": "Responsible manager or source-system owner",
-      "due_date_recommendation": "Review timing",
-      "reason_this_matters": "Why leadership should review it",
-      "related_module": "KPIs | Customer Pipeline | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
-    }
-  ],
   "recommended_actions": [
     {
       "title": "Executive recommendation title",
       "priority": "Low | Medium | High | Urgent",
-      "suggested_owner": "Responsible manager or leadership role to review it",
-      "suggested_due_date": "Review timing",
+      "what_happened": "What changed or declined",
       "why_it_matters": "Business reason in plain language",
-      "related_module": "KPIs | Customer Pipeline | SOPs | Checklists | Forms | Reports | Files | Issues | Assets | People"
+      "evidence": "Evidence that supports the recommendation",
+      "business_impact": "Likely impact if ignored",
+      "confidence": "Low | Medium | High",
+      "leadership_review": "What leadership should review",
+      "recommended_output": "Executive Report | Executive Brief | Improvement Plan | SOP | Meeting Agenda | Investigation Summary | Board Summary"
     }
   ],
   "sop": null,
@@ -73,7 +64,7 @@ Use this root shape whenever possible:
   ],
   "save_recommendations": ["Records the user may confirm and save"]
 }
-Every output that could become a record must be a draft for manager review. Do not imply it has already been saved.
+Every output that could become a record must be a draft for leadership review. Do not imply it has already been saved.
 Every recommendation must explain what happened, why, evidence, business impact, confidence, what could happen next, and what leadership should review. Do not imply Vaeroex owns execution.
 `;
 
@@ -83,7 +74,7 @@ Workspace-aware recommendation rules:
 - Treat existing modules as source context for analysis, not as systems Vaeroex owns.
 - Do not recommend replacing Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or other customer systems.
 - Never say "Create CRM", "Create follow-up tracking", or "Assign owners" as generic advice.
-- Prefer recommendations like "review stalled customer pipeline records with the responsible sales manager", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
+- Prefer recommendations like "customer pipeline completion declined", "leadership should review the current workflow", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
 - Every recommendation should mention what exists, what is missing or stale, why it matters, evidence, confidence, business impact, and what leadership should review.
 - Classify recommendations into the recommendation_categories listed in the JSON shape.
 `;
@@ -239,7 +230,7 @@ For PDFs attached directly, extract readable text when possible and explain clea
 Compare the new file against prior KPI history, file imports, CRM lead history, and business metrics when those are available.
 Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, visibility gaps that stand out, possible data quality concerns, and practical next steps.
 Do not repeat raw rows, long document excerpts, or technical JSON in the user-facing answer.
-For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Issues, Recommended Actions, Source File.
+For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Issues, Executive Recommendations, Source File.
 If the file suggests action, explain what leadership should review and which supporting document would help.
 If the file suggests KPIs, reports, or customer pipeline updates, reference the relevant source context and make clear the user's existing systems remain the execution layer.
 ${workspaceAwareInstructions}
@@ -268,7 +259,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional focus area, such as this week, Sales, Operations, or Customer Service.",
     saveTargets: ["report"],
     instructions: `
-Scan workspace KPIs, customer pipeline records, source-system signals, issues, reports, SOPs, files, alerts, responsibility signals, and checklist completion.
+Scan workspace KPIs, customer pipeline records, source-system signals, issues, reports, SOPs, files, alerts, source context, and checklist completion.
 Return only the top 3-5 priorities. Each priority must include title, what happened, why it matters, evidence, confidence, business impact, and what leadership should review.
 Do not return a long generic list.
 ${workspaceAwareInstructions}
@@ -297,7 +288,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional team or department focus.",
     saveTargets: ["report"],
     instructions: `
-Generate a weekly leadership meeting agenda with these sections: KPI review, customer pipeline review, open issues, overdue source-system signals, checklist compliance, SOP review, department risks, Vaeroex recommendations, decisions needed, and responsible manager review.
+Generate a weekly leadership meeting agenda with these sections: KPI review, customer pipeline review, open issues, overdue source-system signals, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
 Do not build video or chat. This is a leadership meeting agenda, not a task-management workflow.
 Include a report draft.
 ${workspaceAwareInstructions}

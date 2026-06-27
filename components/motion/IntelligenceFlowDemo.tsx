@@ -15,11 +15,11 @@ const intelligenceStages = [
   {
     title: "Visibility",
     short: "Activity becomes clear.",
-    description: "Vaeroex organizes what is happening so important changes, ownership, and movement are easier to see.",
+    description: "Vaeroex organizes what is happening so important changes, source context, and movement are easier to see.",
     input: "Grouped signals and current state",
-    processing: "Patterns, owners, and trends are surfaced",
+    processing: "Patterns, evidence, and trends are surfaced",
     output: "Pattern identified",
-    examples: ["Ownership located", "Risk surfaced", "Trend detected"]
+    examples: ["Evidence linked", "Risk surfaced", "Trend detected"]
   },
   {
     title: "Understanding",
@@ -41,12 +41,12 @@ const intelligenceStages = [
   },
   {
     title: "Action",
-    short: "Intelligence becomes execution.",
-    description: "Useful intelligence becomes reviewable decisions, ownership, follow-up, and measured outcomes.",
+    short: "Intelligence becomes review.",
+    description: "Useful intelligence becomes reviewable decisions, executive outputs, and measured outcomes.",
     input: "Prediction, priority, and context",
-    processing: "Recommendations and ownership paths are prepared",
+    processing: "Recommendations and review paths are prepared",
     output: "Recommendation generated",
-    examples: ["Decision required", "Ownership assigned", "Outcome tracked"]
+    examples: ["Decision required", "Executive output prepared", "Outcome tracked"]
   }
 ] as const;
 

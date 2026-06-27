@@ -25,7 +25,7 @@ function fieldSchemaFor(formName: string): Json {
     { label: "Submitted by", type: "text", required: true },
     { label: "Business details", type: "long_text", required: true },
     { label: "Priority", type: "priority", required: true },
-    { label: "Suggested follow-up date", type: "date", required: false },
+    { label: "Review context", type: "long_text", required: false },
     { label: "Manager notes", type: "long_text", required: false }
   ].map((field) => ({
     ...field,
@@ -35,20 +35,20 @@ function fieldSchemaFor(formName: string): Json {
 
 function checklistItemsFor(name: string): Json {
   return [
-    `Confirm ${name.toLowerCase()} owner`,
-    "Review open follow-ups or blockers",
+    `Confirm how ${name.toLowerCase()} is reviewed`,
+    "Review open signals or blockers",
     "Log missed or failed items",
-    "Create follow-up record when needed",
-    "Submit for manager review"
+    "Document evidence when needed",
+    "Submit for leadership review"
   ] as Json;
 }
 
 function workflowStepsFor(name: string): Json {
   return [
     { order: 1, title: "Trigger", description: `Identify when ${name.toLowerCase()} starts.` },
-    { order: 2, title: "Assign owner", description: "Assign one accountable owner and backup reviewer." },
-    { order: 3, title: "Complete work", description: "Track required fields, checklist items, and blockers." },
-    { order: 4, title: "Manager review", description: "Review exceptions and create follow-up records." }
+    { order: 2, title: "Capture evidence", description: "Record the signals, source data, and context leadership should review." },
+    { order: 3, title: "Review pattern", description: "Compare required fields, checklist items, and blockers." },
+    { order: 4, title: "Leadership review", description: "Review exceptions and decide whether a supporting document is needed." }
   ] as Json;
 }
 
@@ -56,31 +56,31 @@ function sopBody(title: string) {
   return `# ${title}
 
 ## Purpose
-Create a repeatable process with clear ownership, required information, and review points.
+Create a repeatable process with clear evidence, required information, and review points.
 
 ## When to Use This SOP
 Use this draft when the related workflow starts or when a bottleneck is reported.
 
-## Who Is Responsible
-Assign one process owner and one manager reviewer.
+## Leadership Review
+Define when this process should be reviewed and what evidence should be considered.
 
 ## Step-by-Step Process
 1. Capture the request or issue.
-2. Assign an owner and due date.
+2. Capture source context and evidence.
 3. Complete the checklist or workflow steps.
-4. Log blockers, missed items, or follow-up records.
-5. Submit for manager review.
+4. Log blockers, missed items, or unresolved signals.
+5. Submit for leadership review.
 
 ## Quality Checks
 - Required fields are complete.
-- Follow-up record exists when needed.
-- Manager review is logged.
+- Supporting evidence exists when needed.
+- Leadership review is logged.
 
 ## Escalation Rules
-Escalate after one missed deadline or repeated ownership gap.
+Escalate when repeated signals show the process is not producing the expected outcome.
 
 ## Completion Standard
-The process is complete when the owner logs the outcome and the manager confirms closure.`;
+The process is complete when the outcome is documented and leadership can review the evidence.`;
 }
 
 function buildVaeroexAuditSummary(companyName: string, mainProblem: string, organizationDescription: string, environmentName: string) {
@@ -91,13 +91,13 @@ function buildVaeroexAuditSummary(companyName: string, mainProblem: string, orga
       organizationDescription || "The organization"
     } needs clear visibility, accountability, and execution structure for repeatable growth.`,
     current_operational_problems: [mainProblem || "Visibility and execution priorities need to be clarified during setup."],
-    main_bottlenecks: ["Unclear ownership", "Missed follow-ups", "No weekly manager review cadence"],
-    accountability_gaps: ["Follow-ups need assigned owners, due dates, and completion standards."],
-    recommended_systems_to_build: ["Forms", "Checklists", "SOPs", "Follow-up owner review", "Weekly intelligence report"],
-    suggested_dashboard_metrics: ["Open follow-ups", "Overdue follow-ups", "Open risks", "Assets needing attention"],
+    main_bottlenecks: ["Limited visibility", "Missed source-system signals", "No weekly leadership review cadence"],
+    accountability_gaps: ["Source-system signals need evidence, context, and clear review standards."],
+    recommended_systems_to_build: ["Forms", "Checklists", "SOPs", "Executive review cadence", "Weekly intelligence report"],
+    suggested_dashboard_metrics: ["Open source signals", "Unresolved source signals", "Open risks", "Assets needing attention"],
     thirty_day_action_plan: [
       "Week 1: Finalize forms and checklists.",
-      "Week 2: Assign owners and run checklist reviews.",
+      "Week 2: Review evidence and checklist patterns.",
       "Week 3: Convert repeated issues into SOP drafts.",
       "Week 4: Generate weekly intelligence report and refine next actions."
     ]
@@ -313,14 +313,14 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
         severity: issueType === "Missed follow-up" ? "High" : "Medium",
         status: "Open",
         root_cause: "Initial category; confirm with real workspace activity.",
-        recommended_fix: "Assign owner, due date, and review cadence.",
+        recommended_fix: "Review evidence, source context, and leadership review cadence.",
         created_by: user.id
       }))
     ),
     supabase.from("tasks").insert(
       [
         ["Review initial forms", "Review generated forms and adjust required fields.", "High"],
-        ["Assign checklist owners", "Choose who completes each checklist and how often.", "High"],
+        ["Review checklist evidence", "Confirm which checklist results matter for leadership intelligence.", "High"],
         ["Review issue categories", "Confirm the first issue categories match your business.", "Medium"],
         ["Review SOP drafts", "Turn initial SOPs into active working procedures.", "Medium"],
         ["Run Vaeroex review", "Ask Vaeroex to review real workspace data after setup.", "Medium"]
@@ -331,7 +331,6 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
         status: "To Do",
         priority,
         category: "Setup",
-        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
         ai_generated: false,
         created_by: user.id
       }))
@@ -356,7 +355,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       title: "Weekly Intelligence Report - Generated by Vaeroex",
       date_range_start: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
       date_range_end: new Date().toISOString().slice(0, 10),
-      body_markdown: `# Weekly Intelligence Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\n${auditSummary.business_summary}\n\n## Recommended Next Actions\n- Review initial forms.\n- Assign checklist owners.\n- Review issue categories.\n- Run Vaeroex review after real data is added.`,
+      body_markdown: `# Weekly Intelligence Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\n${auditSummary.business_summary}\n\n## Executive Recommendations\n- Review initial forms.\n- Review checklist evidence.\n- Review issue categories.\n- Run Vaeroex review after real data is added.`,
       source_data_json: { generatedFrom: "setup", organizationType: category.name } satisfies Json,
       created_by: user.id
     }),

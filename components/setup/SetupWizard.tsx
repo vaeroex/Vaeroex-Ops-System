@@ -79,7 +79,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
               <textarea
                 required
                 name="organization_description"
-                placeholder="Example: We manage a small regional service team with 12 employees, recurring customer follow-ups, monthly reporting, and several open operational issues."
+                placeholder="Example: We manage a small regional service team with recurring customer response work, monthly reporting, and several open operational issues."
                 className="mt-2 min-h-28 w-full rounded-lg border border-line px-3 py-2"
               />
             </label>
@@ -121,7 +121,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
               <textarea
                 required
                 name="desired_systems"
-                placeholder="Visibility dashboard, accountability follow-ups, reports, checklists, SOPs, CRM, KPI tracking..."
+                placeholder="Visibility dashboard, executive reports, checklists, SOPs, CRM context, KPI tracking..."
                 className="mt-2 min-h-28 w-full rounded-lg border border-line px-3 py-2"
               />
             </label>
@@ -164,7 +164,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
           <p className="mt-3 text-sm leading-6 text-muted">
             Vaeroex will create a practical starting workspace for visibility, accountability, and execution.
             Your selected environment and organization description will shape initial dashboards, terminology,
-            workflows, follow-up records, reports, and intelligence signals.
+            workflows, source signals, reports, and intelligence outputs.
           </p>
           <div className="mt-5">
             <ComplianceNotice />

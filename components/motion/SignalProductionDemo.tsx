@@ -13,7 +13,7 @@ const signalExamples = [
   {
     title: "Risk Surface",
     description: "Changing conditions are organized into risk signals that need review.",
-    steps: ["Risk detected", "Exposure grouped", "Owner located", "Escalation suggested"],
+    steps: ["Risk detected", "Exposure grouped", "Evidence linked", "Review suggested"],
     output: "Risk is no longer buried inside disconnected updates."
   },
   {
@@ -35,16 +35,16 @@ const signalExamples = [
     output: "Vaeroex turns ambiguity into a reviewable decision."
   },
   {
-    title: "Action Path",
-    description: "A recommended response is connected to ownership and follow-through.",
-    steps: ["Action generated", "Owner suggested", "Due path created", "Outcome tracked"],
-    output: "Insight becomes execution instead of another note."
+    title: "Review Path",
+    description: "A recommended response is turned into a reviewable executive output.",
+    steps: ["Recommendation generated", "Evidence summarized", "Confidence labeled", "Output prepared"],
+    output: "Insight becomes a leadership decision instead of another note."
   },
   {
-    title: "Ownership Signal",
-    description: "Responsibility is identified so unresolved work does not drift.",
-    steps: ["Role identified", "Owner located", "Gap surfaced", "Assignment prepared"],
-    output: "Accountability becomes part of the intelligence flow."
+    title: "Source Context",
+    description: "Unclear source data is surfaced so leaders can review the underlying workflow.",
+    steps: ["Signal identified", "Context checked", "Gap surfaced", "Review prepared"],
+    output: "Accountability becomes visible without Vaeroex replacing the execution system."
   },
   {
     title: "Outcome Signal",

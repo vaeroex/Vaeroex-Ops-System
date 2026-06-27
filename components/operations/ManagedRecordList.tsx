@@ -157,7 +157,7 @@ function listParams(searchParams?: ManagedRecordListProps["searchParams"]) {
 function collectionLabel(collection: ManagedRecordCollection) {
   const labels: Record<ManagedRecordCollection, string> = {
     sops: "SOPs",
-    tasks: "follow-ups",
+    tasks: "source signals",
     checklists: "checklists",
     checklist_runs: "checklist runs",
     issues: "issues",

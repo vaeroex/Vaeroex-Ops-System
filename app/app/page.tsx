@@ -581,7 +581,7 @@ function buildSmartAlerts({
           severity: "High",
           title: `${overdueTasks.length} overdue source-system signal${overdueTasks.length === 1 ? "" : "s"}`,
           why: "Overdue signals usually mean responsibility, capacity, or handoff problems need leadership review.",
-          action: "Review overdue signals with the responsible manager",
+          action: "Review the current workflow behind these signals",
           href: "/app/tasks"
         }
       : null,
@@ -745,14 +745,14 @@ function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportun
   }
 
   if (tone === "risk") {
-    return "Open the source record, review the responsible manager or source system, and decide whether an executive report or improvement plan is needed.";
+    return "Review the source evidence and decide whether leadership needs an executive report or improvement plan.";
   }
 
   if (tone === "opportunity") {
     return "Open the source record and decide whether leadership needs a report, meeting agenda, or improvement plan.";
   }
 
-  return "Review the executive recommendation and decide what leadership should discuss with the responsible manager.";
+  return "Review the executive recommendation and decide what leadership should examine next.";
 }
 
 function EvidenceDisclosure({
@@ -813,7 +813,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       title: "Profit Leak Detector",
       href: profitLeak?.href || ("/app/crm" as Route),
       evidence: profitLeak?.evidence || `${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`,
-      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and unclear responsibility signals.",
+      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and unclear source-system signals.",
       confidence: confidenceForPriority(profitLeak?.priority),
       action: profitLeak?.action || "Review customer pipeline, KPI, and issue records for avoidable leakage before the next leadership review."
     },
@@ -908,50 +908,35 @@ function SignalList({
           className={`rounded-lg border p-3 text-sm transition ${toneClasses[tone]}`}
         >
           <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="font-semibold">{item.title}</p>
-              <p className="mt-1 text-xs opacity-80">{item.source}</p>
+            <div className="min-w-0">
+              <p className="font-semibold leading-5">{item.title}</p>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 opacity-90">{item.context}</p>
             </div>
-            <div className="flex shrink-0 flex-col items-end gap-2">
-              {item.status ? <StatusBadge value={item.status} /> : null}
-              <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidenceForSignal(item, tone))}`}>
-                {confidenceForSignal(item, tone)} confidence
-              </span>
-            </div>
+            <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidenceForSignal(item, tone))}`}>
+              {confidenceForSignal(item, tone)}
+            </span>
           </div>
-          <p className="mt-3 text-xs leading-5 opacity-90">
-            <span className="font-semibold opacity-95">Recommended:</span> {signalRecommendedAction(item, tone)}
+          <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-90">
+            <span className="font-semibold opacity-95">Evidence:</span> {signalEvidence(item)}
           </p>
-          <EvidenceDisclosure
-            evidence={signalEvidence(item)}
-            why={signalReasoning(item, tone)}
-            action={signalRecommendedAction(item, tone)}
-            compact
-          />
-          <div className="mt-3 flex flex-wrap gap-2">
-            <Link
-              href={generatedOutputHref({
-                type: tone === "risk" ? "risk_brief" : tone === "opportunity" ? "executive_briefing" : "action_plan",
-                title: item.title,
-                summary: item.context,
-                why: signalReasoning(item, tone),
-                remedy: signalRecommendedAction(item, tone)
-              })}
-              className="inline-flex rounded-md border border-current/20 bg-slate-950/25 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-            >
-              {tone === "risk" ? "Generate Risk Brief" : tone === "opportunity" ? "Generate Executive Briefing" : "Generate Improvement Plan"}
-            </Link>
-            <details className="inline-block">
-              <summary className="cursor-pointer rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25">
-                Advanced
-              </summary>
-              <Link
-                href={item.href}
-                className="mt-2 inline-flex rounded-md border border-current/20 px-2.5 py-1.5 text-xs font-semibold hover:bg-slate-950/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-              >
-                Open source record
-              </Link>
-            </details>
+          <div className="mt-3">
+            <ContextualAskVaeroex
+              label="Explain This"
+              prompt="Explain this intelligence signal for leadership. Include what happened, why it matters, evidence, confidence, what could happen next, and what leadership should review. Do not create tasks, assign owners, or suggest due dates."
+              contextType={`home_${tone}_signal`}
+              contextId={item.id}
+              sourceTitle={item.title}
+              sourceSummary={item.context}
+              evidence={[
+                `Source: ${item.source}`,
+                `Status: ${item.status || "Not labeled"}`,
+                `Evidence: ${signalEvidence(item)}`,
+                `Reasoning: ${signalReasoning(item, tone)}`,
+                `Confidence: ${confidenceForSignal(item, tone)}`,
+                `Leadership review: ${signalRecommendedAction(item, tone)}`
+              ]}
+              compact
+            />
           </div>
         </article>
       )}
@@ -1181,35 +1166,47 @@ function IntelligenceBriefingHero({
           const confidence = item ? confidenceForSignal(item, tone) : "Low";
 
           return (
-            <article key={id} className="rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-sm">
+            <article key={id} className="rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm">
               <div className="flex items-start justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-silver">{question}</p>
-                  <h3 className="mt-3 text-lg font-semibold leading-6">{item?.title || fallback}</h3>
-                  {item ? <p className="mt-1 text-xs text-slate-300">{item.source}</p> : null}
+                  <h3 className="mt-2 line-clamp-2 text-base font-semibold leading-5">{item?.title || fallback}</h3>
                 </div>
                 <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidence)}`}>
-                  {confidence}
+                  {confidence} confidence
                 </span>
               </div>
 
               {item ? (
                 <>
-                  <p className="mt-4 text-xs leading-5 text-slate-300">
-                    <span className="font-semibold text-white">Recommended:</span> {signalRecommendedAction(item, tone)}
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">
+                    {item.context}
                   </p>
-                  <EvidenceDisclosure
-                    evidence={signalEvidence(item)}
-                    why={signalReasoning(item, tone)}
-                    action={signalRecommendedAction(item, tone)}
-                    compact
-                  />
-                  <Link href={item.href} className="mt-4 inline-flex rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
-                    Open source
-                  </Link>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">
+                    <span className="font-semibold text-white">Evidence:</span> {signalEvidence(item)}
+                  </p>
+                  <div className="mt-3">
+                    <ContextualAskVaeroex
+                      label="Explain This"
+                      prompt="Explain this briefing card for leadership. Include what happened, why Vaeroex surfaced it, evidence, confidence, possible business impact, and what leadership should review. Do not assign work, create tasks, name owners, or suggest due dates."
+                      contextType={`home_briefing_${id}`}
+                      contextId={item.id}
+                      sourceTitle={item.title}
+                      sourceSummary={item.context}
+                      evidence={[
+                        `Source: ${item.source}`,
+                        `Status: ${item.status || "Not labeled"}`,
+                        `Evidence: ${signalEvidence(item)}`,
+                        `Reasoning: ${signalReasoning(item, tone)}`,
+                        `Confidence: ${confidence}`,
+                        `Leadership review: ${signalRecommendedAction(item, tone)}`
+                      ]}
+                      compact
+                    />
+                  </div>
                 </>
               ) : (
-                <p className="mt-4 text-xs leading-5 text-slate-300">Add more workspace records, imports, decisions, and outcomes to strengthen this signal.</p>
+                <p className="mt-2 text-xs leading-5 text-slate-300">Add more workspace records, imports, decisions, and outcomes to strengthen this signal.</p>
               )}
             </article>
           );
@@ -1524,7 +1521,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
-    overdueTasks.length ? "Review overdue source-system signals with the responsible manager before the next leadership check-in." : "",
+    overdueTasks.length ? "Review the workflow behind overdue source-system signals before the next leadership check-in." : "",
     openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
@@ -1573,7 +1570,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           severity: "Medium",
           title: "Current month has mixed signals",
           why: "Revenue is above target, but conversion, response time, overdue source-system signals, and checklist completion still need leadership review.",
-          action: "Review executive recommendations",
+          action: "Review executive intelligence",
           href: "/app/intelligence"
         }
       ]
@@ -1594,7 +1591,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       title: task.title,
       source: "Source-system signal",
       status: task.priority || task.status,
-      context: `Due ${task.due_date || "not set"} · ${task.assigned_to ? `Responsible: ${task.assigned_to}` : "Responsible manager not visible"}`,
+      context: `Priority ${task.priority || "not labeled"} · status ${task.status || "open"}. Review why this signal remains unresolved in the source system.`,
       href: "/app/tasks" as Route
     })),
     ...belowTargetKpis.slice(0, 3).map((kpi) => ({
@@ -1691,7 +1688,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: "Review failed checklist runs",
           source: `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"}`,
           status: checklistFailures[0]?.status || "Needs review",
-          context: "Review the process, responsible manager, or escalation rule if the failure repeats.",
+          context: "Review the process, evidence, or escalation pattern if the failure repeats.",
           href: "/app/checklists" as Route
         }
       : null,
@@ -1791,15 +1788,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const recommendationAssignments = activeAssignments.filter((assignment) => assignment.source_type === "vaeroex_recommendation");
   const alertsByRole = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_role)));
   const alertsByDepartment = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_department)));
-  const assignmentOwnerLabel = (assignment: AssignmentRow) => {
-    if (assignment.assigned_person_id && peopleById.has(assignment.assigned_person_id)) {
-      return peopleById.get(assignment.assigned_person_id)?.full_name || "Responsible person";
-    }
-
-    if (assignment.assigned_role) return assignment.assigned_role;
-    if (assignment.assigned_department) return assignment.assigned_department;
-    return "Workspace";
-  };
   const shareRecipientLabel = (share: ShareRow) => {
     if (share.person_id && peopleById.has(share.person_id)) {
       return peopleById.get(share.person_id)?.full_name || "Person";
@@ -1999,20 +1987,20 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       {isOperationsView ? (
         <>
           <DashboardAccordion
-            title="Responsibility visibility"
-            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} overdue responsibility signal${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
+            title="Workspace signals"
+            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} unresolved source signal${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
         <SectionCard
-          title="Responsibility visibility"
-          description="Notifications, shared reports, KPI alerts, and responsibility signals for this workspace."
+	          title="Workspace signals"
+	          description="Notifications, shared reports, KPI alerts, and source-system context for this workspace."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue" : undefined} />
             <StatCard label="KPI alerts" value={kpiAlertNotifications.length} detail="Rules triggered" tone={kpiAlertNotifications.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
             <StatCard label="Shared reports" value={recentReportShares.length} detail="Recent in-app shares" />
-            <StatCard label="Due soon" value={dueSoonAssignments.length} detail="Next 14 days" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
-            <StatCard label="Overdue" value={overdueOperationalAssignments.length} detail="Responsibility signals past due" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
+	            <StatCard label="Upcoming signals" value={dueSoonAssignments.length} detail="Time-sensitive context" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
+	            <StatCard label="Unresolved" value={overdueOperationalAssignments.length} detail="Signals needing review" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
             <StatCard label="Saved recs" value={recommendationAssignments.length} detail="Vaeroex recommendations" />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -2047,59 +2035,59 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-        <SectionCard title="Responsibility signals" description="Source-system signals can indicate a person, role, or department without changing app permissions.">
+	        <SectionCard title="Source-system context" description="Imported or generated signals that may help leadership understand patterns without making Vaeroex the execution system.">
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
-              <h3 className="text-sm font-semibold text-ink">Connected to me</h3>
+	              <h3 className="text-sm font-semibold text-ink">Personal context</h3>
               <SimpleList
                 items={assignedToMe}
-                empty={currentUserPerson ? "No responsibility signals are directed to you." : "No matching person record found for your login email."}
+	                empty={currentUserPerson ? "No personal source context is visible." : "No matching profile context found for your login email."}
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-line p-3">
                     <div className="flex items-start justify-between gap-3">
                       <p className="text-sm font-semibold">{assignment.title}</p>
                       <StatusBadge value={assignment.priority} />
                     </div>
-                    <p className="mt-1 text-xs text-muted">Due {assignment.due_date || "not set"} · {assignment.status}</p>
+	                    <p className="mt-1 text-xs text-muted">Status: {assignment.status}</p>
                   </div>
                 )}
               />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-ink">Connected to my role</h3>
+	              <h3 className="text-sm font-semibold text-ink">Role context</h3>
               <SimpleList
                 items={assignedToMyRole}
-                empty={currentUserPerson?.role_title ? `No responsibility signals for ${currentUserPerson.role_title}.` : "Add your role on the People page to see role-based signals."}
+	                empty={currentUserPerson?.role_title ? `No source context for ${currentUserPerson.role_title}.` : "Add role context on the People page to improve interpretation."}
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-line p-3">
                     <p className="text-sm font-semibold">{assignment.title}</p>
-                    <p className="mt-1 text-xs text-muted">{assignment.assigned_role} · Due {assignment.due_date || "not set"}</p>
+	                    <p className="mt-1 text-xs text-muted">{assignment.assigned_role} · {assignment.status}</p>
                   </div>
                 )}
               />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-ink">Connected to my department</h3>
+	              <h3 className="text-sm font-semibold text-ink">Area context</h3>
               <SimpleList
                 items={assignedToMyDepartment}
-                empty={currentUserPerson?.department ? `No responsibility signals for ${currentUserPerson.department}.` : "Add your department on the People page to see department signals."}
+	                empty={currentUserPerson?.department ? `No source context for this area.` : "Add area context on the People page to improve interpretation."}
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-line p-3">
                     <p className="text-sm font-semibold">{assignment.title}</p>
-                    <p className="mt-1 text-xs text-muted">{assignment.assigned_department} · Due {assignment.due_date || "not set"}</p>
+	                    <p className="mt-1 text-xs text-muted">{assignment.assigned_department} · {assignment.status}</p>
                   </div>
                 )}
               />
             </div>
             <div>
-              <h3 className="text-sm font-semibold text-ink">Overdue responsibility signals</h3>
+	              <h3 className="text-sm font-semibold text-ink">Unresolved source signals</h3>
               <SimpleList
                 items={overdueOperationalAssignments}
-                empty="No overdue responsibility signals."
+	                empty="No unresolved source signals."
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-red-100 bg-red-50 p-3 text-red-700">
                     <p className="text-sm font-semibold">{assignment.title}</p>
-                    <p className="mt-1 text-xs">Responsible: {assignmentOwnerLabel(assignment)} · Due {assignment.due_date}</p>
+	                    <p className="mt-1 text-xs">Review context: {assignment.source_title || assignment.status}</p>
                   </div>
                 )}
               />
@@ -2258,7 +2246,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             summary={`${openTasks.length} open source-system signal${openTasks.length === 1 ? "" : "s"}, ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"}, and ${checklistFailures.length} checklist failure${checklistFailures.length === 1 ? "" : "s"} in this period.`}
           >
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Responsibility visibility" description="Open source-system signals and overdue responsibility indicators.">
+        <SectionCard title="Source-system signals" description="Open source-system signals that may explain business patterns.">
           <SimpleList
             items={openTasks.slice(0, 6)}
             empty="No open source-system signals."
@@ -2268,7 +2256,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   <p className="text-sm font-semibold">{task.title}</p>
                   <StatusBadge value={task.priority} />
                 </div>
-                <p className="mt-1 text-xs text-muted">Due {task.due_date || "not set"} · {task.status}</p>
+                <p className="mt-1 text-xs text-muted">Status: {task.status}</p>
               </div>
             )}
           />

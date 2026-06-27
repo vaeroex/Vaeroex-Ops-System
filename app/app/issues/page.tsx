@@ -1,6 +1,4 @@
-import { convertIssueToTaskAction, createIssueAction } from "@/app/app/operations/actions";
-import { AssignmentPanel, AssignmentTargetFields, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
-import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { createIssueAction } from "@/app/app/operations/actions";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -22,44 +20,29 @@ const issueEditFields: ManagedRecordEditField[] = [
   { name: "severity", label: "Severity", type: "select", options: issueSeverities },
   { name: "status", label: "Status", type: "select", options: issueStatuses },
   { name: "root_cause", label: "Root cause", type: "textarea", rows: 3 },
-  { name: "recommended_fix", label: "Recommended fix", type: "textarea", rows: 3 },
-  { name: "assigned_role", label: "Assigned role" },
-  { name: "assigned_department", label: "Assigned department" },
-  { name: "due_date", label: "Due date", type: "date" }
+  { name: "recommended_fix", label: "Leadership review note", type: "textarea", rows: 3 }
 ];
-
-function ownerLabel(issue: { assigned_person_id?: string | null; assigned_role?: string | null; assigned_department?: string | null; assigned_to?: string | null }, peopleById: Map<string, string>) {
-  if (issue.assigned_person_id) return peopleById.get(issue.assigned_person_id) || "Assigned person";
-  if (issue.assigned_role) return issue.assigned_role;
-  if (issue.assigned_department) return issue.assigned_department;
-  if (issue.assigned_to) return "App user";
-  return "Unassigned";
-}
 
 export default async function IssuesPage({ searchParams }: IssuesPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [{ data: issues, error }, folderResult, peopleResult] = await Promise.all([
+  const [{ data: issues, error }, folderResult] = await Promise.all([
     supabase
       .from("issues")
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false }),
-    getRecordFolders(supabase, workspaceId, "issues"),
-    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
+    getRecordFolders(supabase, workspaceId, "issues")
   ]);
-  const people = (peopleResult.data || []) as TeamPersonOption[];
-  const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
   const managedIssues = (issues || []).map((issue) => {
     const management = managedValues(issue);
-    const owner = ownerLabel(issue, peopleById);
 
     return {
       id: issue.id,
       title: issue.title,
       type: issue.issue_type || "Issue",
       status: issue.status,
-      owner,
+      owner: "Issue context",
       category: issue.severity,
       createdAt: issue.created_at,
       updatedAt: management.updatedAt || issue.updated_at,
@@ -68,13 +51,9 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
       deletedAt: management.deletedAt,
       preview: shortPreview(issue.description, "No description."),
       meta: [
-        { label: "Assigned to", value: owner },
-        { label: "Role", value: issue.assigned_role || "Not set" },
-        { label: "Department", value: issue.assigned_department || "Not set" },
         { label: "Severity", value: issue.severity },
-        { label: "Due date", value: issue.due_date || "Not set" },
         { label: "Root cause", value: issue.root_cause || "Not documented" },
-        { label: "Recommended fix", value: issue.recommended_fix || "Not documented" }
+        { label: "Leadership review", value: issue.recommended_fix || "Not documented" }
       ],
       editFields: issueEditFields,
       editValues: {
@@ -84,10 +63,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
         severity: issue.severity,
         status: issue.status,
         root_cause: issue.root_cause,
-        recommended_fix: issue.recommended_fix,
-        assigned_role: issue.assigned_role,
-        assigned_department: issue.assigned_department,
-        due_date: issue.due_date
+        recommended_fix: issue.recommended_fix
       },
       children: (
         <div className="space-y-3 text-sm leading-6 text-muted">
@@ -96,24 +72,8 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
             <span className="font-semibold text-ink">Root cause:</span> {issue.root_cause || "Not documented."}
           </p>
           <p>
-            <span className="font-semibold text-ink">Recommended fix:</span> {issue.recommended_fix || "Not documented."}
+            <span className="font-semibold text-ink">Leadership review:</span> {issue.recommended_fix || "Not documented."}
           </p>
-          <form action={convertIssueToTaskAction} className="pt-2">
-            <input type="hidden" name="issue_id" value={issue.id} />
-            <ConfirmSubmitButton message="Create a follow-up to resolve this issue?">Create resolution follow-up</ConfirmSubmitButton>
-          </form>
-          <AssignmentPanel
-            sourceType="issue"
-            sourceId={issue.id}
-            sourceTitle={issue.title}
-            relatedModule="Issues"
-            returnPath="/app/issues"
-            actionHref="/app/issues"
-            people={people}
-            defaultTitle={`Resolve issue: ${issue.title}`}
-            defaultDescription={issue.recommended_fix || issue.description || ""}
-            defaultRole={issue.assigned_role || "Manager"}
-          />
         </div>
       )
     };
@@ -124,13 +84,13 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
       <PageHeader
         eyebrow="Visibility"
         title="Risks & Issues"
-        description="Log recurring problems, identify root causes, capture recommended fixes, and convert confirmed risks into accountable follow-ups."
+        description="Log recurring problems, identify root causes, capture evidence, and generate leadership review context."
       />
 
-      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message || peopleResult.error?.message} />
+      <ErrorNotice message={(params?.error as string | undefined) || error?.message || folderResult.error?.message} />
 
       <section className="space-y-6">
-        <CreateDrawer title="Log issue" description="Capture enough detail for a manager to choose the next action." triggerLabel="New Issue">
+        <CreateDrawer title="Log issue" description="Capture enough detail for leadership to understand the risk." triggerLabel="New Issue">
           <form action={createIssueAction} className="grid gap-4 lg:grid-cols-2">
             <TextInput label="Issue title" name="title" required />
             <TextInput label="Issue type" name="issue_type" placeholder="Process, customer, safety, equipment" />
@@ -138,12 +98,7 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
             <SelectInput label="Severity" name="severity" defaultValue="Medium" options={issueSeverities} />
             <SelectInput label="Status" name="status" defaultValue="Open" options={issueStatuses} />
             <TextArea label="Root cause" name="root_cause" rows={3} />
-            <TextArea label="Recommended fix" name="recommended_fix" rows={3} />
-            <TextInput label="Due date" name="due_date" type="date" />
-            <div className="lg:col-span-2">
-              <p className="mb-2 text-sm font-medium">Assignment</p>
-              <AssignmentTargetFields people={people} defaultRole="Manager" />
-            </div>
+            <TextArea label="Leadership review note" name="recommended_fix" rows={3} />
             <div className="lg:col-span-2">
               <PrimaryButton>Log issue</PrimaryButton>
             </div>
@@ -155,9 +110,9 @@ export default async function IssuesPage({ searchParams }: IssuesPageProps) {
           records={managedIssues}
           folders={folderResult.folders}
           title="Issue records"
-          description="Keep risks organized by folder, severity, status, owner, or due date."
+          description="Keep risks organized by folder, severity, status, category, and source evidence."
           emptyTitle="No issues logged"
-          emptyDescription="Add a bottleneck, missed handoff, equipment problem, quality concern, or follow-up gap."
+          emptyDescription="Add a bottleneck, missed handoff, equipment problem, quality concern, or response gap."
           searchParams={params}
         />
 
