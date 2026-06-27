@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { saveGeneratedOutputToBriefingsAction } from "@/app/app/generated/actions";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoverageSummary } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { GeneratedOutputControls } from "@/components/generated/GeneratedOutputControls";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -38,10 +39,6 @@ function confidenceClass(confidence: string) {
   if (confidence === "High") return "border-cyan-300/40 bg-cyan-400/15 text-cyan-100";
   if (confidence === "Medium") return "border-blue-300/30 bg-blue-500/15 text-blue-100";
   return "border-slate-400/30 bg-slate-500/15 text-slate-100";
-}
-
-function askHref(prompt: string) {
-  return `/app/ask?prompt=${encodeURIComponent(prompt)}` as Route;
 }
 
 function outputSourceData(output: ReturnType<typeof buildGeneratedOutput>) {
@@ -256,9 +253,23 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
               Save to Briefings
             </ConfirmSubmitButton>
           </form>
-          <Link href={askHref(askPrompt)} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20">
-            Ask Vaeroex
-          </Link>
+          <ContextualAskVaeroex
+            label="Ask Vaeroex"
+            prompt={askPrompt}
+            contextType="generated_output"
+            contextId={`${output.type}-${output.sourceHref}`}
+            sourceTitle={output.title}
+            sourceSummary={`${output.summary} Recommended remedy: ${output.recommendedRemedy}`}
+            evidence={[
+              output.whyMatters,
+              ...output.evidence,
+              `Confidence: ${output.confidence}`,
+              `Source types: ${output.sourceTypes.join(", ")}`,
+              `Limitations: ${output.limitations}`,
+              `Suggested next data: ${output.suggestedNextData}`
+            ]}
+            compact
+          />
           <Link href="/app/intelligence" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
             Dismiss
           </Link>
@@ -297,13 +308,27 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
           "Turn this into an SOP.",
           "Turn this into an executive briefing."
         ].map((question) => (
-          <Link
+          <div
             key={question}
-            href={askHref(`${question} Context: ${output.title}`)}
             className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/35 hover:bg-cyan-950/30"
           >
-            {question}
-          </Link>
+            <ContextualAskVaeroex
+              label={question}
+              prompt={`${question} Context: ${output.title}`}
+              contextType="generated_output_follow_up"
+              contextId={`${output.type}-${output.sourceHref}`}
+              sourceTitle={output.title}
+              sourceSummary={`${output.summary} Recommended remedy: ${output.recommendedRemedy}`}
+              evidence={[
+                output.whyMatters,
+                ...output.evidence,
+                `Confidence: ${output.confidence}`,
+                `Source types: ${output.sourceTypes.join(", ")}`,
+                `Limitations: ${output.limitations}`
+              ]}
+              compact
+            />
+          </div>
         ))}
       </section>
     </div>

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import type { Route } from "next";
 import type { ReactNode } from "react";
 import {
   acceptPrestigeRecommendationAction,
@@ -8,6 +7,7 @@ import {
   createKpiAlertFromPrestigeAction,
   dismissPrestigeRecommendationAction
 } from "@/app/app/intelligence/actions";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -499,9 +499,22 @@ export function PrestigeOperationsPanel({
         </div>
         <div className="mt-4 flex flex-wrap gap-2 text-xs">
           {["What changed since last month?", "What changed since March?", "What actions helped performance recover?"].map((prompt) => (
-            <Link key={prompt} href={`/app/agents?prompt=${encodeURIComponent(prompt)}` as Route} className="rounded-full border border-line bg-slate-50 px-3 py-2 font-semibold text-slate-700">
-              {prompt}
-            </Link>
+            <ContextualAskVaeroex
+              key={prompt}
+              label={prompt}
+              prompt={prompt}
+              contextType="business_memory"
+              contextId="prestige-business-memory"
+              sourceTitle="Business Memory"
+              sourceSummary={`${intelligence.memoryTimeline.length} memory records stored for this workspace.`}
+              evidence={[
+                ...intelligence.memoryTimeline.slice(0, 6).map((moment) => `${moment.month}: ${moment.title} - ${moment.whatHappened}`),
+                intelligence.memoryTimeline.length
+                  ? `Latest outcome: ${intelligence.memoryTimeline[0]?.outcome || "No latest outcome saved"}`
+                  : "No memory records stored yet"
+              ]}
+              compact
+            />
           ))}
         </div>
       </IntelligenceAccordion>
