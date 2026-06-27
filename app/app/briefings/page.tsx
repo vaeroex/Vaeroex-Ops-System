@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { generateReportAction } from "@/app/app/reports/actions";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -211,9 +212,21 @@ export default async function BriefingsPage() {
                     <Link href={`/app/reports?q=${encodeURIComponent(report.title)}` as Route} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
                       View briefing
                     </Link>
-                    <Link href={`/app/ask?prompt=${encodeURIComponent(`Explain the key point from this briefing: ${report.title}`)}` as Route} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-                      Ask Vaeroex
-                    </Link>
+                    <ContextualAskVaeroex
+                      label="Ask Vaeroex"
+                      prompt={`Explain the key point from this briefing: ${report.title}`}
+                      contextType="briefing"
+                      contextId={report.id}
+                      sourceTitle={report.title}
+                      sourceSummary={summaryFromBody(report.body_markdown)}
+                      evidence={[
+                        `Report type: ${report.report_type}`,
+                        `Date range: ${briefingDateLabel(report)}`,
+                        `Source data: ${sourceDataSummary(report)}`,
+                        `Confidence: ${confidence}`
+                      ]}
+                      compact
+                    />
                   </div>
                 </article>
               );

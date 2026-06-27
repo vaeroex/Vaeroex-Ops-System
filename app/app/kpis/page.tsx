@@ -2,6 +2,7 @@ import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -1338,9 +1339,26 @@ function KpiTargetRecommendationPanel({
             Apply recommended target
           </button>
         </form>
-        <Link href={(`/app/ask?prompt=${encodeURIComponent(`Explain the recommended target for KPI: ${metricName}`)}`) as Route} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-          Ask Vaeroex why
-        </Link>
+      </div>
+      <div className="mt-4">
+        <ContextualAskVaeroex
+          label="Ask Vaeroex why"
+          prompt={`Explain why Vaeroex recommended ${recommendation.value} as the target for ${metricName}. Explain whether the user should apply it or manually adjust it.`}
+          contextType="kpi_recommended_target"
+          contextId={latest?.id || metricName}
+          sourceTitle={`${metricName} recommended target`}
+          sourceSummary={`Recommended target ${recommendation.value}. Current/manual target ${setting?.target ?? latest?.target ?? "not set"}. Latest value ${latest?.actual_value ?? "not set"}.`}
+          evidence={[
+            recommendation.reason,
+            recommendation.dataUsed,
+            `Date range: ${recommendation.dateRange}`,
+            `Confidence: ${recommendation.confidence === "Higher" ? "High" : recommendation.confidence}`,
+            `Limitations: ${recommendation.limitation}`,
+            `Outliers: ${recommendation.outliers}`
+          ]}
+          defaultCollapsed={false}
+          compact
+        />
       </div>
     </div>
   );
@@ -2013,9 +2031,25 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                 <p className="font-semibold text-white">Top KPI needing attention</p>
                 <p className="mt-1">{topAttentionKpi ? `${topAttentionKpi.name}: ${statusLabel(metricTone(topAttentionKpi.actual_value, topAttentionKpi.target))}` : "No KPI has enough data yet."}</p>
               </div>
-              <Link href={(`/app/ask?prompt=${encodeURIComponent("Review our KPI trends and recommend the next leadership action.")}`) as Route} className="mt-4 inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
-                Ask Vaeroex about these KPIs
-              </Link>
+              <div className="mt-4">
+                <ContextualAskVaeroex
+                  label="Ask Vaeroex about these KPIs"
+                  prompt="Review these KPI trends and recommend the next leadership action."
+                  contextType="kpi_summary"
+                  contextId={topAttentionKpi?.id || "kpi-summary"}
+                  sourceTitle="KPI summary"
+                  sourceSummary={kpiSummary}
+                  evidence={[
+                    `${onTrackCount} on track`,
+                    `${behindTargetCount} behind target`,
+                    `${missingDataCount} missing data`,
+                    `${updatedThisMonthCount} updated this month`,
+                    topAttentionKpi ? `Top attention KPI: ${topAttentionKpi.name}` : "No top attention KPI yet"
+                  ]}
+                  compact
+                  defaultCollapsed={false}
+                />
+              </div>
             </div>
           </section>
 

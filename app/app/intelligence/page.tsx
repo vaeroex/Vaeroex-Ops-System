@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { StatusBadge } from "@/components/operations/StatusBadge";
@@ -27,10 +28,6 @@ function typeClass(type: IntelligenceInsightType) {
   if (type === "Forecast") return "border-cyan-400/30 bg-cyan-950/20 text-cyan-100";
   if (type === "Bottleneck") return "border-amber-400/35 bg-amber-950/25 text-amber-100";
   return "border-blue-400/30 bg-blue-950/25 text-blue-100";
-}
-
-function askHref(insight: IntelligenceInsight) {
-  return `/app/agents?prompt=${encodeURIComponent(`Why does this matter and what should we do next? ${insight.title}: ${insight.summary}`)}` as Route;
 }
 
 function groupInsights(insights: IntelligenceInsight[], type: IntelligenceInsightType) {
@@ -97,9 +94,22 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
         <Link href={generatedOutputHref({ type: "executive_briefing", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
           Generate Executive Briefing
         </Link>
-        <Link href={askHref(insight)} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Ask Vaeroex
-        </Link>
+        <ContextualAskVaeroex
+          label="Ask Vaeroex"
+          prompt={`Explain why this ${insight.type.toLowerCase()} matters and what leadership should do next.`}
+          contextType={`intelligence_${insight.type.toLowerCase()}`}
+          contextId={insight.id}
+          sourceTitle={insight.title}
+          sourceSummary={`${insight.summary} Recommended action: ${insight.recommendedAction}`}
+          evidence={[
+            insight.why,
+            ...insight.evidence,
+            `Confidence: ${insight.confidence}`,
+            `Source types: ${insight.sourceTypes.join(", ")}`,
+            `Evidence count: ${insight.evidenceCount}`
+          ]}
+          compact
+        />
       </div>
 
       <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/30 p-3">
@@ -333,9 +343,21 @@ export default async function IntelligencePage() {
           <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
             Generate Executive Briefing
           </Link>
-          <Link href={`/app/agents?prompt=${encodeURIComponent(`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`)}` as Route} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-            Ask for briefing
-          </Link>
+          <ContextualAskVaeroex
+            label="Ask for briefing"
+            prompt={`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`}
+            contextType="business_memory_summary"
+            contextId={context.activeWorkspace?.id || "workspace"}
+            sourceTitle="Current intelligence and business memory"
+            sourceSummary={`Business memory includes ${intelligence.memorySummary.decisions} decision records, ${intelligence.memorySummary.recommendationOutcomes} recommendation outcomes, and data confidence ${intelligence.dataQuality.confidence}.`}
+            evidence={[
+              `Suggested next data: ${intelligence.dataQuality.suggestedNextData[0]}`,
+              `Top risk: ${topRisk?.title || "No top risk visible"}`,
+              `Top opportunity: ${topOpportunity?.title || "No top opportunity visible"}`,
+              `Top recommendation: ${topRecommendation?.title || "No top recommendation visible"}`
+            ]}
+            compact
+          />
         </div>
       </section>
     </div>
