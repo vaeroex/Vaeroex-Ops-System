@@ -393,6 +393,34 @@ export async function updateTaskStatusAction(formData: FormData) {
   redirectWithMessage(path, "Business signal updated.");
 }
 
+export async function deleteBusinessSignalAction(formData: FormData) {
+  const path = returnPath(formData, "/app/tasks");
+  const { supabase, workspaceId } = await requireWorkspace(path);
+  const recordId = text(formData, "record_id");
+
+  if (!recordId) {
+    redirectWithError(path, "Business Signal is required.");
+  }
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", recordId)
+    .eq("workspace_id", workspaceId)
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    redirectWithError(path, error?.message || "Business Signal could not be deleted.");
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "Business Signal permanently deleted.");
+}
+
 export async function createKpiAction(formData: FormData) {
   const path = "/app/kpis";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
