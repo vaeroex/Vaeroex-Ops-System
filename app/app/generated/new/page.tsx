@@ -188,7 +188,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
               {output.confidence} confidence
             </span>
             <span className="w-fit rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-100 print:border-slate-300 print:text-slate-700">
-              {output.evidenceCount} source signal{output.evidenceCount === 1 ? "" : "s"}
+              {output.evidenceCount} Business Signal{output.evidenceCount === 1 ? "" : "s"}
             </span>
           </div>
         </div>

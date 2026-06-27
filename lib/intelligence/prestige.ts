@@ -234,6 +234,18 @@ function isCompletedTask(task: TaskRow) {
   return !isOpenTask(task);
 }
 
+function hasBusinessSignalContext(task: TaskRow) {
+  return Boolean(task.description || task.category || task.related_type || task.due_date || task.ai_generated);
+}
+
+function businessSignalsWithContext(tasks: TaskRow[]) {
+  return tasks.filter((task) => isOpenTask(task) && hasBusinessSignalContext(task));
+}
+
+function businessSignalsWithLimitedContext(tasks: TaskRow[]) {
+  return tasks.filter((task) => isOpenTask(task) && (!task.description || !task.category));
+}
+
 function isOpenIssue(issue: IssueRow) {
   const status = lower(issue.status);
   return status !== "closed" && status !== "resolved";
@@ -435,7 +447,8 @@ function buildDataQuality(input: PrestigeInput) {
 
 function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildDataQuality>) {
   const openTasks = input.tasks.filter(isOpenTask);
-  const overdueTasks = openTasks.filter((task) => task.due_date && task.due_date < todayDate());
+  const signalContext = businessSignalsWithContext(openTasks);
+  const limitedContextSignals = businessSignalsWithLimitedContext(openTasks);
   const openIssues = input.issues.filter(isOpenIssue);
   const revenue = findKpi(input.kpis, ["revenue", "sales"]);
   const conversion = findKpi(input.kpis, ["conversion"]);
@@ -446,23 +459,23 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const targetRate = kpiTargetRate(input.kpis);
   const checkRate = checklistCompletion?.actual_value ?? completionRate(input.checklistRuns);
   const leadsWithoutFollowUp = input.crmLeads.filter((lead) => !isConvertedLead(lead) && !lead.last_activity_at);
-  const assignedRate = openTasks.length
-    ? ((openTasks.length - openTasks.filter((task) => !task.assigned_person_id && !task.assigned_role && !task.assigned_department && !task.assigned_to).length) / openTasks.length) * 100
+  const contextCompletenessRate = openTasks.length
+    ? ((openTasks.length - limitedContextSignals.length) / openTasks.length) * 100
     : 90;
   const processScore = scoreFromRate(sopReview?.actual_value ?? null, input.sops.length ? 72 : 55);
   const customerScore = satisfaction?.actual_value ?? (responseTime && metricOnTarget(responseTime) === false ? 62 : input.crmLeads.length ? 76 : 55);
-  const operationsScore = clampScore(88 - overdueTasks.length * 5 - openIssues.length * 3 + Math.max(0, (checkRate ?? 80) - 85) / 2);
+  const operationsScore = clampScore(88 - signalContext.length * 2 - openIssues.length * 3 + Math.max(0, (checkRate ?? 80) - 85) / 2);
   const salesScore = clampScore((revenue && metricOnTarget(revenue) ? 88 : 66) + (conversion && metricOnTarget(conversion) ? 8 : -8) - leadsWithoutFollowUp.length * 3);
-  const accountabilityScore = clampScore(assignedRate - overdueTasks.length * 4 + Math.min(10, input.assignments.filter((item) => lower(item.status) === "done").length * 2));
-  const teamScore = clampScore(70 + input.people.filter((person) => person.role_title && person.department).length * 4 - overdueTasks.length * 2);
+  const accountabilityScore = clampScore(contextCompletenessRate - limitedContextSignals.length * 3 + Math.min(10, input.assignments.filter((item) => lower(item.status) === "done").length * 2));
+  const teamScore = clampScore(70 + input.people.filter((person) => person.role_title && person.department).length * 4 - Math.min(12, signalContext.length));
   const categories = [
     healthCategory({
       name: "Operational Intelligence Health",
       score: operationsScore,
-      explanation: `${openIssues.length} open issues, ${overdueTasks.length} source-system observations needing review, and checklist completion at ${formatMetric(checkRate, "Checklist Completion Rate")}.`,
+      explanation: `${openIssues.length} open issues, ${signalContext.length} Business Signal${signalContext.length === 1 ? "" : "s"} available as context, and checklist completion at ${formatMetric(checkRate, "Checklist Completion Rate")}.`,
       improved: checkRate && checkRate >= 90 ? "Checklist discipline is improving operational visibility." : "Core business records are now centralized enough to review.",
-      declined: overdueTasks.length ? "Source-system observations are lowering operational confidence." : "No major operational decline is visible.",
-      nextAction: overdueTasks.length ? "Review the source-system observation pattern before the next leadership meeting." : "Keep reviewing checklist completion weekly."
+      declined: signalContext.length ? "Business Signals may indicate patterns leadership should interpret." : "No major operational decline is visible.",
+      nextAction: signalContext.length ? "Review the Business Signal pattern before the next leadership meeting." : "Keep reviewing checklist completion weekly."
     }),
     healthCategory({
       name: "Sales Health",
@@ -475,9 +488,9 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Source Visibility",
       score: accountabilityScore,
-      explanation: `${Math.round(assignedRate)}% of open source-system signals include enough context for review; ${overdueTasks.length} need leadership review.`,
-      improved: assignedRate >= 85 ? "Most open signals include clear source context." : "Source-system signals are available for leadership review.",
-      declined: overdueTasks.length ? "Source-system observations with limited or stale context are the biggest confidence drag." : "No major source-context drag is visible.",
+      explanation: `${Math.round(contextCompletenessRate)}% of Business Signals include enough context for review; ${limitedContextSignals.length} need more detail.`,
+      improved: contextCompletenessRate >= 85 ? "Most Business Signals include clear context." : "Business Signals are available for leadership review.",
+      declined: limitedContextSignals.length ? "Business Signals with limited context are the biggest confidence drag." : "No major source-context drag is visible.",
       nextAction: "Review the top Vaeroex priority and decide whether leadership needs an executive report, meeting agenda, or improvement plan."
     }),
     healthCategory({
@@ -507,9 +520,9 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Team Context Health",
       score: teamScore,
-      explanation: `${input.people.length} people are recorded; ${overdueTasks.length} source-system observations need review.`,
+      explanation: `${input.people.length} people are recorded; ${signalContext.length} Business Signal${signalContext.length === 1 ? "" : "s"} add organizational context.`,
       improved: input.people.length ? "People records add role and area context to leadership briefings." : "Team context can improve once people records are added.",
-      declined: overdueTasks.length ? "Source-system observations suggest workflow or response risk." : "No major team-context decline is visible.",
+      declined: signalContext.length ? "Business Signals suggest workflow or response context leadership may want to review." : "No major team-context decline is visible.",
       nextAction: "Use source visibility to review overloaded areas with leadership."
     })
   ];
@@ -521,14 +534,14 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   return {
     score,
     explanation: `Business Health Score: ${score}/100. ${strong ? `${strong.name} is strongest because ${strong.improved.toLowerCase()}` : "The workspace is still building enough history."} ${weak ? `${weak.name} needs attention because ${weak.declined.toLowerCase()}` : "No category is critically weak right now."}`,
-    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, customer pipeline records, source-system activity, reports, and files are added." : null,
+    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, customer pipeline records, Business Signals, reports, and files are added." : null,
     categories
   };
 }
 
 function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<typeof buildDataQuality>) {
   const openTasks = input.tasks.filter(isOpenTask);
-  const overdueTasks = openTasks.filter((task) => task.due_date && task.due_date < todayDate());
+  const signalContext = businessSignalsWithContext(openTasks);
   const openIssues = input.issues.filter(isOpenIssue);
   const conversion = findKpi(input.kpis, ["conversion"]);
   const responseTime = findKpi(input.kpis, ["response"]);
@@ -580,17 +593,17 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
     }));
   }
 
-  if (overdueTasks.length) {
+  if (signalContext.length) {
     priorities.push(action({
       id: "source-signal-pattern",
-      title: "Review source-system observation pattern",
-      why: "Source-system observations are evidence that customer response, handoffs, service quality, or workflow reliability may need leadership review.",
-      evidence: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} need review.`,
+      title: "Review Business Signal pattern",
+      why: "Business Signals are evidence that customer response, handoffs, service quality, strategic changes, or workflow reliability may need leadership review.",
+      evidence: `${signalContext.length} Business Signal${signalContext.length === 1 ? "" : "s"} may need leadership interpretation.`,
       owner: "Leadership Review",
       dueDate: addDays(todayDate(), 2),
       action: "Review the current workflow and decide whether an executive brief or improvement plan is needed.",
-      priority: overdueTasks.length > 5 ? "Urgent" : "High",
-      relatedModule: "Source Signals",
+      priority: signalContext.length > 5 ? "Urgent" : "High",
+      relatedModule: "Business Signals",
       href: "/app/tasks"
     }));
   }
@@ -618,7 +631,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
       evidence: `${dataQuality.gaps.length} gap${dataQuality.gaps.length === 1 ? "" : "s"} found; first gap: ${dataQuality.gaps[0].title}.`,
       owner: "Coordinator",
       dueDate: addDays(todayDate(), 7),
-      action: "Open the first gap and add the missing responsibility signal, target, source history, or analysis.",
+      action: "Review the first gap and add the missing context, target, source history, or analysis.",
       priority: "Medium",
       relatedModule: "KPIs",
       href: dataQuality.gaps[0].href
@@ -635,7 +648,9 @@ function buildProfitLeaks(input: PrestigeInput) {
   const lostValue = staleLeads.reduce((sum, lead) => sum + (lead.estimated_value || 0), 0);
   const conversion = findKpi(input.kpis, ["conversion"]);
   const revenue = findKpi(input.kpis, ["revenue", "sales"]);
-  const highValueOverdue = input.tasks.filter((task) => isOpenTask(task) && task.due_date && task.due_date < todayDate() && ["High", "Urgent"].includes(task.priority));
+  const highContextSignals = businessSignalsWithContext(input.tasks).filter((task) =>
+    ["customer", "financial", "pricing", "vendor", "regulatory"].some((keyword) => lower(task.category).includes(keyword) || lower(task.title).includes(keyword))
+  );
   const checklistRate = findKpi(input.kpis, ["checklist completion"])?.actual_value ?? completionRate(input.checklistRuns);
 
   if (staleLeads.length) {
@@ -714,18 +729,18 @@ function buildProfitLeaks(input: PrestigeInput) {
     });
   }
 
-  if (highValueOverdue.length) {
+  if (highContextSignals.length) {
     leaks.push({
       ...action({
         id: "high-priority-source-observations",
-        title: "High-priority source observations may be costing momentum",
-        why: "High-priority source-system observations can indicate delayed revenue, service recovery, or customer response in the systems the business already uses.",
-        evidence: `${highValueOverdue.length} high-priority source-system observation${highValueOverdue.length === 1 ? "" : "s"} need review.`,
+        title: "High-context Business Signals may be affecting momentum",
+        why: "Customer, financial, pricing, vendor, or regulatory Business Signals can indicate revenue, service, or response risk in the systems the business already uses.",
+        evidence: `${highContextSignals.length} high-context Business Signal${highContextSignals.length === 1 ? "" : "s"} may need leadership interpretation.`,
         owner: "Leadership Review",
         dueDate: addDays(todayDate(), 2),
-      action: "Review the high-priority source pattern and summarize likely business impact for leadership.",
+        action: "Review the Business Signal pattern and summarize likely business impact for leadership.",
         priority: "High",
-        relatedModule: "Source Signals",
+        relatedModule: "Business Signals",
         href: "/app/tasks"
       }),
       severity: "Medium",
@@ -820,7 +835,7 @@ function buildAccountability(input: PrestigeInput) {
     const assignedTasks = input.tasks.filter((task) => task.assigned_person_id === person.id || task.assigned_to === person.id);
     const assignedAssignments = input.assignments.filter((assignment) => assignment.assigned_person_id === person.id);
     const assignedIssues = input.issues.filter((issue) => issue.assigned_person_id === person.id);
-    const overdue = assignedTasks.filter((task) => isOpenTask(task) && task.due_date && task.due_date < todayDate()).length;
+    const overdue = businessSignalsWithContext(assignedTasks).length;
     const openIssues = assignedIssues.filter(isOpenIssue).length;
     const completed = assignedTasks.filter(isCompletedTask).length + assignedAssignments.filter((assignment) => ["done", "complete", "completed"].includes(lower(assignment.status))).length;
     const riskLevel = overdue + openIssues >= 4 ? "High" : overdue + openIssues >= 2 ? "Medium" : "Low";
@@ -837,7 +852,7 @@ function buildAccountability(input: PrestigeInput) {
       riskLevel,
       explanation:
         riskLevel === "High"
-          ? `${person.full_name} is connected to the highest source-signal concentration and may need leadership review.`
+          ? `${person.full_name} is connected to the highest Business Signal concentration and may need leadership review.`
           : `${person.full_name} has a ${riskLevel.toLowerCase()} visible source-context risk.`
     };
   });
@@ -848,7 +863,7 @@ function buildAccountability(input: PrestigeInput) {
     const tasks = input.tasks.filter((task) => task.assigned_role === role);
     const issues = input.issues.filter((issue) => issue.assigned_role === role);
     const assignments = input.assignments.filter((assignment) => assignment.assigned_role === role);
-    const overdue = tasks.filter((task) => isOpenTask(task) && task.due_date && task.due_date < todayDate()).length;
+    const overdue = businessSignalsWithContext(tasks).length;
     const openIssues = issues.filter(isOpenIssue).length;
     scorecards.push({
       id: `role-${role}`,
@@ -860,7 +875,7 @@ function buildAccountability(input: PrestigeInput) {
       openIssues,
       completedWork: tasks.filter(isCompletedTask).length,
       riskLevel: overdue + openIssues >= 5 ? "High" : overdue + openIssues >= 2 ? "Medium" : "Low",
-      explanation: `${role} is connected to ${tasks.filter(isOpenTask).length + assignments.length} visible source-system signal${tasks.length + assignments.length === 1 ? "" : "s"}.`
+      explanation: `${role} is connected to ${tasks.filter(isOpenTask).length + assignments.length} visible Business Signal${tasks.length + assignments.length === 1 ? "" : "s"}.`
     });
   }
 
@@ -868,7 +883,7 @@ function buildAccountability(input: PrestigeInput) {
     const tasks = input.tasks.filter((task) => task.assigned_department === department);
     const issues = input.issues.filter((issue) => issue.assigned_department === department);
     const assignments = input.assignments.filter((assignment) => assignment.assigned_department === department);
-    const overdue = tasks.filter((task) => isOpenTask(task) && task.due_date && task.due_date < todayDate()).length;
+    const overdue = businessSignalsWithContext(tasks).length;
     const openIssues = issues.filter(isOpenIssue).length;
     scorecards.push({
       id: `department-${department}`,
@@ -880,7 +895,7 @@ function buildAccountability(input: PrestigeInput) {
       openIssues,
       completedWork: tasks.filter(isCompletedTask).length,
       riskLevel: overdue + openIssues >= 5 ? "High" : overdue + openIssues >= 2 ? "Medium" : "Low",
-      explanation: `${department} has ${overdue} source-system observation${overdue === 1 ? "" : "s"} needing review and ${openIssues} open issue${openIssues === 1 ? "" : "s"}.`
+      explanation: `${department} has ${overdue} Business Signal${overdue === 1 ? "" : "s"} available as evidence and ${openIssues} open issue${openIssues === 1 ? "" : "s"}.`
     });
   }
 
@@ -902,7 +917,7 @@ function buildDepartmentScorecards(input: PrestigeInput) {
 
   return allDepartments.map((department) => {
     const openTasks = input.tasks.filter((task) => isOpenTask(task) && (task.assigned_department === department || task.category === department));
-    const overdueTasks = openTasks.filter((task) => task.due_date && task.due_date < todayDate());
+    const overdueTasks = businessSignalsWithContext(openTasks);
     const openIssues = input.issues.filter((issue) => isOpenIssue(issue) && (issue.assigned_department === department || issue.issue_type === department));
     const kpiRows = latestKpis(input.kpis).filter((kpi) => kpi.category === department || kpi.owner === department);
     const onTarget = kpiRows.length ? kpiRows.filter((kpi) => metricOnTarget(kpi)).length / kpiRows.length : null;
@@ -922,8 +937,8 @@ function buildDepartmentScorecards(input: PrestigeInput) {
       crmImpact: lower(department).includes("sales") ? `${input.crmLeads.filter((lead) => !isConvertedLead(lead)).length} active customer pipeline records` : "No direct customer pipeline impact",
       explanation:
         score < 70
-          ? `${department} scores lower because source-system observations, open issues, or missing KPI/checklist signals need attention.`
-          : `${department} is relatively stable based on current source-system activity, issues, KPIs, and checklist signals.`
+          ? `${department} scores lower because Business Signals, open issues, or missing KPI/checklist signals need attention.`
+          : `${department} is relatively stable based on current Business Signals, issues, KPIs, and checklist signals.`
     } satisfies DepartmentScorecard;
   });
 }
@@ -932,7 +947,7 @@ function buildToolSprawl(input: PrestigeInput) {
   const usage = [
     ["KPIs", input.kpis.length > 0, "manual KPI tracker"],
     ["Customer pipeline", input.crmLeads.length > 0, "customer pipeline spreadsheet"],
-    ["Source activity", input.tasks.length > 0, "loose activity list"],
+    ["Business Signals", input.tasks.length > 0, "business context notes"],
     ["Checklists", input.checklists.length > 0, "paper checklist"],
     ["Files", input.files.length > 0, "shared drive review"],
     ["Reports", input.reports.length > 0, "manual report doc"],
@@ -958,7 +973,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
   const responseTime = findKpi(input.kpis, ["response"]);
   const latest = latestKpis(input.kpis);
   const openIssues = input.issues.filter(isOpenIssue);
-  const highPriorityWithoutDueDate = input.tasks.filter((task) => isOpenTask(task) && ["High", "Urgent"].includes(task.priority) && !task.due_date);
+  const highPriorityWithoutDueDate = input.tasks.filter((task) => isOpenTask(task) && !task.due_date);
   const leadsWithoutFollowup = input.crmLeads.filter((lead) => !isConvertedLead(lead) && !lead.last_activity_at);
   const recentReports = input.reports.filter((report) => isOlderThan(report.created_at, 14) === false);
   const staleSops = input.sops.filter((sop) => isOlderThan(sop.updated_at || sop.created_at, 90));
@@ -983,10 +998,10 @@ function buildBenchmarkMode(input: PrestigeInput) {
       recommendedAction: "Review unresolved critical issues with leadership and prepare an investigation summary if needed."
     },
     {
-      title: "High-priority source-system signals should have dates",
+      title: "Business Signals should include dates when useful",
       status: highPriorityWithoutDueDate.length ? "Needs attention" : input.tasks.length ? "On track" : "Missing data",
-      evidence: `${highPriorityWithoutDueDate.length} high-priority source-system signal${highPriorityWithoutDueDate.length === 1 ? "" : "s"} lack dates.`,
-      recommendedAction: "Review high-priority signals and decide whether an improvement plan is needed."
+      evidence: `${highPriorityWithoutDueDate.length} Business Signal${highPriorityWithoutDueDate.length === 1 ? "" : "s"} lack event dates.`,
+      recommendedAction: "Review Business Signals and decide whether additional date or source context would improve confidence."
     },
     {
       title: "Weekly reports should be generated consistently",
@@ -1012,7 +1027,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
 function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: PrestigeAction[]) {
   const openTasks = input.tasks.filter(isOpenTask);
   const openIssues = input.issues.filter(isOpenIssue);
-  const overdue = openTasks.filter((task) => task.due_date && task.due_date < todayDate());
+  const overdue = businessSignalsWithContext(openTasks);
   const topFocus = focus.slice(0, 3).map((item) => item.title);
 
   return [
@@ -1031,20 +1046,20 @@ function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: Pr
     {
       role: "Manager",
       title: "Manager briefing",
-      summary: `${openTasks.length} open source-system signal${openTasks.length === 1 ? "" : "s"} and ${overdue.length} source observation${overdue.length === 1 ? "" : "s"} need review.`,
-      focus: ["Review source observations", "Review open issues", "Document next leadership decision"]
+      summary: `${openTasks.length} Business Signal${openTasks.length === 1 ? "" : "s"} and ${overdue.length} context-rich signal${overdue.length === 1 ? "" : "s"} are available for review.`,
+      focus: ["Review Business Signals", "Review open issues", "Document next leadership decision"]
     },
     {
       role: "Supervisor",
       title: "Supervisor briefing",
-      summary: "Focus on today’s source-system signals, checklist completion, field issues, and items due soon.",
-      focus: ["Review checklists", "Review field issues", "Confirm source-system status"]
+      summary: "Focus on today’s Business Signals, checklist completion, field issues, and current context.",
+      focus: ["Review checklists", "Review field issues", "Confirm Business Signal context"]
     },
     {
       role: "Coordinator / Staff",
       title: "Staff briefing",
-      summary: "Focus on visible source-system signals, shared reports, and checklist evidence.",
-      focus: ["Review source-system signals", "Open shared reports", "Review checklist evidence"]
+      summary: "Focus on visible Business Signals, shared reports, and checklist evidence.",
+      focus: ["Review Business Signals", "Open shared reports", "Review checklist evidence"]
     },
     {
       role: "Viewer",
@@ -1131,13 +1146,13 @@ function buildRecommendationTracking(input: PrestigeInput, focus: PrestigeAction
 
 function buildMeetingMode(input: PrestigeInput, focus: PrestigeAction[]) {
   const openTasks = input.tasks.filter(isOpenTask);
-  const overdue = openTasks.filter((task) => task.due_date && task.due_date < todayDate());
+  const overdue = businessSignalsWithContext(openTasks);
   const agenda = [
     "KPI review: compare current KPIs to targets and prior period.",
     "Customer pipeline review: inspect stalled leads, proposal-stage records, and response gaps.",
     `Open issues: review ${input.issues.filter(isOpenIssue).length} active issue${input.issues.filter(isOpenIssue).length === 1 ? "" : "s"}.`,
-    `Source-system observations: review ${overdue.length} observation${overdue.length === 1 ? "" : "s"} that may indicate response, handoff, or service friction.`,
-    "Checklist compliance: confirm missed runs, failed runs, and source-system signals.",
+    `Business Signals: review ${overdue.length} observation${overdue.length === 1 ? "" : "s"} that may indicate response, handoff, service, market, or operational context.`,
+    "Checklist compliance: confirm missed runs, failed runs, and related Business Signals.",
     "SOP review: identify stale or weak procedures affecting current performance.",
     "Department risks: review department scorecards and workload imbalance.",
     "Vaeroex recommendations: review, save, dismiss, or schedule outcome review.",

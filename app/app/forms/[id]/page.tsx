@@ -92,8 +92,8 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
                   <form action={convertSubmissionToTaskAction} className="mt-4">
                     <input type="hidden" name="form_id" value={form.id} />
                     <input type="hidden" name="submission_id" value={submission.id} />
-                    <ConfirmSubmitButton message="Create a source signal from this submission?">
-                      Create source signal
+                    <ConfirmSubmitButton message="Create a Business Signal from this submission?">
+                      Create Business Signal
                     </ConfirmSubmitButton>
                   </form>
                 </article>

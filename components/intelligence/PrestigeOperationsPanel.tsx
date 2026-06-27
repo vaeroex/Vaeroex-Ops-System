@@ -435,7 +435,7 @@ export function PrestigeOperationsPanel({
                 </ActionCard>
               ))
             ) : (
-              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer pipeline records, KPI targets, and source-system signals current.</p>
+              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer pipeline records, KPI targets, and Business Signals current.</p>
             )}
           </div>
         </IntelligenceAccordion>

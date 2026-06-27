@@ -31,10 +31,6 @@ function isClosed(value: string | null | undefined) {
   return ["closed", "done", "complete", "completed", "dismissed"].includes((value || "").toLowerCase());
 }
 
-function isOverdue(date: string | null | undefined) {
-  return Boolean(date && date < new Date().toISOString().slice(0, 10));
-}
-
 function priorityClass(priority: string) {
   const normalized = priority.toLowerCase();
 
@@ -168,7 +164,7 @@ function SourceContextSummary({
   savedRecommendations: number;
 }) {
   const items = [
-    ["Source signals", openSignals],
+    ["Business Signals", openSignals],
     ["Open issues", openIssues],
     ["Checklist evidence", openRuns],
     ["Saved recommendations", savedRecommendations]
@@ -199,7 +195,7 @@ function SourceLinks() {
     <details className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
       <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced: source evidence areas</summary>
       <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Source signals</Link>
+        <Link href="/app/tasks" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Business Signals</Link>
         <Link href="/app/issues" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Issues</Link>
         <Link href="/app/checklists" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Checklists</Link>
         <Link href="/app/briefings" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">Saved briefings</Link>
@@ -225,19 +221,19 @@ export default async function ActionsPage() {
   const outcomes = (outcomesResult.data || []) as RecommendationOutcomeRow[];
   const errors = [tasksResult.error, issuesResult.error, checklistsResult.error, runsResult.error, outcomesResult.error].filter(Boolean);
   const openSignals = tasks.filter((task) => !isClosed(task.status));
-  const reviewSignals = openSignals.filter((task) => isOverdue(task.due_date));
+  const businessSignals = openSignals;
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const openRuns = runs.filter((run) => !isClosed(run.status));
   const savedRecommendations = outcomes.filter((outcome) => outcome.status === "accepted" || outcome.status === "reviewed" || outcome.status === "assigned");
   const candidates: OutputCandidate[] = [
-    ...reviewSignals.slice(0, 4).map((signal) => ({
+    ...businessSignals.slice(0, 4).map((signal) => ({
       id: `signal-${signal.id}`,
       title: signal.title,
-      source: signal.ai_generated ? "Vaeroex observation" : "Source-system evidence",
+      source: signal.ai_generated ? "Vaeroex observation" : "Business Signal",
       status: "Evidence",
-      priority: signal.priority,
-      evidence: signal.description || "This source-system observation may indicate response, handoff, service, or operational friction.",
-      reviewFocus: "Leadership should review whether the underlying workflow is producing a pattern worth documenting in an executive brief or improvement plan.",
+      priority: "Business Memory",
+      evidence: signal.description || "This business observation may provide context for future intelligence.",
+      reviewFocus: "Leadership should decide whether this context belongs in an executive brief, meeting agenda, or improvement plan.",
       href: "/app/tasks" as Route,
       outputType: "action_plan" as const,
       label: "Generate Improvement Plan"

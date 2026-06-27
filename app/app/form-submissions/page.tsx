@@ -76,7 +76,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
             <input type="hidden" name="return_path" value="/app/form-submissions" />
             <input type="hidden" name="form_id" value={submission.form_id} />
             <input type="hidden" name="submission_id" value={submission.id} />
-            <ConfirmSubmitButton message="Create a source signal from this submission?">Create source signal</ConfirmSubmitButton>
+            <ConfirmSubmitButton message="Create a Business Signal from this submission?">Create Business Signal</ConfirmSubmitButton>
           </form>
         </div>
       )
@@ -88,7 +88,7 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       <PageHeader
         eyebrow="Form submissions"
         title="Submission inbox"
-        description="Review business submissions across every form, inspect Vaeroex summary drafts, and capture source signals when the evidence should inform intelligence."
+        description="Review business submissions across every form, inspect Vaeroex summary drafts, and capture Business Signals when the evidence should inform intelligence."
         actions={
           <Link href="/app/forms" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
             Manage forms

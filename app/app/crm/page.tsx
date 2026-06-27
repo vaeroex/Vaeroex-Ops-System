@@ -175,7 +175,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
         tabs={[
           { label: "Pipeline", href: "/app/crm", active: !params?.status },
           { label: "Leads", href: "/app/crm?view=active" as Route },
-          { label: "Follow-ups", href: "/app/tasks?category=Follow-up" as Route },
+          { label: "Business Signals", href: "/app/tasks?category=Customer" as Route },
           { label: "Won", href: "/app/crm?status=Converted" as Route, active: params?.status === "Converted" },
           { label: "Lost", href: "/app/crm?status=Lost" as Route, active: params?.status === "Lost" },
           { label: "Import History", href: "/app/files?status=Imported" as Route },

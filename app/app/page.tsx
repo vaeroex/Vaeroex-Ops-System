@@ -579,9 +579,9 @@ function buildSmartAlerts({
       ? {
           id: "source-signal-pattern",
           severity: "High",
-          title: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} need review`,
-          why: "Source signals are evidence from existing systems. A concentrated pattern may indicate slower response speed, customer friction, or process drift.",
-          action: "Review the source-system pattern with leadership",
+          title: `${overdueTasks.length} Business Signal${overdueTasks.length === 1 ? "" : "s"} may indicate a pattern`,
+          why: "Business Signals are evidence and context. A concentrated pattern may indicate slower response speed, customer friction, or process drift.",
+          action: "Review the Business Signal pattern with leadership",
           href: "/app/tasks"
         }
       : null,
@@ -589,9 +589,9 @@ function buildSmartAlerts({
       ? {
           id: "unassigned-tasks",
           severity: "Medium",
-          title: `${unassignedTasks.length} source-system signal${unassignedTasks.length === 1 ? "" : "s"} with limited context`,
+          title: `${unassignedTasks.length} business signal${unassignedTasks.length === 1 ? "" : "s"} with limited context`,
           why: "Signals with limited context make it harder for leadership to understand whether the pattern is isolated or systemic.",
-          action: "Review source context",
+          action: "Review business context",
           href: "/app/tasks"
         }
       : null,
@@ -600,7 +600,7 @@ function buildSmartAlerts({
           id: "kpis-below-target",
           severity: "High",
           title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} below target`,
-          why: "Below-target metrics should be reviewed against source-system activity, customer pipeline activity, and open risks.",
+          why: "Below-target metrics should be reviewed against Business Signals, customer pipeline activity, and open risks.",
           action: "Review KPIs",
           href: "/app/kpis"
         }
@@ -736,7 +736,7 @@ function signalReasoning(item: DashboardSignal, tone: "risk" | "opportunity" | "
     return `Vaeroex surfaced this because ${item.source.toLowerCase()} activity may indicate clearer revenue, process, or leadership improvement potential.`;
   }
 
-  return `Vaeroex surfaced this because the related records point to a leadership decision or source-system review.`;
+  return `Vaeroex surfaced this because the related records point to a leadership decision or Business Signal review.`;
 }
 
 function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportunity" | "action") {
@@ -749,7 +749,7 @@ function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportun
   }
 
   if (tone === "opportunity") {
-    return "Open the source record and decide whether leadership needs a report, meeting agenda, or improvement plan.";
+    return "Open the related evidence and decide whether leadership needs a report, meeting agenda, or improvement plan.";
   }
 
   return "Review the executive recommendation and decide what leadership should examine next.";
@@ -813,7 +813,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       title: "Profit Leak Detector",
       href: profitLeak?.href || ("/app/crm" as Route),
       evidence: profitLeak?.evidence || `${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`,
-      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and unclear source-system signals.",
+      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and unclear Business Signals.",
       confidence: confidenceForPriority(profitLeak?.priority),
       action: profitLeak?.action || "Review customer pipeline, KPI, and issue records for avoidable leakage before the next leadership review."
     },
@@ -1251,7 +1251,7 @@ function DemoWorkspaceBanner({
   const summaryItems = [
     ["Demo KPIs", counts.kpis],
     ["Demo Leads", counts.crm],
-    ["Demo Source Signals", counts.tasks],
+    ["Demo Business Signals", counts.tasks],
     ["Demo Reports", counts.reports],
     ["Demo Issues", counts.issues]
   ];
@@ -1259,7 +1259,7 @@ function DemoWorkspaceBanner({
     ["KPIs", counts.kpis],
     ["Business metrics", counts.operationalMetrics],
     ["Customer pipeline records", counts.crm],
-    ["Open source signals", counts.tasks],
+    ["Business Signals", counts.tasks],
     ["Open issues", counts.issues],
     ["Reports", counts.reports],
     ["SOPs", counts.sops],
@@ -1279,7 +1279,7 @@ function DemoWorkspaceBanner({
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
             Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails or customer notifications are sent.
-            It includes YTD KPI movement, customer pipeline activity, weak-month alerts, reports, source-system signals, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
+            It includes YTD KPI movement, customer pipeline activity, weak-month alerts, reports, Business Signals, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1309,7 +1309,7 @@ function DemoWorkspaceBanner({
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">Current month signals</p>
           <p className="mt-2 text-xs leading-5">
-            Revenue is healthy, but response time, conversion, source-system observations, and checklist completion still need leadership attention.
+            Revenue is healthy, but response time, conversion, Business Signals, and checklist completion still need leadership attention.
           </p>
         </article>
       </div>
@@ -1480,7 +1480,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .map((name, index) => buildMetricTrend(kpis, name, weeklyRange, kpiSettings, index));
   const comparisonTrends = names.slice(0, 6).map((name, index) => buildMetricTrend(kpis, name, range, kpiSettings, index));
   const openTasks = tasks.filter(isOpenTask);
-  const overdueTasks = openTasks.filter((task) => Boolean(task.due_date && task.due_date <= range.endDate));
+  const overdueTasks = openTasks.filter((task) => inIsoRange(task.due_date || task.created_at, range.start, range.end));
   const openIssues = issues.filter(isOpenIssue);
   const checklistFailures = checklistRuns.filter((run) => isChecklistFailure(run) && inIsoRange(run.created_at, range.start, range.end));
   const sopUpdates = sops.filter((sop) => inIsoRange(sop.updated_at || sop.created_at, range.start, range.end));
@@ -1508,7 +1508,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .sort((a, b) => Math.abs(b.changePercent ?? 0) * b.weight - Math.abs(a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const risks = [
-    overdueTasks.length ? `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} may indicate response, handoff, or service friction.` : "",
+    overdueTasks.length ? `${overdueTasks.length} Business Signal${overdueTasks.length === 1 ? "" : "s"} may indicate response, handoff, customer, market, or operational context worth leadership review.` : "",
     openIssues.length ? `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} remain unresolved.` : "",
     checklistFailures.length ? `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"} failed or need review.` : "",
     pendingImports.length ? `${pendingImports.length} extracted file import${pendingImports.length === 1 ? "" : "s"} are waiting for mapping review.` : "",
@@ -1521,11 +1521,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
-    overdueTasks.length ? "Review the source-system pattern before the next leadership check-in." : "",
+    overdueTasks.length ? "Review the Business Signal pattern before the next leadership check-in." : "",
     openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
-    negativeTrends.length ? "Review declining KPIs against recent imports, customer pipeline activity, and source-system workload." : "",
+    negativeTrends.length ? "Review declining KPIs against recent imports, customer pipeline activity, and Business Signals." : "",
     !kpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
     !crmLeads.length ? "Connect or import customer pipeline context when available." : "",
     !reports.length ? "Generate a report for this period so the management summary is saved." : ""
@@ -1569,7 +1569,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: "demo-current-month-mixed",
           severity: "Medium",
           title: "Current month has mixed signals",
-          why: "Revenue is above target, but conversion, response time, source-system observations, and checklist completion still need leadership review.",
+          why: "Revenue is above target, but conversion, response time, Business Signals, and checklist completion still need leadership review.",
           action: "Review executive intelligence",
           href: "/app/intelligence"
         }
@@ -1590,12 +1590,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       ? [
           {
             id: "source-signal-pattern",
-            title: "Source-system activity needs review",
-            source: "Source evidence",
-            status: overdueTasks.some((task) => ["High", "Urgent"].includes(task.priority)) ? "High" : "Medium",
-            context: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} suggest a possible pattern in response speed, handoffs, or service quality. Example: ${overdueTasks[0]?.title || "source signal"}.`,
-            evidence: `${overdueTasks.length} source signal${overdueTasks.length === 1 ? "" : "s"} from existing systems; Vaeroex is treating them as evidence, not work items.`,
-            reasoning: "A recurring source-system pattern may point to operational friction even when the underlying work is managed elsewhere.",
+            title: "Business Signal pattern needs review",
+            source: "Business evidence",
+            status: overdueTasks.length >= 3 ? "High" : "Medium",
+            context: `${overdueTasks.length} Business Signal${overdueTasks.length === 1 ? "" : "s"} suggest a possible pattern in response speed, handoffs, or service quality. Example: ${overdueTasks[0]?.title || "business signal"}.`,
+          evidence: `${overdueTasks.length} Business Signal${overdueTasks.length === 1 ? "" : "s"} from existing systems; Vaeroex is treating them as evidence, not work items.`,
+            reasoning: "A recurring Business Signal pattern may point to operational friction even when the underlying work is managed elsewhere.",
             confidence: overdueTasks.length >= 3 ? ("High" as const) : ("Medium" as const),
             recommendedAction: "Leadership should review the current workflow and decide whether an executive brief or improvement plan is needed.",
             href: "/app/tasks" as Route
@@ -1673,11 +1673,11 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     overdueTasks.length
       ? {
           id: "action-source-signal-pattern",
-          title: "Review source-system observation pattern",
-          source: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"}`,
+          title: "Review Business Signal pattern",
+          source: `${overdueTasks.length} Business Signal${overdueTasks.length === 1 ? "" : "s"}`,
           status: "High",
-          context: `Use the source evidence to determine whether response speed, handoffs, or service quality need leadership review. Example: ${overdueTasks[0]?.title || "source signal"}.`,
-          evidence: `${overdueTasks.length} source signal${overdueTasks.length === 1 ? "" : "s"} currently support this recommendation.`,
+          context: `Use the business evidence to determine whether response speed, handoffs, or service quality need leadership review. Example: ${overdueTasks[0]?.title || "business signal"}.`,
+          evidence: `${overdueTasks.length} Business Signal${overdueTasks.length === 1 ? "" : "s"} currently support this recommendation.`,
           reasoning: "Vaeroex is not assigning work; it is surfacing a pattern from existing systems for executive review.",
           confidence: overdueTasks.length >= 3 ? ("High" as const) : ("Medium" as const),
           recommendedAction: "Review the current workflow with leadership and generate an improvement plan only if the evidence is material.",
@@ -1720,7 +1720,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: `Review ${negativeTrends[0].name}`,
           source: "KPI trend",
           status: "Declining",
-          context: "Compare this KPI against recent customer pipeline activity, imports, issues, and source-system workload.",
+          context: "Compare this KPI against recent customer pipeline activity, imports, issues, and Business Signals.",
           href: "/app/kpis" as Route
         }
       : null,
@@ -1876,7 +1876,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     dashboardMode === "Executive View"
       ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next executive recommendation."
       : dashboardMode === "Operations View"
-        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, source-system signals, issues, checklists, responsibility visibility, customer pipeline context, and reports.`
+        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, Business Signals, issues, checklists, responsibility visibility, customer pipeline context, and reports.`
         : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and executive recommendations.`;
 
   return (
@@ -2000,12 +2000,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         <>
           <DashboardAccordion
             title="Workspace signals"
-            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} unresolved source signal${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
+            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} unresolved review item${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
         <SectionCard
 	          title="Workspace signals"
-	          description="Notifications, shared reports, KPI alerts, and source-system context for this workspace."
+	          description="Notifications, shared reports, KPI alerts, and Business Signals for this workspace."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue" : undefined} />
@@ -2020,7 +2020,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               Open notifications
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Review source signals
+              Review Business Signals
             </Link>
             <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               Shared briefings
@@ -2047,7 +2047,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-	        <SectionCard title="Source-system context" description="Imported or generated signals that may help leadership understand patterns without making Vaeroex the execution system.">
+	        <SectionCard title="Business Signal context" description="Imported or generated observations that help leadership understand patterns without making Vaeroex the execution system.">
           <div className="grid gap-4 lg:grid-cols-2">
             <div>
 	              <h3 className="text-sm font-semibold text-ink">Personal context</h3>
@@ -2092,10 +2092,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               />
             </div>
             <div>
-	              <h3 className="text-sm font-semibold text-ink">Unresolved source signals</h3>
+	              <h3 className="text-sm font-semibold text-ink">Unresolved review items</h3>
               <SimpleList
                 items={overdueOperationalAssignments}
-	                empty="No unresolved source signals."
+	                empty="No unresolved review items."
                 render={(assignment: AssignmentRow) => (
                   <div key={assignment.id} className="rounded-lg border border-red-100 bg-red-50 p-3 text-red-700">
                     <p className="text-sm font-semibold">{assignment.title}</p>
@@ -2162,8 +2162,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve current structure" : "Build your first structure"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer pipeline records, source-system signals, SOPs, and reports instead of creating duplicate systems."
-              : "Add KPI sources, customer pipeline samples, source-system signals, SOPs, and reports only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
+              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer pipeline records, Business Signals, SOPs, and reports instead of creating duplicate systems."
+              : "Add KPI sources, customer pipeline samples, Business Signals, SOPs, and reports only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/kpis" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
@@ -2173,7 +2173,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               {crmLeads.length ? "Review pipeline context" : "Add pipeline sample"}
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {tasks.length ? "Review source signals" : "Add source signal"}
+              {tasks.length ? "Review Business Signals" : "Add Business Signal"}
             </Link>
           </div>
         </article>
@@ -2205,7 +2205,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         {primaryTrends.map((trend) => (
           <KpiCard key={trend.name} trend={trend} />
         ))}
-        <StatCard label="Source Signals" value={openTasks.length} detail={`${overdueTasks.length} need review`} tone={overdueTasks.length ? "border-red-200 bg-red-50 text-red-700" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
+        <StatCard label="Business Signals" value={openTasks.length} detail={`${overdueTasks.length} in this view`} tone={overdueTasks.length ? "border-blue-200 bg-blue-50 text-blue-800" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Open Risks" value={openIssues.length} detail="Active risks and blockers" tone={openIssues.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"} />
         <StatCard label="Recent Imports" value={recentImports.length} detail={`${pendingImports.length} waiting for review`} tone={pendingImports.length ? "border-amber-200 bg-amber-50 text-amber-900" : "border-line bg-white text-ink"} />
       </section>
@@ -2254,21 +2254,22 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Source signals, issues, and checklists"
-            summary={`${openTasks.length} open source-system signal${openTasks.length === 1 ? "" : "s"}, ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"}, and ${checklistFailures.length} checklist failure${checklistFailures.length === 1 ? "" : "s"} in this period.`}
+            title="Business Signals, issues, and checklists"
+            summary={`${openTasks.length} Business Signal${openTasks.length === 1 ? "" : "s"}, ${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"}, and ${checklistFailures.length} checklist failure${checklistFailures.length === 1 ? "" : "s"} in this period.`}
           >
       <section className="grid gap-4 xl:grid-cols-3">
-        <SectionCard title="Source-system signals" description="Open source-system signals that may explain business patterns.">
+        <SectionCard title="Business Signals" description="Business observations and context that may explain patterns.">
           <SimpleList
             items={openTasks.slice(0, 6)}
-            empty="No open source-system signals."
+            empty="No Business Signals yet."
             render={(task: TaskRow) => (
               <div key={task.id} className="rounded-lg border border-line p-3">
                 <div className="flex items-start justify-between gap-3">
                   <p className="text-sm font-semibold">{task.title}</p>
-                  <StatusBadge value={task.priority} />
+                  <StatusBadge value={task.category || "General"} />
                 </div>
-                <p className="mt-1 text-xs text-muted">Status: {task.status}</p>
+                <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted">{task.description || "Business context saved for Vaeroex memory."}</p>
+                <p className="mt-2 text-xs text-muted">{new Date(task.due_date || task.created_at).toLocaleDateString()}</p>
               </div>
             )}
           />

@@ -18,7 +18,7 @@ export const VAEROEX_PLAN_FEATURES = [
   "KPIs",
   "Reports",
   "SOPs",
-  "Source Signals",
+  "Business Signals",
   "Issues",
   "Checklists",
   "Files",

@@ -108,8 +108,12 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const assignmentRows = assignments.data || [];
   const fileRows = files.data || [];
   const openTasks = taskRows.filter((task) => !["Done", "Complete"].includes(task.status || ""));
-  const overdueTasks = openTasks.filter((task) => task.due_date && task.due_date < dateOnly(new Date()));
-  const completedTasks = taskRows.filter((task) => ["Done", "Complete"].includes(task.status || "") && inRange(task.updated_at || task.created_at, start, end));
+  const businessSignalsInPeriod = taskRows.filter((task) => inRange(task.due_date || task.created_at, start, end) || inRange(task.created_at, start, end));
+  const contextualBusinessSignals = businessSignalsInPeriod.filter((task) =>
+    Boolean(task.description || task.category || task.related_type || task.ai_generated)
+  );
+  const overdueTasks = contextualBusinessSignals;
+  const completedTasks = businessSignalsInPeriod;
   const openIssues = issueRows.filter((issue) => !["Closed", "Resolved"].includes(issue.status || ""));
   const checklistExceptions = checklistRows.filter((run) => !["Done", "Complete"].includes(run.status || "") && inRange(run.created_at, start, end));
   const currentKpis = kpiRows.filter((kpi) => kpi.metric_date >= dateOnly(start) && kpi.metric_date <= dateOnly(end));
@@ -162,13 +166,13 @@ function reportBody({
 }) {
   const title = categoryLabel(category);
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} source-system observation${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, or service friction.` : "",
+    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} Business Signal${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, customer, market, or operational context worth leadership review.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} are still unresolved.` : "",
     source.counts.below_target_kpis ? `${source.counts.below_target_kpis} KPI${source.counts.below_target_kpis === 1 ? "" : "s"} are below target.` : "",
     source.counts.checklist_exceptions ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.` : ""
   ].filter(Boolean);
   const actions = [
-    source.counts.overdue_tasks ? "Review the source-system observation pattern before the next leadership check-in." : "",
+    source.counts.overdue_tasks ? "Review the Business Signal pattern before the next leadership check-in." : "",
     source.counts.below_target_kpis ? "Review below-target KPIs and decide whether leadership needs an improvement plan for each key metric." : "",
     source.counts.open_issues ? "Review the most important unresolved issues with leadership." : "",
     source.counts.vaeroex_insights ? "Review recent Vaeroex insights and decide which recommendations need an executive report, SOP, checklist, meeting agenda, or improvement plan." : "",
@@ -181,19 +185,19 @@ Period: ${startDate} to ${endDate}
 Workspace: ${workspaceName}
 
 ## Executive Summary
-Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, source-system signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} reviewed source-system signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
+Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, Business Signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} Business Signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
 
 ## What Needs Attention
 ${list(risks, "No urgent risks were detected for this scheduled report.")}
 
-## Reviewed Source-System Signals
-${list(source.items.completed_tasks, "No reviewed source-system signals were found in this period.")}
+## Business Signals
+${list(source.items.completed_tasks, "No Business Signals were found in this period.")}
 
 ## Open Issues
 ${list(source.items.open_issues, "No open issues were found.")}
 
-## Source-System Observations
-${list(source.items.overdue_tasks, "No source-system observations needing review were found.")}
+## Business Signal Evidence
+${list(source.items.overdue_tasks, "No Business Signal evidence was found.")}
 
 ## KPI Signals
 ${list(source.items.below_target_kpis, "No below-target KPIs were found for this period.")}
@@ -201,8 +205,8 @@ ${list(source.items.below_target_kpis, "No below-target KPIs were found for this
 ## Customer Pipeline Context
 ${list(source.items.crm_leads, "No new customer pipeline records were found in this period.")}
 
-## Open Responsibility Signals
-${list(source.items.open_assignments, "No open source-system context signals were found.")}
+## Open Review Signals
+${list(source.items.open_assignments, "No open review signals were found.")}
 
 ## Recent Files
 ${list(source.items.uploaded_files, "No files were uploaded in this period.")}
