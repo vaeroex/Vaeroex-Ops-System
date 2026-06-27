@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { runContextualAskVaeroexAction, type ContextualAskState } from "@/app/app/contextual-ask/actions";
 
 type ContextualAskVaeroexProps = {
@@ -18,6 +18,14 @@ type ContextualAskVaeroexProps = {
 };
 
 const initialState: ContextualAskState = { status: "idle" };
+
+function progressMessage(progress: number) {
+  if (progress >= 100) return "Explanation ready.";
+  if (progress >= 88) return "Finalizing answer...";
+  if (progress >= 58) return "Preparing explanation...";
+  if (progress >= 28) return "Checking evidence...";
+  return "Reading workspace context...";
+}
 
 function HiddenContextFields({
   prompt,
@@ -61,12 +69,74 @@ export function ContextualAskVaeroex({
   const [copied, setCopied] = useState(false);
   const [collapsed, setCollapsed] = useState(defaultCollapsed);
   const [followUp, setFollowUp] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [showCompletion, setShowCompletion] = useState(false);
+  const [showAnswer, setShowAnswer] = useState(false);
   const panelId = useMemo(() => `contextual-ask-${contextType}-${contextId || sourceTitle || "item"}`.replace(/[^a-zA-Z0-9_-]/g, "-"), [
     contextId,
     contextType,
     sourceTitle
   ]);
-  const answer = state.answer;
+  const isGenerating = isPending || showCompletion;
+  const displayedProgress = isGenerating ? Math.max(progress, 5) : progress;
+  const answer = showAnswer ? state.answer : undefined;
+  const activePanelId = isGenerating ? `${panelId}-progress` : panelId;
+
+  useEffect(() => {
+    if (!isPending) {
+      return;
+    }
+
+    setProgress(5);
+    setShowAnswer(false);
+    setShowCompletion(false);
+
+    const timer = window.setInterval(() => {
+      setProgress((current) => {
+        if (current < 70) {
+          return Math.min(70, current + 5);
+        }
+
+        if (current < 90) {
+          return Math.min(90, current + 2);
+        }
+
+        if (current < 95) {
+          return Math.min(95, current + 1);
+        }
+
+        return current;
+      });
+    }, 700);
+
+    return () => window.clearInterval(timer);
+  }, [isPending]);
+
+  useEffect(() => {
+    if (isPending) {
+      return;
+    }
+
+    if (state.status === "success" && state.answer) {
+      setProgress(100);
+      setShowCompletion(true);
+
+      const timer = window.setTimeout(() => {
+        setShowCompletion(false);
+        setShowAnswer(true);
+      }, 450);
+
+      return () => window.clearTimeout(timer);
+    }
+
+    if (state.status === "error") {
+      setShowCompletion(false);
+      setShowAnswer(false);
+      setProgress(0);
+    }
+
+    return undefined;
+  }, [isPending, state.answer, state.status]);
 
   async function copyAnswer() {
     if (!answer?.copyText) {
@@ -91,18 +161,47 @@ export function ContextualAskVaeroex({
         />
         <button
           type="submit"
-          disabled={isPending}
-          aria-controls={panelId}
-          aria-expanded={state.status === "success" && !collapsed}
+          disabled={isGenerating}
+          aria-busy={isGenerating}
+          aria-controls={activePanelId}
+          aria-expanded={isGenerating || (state.status === "success" && !collapsed)}
           className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 disabled:cursor-not-allowed disabled:opacity-65"
         >
-          {isPending ? "Explaining..." : label}
+          {isGenerating ? `Generating explanation... ${displayedProgress}%` : label}
         </button>
       </form>
 
-      {state.status === "error" ? (
+      {isGenerating ? (
+        <div
+          id={`${panelId}-progress`}
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4 text-sm text-cyan-50 shadow-panel"
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Vaeroex is generating</p>
+              <p className="mt-1 font-semibold text-white">{progressMessage(displayedProgress)}</p>
+            </div>
+            <span className="rounded-full border border-cyan-300/25 bg-slate-950/45 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+              {displayedProgress}%
+            </span>
+          </div>
+          <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-950/70">
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-vaeroex-blue via-cyan-400 to-vaeroex-accent transition-[width] duration-700 ease-out"
+              style={{ width: `${displayedProgress}%` }}
+            />
+          </div>
+          <p className="mt-3 text-xs leading-5 text-slate-300">
+            Vaeroex is reviewing the page context, workspace evidence, and limitations before showing the inline answer.
+          </p>
+        </div>
+      ) : null}
+
+      {!isGenerating && state.status === "error" ? (
         <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-4 text-sm leading-6 text-red-100">
-          <p className="font-semibold">Vaeroex couldn’t explain this yet.</p>
+          <p className="font-semibold">Vaeroex couldn’t generate this explanation.</p>
           <p className="mt-1">{state.error || "Try again in a moment."}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <form action={formAction}>
@@ -120,9 +219,6 @@ export function ContextualAskVaeroex({
             </form>
             <a href={askPageHref} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
               Open Ask Vaeroex
-            </a>
-            <a href="mailto:support@vaeroex.com" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-              Contact support
             </a>
           </div>
         </div>
@@ -221,10 +317,10 @@ export function ContextualAskVaeroex({
                     />
                   </label>
                   <button
-                    disabled={isPending || !followUp.trim()}
+                    disabled={isGenerating || !followUp.trim()}
                     className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45 disabled:cursor-not-allowed disabled:opacity-65"
                   >
-                    {isPending ? "Answering..." : "Ask follow-up"}
+                    {isGenerating ? `Generating... ${displayedProgress}%` : "Ask follow-up"}
                   </button>
                 </form>
               ) : null}
