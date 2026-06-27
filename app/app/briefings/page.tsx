@@ -213,7 +213,7 @@ export default async function BriefingsPage() {
                       View briefing
                     </Link>
                     <ContextualAskVaeroex
-                      label="Ask Vaeroex"
+                      label="Explain This"
                       prompt={`Explain the key point from this briefing: ${report.title}`}
                       contextType="briefing"
                       contextId={report.id}

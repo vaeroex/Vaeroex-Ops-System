@@ -14,10 +14,17 @@ type ContextualAskVaeroexProps = {
   compact?: boolean;
   mode?: "inline" | "drawer";
   defaultCollapsed?: boolean;
-  askPageHref?: string;
 };
 
 const initialState: ContextualAskState = { status: "idle" };
+
+function formattedBlocks(value: string) {
+  return value
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .slice(0, 12);
+}
 
 function progressMessage(progress: number) {
   if (progress >= 100) return "Explanation ready.";
@@ -53,7 +60,7 @@ function HiddenContextFields({
 }
 
 export function ContextualAskVaeroex({
-  label = "Ask Vaeroex why",
+  label = "Explain This",
   prompt,
   contextType,
   contextId,
@@ -62,8 +69,7 @@ export function ContextualAskVaeroex({
   evidence = [],
   compact = false,
   mode = "inline",
-  defaultCollapsed = true,
-  askPageHref = "/app/ask"
+  defaultCollapsed = true
 }: ContextualAskVaeroexProps) {
   const [state, formAction, isPending] = useActionState(runContextualAskVaeroexAction, initialState);
   const [copied, setCopied] = useState(false);
@@ -217,9 +223,6 @@ export function ContextualAskVaeroex({
                 Retry
               </button>
             </form>
-            <a href={askPageHref} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-              Open Ask Vaeroex
-            </a>
           </div>
         </div>
       ) : null}
@@ -249,6 +252,30 @@ export function ContextualAskVaeroex({
                 <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Why Vaeroex thinks this</p>
                 <p className="mt-2 leading-6 text-slate-100">{answer.why}</p>
               </div>
+              {answer.responseMarkdown ? (
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Detailed explanation</p>
+                  <div className="mt-2 space-y-3 leading-6 text-slate-100">
+                    {formattedBlocks(answer.responseMarkdown).map((block) => {
+                      const [firstLine, ...rest] = block.split("\n").map((line) => line.trim()).filter(Boolean);
+                      const heading = firstLine?.replace(/^#{1,4}\s*/, "").replace(/\*\*/g, "");
+                      const body = rest.join(" ");
+                      const looksLikeHeading = Boolean(firstLine && (firstLine.startsWith("#") || firstLine.endsWith(":") || firstLine.length < 46));
+
+                      return (
+                        <div key={block} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+                          {looksLikeHeading ? <p className="font-semibold text-white">{heading}</p> : null}
+                          {!looksLikeHeading || body ? (
+                            <p className={`${looksLikeHeading && body ? "mt-1" : ""} whitespace-pre-line text-slate-100`}>
+                              {looksLikeHeading ? body : block}
+                            </p>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : null}
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Data used</p>
                 <ul className="mt-2 space-y-1 leading-6 text-slate-100">

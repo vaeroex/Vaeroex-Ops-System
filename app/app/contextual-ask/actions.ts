@@ -18,6 +18,7 @@ export type ContextualAskAnswer = {
   confidence: string;
   limitations: string;
   suggestedNextStep: string;
+  responseMarkdown?: string;
   copyText: string;
 };
 
@@ -129,6 +130,7 @@ function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext
     str(output.recommended_next_step) ||
     str(output.next_step) ||
     "Review the explanation, compare it with what you know, and decide whether to act or ask a follow-up.";
+  const responseMarkdown = str(output.response_markdown);
   const normalizedDataUsed = dataUsed.length ? dataUsed : compactList([fallbackContext || "Current page context", "Current workspace snapshot"]);
   const copyText = [
     title,
@@ -142,7 +144,8 @@ function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext
     "",
     `Confidence / limitations: ${confidence}. ${limitations}`,
     "",
-    `Suggested next step: ${suggestedNextStep}`
+    `Suggested next step: ${suggestedNextStep}`,
+    responseMarkdown ? `\nDetailed explanation:\n${responseMarkdown}` : ""
   ].join("\n");
 
   return {
@@ -153,6 +156,7 @@ function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext
     confidence,
     limitations,
     suggestedNextStep,
+    responseMarkdown,
     copyText
   };
 }
@@ -199,7 +203,8 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
         data_used: ["Specific records, counts, dates, or evidence used."],
         confidence: "Low | Medium | High | Limited",
         limitations: "What would improve confidence.",
-        suggested_next_step: "One practical next step."
+        suggested_next_step: "One practical next step.",
+        response_markdown: "Optional concise formatted explanation with requested headings when the prompt asks for sections."
       }
     } satisfies Json;
 

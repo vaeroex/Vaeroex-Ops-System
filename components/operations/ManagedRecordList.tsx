@@ -725,7 +725,7 @@ export function ManagedRecordList({
             </summary>
             <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-2xl shadow-black/30">
               <ContextualAskVaeroex
-                label="Ask Vaeroex about this page"
+                label="Explain This Page"
                 prompt={askPrompt}
                 contextType={`managed_${collection}`}
                 contextId={collection}

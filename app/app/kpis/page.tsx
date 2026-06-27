@@ -1327,13 +1327,13 @@ function ComparisonAnalysis({
       <OverlayTrendChart trends={trends} mode={mode} />
       <div className="rounded-lg border border-cyan-400/25 bg-[#08111f] p-4">
         <div className="mb-3">
-          <p className="text-sm font-semibold text-white">Ask Vaeroex About This Comparison</p>
+          <p className="text-sm font-semibold text-white">Explain This Comparison</p>
           <p className="mt-1 text-xs leading-5 text-slate-400">
             Generate an inline leadership readout using this chart, timeframe, selected KPIs, and available Business Memory.
           </p>
         </div>
         <ContextualAskVaeroex
-          label="Ask Vaeroex About This Comparison"
+          label="Explain This Comparison"
           prompt="Analyze this KPI comparison for leadership. Return a concise executive analytics briefing with: Executive Summary, Key Relationships, Biggest Trend, Biggest Risk, Biggest Opportunity, Forecast only if confidence is sufficient, Confidence Score, Data Limitations, Recommended Actions, and Follow-up Questions. Explain why the relationships matter for business decisions. Do not overstate certainty when the data is limited."
           contextType="kpi_comparison"
           contextId={`kpi-comparison-${context.comparedKpis.join("-")}-${mode}`}
@@ -1500,7 +1500,7 @@ function KpiTargetRecommendationPanel({
       </div>
       <div className="mt-4">
         <ContextualAskVaeroex
-          label="Ask Vaeroex why"
+          label="Explain This"
           prompt={`Explain why Vaeroex recommended ${recommendation.value} as the target for ${metricName}. Explain whether the user should apply it or manually adjust it.`}
           contextType="kpi_recommended_target"
           contextId={latest?.id || metricName}
@@ -2121,7 +2121,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             </div>
             <div className="mt-4">
               <ContextualAskVaeroex
-                label="Ask Vaeroex about these KPIs"
+                label="Explain These KPIs"
                 prompt="Review these KPI trends and recommend the next leadership action."
                 contextType="kpi_summary"
                 contextId={topAttentionKpi?.id || "kpi-summary"}
