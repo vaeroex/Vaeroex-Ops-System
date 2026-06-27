@@ -723,6 +723,17 @@ function signalEvidence(item: DashboardSignal) {
   return item.evidence || item.context;
 }
 
+function compactSignalText(value: string | null | undefined, fallback: string, maxLength = 150) {
+  const text = (value || fallback).replace(/\s+/g, " ").trim();
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  const shortened = text.slice(0, maxLength).replace(/\s+\S*$/, "").trim();
+  return `${shortened}...`;
+}
+
 function signalReasoning(item: DashboardSignal, tone: "risk" | "opportunity" | "action") {
   if (item.reasoning) {
     return item.reasoning;
@@ -1093,29 +1104,28 @@ function IntelligenceBriefingHero({
   const briefingItems = [
     {
       id: "risk",
-      question: "Biggest risk",
+      question: "Top Risk",
       fallback: "No major risk is visible yet.",
+      emptyBody: "Vaeroex needs more business context before surfacing a high-confidence risk.",
+      detailLabel: "Evidence",
       item: risk,
       tone: "risk" as const
     },
     {
       id: "opportunity",
-      question: "Biggest opportunity",
+      question: "Top Opportunity",
       fallback: "No clear opportunity is visible yet.",
+      emptyBody: "Add more KPI history, reports, or Business Signals to reveal stronger opportunity patterns.",
+      detailLabel: "Evidence",
       item: opportunity,
       tone: "opportunity" as const
     },
     {
-      id: "attention",
-      question: "Requires attention",
-      fallback: "No immediate attention item is visible yet.",
-      item: attention,
-      tone: "risk" as const
-    },
-    {
       id: "action",
-      question: "Executive recommendation",
+      question: "Executive Recommendation",
       fallback: "Keep adding records so Vaeroex can build a stronger recommendation queue.",
+      emptyBody: "Vaeroex will recommend a leadership review when the evidence is stronger.",
+      detailLabel: "Reason",
       item: action,
       tone: "action" as const
     }
@@ -1161,31 +1171,59 @@ function IntelligenceBriefingHero({
         </div>
       </div>
 
-      <div className="grid gap-4 p-5 xl:grid-cols-4">
-        {briefingItems.map(({ id, question, fallback, item, tone }) => {
+      <div className="grid items-start gap-3 p-4 md:grid-cols-3 lg:p-5">
+        {briefingItems.map(({ id, question, fallback, emptyBody, detailLabel, item, tone }) => {
           const confidence = item ? confidenceForSignal(item, tone) : "Low";
+          const body = item
+            ? compactSignalText(item.context, "Vaeroex is still learning from the available workspace context.", 145)
+            : emptyBody;
+          const detail = item
+            ? compactSignalText(
+                id === "action" ? signalReasoning(item, tone) : signalEvidence(item),
+                "Workspace evidence is still limited.",
+                125
+              )
+            : "More source data needed.";
 
           return (
-            <article key={id} className="rounded-lg border border-white/10 bg-white/[0.06] p-3 shadow-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-silver">{question}</p>
-                  <h3 className="mt-2 line-clamp-2 text-base font-semibold leading-5">{item?.title || fallback}</h3>
-                </div>
+            <article key={id} className="min-h-[168px] rounded-lg border border-white/10 bg-white/[0.055] p-3 shadow-sm">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-cyan-100">
+                  {question}
+                </span>
                 <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(confidence)}`}>
-                  {confidence} confidence
+                  Confidence: {confidence}
                 </span>
               </div>
 
+              <h3 className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-white">
+                {compactSignalText(item?.title, fallback, 92)}
+              </h3>
+
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-300">
+                {body}
+              </p>
+
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">
+                <span className="font-semibold text-white">{detailLabel}:</span> {detail}
+              </p>
+
               {item ? (
-                <>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">
-                    {item.context}
-                  </p>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">
-                    <span className="font-semibold text-white">Evidence:</span> {signalEvidence(item)}
-                  </p>
-                  <div className="mt-3">
+                <div className="mt-3">
+                  {id === "action" ? (
+                    <Link
+                      href={generatedOutputHref({
+                        type: "executive_briefing",
+                        title: item.title,
+                        summary: item.context,
+                        why: signalReasoning(item, tone),
+                        remedy: signalRecommendedAction(item, tone)
+                      })}
+                      className="inline-flex min-h-10 items-center rounded-lg border border-cyan-300/25 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:border-vaeroex-accent/60 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
+                    >
+                      Generate Executive Brief
+                    </Link>
+                  ) : (
                     <ContextualAskVaeroex
                       label="Explain This"
                       prompt="Explain this briefing card for leadership. Include what happened, why Vaeroex surfaced it, evidence, confidence, possible business impact, and what leadership should review. Do not assign work, create tasks, name owners, or suggest due dates."
@@ -1203,10 +1241,10 @@ function IntelligenceBriefingHero({
                       ]}
                       compact
                     />
-                  </div>
-                </>
+                  )}
+                </div>
               ) : (
-                <p className="mt-2 text-xs leading-5 text-slate-300">Add more workspace records, imports, decisions, and outcomes to strengthen this signal.</p>
+                <p className="mt-3 text-xs leading-5 text-slate-400">Add more records, imports, decisions, and outcomes to strengthen this signal.</p>
               )}
             </article>
           );
