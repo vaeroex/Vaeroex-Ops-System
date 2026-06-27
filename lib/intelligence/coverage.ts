@@ -437,7 +437,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   const operationsSources = [
     ...kpiSources(input.kpis || [], operationsKeywords),
     ...operationalMetricSources(input.operationalMetrics || [], operationsKeywords),
-    ...activeRows(input.tasks || []).slice(0, 80).map((task) => evidence(task.title, "Follow-ups", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category))),
+    ...activeRows(input.tasks || []).slice(0, 80).map((task) => evidence(task.title, "Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category))),
     ...(input.checklistRuns || []).slice(0, 80).map((run) => evidence(`Checklist run ${run.status}`, "Checklist Runs", run.created_at, true, "developing", sourceText(run.status, run.notes))),
     ...activeRows(input.assets || []).slice(0, 40).map((asset) => evidence(asset.asset_name, "Assets", asset.updated_at || asset.created_at, true, "developing", sourceText(asset.asset_type, asset.status, asset.notes))),
     ...fileSources(input.files || [], operationsKeywords),
@@ -466,14 +466,14 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   ];
   const staffingSources = [
     ...activeRows(input.people || []).map((person) => evidence(person.full_name, "People", person.updated_at || person.created_at, true, person.role_title || person.department ? "strong" : "developing", sourceText(person.role_title, person.department, person.status))),
-    ...activeRows(input.tasks || []).filter((task) => task.assigned_to || task.assigned_person_id || task.assigned_role || task.assigned_department).map((task) => evidence(task.title, "Assigned Follow-ups", task.updated_at || task.created_at, true, "developing", sourceText(task.assigned_to, task.assigned_role, task.assigned_department))),
+    ...activeRows(input.tasks || []).filter((task) => task.assigned_to || task.assigned_person_id || task.assigned_role || task.assigned_department).map((task) => evidence(task.title, "Business Signal Context", task.updated_at || task.created_at, true, "developing", sourceText(task.assigned_to, task.assigned_role, task.assigned_department))),
     ...operationalMetricSources(input.operationalMetrics || [], staffingKeywords, "Staffing Metrics"),
     ...fileSources(input.files || [], staffingKeywords, "Staffing Files"),
     ...reportSources(input.reports || [], staffingKeywords, "Staffing Reports")
   ];
   const riskSources = [
     ...(input.issues || []).map((issue) => evidence(issue.title, "Issues", issue.updated_at || issue.created_at, true, issue.root_cause || issue.recommended_fix ? "strong" : "developing", sourceText(issue.description, issue.issue_type, issue.severity, issue.root_cause, issue.recommended_fix))),
-    ...activeRows(input.tasks || []).filter((task) => includesAny(sourceText(task.title, task.description, task.priority, task.status), riskKeywords)).map((task) => evidence(task.title, "Risk Follow-ups", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.priority, task.status))),
+    ...activeRows(input.tasks || []).filter((task) => includesAny(sourceText(task.title, task.description, task.category, task.status), riskKeywords)).map((task) => evidence(task.title, "Risk Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category, task.status))),
     ...fileSources(input.files || [], riskKeywords, "Risk Files"),
     ...reportSources(input.reports || [], riskKeywords, "Risk Reports"),
     ...(input.vaeroexRuns || []).filter((run) => run.status === "failed").map((run) => evidence(`Failed Vaeroex run: ${run.agent_type}`, "Vaeroex Runs", run.created_at, false, "limited", run.error_message || ""))

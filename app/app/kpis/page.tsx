@@ -1248,7 +1248,7 @@ function comparisonNotes(trends: KpiTrend[]) {
   const executionRisk = issues || overdue;
 
   if (executionRisk && revenue && trendDirection(revenue) === "up" && trendDirection(executionRisk) === "up") {
-    notes.push("Operating demand appears to be rising while issues or source-system observations are also increasing. That pattern can indicate capacity, response, or service-quality pressure.");
+    notes.push("Operating demand appears to be rising while issues or Business Signals are also increasing. That pattern can indicate capacity, response, or service-quality pressure.");
   }
 
   return notes;

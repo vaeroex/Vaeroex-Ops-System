@@ -251,8 +251,17 @@ function matchesCategory(category: string, row: { category?: string | null; issu
   }
 
   const target = normalizeCategory(category);
+  const normalizedModule = normalizeCategory(moduleName);
+  const moduleAliases =
+    normalizedModule === "business signals"
+      ? ["tasks", "source signals", "follow-ups"]
+      : normalizedModule === "crm"
+        ? ["customer pipeline"]
+        : [];
+
   return (
-    normalizeCategory(moduleName) === target ||
+    normalizedModule === target ||
+    moduleAliases.includes(target) ||
     normalizeCategory(row.category || "") === target ||
     normalizeCategory(row.issue_type || "") === target
   );
@@ -486,7 +495,7 @@ async function fetchReportSource(
       .limit(300)
   ]);
 
-  const taskRows = ((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Tasks"));
+  const taskRows = ((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
   const issueRows = ((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
   const checklistRunRows = ((checklistRuns.data ?? []) as ChecklistRunRow[]).filter(() =>
     matchesCategory(category, {}, "Checklists")
@@ -507,9 +516,13 @@ async function fetchReportSource(
     (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
 
-  const completedTasks = taskRows.filter((task) => task.status === "Done" && inIsoRange(task.updated_at || task.created_at, range));
+  const businessSignalsInPeriod = taskRows.filter((task) => inIsoRange(task.due_date || task.created_at, range) || inIsoRange(task.created_at, range));
+  const contextualBusinessSignals = businessSignalsInPeriod.filter((task) =>
+    Boolean(task.description || task.category || task.related_type || task.ai_generated)
+  );
+  const completedTasks = businessSignalsInPeriod;
   const createdTasks = taskRows.filter((task) => inIsoRange(task.created_at, range));
-  const overdueTasks = taskRows.filter((task) => task.status !== "Done" && Boolean(task.due_date && task.due_date <= range.endDate));
+  const overdueTasks = contextualBusinessSignals;
   const openTasks = taskRows.filter((task) => task.status !== "Done");
   const completedChecklistRuns = checklistRunRows.filter(
     (run) => (run.completed_at && inIsoRange(run.completed_at, range)) || (run.status === "Complete" && inIsoRange(run.created_at, range))
@@ -603,7 +616,7 @@ async function fetchReportSource(
 
 function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} source-system observation${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, or service friction.` : "",
+    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} Business Signal${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, customer, market, or operational context worth leadership review.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} remain unresolved.` : "",
     source.counts.checklist_exceptions
       ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.`
@@ -620,7 +633,7 @@ function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
 
 function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const actions = [
-    source.counts.overdue_tasks ? "Review the source-system observation pattern before the next management review." : "",
+    source.counts.overdue_tasks ? "Review the Business Signal pattern before the next management review." : "",
     source.counts.open_issues ? "Review open issues by severity and decide whether an investigation summary is needed." : "",
     source.counts.checklist_exceptions ? "Review incomplete checklist runs and update the checklist or accountability process where needed." : "",
     source.counts.flagged_assets ? "Confirm asset readiness and document any maintenance or replacement decisions." : "",
@@ -655,13 +668,13 @@ function buildReportBody({
   const risks = riskItems(current);
   const nextActions = recommendedActions(current);
   const summary =
-    `${workspaceName} reviewed ${current.counts.completed_tasks} source-system signal${current.counts.completed_tasks === 1 ? "" : "s"}, ` +
+    `${workspaceName} captured ${current.counts.completed_tasks} Business Signal${current.counts.completed_tasks === 1 ? "" : "s"}, ` +
     `${current.counts.checklist_completions} checklist run${current.counts.checklist_completions === 1 ? "" : "s"}, and ` +
     `${current.counts.sops_created} SOP update${current.counts.sops_created === 1 ? "" : "s"} during this period. ` +
     `${current.counts.uploaded_files} file${current.counts.uploaded_files === 1 ? "" : "s"} were uploaded and ` +
     `${current.counts.imported_file_rows} spreadsheet row${current.counts.imported_file_rows === 1 ? "" : "s"} were imported where useful. ` +
     `${current.counts.open_issues} open issue${current.counts.open_issues === 1 ? "" : "s"} and ` +
-    `${current.counts.overdue_tasks} source-system observation${current.counts.overdue_tasks === 1 ? "" : "s"} need leadership review.`;
+    `${current.counts.overdue_tasks} Business Signal${current.counts.overdue_tasks === 1 ? "" : "s"} provide context for leadership review.`;
 
   return `# ${period} ${reportType} - Generated by Vaeroex
 
@@ -673,7 +686,7 @@ Category: ${category || "All"}
 ${summary}
 
 ## Trend Comparison
-- Reviewed source signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
+- Business Signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
 - Checklist completions: ${trendPhrase(current.counts.checklist_completions, previous.counts.checklist_completions)} vs ${previousLabel}
 - New issues: ${trendPhrase(current.counts.new_issues, previous.counts.new_issues)} vs ${previousLabel}
 - Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)} vs ${previousLabel}
@@ -683,21 +696,21 @@ ${summary}
 - Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)} vs ${previousLabel}
 - CRM leads: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)} vs ${previousLabel}
 
-## Reviewed Source Activity
+## Business Signals and Source Context
 ${readableList(
   [
-    ...current.items.completed_tasks.map((item) => `Source signal reviewed: ${item}`),
+    ...current.items.completed_tasks.map((item) => `Business Signal: ${item}`),
     ...current.items.checklist_completions.map((item) => `Checklist completed: ${item}`),
     ...current.items.sops_created.map((item) => `SOP updated: ${item}`)
   ],
-  "No reviewed source signals, checklist completions, or SOP updates were found in this period."
+  "No Business Signals, checklist completions, or SOP updates were found in this period."
 )}
 
 ## Open Issues
 ${readableList(current.items.open_issues, "No open issues are currently listed for this filter.")}
 
-## Source-System Observations
-${readableList(current.items.overdue_tasks, "No source-system observations needing review were found for this period.")}
+## Business Signal Evidence
+${readableList(current.items.overdue_tasks, "No Business Signal evidence was found for this period.")}
 
 ## KPI Trends
 - KPI records added: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)}
@@ -705,8 +718,8 @@ ${readableList(current.items.overdue_tasks, "No source-system observations needi
 ${readableList(current.items.kpis_recorded, "No KPI records were found for this period.")}
 - KPI comparison observations:
 ${readableList(current.items.kpi_trend_observations, "No KPI trend observations were available yet. Add at least two dated values for a KPI to unlock comparisons.")}
-- Reviewed source signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
-- Open source signals now: ${current.counts.open_tasks}
+- Business Signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
+- Business Signals in memory now: ${current.counts.open_tasks}
 - Open issues now: ${current.counts.open_issues}
 - Checklist exceptions: ${trendPhrase(current.counts.checklist_exceptions, previous.counts.checklist_exceptions)}
 - Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)}

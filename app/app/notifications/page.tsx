@@ -283,13 +283,13 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
               description={
                 view === "unread"
                   ? "You are caught up. Read and archived history is still available in the other tabs."
-                  : "Shared reports, KPI alerts, source signals, file analysis, and Vaeroex recommendations will appear here."
+                  : "Shared reports, KPI alerts, Business Signals, file analysis, and Vaeroex recommendations will appear here."
               }
             />
           )}
         </SectionCard>
 
-        <SectionCard title="Workspace signals" description="Source-system and shared-review signals from reports, KPI alerts, checklists, and Vaeroex recommendations.">
+        <SectionCard title="Workspace signals" description="Business Signals and shared-review signals from reports, KPI alerts, checklists, and Vaeroex recommendations.">
           {assignments.length ? (
             <div className="space-y-2">
               {assignments.slice(0, 12).map((assignment) => (

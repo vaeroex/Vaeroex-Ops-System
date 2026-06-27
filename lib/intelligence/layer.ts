@@ -182,8 +182,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const decisions = input.decisions || [];
   const recommendationOutcomes = activeRows(input.recommendationOutcomes || []);
   const openTasks = tasks.filter((task) => !isClosed(task.status));
-  const overdueTasks = openTasks.filter((task) => isOverdue(task.due_date));
-  const ownerlessTasks = openTasks.filter((task) => !task.assigned_to && !task.assigned_role && !task.assigned_person_id && !task.assigned_department);
+  const businessSignalsForReview = openTasks.filter((task) => Boolean(task.description || task.category || task.related_type || task.due_date));
+  const signalsWithLimitedContext = openTasks.filter((task) => !task.description || !task.category);
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const latestKpis = latestKpisByName(kpis);
   const historyCounts = kpiHistoryCounts(kpis);
@@ -205,7 +205,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     !reports.length ? "Upload or generate prior management reports." : "",
     !files.length ? "Upload a recent spreadsheet, report, meeting note, or SOP." : "",
     !crmLeads.length ? "Add customer context or import a customer/lead list." : "",
-    !people.length ? "Add leadership or area context so Vaeroex can interpret source-system signals." : ""
+    !people.length ? "Add leadership or area context so Vaeroex can interpret Business Signals." : ""
   ].filter(Boolean);
   const dataQualityScore = Math.min(
     100,
@@ -243,53 +243,53 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         lastUpdated: issue.updated_at || issue.created_at
       };
     }),
-    overdueTasks.length
+    businessSignalsForReview.length
       ? (() => {
-          const highestPriority = overdueTasks.some((task) => ["High", "Urgent"].includes(task.priority)) ? "High" : "Medium";
-          const examples = overdueTasks
+          const signalPriority = businessSignalsForReview.length >= 5 ? "High" : "Medium";
+          const examples = businessSignalsForReview
             .slice(0, 3)
             .map((task) => task.title)
             .join(", ");
           const evidence = [
-            `Source signals needing review: ${overdueTasks.length}`,
+            `Business Signals in this pattern: ${businessSignalsForReview.length}`,
             examples ? `Examples: ${examples}` : "Examples: no titles available",
-            "Source signals are evidence from connected business systems, not Vaeroex-owned tasks"
+            "Business Signals are evidence and context, not Vaeroex-owned tasks"
           ];
 
           return {
             id: "source-signal-review-pattern",
             type: "Risk" as const,
-            title: "Source-system activity needs leadership review",
-            summary: `${overdueTasks.length} source-system observation${overdueTasks.length === 1 ? "" : "s"} suggest a pattern that may affect customer response, conversion, service quality, or operational reliability.`,
-            why: "Vaeroex treats source signals as evidence from the systems a business already uses. The pattern matters because it may reveal slower response speed, unresolved customer needs, or process friction.",
+            title: "Business Signals may indicate a pattern",
+            summary: `${businessSignalsForReview.length} Business Signal${businessSignalsForReview.length === 1 ? "" : "s"} may affect customer response, conversion, service quality, market timing, or operational reliability.`,
+            why: "Vaeroex treats Business Signals as evidence and context from the organization. The pattern matters because it may reveal slower response speed, unresolved customer needs, or process friction.",
             impact: "If ignored, leadership may miss a developing retention, conversion, or service-quality risk.",
-            recommendedAction: "Leadership should review the current source-system workflow and decide whether an executive brief, meeting agenda, or improvement plan is needed.",
-            confidence: confidenceFromEvidence(evidence.length, highestPriority),
+            recommendedAction: "Leadership should review the Business Signal evidence and decide whether an executive brief, meeting agenda, or improvement plan is needed.",
+            confidence: confidenceFromEvidence(evidence.length, signalPriority),
             evidence,
             evidenceCount: evidence.length,
-            sourceTypes: ["Source-system evidence"],
+            sourceTypes: ["Business Signals"],
             sourceHref: "/app/tasks",
-            priority: highestPriority,
-            lastUpdated: latestDate(overdueTasks.map((task) => task.updated_at || task.created_at))
+            priority: signalPriority,
+            lastUpdated: latestDate(businessSignalsForReview.map((task) => task.updated_at || task.created_at))
           };
         })()
       : null,
-    ownerlessTasks.length
+    signalsWithLimitedContext.length
       ? {
           id: "unclear-source-signals",
           type: "Bottleneck" as const,
-          title: "Source-system context is unclear",
-          summary: `${ownerlessTasks.length} open source-system signal${ownerlessTasks.length === 1 ? " has" : "s have"} limited review context visible in the source data.`,
-          why: "Vaeroex looks for source-system signals with limited context because those patterns can weaken leadership confidence.",
+          title: "Business Signal context is unclear",
+          summary: `${signalsWithLimitedContext.length} Business Signal${signalsWithLimitedContext.length === 1 ? " has" : "s have"} limited context visible in the source data.`,
+          why: "Vaeroex looks for Business Signals with limited context because those patterns can weaken leadership confidence.",
           impact: "If ignored, customer response, issue recovery, or internal decision speed may slow without leadership noticing.",
           recommendedAction: "Leadership should review the underlying workflow and decide whether clearer reporting or a meeting agenda is needed.",
-          confidence: ownerlessTasks.length >= 5 ? "High" : "Medium",
-          evidence: [`Signals with limited context: ${ownerlessTasks.length}`, `Open source-system signals: ${openTasks.length}`, ownerlessTasks[0]?.title ? `Example: ${ownerlessTasks[0].title}` : "No example available"],
+          confidence: signalsWithLimitedContext.length >= 5 ? "High" : "Medium",
+          evidence: [`Business Signals with limited context: ${signalsWithLimitedContext.length}`, `Business Signals in memory: ${openTasks.length}`, signalsWithLimitedContext[0]?.title ? `Example: ${signalsWithLimitedContext[0].title}` : "No example available"],
           evidenceCount: 3,
-          sourceTypes: ["Source-system signals"],
+          sourceTypes: ["Business Signals"],
           sourceHref: "/app/tasks",
-          priority: ownerlessTasks.length >= 5 ? "High" : "Medium",
-          lastUpdated: latestDate(ownerlessTasks.map((task) => task.updated_at || task.created_at))
+          priority: signalsWithLimitedContext.length >= 5 ? "High" : "Medium",
+          lastUpdated: latestDate(signalsWithLimitedContext.map((task) => task.updated_at || task.created_at))
         }
       : null,
     ...belowTargetKpis.slice(0, 4).map((kpi) => {
@@ -303,7 +303,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
         why: "A below-target KPI is a signal that performance changed or the target needs leadership review.",
         impact: "The metric may point to execution risk, weak process, or a target that needs a management decision.",
-        recommendedAction: "Review related reports, files, customer activity, and source-system history before making a leadership decision.",
+        recommendedAction: "Review related reports, files, customer activity, and Business Signal history before making a leadership decision.",
         confidence: history >= 3 ? "High" : "Medium",
         evidence,
         evidenceCount: evidence.length,

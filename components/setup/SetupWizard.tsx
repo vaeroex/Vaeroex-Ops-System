@@ -164,7 +164,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
           <p className="mt-3 text-sm leading-6 text-muted">
             Vaeroex will create a practical starting workspace for visibility, accountability, and execution.
             Your selected environment and organization description will shape initial dashboards, terminology,
-            workflows, source signals, reports, and intelligence outputs.
+            workflows, Business Signals, reports, and intelligence outputs.
           </p>
           <div className="mt-5">
             <ComplianceNotice />

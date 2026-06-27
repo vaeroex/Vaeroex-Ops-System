@@ -26,8 +26,8 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Reports",
   "Files",
   "Issues",
-  "Tasks",
-  "Follow-ups",
+  "Business Signals",
+  "Review Signals",
   "CRM",
   "SOPs",
   "Checklists",
@@ -349,24 +349,24 @@ export async function GET(request: Request) {
 
   addGroup(
     groups,
-    "Tasks",
+    "Business Signals",
     tasks.map((task) => ({
       id: task.id,
       title: task.title,
-      sourceType: "Task",
-      preview: truncate(task.description || compact([task.category, task.assigned_role, task.assigned_department])),
+      sourceType: "Business Signal",
+      preview: truncate(task.description || compact([task.category, task.related_type, task.due_date])),
       href: hrefWithQuery("/app/tasks", task.title),
-      meta: compact([task.status, task.priority, task.due_date])
+      meta: compact([task.category, task.related_type, task.due_date])
     }))
   );
 
   addGroup(
     groups,
-    "Follow-ups",
+    "Review Signals",
     assignments.map((assignment) => ({
       id: assignment.id,
       title: assignment.title,
-      sourceType: "Follow-up",
+      sourceType: "Review Signal",
       preview: truncate(assignment.description || assignment.source_title),
       href: sourceHref(assignment.source_type, assignment.source_title || assignment.title),
       meta: compact([assignment.status, assignment.priority, assignment.due_date])

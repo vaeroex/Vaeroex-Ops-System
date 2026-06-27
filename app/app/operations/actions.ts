@@ -228,11 +228,11 @@ export async function convertSubmissionToTaskAction(formData: FormData) {
 
   const { error } = await supabase.from("tasks").insert({
     workspace_id: workspaceId,
-    title: `Source signal: ${submission.submitter_name || "Form submission"}`,
+    title: `Business signal: ${submission.submitter_name || "Form submission"}`,
     description: submission.ai_summary || "Review form submission as source evidence.",
-    status: "To Do",
-    priority: submission.ai_detected_priority || "Medium",
-    category: "Form source signal",
+    status: "Business Signal",
+    priority: "Context",
+    category: "Form context",
     related_type: "form_submission",
     related_id: submission.id,
     ai_generated: true,
@@ -246,7 +246,7 @@ export async function convertSubmissionToTaskAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app/form-submissions");
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Source signal created.");
+  redirectWithMessage(path, "Business signal saved to Business Memory.");
 }
 
 export async function createChecklistAction(formData: FormData) {
@@ -314,15 +314,15 @@ export async function createTaskAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace(path);
   const title = text(formData, "title");
 
-  requireValue(path, "Signal title", title);
-  validateLength(path, "Signal description", text(formData, "description"), 2000);
+  requireValue(path, "Business signal title", title);
+  validateLength(path, "Business signal description", text(formData, "description"), 2000);
 
   const { error } = await supabase.from("tasks").insert({
     workspace_id: workspaceId,
     title,
     description: text(formData, "description"),
-    status: text(formData, "status") || "To Do",
-    priority: text(formData, "priority") || "Medium",
+    status: text(formData, "status") || "Business Signal",
+    priority: text(formData, "priority") || "Context",
     category: text(formData, "category"),
     assigned_person_id: text(formData, "person_id") || null,
     assigned_role: text(formData, "role") || null,
@@ -336,7 +336,42 @@ export async function createTaskAction(formData: FormData) {
   }
 
   revalidatePath(path);
-  redirectWithMessage(path, "Source signal created.");
+  redirectWithMessage(path, "Business signal saved to Business Memory.");
+}
+
+export async function createBusinessSignalAction(formData: FormData) {
+  const path = "/app/tasks";
+  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const title = text(formData, "title");
+  const description = text(formData, "description");
+  const category = text(formData, "category") || "General";
+  const signalDate = text(formData, "signal_date");
+  const source = text(formData, "source") || "Manual";
+
+  requireValue(path, "Business signal title", title);
+  validateLength(path, "Business signal description", description, 2000);
+
+  const { error } = await supabase.from("tasks").insert({
+    workspace_id: workspaceId,
+    title,
+    description,
+    status: "Business Signal",
+    priority: "Context",
+    category,
+    due_date: signalDate || null,
+    related_type: source === "Uploaded" ? "Uploaded" : "Manual",
+    ai_generated: false,
+    created_by: user.id
+  });
+
+  if (error) {
+    redirectWithError(path, error.message);
+  }
+
+  revalidatePath(path);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  redirectWithMessage(path, "Business signal saved to Business Memory.");
 }
 
 export async function updateTaskStatusAction(formData: FormData) {
@@ -346,7 +381,7 @@ export async function updateTaskStatusAction(formData: FormData) {
 
   const { error } = await supabase
     .from("tasks")
-    .update({ status: text(formData, "status") || "To Do" })
+    .update({ status: text(formData, "status") || "Business Signal" })
     .eq("id", taskId)
     .eq("workspace_id", workspaceId);
 
@@ -355,7 +390,7 @@ export async function updateTaskStatusAction(formData: FormData) {
   }
 
   revalidatePath(path);
-  redirectWithMessage(path, "Follow-up status updated.");
+  redirectWithMessage(path, "Business signal updated.");
 }
 
 export async function createKpiAction(formData: FormData) {
@@ -711,11 +746,11 @@ export async function convertIssueToTaskAction(formData: FormData) {
 
   const { error } = await supabase.from("tasks").insert({
     workspace_id: workspaceId,
-    title: `Resolve issue: ${issue.title}`,
-    description: issue.recommended_fix || issue.description || "Review issue and confirm next action.",
-    status: "To Do",
-    priority: issue.severity === "High" ? "High" : issue.severity === "Urgent" ? "Urgent" : "Medium",
-    category: "Issue resolution",
+    title: `Business signal: ${issue.title}`,
+    description: issue.description || issue.root_cause || issue.recommended_fix || "Review issue as business context.",
+    status: "Business Signal",
+    priority: "Context",
+    category: "Issue context",
     assigned_person_id: issue.assigned_person_id,
     assigned_role: issue.assigned_role,
     assigned_department: issue.assigned_department,
@@ -731,7 +766,7 @@ export async function convertIssueToTaskAction(formData: FormData) {
 
   revalidatePath(path);
   revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Source signal created.");
+  redirectWithMessage(path, "Business signal saved to Business Memory.");
 }
 
 export async function createAssetAction(formData: FormData) {

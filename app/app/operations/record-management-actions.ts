@@ -101,6 +101,7 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "status", kind: "select", maxLength: 80 },
       { name: "priority", kind: "select", maxLength: 80 },
       { name: "category", kind: "text", maxLength: 120 },
+      { name: "related_type", kind: "select", maxLength: 80 },
       { name: "assigned_role", kind: "text", maxLength: 120 },
       { name: "assigned_department", kind: "text", maxLength: 140 },
       { name: "due_date", kind: "date" }

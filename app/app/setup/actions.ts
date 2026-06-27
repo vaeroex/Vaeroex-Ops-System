@@ -91,10 +91,10 @@ function buildVaeroexAuditSummary(companyName: string, mainProblem: string, orga
       organizationDescription || "The organization"
     } needs clear visibility, accountability, and execution structure for repeatable growth.`,
     current_operational_problems: [mainProblem || "Visibility and execution priorities need to be clarified during setup."],
-    main_bottlenecks: ["Limited visibility", "Missed source-system signals", "No weekly leadership review cadence"],
-    accountability_gaps: ["Source-system signals need evidence, context, and clear review standards."],
+    main_bottlenecks: ["Limited visibility", "Missing Business Signals", "No weekly leadership review cadence"],
+    accountability_gaps: ["Business Signals need evidence, context, and clear review standards."],
     recommended_systems_to_build: ["Forms", "Checklists", "SOPs", "Executive review cadence", "Weekly intelligence report"],
-    suggested_dashboard_metrics: ["Open source signals", "Unresolved source signals", "Open risks", "Assets needing attention"],
+    suggested_dashboard_metrics: ["Business Signals", "Signals with limited context", "Open risks", "Assets needing attention"],
     thirty_day_action_plan: [
       "Week 1: Finalize forms and checklists.",
       "Week 2: Review evidence and checklist patterns.",
@@ -319,17 +319,17 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     ),
     supabase.from("tasks").insert(
       [
-        ["Review initial forms", "Review generated forms and adjust required fields.", "High"],
-        ["Review checklist evidence", "Confirm which checklist results matter for leadership intelligence.", "High"],
-        ["Review issue categories", "Confirm the first issue categories match your business.", "Medium"],
-        ["Review SOP drafts", "Turn initial SOPs into active working procedures.", "Medium"],
-        ["Run Vaeroex review", "Ask Vaeroex to review real workspace data after setup.", "Medium"]
-      ].map(([title, description, priority]) => ({
+        ["Initial forms configured", "Generated forms were created during setup and can provide future business context."],
+        ["Checklist evidence configured", "Checklist results can help Vaeroex understand operating rhythm and leadership signals."],
+        ["Issue categories configured", "Initial issue categories were selected to help Vaeroex interpret risk patterns."],
+        ["SOP drafts configured", "Initial SOP drafts can help Vaeroex understand process context."],
+        ["Vaeroex review available", "Vaeroex can review real workspace data once the workspace has more business activity."]
+      ].map(([title, description]) => ({
         workspace_id: workspaceId,
         title,
         description,
-        status: "To Do",
-        priority,
+        status: "Business Signal",
+        priority: "Context",
         category: "Setup",
         ai_generated: false,
         created_by: user.id

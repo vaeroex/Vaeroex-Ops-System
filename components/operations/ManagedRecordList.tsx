@@ -84,6 +84,12 @@ type ManagedRecordListProps = {
   returnPath?: string;
   searchParams?: Record<string, string | string[] | undefined>;
   activeRecordId?: string | null;
+  labels?: {
+    status?: string;
+    owner?: string;
+    category?: string;
+    date?: string;
+  };
 };
 
 const sortOptions = [
@@ -157,7 +163,7 @@ function listParams(searchParams?: ManagedRecordListProps["searchParams"]) {
 function collectionLabel(collection: ManagedRecordCollection) {
   const labels: Record<ManagedRecordCollection, string> = {
     sops: "SOPs",
-    tasks: "source signals",
+    tasks: "business signals",
     checklists: "checklists",
     checklist_runs: "checklist runs",
     issues: "issues",
@@ -187,19 +193,21 @@ function removeParam(params: ReturnType<typeof listParams>, key: keyof ReturnTyp
 function activeFilterChips({
   params,
   folders,
-  returnPath
+  returnPath,
+  labels
 }: {
   params: ReturnType<typeof listParams>;
   folders: ManagedRecordFolder[];
   returnPath: string;
+  labels: Required<NonNullable<ManagedRecordListProps["labels"]>>;
 }) {
   const chips: Array<{ key: keyof typeof params; label: string; value: string }> = [];
 
   if (params.q) chips.push({ key: "q", label: "Search", value: params.q });
   if (params.folder) chips.push({ key: "folder", label: "Folder", value: params.folder === "unfiled" ? "Unfiled" : getFolderName(folders, params.folder) });
-  if (params.status) chips.push({ key: "status", label: "Status", value: params.status });
-  if (params.owner) chips.push({ key: "owner", label: "Owner", value: params.owner });
-  if (params.category) chips.push({ key: "category", label: "Category", value: params.category });
+  if (params.status) chips.push({ key: "status", label: labels.status, value: params.status });
+  if (params.owner) chips.push({ key: "owner", label: labels.owner, value: params.owner });
+  if (params.category) chips.push({ key: "category", label: labels.category, value: params.category });
   if (params.view && params.view !== "active") chips.push({ key: "view", label: "View", value: params.view });
   if (params.date_from) chips.push({ key: "date_from", label: "From", value: params.date_from });
   if (params.date_to) chips.push({ key: "date_to", label: "To", value: params.date_to });
@@ -410,10 +418,12 @@ function RecordEditForm({
 
 function RecordDetailContent({
   record,
-  folders
+  folders,
+  labels
 }: {
   record: ManagedRecord;
   folders: ManagedRecordFolder[];
+  labels: Required<NonNullable<ManagedRecordListProps["labels"]>>;
 }) {
   return (
     <>
@@ -423,15 +433,15 @@ function RecordDetailContent({
           <p className="mt-1 text-ink">{record.type || "Record"}</p>
         </div>
         <div className="rounded-lg border border-line bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Status</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{labels.status}</p>
           <div className="mt-1">{record.status ? <StatusBadge value={record.status} /> : <span className="text-ink">Not set</span>}</div>
         </div>
         <div className="rounded-lg border border-line bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Owner</p>
-          <p className="mt-1 text-ink">{record.owner || "No owner"}</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{labels.owner}</p>
+          <p className="mt-1 text-ink">{record.owner || "Not set"}</p>
         </div>
         <div className="rounded-lg border border-line bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Category</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{labels.category}</p>
           <p className="mt-1 text-ink">{record.category || "Uncategorized"}</p>
         </div>
         <div className="rounded-lg border border-line bg-slate-50 p-3">
@@ -443,7 +453,7 @@ function RecordDetailContent({
           <p className="mt-1 text-ink">{readableDate(record.createdAt)}</p>
         </div>
         <div className="rounded-lg border border-line bg-slate-50 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Updated</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">{labels.date}</p>
           <p className="mt-1 text-ink">{readableDate(record.updatedAt || record.createdAt)}</p>
         </div>
       </div>
@@ -467,13 +477,15 @@ function RecordActionsMenu({
   record,
   folders,
   activeFolders,
-  returnPath
+  returnPath,
+  labels
 }: {
   collection: ManagedRecordCollection;
   record: ManagedRecord;
   folders: ManagedRecordFolder[];
   activeFolders: ManagedRecordFolder[];
   returnPath: string;
+  labels: Required<NonNullable<ManagedRecordListProps["labels"]>>;
 }) {
   return (
     <details className="relative">
@@ -491,7 +503,7 @@ function RecordActionsMenu({
             triggerLabel="View"
             triggerClassName={menuItemClass}
           >
-            <RecordDetailContent record={record} folders={folders} />
+            <RecordDetailContent record={record} folders={folders} labels={labels} />
           </RecordDetailDrawer>
 
           {record.editFields?.length ? (
@@ -578,8 +590,15 @@ export function ManagedRecordList({
   emptyDescription,
   returnPath: configuredReturnPath,
   searchParams,
-  activeRecordId
+  activeRecordId,
+  labels: configuredLabels
 }: ManagedRecordListProps) {
+  const labels = {
+    status: configuredLabels?.status || "Status",
+    owner: configuredLabels?.owner || "Owner",
+    category: configuredLabels?.category || "Category",
+    date: configuredLabels?.date || "Date"
+  };
   const sort = param(searchParams?.sort) || "newest";
   const visibleRecords = sortedRecords(filteredRecords(records, folders, searchParams), sort);
   const limitValue = param(searchParams?.limit);
@@ -598,7 +617,7 @@ export function ManagedRecordList({
   const activeCount = records.filter((record) => !record.deletedAt && !record.archivedAt).length;
   const archivedCount = records.filter((record) => record.archivedAt && !record.deletedAt).length;
   const deletedCount = records.filter((record) => record.deletedAt).length;
-  const chips = activeFilterChips({ params: baseParams, folders, returnPath });
+  const chips = activeFilterChips({ params: baseParams, folders, returnPath, labels });
   const askPrompt = `Review these ${collectionLabel(collection)} and tell me what needs attention.`;
   const summaryChips = [
     { label: "Active", value: activeCount },
@@ -646,7 +665,9 @@ export function ManagedRecordList({
           </select>
           <select name="sort" defaultValue={sort} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
             {sortOptions.map((option) => (
-              <option key={option.value} value={option.value}>{option.label}</option>
+              <option key={option.value} value={option.value}>
+                {option.label === "Status" ? labels.status : option.label === "Owner" ? labels.owner : option.label === "Category" ? labels.category : option.label}
+              </option>
             ))}
           </select>
           <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
@@ -659,19 +680,19 @@ export function ManagedRecordList({
             <summary className="flex min-h-11 cursor-pointer list-none items-center justify-center px-3 py-2 text-sm font-semibold text-slate-100">Filters</summary>
             <div className="mt-2 grid gap-2 border-t border-white/10 p-3 md:grid-cols-2 xl:absolute xl:right-0 xl:z-20 xl:w-[42rem] xl:rounded-lg xl:border xl:border-white/10 xl:bg-[#08111f] xl:shadow-2xl xl:shadow-black/30">
               <select name="status" defaultValue={param(searchParams?.status)} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
-                <option value="">All statuses</option>
+                <option value="">All {labels.status.toLowerCase()}</option>
                 {statusOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
               <select name="owner" defaultValue={param(searchParams?.owner)} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
-                <option value="">All owners</option>
+                <option value="">All {labels.owner.toLowerCase()}</option>
                 {ownerOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
               </select>
               <select name="category" defaultValue={param(searchParams?.category)} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
-                <option value="">All categories</option>
+                <option value="">All {labels.category.toLowerCase()}</option>
                 {categoryOptions.map((option) => (
                   <option key={option}>{option}</option>
                 ))}
@@ -739,7 +760,7 @@ export function ManagedRecordList({
                   `Archived records: ${archivedCount}`,
                   `Hidden records: ${deletedCount}`,
                   activeFolder ? `Active folder: ${getFolderName(folders, activeFolder)}` : "No folder filter selected",
-                  statusOptions.length ? `Statuses visible: ${statusOptions.slice(0, 8).join(", ")}` : "No status values visible"
+                  statusOptions.length ? `${labels.status} visible: ${statusOptions.slice(0, 8).join(", ")}` : `No ${labels.status.toLowerCase()} values visible`
                 ]}
                 compact
               />
@@ -799,10 +820,10 @@ export function ManagedRecordList({
               <div className="hidden border-b border-line bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted lg:grid lg:grid-cols-[32px_minmax(220px,1.5fr)_110px_110px_110px_120px_44px] lg:gap-3">
                 <span />
                 <span>Title</span>
-                <span>Status</span>
-                <span>Owner</span>
-                <span>Category</span>
-                <span>Date</span>
+                <span>{labels.status}</span>
+                <span>{labels.owner}</span>
+                <span>{labels.category}</span>
+                <span>{labels.date}</span>
                 <span />
               </div>
               <div className="divide-y divide-line">
@@ -842,10 +863,10 @@ export function ManagedRecordList({
                           </p>
                           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                             <RecordDetailDrawer title={record.title} description={record.preview || record.type}>
-                              <RecordDetailContent record={record} folders={folders} />
+                              <RecordDetailContent record={record} folders={folders} labels={labels} />
                               <div className="rounded-lg border border-line bg-slate-50 p-3">
                                 <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted">Actions</p>
-                                <RecordActionsMenu collection={collection} record={record} folders={folders} activeFolders={activeFolders} returnPath={returnPath} />
+                                <RecordActionsMenu collection={collection} record={record} folders={folders} activeFolders={activeFolders} returnPath={returnPath} labels={labels} />
                               </div>
                             </RecordDetailDrawer>
                             {record.editFields?.length ? (
@@ -865,7 +886,7 @@ export function ManagedRecordList({
                             ) : null}
                           </div>
                           <p className="mt-1 text-xs text-muted lg:hidden">
-                            {record.status || "No status"} · {record.owner || "No owner"} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
+                            {record.status || `No ${labels.status.toLowerCase()}`} · {record.owner || `No ${labels.owner.toLowerCase()}`} · {record.category || "Uncategorized"} · {readableDate(record.updatedAt || record.createdAt)}
                           </p>
                         </div>
                         {record.inlineActions ? <div className="lg:col-span-6 lg:col-start-2">{record.inlineActions}</div> : null}
@@ -873,7 +894,7 @@ export function ManagedRecordList({
                         <div className="hidden truncate text-sm text-slate-700 lg:block">{record.owner || "-"}</div>
                         <div className="hidden lg:block">{record.category ? <StatusBadge value={record.category} /> : <span className="text-sm text-muted">-</span>}</div>
                         <div className="hidden text-sm text-muted lg:block">{readableDate(record.updatedAt || record.createdAt)}</div>
-                        <RecordActionsMenu collection={collection} record={record} folders={folders} activeFolders={activeFolders} returnPath={returnPath} />
+                        <RecordActionsMenu collection={collection} record={record} folders={folders} activeFolders={activeFolders} returnPath={returnPath} labels={labels} />
                       </div>
                     </article>
                   );

@@ -49,7 +49,7 @@ function sourceDataSummary(report: ReportRow) {
   const counts = asRecord(current.counts);
   const labels = [
     typeof counts.kpis === "number" ? `${counts.kpis} KPI signal${counts.kpis === 1 ? "" : "s"}` : "",
-    typeof counts.tasks === "number" ? `${counts.tasks} follow-up${counts.tasks === 1 ? "" : "s"}` : "",
+    typeof counts.tasks === "number" ? `${counts.tasks} Business Signal${counts.tasks === 1 ? "" : "s"}` : "",
     typeof counts.issues === "number" ? `${counts.issues} issue${counts.issues === 1 ? "" : "s"}` : "",
     typeof counts.files === "number" ? `${counts.files} source file${counts.files === 1 ? "" : "s"}` : "",
     str(source.category)

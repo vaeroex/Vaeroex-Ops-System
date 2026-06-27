@@ -117,10 +117,10 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
 
   requireTitle(path, title);
 
-  const description = text(formData, "description") || text(formData, "evidence") || "Review this Vaeroex recommendation and confirm next action.";
+  const description = text(formData, "description") || text(formData, "evidence") || "Review this Vaeroex recommendation as business context.";
   const priority = text(formData, "priority") || "Medium";
   const dueDate = nullableText(formData, "due_date");
-  const relatedModule = text(formData, "related_module") || "Source Signals";
+  const relatedModule = text(formData, "related_module") || "Business Signals";
   const owner = nullableText(formData, "owner");
   const { data: task, error: taskError } = await supabase
     .from("tasks")
@@ -128,10 +128,10 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
       workspace_id: workspaceId,
       title,
       description,
-      status: "To Do",
-      priority,
+      status: "Business Signal",
+      priority: "Context",
       category: relatedModule,
-      assigned_role: owner,
+      assigned_role: null,
       due_date: dueDate,
       ai_generated: true,
       related_type: "vaeroex_recommendation",
@@ -141,7 +141,7 @@ export async function acceptPrestigeRecommendationAction(formData: FormData) {
     .single();
 
   if (taskError || !task) {
-    redirectWithError(path, taskError?.message || "Source signal could not be created.");
+    redirectWithError(path, taskError?.message || "Business Signal could not be created.");
   }
 
   const { error } = await supabase.from("vaeroex_recommendation_outcomes").insert({

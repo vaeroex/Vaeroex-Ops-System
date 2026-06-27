@@ -67,7 +67,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
       <PageHeader
         eyebrow="Forms"
         title="Visibility forms"
-        description="Create intake, completion, issue, shift handoff, and source-evidence forms. Submissions can become source signals for Vaeroex intelligence."
+        description="Create intake, completion, issue, shift handoff, and business-evidence forms. Submissions can become Business Signals for Vaeroex intelligence."
       />
       <LegalSafetyNotice tone="sensitive" compact />
 
@@ -77,7 +77,7 @@ export default async function FormsPage({ searchParams }: FormsPageProps) {
         <CreateDrawer title="Create form" description="Start simple. You can refine fields later." triggerLabel="New Form">
           <form action={createFormAction} className="grid gap-4 lg:grid-cols-2">
             <TextInput label="Form name" name="name" required />
-            <TextInput label="Form type" name="form_type" placeholder="intake, completion, issue, source signal" />
+            <TextInput label="Form type" name="form_type" placeholder="intake, completion, issue, business signal" />
             <div className="lg:col-span-2">
               <TextArea label="Description" name="description" />
             </div>

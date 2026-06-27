@@ -232,12 +232,12 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       statuses: countByStatus(recentLeadRows),
       guidance: "Customer pipeline records already exist as source context. Recommend reviewing response gaps, status quality, source tracking, or estimated value with leadership."
     },
-    task_tracking: {
+    business_signals: {
       exists: true,
       open_records: openTasks.count ?? 0,
       observations_needing_review: overdueTasks.count ?? 0,
       statuses: countByStatus(recentTaskRows),
-      guidance: "Source-system signals already exist as evidence. Recommend reviewing observation patterns, source context, priority labels, and whether leadership needs an executive report or improvement plan. Do not treat them as Vaeroex-owned tasks."
+      guidance: "Business Signals already exist as evidence and strategic context. Recommend reviewing observation patterns, source quality, category coverage, and whether leadership needs an executive report or improvement plan. Do not treat them as Vaeroex-owned tasks."
     },
     issue_tracking: {
       exists: true,
@@ -297,7 +297,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
     pendingImports.length ? `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"} are waiting for review or approval.` : "",
-    (overdueTasks.count ?? 0) ? `${overdueTasks.count} source-system observation${overdueTasks.count === 1 ? "" : "s"} need leadership review.` : "",
+    (overdueTasks.count ?? 0) ? `${overdueTasks.count} Business Signal${overdueTasks.count === 1 ? "" : "s"} may need leadership interpretation.` : "",
     (openIssues.count ?? 0) ? `${openIssues.count} issue${openIssues.count === 1 ? "" : "s"} are open.` : ""
   ].filter(Boolean);
 
@@ -307,8 +307,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     workspace_awareness_rules: [
       "Do not recommend creating a Vaeroex module that already exists in module_state.",
       "If a module exists, treat it as source context for analysis and recommend leadership review, evidence gathering, or portable documents.",
-      "Treat Source Signals as evidence and observations from existing systems. Mention source-system observation patterns only as evidence for risks, opportunities, predictions, confidence, or executive briefings.",
-      "Mention the specific existing workspace records, counts, gaps, source-system observations, stale items, file analyses, reports, KPIs, customer pipeline records, SOPs, checklists, issues, assets, or people records that support the recommendation.",
+      "Treat Business Signals as evidence, observations, and strategic context. Mention Business Signal patterns only as evidence for Business Memory, risks, opportunities, predictions, confidence, or executive briefings.",
+      "Mention the specific existing workspace records, counts, gaps, Business Signals, stale items, file analyses, reports, KPIs, customer pipeline records, SOPs, checklists, issues, assets, or people records that support the recommendation.",
       "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Leadership Review, Business Risk, Dashboard / KPI Improvement, Customer Pipeline / Revenue Improvement, SOP / Process Improvement, or File / Report Review.",
       "Never say 'Create KPI Dashboard', 'Create CRM', 'Create follow-up tracking', 'Assign owners', 'Create SOPs', 'Create reports', or 'Upload files' as a generic recommendation. Vaeroex is an intelligence layer, not the system of record."
     ],
@@ -316,6 +316,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     workspace_gaps: gaps,
     metrics: {
       open_tasks: openTasks.count ?? 0,
+      business_signals: openTasks.count ?? 0,
       source_observations_needing_review: overdueTasks.count ?? 0,
       open_issues: openIssues.count ?? 0,
       flagged_assets: flaggedAssets.count ?? 0,

@@ -241,18 +241,18 @@ function workflowDataUsed(key: VaeroexWorkflowKey) {
   }
 
   if (key === "weekly_report" || key === "daily_summary" || key === "business_review_package") {
-    return "KPIs, source-system signals, issues, customer pipeline context, reports, Vaeroex runs";
+    return "KPIs, Business Signals, issues, customer pipeline context, reports, Vaeroex runs";
   }
 
   if (key === "sop_generator" || key === "form_builder" || key === "checklist_builder") {
-    return "Existing SOPs, forms, checklists, issues, source-system signals";
+    return "Existing SOPs, forms, checklists, issues, Business Signals";
   }
 
   if (key === "ceo_mode" || key === "focus_priorities" || key === "risk_simulation" || key === "weekly_management_meeting") {
-    return "Workspace health, risks, KPIs, decisions, source-system signals, business memory";
+    return "Workspace health, risks, KPIs, decisions, Business Signals, business memory";
   }
 
-  return "Workspace records, source-system signals, issues, files, reports";
+  return "Workspace records, Business Signals, issues, files, reports";
 }
 
 function resultTitle(output: JsonRecord, fallback: string) {

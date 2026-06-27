@@ -45,7 +45,7 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     title: "Business Intake",
     whatItWillDo: [
       "Capture business context before setup.",
-      "Identify recurring headaches, missed source-system signals, and spreadsheet-driven processes.",
+      "Identify recurring headaches, Business Signals, and spreadsheet-driven processes.",
       "Use answers to recommend starter workflows, KPIs, forms, SOPs, and reports."
     ],
     whyItMatters:
