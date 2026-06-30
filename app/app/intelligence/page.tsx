@@ -22,6 +22,12 @@ function confidenceClass(confidence: IntelligenceConfidence) {
   return "border-slate-400/30 bg-slate-500/15 text-slate-100";
 }
 
+function priorityClass(priority: "High" | "Medium" | "Low") {
+  if (priority === "High") return "border-red-300/40 bg-red-500/15 text-red-100";
+  if (priority === "Medium") return "border-amber-300/35 bg-amber-500/15 text-amber-100";
+  return "border-slate-400/30 bg-slate-500/15 text-slate-100";
+}
+
 function typeClass(type: IntelligenceInsightType) {
   if (type === "Risk" || type === "Anomaly") return "border-red-400/35 bg-red-950/25 text-red-100";
   if (type === "Opportunity") return "border-emerald-400/35 bg-emerald-950/25 text-emerald-100";
@@ -32,6 +38,39 @@ function typeClass(type: IntelligenceInsightType) {
 
 function groupInsights(insights: IntelligenceInsight[], type: IntelligenceInsightType) {
   return insights.filter((insight) => insight.type === type);
+}
+
+function compactText(value: string | null | undefined, fallback: string, maxLength = 160) {
+  const text = (value || fallback).replace(/\s+/g, " ").trim();
+
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  const shortened = text.slice(0, maxLength).replace(/\s+\S*$/, "").trim();
+  return `${shortened}...`;
+}
+
+function evidenceCountLabel(count: number) {
+  return `${count} supporting signal${count === 1 ? "" : "s"}`;
+}
+
+function executiveReviewText(insight: IntelligenceInsight | undefined) {
+  if (!insight) {
+    return "Review Business Signals.";
+  }
+
+  const text = compactText(insight.recommendedAction || insight.title, "Review Business Signals.", 120);
+
+  if (/business signal/i.test(`${insight.title} ${insight.summary} ${insight.why}`)) {
+    return "Review Business Signals.";
+  }
+
+  if (/brief|review|determine|evaluate|assess/i.test(text)) {
+    return text;
+  }
+
+  return `Review ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
 }
 
 function InsightCard({ insight }: { insight: IntelligenceInsight }) {
@@ -130,23 +169,165 @@ function InsightCard({ insight }: { insight: IntelligenceInsight }) {
   );
 }
 
-function SummaryPanel({
-  title,
-  value,
-  detail,
-  href
+function ExecutiveSignalCard({
+  label,
+  insight,
+  emptyHeadline,
+  emptySummary,
+  tone
 }: {
-  title: string;
-  value: string;
-  detail: string;
-  href: Route;
+  label: "Risk" | "Opportunity";
+  insight?: IntelligenceInsight;
+  emptyHeadline: string;
+  emptySummary: string;
+  tone: "risk" | "opportunity";
 }) {
+  const toneClass =
+    tone === "risk"
+      ? "border-red-400/30 bg-[radial-gradient(circle_at_12%_0%,rgba(248,113,113,0.14),transparent_38%),rgba(8,17,31,0.96)]"
+      : "border-emerald-400/30 bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.14),transparent_38%),rgba(8,17,31,0.96)]";
+  const labelClass = tone === "risk" ? "border-red-300/30 bg-red-500/10 text-red-100" : "border-emerald-300/30 bg-emerald-500/10 text-emerald-100";
+  const headline = insight?.title || emptyHeadline;
+  const summary = compactText(insight?.summary, emptySummary, 170);
+
   return (
-    <Link href={href} className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/40 hover:bg-blue-950/25">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{title}</p>
-      <p className="mt-2 text-2xl font-semibold text-white">{value}</p>
-      <p className="mt-2 text-sm leading-6 text-slate-300">{detail}</p>
-    </Link>
+    <article className={`rounded-xl border p-4 text-slate-100 shadow-panel ${toneClass}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em] ${labelClass}`}>
+          {label}
+        </span>
+        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(insight?.confidence || "Low")}`}>
+          Confidence: {insight?.confidence || "Low"}
+        </span>
+      </div>
+      <h2 className="mt-3 line-clamp-2 text-lg font-semibold leading-6 text-white">{compactText(headline, emptyHeadline, 96)}</h2>
+      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">{summary}</p>
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-300">
+        <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+          Evidence: {insight ? evidenceCountLabel(insight.evidenceCount) : "Needs source data"}
+        </span>
+        <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
+          Sources: {insight?.sourceTypes.slice(0, 2).join(", ") || "Not enough context"}
+        </span>
+      </div>
+      {insight ? (
+        <div className="mt-4">
+          <ContextualAskVaeroex
+            label="Explain Why"
+            prompt={`Explain why this ${label.toLowerCase()} matters for leadership. Include what happened, why Vaeroex surfaced it, evidence count, confidence, expected business impact, and what leadership should review. Do not create tasks, assign owners, or suggest due dates.`}
+            contextType={`intelligence_executive_${label.toLowerCase()}`}
+            contextId={insight.id}
+            sourceTitle={insight.title}
+            sourceSummary={insight.summary}
+            evidence={[
+              `Evidence count: ${evidenceCountLabel(insight.evidenceCount)}`,
+              `Confidence: ${insight.confidence}`,
+              `Reason: ${insight.why}`,
+              `Impact: ${insight.impact}`,
+              ...insight.evidence.slice(0, 4)
+            ]}
+            compact
+          />
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function LeadershipRecommendationCard({
+  insight,
+  risk,
+  opportunity
+}: {
+  insight?: IntelligenceInsight;
+  risk?: IntelligenceInsight;
+  opportunity?: IntelligenceInsight;
+}) {
+  const headline = executiveReviewText(insight);
+  const reason = compactText(
+    insight?.why,
+    risk
+      ? `Vaeroex surfaced ${risk.title} as the strongest risk pattern.`
+      : opportunity
+        ? `Vaeroex surfaced ${opportunity.title} as the clearest opportunity pattern.`
+        : "Vaeroex needs more source evidence before making a stronger leadership recommendation.",
+    180
+  );
+  const impact = compactText(
+    insight?.impact,
+    "Better source coverage will improve Vaeroex confidence and make future executive briefings more useful.",
+    170
+  );
+  const priority = insight?.priority || risk?.priority || opportunity?.priority || "Low";
+  const sourceSummary = `Recommendation: ${headline}. Reason: ${reason}. Expected impact: ${impact}.`;
+
+  return (
+    <article className="mt-4 rounded-xl border border-cyan-300/25 bg-[radial-gradient(circle_at_8%_0%,rgba(56,189,248,0.16),transparent_34%),linear-gradient(135deg,rgba(8,17,31,0.98),rgba(15,23,42,0.94))] p-4 text-slate-100 shadow-command sm:p-5">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Leadership Recommendation</p>
+          <h2 className="mt-2 text-xl font-semibold leading-7 text-white">{headline}</h2>
+        </div>
+        <span className={`w-fit rounded-full border px-3 py-1.5 text-xs font-semibold ${priorityClass(priority)}`}>
+          Priority: {priority}
+        </span>
+      </div>
+      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Reason</p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">{reason}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Expected impact</p>
+          <p className="mt-2 text-sm leading-6 text-slate-200">{impact}</p>
+        </div>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Link
+          href={generatedOutputHref({
+            type: "executive_briefing",
+            source: insight?.id,
+            title: headline,
+            summary: sourceSummary,
+            why: reason,
+            remedy: headline
+          })}
+          className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy"
+        >
+          Generate Executive Brief
+        </Link>
+        <Link
+          href={generatedOutputHref({
+            type: "executive_briefing",
+            source: insight?.id,
+            title: "Leadership Meeting Agenda",
+            summary: sourceSummary,
+            why: reason,
+            remedy: "Determine whether an executive briefing or operational review is warranted."
+          })}
+          className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20"
+        >
+          Generate Meeting Agenda
+        </Link>
+        <ContextualAskVaeroex
+          label="Explain Recommendation"
+          prompt="Explain this leadership recommendation. Include what happened, why Vaeroex surfaced it, evidence, confidence, expected impact, and what leadership should review. Do not create tasks, assign owners, or suggest due dates."
+          contextType="intelligence_leadership_recommendation"
+          contextId={insight?.id || "recommendation"}
+          sourceTitle={headline}
+          sourceSummary={sourceSummary}
+          evidence={[
+            `Priority: ${priority}`,
+            `Reason: ${reason}`,
+            `Expected impact: ${impact}`,
+            `Risk: ${risk?.title || "No top risk visible"}`,
+            `Opportunity: ${opportunity?.title || "No top opportunity visible"}`,
+            ...(insight?.evidence.slice(0, 4) || [])
+          ]}
+          compact
+        />
+      </div>
+    </article>
   );
 }
 
@@ -254,46 +435,47 @@ export default async function IntelligencePage() {
         </div>
       ) : null}
 
-      <section className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-slate-100 shadow-panel">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Executive summary</p>
-          <h2 className="mt-3 text-2xl font-semibold text-white">
-            {topRisk ? topRisk.title : topOpportunity ? topOpportunity.title : "Vaeroex needs more business context."}
-          </h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">{intelligence.executiveSummary}</p>
-          <div className="mt-5 grid gap-3 md:grid-cols-3">
-            <SummaryPanel title="Top risk" value={topRisk?.title || "None visible"} detail={topRisk?.summary || "No active risk signal is strong enough yet."} href={(topRisk?.sourceHref || "/app/sources") as Route} />
-            <SummaryPanel title="Top opportunity" value={topOpportunity?.title || "Needs context"} detail={topOpportunity?.summary || "Add customer, KPI, file, or report history."} href={(topOpportunity?.sourceHref || "/app/sources") as Route} />
-            <SummaryPanel
-              title="Executive recommendation"
-              value={topRecommendation?.recommendedAction || "Add source data"}
-              detail={topRecommendation?.summary || "Vaeroex generates stronger recommendations as evidence improves."}
-              href={topRecommendation ? generatedOutputHref({ type: "action_plan", source: topRecommendation.id }) : "/app/actions"}
-            />
+      <section className="rounded-2xl border border-cyan-300/20 bg-[#061225] p-4 text-slate-100 shadow-command sm:p-5 xl:p-6">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Executive briefing</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Risk, opportunity, and leadership review.</h2>
+            <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-300">{compactText(intelligence.executiveSummary, "Vaeroex needs more business context before surfacing a stronger leadership briefing.", 220)}</p>
+          </div>
+          <div className="grid w-full gap-2 rounded-xl border border-white/10 bg-slate-950/35 p-3 text-sm xl:max-w-md">
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-slate-400">Business memory</span>
+              <span className="font-semibold text-white">{intelligence.dataQuality.score}/100</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-slate-400">Sources</span>
+              <span className="font-semibold text-white">{intelligence.memorySummary.sourceRecords}</span>
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-slate-400">KPI history</span>
+              <span className="font-semibold text-white">{intelligence.memorySummary.kpiHistoryRecords}</span>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-slate-100 shadow-panel">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Business memory confidence</p>
-          <p className="mt-3 text-4xl font-semibold text-white">{intelligence.dataQuality.score}/100</p>
-          <p className="mt-2 text-sm leading-6 text-slate-300">
-            {intelligence.dataQuality.label} context. {intelligence.dataQuality.reason}
-          </p>
-          <dl className="mt-5 grid gap-3 text-sm">
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] p-3">
-              <dt>Sources</dt>
-              <dd className="font-semibold text-white">{intelligence.memorySummary.sourceRecords}</dd>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] p-3">
-              <dt>KPI history</dt>
-              <dd className="font-semibold text-white">{intelligence.memorySummary.kpiHistoryRecords}</dd>
-            </div>
-            <div className="flex items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] p-3">
-              <dt>Saved Vaeroex runs</dt>
-              <dd className="font-semibold text-white">{intelligence.memorySummary.vaeroexRuns}</dd>
-            </div>
-          </dl>
+        <div className="mt-5 grid gap-4 xl:grid-cols-2">
+          <ExecutiveSignalCard
+            label="Risk"
+            insight={topRisk}
+            emptyHeadline="No major risk is visible yet."
+            emptySummary="Add source records, KPI history, reports, or Business Signals so Vaeroex can identify risk patterns responsibly."
+            tone="risk"
+          />
+          <ExecutiveSignalCard
+            label="Opportunity"
+            insight={topOpportunity}
+            emptyHeadline="No clear opportunity is visible yet."
+            emptySummary="Add customer, KPI, file, or report history so Vaeroex can identify stronger upside patterns."
+            tone="opportunity"
+          />
         </div>
+
+        <LeadershipRecommendationCard insight={topRecommendation} risk={topRisk} opportunity={topOpportunity} />
       </section>
 
       <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} />
