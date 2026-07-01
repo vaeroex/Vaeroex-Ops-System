@@ -1682,6 +1682,80 @@ export async function uploadFileAction(formData: FormData) {
   );
 }
 
+export async function saveFileAnalysisToMemoryAction(formData: FormData) {
+  const { supabase, user, workspaceId } = await requireWorkspace();
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const runId = text(formData, "run_id");
+  const summary = text(formData, "summary") || file.analysis_summary || "Saved file analysis.";
+  const confidence = text(formData, "confidence") || "Context saved";
+  const evidence = text(formData, "evidence");
+  let latestRunOutput: Json | null = null;
+
+  if (runId) {
+    const { data: latestRun } = await supabase
+      .from("ai_agent_runs")
+      .select("output_json")
+      .eq("id", runId)
+      .eq("workspace_id", workspaceId)
+      .maybeSingle();
+
+    latestRunOutput = latestRun?.output_json || null;
+  }
+
+  const savedAt = new Date().toISOString();
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const businessMemoryEntry = {
+    saved: true,
+    saved_at: savedAt,
+    saved_by: user.id,
+    source: "file_analysis",
+    source_file_id: file.id,
+    source_file_name: file.display_name,
+    run_id: runId || null,
+    summary,
+    confidence,
+    evidence: evidence
+      .split("\n")
+      .map((item) => item.trim())
+      .filter(Boolean)
+      .slice(0, 12),
+    source_references: {
+      file_id: file.id,
+      original_name: file.original_name,
+      storage_path: file.storage_path,
+      latest_analysis_at: savedAt
+    },
+    latest_output_json: latestRunOutput
+  } satisfies JsonObject;
+
+  const { error } = await supabase
+    .from("file_uploads")
+    .update({
+      metadata_json: {
+        ...metadata,
+        business_memory: businessMemoryEntry,
+        business_memory_history: [
+          businessMemoryEntry,
+          ...(Array.isArray(metadata.business_memory_history) ? metadata.business_memory_history.filter(isRecord).slice(0, 9) : [])
+        ]
+      } satisfies Json,
+      updated_at: savedAt
+    })
+    .eq("id", file.id)
+    .eq("workspace_id", workspaceId);
+
+  if (error) {
+    redirectWithFileError(error.message, file.id);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/reports");
+  redirectWithMessage("Analysis saved to Business Memory for future Vaeroex context.", file.id);
+}
+
 export async function importFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const importType = validImportType(text(formData, "import_type"));

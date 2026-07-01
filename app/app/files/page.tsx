@@ -6,10 +6,12 @@ import {
   attachFileToReportAction,
   createReportFromFileAction,
   importFileAction,
+  saveFileAnalysisToMemoryAction,
   saveExtractedImportAction,
   uploadFileAction
 } from "@/app/app/files/actions";
-import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
+import { CopyVaeroexResultButton } from "@/components/ai/CopyVaeroexResultButton";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { CompactSummaryChips } from "@/components/operations/CompactSummaryChips";
@@ -53,7 +55,7 @@ type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type ImportType = "kpi" | "crm" | "metrics";
 type JsonRecord = Record<string, unknown>;
 
-const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Execution"];
+const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Business Memory"];
 const IMPORT_TYPES = [
   { value: "kpi", label: "KPI data" },
   { value: "crm", label: "CRM leads" },
@@ -64,7 +66,7 @@ const SUGGESTED_PROMPTS = [
   "What KPIs should I track?",
   "What problems stand out?",
   "Create an executive summary.",
-  "Create recommended actions."
+  "Create executive recommendations."
 ];
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting content", "Sending to Vaeroex", "Preparing findings", "Saving review", "Done"];
 const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing source record", "Refreshing file list", "Complete"];
@@ -214,7 +216,7 @@ function fileSupportNotice(file: FileUploadRow) {
   if (isImageFile(file)) {
     return {
       title: "Image OCR and review ready",
-      body: "Vaeroex can review PNG and JPG files for readable text, visible issues, KPIs, risks, and recommended actions."
+      body: "Vaeroex can review PNG and JPG files for readable text, visible issues, KPIs, risks, and executive recommendations."
     };
   }
 
@@ -548,7 +550,7 @@ function runFileId(run: VaeroexRunRow) {
   return typeof id === "string" ? id : "";
 }
 
-function runQuestion(run: VaeroexRunRow, fallback = "Review this file and recommend next actions.") {
+function runQuestion(run: VaeroexRunRow, fallback = "Review this file and summarize the leadership implications.") {
   const input = isRecord(run.input_json) ? run.input_json : {};
   return stringValue(input.user_prompt, fallback);
 }
@@ -655,10 +657,8 @@ function analysisInsightCount(result: JsonRecord | null) {
     ...sections.risks,
     ...sections.opportunities,
     ...sections.actions,
-    ...sections.tasks,
     ...sections.reports,
-    ...sections.kpiRecords,
-    ...sections.crmRecords
+    ...sections.kpiRecords
   ].length;
 }
 
@@ -682,14 +682,128 @@ function AnalysisSection({ title, items, empty }: { title: string; items: string
   );
 }
 
-function FileAnalysisResult({
+function analysisEvidenceForActions(file: FileUploadRow, sections: ReturnType<typeof cleanAnalysisSections>, insightCount: number) {
+  return [
+    `Source file: ${file.display_name}`,
+    `File type: ${file.file_extension.toUpperCase()}`,
+    `Insights found: ${insightCount}`,
+    sections.executiveSummary ? `Executive summary: ${sections.executiveSummary}` : "",
+    ...sections.findings.slice(0, 4).map((item) => `Finding: ${item}`),
+    ...sections.risks.slice(0, 3).map((item) => `Risk: ${item}`),
+    ...sections.opportunities.slice(0, 3).map((item) => `Opportunity: ${item}`),
+    ...sections.kpis.slice(0, 3).map((item) => `KPI detected: ${item}`)
+  ].filter(Boolean);
+}
+
+function executiveSummaryText(file: FileUploadRow, sections: ReturnType<typeof cleanAnalysisSections>, insightCount: number) {
+  return [
+    `Vaeroex analysis: ${file.display_name}`,
+    "",
+    sections.executiveSummary || "Vaeroex completed this file analysis, but no concise executive summary was saved.",
+    "",
+    `Insights found: ${insightCount}`,
+    sections.findings.length ? `Key findings: ${sections.findings.slice(0, 3).join("; ")}` : "",
+    sections.risks.length ? `Risks: ${sections.risks.slice(0, 3).join("; ")}` : "",
+    sections.opportunities.length ? `Opportunities: ${sections.opportunities.slice(0, 3).join("; ")}` : "",
+    sections.actions.length ? `Executive recommendations: ${sections.actions.slice(0, 3).join("; ")}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function FileAnalysisActions({
   file,
   latestRun,
-  people
+  sections,
+  insightCount
 }: {
   file: FileUploadRow;
   latestRun?: VaeroexRunRow | null;
-  people: TeamPersonOption[];
+  sections: ReturnType<typeof cleanAnalysisSections>;
+  insightCount: number;
+}) {
+  const summary = executiveSummaryText(file, sections, insightCount);
+  const evidence = analysisEvidenceForActions(file, sections, insightCount);
+  const title = `File analysis - ${file.display_name}`;
+  const executiveBriefHref = generatedOutputHref({
+    type: "executive_briefing",
+    title: `Executive brief - ${file.display_name}`,
+    summary: sections.executiveSummary || summary,
+    why: sections.findings.slice(0, 4).join("; ") || "Vaeroex analyzed this source file for leadership context.",
+    remedy: sections.actions[0] || "Review the evidence and decide whether leadership should preserve this analysis for future briefings.",
+    run: latestRun?.id
+  });
+  const meetingBriefHref = generatedOutputHref({
+    type: "meeting_agenda",
+    title: `Meeting brief - ${file.display_name}`,
+    summary: sections.executiveSummary || summary,
+    why: [
+      sections.findings.length ? `Findings: ${sections.findings.slice(0, 4).join("; ")}` : "",
+      sections.risks.length ? `Risks: ${sections.risks.slice(0, 4).join("; ")}` : "",
+      sections.opportunities.length ? `Opportunities: ${sections.opportunities.slice(0, 4).join("; ")}` : ""
+    ].filter(Boolean).join("\n"),
+    remedy: "Use this meeting brief to guide leadership discussion, not to assign workflow inside Vaeroex.",
+    run: latestRun?.id
+  });
+
+  return (
+    <section className="mt-4 rounded-lg border border-cyan-400/25 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Analysis Actions</p>
+          <h4 className="mt-2 text-base font-semibold text-white">What would you like to do with this intelligence?</h4>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            Preserve, export, copy, or review the intelligence Vaeroex generated. These actions support leadership decision-making and do not create assignments, notifications, CRM records, or internal workflows.
+          </p>
+        </div>
+        <StatusBadge value="Leadership intelligence" />
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <form action={saveFileAnalysisToMemoryAction}>
+          <input type="hidden" name="file_id" value={file.id} />
+          <input type="hidden" name="run_id" value={latestRun?.id || ""} />
+          <input type="hidden" name="summary" value={sections.executiveSummary || summary} />
+          <input type="hidden" name="confidence" value={insightCount >= 6 ? "High" : insightCount >= 3 ? "Medium" : "Limited"} />
+          <input type="hidden" name="evidence" value={evidence.join("\n")} />
+          <PendingSubmitButton pendingLabel="Saving analysis..." className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+            Save Analysis
+          </PendingSubmitButton>
+        </form>
+        <Link href={executiveBriefHref} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+          Export Executive Brief (PDF)
+        </Link>
+        <CopyVaeroexResultButton
+          text={summary}
+          label="Copy Executive Summary"
+          copiedLabel="Executive summary copied."
+          className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+        />
+        <Link href={meetingBriefHref} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+          Generate Meeting Brief
+        </Link>
+      </div>
+
+      <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-3">
+        <ContextualAskVaeroex
+          label="Ask Vaeroex About This Analysis"
+          prompt="Explain this file analysis for leadership. Focus on what happened, why it matters, evidence, confidence, data limitations, and the one leadership discussion this should trigger."
+          contextType="file_analysis"
+          contextId={latestRun?.id || file.id}
+          sourceTitle={title}
+          sourceSummary={sections.executiveSummary || summary}
+          evidence={evidence}
+          compact
+        />
+      </div>
+    </section>
+  );
+}
+
+function FileAnalysisResult({
+  file,
+  latestRun
+}: {
+  file: FileUploadRow;
+  latestRun?: VaeroexRunRow | null;
 }) {
   const metadataResult = latestAnalysisResult(file);
   const runResult = latestRun?.status === "completed" ? displayAnalysisOutput(latestRun.output_json) : null;
@@ -703,7 +817,7 @@ function FileAnalysisResult({
       <section id="analysis-result" className="rounded-lg border border-dashed border-line bg-white p-4">
         <p className="text-sm font-semibold text-ink">No file review yet</p>
         <p className="mt-2 text-sm leading-6 text-muted">
-          Analyze this selected file to see Vaeroex findings, KPIs, risks, opportunities, and recommended next actions here.
+          Analyze this selected file to see Vaeroex findings, KPIs, risks, opportunities, and executive recommendations here.
         </p>
       </section>
     );
@@ -749,24 +863,10 @@ function FileAnalysisResult({
         <AnalysisSection title="Risks" items={sections.risks} empty="No clear risks were identified." />
         <AnalysisSection title="Opportunities" items={sections.opportunities} empty="No clear opportunities were identified." />
         <AnalysisSection title="Executive Recommendations" items={sections.actions} empty="No executive recommendations were returned." />
-        <AnalysisSection title="Suggested Outputs" items={sections.tasks} empty="No supporting outputs were suggested." />
-        <AnalysisSection title="Suggested Reports" items={sections.reports} empty="No additional reports were suggested." />
+        <AnalysisSection title="Possible Leadership Documents" items={sections.reports} empty="No additional leadership documents were suggested." />
         <AnalysisSection title="Suggested KPI Records" items={sections.kpiRecords} empty="No KPI records were suggested." />
-        <div className="lg:col-span-2">
-          <AnalysisSection title="Suggested CRM Records" items={sections.crmRecords} empty="No CRM records were suggested from this file." />
-        </div>
       </div>
-      <div className="mt-4">
-        <ShareRecordPanel
-          sourceType="file_analysis"
-          sourceId={latestRun?.id || file.id}
-          sourceTitle={`${file.display_name} analysis`}
-          relatedModule="Files"
-          returnPath={`/app/files?file=${file.id}`}
-          actionHref={`/app/files?file=${file.id}#analysis-result`}
-          people={people}
-        />
-      </div>
+      <FileAnalysisActions file={file} latestRun={latestRun} sections={sections} insightCount={insightCount} />
     </section>
   );
 }
@@ -929,7 +1029,7 @@ function FileInlineActions({
           <input
             type="hidden"
             name="analysis_prompt"
-            value="What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary and recommended actions."
+            value="What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary and executive recommendations."
           />
           <CompactProgressActionButton pendingLabel="Analyzing...">Analyze</CompactProgressActionButton>
         </form>
@@ -1093,7 +1193,7 @@ function FileActionCenter({
                 </div>
               ) : (
                 <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-                  This report will use the saved Vaeroex review, extracted findings, risks, KPIs, and recommended actions for {file.display_name}.
+                  This report will use the saved Vaeroex review, extracted findings, risks, KPIs, and executive recommendations for {file.display_name}.
                 </p>
               )}
               <form action={createReportFromFileAction} className="space-y-3">
@@ -1514,25 +1614,25 @@ function AnalysisHistory({
                   <form action={createReportFromFileAction}>
                     <input type="hidden" name="file_id" value={file.id} />
                     <input type="hidden" name="report_title" value={`File Report - ${file.display_name}`} />
-                    <CompactActionButton pendingLabel="Creating report...">Create report</CompactActionButton>
+                    <CompactActionButton pendingLabel="Creating report...">Create file report</CompactActionButton>
                   </form>
                 </>
               ) : null}
               <Link
                 href={generatedOutputHref({
                   type: "action_plan",
-                  title: file ? `File analysis action plan - ${file.display_name}` : runQuestion(run),
+                  title: file ? `File analysis improvement plan - ${file.display_name}` : runQuestion(run),
                   summary: runSummary(run),
-                  remedy: "Review the file analysis and decide what leadership should do next.",
+                  remedy: "Review the file analysis and decide what leadership should preserve, discuss, or document.",
                   run: run.id
                 })}
                 className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent"
               >
-                Generate Action Plan
+                Generate Improvement Plan
               </Link>
               {hasKpis ? (
                 <Link href="/app/kpis" className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
-                  Create KPIs
+                  Review KPI Suggestions
                 </Link>
               ) : null}
             </div>
@@ -1588,14 +1688,12 @@ function FileDetails({
   imports,
   importRows,
   latestRun,
-  people,
   access
 }: {
   file: FileUploadRow;
   imports: FileImportRow[];
   importRows: FileImportDataRow[];
   latestRun?: VaeroexRunRow | null;
-  people: TeamPersonOption[];
   access?: FileAccessLinks | null;
 }) {
   const lines = analysisLines(file.analysis_summary);
@@ -1617,7 +1715,7 @@ function FileDetails({
           <FileSourceActions file={file} access={access} />
         </div>
       </section>
-      <FileAnalysisResult file={file} latestRun={latestRun} people={people} />
+      <FileAnalysisResult file={file} latestRun={latestRun} />
       {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
       <ImportHistory imports={imports} />
 
@@ -1644,7 +1742,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
 
   await ensureDefaultFileFolders(supabase, workspaceId, user?.id);
 
-  const [fileResult, folderResult, importResult, importRowResult, reportResult, analysisRunResult, peopleResult] = await Promise.all([
+  const [fileResult, folderResult, importResult, importRowResult, reportResult, analysisRunResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
@@ -1656,15 +1754,13 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       .eq("workspace_id", workspaceId)
       .eq("agent_type", "file_analysis")
       .order("created_at", { ascending: false })
-      .limit(120),
-    supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name")
+      .limit(120)
   ]);
   const files = (fileResult.data || []) as FileUploadRow[];
   const imports = (importResult.data || []) as FileImportRow[];
   const importRows = (importRowResult.data || []) as FileImportDataRow[];
   const reports = (reportResult.data || []) as ReportRow[];
   const analysisRuns = (analysisRunResult.data || []) as VaeroexRunRow[];
-  const people = (peopleResult.data || []) as TeamPersonOption[];
   const fileAccessById = await createFileAccessLinkMap(supabase, files);
   const folderOptions = folderResult.folders;
   const importedRows = files.reduce((sum, file) => sum + file.imported_rows, 0);
@@ -1681,8 +1777,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       importResult.error?.message ||
       importRowResult.error?.message ||
       reportResult.error?.message ||
-      analysisRunResult.error?.message ||
-      peopleResult.error?.message,
+      analysisRunResult.error?.message,
     "Vaeroex could not complete that file action. Please try again."
   );
   const successMessage = cleanNoticeMessage(params?.message, "File action completed.");
@@ -1735,7 +1830,6 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           imports={fileImports}
           importRows={fileImportRows}
           latestRun={fileAnalysisRuns[0]}
-          people={people}
           access={fileAccessById.get(file.id)}
         />
       )
@@ -1858,7 +1952,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           </div>
           <div className="space-y-4">
             <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
-            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} people={people} />
+            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} />
             <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
           </div>
         </section>
