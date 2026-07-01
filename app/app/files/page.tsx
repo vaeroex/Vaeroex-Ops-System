@@ -67,6 +67,7 @@ const SUGGESTED_PROMPTS = [
   "Create recommended actions."
 ];
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting content", "Sending to Vaeroex", "Preparing findings", "Saving review", "Done"];
+const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing source record", "Refreshing file list", "Complete"];
 const KPI_IMPORT_CHART_TYPES = [
   { value: "line", label: "Line chart" },
   { value: "bar", label: "Bar chart" },
@@ -591,6 +592,18 @@ function analysisStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   }
 
   return "Not reviewed";
+}
+
+function fileListStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
+  if (file.deleted_at) return "Deleted";
+  if (file.archived_at) return "Archived";
+  if ((file.processing_status || "") === "processing") return "Analyzing";
+  if ((file.processing_status || "") === "failed" || file.import_status === "failed") return "Error";
+  if (file.import_status === "extracted" || file.import_status === "needs_review") return "Pending Review";
+  if (file.import_status === "imported") return "Imported";
+  if (analysisStatus(file, runs) === "Completed") return "Analyzed";
+  if (isSpreadsheet(file) && file.import_status === "ready") return "Import Ready";
+  return "Uploaded";
 }
 
 function reportsForFile(reports: ReportRow[], fileId: string) {
@@ -1684,7 +1697,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       id: file.id,
       title: file.display_name,
       type: file.file_extension.toUpperCase(),
-      status: fileStatusLabel(file),
+      status: fileListStatus(file, fileAnalysisRuns),
       owner: "Workspace",
       category: file.import_type === "none" ? file.file_extension.toUpperCase() : file.import_type.toUpperCase(),
       createdAt: file.created_at,
@@ -1698,6 +1711,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       inlineActions: <FileInlineActions file={file} analysisRuns={fileAnalysisRuns} access={fileAccessById.get(file.id)} />,
       meta: [
         { label: "Original name", value: file.original_name },
+        { label: "File status", value: fileListStatus(file, fileAnalysisRuns) },
         { label: "Processing", value: fileStatusLabel(file) },
         { label: "Analysis status", value: analysisStatus(file, fileAnalysisRuns) },
         { label: "Last analysis", value: formatDateTime(latestAnalysisAt(file) || fileAnalysisRuns[0]?.created_at || null) },
@@ -1742,16 +1756,45 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
       />
       <LegalSafetyNotice tone="sensitive" compact />
 
-      <details className="rounded-lg border border-white/10 bg-[#08111f] p-3 text-sm text-slate-300">
-        <summary className="cursor-pointer font-semibold text-slate-100">More file views</summary>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link href="/app/files" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">All files</Link>
-          <Link href="/app/files?status=Ready" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Analyses</Link>
-          <Link href="/app/files?status=Imported" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Imports</Link>
-          <Link href="/app/reports?report_type=File%20Review" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Reports from files</Link>
-          <Link href="/app/files?folder=unfiled" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Unfiled</Link>
+      <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 text-sm shadow-sm" aria-label="File views">
+        {[
+          { label: "All Files", href: "/app/files" },
+          { label: "Recent Uploads", href: "/app/files?sort=newest" },
+          { label: "Pending Review", href: "/app/files?status=Pending%20Review" },
+          { label: "Analyzed", href: "/app/files?status=Analyzed" },
+          { label: "Imported Data", href: "/app/files?status=Imported" },
+          { label: "Archived / Hidden", href: "/app/files?view=all" }
+        ].map((item) => {
+          const active =
+            (!params?.status && !params?.view && item.href === "/app/files") ||
+            (params?.status && item.href.includes(`status=${encodeURIComponent(params.status).replace(/%20/g, "%20")}`)) ||
+            (params?.view && item.href.includes(`view=${params.view}`));
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href as Route}
+              className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-3 py-2 text-xs font-semibold ${active ? "bg-vaeroex-blue text-white" : "border border-white/10 bg-white/[0.04] text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30"}`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+        <Link href="/app/reports?report_type=File%20Review" className="inline-flex min-h-11 items-center whitespace-nowrap rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30">
+          Reports from Files
+        </Link>
+      </nav>
+
+      {params?.status || params?.folder || params?.q || params?.view ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-cyan-400/25 bg-cyan-950/30 p-3 text-sm text-cyan-50 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            Showing: <span className="font-semibold">{params.status || (params.view === "all" ? "Archived / hidden included" : params.view) || params.folder || params.q}</span>
+          </p>
+          <Link href="/app/files" className="w-fit rounded-lg border border-cyan-300/30 px-3 py-2 text-xs font-semibold text-cyan-50 hover:bg-cyan-900/40">
+            Clear filter
+          </Link>
         </div>
-      </details>
+      ) : null}
 
       <ErrorNotice message={errorMessage} />
       <SuccessNotice message={successMessage} />
@@ -1785,7 +1828,9 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
               <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
                 Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
               </p>
-              <ActionButton tone="primary" pendingLabel="Uploading file...">Upload file</ActionButton>
+              <AnalysisProgressSubmit className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" pendingLabel="Uploading file..." steps={UPLOAD_PROGRESS_STEPS}>
+                Upload file
+              </AnalysisProgressSubmit>
             </form>
           </CreateDrawer>
         </div>
@@ -1801,6 +1846,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           returnPath="/app/files"
           searchParams={params}
           activeRecordId={selectedFile?.id}
+          defaultView="current"
         />
       </section>
 

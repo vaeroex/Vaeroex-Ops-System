@@ -56,6 +56,7 @@ type ImportField = {
 };
 
 const FILES_PATH = "/app/files";
+const SOURCES_PATH = "/app/sources";
 const STORAGE_BUCKET = "workspace-files";
 const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_ANALYSIS_ROWS = 60;
@@ -120,6 +121,25 @@ function cleanNoticeMessage(message: string, fallback: string) {
 
 function redirectWithError(message: string): never {
   redirect(`${FILES_PATH}?error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."))}` as Route);
+}
+
+function safeFileReturnPath(value: string) {
+  return value === SOURCES_PATH ? SOURCES_PATH : FILES_PATH;
+}
+
+function redirectWithPathError(path: string, message: string): never {
+  redirect(`${path}?error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."))}` as Route);
+}
+
+function redirectWithPathMessage(path: string, message: string, fileId?: string): never {
+  const query = new URLSearchParams();
+
+  if (fileId) {
+    query.set("file", fileId);
+  }
+
+  query.set("message", cleanNoticeMessage(message, "Done."));
+  redirect(`${path}?${query.toString()}` as Route);
 }
 
 function redirectWithFileError(message: string, fileId?: string): never {
@@ -1572,20 +1592,21 @@ async function runFileVaeroexAnalysis({
 
 export async function uploadFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
+  const returnPath = safeFileReturnPath(text(formData, "return_path"));
   const uploadedFile = formData.get("file");
 
   if (!(uploadedFile instanceof File) || uploadedFile.size === 0) {
-    redirectWithError("Choose a file to upload.");
+    redirectWithPathError(returnPath, "Choose a file to upload.");
   }
 
   if (uploadedFile.size > MAX_FILE_SIZE_BYTES) {
-    redirectWithError("Files must be 25 MB or smaller.");
+    redirectWithPathError(returnPath, "Files must be 25 MB or smaller.");
   }
 
   const extension = fileExtension(uploadedFile.name);
 
   if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    redirectWithError("Supported file types are CSV, XLSX, PDF, PNG, JPG, and DOCX.");
+    redirectWithPathError(returnPath, "Supported file types are CSV, XLSX, PDF, PNG, JPG, and DOCX.");
   }
 
   const storedExtension = extension === "jpeg" ? "jpg" : extension;
@@ -1600,7 +1621,7 @@ export async function uploadFileAction(formData: FormData) {
   });
 
   if (upload.error) {
-    redirectWithError(upload.error.message);
+    redirectWithPathError(returnPath, upload.error.message);
   }
 
   const displayName = text(formData, "display_name") || uploadedFile.name;
@@ -1644,12 +1665,14 @@ export async function uploadFileAction(formData: FormData) {
     .single();
 
   if (error || !data) {
-    redirectWithError(error?.message || "File metadata could not be saved.");
+    redirectWithPathError(returnPath, error?.message || "File metadata could not be saved.");
   }
 
   revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
   revalidatePath("/app/reports");
-  redirectWithMessage(
+  redirectWithPathMessage(
+    returnPath,
     storedExtension === "csv" || storedExtension === "xlsx"
       ? "File uploaded. Next: analyze it with Vaeroex, import rows for review, or create a report from the spreadsheet."
       : storedExtension === "pdf" || storedExtension === "docx"

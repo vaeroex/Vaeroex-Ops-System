@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import type { Route } from "next";
+import { useState } from "react";
 
 type ModuleTab = {
   label: string;
@@ -12,17 +15,29 @@ type ModuleTabsProps = {
 };
 
 export function ModuleTabs({ tabs }: ModuleTabsProps) {
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+
   return (
     <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Page sections">
-      {tabs.map((tab) => (
-        <Link
-          key={tab.href}
-          href={tab.href}
-          className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 ${tab.active ? "bg-vaeroex-blue text-white" : "text-slate-200 hover:bg-cyan-950/40 hover:text-vaeroex-accent"}`}
-        >
-          {tab.label}
-        </Link>
-      ))}
+      {tabs.map((tab) => {
+        const isPending = pendingHref === tab.href;
+
+        return (
+          <Link
+            key={tab.href}
+            href={tab.href}
+            onClick={() => {
+              if (!tab.active) {
+                setPendingHref(tab.href);
+              }
+            }}
+            aria-busy={isPending}
+            className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 ${tab.active ? "bg-vaeroex-blue text-white" : "text-slate-200 hover:bg-cyan-950/40 hover:text-vaeroex-accent"}`}
+          >
+            {isPending ? `Loading ${tab.label}...` : tab.label}
+          </Link>
+        );
+      })}
     </nav>
   );
 }

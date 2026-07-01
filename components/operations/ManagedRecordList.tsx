@@ -13,6 +13,7 @@ import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { CompactSummaryChips } from "@/components/operations/CompactSummaryChips";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { EmptyState } from "@/components/operations/EmptyState";
+import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 
@@ -84,6 +85,7 @@ type ManagedRecordListProps = {
   returnPath?: string;
   searchParams?: Record<string, string | string[] | undefined>;
   activeRecordId?: string | null;
+  defaultView?: "active" | "current" | "archived" | "deleted" | "all";
   labels?: {
     status?: string;
     owner?: string;
@@ -183,6 +185,14 @@ function collectionLabel(collection: ManagedRecordCollection) {
   return labels[collection];
 }
 
+function viewLabel(value: string) {
+  if (value === "current") return "Current";
+  if (value === "archived") return "Archived";
+  if (value === "deleted") return "Hidden";
+  if (value === "all") return "All";
+  return "Active";
+}
+
 function removeParam(params: ReturnType<typeof listParams>, key: keyof ReturnType<typeof listParams>) {
   return {
     ...params,
@@ -194,12 +204,14 @@ function activeFilterChips({
   params,
   folders,
   returnPath,
-  labels
+  labels,
+  defaultView = "active"
 }: {
   params: ReturnType<typeof listParams>;
   folders: ManagedRecordFolder[];
   returnPath: string;
   labels: Required<NonNullable<ManagedRecordListProps["labels"]>>;
+  defaultView?: NonNullable<ManagedRecordListProps["defaultView"]>;
 }) {
   const chips: Array<{ key: keyof typeof params; label: string; value: string }> = [];
 
@@ -208,7 +220,7 @@ function activeFilterChips({
   if (params.status) chips.push({ key: "status", label: labels.status, value: params.status });
   if (params.owner) chips.push({ key: "owner", label: labels.owner, value: params.owner });
   if (params.category) chips.push({ key: "category", label: labels.category, value: params.category });
-  if (params.view && params.view !== "active") chips.push({ key: "view", label: "View", value: params.view });
+  if (params.view && params.view !== defaultView) chips.push({ key: "view", label: "View", value: viewLabel(params.view) });
   if (params.date_from) chips.push({ key: "date_from", label: "From", value: params.date_from });
   if (params.date_to) chips.push({ key: "date_to", label: "To", value: params.date_to });
 
@@ -227,13 +239,18 @@ function pageLimit(value: string, total: number) {
   return pageSizeOptions.includes(String(parsed)) ? parsed : 10;
 }
 
-function filteredRecords(records: ManagedRecord[], folders: ManagedRecordFolder[], searchParams?: ManagedRecordListProps["searchParams"]) {
+function filteredRecords(
+  records: ManagedRecord[],
+  folders: ManagedRecordFolder[],
+  searchParams?: ManagedRecordListProps["searchParams"],
+  defaultView: NonNullable<ManagedRecordListProps["defaultView"]> = "active"
+) {
   const query = param(searchParams?.q).toLowerCase().trim();
   const folder = param(searchParams?.folder);
   const status = param(searchParams?.status);
   const owner = param(searchParams?.owner);
   const category = param(searchParams?.category);
-  const view = param(searchParams?.view) || "active";
+  const view = param(searchParams?.view) || defaultView;
   const dateFrom = param(searchParams?.date_from);
   const dateTo = param(searchParams?.date_to);
 
@@ -243,6 +260,7 @@ function filteredRecords(records: ManagedRecord[], folders: ManagedRecordFolder[
     const recordDate = (record.updatedAt || record.createdAt).slice(0, 10);
 
     if (view === "active" && (isDeleted || isArchived)) return false;
+    if (view === "current" && (isDeleted || isArchived)) return false;
     if (view === "archived" && (!isArchived || isDeleted)) return false;
     if (view === "deleted" && !isDeleted) return false;
     if (folder === "unfiled" && record.folderId) return false;
@@ -487,6 +505,14 @@ function RecordActionsMenu({
   returnPath: string;
   labels: Required<NonNullable<ManagedRecordListProps["labels"]>>;
 }) {
+  const isFile = collection === "files";
+  const archiveMessage = isFile
+    ? `Archive "${record.title}"? It will leave current file views but remain available as historical context.`
+    : `Archive "${record.title}"? It will be removed from active views.`;
+  const deleteMessage = isFile
+    ? `Delete this file from current views? This uses a workspace-safe soft delete and may remove supporting evidence from active file views.`
+    : `Delete "${record.title}"? It will be hidden from active views.`;
+
   return (
     <details className="relative">
       <summary
@@ -538,7 +564,9 @@ function RecordActionsMenu({
                   <option key={folder.id} value={folder.id}>{folder.name}</option>
                 ))}
               </select>
-              <button className="min-h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">Move</button>
+              <PendingSubmitButton pendingLabel="Moving..." className="min-h-11 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
+                Move
+              </PendingSubmitButton>
             </form>
           </details>
 
@@ -547,9 +575,13 @@ function RecordActionsMenu({
             <input type="hidden" name="record_id" value={record.id} />
             <input type="hidden" name="record_action" value={record.archivedAt ? "restore" : "archive"} />
             <input type="hidden" name="return_path" value={returnPath} />
-            <button className={menuItemClass}>
+            <ConfirmSubmitButton
+              message={record.archivedAt ? `Restore "${record.title}" to current views?` : archiveMessage}
+              pendingLabel={record.archivedAt ? "Restoring..." : "Archiving..."}
+              className={menuItemClass}
+            >
               {record.archivedAt ? "Restore" : "Archive"}
-            </button>
+            </ConfirmSubmitButton>
           </form>
 
           <form action={manageRecordAction}>
@@ -557,9 +589,9 @@ function RecordActionsMenu({
             <input type="hidden" name="record_id" value={record.id} />
             <input type="hidden" name="record_action" value="duplicate" />
             <input type="hidden" name="return_path" value={returnPath} />
-            <button className={menuItemClass}>
+            <PendingSubmitButton pendingLabel="Duplicating..." className={menuItemClass}>
               Duplicate
-            </button>
+            </PendingSubmitButton>
           </form>
 
           <form action={manageRecordAction}>
@@ -568,10 +600,11 @@ function RecordActionsMenu({
             <input type="hidden" name="record_action" value="delete" />
             <input type="hidden" name="return_path" value={returnPath} />
             <ConfirmSubmitButton
-              message={`Delete "${record.title}"? It will be hidden from active views.`}
+              message={deleteMessage}
+              pendingLabel={isFile ? "Deleting file..." : "Deleting..."}
               className="min-h-11 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-700 hover:bg-red-950/35 hover:text-red-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/40"
             >
-              Delete
+              {isFile ? "Delete File" : "Delete"}
             </ConfirmSubmitButton>
           </form>
         </div>
@@ -591,6 +624,7 @@ export function ManagedRecordList({
   returnPath: configuredReturnPath,
   searchParams,
   activeRecordId,
+  defaultView = "active",
   labels: configuredLabels
 }: ManagedRecordListProps) {
   const labels = {
@@ -600,7 +634,7 @@ export function ManagedRecordList({
     date: configuredLabels?.date || "Date"
   };
   const sort = param(searchParams?.sort) || "newest";
-  const visibleRecords = sortedRecords(filteredRecords(records, folders, searchParams), sort);
+  const visibleRecords = sortedRecords(filteredRecords(records, folders, searchParams, defaultView), sort);
   const limitValue = param(searchParams?.limit);
   const visibleLimit = pageLimit(limitValue, visibleRecords.length);
   const displayedRecords = visibleRecords.slice(0, visibleLimit);
@@ -617,14 +651,24 @@ export function ManagedRecordList({
   const activeCount = records.filter((record) => !record.deletedAt && !record.archivedAt).length;
   const archivedCount = records.filter((record) => record.archivedAt && !record.deletedAt).length;
   const deletedCount = records.filter((record) => record.deletedAt).length;
-  const chips = activeFilterChips({ params: baseParams, folders, returnPath, labels });
+  const currentCount = activeCount;
+  const chips = activeFilterChips({ params: baseParams, folders, returnPath, labels, defaultView });
+  const hasFilter = Boolean(chips.length || param(searchParams?.limit));
   const askPrompt = `Review these ${collectionLabel(collection)} and tell me what needs attention.`;
-  const summaryChips = [
-    { label: "Active", value: activeCount },
-    { label: "Showing", value: visibleRecords.length },
-    archivedCount ? { label: "Archived", value: archivedCount, tone: "muted" as const } : null,
-    deletedCount ? { label: "Hidden", value: deletedCount, tone: "muted" as const } : null
-  ].filter(Boolean) as Array<{ label: string; value: string | number; tone?: "default" | "attention" | "good" | "muted" }>;
+  const summaryChips =
+    collection === "files"
+      ? ([
+          { label: "Current", value: currentCount },
+          { label: "Matching", value: visibleRecords.length },
+          archivedCount ? { label: "Archived", value: archivedCount, tone: "muted" as const } : null,
+          deletedCount ? { label: "Deleted", value: deletedCount, tone: "muted" as const } : null
+        ].filter(Boolean) as Array<{ label: string; value: string | number; tone?: "default" | "attention" | "good" | "muted" }>)
+      : ([
+          { label: "Active", value: activeCount },
+          { label: "Showing", value: visibleRecords.length },
+          archivedCount ? { label: "Archived", value: archivedCount, tone: "muted" as const } : null,
+          deletedCount ? { label: "Hidden", value: deletedCount, tone: "muted" as const } : null
+        ].filter(Boolean) as Array<{ label: string; value: string | number; tone?: "default" | "attention" | "good" | "muted" }>);
 
   return (
     <div className="managed-record-list space-y-3">
@@ -670,7 +714,8 @@ export function ManagedRecordList({
               </option>
             ))}
           </select>
-          <select name="view" defaultValue={param(searchParams?.view) || "active"} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
+          <select name="view" defaultValue={param(searchParams?.view) || defaultView} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100">
+            <option value="current">Current</option>
             <option value="active">Active</option>
             <option value="archived">Archived</option>
             <option value="deleted">Hidden</option>
@@ -788,7 +833,7 @@ export function ManagedRecordList({
               <option key={folder.id} value={folder.id}>{folder.name}</option>
             ))}
           </select>
-          <ConfirmSubmitButton message="Apply this action to the selected records?">Apply</ConfirmSubmitButton>
+          <ConfirmSubmitButton message="Apply this action to the selected records?" pendingLabel="Applying...">Apply</ConfirmSubmitButton>
         </form>
       </div>
 
@@ -902,7 +947,35 @@ export function ManagedRecordList({
               </div>
             </div>
           ) : (
-            <EmptyState title={emptyTitle} description={emptyDescription} />
+            <EmptyState
+              title={records.length ? "No records match this view" : emptyTitle}
+              description={
+                records.length
+                  ? collection === "files"
+                    ? "No files match the current filters. Clear filters to view all current files, or switch to archived/hidden files."
+                    : "No records match the current filters. Clear filters or switch views to find archived or hidden records."
+                  : emptyDescription
+              }
+              action={
+                records.length ? (
+                  <div className="flex flex-wrap justify-center gap-2">
+                    {hasFilter ? (
+                      <Link href={returnPath as Route} className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+                        Clear filters
+                      </Link>
+                    ) : null}
+                    <Link href={listHref(returnPath, { ...baseParams, view: "all" }) as Route} className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                      Show all records
+                    </Link>
+                    {collection === "files" ? (
+                      <Link href={listHref(returnPath, { ...baseParams, view: "deleted" }) as Route} className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                        Show deleted files
+                      </Link>
+                    ) : null}
+                  </div>
+                ) : null
+              }
+            />
           )}
     </div>
   );
