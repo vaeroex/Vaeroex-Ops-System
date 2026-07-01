@@ -53,6 +53,7 @@ type KpisPageProps = {
 };
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
+type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type KpiAlertRuleRow = Database["public"]["Tables"]["kpi_alert_rules"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
@@ -1817,6 +1818,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const sourceFiles = (fileResult.data || []) as FileUploadRow[];
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
   const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
   const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
@@ -1903,6 +1905,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedMetricRows = primaryMetric ? getMetricHistoryRows(allVisibleKpis, primaryMetric) : [];
   const selectedMetricActualValues = selectedMetricRows.map((row) => row.actual_value).filter((value): value is number => value !== null);
   const selectedLatestKpi = selectedMetricRows.at(-1);
+  const selectedSourceFile = selectedLatestKpi?.source_file_id ? sourceFiles.find((file) => file.id === selectedLatestKpi.source_file_id) : null;
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
   const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis) : null;
   const undoMetricName = params?.target_applied === "true" ? params.undo_kpi : undefined;
@@ -1974,7 +1977,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <Link href="/app/kpis?section=records#add-kpi" className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
               Add KPI
             </Link>
-            <Link href="/app/files?status=Uploaded" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
+            <Link href="/app/files?status=Import%20Ready" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
               Import KPI Data
             </Link>
             <Link href="/app/ask" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
@@ -2241,7 +2244,18 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   <summary className="cursor-pointer font-semibold text-white">Source/import information</summary>
                   <div className="mt-3 space-y-2 text-xs leading-5 text-slate-400">
                     <p>Latest source: {selectedLatestKpi?.source || "Manual or not provided"}</p>
-                    <p>Source file: {selectedLatestKpi?.source_file_id || "None"}</p>
+                    <div>
+                      Source file:{" "}
+                      {selectedSourceFile ? (
+                        <Link href={`/app/sources?file=${selectedSourceFile.id}#file-${selectedSourceFile.id}` as Route} className="font-semibold text-cyan-100 underline underline-offset-4 hover:text-white">
+                          {selectedSourceFile.display_name}
+                        </Link>
+                      ) : selectedLatestKpi?.source_file_id ? (
+                        <span>{selectedLatestKpi.source_file_id}</span>
+                      ) : (
+                        <span>None</span>
+                      )}
+                    </div>
                     <p>Import ID: {selectedLatestKpi?.import_id || "None"}</p>
                     <p>Import row: {selectedLatestKpi?.import_row_id || "None"}</p>
                   </div>
