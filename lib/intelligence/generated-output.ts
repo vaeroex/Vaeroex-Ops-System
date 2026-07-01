@@ -6,7 +6,7 @@ import type {
   IntelligenceLayerResult
 } from "@/lib/intelligence/layer";
 
-export type GeneratedOutputType = "action_plan" | "risk_brief" | "checklist" | "sop" | "executive_briefing";
+export type GeneratedOutputType = "action_plan" | "risk_brief" | "checklist" | "sop" | "executive_briefing" | "meeting_agenda";
 
 export type GeneratedOutputSource = Pick<
   IntelligenceInsight,
@@ -48,7 +48,8 @@ const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
   risk_brief: "Generated Investigation Summary",
   checklist: "Generated Checklist Draft",
   sop: "Generated SOP Draft",
-  executive_briefing: "Generated Executive Briefing"
+  executive_briefing: "Generated Executive Briefing",
+  meeting_agenda: "Generated Meeting Brief"
 };
 
 const OUTPUT_NAMES: Record<GeneratedOutputType, string> = {
@@ -56,11 +57,18 @@ const OUTPUT_NAMES: Record<GeneratedOutputType, string> = {
   risk_brief: "Investigation Summary",
   checklist: "Checklist Draft",
   sop: "SOP Draft",
-  executive_briefing: "Executive Briefing"
+  executive_briefing: "Executive Briefing",
+  meeting_agenda: "Meeting Brief"
 };
 
 export function parseGeneratedOutputType(value: string | null | undefined): GeneratedOutputType {
-  if (value === "risk_brief" || value === "checklist" || value === "sop" || value === "executive_briefing") {
+  if (
+    value === "risk_brief" ||
+    value === "checklist" ||
+    value === "sop" ||
+    value === "executive_briefing" ||
+    value === "meeting_agenda"
+  ) {
     return value;
   }
 
@@ -126,7 +134,7 @@ function clean(value: string | null | undefined, fallback: string) {
 
 function sourceForType(type: GeneratedOutputType, intelligence: IntelligenceLayerResult) {
   if (type === "risk_brief") return intelligence.topRisk;
-  if (type === "executive_briefing") return intelligence.topRecommendation || intelligence.topRisk || intelligence.topOpportunity;
+  if (type === "executive_briefing" || type === "meeting_agenda") return intelligence.topRecommendation || intelligence.topRisk || intelligence.topOpportunity;
   if (type === "checklist" || type === "sop") return intelligence.topRecommendation || intelligence.topRisk || intelligence.topOpportunity;
   return intelligence.topRecommendation || intelligence.topRisk || intelligence.topOpportunity;
 }
@@ -280,6 +288,37 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
       ),
       "",
       "## Evidence",
+      bulletList(source.evidence)
+    ].join("\n");
+  }
+
+  if (type === "meeting_agenda") {
+    return [
+      "## Meeting Purpose",
+      source.summary,
+      "",
+      "## Findings",
+      bulletList(source.evidence.slice(0, 5)),
+      "",
+      "## Risks to Discuss",
+      source.why,
+      "",
+      "## Opportunities to Discuss",
+      source.impact,
+      "",
+      "## Recommended Discussion Topics",
+      numberedList([
+        "What did this source reveal that leadership did not already know?",
+        "Which risk or opportunity deserves executive attention first?",
+        "What evidence supports the conclusion?",
+        "What additional source data would increase confidence?",
+        source.recommendedAction
+      ]),
+      "",
+      "## Confidence Level",
+      source.confidence,
+      "",
+      "## Evidence Summary",
       bulletList(source.evidence)
     ].join("\n");
   }
