@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
-import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
+import { VAEROEX_CONTACT_EMAILS, VAEROEX_FOOTER_LOCATION, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { legalLinks } from "@/lib/legal/content";
 
 const platformLinks: Array<[string, Route]> = [
@@ -42,6 +42,7 @@ export function PublicFooter() {
             Intelligence Platform. The Advantage of Knowing First.
           </p>
           <p className="mt-3 text-xs">Visibility • Awareness • Execution</p>
+          <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
         </div>
         <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div>

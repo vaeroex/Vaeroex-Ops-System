@@ -3,7 +3,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
-import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
+import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 
 const inquiryCategories = [
   "Product Demo",
@@ -63,6 +63,16 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
                 </a>
               ))}
             </div>
+          </ScrollReveal>
+          <ScrollReveal delayMs={220} className="mt-4 rounded-lg border border-line bg-white p-5 shadow-sm">
+            <p className="text-sm font-semibold text-vaeroex-blue">Company mailing address</p>
+            <address className="mt-3 not-italic text-sm leading-6 text-muted">
+              {VAEROEX_COMPANY_ADDRESS_LINES.map((line) => (
+                <span key={line} className="block">
+                  {line}
+                </span>
+              ))}
+            </address>
           </ScrollReveal>
         </div>
         <ScrollReveal delayMs={140}>
