@@ -176,13 +176,67 @@ function fileStatusLabel(file: FileUploadRow) {
 }
 
 function indexStatusLabel(file: FileUploadRow) {
-  const status = file.index_status || "not_indexed";
+  return indexStatusDetails(file).label;
+}
 
-  if (status === "ready") return `Indexed${file.indexed_chunk_count ? ` · ${file.indexed_chunk_count} chunks` : ""}`;
-  if (status === "processing") return "Indexing";
-  if (status === "queued") return "Queued";
-  if (status === "failed") return file.index_error ? "Index warning" : "Index failed";
-  return "Not indexed";
+function evidenceChunkText(count: number) {
+  return `${count} evidence chunk${count === 1 ? "" : "s"}`;
+}
+
+function indexStatusDetails(file: FileUploadRow) {
+  const status = file.index_status || "not_indexed";
+  const chunkCount = file.indexed_chunk_count || 0;
+
+  if (status === "ready") {
+    return {
+      label: "Indexed",
+      subtext: `${evidenceChunkText(chunkCount)} stored for future intelligence.`,
+      detail: "Available for future Vaeroex answers, recommendations, and briefings.",
+      tone: "good"
+    };
+  }
+
+  if (status === "processing") {
+    return {
+      label: "Indexing evidence...",
+      subtext: "Vaeroex is preparing this file for Business Memory.",
+      detail: "Indexing evidence...",
+      tone: "info"
+    };
+  }
+
+  if (status === "queued") {
+    return {
+      label: "Queued",
+      subtext: "Vaeroex will index this file after processing.",
+      detail: "Indexing evidence is queued.",
+      tone: "info"
+    };
+  }
+
+  if (status === "failed") {
+    return {
+      label: "Indexing failed",
+      subtext: "Indexing failed. Retry indexing.",
+      detail: file.index_error || "Retry indexing by running a new Vaeroex review for this file.",
+      tone: "error"
+    };
+  }
+
+  return {
+    label: "Not indexed",
+    subtext: "Not yet available in Business Memory.",
+    detail: "Not yet available in Business Memory.",
+    tone: "muted"
+  };
+}
+
+function memoryStatusClass(tone: string) {
+  if (tone === "good") return "border-emerald-400/35 bg-emerald-950/25 text-emerald-100";
+  if (tone === "error") return "border-red-400/35 bg-red-950/25 text-red-100";
+  if (tone === "info") return "border-cyan-400/35 bg-cyan-950/25 text-cyan-100";
+
+  return "border-white/10 bg-slate-950/30 text-slate-200";
 }
 
 function isSpreadsheet(file: FileUploadRow) {
@@ -672,9 +726,9 @@ function analysisInsightCount(result: JsonRecord | null) {
   ].length;
 }
 
-function AnalysisSection({ title, items, empty }: { title: string; items: string[]; empty: string }) {
+function AnalysisSection({ id, title, items, empty }: { id?: string; title: string; items: string[]; empty: string }) {
   return (
-    <section className="rounded-lg border border-line bg-slate-50 p-4">
+    <section id={id} className="scroll-mt-24 rounded-lg border border-line bg-slate-50 p-4">
       <h5 className="text-sm font-semibold text-ink">{title}</h5>
       <div className="mt-3 space-y-2 text-sm leading-6 text-slate-700">
         {items.length ? (
@@ -687,6 +741,240 @@ function AnalysisSection({ title, items, empty }: { title: string; items: string
         ) : (
           <p className="text-muted">{empty}</p>
         )}
+      </div>
+    </section>
+  );
+}
+
+function analysisConfidence({
+  file,
+  latestRun,
+  result,
+  insightCount
+}: {
+  file: FileUploadRow;
+  latestRun?: VaeroexRunRow | null;
+  result: JsonRecord | null;
+  insightCount: number;
+}) {
+  const output = result ? displayAnalysisOutput(result) : {};
+  const rawConfidence = output.confidence || output.confidence_level || output.confidence_score || output.confidenceScore;
+  const rawReason =
+    stringValue(output.confidence_reason) ||
+    stringValue(output.confidence_explanation) ||
+    stringValue(output.limitations);
+  const normalized = typeof rawConfidence === "string" ? rawConfidence.toLowerCase() : "";
+  const numericConfidence = typeof rawConfidence === "number" ? rawConfidence : Number.parseFloat(String(rawConfidence || ""));
+  const indexedChunks = file.indexed_chunk_count || 0;
+  const hasIndexedEvidence = file.index_status === "ready" && indexedChunks > 0;
+
+  if (normalized.includes("high") || numericConfidence >= 75) {
+    return {
+      label: "High",
+      reason: rawReason || (hasIndexedEvidence ? "Supported by indexed Business Memory evidence." : "Based on uploaded file evidence only.")
+    };
+  }
+
+  if (normalized.includes("medium") || normalized.includes("partial") || (numericConfidence >= 45 && numericConfidence < 75)) {
+    return {
+      label: "Medium",
+      reason: rawReason || (hasIndexedEvidence ? "Supported by indexed Business Memory evidence." : "Based on uploaded file evidence only.")
+    };
+  }
+
+  if (normalized.includes("low") || normalized.includes("limited") || (numericConfidence > 0 && numericConfidence < 45)) {
+    return {
+      label: "Low",
+      reason: rawReason || "Limited historical context available."
+    };
+  }
+
+  if (!result && latestRun?.status !== "completed") {
+    return {
+      label: "Developing",
+      reason: "No completed Vaeroex review is available yet."
+    };
+  }
+
+  if (hasIndexedEvidence && indexedChunks >= 4 && insightCount >= 4) {
+    return {
+      label: "High",
+      reason: "Supported by indexed Business Memory evidence."
+    };
+  }
+
+  if (hasIndexedEvidence || insightCount >= 3) {
+    return {
+      label: "Medium",
+      reason: hasIndexedEvidence ? "Supported by indexed Business Memory evidence." : "Based on uploaded file evidence only."
+    };
+  }
+
+  return {
+    label: "Developing",
+    reason: "Limited historical context available."
+  };
+}
+
+function confidenceClass(label: string) {
+  if (label === "High") return "border-emerald-400/35 bg-emerald-950/25 text-emerald-100";
+  if (label === "Medium") return "border-cyan-400/35 bg-cyan-950/25 text-cyan-100";
+  if (label === "Low") return "border-amber-400/35 bg-amber-950/25 text-amber-100";
+
+  return "border-white/10 bg-slate-950/30 text-slate-200";
+}
+
+function insightCategories(sections: ReturnType<typeof cleanAnalysisSections>) {
+  return [
+    { label: "Risks", count: sections.risks.length, href: "#analysis-risks" },
+    { label: "Opportunities", count: sections.opportunities.length, href: "#analysis-opportunities" },
+    { label: "KPI Suggestions", count: sections.kpis.length + sections.kpiRecords.length, href: "#analysis-kpis" },
+    { label: "Recommendations", count: sections.actions.length, href: "#analysis-recommendations" }
+  ];
+}
+
+function InsightCategoryLinks({ sections }: { sections: ReturnType<typeof cleanAnalysisSections> }) {
+  return (
+    <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+      {insightCategories(sections).map((category) => (
+        <a
+          key={category.label}
+          href={category.href}
+          className={`rounded-lg border px-3 py-2 text-xs font-semibold transition ${
+            category.count
+              ? "border-vaeroex-accent/35 bg-white text-slate-800 hover:border-vaeroex-blue hover:text-vaeroex-blue"
+              : "border-line bg-white/60 text-slate-400"
+          }`}
+        >
+          {category.label}: <span className="font-bold">{category.count}</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function EvidenceUsedPanel({
+  file,
+  analysisDate
+}: {
+  file: FileUploadRow;
+  analysisDate?: string | null;
+}) {
+  const memory = indexStatusDetails(file);
+  const chunkCount = file.indexed_chunk_count || 0;
+
+  return (
+    <section className="mt-4 rounded-lg border border-line bg-white p-4">
+      <h5 className="text-sm font-semibold text-ink">Evidence Used</h5>
+      <div className="mt-3 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Source file</p>
+          <p className="mt-1 break-words font-semibold text-ink">{file.display_name}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Business Memory</p>
+          <p className="mt-1 font-semibold text-ink">{memory.label}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Evidence chunks</p>
+          <p className="mt-1 font-semibold text-ink">{chunkCount}</p>
+        </div>
+        <div className="rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last analyzed</p>
+          <p className="mt-1 font-semibold text-ink">{formatDateTime(analysisDate)}</p>
+        </div>
+      </div>
+      <p className="mt-3 text-xs leading-5 text-muted">{memory.detail}</p>
+    </section>
+  );
+}
+
+function fileAskEvidence({
+  file,
+  sections,
+  insightCount,
+  confidence,
+  analysisDate
+}: {
+  file: FileUploadRow;
+  sections: ReturnType<typeof cleanAnalysisSections>;
+  insightCount: number;
+  confidence: ReturnType<typeof analysisConfidence>;
+  analysisDate?: string | null;
+}) {
+  const memory = indexStatusDetails(file);
+
+  return [
+    `Source file: ${file.display_name}`,
+    `File type: ${file.file_extension.toUpperCase()}`,
+    `Business Memory status: ${memory.label}`,
+    `Evidence chunks stored: ${file.indexed_chunk_count || 0}`,
+    `Last analyzed: ${formatDateTime(analysisDate)}`,
+    `Review confidence: ${confidence.label} - ${confidence.reason}`,
+    `Insights found: ${insightCount}`,
+    sections.executiveSummary ? `Executive summary: ${sections.executiveSummary}` : "",
+    sections.risks.length ? `Risks: ${sections.risks.slice(0, 4).join("; ")}` : "Risks: none identified in the saved review.",
+    sections.opportunities.length ? `Opportunities: ${sections.opportunities.slice(0, 4).join("; ")}` : "Opportunities: none identified in the saved review.",
+    sections.kpis.length ? `KPI suggestions: ${sections.kpis.slice(0, 4).join("; ")}` : "KPI suggestions: none identified in the saved review.",
+    sections.actions.length ? `Executive recommendations: ${sections.actions.slice(0, 4).join("; ")}` : "Executive recommendations: none identified in the saved review."
+  ].filter(Boolean);
+}
+
+function FileContextualAskPanel({
+  file,
+  latestRun
+}: {
+  file: FileUploadRow;
+  latestRun?: VaeroexRunRow | null;
+}) {
+  const metadataResult = latestAnalysisResult(file);
+  const runResult = latestRun?.status === "completed" ? displayAnalysisOutput(latestRun.output_json) : null;
+  const result = metadataResult || runResult;
+  const sections = cleanAnalysisSections(result, file.analysis_summary);
+  const insightCount = analysisInsightCount(result);
+  const analysisDate = latestAnalysisAt(file) || latestRun?.created_at || null;
+  const confidence = analysisConfidence({ file, latestRun, result, insightCount });
+  const evidence = fileAskEvidence({ file, sections, insightCount, confidence, analysisDate });
+
+  return (
+    <section id="ask-about-file" className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4 text-cyan-50">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Ask about this file</p>
+          <h4 className="mt-2 text-base font-semibold text-white">Ask Vaeroex About This File</h4>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            Vaeroex will answer inline using this file’s evidence and relevant workspace Business Memory. If the evidence is limited, it should say so instead of guessing.
+          </p>
+        </div>
+        <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClass(confidence.label)}`}>
+          Confidence: {confidence.label}
+        </span>
+      </div>
+      <div className="mt-4 flex flex-wrap gap-2">
+        {[
+          "Summarize this file.",
+          "What risks did this file reveal?",
+          "What opportunities did this file reveal?",
+          "What KPIs should leadership monitor?",
+          "What information is missing?",
+          "What should leadership review next?"
+        ].map((prompt) => (
+          <span key={prompt} className="rounded-full border border-cyan-300/20 bg-slate-950/35 px-3 py-1.5 text-xs font-semibold text-cyan-100">
+            {prompt}
+          </span>
+        ))}
+      </div>
+      <div className="mt-4">
+        <ContextualAskVaeroex
+          label="Ask Vaeroex About This File"
+          prompt={`Answer a leadership question about ${file.display_name}. Use only this file evidence and relevant workspace Business Memory. Cover summary, risks, opportunities, KPI suggestions, missing information, and what leadership should review next. Do not create assignments, CRM records, tasks, distribution schedules, or team workflow.`}
+          contextType="file"
+          contextId={file.id}
+          sourceTitle={`File - ${file.display_name}`}
+          sourceSummary={sections.executiveSummary || file.analysis_summary || "No completed Vaeroex review is available for this file yet."}
+          evidence={evidence}
+          compact
+        />
       </div>
     </section>
   );
@@ -794,7 +1082,7 @@ function FileAnalysisActions({
 
       <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-3">
         <ContextualAskVaeroex
-          label="Ask Vaeroex About This Analysis"
+          label="Ask Vaeroex About This File"
           prompt="Explain this file analysis for leadership. Focus on what happened, why it matters, evidence, confidence, data limitations, and the one leadership discussion this should trigger."
           contextType="file_analysis"
           contextId={latestRun?.id || file.id}
@@ -821,6 +1109,7 @@ function FileAnalysisResult({
   const sections = cleanAnalysisSections(result, file.analysis_summary);
   const insightCount = analysisInsightCount(result);
   const analysisDate = latestAnalysisAt(file) || latestRun?.created_at || null;
+  const confidence = analysisConfidence({ file, latestRun, result, insightCount });
 
   if (!result && !file.processing_error && latestRun?.status !== "failed") {
     return (
@@ -859,22 +1148,30 @@ function FileAnalysisResult({
               {sections.executiveSummary ||
                 "Vaeroex could not find enough readable business data in this file to generate a useful review."}
             </p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClass(confidence.label)}`}>
+                Confidence: {confidence.label}
+              </span>
+              <span className="text-xs leading-5 text-muted">{confidence.reason}</span>
+            </div>
           </div>
           <StatusBadge value="Completed" />
         </div>
+        <InsightCategoryLinks sections={sections} />
         <p className="mt-3 text-xs leading-5 text-muted">
           Source file: {file.display_name} · Review date: {formatDateTime(analysisDate)} · Status: {fileStatusLabel(file)}
         </p>
       </div>
+      <EvidenceUsedPanel file={file} analysisDate={analysisDate} />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
-        <AnalysisSection title="Key Findings" items={sections.findings} empty="No specific findings were saved from this analysis." />
-        <AnalysisSection title="KPIs Detected" items={sections.kpis} empty="No KPI suggestions were found yet." />
-        <AnalysisSection title="Risks" items={sections.risks} empty="No clear risks were identified." />
-        <AnalysisSection title="Opportunities" items={sections.opportunities} empty="No clear opportunities were identified." />
-        <AnalysisSection title="Executive Recommendations" items={sections.actions} empty="No executive recommendations were returned." />
+        <AnalysisSection id="analysis-findings" title="Key Findings" items={sections.findings} empty="No specific findings were saved from this analysis." />
+        <AnalysisSection id="analysis-kpis" title="KPIs Detected" items={sections.kpis} empty="No KPI suggestions were found yet." />
+        <AnalysisSection id="analysis-risks" title="Risks" items={sections.risks} empty="No clear risks were identified." />
+        <AnalysisSection id="analysis-opportunities" title="Opportunities" items={sections.opportunities} empty="No clear opportunities were identified." />
+        <AnalysisSection id="analysis-recommendations" title="Executive Recommendations" items={sections.actions} empty="No executive recommendations were returned." />
         <AnalysisSection title="Possible Leadership Documents" items={sections.reports} empty="No additional leadership documents were suggested." />
-        <AnalysisSection title="Suggested KPI Records" items={sections.kpiRecords} empty="No KPI records were suggested." />
+        <AnalysisSection id="analysis-kpi-records" title="Suggested KPI Records" items={sections.kpiRecords} empty="No KPI records were suggested." />
       </div>
       <FileAnalysisActions file={file} latestRun={latestRun} sections={sections} insightCount={insightCount} />
     </section>
@@ -1079,6 +1376,7 @@ function FileActionCenter({
   const support = fileSupportNotice(file);
   const latestStatus = analysisStatus(file, analysisRuns);
   const hasCompletedAnalysis = latestStatus === "Completed";
+  const memory = indexStatusDetails(file);
 
   if (compact) {
     return (
@@ -1275,8 +1573,9 @@ function FileActionCenter({
             <p className="mt-1 text-ink">{(file.processing_status || "uploaded").replace(/_/g, " ")}</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Memory index</p>
-            <p className="mt-1 text-ink">{indexStatusLabel(file)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Business Memory Status</p>
+            <p className="mt-1 font-semibold text-ink">{memory.label}</p>
+            <p className="mt-1 text-xs leading-5 text-muted">{memory.subtext}</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Analysis status</p>
@@ -1317,6 +1616,7 @@ function SelectedFileBanner({
   const fileReports = reportsForFile(reports, file.id);
   const status = analysisStatus(file, analysisRuns);
   const latestDate = latestAnalysisAt(file) || analysisRuns[0]?.created_at || null;
+  const memory = indexStatusDetails(file);
 
   return (
     <div className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-4">
@@ -1339,6 +1639,9 @@ function SelectedFileBanner({
             <Link href="#file-report-actions" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               Create report
             </Link>
+            <Link href="#ask-about-file" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
+              Ask about file
+            </Link>
             <Link href="#analysis-history" className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
               View review history
             </Link>
@@ -1346,7 +1649,7 @@ function SelectedFileBanner({
               View file details
             </Link>
             <Link href="/app/files" className="rounded-lg border border-line bg-white px-3 py-2 text-center text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
-              Change Selection
+              Back to Files
             </Link>
           </div>
         </div>
@@ -1373,8 +1676,11 @@ function SelectedFileBanner({
             <p className="mt-1 text-sm font-semibold text-ink">{status}</p>
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Memory index</p>
-            <p className="mt-1 text-sm font-semibold text-ink">{indexStatusLabel(file)}</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Business Memory Status</p>
+            <div className={`mt-1 rounded-lg border px-3 py-2 ${memoryStatusClass(memory.tone)}`}>
+              <p className="text-sm font-semibold">{memory.label}</p>
+              <p className="mt-1 text-xs leading-5 opacity-85">{memory.subtext}</p>
+            </div>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last review date</p>
@@ -1827,7 +2133,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         { label: "File status", value: fileListStatus(file, fileAnalysisRuns) },
         { label: "Processing", value: fileStatusLabel(file) },
         { label: "Analysis status", value: analysisStatus(file, fileAnalysisRuns) },
-        { label: "Memory index", value: indexStatusLabel(file) },
+        { label: "Business Memory Status", value: indexStatusLabel(file) },
         { label: "Last analysis", value: formatDateTime(latestAnalysisAt(file) || fileAnalysisRuns[0]?.created_at || null) },
         { label: "Import status", value: importStatusLabel(file.import_status) },
         { label: "Rows imported", value: file.imported_rows },
@@ -1971,6 +2277,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           </div>
           <div className="space-y-4">
             <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
+            <FileContextualAskPanel file={selectedFile} latestRun={selectedFileRuns[0]} />
             <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} />
             <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
           </div>
