@@ -4,8 +4,10 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { runVaeroexCompletion, type VaeroexFileAttachment } from "@/lib/ai/vaeroex-client";
+import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment } from "@/lib/ai/vaeroex-client";
+import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
@@ -1199,7 +1201,7 @@ async function extractFileContent(file: FileUploadRow, rowLimit: number): Promis
         columns: [],
         textContent: "",
         textPreview: "",
-        contentNote: "Vaeroex will inspect this image for readable text, visual business context, risks, KPIs, and recommended actions.",
+        contentNote: "Vaeroex will inspect this image for readable text, visual business context, risks, KPIs, and executive recommendations.",
         fileAttachment: fileAttachment(file, buffer, "image")
       };
     }
@@ -1279,7 +1281,7 @@ ${risks.length ? risks.map((item) => `- ${item}`).join("\n") : "- No clear risks
 ${issues.length ? issues.map((item) => `- ${item}`).join("\n") : "- No specific issues were found in the extracted content."}
 
 ## Executive Recommendations
-${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the findings and decide which actions should be assigned."}
+${actions.length ? actions.map((item) => `- ${item}`).join("\n") : "- Review the findings and decide what leadership should examine next."}
 
 ## Suggested Systems
 ${systems.length ? systems.map((item) => `- ${item}`).join("\n") : "- Track the key metrics from this file in the KPI dashboard and reports."}`;
@@ -1371,7 +1373,7 @@ ${analysisSummary || "Vaeroex reviewed this file and prepared a report from the 
 - Review the extracted content for metrics that should be saved into KPI history, CRM history, or business metrics.
 
 ## Risks
-- Confirm any high-impact findings before assigning work or changing records.
+- Confirm any high-impact findings before leadership relies on the conclusion.
 
 ## Issues
 - Look for repeated delays, response gaps, unclear source context, missing checklists, or untracked metrics.
@@ -1384,7 +1386,7 @@ ${analysisSummary || "Vaeroex reviewed this file and prepared a report from the 
 - Uploaded: ${file.created_at}
 
 ## Analysis Question
-${prompt || file.analysis_prompt || "Review this file for findings, trends, KPIs, risks, and recommended actions."}
+${prompt || file.analysis_prompt || "Review this file for findings, trends, KPIs, risks, and executive recommendations."}
 
 ## Import History
 ${imports}
@@ -1392,8 +1394,8 @@ ${imports}
 ## File Data Preview
 ${contentPreview}
 
-## Recommended Next Actions
-- Review the findings before saving or assigning any recommended work.
+## Recommended Leadership Review
+- Review the findings before saving or using any recommended output.
 - Import approved spreadsheet rows into KPI, CRM, or business metrics history when appropriate.
 - Use this file in the next management review so trends are tracked over time.`;
 }
@@ -1427,7 +1429,7 @@ async function runFileVaeroexAnalysis({
     throw new Error(unsupportedFileContentMessage(file));
   }
 
-  const [workspaceSnapshot, fileImports, fileReports] = await Promise.all([
+  const [workspaceSnapshot, fileImports, fileReports, evidenceContext] = await Promise.all([
     buildWorkspaceSnapshot(supabase, workspaceId),
     supabase
       .from("file_imports")
@@ -1441,7 +1443,12 @@ async function runFileVaeroexAnalysis({
       .select("id,title,report_type,created_at,source_data_json")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
-      .limit(10)
+      .limit(10),
+    buildWorkspaceEvidenceContext({
+      supabase,
+      workspaceId,
+      query: `${prompt}\nFile: ${file.display_name}\nExisting summary: ${file.analysis_summary || ""}`
+    })
   ]);
   const extraInputs = {
     file: {
@@ -1464,7 +1471,8 @@ async function runFileVaeroexAnalysis({
     spreadsheet_preview: extraction.kind === "spreadsheet" ? extraction.preview : [],
     spreadsheet_row_text: extraction.kind === "spreadsheet" ? extraction.rowText : "",
     extracted_text: extraction.textContent,
-    extracted_text_preview: extraction.textPreview
+    extracted_text_preview: extraction.textPreview,
+    evidence_context: evidenceContextAsJson(evidenceContext)
   } satisfies Json;
   const inputJson = {
     workflow: workflow.key,
@@ -1484,7 +1492,7 @@ async function runFileVaeroexAnalysis({
     throw new Error("You’ve reached the monthly Vaeroex usage limit for this workspace.");
   }
 
-  const outputJson = await runVaeroexCompletion({
+  const { outputJson, usage } = await runVaeroexCompletionWithUsage({
     workflow,
     userPrompt: prompt,
     workspaceSnapshot,
@@ -1537,12 +1545,20 @@ async function runFileVaeroexAnalysis({
     throw new Error(error?.message || "Vaeroex analysis could not be saved.");
   }
 
-  await supabase.from("ai_usage").insert({
-    workspace_id: workspaceId,
-    user_id: userId,
-    agent_type: workflow.key,
-    tokens_used: 0,
-    estimated_cost_cents: 0
+  await recordVaeroexAiUsage({
+    supabase,
+    workspaceId,
+    userId,
+    agentType: workflow.key,
+    usage: {
+      ...usage,
+      metadata: {
+        evidence_retrieval_mode: evidenceContext.retrievalMode,
+        evidence_chunks: evidenceContext.chunks.length,
+        evidence_confidence_score: evidenceContext.confidenceScore,
+        source_file_id: file.id
+      }
+    }
   });
 
   await supabase
@@ -1579,6 +1595,23 @@ async function runFileVaeroexAnalysis({
     .eq("id", file.id)
     .eq("workspace_id", workspaceId);
 
+  const indexResult = await indexFileAnalysisEvidence({
+    supabase,
+    workspaceId,
+    userId,
+    file,
+    runId: data.id,
+    extractedText: finalExtraction.textContent || summary,
+    summary,
+    metadata: {
+      analysis_run_id: data.id,
+      content_kind: finalExtraction.kind,
+      rows_detected: finalExtraction.rows.length,
+      columns_detected: finalExtraction.columns,
+      evidence_retrieval_mode: evidenceContext.retrievalMode
+    }
+  });
+
   return {
     workflow,
     inputJson,
@@ -1586,6 +1619,7 @@ async function runFileVaeroexAnalysis({
     cleanResult,
     summary,
     extraction: finalExtraction,
+    indexResult,
     runId: data.id
   };
 }
@@ -1601,6 +1635,18 @@ export async function uploadFileAction(formData: FormData) {
 
   if (uploadedFile.size > MAX_FILE_SIZE_BYTES) {
     redirectWithPathError(returnPath, "Files must be 25 MB or smaller.");
+  }
+
+  const fileLimit = await isUsageLimitReached({
+    supabase,
+    userId: user.id,
+    email: user.email,
+    workspaceId,
+    limit: "files"
+  });
+
+  if (fileLimit.reached) {
+    redirectWithPathError(returnPath, `This workspace has reached the file upload limit for the current Vaeroex plan (${fileLimit.limitValue} files).`);
   }
 
   const extension = fileExtension(uploadedFile.name);
@@ -1667,6 +1713,20 @@ export async function uploadFileAction(formData: FormData) {
   if (error || !data) {
     redirectWithPathError(returnPath, error?.message || "File metadata could not be saved.");
   }
+
+  await supabase.from("file_processing_jobs").insert({
+    workspace_id: workspaceId,
+    file_upload_id: data.id,
+    job_type: "extract",
+    status: "queued",
+    created_by: user.id,
+    metadata_json: {
+      source: "upload",
+      file_name: displayName,
+      file_extension: storedExtension,
+      file_size_bytes: uploadedFile.size
+    }
+  });
 
   revalidatePath(FILES_PATH);
   revalidatePath(SOURCES_PATH);
@@ -2279,7 +2339,7 @@ export async function analyzeFileAction(formData: FormData) {
   const prompt =
     text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
-    "Review this file and explain trends, useful KPIs, visibility gaps, risks, recommended actions, and an executive summary.";
+    "Review this file and explain trends, useful KPIs, visibility gaps, risks, executive recommendations, and an executive summary.";
 
   const workflow = getVaeroexWorkflow("file_analysis");
   let inputJson: Json = {

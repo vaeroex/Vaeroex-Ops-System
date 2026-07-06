@@ -20,6 +20,14 @@ const runFilters = [
   { key: "operations_audit", label: "Operations audit" }
 ];
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function numberValue(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
 function parseLimit(value: string | undefined, fallback: number, maximum = 50) {
   const parsed = Number.parseInt(value || "", 10);
 
@@ -104,6 +112,15 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
   const completedCount = allRuns.filter((run) => run.status === "completed").length;
   const failedCount = allRuns.filter((run) => run.status === "failed").length;
   const fileAnalysisCount = allRuns.filter((run) => matchesRunFilter(run, "file_analysis")).length;
+  const usageRowsRaw = usage || [];
+  const averageLatencyMs = usageRowsRaw.length
+    ? Math.round(usageRowsRaw.reduce((sum, row) => sum + (row.latency_ms || 0), 0) / usageRowsRaw.length)
+    : 0;
+  const lowEvidenceRuns = usageRowsRaw.filter((row) => {
+    const metadata = isRecord(row.metadata_json) ? row.metadata_json : {};
+
+    return numberValue(metadata.evidence_confidence_score) > 0 && numberValue(metadata.evidence_confidence_score) < 46;
+  }).length;
 
   return (
     <div className="space-y-6">
@@ -119,7 +136,9 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
           { label: "Usage rows this month", value: usage?.length || 0 },
           { label: "Completed runs", value: completedCount },
           { label: "Failed runs", value: failedCount },
-          { label: "File analyses", value: fileAnalysisCount }
+          { label: "File analyses", value: fileAnalysisCount },
+          { label: "Avg latency", value: averageLatencyMs ? `${averageLatencyMs}ms` : "n/a" },
+          { label: "Low-evidence runs", value: lowEvidenceRuns }
         ].map((item) => (
           <span key={item.label} className="inline-flex min-h-10 shrink-0 items-center gap-2 rounded-full border border-line bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
             {item.label}

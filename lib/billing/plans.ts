@@ -9,7 +9,8 @@ export const VAEROEX_PLAN_LIMITS = {
   max_users: 10,
   max_forms: null,
   max_checklists: null,
-  max_ai_runs_per_month: 1000
+  max_ai_runs_per_month: 1000,
+  max_files: 500
 } satisfies PlanLimits;
 
 export const VAEROEX_PLAN_FEATURES = [
