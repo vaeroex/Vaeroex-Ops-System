@@ -43,6 +43,7 @@ type FilesPageProps = {
     sort?: string;
     view?: string;
     section?: string;
+    panel?: string;
   }>;
 };
 
@@ -53,6 +54,7 @@ type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type ImportType = "kpi" | "crm" | "metrics";
+type FilePanelKey = "analyze" | "ask" | "intelligence" | "evidence" | "reports" | "import" | "history" | "details";
 type JsonRecord = Record<string, unknown>;
 
 const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Business Memory"];
@@ -60,6 +62,14 @@ const IMPORT_TYPES = [
   { value: "kpi", label: "KPI data" },
   { value: "crm", label: "CRM leads" },
   { value: "metrics", label: "Business metrics" }
+];
+const FILE_PANELS: Array<{ key: FilePanelKey; label: string; description: string }> = [
+  { key: "intelligence", label: "Intelligence", description: "Latest review, risks, opportunities, and recommendations." },
+  { key: "evidence", label: "Evidence", description: "Source file, Business Memory status, and evidence context." },
+  { key: "reports", label: "Reports", description: "Create or attach leadership reports." },
+  { key: "import", label: "Import", description: "Review structured data before saving." },
+  { key: "history", label: "History", description: "Past Vaeroex reviews for this file." },
+  { key: "details", label: "Details", description: "File metadata and source links." }
 ];
 const SUGGESTED_PROMPTS = [
   "What trends do you see?",
@@ -146,6 +156,27 @@ function SuccessNotice({ message }: { message?: string | null }) {
       ) : null}
     </div>
   );
+}
+
+function normalizeFilePanel(value?: string | null): FilePanelKey | null {
+  if (
+    value === "analyze" ||
+    value === "ask" ||
+    value === "intelligence" ||
+    value === "evidence" ||
+    value === "reports" ||
+    value === "import" ||
+    value === "history" ||
+    value === "details"
+  ) {
+    return value;
+  }
+
+  return null;
+}
+
+function selectedFileRoute(fileId: string, panel?: FilePanelKey | null) {
+  return (`/app/files?file=${fileId}${panel ? `&panel=${panel}` : ""}`) as Route;
 }
 
 function fileSizeLabel(bytes: number) {
@@ -824,6 +855,24 @@ function confidenceClass(label: string) {
   return "border-white/10 bg-slate-950/30 text-slate-200";
 }
 
+function fileAnalysisSnapshot(file: FileUploadRow, latestRun?: VaeroexRunRow | null) {
+  const metadataResult = latestAnalysisResult(file);
+  const runResult = latestRun?.status === "completed" ? displayAnalysisOutput(latestRun.output_json) : null;
+  const result = metadataResult || runResult;
+  const sections = cleanAnalysisSections(result, file.analysis_summary);
+  const insightCount = analysisInsightCount(result);
+  const analysisDate = latestAnalysisAt(file) || latestRun?.created_at || null;
+  const confidence = analysisConfidence({ file, latestRun, result, insightCount });
+
+  return {
+    result,
+    sections,
+    insightCount,
+    analysisDate,
+    confidence
+  };
+}
+
 function insightCategories(sections: ReturnType<typeof cleanAnalysisSections>) {
   return [
     { label: "Risks", count: sections.risks.length, href: "#analysis-risks" },
@@ -1384,7 +1433,7 @@ function FileActionCenter({
         <Link href={`/app/files?file=${file.id}`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
           Select {file.display_name}
         </Link>
-        <Link href={`/app/files?file=${file.id}#analysis-result`} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
+        <Link href={selectedFileRoute(file.id, "intelligence")} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-vaeroex-accent">
           View latest analysis
         </Link>
         <FileSourceActions file={file} access={access} />
@@ -1700,6 +1749,435 @@ function SelectedFileBanner({
   );
 }
 
+function SelectedFileSummary({
+  file,
+  latestRun,
+  analysisRuns,
+  access,
+  activePanel
+}: {
+  file: FileUploadRow;
+  latestRun?: VaeroexRunRow | null;
+  analysisRuns: VaeroexRunRow[];
+  access?: FileAccessLinks | null;
+  activePanel?: FilePanelKey | null;
+}) {
+  const memory = indexStatusDetails(file);
+  const snapshot = fileAnalysisSnapshot(file, latestRun);
+  const status = analysisStatus(file, analysisRuns);
+  const actionClass = (panel: FilePanelKey, primary = false) =>
+    `inline-flex min-h-11 items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold transition ${
+      activePanel === panel
+        ? "border border-cyan-300/50 bg-cyan-400/15 text-cyan-50 shadow-sm shadow-cyan-950/30"
+        : primary
+          ? "bg-vaeroex-blue text-white hover:bg-cyan-500"
+          : "border border-white/10 bg-white/[0.04] text-slate-100 hover:border-cyan-400/40 hover:bg-cyan-950/40"
+    }`;
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-[#08111f] p-4 shadow-panel">
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Selected File</p>
+          <h2 className="mt-2 break-words text-xl font-semibold text-white">{file.display_name}</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-200">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">{file.file_extension.toUpperCase()}</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">{fileSizeLabel(file.file_size_bytes)}</span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1">{status}</span>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <FileSourceActions file={file} access={access} compact />
+          <Link href="/app/files" className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-400/40 hover:bg-cyan-950/40">
+            Back to Files
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        <div className={`rounded-lg border p-3 ${memoryStatusClass(memory.tone)}`}>
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Business Memory Status</p>
+          <p className="mt-1 text-sm font-semibold">{memory.label}</p>
+          <p className="mt-1 text-xs leading-5 opacity-90">{memory.subtext}</p>
+        </div>
+        <div className={`rounded-lg border p-3 ${confidenceClass(snapshot.confidence.label)}`}>
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Confidence</p>
+          <p className="mt-1 text-sm font-semibold">{snapshot.confidence.label}</p>
+          <p className="mt-1 text-xs leading-5 opacity-90">{snapshot.confidence.reason}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3 text-slate-100">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Last Analysis</p>
+          <p className="mt-1 text-sm font-semibold text-white">{formatDateTime(snapshot.analysisDate)}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">
+            {snapshot.insightCount ? `${snapshot.insightCount} insights found.` : "No completed review yet."}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link href={selectedFileRoute(file.id, "analyze")} className={actionClass("analyze", true)}>
+          Analyze
+        </Link>
+        <Link href={selectedFileRoute(file.id, "import")} className={actionClass("import")}>
+          Import
+        </Link>
+        <Link href={selectedFileRoute(file.id, "intelligence")} className={actionClass("intelligence")}>
+          View Intelligence
+        </Link>
+        <Link href={selectedFileRoute(file.id, "ask")} className={actionClass("ask")}>
+          Ask Vaeroex
+        </Link>
+      </div>
+    </section>
+  );
+}
+
+function FilePanelNav({ file, activePanel }: { file: FileUploadRow; activePanel?: FilePanelKey | null }) {
+  return (
+    <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-xl border border-white/10 bg-slate-950/35 p-2" aria-label="Selected file panels">
+      {FILE_PANELS.map((panel) => (
+        <Link
+          key={panel.key}
+          href={selectedFileRoute(file.id, panel.key)}
+          title={panel.description}
+          className={`inline-flex min-h-10 shrink-0 items-center rounded-lg px-3 py-2 text-xs font-semibold transition ${
+            activePanel === panel.key
+              ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/40"
+              : "border border-white/10 bg-white/[0.04] text-slate-100 hover:border-cyan-400/40 hover:bg-cyan-950/35"
+          }`}
+        >
+          {panel.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}
+
+function FileAnalyzePanel({ file }: { file: FileUploadRow }) {
+  const canAnalyze = canAnalyzeFile(file);
+  const support = fileSupportNotice(file);
+
+  return (
+    <section className="rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Analyze</p>
+          <h3 className="mt-2 text-lg font-semibold text-white">Analyze {file.display_name}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            Ask Vaeroex to review this file for leadership context. The result can be saved, copied, exported, or used in future Business Memory.
+          </p>
+        </div>
+        <StatusBadge value={support.title} />
+      </div>
+      {canAnalyze ? (
+        <form action={analyzeFileAction} className="mt-4 space-y-4">
+          <input type="hidden" name="file_id" value={file.id} />
+          <TextArea
+            label="Question for Vaeroex"
+            name="analysis_prompt"
+            rows={4}
+            defaultValue={file.analysis_prompt || "What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary."}
+          />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Suggested prompts</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {SUGGESTED_PROMPTS.map((prompt) => (
+                <button
+                  key={prompt}
+                  name="suggested_prompt"
+                  value={prompt}
+                  className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-400/40 hover:bg-cyan-950/35"
+                >
+                  {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+          <ProgressActionButton pendingLabel={`Analyzing ${file.display_name}...`}>Analyze {file.display_name}</ProgressActionButton>
+        </form>
+      ) : (
+        <p className="mt-4 rounded-lg border border-amber-400/30 bg-amber-950/30 p-3 text-sm leading-6 text-amber-100">
+          {support.body}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function FileImportPanel({
+  file,
+  imports,
+  importRows
+}: {
+  file: FileUploadRow;
+  imports: FileImportRow[];
+  importRows: FileImportDataRow[];
+}) {
+  const canImport = isSpreadsheet(file);
+  const fileImports = importsForFile(imports, file.id);
+  const latestImport = fileImports[0];
+  const latestImportRows = latestImport ? rowsForImport(importRows, latestImport.id) : [];
+  const needsReview = latestImport && (latestImport.status === "needs_review" || latestImport.status === "extracted");
+
+  return (
+    <section className="space-y-4 rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Import</p>
+        <h3 className="mt-2 text-lg font-semibold text-white">Import structured data after review</h3>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+          Spreadsheet imports are staged first. Vaeroex shows mappings and sample rows before anything is saved into historical records.
+        </p>
+      </div>
+      {canImport ? (
+        <div className="rounded-lg border border-cyan-400/30 bg-cyan-950/25 p-4">
+          <p className="text-sm font-semibold text-cyan-50">Vaeroex found structured data in this file.</p>
+          <p className="mt-1 text-sm leading-6 text-cyan-100">
+            Review KPI data, customer records, or operational metrics before saving approved rows.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <ImportActionForm file={file} importType="kpi" label="Review KPI Import" />
+            <ImportActionForm file={file} importType="crm" label={`Review customer data import`} />
+            <ImportActionForm file={file} importType="metrics" label={`Review operational metrics import`} />
+          </div>
+        </div>
+      ) : (
+        <p className="rounded-lg border border-white/10 bg-slate-950/35 p-3 text-sm leading-6 text-slate-300">
+          CSV and XLSX files can be imported into structured records after review. PDF, DOCX, PNG, and JPG files can still be analyzed, preserved in Business Memory, and used for reports.
+        </p>
+      )}
+      {needsReview ? <MappingReview file={file} importRecord={latestImport} rows={latestImportRows} /> : null}
+      <ImportHistory imports={fileImports} />
+    </section>
+  );
+}
+
+function FileReportsPanel({
+  file,
+  reports,
+  analysisRuns
+}: {
+  file: FileUploadRow;
+  reports: ReportRow[];
+  analysisRuns: VaeroexRunRow[];
+}) {
+  const canAnalyze = canAnalyzeFile(file);
+  const support = fileSupportNotice(file);
+  const hasCompletedAnalysis = analysisStatus(file, analysisRuns) === "Completed";
+
+  return (
+    <section className="grid gap-4 rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel lg:grid-cols-2">
+      <div className="space-y-3 rounded-lg border border-white/10 bg-slate-950/35 p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Reports</p>
+        <h3 className="text-lg font-semibold text-white">Create report from file intelligence</h3>
+        {canAnalyze ? (
+          <form action={createReportFromFileAction} className="space-y-3">
+            <input type="hidden" name="file_id" value={file.id} />
+            <TextInput label="Report title" name="report_title" defaultValue={`File Report - ${file.display_name}`} />
+            <TextInput label="Report type" name="report_type" defaultValue="File Review" />
+            <TextArea label="Report focus" name="report_focus" rows={3} placeholder="Optional: what should this report focus on?" />
+            <ProgressActionButton pendingLabel={`${hasCompletedAnalysis ? "Creating report" : "Analyzing and creating report"} from ${file.display_name}...`}>
+              {hasCompletedAnalysis ? `Create Report` : "Analyze and Create Report"}
+            </ProgressActionButton>
+          </form>
+        ) : (
+          <p className="rounded-lg border border-amber-400/30 bg-amber-950/30 p-3 text-sm leading-6 text-amber-100">
+            {support.body} Vaeroex will not create a file-content report until it can read real file content.
+          </p>
+        )}
+      </div>
+
+      <form action={attachFileToReportAction} className="space-y-3 rounded-lg border border-white/10 bg-slate-950/35 p-4">
+        <input type="hidden" name="file_id" value={file.id} />
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Attach</p>
+        <h3 className="text-lg font-semibold text-white">Attach to existing report</h3>
+        <label className="block text-sm font-medium text-slate-200">
+          Report
+          <select
+            name="report_id"
+            required
+            disabled={!reports.length}
+            className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/80 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <option value="">Choose report...</option>
+            {reports.map((report) => (
+              <option key={report.id} value={report.id}>
+                {reportLabel(report)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <ActionButton tone="primary" disabled={!reports.length} pendingLabel="Attaching file...">Attach to Existing Report</ActionButton>
+        {!reports.length ? <p className="text-sm leading-6 text-slate-300">Create a report first, then attach files to it.</p> : null}
+      </form>
+    </section>
+  );
+}
+
+function FileEvidencePanel({ file, latestRun }: { file: FileUploadRow; latestRun?: VaeroexRunRow | null }) {
+  const snapshot = fileAnalysisSnapshot(file, latestRun);
+  const memory = indexStatusDetails(file);
+
+  return (
+    <section className="space-y-4 rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Evidence</p>
+        <h3 className="mt-2 text-lg font-semibold text-white">Evidence used by Vaeroex</h3>
+        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+          This shows why Vaeroex can use this file for future answers, recommendations, and briefings.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Source file</p>
+          <p className="mt-1 break-words text-sm font-semibold text-white">{file.display_name}</p>
+        </div>
+        <div className={`rounded-lg border p-3 ${memoryStatusClass(memory.tone)}`}>
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Business Memory</p>
+          <p className="mt-1 text-sm font-semibold">{memory.label}</p>
+          <p className="mt-1 text-xs leading-5 opacity-90">{memory.detail}</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Evidence chunks</p>
+          <p className="mt-1 text-sm font-semibold text-white">{file.indexed_chunk_count || 0}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">Stored for future intelligence.</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Last analyzed</p>
+          <p className="mt-1 text-sm font-semibold text-white">{formatDateTime(snapshot.analysisDate)}</p>
+        </div>
+      </div>
+      <InsightCategoryLinks sections={snapshot.sections} />
+    </section>
+  );
+}
+
+function FileMetadataPanel({
+  file,
+  analysisRuns,
+  reports,
+  folders,
+  access
+}: {
+  file: FileUploadRow;
+  analysisRuns: VaeroexRunRow[];
+  reports: ReportRow[];
+  folders: Pick<FolderRow, "id" | "name">[];
+  access?: FileAccessLinks | null;
+}) {
+  const fileReports = reportsForFile(reports, file.id);
+  const memory = indexStatusDetails(file);
+  const details = [
+    { label: "Original name", value: file.original_name },
+    { label: "File type", value: file.file_extension.toUpperCase() },
+    { label: "Uploaded", value: formatDate(file.created_at) },
+    { label: "Folder", value: folderName(folders, file.folder_id) },
+    { label: "Size", value: fileSizeLabel(file.file_size_bytes) },
+    { label: "Import status", value: fileStatusLabel(file) },
+    { label: "Processing status", value: (file.processing_status || "uploaded").replace(/_/g, " ") },
+    { label: "Business Memory Status", value: memory.label },
+    { label: "Analysis status", value: analysisStatus(file, analysisRuns) },
+    { label: "Last analysis date", value: formatDateTime(latestAnalysisAt(file) || analysisRuns[0]?.created_at || null) },
+    { label: "Rows imported", value: file.imported_rows },
+    { label: "Reports from file", value: fileReports.length }
+  ];
+
+  return (
+    <section className="space-y-4 rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Details</p>
+          <h3 className="mt-2 text-lg font-semibold text-white">File details</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
+            Metadata, source access, and processing context for this workspace file.
+          </p>
+        </div>
+        <FileSourceActions file={file} access={access} />
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {details.map((item) => (
+          <div key={item.label} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">{item.label}</p>
+            <p className="mt-1 break-words text-sm font-semibold text-white">{item.value}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SelectedFilePanel({
+  activePanel,
+  file,
+  reports,
+  analysisRuns,
+  imports,
+  importRows,
+  folders,
+  files,
+  access,
+  showAllAnalyses
+}: {
+  activePanel?: FilePanelKey | null;
+  file: FileUploadRow;
+  reports: ReportRow[];
+  analysisRuns: VaeroexRunRow[];
+  imports: FileImportRow[];
+  importRows: FileImportDataRow[];
+  folders: Pick<FolderRow, "id" | "name">[];
+  files: FileUploadRow[];
+  access?: FileAccessLinks | null;
+  showAllAnalyses?: boolean;
+}) {
+  if (!activePanel) {
+    return (
+      <section className="rounded-xl border border-dashed border-white/15 bg-slate-950/25 p-4 text-slate-100">
+        <p className="text-sm font-semibold text-white">Choose a next action.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Start with Analyze for a fresh review, Import for structured spreadsheets, View Intelligence for saved findings, or Ask Vaeroex for a contextual answer about this file.
+        </p>
+      </section>
+    );
+  }
+
+  if (activePanel === "analyze") {
+    return <FileAnalyzePanel file={file} />;
+  }
+
+  if (activePanel === "ask") {
+    return <FileContextualAskPanel file={file} latestRun={analysisRuns[0]} />;
+  }
+
+  if (activePanel === "intelligence") {
+    return <FileAnalysisResult file={file} latestRun={analysisRuns[0]} />;
+  }
+
+  if (activePanel === "evidence") {
+    return <FileEvidencePanel file={file} latestRun={analysisRuns[0]} />;
+  }
+
+  if (activePanel === "reports") {
+    return <FileReportsPanel file={file} reports={reports} analysisRuns={analysisRuns} />;
+  }
+
+  if (activePanel === "import") {
+    return <FileImportPanel file={file} imports={imports} importRows={importRows} />;
+  }
+
+  if (activePanel === "history") {
+    return <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={file.id} showAll={showAllAnalyses} />;
+  }
+
+  return (
+    <FileMetadataPanel
+      file={file}
+      analysisRuns={analysisRuns}
+      reports={reports}
+      folders={folders}
+      access={access}
+    />
+  );
+}
+
 function asImportType(value: string): ImportType {
   if (value === "crm" || value === "metrics") {
     return value;
@@ -1932,7 +2410,7 @@ function AnalysisHistory({
             <div className="mt-4 flex flex-wrap gap-2">
               {file ? (
                 <>
-                  <Link href={`/app/files?file=${file.id}#analysis-result`} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
+                  <Link href={selectedFileRoute(file.id, "intelligence")} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
                     View result
                   </Link>
                   <form action={createReportFromFileAction}>
@@ -2094,6 +2572,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
   const selectedFile = params?.file ? files.find((file) => file.id === params.file) || null : null;
   const selectedFileRuns = selectedFile ? analysisRuns.filter((run) => runFileId(run) === selectedFile.id) : [];
   const selectedFileAccess = selectedFile ? fileAccessById.get(selectedFile.id) : null;
+  const activeFilePanel = selectedFile ? normalizeFilePanel(params?.panel) : null;
   const errorMessage = cleanNoticeMessage(
     params?.error ||
       fileResult.error?.message ||
@@ -2228,70 +2707,89 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         ]}
       />
 
-      <section className="space-y-4">
-        <div className="max-w-xl">
-          <CreateDrawer title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX imports always go through review before saving." triggerLabel="Upload File">
-            <form action={uploadFileAction} encType="multipart/form-data" className="grid gap-4">
-              <label className="block text-sm font-medium">
-                File
-                <input
-                  name="file"
-                  type="file"
-                  accept=".csv,.xlsx,.pdf,.png,.jpg,.jpeg,.docx"
-                  required
-                  className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold focus:border-vaeroex-blue"
-                />
-              </label>
-              <TextInput label="Display name" name="display_name" placeholder="Optional name shown in Vaeroex" />
-              <FolderSelect folders={folderOptions} />
-              <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-                Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
-              </p>
-              <AnalysisProgressSubmit className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" pendingLabel="Uploading file..." steps={UPLOAD_PROGRESS_STEPS}>
-                Upload file
-              </AnalysisProgressSubmit>
-            </form>
-          </CreateDrawer>
+      <section className="grid gap-4 xl:grid-cols-[minmax(280px,360px)_1fr]">
+        <div className="rounded-xl border border-white/10 bg-[#08111f] p-4 shadow-panel">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Upload</p>
+          <h2 className="mt-2 text-base font-semibold text-white">Add source material</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            Upload files privately to this workspace. Spreadsheet imports always require review before data is saved.
+          </p>
+          <div className="mt-4">
+            <CreateDrawer title="Upload file" description="Files are stored privately for the active workspace. CSV/XLSX imports always go through review before saving." triggerLabel="Upload File">
+              <form action={uploadFileAction} encType="multipart/form-data" className="grid gap-4">
+                <label className="block text-sm font-medium">
+                  File
+                  <input
+                    name="file"
+                    type="file"
+                    accept=".csv,.xlsx,.pdf,.png,.jpg,.jpeg,.docx"
+                    required
+                    className="mt-2 w-full rounded-lg border border-line px-3 py-2 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold focus:border-vaeroex-blue"
+                  />
+                </label>
+                <TextInput label="Display name" name="display_name" placeholder="Optional name shown in Vaeroex" />
+                <FolderSelect folders={folderOptions} />
+                <p className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
+                  Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
+                </p>
+                <AnalysisProgressSubmit className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" pendingLabel="Uploading file..." steps={UPLOAD_PROGRESS_STEPS}>
+                  Upload file
+                </AnalysisProgressSubmit>
+              </form>
+            </CreateDrawer>
+          </div>
         </div>
 
-        <ManagedRecordList
-          collection="files"
-          records={managedFiles}
-          folders={folderOptions}
-          title="Workspace files"
-          description="Search, select, organize, and review files in this workspace."
-          emptyTitle="No files uploaded yet"
-          emptyDescription="Upload a CSV, XLSX, PDF, image, or DOCX file to start building a workspace file library."
-          returnPath="/app/files"
-          searchParams={params}
-          activeRecordId={selectedFile?.id}
-          defaultView="current"
-        />
+        <div className="min-w-0">
+          <ManagedRecordList
+            collection="files"
+            records={managedFiles}
+            folders={folderOptions}
+            title="Recent files"
+            description="Select one file to review its memory status, confidence, intelligence, evidence, imports, reports, and history."
+            emptyTitle="No files uploaded yet"
+            emptyDescription="Upload a CSV, XLSX, PDF, image, or DOCX file to start building a workspace file library."
+            returnPath="/app/files"
+            searchParams={params}
+            activeRecordId={selectedFile?.id}
+            defaultView="current"
+          />
+        </div>
       </section>
 
       {selectedFile ? (
-        <section className="space-y-4 rounded-lg border border-white/10 bg-[#08111f] p-4">
-          <div>
-            <h2 className="text-base font-semibold text-white">Selected file actions</h2>
-            <p className="mt-1 text-sm text-slate-400">Imports always go to review before anything is saved.</p>
-          </div>
-          <div className="space-y-4">
-            <SelectedFileBanner file={selectedFile} folders={folderOptions} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
-            <FileContextualAskPanel file={selectedFile} latestRun={selectedFileRuns[0]} />
-            <FileAnalysisResult file={selectedFile} latestRun={selectedFileRuns[0]} />
-            <FileActionCenter file={selectedFile} reports={reports} analysisRuns={selectedFileRuns} access={selectedFileAccess} />
-          </div>
+        <section className="mx-auto w-full max-w-7xl space-y-4">
+          <SelectedFileSummary
+            file={selectedFile}
+            latestRun={selectedFileRuns[0]}
+            analysisRuns={selectedFileRuns}
+            access={selectedFileAccess}
+            activePanel={activeFilePanel}
+          />
+          <FilePanelNav file={selectedFile} activePanel={activeFilePanel} />
+          <SelectedFilePanel
+            activePanel={activeFilePanel}
+            file={selectedFile}
+            reports={reports}
+            analysisRuns={selectedFileRuns}
+            imports={imports}
+            importRows={importRows}
+            folders={folderOptions}
+            files={files}
+            access={selectedFileAccess}
+            showAllAnalyses={params?.section === "all-analyses"}
+          />
         </section>
       ) : null}
 
-      <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-100">
-          Analysis history{selectedFile ? ` for ${selectedFile.display_name}` : ""}
-        </summary>
-        <div className="mt-4">
-          <AnalysisHistory runs={analysisRuns} files={files} reports={reports} selectedFileId={selectedFile?.id} showAll={params?.section === "all-analyses"} />
-        </div>
-      </details>
+      {!selectedFile ? (
+        <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-100">All file analysis history</summary>
+          <div className="mt-4">
+            <AnalysisHistory runs={analysisRuns} files={files} reports={reports} showAll={params?.section === "all-analyses"} />
+          </div>
+        </details>
+      ) : null}
     </div>
   );
 }
