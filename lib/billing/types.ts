@@ -19,6 +19,7 @@ export type PlanLimits = {
   max_forms: number | null;
   max_checklists: number | null;
   max_ai_runs_per_month: number | null;
+  max_files?: number | null;
 };
 
 export type SubscriptionAccessResult = {
@@ -42,4 +43,5 @@ export type UsageSnapshot = {
   forms: number;
   checklists: number;
   ai_runs_this_month: number;
+  files: number;
 };

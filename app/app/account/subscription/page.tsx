@@ -82,10 +82,11 @@ export default async function AccountSubscriptionPage({ searchParams }: AccountS
       </SectionCard>
 
       <SectionCard title="Current usage" description="Usage is checked against active Vaeroex access limits. All product features are included.">
-        <div className="grid gap-4 md:grid-cols-3">
+        <div className="grid gap-4 md:grid-cols-4">
           {[
             ["Workspaces", usage.workspaces, limits?.max_workspaces],
             ["Users", usage.users, limits?.max_users],
+            ["Files", usage.files, limits?.max_files],
             ["Vaeroex runs this month", usage.ai_runs_this_month, limits?.max_ai_runs_per_month]
           ].map(([label, current, limit]) => (
             <div key={String(label)} className="rounded-lg border border-line p-4">

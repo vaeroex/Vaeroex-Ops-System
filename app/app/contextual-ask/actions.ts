@@ -1,7 +1,9 @@
 "use server";
 
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { runVaeroexCompletion } from "@/lib/ai/vaeroex-client";
+import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
+import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
@@ -188,6 +190,11 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
     }
 
     workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
+    const evidenceContext = await buildWorkspaceEvidenceContext({
+      supabase,
+      workspaceId,
+      query: `${question}\n${sourceTitle}\n${sourceSummary}\n${evidence.join("\n")}`
+    });
 
     const contextualInput = {
       context_type: contextType,
@@ -195,6 +202,7 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
       source_title: sourceTitle,
       source_summary: sourceSummary,
       evidence,
+      retrieved_evidence: evidenceContextAsJson(evidenceContext),
       follow_up: followUp || null,
       answer_format: {
         title: "Short contextual title",
@@ -221,7 +229,7 @@ Return concise JSON with title, short_answer, why_vaeroex_thinks_this, data_used
 Be specific about the data used. Do not expose raw debug details or chain-of-thought.
 `;
 
-    const outputJson = await runVaeroexCompletion({
+    const { outputJson, usage } = await runVaeroexCompletionWithUsage({
       workflow,
       userPrompt,
       workspaceSnapshot,
@@ -254,12 +262,21 @@ Be specific about the data used. Do not expose raw debug details or chain-of-tho
       throw new Error(error.message);
     }
 
-    await supabase.from("ai_usage").insert({
-      workspace_id: workspaceId,
-      user_id: user.id,
-      agent_type: workflow.key,
-      tokens_used: 0,
-      estimated_cost_cents: 0
+    await recordVaeroexAiUsage({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      agentType: workflow.key,
+      usage: {
+        ...usage,
+        metadata: {
+          context_type: contextType,
+          context_id: contextId || null,
+          evidence_retrieval_mode: evidenceContext.retrievalMode,
+          evidence_chunks: evidenceContext.chunks.length,
+          evidence_confidence_score: evidenceContext.confidenceScore
+        }
+      }
     });
 
     return {

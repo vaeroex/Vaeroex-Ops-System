@@ -175,6 +175,16 @@ function fileStatusLabel(file: FileUploadRow) {
   return "Uploaded";
 }
 
+function indexStatusLabel(file: FileUploadRow) {
+  const status = file.index_status || "not_indexed";
+
+  if (status === "ready") return `Indexed${file.indexed_chunk_count ? ` · ${file.indexed_chunk_count} chunks` : ""}`;
+  if (status === "processing") return "Indexing";
+  if (status === "queued") return "Queued";
+  if (status === "failed") return file.index_error ? "Index warning" : "Index failed";
+  return "Not indexed";
+}
+
 function isSpreadsheet(file: FileUploadRow) {
   return file.file_extension === "csv" || file.file_extension === "xlsx";
 }
@@ -1265,6 +1275,10 @@ function FileActionCenter({
             <p className="mt-1 text-ink">{(file.processing_status || "uploaded").replace(/_/g, " ")}</p>
           </div>
           <div className="rounded-lg bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Memory index</p>
+            <p className="mt-1 text-ink">{indexStatusLabel(file)}</p>
+          </div>
+          <div className="rounded-lg bg-slate-50 p-3">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Analysis status</p>
             <p className="mt-1 text-ink">{latestStatus}</p>
           </div>
@@ -1357,6 +1371,10 @@ function SelectedFileBanner({
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last review status</p>
             <p className="mt-1 text-sm font-semibold text-ink">{status}</p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted">Memory index</p>
+            <p className="mt-1 text-sm font-semibold text-ink">{indexStatusLabel(file)}</p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted">Last review date</p>
@@ -1809,6 +1827,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
         { label: "File status", value: fileListStatus(file, fileAnalysisRuns) },
         { label: "Processing", value: fileStatusLabel(file) },
         { label: "Analysis status", value: analysisStatus(file, fileAnalysisRuns) },
+        { label: "Memory index", value: indexStatusLabel(file) },
         { label: "Last analysis", value: formatDateTime(latestAnalysisAt(file) || fileAnalysisRuns[0]?.created_at || null) },
         { label: "Import status", value: importStatusLabel(file.import_status) },
         { label: "Rows imported", value: file.imported_rows },

@@ -9,6 +9,30 @@ export type Database = {
         Args: Record<string, never>;
         Returns: void;
       };
+      match_business_memory_chunks: {
+        Args: {
+          target_workspace_id: string;
+          query_embedding: number[];
+          match_count?: number;
+          min_similarity?: number;
+        };
+        Returns: Array<{
+          id: string;
+          workspace_id: string;
+          source_type: string;
+          source_id: string | null;
+          source_file_id: string | null;
+          source_title: string;
+          source_excerpt: string;
+          summary: string | null;
+          chunk_index: number;
+          source_metadata: Json;
+          source_quality: string;
+          confidence_score: number;
+          indexed_at: string;
+          similarity: number;
+        }>;
+      };
     };
     Views: Record<string, never>;
     Tables: {
@@ -261,6 +285,10 @@ export type Database = {
           processing_status: string;
           processing_error: string | null;
           processed_at: string | null;
+          index_status: string;
+          indexed_at: string | null;
+          indexed_chunk_count: number;
+          index_error: string | null;
           metadata_json: Json;
           created_by: string | null;
           created_at: string;
@@ -287,6 +315,10 @@ export type Database = {
           processing_status?: string;
           processing_error?: string | null;
           processed_at?: string | null;
+          index_status?: string;
+          indexed_at?: string | null;
+          indexed_chunk_count?: number;
+          index_error?: string | null;
           metadata_json?: Json;
           created_by?: string | null;
           created_at?: string;
@@ -365,6 +397,94 @@ export type Database = {
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["file_import_rows"]["Insert"]>;
+        Relationships: [];
+      };
+      file_processing_jobs: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          file_upload_id: string;
+          job_type: string;
+          status: string;
+          attempts: number;
+          max_attempts: number;
+          error_message: string | null;
+          metadata_json: Json;
+          queued_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          file_upload_id: string;
+          job_type?: string;
+          status?: string;
+          attempts?: number;
+          max_attempts?: number;
+          error_message?: string | null;
+          metadata_json?: Json;
+          queued_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["file_processing_jobs"]["Insert"]>;
+        Relationships: [];
+      };
+      business_memory_chunks: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          source_type: string;
+          source_id: string | null;
+          source_file_id: string | null;
+          source_title: string;
+          source_excerpt: string;
+          summary: string | null;
+          chunk_index: number;
+          content_hash: string;
+          embedding: number[] | null;
+          embedding_model: string | null;
+          source_metadata: Json;
+          source_quality: string;
+          confidence_score: number;
+          token_estimate: number;
+          indexed_at: string;
+          created_at: string;
+          updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          source_type: string;
+          source_id?: string | null;
+          source_file_id?: string | null;
+          source_title: string;
+          source_excerpt: string;
+          summary?: string | null;
+          chunk_index?: number;
+          content_hash: string;
+          embedding?: number[] | null;
+          embedding_model?: string | null;
+          source_metadata?: Json;
+          source_quality?: string;
+          confidence_score?: number;
+          token_estimate?: number;
+          indexed_at?: string;
+          created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["business_memory_chunks"]["Insert"]>;
         Relationships: [];
       };
       crm_leads: {
@@ -1546,6 +1666,13 @@ export type Database = {
           agent_type: string | null;
           tokens_used: number;
           estimated_cost_cents: number;
+          model: string | null;
+          input_tokens: number;
+          output_tokens: number;
+          request_id: string | null;
+          latency_ms: number | null;
+          status: string;
+          metadata_json: Json;
           created_at: string;
         };
         Insert: {
@@ -1555,6 +1682,13 @@ export type Database = {
           agent_type?: string | null;
           tokens_used?: number;
           estimated_cost_cents?: number;
+          model?: string | null;
+          input_tokens?: number;
+          output_tokens?: number;
+          request_id?: string | null;
+          latency_ms?: number | null;
+          status?: string;
+          metadata_json?: Json;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["ai_usage"]["Insert"]>;

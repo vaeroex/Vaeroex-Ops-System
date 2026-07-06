@@ -3,8 +3,10 @@
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { runVaeroexCompletion } from "@/lib/ai/vaeroex-client";
+import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
+import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
@@ -172,13 +174,22 @@ export async function runVaeroexAction(formData: FormData) {
     }
 
     workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
-    inputJson = buildInputJson(workflow.key, userPrompt, extraInputs, workspaceSnapshot);
+    const evidenceContext = await buildWorkspaceEvidenceContext({
+      supabase,
+      workspaceId,
+      query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`
+    });
+    const evidenceAwareInputs = {
+      ...extraInputs,
+      evidence_context: evidenceContextAsJson(evidenceContext)
+    } satisfies Json;
+    inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
 
-    const outputJson = await runVaeroexCompletion({
+    const { outputJson, usage } = await runVaeroexCompletionWithUsage({
       workflow,
       userPrompt,
       workspaceSnapshot,
-      extraInputs
+      extraInputs: evidenceAwareInputs
     });
 
     const { data, error } = await supabase
@@ -198,12 +209,19 @@ export async function runVaeroexAction(formData: FormData) {
       throw new Error(error?.message || "Vaeroex run could not be saved.");
     }
 
-    await supabase.from("ai_usage").insert({
-      workspace_id: workspaceId,
-      user_id: user.id,
-      agent_type: workflow.key,
-      tokens_used: 0,
-      estimated_cost_cents: 0
+    await recordVaeroexAiUsage({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      agentType: workflow.key,
+      usage: {
+        ...usage,
+        metadata: {
+          evidence_retrieval_mode: evidenceContext.retrievalMode,
+          evidence_chunks: evidenceContext.chunks.length,
+          evidence_confidence_score: evidenceContext.confidenceScore
+        }
+      }
     });
 
     revalidatePath("/app/agents");

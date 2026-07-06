@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "crypto";
 import { cleanVaeroexErrorMessage, VAEROEX_INTELLIGENCE_UNAVAILABLE_MESSAGE } from "@/lib/ai/errors";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
+import type { VaeroexTokenUsage } from "@/lib/ai/usage";
 import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import type { Json } from "@/lib/supabase/types";
 
@@ -37,6 +38,11 @@ type ResponsesApiResponse = {
   }>;
   error?: {
     message?: string;
+  };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
   };
 };
 
@@ -233,6 +239,14 @@ function buildUserContent({
       workflow: workflow.key,
       user_request: userPrompt || workflow.promptPlaceholder,
       extra_inputs: extraInputs,
+      evidence_answer_policy: {
+        use_only_available_evidence: true,
+        cite_sources_for_recommendations: true,
+        maximum_evidence_chunks: Number.parseInt(process.env.VAEROEX_MAX_EVIDENCE_CHUNKS || "8", 10),
+        no_invented_numbers: true,
+        low_confidence_behavior: "Say not enough evidence, list data gaps, and ask for the missing source data.",
+        recommendation_format: ["Evidence", "Reasoning", "Confidence", "Limitations", "Recommended leadership review"]
+      },
       workspace_context: workspaceSnapshot,
       attached_file: fileAttachment
         ? {
@@ -282,12 +296,26 @@ export function getVaeroexOpenAIRuntimeStatus() {
     openaiModel: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
     openaiApiMode: "responses",
     openaiEndpoint: "/v1/responses",
+    openaiEmbeddingModel: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
+    maxEvidenceChunks: Number.parseInt(process.env.VAEROEX_MAX_EVIDENCE_CHUNKS || "8", 10),
     responseFormat: "text.format json_object",
     serverOnly: true
   };
 }
 
 export async function runVaeroexCompletion({
+  workflow,
+  userPrompt,
+  workspaceSnapshot,
+  extraInputs = {},
+  fileAttachment
+}: RunVaeroexRequest) {
+  const result = await runVaeroexCompletionWithUsage({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment });
+
+  return result.outputJson;
+}
+
+export async function runVaeroexCompletionWithUsage({
   workflow,
   userPrompt,
   workspaceSnapshot,
@@ -313,6 +341,7 @@ export async function runVaeroexCompletion({
   }
 
   const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+  const startedAt = Date.now();
   logVaeroexOpenAIEvent("request_start", {
     requestId,
     workflow: workflow.key,
@@ -347,6 +376,7 @@ export async function runVaeroexCompletion({
 
   const payload = (await response.json().catch(() => ({}))) as ResponsesApiResponse;
   const openaiRequestId = response.headers.get("x-request-id") || response.headers.get("openai-request-id");
+  const latencyMs = Date.now() - startedAt;
 
   if (!response.ok) {
     logVaeroexOpenAIError("request_failed", {
@@ -358,6 +388,7 @@ export async function runVaeroexCompletion({
       openaiEndpoint: "/v1/responses",
       openaiStatus: response.status,
       openaiRequestId,
+      latencyMs,
       openaiErrorMessage: cleanOpenAIError(payload.error?.message, response.status)
     });
     throw new Error(cleanOpenAIError(payload.error?.message, response.status));
@@ -374,7 +405,8 @@ export async function runVaeroexCompletion({
       openaiApiMode: "responses",
       openaiEndpoint: "/v1/responses",
       openaiStatus: response.status,
-      openaiRequestId
+      openaiRequestId,
+      latencyMs
     });
     throw new Error("Vaeroex returned an empty response.");
   }
@@ -387,8 +419,28 @@ export async function runVaeroexCompletion({
     openaiApiMode: "responses",
     openaiEndpoint: "/v1/responses",
     openaiStatus: response.status,
-    openaiRequestId
+    openaiRequestId,
+    latencyMs,
+    inputTokens: payload.usage?.input_tokens || 0,
+    outputTokens: payload.usage?.output_tokens || 0,
+    totalTokens: payload.usage?.total_tokens || 0
   });
 
-  return parseVaeroexJson(content);
+  const inputTokens = payload.usage?.input_tokens || 0;
+  const outputTokens = payload.usage?.output_tokens || 0;
+  const totalTokens = payload.usage?.total_tokens || inputTokens + outputTokens;
+  const usage: VaeroexTokenUsage = {
+    inputTokens,
+    outputTokens,
+    totalTokens,
+    model,
+    requestId: openaiRequestId,
+    latencyMs,
+    status: "completed"
+  };
+
+  return {
+    outputJson: parseVaeroexJson(content),
+    usage
+  };
 }

@@ -154,6 +154,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+VAEROEX_MAX_EVIDENCE_CHUNKS=8
+OPENAI_INPUT_COST_CENTS_PER_1M=
+OPENAI_OUTPUT_COST_CENTS_PER_1M=
 CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=
@@ -288,7 +292,9 @@ VAEROEX_SYSTEM_PROMPT
 
 Every Vaeroex interaction must use that prompt. The app must not run a Vaeroex review without a non-empty system prompt.
 
-Vaeroex runs use `OPENAI_API_KEY` and optionally `OPENAI_MODEL`. If `OPENAI_MODEL` is blank, the app uses the default configured in `lib/ai/vaeroex-client.ts`.
+Vaeroex runs use the OpenAI API through server-side `OPENAI_API_KEY`; customer usage is not powered by a personal ChatGPT subscription. If `OPENAI_MODEL` is blank, the app uses the default configured in `lib/ai/vaeroex-client.ts`.
+
+Uploaded source evidence can be indexed with `OPENAI_EMBEDDING_MODEL` for workspace-private Business Memory retrieval. `VAEROEX_MAX_EVIDENCE_CHUNKS` controls how many evidence chunks Vaeroex may use per answer. Optional OpenAI cost-rate variables let the admin usage dashboard estimate cost from recorded input/output tokens.
 
 ## Seed Data
 
