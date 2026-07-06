@@ -15,3 +15,14 @@ export const VAEROEX_MAILTO_LINKS = {
   billing: `mailto:${VAEROEX_CONTACT_EMAILS.billing}`,
   partners: `mailto:${VAEROEX_CONTACT_EMAILS.partners}`
 } as const;
+
+export const VAEROEX_COMPANY_ADDRESS_LINES = [
+  "Vaeroex LLC",
+  "5319 University Dr, Unit 762",
+  "Irvine, CA 92612",
+  "United States"
+] as const;
+
+export const VAEROEX_COMPANY_ADDRESS_SINGLE_LINE = "Vaeroex LLC, 5319 University Dr, Unit 762, Irvine, CA 92612, United States";
+
+export const VAEROEX_FOOTER_LOCATION = "Vaeroex LLC • Irvine, California • United States";

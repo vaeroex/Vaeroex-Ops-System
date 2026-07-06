@@ -1,5 +1,5 @@
 import type { Route } from "next";
-import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
+import { VAEROEX_COMPANY_ADDRESS_SINGLE_LINE, VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export const LEGAL_DOCUMENT_VERSIONS = {
   terms: "2026-06-19",
@@ -206,7 +206,10 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       },
       {
         title: "Contact",
-        body: [`Questions about these terms can be sent to ${VAEROEX_CONTACT_EMAILS.support} or through the Vaeroex support page.`]
+        body: [
+          `Questions about these terms can be sent to ${VAEROEX_CONTACT_EMAILS.support} or through the Vaeroex support page.`,
+          `Company mailing address: ${VAEROEX_COMPANY_ADDRESS_SINGLE_LINE}.`
+        ]
       }
     ]
   },
@@ -233,7 +236,13 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Cookies and Analytics", body: ["Vaeroex may use cookies or similar technologies for authentication, security, preferences, and platform operation. Analytics details should be finalized before commercial launch."] },
       { title: "Children's Privacy", body: ["Vaeroex is intended for business use and is not directed to children."] },
       { title: "Changes to Privacy Policy", body: ["Vaeroex may update this policy as the platform evolves. Material updates may require users to review and accept updated terms."] },
-      { title: "Contact", body: [`Privacy questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`] }
+      {
+        title: "Contact",
+        body: [
+          `Privacy questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`,
+          `Company mailing address: ${VAEROEX_COMPANY_ADDRESS_SINGLE_LINE}.`
+        ]
+      }
     ]
   },
   "acceptable-use": {
