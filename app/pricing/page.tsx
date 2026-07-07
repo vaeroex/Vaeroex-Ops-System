@@ -4,25 +4,32 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { ScrollReveal } from "@/components/motion/ScrollReveal";
-import { VAEROEX_PLAN_LIMITS, VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
+import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Vaeroex Pricing",
-  description: "Review Vaeroex subscription pricing for Operations Intelligence.",
+  description: "Review Vaeroex Operations Intelligence pricing for executive visibility, Business Memory, and evidence-backed decision support.",
   path: "/pricing"
 });
 
 const buyingSummary = [
-  ["Workspace", `${VAEROEX_PLAN_LIMITS.max_workspaces} included`],
-  ["Users", `${VAEROEX_PLAN_LIMITS.max_users} included`],
-  ["Billing", "Monthly subscription"]
+  ["Private Business Workspace", "A secure place for your organization's intelligence context"],
+  ["Business Memory Included", "Preserves evidence, history, and source context over time"],
+  ["Monthly Subscription", "Simple monthly access to Operations Intelligence"]
 ] as const;
 
 const subscriptionDetails = [
-  `${VAEROEX_PLAN_LIMITS.max_workspaces} workspace included`,
-  `${VAEROEX_PLAN_LIMITS.max_users} users included`,
+  "Private Business Workspace",
+  "Business Memory",
+  "Operations Intelligence",
+  "KPI Intelligence",
+  "Evidence-backed recommendations",
+  "Executive brief generation",
+  "Ask Vaeroex",
+  "File analysis & imports",
+  "Continuous platform improvements",
   "Monthly subscription",
   "Subscription renews automatically unless canceled",
   "Pricing may change with advance notice",
@@ -48,7 +55,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Pricing</p>
             <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Vaeroex Pricing</h1>
             <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-              Vaeroex pricing is organized by product and subscription type. Choose the Vaeroex subscription you want to start with.
+              One monthly subscription for Operations Intelligence: executive visibility, Business Memory, evidence-backed recommendations, and leadership decision support.
             </p>
             <div className="mt-6 flex flex-wrap items-start gap-3">
               <StartWithVaeroexMenu />
@@ -71,10 +78,10 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             ) : null}
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Available Product</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Operations Intelligence Platform</p>
                 <h2 className="mt-3 text-3xl font-semibold">Operations Intelligence</h2>
                 <p className="mt-2 max-w-xl text-sm leading-6 text-muted">
-                  For organizations that need operational visibility, accountability, execution, and decision support.
+                  For executives, business owners, CEOs, COOs, and operations leaders who need clarity from scattered business information.
                 </p>
               </div>
               <div className="shrink-0 rounded-lg border border-vaeroex-blue/20 bg-vaeroex-soft px-4 py-3 text-left sm:text-right">
@@ -87,7 +94,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
               {buyingSummary.map(([label, value]) => (
                 <div key={label} className="rounded-lg border border-line bg-slate-50 p-3">
                   <dt className="text-xs font-semibold uppercase tracking-wide text-muted">{label}</dt>
-                  <dd className="mt-1 text-sm font-semibold">{value}</dd>
+                  <dd className="mt-1 text-sm font-semibold leading-5">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -103,11 +110,12 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
             <details className="mt-6 rounded-lg border border-line bg-slate-50">
               <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-ink hover:text-vaeroex-blue [&::-webkit-details-marker]:hidden">
-                Subscription Details
+                What is included
               </summary>
               <div className="grid gap-2 border-t border-line p-4">
                 {subscriptionDetails.map((detail) => (
                   <div key={detail} className="rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold">
+                    <span className="mr-2 text-vaeroex-blue">✓</span>
                     {detail}
                   </div>
                 ))}
@@ -124,8 +132,10 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr]">
           <ScrollReveal className="rounded-lg border border-line bg-white p-6 shadow-panel">
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Billing Details</p>
+            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">What you are buying</p>
             <div className="mt-3 space-y-3 text-sm leading-6 text-muted">
+              <p>Vaeroex helps leadership see what matters, understand why it matters, and review decisions with stronger evidence.</p>
+              <p>You are buying operational clarity, not another employee workspace or task management system.</p>
               <p>Vaeroex subscriptions renew automatically unless canceled.</p>
               <p>Pricing may change in the future. Customers will receive advance notice before pricing changes take effect.</p>
               <p>Refunds are handled according to the Vaeroex Refund Policy.</p>

@@ -8,7 +8,7 @@ Create one monthly subscription product:
 
 ```text
 Vaeroex
-$399/month
+$500/month
 Everything Included
 ```
 
