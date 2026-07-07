@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useState } from "react";
 
 const signalExamples = [
@@ -55,12 +54,12 @@ const signalExamples = [
 ] as const;
 
 export function SignalProductionDemo() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activeSignal = signalExamples[activeIndex];
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const activeSignal = activeIndex === null ? null : signalExamples[activeIndex];
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[0.92fr_1.08fr]">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <div className="grid gap-4">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {signalExamples.map((signal, index) => {
           const isActive = index === activeIndex;
 
@@ -70,7 +69,7 @@ export function SignalProductionDemo() {
               type="button"
               onClick={() => setActiveIndex(index)}
               className={[
-                "vaeroex-hover-card rounded-lg border p-4 text-left shadow-command transition focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50",
+                "vaeroex-hover-card rounded-lg border p-3 text-left shadow-command transition focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50",
                 isActive ? "border-vaeroex-accent/70 bg-vaeroex-accent/10" : "border-white/10 bg-white/[0.06]"
               ].join(" ")}
               aria-pressed={isActive}
@@ -79,35 +78,35 @@ export function SignalProductionDemo() {
               <span className="inline-flex rounded-full border border-vaeroex-accent/30 bg-vaeroex-accent/10 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-vaeroex-accent">
                 Signal
               </span>
-              <h3 className="mt-4 font-semibold text-white">{signal.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-slate-300">{signal.description}</p>
+              <h3 className="mt-3 font-semibold text-white">{signal.title}</h3>
+              <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-300">{signal.description}</p>
             </button>
           );
         })}
       </div>
 
-      <section className="vaeroex-intelligence-flow rounded-xl border border-white/10 bg-[#08111f]/95 p-5 shadow-command">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Signal Production</p>
-        <h3 className="mt-2 text-2xl font-semibold text-white">{activeSignal.title}</h3>
-        <p className="mt-3 text-sm leading-6 text-slate-300">{activeSignal.description}</p>
-        <div className="mt-5 grid gap-3">
-          {activeSignal.steps.map((step, index) => (
-            <div key={step} className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-              <div className="vaeroex-signal-chip rounded-lg border border-white/10 bg-[#0d1728] px-3 py-2 text-sm font-semibold text-slate-100" style={{ "--signal-delay": `${index * 100}ms` } as CSSProperties}>
-                {step}
-              </div>
-              {index < activeSignal.steps.length - 1 ? (
-                <span className="hidden h-px w-12 bg-gradient-to-r from-vaeroex-blue to-vaeroex-accent sm:block">
-                  <span className="vaeroex-flow-dot relative block h-1.5 w-1.5 -translate-y-[3px] rounded-full bg-vaeroex-accent shadow-[0_0_16px_rgba(56,189,248,0.8)]" />
+      {activeSignal ? (
+        <section className="vaeroex-intelligence-flow grid gap-4 rounded-lg border border-white/10 bg-[#08111f]/95 p-4 shadow-command lg:grid-cols-[0.8fr_1.2fr] lg:items-start">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Signal Production</p>
+            <h3 className="mt-2 text-xl font-semibold text-white">{activeSignal.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-300">{activeSignal.description}</p>
+          </div>
+
+          <div>
+            <div className="flex flex-wrap gap-2">
+              {activeSignal.steps.map((step) => (
+                <span key={step} className="rounded-full border border-white/10 bg-[#0d1728] px-3 py-1.5 text-xs font-semibold text-slate-100">
+                  {step}
                 </span>
-              ) : null}
+              ))}
             </div>
-          ))}
-        </div>
-        <div className="mt-5 rounded-lg border border-vaeroex-accent/30 bg-vaeroex-accent/10 p-4 text-sm font-semibold leading-6 text-slate-100">
-          {activeSignal.output}
-        </div>
-      </section>
+            <div className="mt-3 rounded-lg border border-vaeroex-accent/30 bg-vaeroex-accent/10 p-3 text-sm font-semibold leading-6 text-slate-100">
+              {activeSignal.output}
+            </div>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

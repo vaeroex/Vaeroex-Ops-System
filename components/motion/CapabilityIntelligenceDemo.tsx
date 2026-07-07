@@ -1,6 +1,5 @@
 "use client";
 
-import type { CSSProperties } from "react";
 import { useState } from "react";
 
 const capabilities = [
@@ -93,13 +92,14 @@ function statusClass(status: string) {
 }
 
 export function CapabilityIntelligenceDemo() {
-  const [activeIndex, setActiveIndex] = useState(0);
-  const active = capabilities[activeIndex];
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const visibleCapabilities = capabilities.filter((capability) => capability.status === "Current");
+  const active = activeIndex === null ? null : visibleCapabilities[activeIndex];
 
   return (
-    <div className="grid gap-5">
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
-        {capabilities.map((capability, index) => {
+    <div className="grid gap-4">
+      <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5">
+        {visibleCapabilities.map((capability, index) => {
           const isActive = index === activeIndex;
 
           return (
@@ -108,7 +108,7 @@ export function CapabilityIntelligenceDemo() {
               type="button"
               onClick={() => setActiveIndex(index)}
               className={[
-                "vaeroex-hover-card rounded-lg border p-4 text-left shadow-command backdrop-blur transition focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50",
+                "vaeroex-hover-card rounded-lg border p-3 text-left shadow-command backdrop-blur transition focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50",
                 isActive ? "border-vaeroex-accent/70 bg-vaeroex-accent/10" : "border-white/10 bg-white/[0.055]"
               ].join(" ")}
               aria-pressed={isActive}
@@ -117,46 +117,48 @@ export function CapabilityIntelligenceDemo() {
               <span className={`inline-flex rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold ${statusClass(capability.status)}`}>
                 {capability.status}
               </span>
-              <h3 className="mt-4 font-semibold text-white">{capability.title}</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-300">{capability.summary}</p>
+              <h3 className="mt-3 font-semibold text-white">{capability.title}</h3>
+              <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-300">{capability.summary}</p>
             </button>
           );
         })}
       </div>
 
-      <section className="vaeroex-intelligence-flow grid gap-5 rounded-xl border border-white/10 bg-[#08111f]/95 p-5 shadow-command lg:grid-cols-[0.95fr_1.05fr]">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Selected Capability</p>
-          <h3 className="mt-2 text-2xl font-semibold text-white">{active.title}</h3>
-          <p className="mt-3 text-sm leading-6 text-slate-300">{active.summary}</p>
-          <div className="mt-4 rounded-lg border border-vaeroex-accent/30 bg-vaeroex-accent/10 p-4 text-sm font-semibold leading-6 text-slate-100">
-            {active.relationship}
+      {active ? (
+        <section className="vaeroex-intelligence-flow grid gap-4 rounded-lg border border-white/10 bg-[#08111f]/95 p-4 shadow-command lg:grid-cols-[0.85fr_1.15fr]">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Selected Capability</p>
+            <h3 className="mt-2 text-xl font-semibold text-white">{active.title}</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-300">{active.summary}</p>
+            <div className="mt-3 rounded-lg border border-vaeroex-accent/30 bg-vaeroex-accent/10 p-3 text-sm font-semibold leading-6 text-slate-100">
+              {active.relationship}
+            </div>
           </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-lg border border-white/10 bg-white/[0.05] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Generation Flow</p>
-            <div className="mt-3 grid gap-2">
-              {active.generated.map((item, index) => (
-                <div key={item} className="vaeroex-signal-chip rounded-lg border border-white/10 bg-[#0d1728] px-3 py-2 text-sm font-semibold text-slate-100" style={{ "--signal-delay": `${index * 100}ms` } as CSSProperties}>
-                  {item}
-                </div>
-              ))}
+          <div className="grid gap-3">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Generation Flow</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {active.generated.map((item) => (
+                  <span key={item} className="rounded-full border border-white/10 bg-[#0d1728] px-3 py-1.5 text-xs font-semibold text-slate-100">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Context Relationships</p>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {active.examples.map((item) => (
+                  <span key={item} className="rounded-full border border-vaeroex-blue/25 bg-vaeroex-blue/10 px-3 py-1.5 text-xs font-semibold text-slate-100">
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
           </div>
-          <div className="rounded-lg border border-white/10 bg-white/[0.05] p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Context Relationships</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              {active.examples.map((item) => (
-                <span key={item} className="rounded-full border border-vaeroex-blue/25 bg-vaeroex-blue/10 px-3 py-1.5 text-xs font-semibold text-slate-100">
-                  {item}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
     </div>
   );
 }
