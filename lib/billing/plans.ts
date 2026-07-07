@@ -2,7 +2,7 @@ import type { PlanLimits } from "@/lib/billing/types";
 
 export const VAEROEX_PLAN_SLUG = "vaeroex";
 export const VAEROEX_PLAN_NAME = "Vaeroex";
-export const VAEROEX_PLAN_PRICE_LABEL = "$399/month";
+export const VAEROEX_PLAN_PRICE_LABEL = "$500/month";
 
 export const VAEROEX_PLAN_LIMITS = {
   max_workspaces: 1,
@@ -14,33 +14,24 @@ export const VAEROEX_PLAN_LIMITS = {
 } satisfies PlanLimits;
 
 export const VAEROEX_PLAN_FEATURES = [
-  "Executive Visibility Dashboard",
-  "CRM",
-  "KPIs",
-  "Reports",
-  "SOPs",
-  "Business Signals",
-  "Issues",
-  "Checklists",
-  "Files",
-  "People",
-  "Notifications",
-  "Team Roles",
-  "Generated Outputs",
-  "Report Scheduling",
-  "Report Sharing",
-  "KPI Alerts",
-  "Vaeroex Intelligence",
-  "Business Health Score",
+  "Private Business Workspace",
   "Business Memory",
+  "Operations Intelligence",
+  "KPI Intelligence",
+  "Evidence-backed recommendations",
+  "Executive brief generation",
+  "Ask Vaeroex",
+  "File analysis & imports",
+  "Continuous platform improvements",
+  "Leadership decision support",
+  "Executive Visibility Dashboard",
+  "Business Signals",
+  "Files",
+  "Generated Outputs",
+  "Business Health Score",
   "Profit Leak Detector",
-  "Executive Briefings",
-  "Role-Based Briefings",
-  "Weekly Reviews",
-  "Demo Workspace",
   "Security Features",
-  "Help Center",
-  "Future Prestige Features"
+  "Help Center"
 ] as const;
 
 const legacyPlanSlugs = new Set(["starter", "growth", "pro"]);

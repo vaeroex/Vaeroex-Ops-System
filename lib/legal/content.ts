@@ -314,7 +314,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/subscription-billing-terms",
     updated: "2026-06-19",
     sections: [
-      { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex Operations Intelligence, $399/month, Everything Included."] },
+      { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex Operations Intelligence, $500/month, Everything Included."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
       { title: "Subscription Requests", body: [`Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`] },
