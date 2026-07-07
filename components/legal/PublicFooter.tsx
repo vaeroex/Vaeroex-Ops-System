@@ -31,19 +31,19 @@ const contactLinks = [
 
 export function PublicFooter() {
   return (
-    <footer className="border-t border-line bg-white px-6 py-8 text-sm text-muted">
-      <div className="mx-auto grid max-w-6xl gap-6 lg:grid-cols-[1fr_1.4fr] lg:items-start">
+    <footer className="border-t border-line bg-white px-6 py-6 text-sm text-muted">
+      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[1fr_1.4fr] lg:items-start">
         <div>
           <Link href="/" className="inline-flex items-center gap-3 text-ink" aria-label="Vaeroex home">
             <VaeroexLogo variant="symbol" size="xs" />
             <span className="font-semibold">Vaeroex</span>
           </Link>
-          <p className="mt-3 max-w-md leading-6">
+          <p className="mt-2 max-w-md leading-5">
             Intelligence Platform. The Advantage of Knowing First.
           </p>
-          <p className="mt-3 text-xs">Visibility • Awareness • Execution</p>
-          <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
-          <div className="mt-4 text-xs leading-5">
+          <p className="mt-2 text-xs">Visibility • Awareness • Execution</p>
+          <p className="mt-2 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
+          <div className="mt-3 text-xs leading-5">
             <p className="font-semibold text-ink">Business Address</p>
             <address className="mt-1 not-italic">
               {VAEROEX_COMPANY_ADDRESS_LINES.map((line) => (
@@ -54,10 +54,10 @@ export function PublicFooter() {
             </address>
           </div>
         </div>
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <p className="font-semibold text-ink">Platform</p>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-2 grid gap-1.5">
               {platformLinks.map(([label, href]) => (
                 <Link key={href} href={href} className="hover:text-vaeroex-blue">
                   {label}
@@ -67,7 +67,7 @@ export function PublicFooter() {
           </div>
           <div>
             <p className="font-semibold text-ink">Access</p>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-2 grid gap-1.5">
               {accessLinks.map(([label, href]) => (
                 <Link key={href} href={href} className="hover:text-vaeroex-blue">
                   {label}
@@ -77,7 +77,7 @@ export function PublicFooter() {
           </div>
           <div>
             <p className="font-semibold text-ink">Direct Email</p>
-            <div className="mt-3 grid gap-2">
+            <div className="mt-2 grid gap-1.5">
               {contactLinks.map(([label, email, href]) => (
                 <a key={email} href={href} className="hover:text-vaeroex-blue">
                   {label}: {email}
@@ -87,7 +87,7 @@ export function PublicFooter() {
           </div>
           <div>
             <p className="font-semibold text-ink">Legal</p>
-            <nav className="mt-3 grid gap-2" aria-label="Legal links">
+            <nav className="mt-2 grid gap-1.5" aria-label="Legal links">
               {legalLinks.map((link) => (
                 <Link key={link.href} href={link.href} className="hover:text-vaeroex-blue">
                   {link.label}
