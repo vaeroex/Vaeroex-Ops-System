@@ -80,5 +80,5 @@ export const operationsIntelligenceJsonLd = {
     name: "Vaeroex",
     url: PUBLIC_SITE_URL
   },
-  description: "Operations Intelligence by Vaeroex helps organizations improve visibility, accountability, execution, reporting, and decision support."
+  description: "Operations Intelligence by Vaeroex transforms operational activity into visibility, context, prediction, evidence, and executive recommendations."
 };
