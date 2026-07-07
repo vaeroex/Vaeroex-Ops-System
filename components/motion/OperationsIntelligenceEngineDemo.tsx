@@ -8,7 +8,7 @@ const engineScenarios = [
     title: "Business Health Score",
     signal: "92 / 100",
     summary: "Leadership signal combining performance, risk, evidence, and operational movement.",
-    flow: ["Business Health Score", "Trend detected", "Source gap identified", "Recommendation generated"],
+    flow: ["Business Health Score", "Trend detected", "Source gap identified", "Executive recommendation"],
     output: "Review sales pipeline response quality and decide whether an executive brief is needed."
   },
   {
@@ -19,7 +19,7 @@ const engineScenarios = [
     output: "Generate an investigation summary or improvement plan for leadership review."
   },
   {
-    title: "Customer Pipeline",
+    title: "Customer response risk",
     signal: "Review needed",
     summary: "Pipeline risk is connected to response quality, conversion movement, and evidence.",
     flow: ["Risk surfaced", "Evidence linked", "Confidence scored", "Decision framed"],
