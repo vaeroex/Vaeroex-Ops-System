@@ -32,7 +32,7 @@ const intelligenceLoop = [
   ["Analyze", "Identify relationships, changes, anomalies, risk patterns, and meaningful signals."],
   ["Predict", "Surface emerging risks, likely outcomes, opportunities, and conditions before they become obvious."],
   ["Prioritize", "Determine what matters most and what requires attention, review, escalation, or response."],
-  ["Execute", "Turn intelligence into ownership, decisions, assignments, alerts, workflows, and action."],
+  ["Execute", "Turn intelligence into review-ready decisions, executive briefs, recommendations, and supporting outputs."],
   ["Measure", "Track outcomes over time to understand what changed, what improved, and what needs attention next."]
 ] as const;
 
@@ -126,28 +126,23 @@ export default function HomePage() {
 
       <section className="border-b border-white/10 bg-[#030712] px-6 py-10 sm:py-12">
         <div className="mx-auto max-w-6xl">
-          <div className="grid gap-7 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence Capabilities</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">What Vaeroex is built to do.</h2>
-              <p className="mt-4 text-sm leading-6 text-slate-300">
-                Vaeroex combines current platform capabilities with an architecture designed to evolve across multiple intelligence domains over time.
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence Capabilities</p>
+            <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-white">What Vaeroex is built to do.</h2>
+              <p className="max-w-xl text-sm leading-6 text-slate-300">
+                Vaeroex turns scattered information into visibility, context, risk detection, prediction, and decision support.
               </p>
             </div>
-            <CapabilityIntelligenceDemo />
+            <div className="mt-5">
+              <CapabilityIntelligenceDemo />
+            </div>
           </div>
 
-          <div className="mt-8 grid gap-7 border-t border-white/10 pt-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence Domains</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">One platform direction. Multiple areas of application.</h2>
-              <p className="mt-4 text-sm leading-6 text-slate-300">
-                Vaeroex is designed around an intelligence architecture that can be applied across multiple domains over time.
-              </p>
-              <p className="mt-3 text-xs leading-5 text-slate-400">
-                Expanding domains are future-facing categories, not currently available product promises.
-              </p>
-              <ScrollReveal className="vaeroex-hover-card mt-5 rounded-lg border border-white/10 bg-white/[0.06] p-5 shadow-command">
+          <div className="mt-8 border-t border-white/10 pt-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Current Capability</p>
+            <div className="mt-3 grid gap-5 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+              <ScrollReveal className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-5 shadow-command">
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Applied Intelligence</p>
                 <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">Operations Intelligence</h3>
                 <p className="mt-3 text-sm leading-6 text-slate-300">
@@ -162,19 +157,37 @@ export default function HomePage() {
                   </Link>
                 </div>
               </ScrollReveal>
-            </div>
-            <div className="grid gap-3 md:grid-cols-2">
-              {intelligenceDomains.map(([title, status, description], index) => (
-                <ScrollReveal key={title} delayMs={index * 70} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-command">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="font-semibold text-white">{title}</h3>
-                    <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${status === "Current" ? badgeClass("Current") : badgeClass("Expanding")}`}>
-                      {status}
+
+              <details className="group rounded-lg border border-white/10 bg-white/[0.05] p-5 shadow-command">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4">
+                  <span>
+                    <span className="block text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Future Platform Direction</span>
+                    <span className="mt-2 block text-xl font-semibold tracking-tight text-white">Multiple areas of application over time.</span>
+                    <span className="mt-2 block text-sm leading-6 text-slate-300">
+                      Vaeroex is designed around an intelligence architecture that can expand beyond the current capability.
                     </span>
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
-                </ScrollReveal>
-              ))}
+                  </span>
+                  <span className="shrink-0 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-100 group-open:border-vaeroex-accent/50 group-open:text-vaeroex-accent">
+                    Expand
+                  </span>
+                </summary>
+                <p className="mt-4 text-xs leading-5 text-slate-400">
+                  These are platform direction areas, not currently available product promises.
+                </p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  {intelligenceDomains.filter(([title]) => title !== "Operations Intelligence").map(([title, status, description], index) => (
+                    <ScrollReveal key={title} delayMs={index * 70} className="vaeroex-hover-card rounded-lg border border-white/10 bg-white/[0.06] p-4 shadow-command">
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-semibold text-white">{title}</h3>
+                        <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${badgeClass(status)}`}>
+                          {status}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-300">{description}</p>
+                    </ScrollReveal>
+                  ))}
+                </div>
+              </details>
             </div>
           </div>
         </div>
@@ -182,15 +195,17 @@ export default function HomePage() {
 
       <section className="border-b border-white/10 bg-[#050b18] px-6 py-10 sm:py-12">
         <div className="mx-auto max-w-6xl">
-          <div className="grid gap-7 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">The Vaeroex Intelligence Loop</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Capture, remember, analyze, predict, prioritize, execute, and measure.</h2>
-              <p className="mt-4 text-sm leading-6 text-slate-300">
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">The Vaeroex Intelligence Loop</p>
+            <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-white">Capture, remember, analyze, predict, prioritize, execute, and measure.</h2>
+              <p className="max-w-xl text-sm leading-6 text-slate-300">
                 Vaeroex helps organizations move from raw signals to awareness, prediction, action, and measured outcomes.
               </p>
             </div>
-            <IntelligenceLoopShowcase steps={intelligenceLoop} />
+            <div className="mt-5">
+              <IntelligenceLoopShowcase steps={intelligenceLoop} />
+            </div>
           </div>
 
           <div className="mt-8 border-t border-white/10 pt-8">
