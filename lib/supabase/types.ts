@@ -519,6 +519,46 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["business_health_snapshots"]["Insert"]>;
         Relationships: [];
       };
+      security_audit_events: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          user_id: string | null;
+          action_name: string;
+          operation_type: string;
+          target_table: string | null;
+          target_record_id: string | null;
+          initiated_by: string;
+          required_confirmation: boolean;
+          confirmation_received: boolean;
+          allowed: boolean;
+          reason_blocked: string | null;
+          request_id: string | null;
+          model: string | null;
+          metadata_json: Json;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          user_id?: string | null;
+          action_name: string;
+          operation_type: string;
+          target_table?: string | null;
+          target_record_id?: string | null;
+          initiated_by: string;
+          required_confirmation?: boolean;
+          confirmation_received?: boolean;
+          allowed?: boolean;
+          reason_blocked?: string | null;
+          request_id?: string | null;
+          model?: string | null;
+          metadata_json?: Json;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["security_audit_events"]["Insert"]>;
+        Relationships: [];
+      };
       crm_leads: {
         Row: {
           id: string;
