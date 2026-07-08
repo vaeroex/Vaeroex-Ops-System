@@ -16,7 +16,6 @@ import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextInput } from "@/components/operations/FormControls";
 import { LoadingLink } from "@/components/operations/LoadingLink";
-import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
@@ -309,34 +308,57 @@ function FolderSelect({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }
   );
 }
 
-function UploadSourceDrawer({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }) {
+function UploadSourceForm({ folders }: { folders: Pick<FolderRow, "id" | "name">[] }) {
+  return (
+    <form action={uploadFileAction} encType="multipart/form-data" className="grid gap-4 text-slate-100">
+      <input type="hidden" name="return_path" value="/app/sources" />
+      <label className="block text-sm font-medium text-slate-200">
+        File
+        <input
+          name="file"
+          type="file"
+          accept=".csv,.xlsx,.pdf,.png,.jpg,.jpeg,.docx"
+          required
+          className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-vaeroex-blue file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white focus:border-vaeroex-accent"
+        />
+      </label>
+      <TextInput label="Display name" name="display_name" placeholder="Optional name shown in Vaeroex" />
+      <FolderSelect folders={folders} />
+      <p className="rounded-lg border border-white/10 bg-slate-950/45 p-3 text-xs leading-5 text-slate-400">
+        Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
+      </p>
+      <AnalysisProgressSubmit className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" pendingLabel="Uploading file..." steps={UPLOAD_PROGRESS_STEPS}>
+        Upload file
+      </AnalysisProgressSubmit>
+    </form>
+  );
+}
+
+function UploadSourceDrawer({ folders, compact = false }: { folders: Pick<FolderRow, "id" | "name">[]; compact?: boolean }) {
+  if (compact) {
+    return (
+      <details className="group relative">
+        <summary className="inline-flex min-h-11 cursor-pointer list-none items-center justify-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-cyan-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60">
+          Upload Source
+        </summary>
+        <div className="absolute right-0 z-30 mt-2 w-[min(34rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-2xl shadow-black/40">
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-white">Upload Source</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
+          </div>
+          <UploadSourceForm folders={folders} />
+        </div>
+      </details>
+    );
+  }
+
   return (
     <CreateDrawer
       title="Upload source file"
       description="Upload reports, KPI spreadsheets, SOPs, meeting notes, financial exports, or operational documents. CSV/XLSX imports always go through review before saving."
       triggerLabel="Upload Source"
     >
-      <form action={uploadFileAction} encType="multipart/form-data" className="grid gap-4 text-slate-100">
-        <input type="hidden" name="return_path" value="/app/sources" />
-        <label className="block text-sm font-medium text-slate-200">
-          File
-          <input
-            name="file"
-            type="file"
-            accept=".csv,.xlsx,.pdf,.png,.jpg,.jpeg,.docx"
-            required
-            className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm outline-none file:mr-3 file:rounded-md file:border-0 file:bg-vaeroex-blue file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-white focus:border-vaeroex-accent"
-          />
-        </label>
-        <TextInput label="Display name" name="display_name" placeholder="Optional name shown in Vaeroex" />
-        <FolderSelect folders={folders} />
-        <p className="rounded-lg border border-white/10 bg-slate-950/45 p-3 text-xs leading-5 text-slate-400">
-          Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
-        </p>
-        <AnalysisProgressSubmit className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50" pendingLabel="Uploading file..." steps={UPLOAD_PROGRESS_STEPS}>
-          Upload file
-        </AnalysisProgressSubmit>
-      </form>
+      <UploadSourceForm folders={folders} />
     </CreateDrawer>
   );
 }
@@ -735,33 +757,43 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Sources"
-        title="Sources"
-        description="Manage the information Vaeroex uses to understand the business. Upload, review, analyze, import, and organize business evidence from one place."
-        actions={<UploadSourceDrawer folders={folders} />}
-      />
+      <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold tracking-tight text-white">Sources</h1>
+            <p className="mt-1 text-sm leading-6 text-slate-300">Upload, analyze, and organize business evidence.</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <p className="max-w-sm text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
+            <UploadSourceDrawer folders={folders} compact />
+          </div>
+        </div>
+        <div className="mt-3 grid gap-2 lg:grid-cols-2">
+          <details className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-semibold text-cyan-100">
+              What is this?
+            </summary>
+            <p className="mt-2 text-xs leading-5 text-slate-400">
+              Sources are business evidence Vaeroex can analyze, import, reference in briefings, or preserve as Business Memory after review.
+            </p>
+          </details>
+          <details className="rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-semibold text-amber-100">
+              Sensitive information reminder
+            </summary>
+            <div className="mt-2">
+              <LegalSafetyNotice tone="sensitive" compact />
+            </div>
+          </details>
+        </div>
+      </section>
 
-      <LegalSafetyNotice tone="sensitive" compact />
       <ErrorNotice message={errorMessage} />
       {successMessage ? (
         <div className="rounded-lg border border-emerald-400/35 bg-emerald-950/30 p-3 text-sm text-emerald-100">
           {successMessage}
         </div>
       ) : null}
-
-      <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Upload</p>
-            <h2 className="mt-2 text-xl font-semibold text-white">Upload business evidence.</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-              Upload reports, KPI spreadsheets, SOPs, meeting notes, financial exports, or operational documents. After upload, choose whether Vaeroex should analyze it, stage an import for review, create a report, or keep it as business memory.
-            </p>
-          </div>
-          <UploadSourceDrawer folders={folders} />
-        </div>
-      </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         {metricGroups.map((group) => (
