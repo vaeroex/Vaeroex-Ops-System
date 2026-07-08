@@ -1082,6 +1082,7 @@ export type Database = {
         Row: {
           id: string;
           workspace_id: string;
+          folder_id: string | null;
           agent_type: string;
           input_json: Json;
           output_json: Json;
@@ -1089,10 +1090,14 @@ export type Database = {
           error_message: string | null;
           created_by: string | null;
           created_at: string;
+          updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
           workspace_id: string;
+          folder_id?: string | null;
           agent_type: string;
           input_json?: Json;
           output_json?: Json;
@@ -1100,6 +1105,9 @@ export type Database = {
           error_message?: string | null;
           created_by?: string | null;
           created_at?: string;
+          updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["ai_agent_runs"]["Insert"]>;
         Relationships: [];
