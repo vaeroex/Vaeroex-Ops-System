@@ -2661,7 +2661,7 @@ export default async function FilesPage({ searchParams }: FilesPageProps) {
           { label: "Pending Review", href: "/app/files?status=Pending%20Review" },
           { label: "Analyzed", href: "/app/files?status=Analyzed" },
           { label: "Imported Data", href: "/app/files?status=Imported" },
-          { label: "Archived / Hidden", href: "/app/files?view=all" }
+          { label: "Archived Files", href: "/app/files?view=all" }
         ].map((item) => {
           const active =
             (!params?.status && !params?.view && item.href === "/app/files") ||

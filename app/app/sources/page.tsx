@@ -6,6 +6,8 @@ import {
   importFileAction,
   uploadFileAction
 } from "@/app/app/files/actions";
+import { deleteGeneratedInsightAction } from "@/app/app/sources/actions";
+import { ArchivedFilesBulkActions } from "@/components/operations/ArchivedFilesBulkActions";
 import { manageRecordAction } from "@/app/app/operations/record-management-actions";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
@@ -13,6 +15,7 @@ import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextInput } from "@/components/operations/FormControls";
+import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
@@ -31,6 +34,7 @@ type SourcesPageProps = {
     q?: string;
     file?: string;
     view?: string;
+    insights?: string;
   }>;
 };
 
@@ -121,6 +125,34 @@ function runSummary(run: VaeroexRunRow) {
   return stringValue(output.executive_summary) || stringValue(output.summary) || stringValue(output.response_markdown) || run.error_message || "No summary was saved.";
 }
 
+function confidenceFromScore(score: number) {
+  if (score >= 80) return `High (${score}%)`;
+  if (score >= 60) return `Medium (${score}%)`;
+  if (score >= 35) return `Developing (${score}%)`;
+  return `Low (${score}%)`;
+}
+
+function runConfidence(run: VaeroexRunRow) {
+  const output = isRecord(run.output_json) ? run.output_json : {};
+  const confidence =
+    stringValue(output.confidence) ||
+    stringValue(output.confidence_level) ||
+    stringValue(output.confidence_label) ||
+    stringValue(output.analysis_confidence);
+
+  if (confidence) {
+    return confidence;
+  }
+
+  const score = output.confidence_score ?? output.evidence_confidence_score;
+
+  if (typeof score === "number" && Number.isFinite(score)) {
+    return confidenceFromScore(Math.round(score <= 1 ? score * 100 : score));
+  }
+
+  return "";
+}
+
 function reportsForFile(reports: ReportRow[], fileId: string) {
   return reports.filter((report) => {
     const source = isRecord(report.source_data_json) ? report.source_data_json : {};
@@ -204,7 +236,7 @@ function filteredFiles({
 
   return files
     .filter((file) => (fileId ? file.id === fileId : true))
-    .filter((file) => (includeHidden ? Boolean(file.deleted_at || file.archived_at) : !file.deleted_at && !file.archived_at))
+    .filter((file) => (includeHidden ? Boolean(file.archived_at && !file.deleted_at) : !file.deleted_at && !file.archived_at))
     .filter((file) => fileMatchesStatus(file, status || "", runsByFile.get(file.id) || []))
     .filter((file) => {
       if (!normalizedQuery) return true;
@@ -230,9 +262,10 @@ function SourceMetricCard({ label, value, href, detail, emptyDetail }: SourceMet
   const explanation = value ? detail : emptyDetail;
 
   return (
-    <Link
+    <LoadingLink
       href={href}
       className="group block rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/40 hover:bg-blue-950/25 focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50"
+      loadingLabel={label === "Archived Files" ? "Loading archived files..." : label === "Insights Generated" ? "Loading generated insights..." : "Loading source view..."}
       aria-label={`${label}: ${value}. ${explanation}`}
     >
       <div className="flex items-start justify-between gap-3">
@@ -241,7 +274,7 @@ function SourceMetricCard({ label, value, href, detail, emptyDetail }: SourceMet
       </div>
       <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
       <p className={`mt-2 text-xs leading-5 ${value ? "text-slate-300" : "text-slate-400"}`}>{explanation}</p>
-    </Link>
+    </LoadingLink>
   );
 }
 
@@ -501,7 +534,8 @@ function SourceFileRow({
   reports,
   kpis,
   runs,
-  access
+  access,
+  selectable = false
 }: {
   file: FileUploadRow;
   folders: Pick<FolderRow, "id" | "name">[];
@@ -510,6 +544,7 @@ function SourceFileRow({
   kpis: KpiRow[];
   runs: VaeroexRunRow[];
   access?: FileAccessLinks | null;
+  selectable?: boolean;
 }) {
   const linkedKpis = kpis.filter((kpi) => kpi.source_file_id === file.id);
   const linkedRuns = runs.filter((run) => runFileId(run) === file.id);
@@ -519,6 +554,17 @@ function SourceFileRow({
 
   return (
     <article id={`file-${file.id}`} className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      {selectable ? (
+        <label className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100">
+          <input
+            type="checkbox"
+            name="record_id"
+            value={file.id}
+            className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent"
+          />
+          Select file
+        </label>
+      ) : null}
       <div className="grid gap-4 xl:grid-cols-[minmax(220px,1.2fr)_110px_120px_130px_130px_minmax(220px,1fr)] xl:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -580,8 +626,8 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       .select("*")
       .eq("workspace_id", workspaceId)
       .eq("agent_type", "file_analysis")
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(200)
   ]);
 
   const files = (filesResult.data || []) as FileUploadRow[];
@@ -609,12 +655,15 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     runsByFile
   });
   const currentFiles = files.filter((file) => !file.deleted_at && !file.archived_at);
-  const hiddenFiles = files.filter((file) => file.deleted_at || file.archived_at);
+  const hiddenFiles = files.filter((file) => file.archived_at && !file.deleted_at);
   const analyzedFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Analyzed");
   const importReadyFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Import Ready");
   const pendingReviewFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Pending Review");
   const linkedFile = params?.file ? files.find((file) => file.id === params.file) : null;
   const activeFilterLabel = linkedFile?.display_name || params?.status || (params?.view === "hidden" ? "Archived Files" : "") || params?.q || "";
+  const isArchivedView = params?.view === "hidden";
+  const showAllInsights = params?.insights === "all";
+  const visibleInsights = showAllInsights ? runs : runs.slice(0, 5);
   const metricGroups = [
     {
       title: "Business Evidence",
@@ -657,7 +706,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
         {
           label: "Insights Generated",
           value: runs.length,
-          href: "/app/sources#source-insights" as Route,
+          href: "/app/sources?insights=all#source-insights" as Route,
           detail: "Generated file insights available for leadership review.",
           emptyDetail: "No insights have been generated yet."
         },
@@ -719,13 +768,14 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
               (params?.view && tab.href.includes(`view=${params.view}`));
 
             return (
-              <Link
+              <LoadingLink
                 key={tab.href}
                 href={tab.href as Route}
                 className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-3 py-2 text-xs font-semibold ${active ? "bg-vaeroex-blue text-white" : "border border-white/10 bg-white/[0.04] text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30"}`}
+                loadingLabel={tab.label === "Archived Files" ? "Loading archived files..." : `Loading ${tab.label.toLowerCase()}...`}
               >
                 {tab.label}
-              </Link>
+              </LoadingLink>
             );
           })}
         </nav>
@@ -763,34 +813,56 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
           </div>
           <div className="mt-4 space-y-3">
             {visibleFiles.length ? (
-              visibleFiles.map((file) => (
-                <SourceFileRow
-                  key={file.id}
-                  file={file}
-                  folders={folders}
-                  imports={imports}
-                  reports={reports}
-                  kpis={kpis}
-                  runs={runs}
-                  access={accessByFileId.get(file.id)}
-                />
-              ))
+              isArchivedView ? (
+                <ArchivedFilesBulkActions fileCount={visibleFiles.length} returnPath="/app/sources?view=hidden">
+                  <div className="space-y-3">
+                    {visibleFiles.map((file) => (
+                      <SourceFileRow
+                        key={file.id}
+                        file={file}
+                        folders={folders}
+                        imports={imports}
+                        reports={reports}
+                        kpis={kpis}
+                        runs={runs}
+                        access={accessByFileId.get(file.id)}
+                        selectable
+                      />
+                    ))}
+                  </div>
+                </ArchivedFilesBulkActions>
+              ) : (
+                visibleFiles.map((file) => (
+                  <SourceFileRow
+                    key={file.id}
+                    file={file}
+                    folders={folders}
+                    imports={imports}
+                    reports={reports}
+                    kpis={kpis}
+                    runs={runs}
+                    access={accessByFileId.get(file.id)}
+                  />
+                ))
+              )
             ) : (
               <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
-                <h3 className="text-lg font-semibold text-white">{files.length ? "No files match this filter" : "No source files yet"}</h3>
+                <h3 className="text-lg font-semibold text-white">{isArchivedView ? "No archived files." : files.length ? "No files match this filter" : "No source files yet"}</h3>
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
-                  {files.length
-                    ? "Clear filters to view all files, or open Archived Files if the file was archived or deleted."
-                    : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
+                  {isArchivedView
+                    ? "Archived source files will appear here after you archive them."
+                    : files.length
+                      ? "Clear filters to view all files, or open Archived Files if the file was archived."
+                      : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {files.length ? (
+                  {files.length && !isArchivedView ? (
                     <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
                       Clear filters
                     </Link>
                   ) : null}
                   <UploadSourceDrawer folders={folders} />
-                  {files.length ? (
+                  {files.length && !isArchivedView ? (
                     <Link href="/app/sources?view=hidden" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
                       Show archived files
                     </Link>
@@ -804,22 +876,72 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
 
       <section className="grid gap-4 xl:grid-cols-2">
         <div id="source-insights" className="scroll-mt-24 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-          <h2 className="text-base font-semibold text-white">Generated Insights</h2>
-          <p className="mt-1 text-sm text-slate-400">Recent Vaeroex file reviews saved to workspace context.</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-base font-semibold text-white">Generated Insights</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                File reviews that may inform future Vaeroex answers, briefings, and Business Memory.
+              </p>
+            </div>
+            {runs.length > 5 ? (
+              <LoadingLink
+                href={(showAllInsights ? "/app/sources#source-insights" : "/app/sources?insights=all#source-insights") as Route}
+                loadingLabel={showAllInsights ? "Collapsing insights..." : "Loading all generated insights..."}
+                className="inline-flex min-h-10 w-fit items-center rounded-md border border-cyan-300/30 bg-cyan-950/25 px-3 py-2 text-xs font-semibold text-cyan-50 hover:border-cyan-300/60 hover:bg-cyan-950/40"
+              >
+                {showAllInsights ? "Collapse insights" : "View all insights"}
+              </LoadingLink>
+            ) : null}
+          </div>
+          {runs.length ? (
+            <p className="mt-3 text-xs text-slate-400">
+              Showing {visibleInsights.length} of {runs.length} generated insight{runs.length === 1 ? "" : "s"}.
+            </p>
+          ) : null}
           <div className="mt-4 space-y-3">
-            {runs.slice(0, 5).map((run) => {
+            {visibleInsights.map((run) => {
               const fileId = runFileId(run);
               const file = files.find((item) => item.id === fileId);
+              const confidence = runConfidence(run);
 
               return (
-                <Link key={run.id} href={file ? (`/app/files?file=${file.id}#analysis-result` as Route) : "/app/files"} className="block rounded-lg border border-white/10 bg-slate-950/45 p-3 transition hover:border-cyan-300/40 hover:bg-cyan-950/30">
-                  <p className="text-sm font-semibold text-white">{file?.display_name || "File analysis"}</p>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">{runSummary(run)}</p>
-                  <p className="mt-2 text-xs text-slate-500">{formatDateTime(run.created_at)}</p>
-                </Link>
+                <article key={run.id} className="rounded-lg border border-white/10 bg-slate-950/45 p-3 transition hover:border-cyan-300/35 hover:bg-cyan-950/20">
+                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="break-words text-sm font-semibold text-white">{file?.display_name || "File analysis"}</h3>
+                        {confidence ? <StatusBadge value={`Confidence: ${confidence}`} /> : null}
+                      </div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-300">{runSummary(run)}</p>
+                      <p className="mt-2 text-xs text-slate-500">Created {formatDateTime(run.created_at)}</p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      {file ? (
+                        <LoadingLink
+                          href={`/app/files?file=${file.id}#analysis-result` as Route}
+                          loadingLabel="Opening evidence..."
+                          className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-cyan-50 hover:border-cyan-300/40 hover:bg-cyan-950/30"
+                        >
+                          Open source evidence
+                        </LoadingLink>
+                      ) : null}
+                      <form action={deleteGeneratedInsightAction}>
+                        <input type="hidden" name="run_id" value={run.id} />
+                        <input type="hidden" name="return_path" value={showAllInsights ? "/app/sources?insights=all#source-insights" : "/app/sources#source-insights"} />
+                        <ConfirmSubmitButton
+                          message="Delete this generated insight? This removes it from Business Memory and future Vaeroex answers."
+                          pendingLabel="Updating Business Memory..."
+                          className="rounded-md border border-red-400/35 bg-red-950/35 px-3 py-2 text-xs font-semibold text-red-100 hover:border-red-300/60 hover:bg-red-950/55"
+                        >
+                          Delete insight
+                        </ConfirmSubmitButton>
+                      </form>
+                    </div>
+                  </div>
+                </article>
               );
             })}
-            {!runs.length ? <p className="text-sm leading-6 text-slate-400">No file analysis history yet.</p> : null}
+            {!runs.length ? <p className="text-sm leading-6 text-slate-400">No generated insights yet.</p> : null}
           </div>
         </div>
 
