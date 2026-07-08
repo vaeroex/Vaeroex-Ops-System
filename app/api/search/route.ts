@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -146,6 +147,21 @@ export async function GET(request: Request) {
 
   if (!subscriptionStatus.allowed) {
     return NextResponse.json({ error: "Subscription access is required." }, { status: 402 });
+  }
+
+  const rateLimit = await enforceRateLimit({
+    action: "global.search",
+    limit: 80,
+    windowSeconds: 60,
+    requestHeaders: request.headers,
+    userId: user.id,
+    workspaceId,
+    identifiers: [query],
+    metadata: { source: "global_search" }
+  });
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: rateLimitMessage(rateLimit) }, { status: 429 });
   }
 
   const words = queryWords(query);

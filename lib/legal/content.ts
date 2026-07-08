@@ -349,14 +349,17 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
 };
 
 export const trustSections = [
-  ["Responsible Intelligence", "Intelligence systems should help people make better decisions, not replace judgment. Vaeroex outputs are designed to support review, awareness, prioritization, and action."],
-  ["Workspace Data Boundaries", "Vaeroex is designed around workspace-scoped data so customer records, files, reports, and activity remain separated by workspace."],
-  ["Access and Roles", "Workspace membership, role-based controls, admin-restricted pages, manual access controls, and subscription state help limit who can view or manage workspace information."],
-  ["AI and Human Review", "Vaeroex outputs may be incomplete, inaccurate, or unsuitable for a specific situation. Human review is required before relying on recommendations or making decisions."],
+  ["Workspace Isolation", "Vaeroex uses workspace-scoped records, private workspace file paths, role-aware access checks, and Supabase Row Level Security policies to keep customer workspaces separated."],
+  ["Private File Storage", "Uploaded files are stored in a private workspace file bucket. File metadata and storage paths are scoped to the active workspace, and supported upload types are allowlisted."],
+  ["Business Memory", "Business Memory stores extracted evidence by workspace and retrieves relevant evidence for Vaeroex answers. Archived or deleted evidence is excluded from future retrieval."],
+  ["Evidence Retrieval", "Vaeroex is designed to retrieve a limited set of relevant evidence instead of sending every uploaded file into a single long conversation."],
+  ["Prompt Injection Safeguards", "Uploaded files, OCR text, spreadsheet rows, and Business Memory are treated as untrusted evidence, not instructions. Vaeroex is instructed not to follow commands embedded inside source material."],
+  ["Tool Execution Gateway", "Model-influenced create, update, delete, import, and generated-output actions must pass through a server-side allowlist, schema validation, role checks, and confirmation rules before records can change."],
+  ["Destructive Action Confirmation", "Destructive actions are user-driven and require confirmation. Bulk destructive actions are designed to require stronger confirmation before execution."],
+  ["Audit Logging", "Security-sensitive actions, blocked model-influenced actions, Stripe webhook processing, admin operations, and selected support events are designed to create audit records for review."],
+  ["Server-Side OpenAI Usage", "OpenAI API calls run server-side using Vaeroex production configuration. Customer browsers do not receive the OpenAI API key."],
   ["Sensitive Data Boundaries", "Vaeroex is not intended for unrestricted regulated sensitive data such as PHI/ePHI, Social Security numbers, payment card numbers, government IDs, or highly sensitive personal records unless appropriate controls exist."],
-  ["Demo Workspace Isolation", "Demo workspaces are sample environments and should remain separate from real customer data."],
-  ["Admin Security", "Internal admin tools are restricted to emails listed in Vaeroex admin configuration and should be used only for support and owner/admin operations."],
-  ["Transparency", "This Trust Center avoids unsupported claims. Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR certification, government certification, or absolute security."],
+  ["Current Compliance Status", "Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR certification, government certification, malware scanning certification, or absolute security."],
   ["Customer Responsibility", "Customers remain responsible for the information they upload, workspace roles they assign, legal obligations that apply to their data, and final decisions they make."],
   ["Security Contact", `Security or trust questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`]
 ] as const;
