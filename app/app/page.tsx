@@ -7,6 +7,7 @@ import {
 } from "@/app/app/demo/actions";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
+import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -14,6 +15,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { getBusinessHealthSnapshots, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
@@ -962,7 +964,13 @@ function intelligenceHealthTone(status: IntelligenceLayerResult["businessHealth"
   return "border-slate-300/25 bg-white/[0.05] text-slate-100";
 }
 
-function IntelligenceLayerSummary({ intelligence }: { intelligence: IntelligenceLayerResult }) {
+function IntelligenceLayerSummary({
+  intelligence,
+  businessHealthHistory
+}: {
+  intelligence: IntelligenceLayerResult;
+  businessHealthHistory: BusinessHealthTrendPoint[];
+}) {
   const briefingCards = [
     {
       label: "Top risk",
@@ -1034,6 +1042,7 @@ function IntelligenceLayerSummary({ intelligence }: { intelligence: Intelligence
               <dd className="font-semibold text-slate-100">{intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords} signals</dd>
             </div>
           </dl>
+          <BusinessHealthTrendChart points={businessHealthHistory} />
         </div>
 
         <div className="space-y-4">
@@ -1887,6 +1896,31 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisions,
     recommendationOutcomes
   });
+  const businessHealthMemorySignals = intelligenceLayer.memorySummary.sourceRecords + intelligenceLayer.memorySummary.kpiHistoryRecords;
+  await recordDailyBusinessHealthSnapshot(supabase, {
+    workspaceId,
+    score: intelligenceLayer.businessHealth.score,
+    status: intelligenceLayer.businessHealth.status,
+    trend: intelligenceLayer.businessHealth.trend,
+    dataConfidence: intelligenceLayer.dataQuality.confidence,
+    dataQualityScore: intelligenceLayer.dataQuality.score,
+    memorySignalCount: businessHealthMemorySignals,
+    sourceSummary: {
+      kpis: kpis.length,
+      reports: reports.length,
+      files: files.length,
+      issues: issues.length,
+      crm_leads: crmLeads.length,
+      business_memory_signals: businessHealthMemorySignals,
+      vaeroex_runs: vaeroexRuns.length
+    }
+  });
+  const businessHealthHistory: BusinessHealthTrendPoint[] = (await getBusinessHealthSnapshots(supabase, workspaceId)).map((snapshot) => ({
+    snapshotDate: snapshot.snapshot_date,
+    score: snapshot.score,
+    status: snapshot.status,
+    trend: snapshot.trend
+  }));
   const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
     kpis,
     tasks,
@@ -1948,7 +1982,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       {isExecutiveView ? (
         <>
-          <IntelligenceLayerSummary intelligence={intelligenceLayer} />
+          <IntelligenceLayerSummary intelligence={intelligenceLayer} businessHealthHistory={businessHealthHistory} />
           <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} compact />
 
           <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">

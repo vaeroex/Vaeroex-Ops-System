@@ -487,6 +487,38 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["business_memory_chunks"]["Insert"]>;
         Relationships: [];
       };
+      business_health_snapshots: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          snapshot_date: string;
+          score: number;
+          status: string;
+          trend: string;
+          data_confidence: string;
+          data_quality_score: number;
+          memory_signal_count: number;
+          source_summary: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          snapshot_date?: string;
+          score: number;
+          status: string;
+          trend: string;
+          data_confidence: string;
+          data_quality_score?: number;
+          memory_signal_count?: number;
+          source_summary?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["business_health_snapshots"]["Insert"]>;
+        Relationships: [];
+      };
       crm_leads: {
         Row: {
           id: string;
