@@ -6,8 +6,8 @@ import {
   importFileAction,
   uploadFileAction
 } from "@/app/app/files/actions";
-import { deleteGeneratedInsightAction } from "@/app/app/sources/actions";
 import { ArchivedFilesBulkActions } from "@/components/operations/ArchivedFilesBulkActions";
+import { GeneratedInsightsPanel, type GeneratedInsightItem } from "@/components/operations/GeneratedInsightsPanel";
 import { manageRecordAction } from "@/app/app/operations/record-management-actions";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
@@ -34,7 +34,6 @@ type SourcesPageProps = {
     q?: string;
     file?: string;
     view?: string;
-    insights?: string;
   }>;
 };
 
@@ -662,8 +661,19 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const linkedFile = params?.file ? files.find((file) => file.id === params.file) : null;
   const activeFilterLabel = linkedFile?.display_name || params?.status || (params?.view === "hidden" ? "Archived Files" : "") || params?.q || "";
   const isArchivedView = params?.view === "hidden";
-  const showAllInsights = params?.insights === "all";
-  const visibleInsights = showAllInsights ? runs : runs.slice(0, 5);
+  const insightItems: GeneratedInsightItem[] = runs.map((run) => {
+    const fileId = runFileId(run);
+    const file = files.find((item) => item.id === fileId);
+
+    return {
+      id: run.id,
+      title: file?.display_name || "File analysis",
+      summary: runSummary(run),
+      createdAt: formatDateTime(run.created_at),
+      confidence: runConfidence(run) || undefined,
+      evidenceHref: file ? (`/app/files?file=${file.id}#analysis-result` as Route) : undefined
+    };
+  });
   const metricGroups = [
     {
       title: "Business Evidence",
@@ -706,7 +716,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
         {
           label: "Insights Generated",
           value: runs.length,
-          href: "/app/sources?insights=all#source-insights" as Route,
+          href: "/app/sources#source-insights" as Route,
           detail: "Generated file insights available for leadership review.",
           emptyDetail: "No insights have been generated yet."
         },
@@ -875,75 +885,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <div id="source-insights" className="scroll-mt-24 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">Generated Insights</h2>
-              <p className="mt-1 text-sm text-slate-400">
-                File reviews that may inform future Vaeroex answers, briefings, and Business Memory.
-              </p>
-            </div>
-            {runs.length > 5 ? (
-              <LoadingLink
-                href={(showAllInsights ? "/app/sources#source-insights" : "/app/sources?insights=all#source-insights") as Route}
-                loadingLabel={showAllInsights ? "Collapsing insights..." : "Loading all generated insights..."}
-                className="inline-flex min-h-10 w-fit items-center rounded-md border border-cyan-300/30 bg-cyan-950/25 px-3 py-2 text-xs font-semibold text-cyan-50 hover:border-cyan-300/60 hover:bg-cyan-950/40"
-              >
-                {showAllInsights ? "Collapse insights" : "View all insights"}
-              </LoadingLink>
-            ) : null}
-          </div>
-          {runs.length ? (
-            <p className="mt-3 text-xs text-slate-400">
-              Showing {visibleInsights.length} of {runs.length} generated insight{runs.length === 1 ? "" : "s"}.
-            </p>
-          ) : null}
-          <div className="mt-4 space-y-3">
-            {visibleInsights.map((run) => {
-              const fileId = runFileId(run);
-              const file = files.find((item) => item.id === fileId);
-              const confidence = runConfidence(run);
-
-              return (
-                <article key={run.id} className="rounded-lg border border-white/10 bg-slate-950/45 p-3 transition hover:border-cyan-300/35 hover:bg-cyan-950/20">
-                  <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="break-words text-sm font-semibold text-white">{file?.display_name || "File analysis"}</h3>
-                        {confidence ? <StatusBadge value={`Confidence: ${confidence}`} /> : null}
-                      </div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-300">{runSummary(run)}</p>
-                      <p className="mt-2 text-xs text-slate-500">Created {formatDateTime(run.created_at)}</p>
-                    </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
-                      {file ? (
-                        <LoadingLink
-                          href={`/app/files?file=${file.id}#analysis-result` as Route}
-                          loadingLabel="Opening evidence..."
-                          className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-cyan-50 hover:border-cyan-300/40 hover:bg-cyan-950/30"
-                        >
-                          Open source evidence
-                        </LoadingLink>
-                      ) : null}
-                      <form action={deleteGeneratedInsightAction}>
-                        <input type="hidden" name="run_id" value={run.id} />
-                        <input type="hidden" name="return_path" value={showAllInsights ? "/app/sources?insights=all#source-insights" : "/app/sources#source-insights"} />
-                        <ConfirmSubmitButton
-                          message="Delete this generated insight? This removes it from Business Memory and future Vaeroex answers."
-                          pendingLabel="Updating Business Memory..."
-                          className="rounded-md border border-red-400/35 bg-red-950/35 px-3 py-2 text-xs font-semibold text-red-100 hover:border-red-300/60 hover:bg-red-950/55"
-                        >
-                          Delete insight
-                        </ConfirmSubmitButton>
-                      </form>
-                    </div>
-                  </div>
-                </article>
-              );
-            })}
-            {!runs.length ? <p className="text-sm leading-6 text-slate-400">No generated insights yet.</p> : null}
-          </div>
-        </div>
+        <GeneratedInsightsPanel insights={insightItems} />
 
         <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
           <h2 className="text-base font-semibold text-white">Imports</h2>
