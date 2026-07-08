@@ -63,7 +63,8 @@ const expectedDocs = [
   "docs/security/permission-matrix.md",
   "docs/security/customer-data-safety.md",
   "docs/security/final-security-report.md",
-  "docs/security/ai-tool-execution-safety.md"
+  "docs/security/ai-tool-execution-safety.md",
+  "docs/security/ai-app-mutation-gap-closure-report.md"
 ];
 
 for (const doc of expectedDocs) {
@@ -221,6 +222,7 @@ check(demoActions.includes("isVaeroexAdminUser"), "Demo reset/fresh actions must
 
 const supportActions = read("app/support/actions.ts");
 check(supportActions.includes(".from(\"workspace_members\")") && supportActions.includes(".eq(\"user_id\", user.id)"), "Support requests must validate workspace membership before storing workspace_id.");
+check(supportActions.includes("support.create_request") && supportActions.includes("logSecurityAuditEvent"), "Support/contact request creation must write security audit events.");
 
 const clientFiles = sourceFiles.filter((file) => read(file).startsWith("\"use client\"") || read(file).startsWith("'use client'"));
 const serverSecrets = [
@@ -258,6 +260,72 @@ check(toolGateway.includes("allowedRoles"), "AI tool execution gateway must enfo
 check(toolGateway.includes("requiresConfirmation"), "AI tool execution gateway must enforce confirmation metadata.");
 check(toolGateway.includes("security_audit_events"), "AI tool execution gateway must write audit events.");
 check(toolGateway.includes("delete_generated_insights"), "AI tool execution gateway must guard generated insight deletion.");
+for (const toolName of [
+  "stage_file_import",
+  "approve_kpi_import",
+  "approve_crm_import",
+  "approve_operational_metrics_import",
+  "create_report_from_file",
+  "attach_file_to_report",
+  "save_file_analysis_business_memory",
+  "update_kpi_record",
+  "update_kpi_settings",
+  "delete_kpi_record",
+  "manage_record",
+  "archive_record",
+  "delete_record",
+  "bulk_manage_records"
+]) {
+  check(toolGateway.includes(toolName), `AI tool execution gateway must register mutation path: ${toolName}.`);
+}
+check(toolGateway.includes("Bulk record deletion requires typed DELETE confirmation"), "Bulk destructive record actions must require typed DELETE confirmation.");
+check(toolGateway.includes("recentBlockedActionCount"), "Gateway must rate-limit repeated blocked or suspicious actions.");
+check(toolGateway.includes("unsafeInstructionPattern"), "Gateway must reject raw SQL and prompt-injection-like tool arguments.");
+
+const securityEventsMigration = read("supabase/migrations/202607080003_security_audit_service_events.sql");
+check(securityEventsMigration.includes("alter column workspace_id drop not null"), "Service/system security audit migration must allow workspace-pending events.");
+check(securityEventsMigration.includes("security_audit_events_created_idx"), "Security audit migration must add a created_at index for admin review.");
+
+const recordManagementActions = read("app/app/operations/record-management-actions.ts");
+check(recordManagementActions.includes("bulk_manage_records"), "Managed record bulk mutations must pass through the gateway.");
+check(recordManagementActions.includes("typed_confirmation"), "Managed record bulk delete UI/action must carry typed DELETE confirmation.");
+check(recordManagementActions.includes("delete_record") && recordManagementActions.includes("archive_record"), "Managed record destructive actions must use delete/archive gateway tools.");
+
+const managedRecordList = read("components/operations/ManagedRecordList.tsx");
+check(managedRecordList.includes("Type DELETE for bulk delete"), "Bulk delete form must require visible typed DELETE confirmation.");
+const archivedBulkActions = read("components/operations/ArchivedFilesBulkActions.tsx");
+check(archivedBulkActions.includes("Type DELETE") && archivedBulkActions.includes("typed_confirmation"), "Archived file bulk delete must require typed DELETE confirmation.");
+
+check(fileActions.includes("stage_file_import"), "File import staging must pass through the gateway.");
+check(fileActions.includes("approve_kpi_import"), "KPI import approval must pass through the gateway.");
+check(fileActions.includes("approve_crm_import"), "CRM import approval must pass through the gateway.");
+check(fileActions.includes("approve_operational_metrics_import"), "Operational metrics import approval must pass through the gateway.");
+check(fileActions.includes("create_report_from_file"), "Report-from-file generation must pass through the gateway.");
+check(fileActions.includes("attach_file_to_report"), "File-to-report attachment must pass through the gateway.");
+check(fileActions.includes("save_file_analysis_business_memory"), "Saving file analysis to Business Memory must pass through the gateway.");
+
+const operationsActions = read("app/app/operations/actions.ts");
+check(operationsActions.includes("update_kpi_record") && operationsActions.includes("delete_kpi_record"), "KPI edits/deletes must pass through the gateway.");
+check(operationsActions.includes("update_kpi_settings"), "KPI configuration edits must pass through the gateway.");
+check(operationsActions.includes("business_signal_delete"), "Business Memory/Signal deletion must be audited through the gateway.");
+
+const sourcesActions = read("app/app/sources/actions.ts");
+check(sourcesActions.includes("delete_generated_insights"), "Generated insight deletion must pass through the gateway.");
+check(sourcesActions.includes("business_memory_chunks") && sourcesActions.includes("deleted_at") && sourcesActions.includes("archived_at"), "Deleted generated insights must be excluded from Business Memory retrieval.");
+
+const stripeWebhook = read("app/api/stripe/webhook/route.ts");
+check(stripeWebhook.includes("logSecurityAuditEvent") && stripeWebhook.includes("stripe."), "Stripe webhook processing must write security audit events.");
+const demoAdminActions = read("app/app/demo/actions.ts");
+check(demoAdminActions.includes("admin.reset_demo_workspace") && demoAdminActions.includes("admin.create_fresh_demo_workspace"), "Admin demo reset/create actions must write security audit events.");
+const adminWorkspaceActions = read("app/app/admin/workspaces/actions.ts");
+check(adminWorkspaceActions.includes("admin.update_workspace_access"), "Admin workspace access updates must write security audit events.");
+const adminSubscriptionActions = read("app/app/admin/subscriptions/actions.ts");
+check(adminSubscriptionActions.includes("admin.update_subscription") && adminSubscriptionActions.includes("admin.create_manual_subscription"), "Admin subscription mutations must write security audit events.");
+const adminSupportActions = read("app/app/admin/support-requests/actions.ts");
+check(adminSupportActions.includes("admin.update_support_request") && adminSupportActions.includes("admin_support_request_action"), "Admin support request mutations must write security audit events.");
+
+const adminAuditPage = read("app/app/admin/audit-logs/page.tsx");
+check(adminAuditPage.includes("security_audit_events") && adminAuditPage.includes("Security events"), "Admin audit page must show security audit events.");
 
 const evidenceIndex = read("lib/ai/evidence-index.ts");
 check(evidenceIndex.toLowerCase().includes("untrusted data"), "Evidence retrieval policy must treat retrieved chunks as untrusted data.");
@@ -265,6 +333,7 @@ check(evidenceIndex.toLowerCase().includes("untrusted data"), "Evidence retrieva
 const outputValidation = read("lib/security/ai-output-validation.ts");
 check(outputValidation.includes("validateAiGeneratedOutput"), "AI output validation helper must expose validateAiGeneratedOutput.");
 check(outputValidation.includes("FORBIDDEN_OUTPUT_PATTERNS"), "AI output validation helper must define forbidden output patterns.");
+check(outputValidation.includes("SOURCE_REFERENCE_KEYS") && outputValidation.includes("UUID_PATTERN"), "AI output validation must validate source citation record IDs.");
 
 const rawDebugFiles = sourceFiles.filter((file) => {
   const content = read(file);

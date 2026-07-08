@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { ensureDemoWorkspacePopulated, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -190,6 +191,22 @@ export async function createFreshDemoWorkspaceAction() {
 
   const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
   const workspaceId = await createDemoWorkspaceShell(supabase, user, `Vaeroex Demo Workspace ${stamp}`);
+  await logSecurityAuditEvent({
+    supabase,
+    workspaceId,
+    userId: user.id,
+    actionName: "admin.create_fresh_demo_workspace",
+    operationType: "ADMIN",
+    targetTable: "workspaces",
+    targetRecordId: workspaceId,
+    initiatedBy: "user",
+    requiredConfirmation: true,
+    confirmationReceived: true,
+    allowed: true,
+    metadata: {
+      source: "demo_workspace_admin_action"
+    }
+  });
   await setActiveWorkspace(workspaceId);
   redirect(appMessage("Fresh demo workspace created with realistic January-to-current-month sample data."));
 }
@@ -213,6 +230,23 @@ export async function resetDemoWorkspaceAction() {
     redirect(appError("Supabase service role is required to reset demo workspace."));
   }
 
+  await logSecurityAuditEvent({
+    supabase: admin,
+    workspaceId: demoWorkspace.id,
+    userId: user.id,
+    actionName: "admin.reset_demo_workspace",
+    operationType: "ADMIN",
+    targetTable: "workspaces",
+    targetRecordId: demoWorkspace.id,
+    initiatedBy: "user",
+    requiredConfirmation: true,
+    confirmationReceived: true,
+    allowed: true,
+    metadata: {
+      source: "demo_workspace_admin_action",
+      deleted_demo_workspace_id: demoWorkspace.id
+    }
+  });
   const { error } = await admin.from("workspaces").delete().eq("id", demoWorkspace.id);
   throwIfError(error, "Reset demo workspace");
 

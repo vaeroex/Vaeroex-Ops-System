@@ -15,6 +15,7 @@ import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { cleanExtractedText, extractDocxText, extractPdfText } from "@/lib/imports/document-text";
 import { parseSpreadsheetRows, previewRows, type ImportCellValue, type ImportRow } from "@/lib/imports/spreadsheets";
 import { approvedKpiColor } from "@/lib/kpis/settings";
+import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -276,6 +277,10 @@ async function requireWorkspace() {
     redirect("/app/setup");
   }
 
+  if (!context.membership || context.membership.workspace_id !== context.activeWorkspace.id || context.membership.status !== "active") {
+    redirect("/app/setup?error=Workspace access is required.");
+  }
+
   await requireActiveSubscription({
     supabase,
     userId: user.id,
@@ -286,7 +291,8 @@ async function requireWorkspace() {
   return {
     supabase,
     user,
-    workspaceId: context.activeWorkspace.id
+    workspaceId: context.activeWorkspace.id,
+    membership: context.membership
   };
 }
 
@@ -1743,7 +1749,7 @@ export async function uploadFileAction(formData: FormData) {
 }
 
 export async function saveFileAnalysisToMemoryAction(formData: FormData) {
-  const { supabase, user, workspaceId } = await requireWorkspace();
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const runId = text(formData, "run_id");
   const summary = text(formData, "summary") || file.analysis_summary || "Saved file analysis.";
@@ -1788,6 +1794,34 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
     latest_output_json: latestRunOutput
   } satisfies JsonObject;
 
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "save_file_analysis_business_memory",
+        args: {
+          fileId: file.id,
+          ...(runId ? { runId } : {}),
+          summary
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: file.id,
+        metadata: {
+          source: "file_analysis_save",
+          confidence
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithFileError(error instanceof Error ? error.message : "Saving analysis was blocked by Vaeroex security policy.", file.id);
+  }
+
   const { error } = await supabase
     .from("file_uploads")
     .update({
@@ -1817,7 +1851,7 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
 }
 
 export async function importFileAction(formData: FormData) {
-  const { supabase, user, workspaceId } = await requireWorkspace();
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const importType = validImportType(text(formData, "import_type"));
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
 
@@ -1854,6 +1888,34 @@ export async function importFileAction(formData: FormData) {
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
     redirectWithFileError("No data rows were found. Make sure the first row contains column names.", file.id);
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "stage_file_import",
+        args: {
+          fileId: file.id,
+          importType,
+          rowsDetected: rows.length
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: file.id,
+        metadata: {
+          source: "file_import_extraction",
+          file_extension: file.file_extension
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithFileError(error instanceof Error ? error.message : "File import was blocked by Vaeroex security policy.", file.id);
   }
 
   const mapping = inferMapping(importType, rows);
@@ -1945,7 +2007,7 @@ function appendImportHistory(metadataJson: Json, entry: JsonObject) {
 }
 
 export async function saveExtractedImportAction(formData: FormData) {
-  const { supabase, user, workspaceId } = await requireWorkspace();
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const importId = text(formData, "import_id");
 
@@ -1991,6 +2053,41 @@ export async function saveExtractedImportAction(formData: FormData) {
 
   if (!stagedRows?.length) {
     redirectWithFileError("No extracted rows were found to save.", file.id);
+  }
+
+  const importToolByType: Record<ImportType, RegisteredToolName> = {
+    kpi: "approve_kpi_import",
+    crm: "approve_crm_import",
+    metrics: "approve_operational_metrics_import"
+  };
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: importToolByType[importType],
+        args: {
+          fileId: file.id,
+          importId,
+          importType,
+          rowsApproved: stagedRows.length
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: importId,
+        metadata: {
+          source: "file_import_approval",
+          file_id: file.id
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithFileError(error instanceof Error ? error.message : "Import approval was blocked by Vaeroex security policy.", file.id);
   }
 
   let importedRowCount = 0;
@@ -2169,11 +2266,39 @@ export async function saveExtractedImportAction(formData: FormData) {
 }
 
 export async function createReportFromFileAction(formData: FormData) {
-  const { supabase, user, workspaceId } = await requireWorkspace();
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const reportTitle = text(formData, "report_title") || `File Report - ${file.display_name}`;
   const reportType = text(formData, "report_type") || "File Review";
   const reportFocus = text(formData, "report_focus");
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "create_report_from_file",
+        args: {
+          fileId: file.id,
+          title: reportTitle,
+          reportType
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: file.id,
+        metadata: {
+          source: "file_report_generation",
+          report_focus_present: Boolean(reportFocus)
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithFileError(error instanceof Error ? error.message : "Report creation was blocked by Vaeroex security policy.", file.id);
+  }
 
   const { data: importRows, error: importError } = await supabase
     .from("file_imports")
@@ -2277,7 +2402,7 @@ export async function createReportFromFileAction(formData: FormData) {
 }
 
 export async function attachFileToReportAction(formData: FormData) {
-  const { supabase, workspaceId } = await requireWorkspace();
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const reportId = text(formData, "report_id");
 
@@ -2294,6 +2419,32 @@ export async function attachFileToReportAction(formData: FormData) {
 
   if (reportError || !report) {
     redirectWithFileError(reportError?.message || "Report not found for this workspace.", file.id);
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "attach_file_to_report",
+        args: {
+          fileId: file.id,
+          reportId: report.id
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: report.id,
+        metadata: {
+          source: "file_report_attachment"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithFileError(error instanceof Error ? error.message : "File attachment was blocked by Vaeroex security policy.", file.id);
   }
 
   const sourceData = (isRecord(report.source_data_json) ? report.source_data_json : {}) as JsonObject;

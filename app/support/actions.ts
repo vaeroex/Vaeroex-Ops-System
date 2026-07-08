@@ -2,8 +2,10 @@
 
 import { redirect } from "next/navigation";
 import type { Route } from "next";
+import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 function text(formData: FormData, key: string) {
@@ -89,20 +91,45 @@ export async function createSupportRequestAction(formData: FormData) {
     redirectBack(formData, "error", "Support requests are not configured yet.");
   }
 
-  const { error } = await client.from("support_requests").insert({
-    workspace_id: workspaceId,
-    user_id: userId,
-    name,
-    email,
-    issue_type: issueType,
-    message: fullMessage,
-    priority,
-    status: "open"
-  });
+  const { data: supportRequest, error } = await client
+    .from("support_requests")
+    .insert({
+      workspace_id: workspaceId,
+      user_id: userId,
+      name,
+      email,
+      issue_type: issueType,
+      message: fullMessage,
+      priority,
+      status: "open"
+    })
+    .select("id")
+    .maybeSingle();
 
   if (error) {
     redirectBack(formData, "error", error.message);
   }
+
+  await logSecurityAuditEvent({
+    supabase: client,
+    workspaceId,
+    userId,
+    actionName: "support.create_request",
+    operationType: "CREATE_RECORD",
+    targetTable: "support_requests",
+    targetRecordId: supportRequest?.id ?? null,
+    initiatedBy: "user",
+    requiredConfirmation: true,
+    confirmationReceived: true,
+    allowed: true,
+    metadata: {
+      source: "public_support_request",
+      issue_type: issueType,
+      priority,
+      authenticated: Boolean(userId),
+      workspace_scoped: Boolean(workspaceId)
+    } satisfies Json
+  });
 
   const successMessage =
     issueType === "Demo request" || issueType === "Product Demo"

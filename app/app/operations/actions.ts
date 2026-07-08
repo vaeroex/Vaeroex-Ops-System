@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
+import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -119,6 +120,10 @@ async function requireWorkspace(path: string) {
     redirect("/app/setup");
   }
 
+  if (!context.membership || context.membership.workspace_id !== context.activeWorkspace.id || context.membership.status !== "active") {
+    redirect("/app/setup?error=Workspace access is required.");
+  }
+
   await requireActiveSubscription({
     supabase,
     userId: user.id,
@@ -129,7 +134,8 @@ async function requireWorkspace(path: string) {
   return {
     supabase,
     user,
-    workspaceId: context.activeWorkspace.id
+    workspaceId: context.activeWorkspace.id,
+    membership: context.membership
   };
 }
 
@@ -395,11 +401,38 @@ export async function updateTaskStatusAction(formData: FormData) {
 
 export async function deleteBusinessSignalAction(formData: FormData) {
   const path = returnPath(formData, "/app/tasks");
-  const { supabase, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const recordId = text(formData, "record_id");
 
   if (!recordId) {
     redirectWithError(path, "Business Signal is required.");
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "delete_record",
+        args: {
+          recordId,
+          collection: "business_signals",
+          action: "delete"
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: recordId,
+        metadata: {
+          source: "business_signal_delete"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "Business Signal deletion was blocked by Vaeroex security policy.");
   }
 
   const { data, error } = await supabase
@@ -459,7 +492,7 @@ export async function createKpiAction(formData: FormData) {
 
 export async function updateKpiAction(formData: FormData) {
   const path = "/app/kpis";
-  const { supabase, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const kpiId = text(formData, "kpi_id");
   const name = text(formData, "name");
   const category = text(formData, "category");
@@ -473,6 +506,32 @@ export async function updateKpiAction(formData: FormData) {
   validateLength(path, "Owner", owner, 120);
   validateLength(path, "Notes", notes, 1500);
   validateLength(path, "Source", source, 160);
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "update_kpi_record",
+        args: {
+          kpiId,
+          fieldSet: ["name", "category", "owner", "notes", "source"]
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: kpiId,
+        metadata: {
+          source: "kpi_record_edit"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "KPI update was blocked by Vaeroex security policy.");
+  }
 
   const { data, error } = await supabase
     .from("kpis")
@@ -503,7 +562,7 @@ export async function updateKpiAction(formData: FormData) {
 
 export async function updateKpiValueAction(formData: FormData) {
   const path = returnPath(formData, "/app/kpis");
-  const { supabase, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const kpiId = text(formData, "kpi_id");
   const actualValue = optionalNumber(path, "Actual value", text(formData, "actual_value"));
   const target = optionalNumber(path, "Target", text(formData, "target"));
@@ -514,6 +573,32 @@ export async function updateKpiValueAction(formData: FormData) {
   requireValue(path, "KPI", kpiId, 80);
   validateLength(path, "Notes", notes, 1500);
   validateLength(path, "Source", source, 160);
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "update_kpi_record",
+        args: {
+          kpiId,
+          fieldSet: ["actual_value", "target", "metric_date", "notes", "source"]
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: kpiId,
+        metadata: {
+          source: "kpi_value_edit"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "KPI value update was blocked by Vaeroex security policy.");
+  }
 
   const { data, error } = await supabase
     .from("kpis")
@@ -546,7 +631,7 @@ export async function updateKpiValueAction(formData: FormData) {
 
 export async function updateKpiSettingAction(formData: FormData) {
   const path = returnPath(formData, "/app/kpis/settings");
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const kpiName = text(formData, "kpi_name");
   const category = text(formData, "category");
   const definition = text(formData, "definition");
@@ -580,6 +665,31 @@ export async function updateKpiSettingAction(formData: FormData) {
 
   if (!["line", "bar", "mixed"].includes(preferredChartType)) {
     redirectWithError(path, "Choose line, bar, or mixed as the chart type.");
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "update_kpi_settings",
+        args: {
+          kpiName
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: null,
+        metadata: {
+          source: "kpi_settings_update"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "KPI settings update was blocked by Vaeroex security policy.");
   }
 
   const { error } = await supabase.from("kpi_settings").upsert(
@@ -629,10 +739,35 @@ export async function updateKpiSettingAction(formData: FormData) {
 
 export async function deleteKpiAction(formData: FormData) {
   const path = "/app/kpis";
-  const { supabase, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const kpiId = text(formData, "kpi_id");
 
   requireValue(path, "KPI", kpiId, 80);
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "delete_kpi_record",
+        args: {
+          recordId: kpiId
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: kpiId,
+        metadata: {
+          source: "kpi_record_delete"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "KPI deletion was blocked by Vaeroex security policy.");
+  }
 
   const { data, error } = await supabase
     .from("kpis")

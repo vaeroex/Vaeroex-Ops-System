@@ -522,7 +522,7 @@ export type Database = {
       security_audit_events: {
         Row: {
           id: string;
-          workspace_id: string;
+          workspace_id: string | null;
           user_id: string | null;
           action_name: string;
           operation_type: string;
@@ -540,7 +540,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          workspace_id: string;
+          workspace_id?: string | null;
           user_id?: string | null;
           action_name: string;
           operation_type: string;
