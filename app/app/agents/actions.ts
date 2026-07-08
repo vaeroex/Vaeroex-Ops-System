@@ -13,6 +13,7 @@ import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
+import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type JsonRecord = Record<string, unknown>;
@@ -88,6 +89,10 @@ async function requireWorkspace() {
     redirect("/app/setup");
   }
 
+  if (!context.membership || context.membership.workspace_id !== context.activeWorkspace.id || context.membership.status !== "active") {
+    redirect("/app/setup?error=Workspace access is required.");
+  }
+
   await requireActiveSubscription({
     supabase,
     userId: user.id,
@@ -98,7 +103,8 @@ async function requireWorkspace() {
   return {
     supabase,
     user,
-    workspaceId: context.activeWorkspace.id
+    workspaceId: context.activeWorkspace.id,
+    membership: context.membership
   };
 }
 
@@ -243,7 +249,7 @@ export async function runVaeroexAction(formData: FormData) {
 }
 
 async function getRun(runId: string) {
-  const { supabase, user, workspaceId } = await requireWorkspace();
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const { data: run, error } = await supabase
     .from("ai_agent_runs")
     .select("*")
@@ -255,7 +261,7 @@ async function getRun(runId: string) {
     redirectWithError(error?.message || "Vaeroex result not found.");
   }
 
-  return { supabase, user, workspaceId, run, output: asRecord(run.output_json) };
+  return { supabase, user, workspaceId, membership, run, output: asRecord(run.output_json) };
 }
 
 function taskDrafts(output: JsonRecord) {
@@ -412,7 +418,33 @@ export async function saveVaeroexOutputAction(formData: FormData) {
     redirectWithError("Choose a Vaeroex result and save target.");
   }
 
-  const { supabase, user, workspaceId, run, output } = await getRun(runId);
+  const { supabase, user, workspaceId, membership, run, output } = await getRun(runId);
+  const toolByTarget: Record<VaeroexSaveTarget, RegisteredToolName> = {
+    tasks: "save_vaeroex_output_tasks",
+    form: "save_vaeroex_output_form",
+    checklist: "save_vaeroex_output_checklist",
+    sop: "save_vaeroex_output_sop",
+    report: "save_vaeroex_output_report"
+  };
+  await requireToolExecution<{ runId: string }>(
+    {
+      supabase,
+      workspaceId,
+      userId: user.id,
+      userRole: membership.role
+    },
+    {
+      toolName: toolByTarget[target],
+      args: { runId },
+      initiatedBy: "user",
+      confirmationReceived: true,
+      targetRecordId: run.id,
+      metadata: {
+        save_target: target,
+        agent_type: run.agent_type
+      } satisfies Json
+    }
+  );
   const createdIds: string[] = [];
 
   if (target === "tasks") {

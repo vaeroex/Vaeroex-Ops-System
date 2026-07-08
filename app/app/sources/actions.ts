@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
+import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
@@ -84,12 +85,42 @@ function withoutRunMemory(metadata: Json, runIds: string[], removedAt: string): 
   return next as Json;
 }
 
-async function deleteGeneratedInsights(runIds: string[]) {
-  const { supabase, workspaceId } = await requireWorkspaceAccess();
-  const uniqueRunIds = Array.from(new Set(runIds.map((id) => id.trim()).filter(Boolean))).slice(0, 200);
+async function deleteGeneratedInsights(runIds: string[], typedConfirmation?: string) {
+  const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
+  const uniqueRunIds = Array.from(new Set(runIds.map((id) => id.trim()).filter(Boolean))).slice(0, 25);
 
   if (!uniqueRunIds.length) {
     return { ok: false, deletedCount: 0, error: "Select at least one generated insight." };
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "delete_generated_insights",
+        args: {
+          runIds: uniqueRunIds,
+          typedConfirmation: typedConfirmation === "DELETE" ? "DELETE" : undefined
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        metadata: {
+          requested_count: uniqueRunIds.length,
+          bulk: uniqueRunIds.length > 1
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    return {
+      ok: false,
+      deletedCount: 0,
+      error: error instanceof Error ? error.message : "Generated insight deletion was blocked by Vaeroex security policy."
+    };
   }
 
   const { data: run, error: runError } = await supabase
@@ -181,8 +212,8 @@ async function deleteGeneratedInsights(runIds: string[]) {
   return { ok: true, deletedCount: runs.length, error: "" };
 }
 
-export async function deleteGeneratedInsightsAction(runIds: string[]) {
-  return deleteGeneratedInsights(runIds);
+export async function deleteGeneratedInsightsAction(runIds: string[], typedConfirmation?: string) {
+  return deleteGeneratedInsights(runIds, typedConfirmation);
 }
 
 export async function deleteGeneratedInsightAction(formData: FormData) {

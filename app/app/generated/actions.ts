@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
+import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
 function text(formData: FormData, key: string) {
@@ -29,7 +30,7 @@ function parseJson(value: string): Json {
 }
 
 export async function saveGeneratedOutputToBriefingsAction(formData: FormData) {
-  const { supabase, user, workspaceId } = await requireWorkspaceAccess();
+  const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
   const title = text(formData, "title") || "Generated Vaeroex output";
   const outputType = text(formData, "output_type") || "Generated Output";
   const bodyMarkdown = text(formData, "body_markdown");
@@ -37,6 +38,33 @@ export async function saveGeneratedOutputToBriefingsAction(formData: FormData) {
 
   if (!bodyMarkdown) {
     redirectWithError("Vaeroex could not save an empty generated output.");
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "save_generated_output_briefing",
+        args: {
+          title,
+          outputType,
+          bodyMarkdown,
+          sourceData
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        metadata: {
+          source: "generated_output"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(error instanceof Error ? error.message : "Generated output was blocked by Vaeroex security policy.");
   }
 
   const { error } = await supabase.from("reports").insert({

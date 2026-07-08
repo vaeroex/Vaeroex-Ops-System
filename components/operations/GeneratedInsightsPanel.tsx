@@ -97,12 +97,22 @@ export function GeneratedInsightsPanel({ insights }: { insights: GeneratedInsigh
       return;
     }
 
+    const typedConfirmation =
+      uniqueIds.length > 1
+        ? window.prompt(`Type DELETE to confirm deleting ${uniqueIds.length} generated insights.`)?.trim()
+        : undefined;
+
+    if (uniqueIds.length > 1 && typedConfirmation !== "DELETE") {
+      setNotice({ type: "error", message: "Bulk deletion cancelled. Type DELETE exactly to confirm." });
+      return;
+    }
+
     setNotice(null);
     setPending(true);
     setPendingText(`Deleting ${uniqueIds.length} generated insight${uniqueIds.length === 1 ? "" : "s"}...`);
 
     try {
-      const result = await deleteGeneratedInsightsAction(uniqueIds);
+      const result = await deleteGeneratedInsightsAction(uniqueIds, typedConfirmation);
 
       if (!result.ok) {
         throw new Error(result.error || "Generated insights could not be deleted.");

@@ -62,7 +62,8 @@ const expectedDocs = [
   "docs/security/manual-security-test-plan.md",
   "docs/security/permission-matrix.md",
   "docs/security/customer-data-safety.md",
-  "docs/security/final-security-report.md"
+  "docs/security/final-security-report.md",
+  "docs/security/ai-tool-execution-safety.md"
 ];
 
 for (const doc of expectedDocs) {
@@ -77,7 +78,9 @@ const requiredSecurityHelpers = [
   "lib/security/require-active-subscription.ts",
   "lib/security/assert-workspace-scope.ts",
   "lib/security/get-current-workspace.ts",
-  "lib/security/types.ts"
+  "lib/security/types.ts",
+  "lib/security/tool-execution-gateway.ts",
+  "lib/security/ai-output-validation.ts"
 ];
 
 for (const helper of requiredSecurityHelpers) {
@@ -121,7 +124,9 @@ const tenantTables = [
   "customer_subscriptions",
   "subscription_events",
   "ai_usage",
-  "manual_activation_requests"
+  "manual_activation_requests",
+  "business_health_snapshots",
+  "security_audit_events"
 ];
 
 function migrationMentionsTable(table: string) {
@@ -242,6 +247,24 @@ check(adminClient.includes("SUPABASE_SERVICE_ROLE_KEY"), "Service-role Supabase 
 const openAiClient = read("lib/ai/vaeroex-client.ts");
 check(openAiClient.includes("server-only"), "Vaeroex OpenAI runtime client must be marked server-only.");
 check(openAiClient.includes("process.env.OPENAI_API_KEY"), "Vaeroex OpenAI runtime client must read OPENAI_API_KEY server-side.");
+check(openAiClient.includes("validateAiGeneratedOutput"), "Vaeroex OpenAI runtime client must validate model output before saving.");
+check(openAiClient.includes("untrusted_evidence_boundary"), "Vaeroex OpenAI runtime client must label retrieved evidence as untrusted.");
+
+const toolGateway = read("lib/security/tool-execution-gateway.ts");
+check(toolGateway.includes("server-only"), "AI tool execution gateway must be server-only.");
+check(toolGateway.includes("TOOL_EXECUTION_REGISTRY"), "AI tool execution gateway must use an explicit allowlist registry.");
+check(toolGateway.includes("z.object"), "AI tool execution gateway must validate tool arguments with schemas.");
+check(toolGateway.includes("allowedRoles"), "AI tool execution gateway must enforce workspace role permissions.");
+check(toolGateway.includes("requiresConfirmation"), "AI tool execution gateway must enforce confirmation metadata.");
+check(toolGateway.includes("security_audit_events"), "AI tool execution gateway must write audit events.");
+check(toolGateway.includes("delete_generated_insights"), "AI tool execution gateway must guard generated insight deletion.");
+
+const evidenceIndex = read("lib/ai/evidence-index.ts");
+check(evidenceIndex.toLowerCase().includes("untrusted data"), "Evidence retrieval policy must treat retrieved chunks as untrusted data.");
+
+const outputValidation = read("lib/security/ai-output-validation.ts");
+check(outputValidation.includes("validateAiGeneratedOutput"), "AI output validation helper must expose validateAiGeneratedOutput.");
+check(outputValidation.includes("FORBIDDEN_OUTPUT_PATTERNS"), "AI output validation helper must define forbidden output patterns.");
 
 const rawDebugFiles = sourceFiles.filter((file) => {
   const content = read(file);
