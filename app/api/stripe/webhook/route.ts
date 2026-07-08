@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { sendVaeroexWelcomeEmail, type WelcomeEmailResult } from "@/lib/email/welcome";
+import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Json } from "@/lib/supabase/types";
 import {
@@ -36,6 +37,7 @@ type StripeSyncResult = {
   stripeSubscriptionId: string | null;
   status: ReturnType<typeof mapStripeStatus>;
   subscriptionRecordId: string | null;
+  workspaceId: string | null;
 };
 
 function asJson(value: unknown): Json {
@@ -196,7 +198,8 @@ async function syncStripeSubscription({
     customerName,
     stripeSubscriptionId,
     status,
-    subscriptionRecordId: existing?.id ?? null
+    subscriptionRecordId: existing?.id ?? null,
+    workspaceId: existing?.workspace_id ?? null
   };
 }
 
@@ -255,7 +258,8 @@ async function processStripeEvent(admin: AdminClient, event: StripeEvent) {
         customerName: null,
         stripeSubscriptionId: null,
         status: "manual_review" as const,
-        subscriptionRecordId: null
+        subscriptionRecordId: null,
+        workspaceId: null
       };
   }
 }
@@ -430,6 +434,26 @@ export async function POST(request: Request) {
     const result = await processStripeEvent(admin, event);
     const welcomeEmail = await sendWelcomeEmailOnce(admin, event, result);
 
+    await logSecurityAuditEvent({
+      supabase: admin,
+      workspaceId: result.workspaceId,
+      userId: null,
+      actionName: `stripe.${event.type}`,
+      operationType: "BILLING",
+      targetTable: "customer_subscriptions",
+      targetRecordId: result.subscriptionRecordId,
+      initiatedBy: "system",
+      allowed: true,
+      requestId: event.id,
+      metadata: {
+        source: "stripe_webhook",
+        stripe_subscription_id: result.stripeSubscriptionId,
+        customer_email: result.customerEmail,
+        status: result.status,
+        welcome_email: welcomeEmail
+      } satisfies Json
+    });
+
     if (eventRow) {
       await admin
         .from("subscription_events")
@@ -451,6 +475,24 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Stripe subscription event processing failed.";
+
+    await logSecurityAuditEvent({
+      supabase: admin,
+      workspaceId: null,
+      userId: null,
+      actionName: `stripe.${event.type}`,
+      operationType: "BILLING",
+      targetTable: "subscription_events",
+      targetRecordId: eventRow?.id ?? null,
+      initiatedBy: "system",
+      allowed: false,
+      reasonBlocked: message,
+      requestId: event.id,
+      metadata: {
+        source: "stripe_webhook",
+        stripe_event_type: event.type
+      } satisfies Json
+    });
 
     if (eventRow) {
       await admin

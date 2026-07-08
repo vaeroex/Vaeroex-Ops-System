@@ -816,7 +816,7 @@ export function ManagedRecordList({
       </div>
 
       <div className="bulk-action-bar hidden rounded-lg border border-vaeroex-accent/35 bg-vaeroex-soft p-3">
-        <form id={bulkFormId} action={bulkManageRecordsAction} className="grid w-full gap-3 md:grid-cols-[auto_1fr_220px_auto] md:items-center">
+        <form id={bulkFormId} action={bulkManageRecordsAction} className="grid w-full gap-3 md:grid-cols-[auto_1fr_220px_220px_auto] md:items-center">
           <input type="hidden" name="collection" value={collection} />
           <input type="hidden" name="return_path" value={returnPath} />
           <p className="text-sm font-semibold text-vaeroex-blue">Selected records</p>
@@ -833,6 +833,11 @@ export function ManagedRecordList({
               <option key={folder.id} value={folder.id}>{folder.name}</option>
             ))}
           </select>
+          <input
+            name="typed_confirmation"
+            placeholder="Type DELETE for bulk delete"
+            className="min-h-11 rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-500"
+          />
           <ConfirmSubmitButton message="Apply this action to the selected records?" pendingLabel="Applying...">Apply</ConfirmSubmitButton>
         </form>
       </div>

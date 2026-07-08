@@ -163,17 +163,15 @@ Policy:
 
 ## Current Gaps
 
-This pass hardened the most direct AI-derived save/delete paths, but not every application mutation now flows through the gateway.
+The next security phase expands gateway coverage across the highest-risk user-driven mutations and adds admin visibility into security events.
 
-Known follow-up work:
+Remaining follow-up work:
 
-- Expand gateway coverage to file import approval, KPI import approval, and file report creation.
-- Add automated integration tests for the gateway.
-- Add admin UI for `security_audit_events`.
-- Add service-role mutation audit events for admin/cron/webhook paths.
-- Add source-reference existence validation for every model citation.
-- Add per-minute rate limiting for repeated blocked AI action attempts.
+- Add browser/API integration tests that exercise the full UI confirmation flow.
+- Add source-reference existence validation against workspace records for every model citation.
 - Add structured low-evidence logging when Vaeroex answers "not enough evidence."
+- Add IP/device-level rate limiting at Vercel or Cloudflare for repeated suspicious attempts.
+- Continue expanding audit events to any new service-role cron or admin path as it is added.
 
 ## Manual Security Test Fixtures
 
@@ -243,4 +241,3 @@ Vaeroex is also being hardened around prompt injection, excessive agency, and ev
 - `lib/supabase/admin.ts`
 - `supabase/migrations/202607060001_business_memory_evidence_index.sql`
 - `supabase/migrations/202607080002_ai_tool_execution_security.sql`
-

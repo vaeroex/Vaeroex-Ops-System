@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
+import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -328,6 +329,10 @@ async function requireWorkspace(path: Route | string) {
     redirect("/app/setup");
   }
 
+  if (!context.membership || context.membership.workspace_id !== context.activeWorkspace.id || context.membership.status !== "active") {
+    redirect("/app/setup?error=Workspace access is required.");
+  }
+
   await requireActiveSubscription({
     supabase,
     userId: user.id,
@@ -338,7 +343,8 @@ async function requireWorkspace(path: Route | string) {
   return {
     supabase,
     user,
-    workspaceId: context.activeWorkspace.id
+    workspaceId: context.activeWorkspace.id,
+    membership: context.membership
   };
 }
 
@@ -497,12 +503,41 @@ export async function updateManagedRecordAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const recordId = text(formData, "record_id");
   const update: Record<string, unknown> = {};
 
   for (const field of config.fields) {
     update[field.name] = parsedFieldValue(field, formData, path);
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "manage_record",
+        args: {
+          recordId,
+          collection,
+          action: "edit"
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: recordId,
+        metadata: {
+          source: "managed_record_edit",
+          table: config.table,
+          fields_changed: Object.keys(update)
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "Record update was blocked by Vaeroex security policy.");
   }
 
   const query = dbClient(supabase).from(config.table).update(update) as {
@@ -550,7 +585,7 @@ export async function manageRecordAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const recordId = text(formData, "record_id");
   const action = text(formData, "record_action");
   const now = new Date().toISOString();
@@ -560,6 +595,34 @@ export async function manageRecordAction(formData: FormData) {
   }
 
   if (action === "duplicate") {
+    try {
+      await requireToolExecution(
+        {
+          supabase,
+          workspaceId,
+          userId: user.id,
+          userRole: membership.role
+        },
+        {
+          toolName: "manage_record",
+          args: {
+            recordId,
+            collection,
+            action: "duplicate"
+          },
+          initiatedBy: "user",
+          confirmationReceived: true,
+          targetRecordId: recordId,
+          metadata: {
+            source: "managed_record_duplicate",
+            table: config.table
+          } satisfies Json
+        }
+      );
+    } catch (error) {
+      redirectWithError(path, error instanceof Error ? error.message : "Record duplication was blocked by Vaeroex security policy.");
+    }
+
     const selectQuery = dbClient(supabase).from(config.table).select("*") as {
       eq: (column: string, value: string) => unknown;
     };
@@ -610,6 +673,36 @@ export async function manageRecordAction(formData: FormData) {
     redirectWithError(path, "Record action is not supported.");
   }
 
+  const toolName: RegisteredToolName = action === "delete" ? "delete_record" : action === "archive" ? "archive_record" : "manage_record";
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName,
+        args: {
+          recordId,
+          collection,
+          action
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: recordId,
+        metadata: {
+          source: "managed_record_action",
+          table: config.table
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "Record action was blocked by Vaeroex security policy.");
+  }
+
   const updateQuery = dbClient(supabase).from(config.table).update(update) as {
     eq: (column: string, value: string) => unknown;
   };
@@ -634,9 +727,10 @@ export async function bulkManageRecordsAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
-  const { supabase, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const ids = formData.getAll("record_id").filter((value): value is string => typeof value === "string" && Boolean(value));
   const action = text(formData, "bulk_action");
+  const typedConfirmation = text(formData, "typed_confirmation");
   const now = new Date().toISOString();
 
   if (!ids.length) {
@@ -656,6 +750,35 @@ export async function bulkManageRecordsAction(formData: FormData) {
     update.folder_id = await validateFolder(supabase, workspaceId, collection, text(formData, "target_folder_id"), path);
   } else {
     redirectWithError(path, "Choose a bulk action.");
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "bulk_manage_records",
+        args: {
+          recordIds: ids,
+          collection,
+          action,
+          typedConfirmation: typedConfirmation === "DELETE" ? "DELETE" : undefined
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        metadata: {
+          source: "managed_record_bulk_action",
+          table: config.table,
+          requested_count: ids.length
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "Bulk action was blocked by Vaeroex security policy.");
   }
 
   const query = dbClient(supabase).from(config.table).update(update) as {

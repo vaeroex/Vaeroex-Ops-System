@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
+import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
 function text(formData: FormData, key: string) {
@@ -70,12 +71,32 @@ export async function createManualSubscriptionAction(formData: FormData) {
       .eq("id", effectiveWorkspaceId);
   }
 
+  await logSecurityAuditEvent({
+    supabase: admin,
+    workspaceId: effectiveWorkspaceId,
+    userId: user.id,
+    actionName: existing ? "admin.update_manual_subscription" : "admin.create_manual_subscription",
+    operationType: "BILLING",
+    targetTable: "customer_subscriptions",
+    targetRecordId: existing?.id ?? null,
+    initiatedBy: "user",
+    requiredConfirmation: true,
+    confirmationReceived: true,
+    allowed: true,
+    metadata: {
+      source: "admin_subscription_action",
+      customer_email: email,
+      status,
+      plan_slug: planSlug
+    } satisfies Json
+  });
+
   revalidatePath("/app/admin/subscriptions");
   redirect("/app/admin/subscriptions?message=Manual activation saved.");
 }
 
 export async function updateSubscriptionAction(formData: FormData) {
-  const { admin } = await requireSubscriptionAdmin();
+  const { admin, user } = await requireSubscriptionAdmin();
   const id = text(formData, "subscription_id");
   const status = text(formData, "status") || "manual_review";
   const planSlug = normalizePlanSlug(text(formData, "plan_slug")) || VAEROEX_PLAN_SLUG;
@@ -113,6 +134,25 @@ export async function updateSubscriptionAction(formData: FormData) {
       })
       .eq("id", existing.workspace_id);
   }
+
+  await logSecurityAuditEvent({
+    supabase: admin,
+    workspaceId: existing?.workspace_id ?? null,
+    userId: user.id,
+    actionName: "admin.update_subscription",
+    operationType: "BILLING",
+    targetTable: "customer_subscriptions",
+    targetRecordId: id,
+    initiatedBy: "user",
+    requiredConfirmation: true,
+    confirmationReceived: true,
+    allowed: true,
+    metadata: {
+      source: "admin_subscription_action",
+      status,
+      plan_slug: planSlug
+    } satisfies Json
+  });
 
   revalidatePath("/app/admin/subscriptions");
   redirect("/app/admin/subscriptions?message=Subscription updated.");

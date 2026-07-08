@@ -21,6 +21,7 @@ export function ArchivedFilesBulkActions({
   const [feedback, setFeedback] = useState("");
   const [showDelayedFeedback, setShowDelayedFeedback] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [typedConfirmation, setTypedConfirmation] = useState("");
 
   const updateSelectedCount = () => {
     const checked = formRef.current?.querySelectorAll<HTMLInputElement>('input[name="record_id"]:checked').length || 0;
@@ -73,6 +74,24 @@ export function ArchivedFilesBulkActions({
         return;
       }
 
+      if (selectedCount > 1) {
+        const typed = window.prompt(`Type DELETE to confirm deleting ${plural(selectedCount, "selected archived file")}.`)?.trim() || "";
+
+        if (typed !== "DELETE") {
+          event.preventDefault();
+          setFeedback("Bulk deletion cancelled. Type DELETE exactly to confirm.");
+          setShowDelayedFeedback(true);
+          return;
+        }
+
+        setTypedConfirmation("DELETE");
+        const hiddenInput = formRef.current?.querySelector<HTMLInputElement>('input[name="typed_confirmation"]');
+
+        if (hiddenInput) {
+          hiddenInput.value = "DELETE";
+        }
+      }
+
       setFeedback(`Deleting ${plural(selectedCount, "selected file")}...`);
     } else if (action === "restore") {
       setFeedback(`Restoring ${plural(selectedCount, "selected file")}...`);
@@ -92,6 +111,7 @@ export function ArchivedFilesBulkActions({
     <form ref={formRef} action={bulkManageRecordsAction} onSubmit={handleSubmit} onChange={updateSelectedCount} className="space-y-3">
       <input type="hidden" name="collection" value="files" />
       <input type="hidden" name="return_path" value={returnPath} />
+      <input type="hidden" name="typed_confirmation" value={typedConfirmation} />
       <div className="flex flex-col gap-3 rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-3 text-sm text-cyan-50 md:flex-row md:items-center md:justify-between">
         <label className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold">
           <input
