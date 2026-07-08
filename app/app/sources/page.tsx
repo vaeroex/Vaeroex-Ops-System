@@ -9,7 +9,6 @@ import {
 import { manageRecordAction } from "@/app/app/operations/record-management-actions";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
-import { CompactSummaryChips } from "@/components/operations/CompactSummaryChips";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -53,7 +52,7 @@ const fileStatusTabs = [
   { label: "Pending Review", href: "/app/sources?status=Pending%20Review" },
   { label: "Analyzed", href: "/app/sources?status=Analyzed" },
   { label: "Imported Data", href: "/app/sources?status=Imported" },
-  { label: "Archived / Hidden", href: "/app/sources?view=hidden" }
+  { label: "Archived Files", href: "/app/sources?view=hidden" }
 ] as const;
 
 function cleanNoticeMessage(message: string | null | undefined, fallback: string) {
@@ -219,13 +218,46 @@ function filteredFiles({
     });
 }
 
-function SourceCountCard({ label, value, href, detail }: { label: string; value: number; href: Route; detail: string }) {
+type SourceMetric = {
+  label: string;
+  value: number;
+  href: Route;
+  detail: string;
+  emptyDetail: string;
+};
+
+function SourceMetricCard({ label, value, href, detail, emptyDetail }: SourceMetric) {
+  const explanation = value ? detail : emptyDetail;
+
   return (
-    <Link href={href} className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/40 hover:bg-blue-950/25">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</p>
+    <Link
+      href={href}
+      className="group block rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/40 hover:bg-blue-950/25 focus:outline-none focus:ring-2 focus:ring-vaeroex-accent/50"
+      aria-label={`${label}: ${value}. ${explanation}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-white">{label}</p>
+        <span className="text-xs font-semibold text-vaeroex-accent opacity-80 transition group-hover:opacity-100">Open</span>
+      </div>
       <p className="mt-3 text-3xl font-semibold text-white">{value}</p>
-      <p className="mt-2 text-xs leading-5 text-slate-400">{detail}</p>
+      <p className={`mt-2 text-xs leading-5 ${value ? "text-slate-300" : "text-slate-400"}`}>{explanation}</p>
     </Link>
+  );
+}
+
+function SourceMetricGroup({ title, description, metrics }: { title: string; description: string; metrics: SourceMetric[] }) {
+  return (
+    <section className="rounded-lg border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-panel">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">{title}</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {metrics.map((metric) => (
+          <SourceMetricCard key={metric.label} {...metric} />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -305,7 +337,7 @@ function SourceFileActions({
   linkedRuns: VaeroexRunRow[];
 }) {
   const referenceWarning = linkedKpis.length || linkedRuns.length
-    ? ` This file is linked to ${linkedKpis.length} KPI record${linkedKpis.length === 1 ? "" : "s"} and ${linkedRuns.length} intelligence output${linkedRuns.length === 1 ? "" : "s"}.`
+    ? ` This file is linked to ${linkedKpis.length} KPI record${linkedKpis.length === 1 ? "" : "s"} and ${linkedRuns.length} generated insight${linkedRuns.length === 1 ? "" : "s"}.`
     : "";
 
   return (
@@ -428,7 +460,7 @@ function SourceFileDetails({
           )}
         </section>
         <section className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Intelligence outputs using this file</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Insights using this file</p>
           {linkedRuns.length || linkedReports.length ? (
             <div className="mt-2 space-y-2">
               {linkedRuns.slice(0, 4).map((run) => (
@@ -441,7 +473,7 @@ function SourceFileDetails({
               ))}
             </div>
           ) : (
-            <p className="mt-2 text-sm text-slate-400">No saved intelligence output references this file yet.</p>
+            <p className="mt-2 text-sm text-slate-400">No saved insight references this file yet.</p>
           )}
         </section>
       </div>
@@ -515,7 +547,7 @@ function SourceFileRow({
         <div>
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Used by</p>
           <p className="mt-1 text-sm font-semibold text-slate-200">
-            {linkedKpis.length} KPI{linkedKpis.length === 1 ? "" : "s"} · {linkedRuns.length} intelligence output{linkedRuns.length === 1 ? "" : "s"}
+            {linkedKpis.length} KPI{linkedKpis.length === 1 ? "" : "s"} · {linkedRuns.length} generated insight{linkedRuns.length === 1 ? "" : "s"}
           </p>
         </div>
       </div>
@@ -581,10 +613,64 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const analyzedFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Analyzed");
   const importReadyFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Import Ready");
   const pendingReviewFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Pending Review");
-  const importedFiles = files.filter((file) => file.import_status === "imported");
-  const importedRows = files.reduce((sum, file) => sum + file.imported_rows, 0);
   const linkedFile = params?.file ? files.find((file) => file.id === params.file) : null;
-  const activeFilterLabel = linkedFile?.display_name || params?.status || (params?.view === "hidden" ? "Archived / Hidden" : "") || params?.q || "";
+  const activeFilterLabel = linkedFile?.display_name || params?.status || (params?.view === "hidden" ? "Archived Files" : "") || params?.q || "";
+  const metricGroups = [
+    {
+      title: "Business Evidence",
+      description: "Source files Vaeroex can analyze, import, or preserve as business context.",
+      metrics: [
+        {
+          label: "Files",
+          value: currentFiles.length,
+          href: "/app/sources" as Route,
+          detail: "Uploaded business evidence available in this workspace.",
+          emptyDetail: "No business evidence uploaded yet."
+        },
+        {
+          label: "Analyzed Evidence",
+          value: analyzedFiles.length,
+          href: "/app/sources?status=Analyzed" as Route,
+          detail: "Files Vaeroex has reviewed for leadership context.",
+          emptyDetail: "No files have been analyzed yet."
+        },
+        {
+          label: "Import Ready",
+          value: importReadyFiles.length,
+          href: "/app/sources?status=Import%20Ready" as Route,
+          detail: "Structured files ready for review-gated import.",
+          emptyDetail: "No files are waiting for import."
+        },
+        {
+          label: "Pending Review",
+          value: pendingReviewFiles.length,
+          href: "/app/sources?status=Pending%20Review" as Route,
+          detail: "Imported rows waiting for approval before saving.",
+          emptyDetail: "No pending reviews."
+        }
+      ]
+    },
+    {
+      title: "Executive Intelligence",
+      description: "Leadership-ready insights and archived evidence from source material.",
+      metrics: [
+        {
+          label: "Insights Generated",
+          value: runs.length,
+          href: "/app/sources#source-insights" as Route,
+          detail: "Generated file insights available for leadership review.",
+          emptyDetail: "No insights have been generated yet."
+        },
+        {
+          label: "Archived Files",
+          value: hiddenFiles.length,
+          href: "/app/sources?view=hidden" as Route,
+          detail: "Archived evidence kept out of active views.",
+          emptyDetail: "No archived files."
+        }
+      ]
+    }
+  ];
   const successMessage = cleanNoticeMessage(params?.message, "File action completed.");
   const errorMessage = cleanNoticeMessage(params?.error || errors[0]?.message, "Source data could not be loaded.");
 
@@ -618,21 +704,11 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <SourceCountCard label="Files uploaded" value={currentFiles.length} href="/app/sources" detail="Current source files available in this workspace." />
-        <SourceCountCard label="Files analyzed" value={analyzedFiles.length} href="/app/sources?status=Analyzed" detail="Files with saved Vaeroex review output." />
-        <SourceCountCard label="Import-ready" value={importReadyFiles.length} href="/app/sources?status=Import%20Ready" detail="CSV/XLSX files ready for review-gated import." />
-        <SourceCountCard label="Pending review" value={pendingReviewFiles.length} href="/app/sources?status=Pending%20Review" detail="Extracted rows waiting for mapping approval." />
+      <section className="grid gap-4 xl:grid-cols-2">
+        {metricGroups.map((group) => (
+          <SourceMetricGroup key={group.title} {...group} />
+        ))}
       </section>
-
-      <CompactSummaryChips
-        items={[
-          { label: "Rows imported", value: importedRows, tone: importedRows ? "good" : "muted" },
-          { label: "Imported files", value: importedFiles.length, tone: importedFiles.length ? "good" : "muted" },
-          { label: "Intelligence outputs", value: runs.length, tone: runs.length ? "good" : "muted" },
-          { label: "Archived / hidden", value: hiddenFiles.length, tone: hiddenFiles.length ? "attention" : "muted" }
-        ]}
-      />
 
       <section className="space-y-3">
         <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Source file views">
@@ -704,7 +780,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                 <h3 className="text-lg font-semibold text-white">{files.length ? "No files match this filter" : "No source files yet"}</h3>
                 <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
                   {files.length
-                    ? "Clear filters to view all files, or open Archived / Hidden if the file was archived or deleted."
+                    ? "Clear filters to view all files, or open Archived Files if the file was archived or deleted."
                     : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
                 </p>
                 <div className="mt-5 flex flex-wrap justify-center gap-2">
@@ -716,7 +792,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                   <UploadSourceDrawer folders={folders} />
                   {files.length ? (
                     <Link href="/app/sources?view=hidden" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-                      Show archived / hidden files
+                      Show archived files
                     </Link>
                   ) : null}
                 </div>
@@ -727,8 +803,8 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-          <h2 className="text-base font-semibold text-white">Analyses</h2>
+        <div id="source-insights" className="scroll-mt-24 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+          <h2 className="text-base font-semibold text-white">Generated Insights</h2>
           <p className="mt-1 text-sm text-slate-400">Recent Vaeroex file reviews saved to workspace context.</p>
           <div className="mt-4 space-y-3">
             {runs.slice(0, 5).map((run) => {
@@ -772,9 +848,9 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       </section>
 
       <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-        <h2 className="text-base font-semibold text-white">Intelligence Learned</h2>
+        <h2 className="text-base font-semibold text-white">What Vaeroex Has Learned</h2>
         <p className="mt-1 text-sm leading-6 text-slate-400">
-          Sources currently support {kpis.filter((kpi) => kpi.source_file_id).length} KPI evidence record{kpis.filter((kpi) => kpi.source_file_id).length === 1 ? "" : "s"}, {runs.length} file intelligence output{runs.length === 1 ? "" : "s"}, and {reports.filter((report) => isRecord(report.source_data_json)).length} report source connection{reports.filter((report) => isRecord(report.source_data_json)).length === 1 ? "" : "s"}.
+          Sources currently support {kpis.filter((kpi) => kpi.source_file_id).length} KPI evidence record{kpis.filter((kpi) => kpi.source_file_id).length === 1 ? "" : "s"}, {runs.length} generated file insight{runs.length === 1 ? "" : "s"}, and {reports.filter((report) => isRecord(report.source_data_json)).length} report source connection{reports.filter((report) => isRecord(report.source_data_json)).length === 1 ? "" : "s"}.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/app/intelligence" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
