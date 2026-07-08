@@ -1,44 +1,13 @@
 import Link from "next/link";
-import type { Route } from "next";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
-import { PageHeader } from "@/components/operations/PageHeader";
-import { StatusBadge } from "@/components/operations/StatusBadge";
+import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
-import { generatedOutputHref, outputTypeForInsight } from "@/lib/intelligence/generated-output";
-import {
-  buildIntelligenceLayer,
-  type IntelligenceConfidence,
-  type IntelligenceInsight,
-  type IntelligenceInsightType
-} from "@/lib/intelligence/layer";
+import { generatedOutputHref } from "@/lib/intelligence/generated-output";
+import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
-
-function confidenceClass(confidence: IntelligenceConfidence) {
-  if (confidence === "High") return "border-cyan-300/40 bg-cyan-400/15 text-cyan-100";
-  if (confidence === "Medium") return "border-blue-300/30 bg-blue-500/15 text-blue-100";
-  return "border-slate-400/30 bg-slate-500/15 text-slate-100";
-}
-
-function priorityClass(priority: "High" | "Medium" | "Low") {
-  if (priority === "High") return "border-red-300/40 bg-red-500/15 text-red-100";
-  if (priority === "Medium") return "border-amber-300/35 bg-amber-500/15 text-amber-100";
-  return "border-slate-400/30 bg-slate-500/15 text-slate-100";
-}
-
-function typeClass(type: IntelligenceInsightType) {
-  if (type === "Risk" || type === "Anomaly") return "border-red-400/35 bg-red-950/25 text-red-100";
-  if (type === "Opportunity") return "border-emerald-400/35 bg-emerald-950/25 text-emerald-100";
-  if (type === "Forecast") return "border-cyan-400/30 bg-cyan-950/20 text-cyan-100";
-  if (type === "Bottleneck") return "border-amber-400/35 bg-amber-950/25 text-amber-100";
-  return "border-blue-400/30 bg-blue-950/25 text-blue-100";
-}
-
-function groupInsights(insights: IntelligenceInsight[], type: IntelligenceInsightType) {
-  return insights.filter((insight) => insight.type === type);
-}
 
 function compactText(value: string | null | undefined, fallback: string, maxLength = 160) {
   const text = (value || fallback).replace(/\s+/g, " ").trim();
@@ -49,286 +18,6 @@ function compactText(value: string | null | undefined, fallback: string, maxLeng
 
   const shortened = text.slice(0, maxLength).replace(/\s+\S*$/, "").trim();
   return `${shortened}...`;
-}
-
-function evidenceCountLabel(count: number) {
-  return `${count} supporting signal${count === 1 ? "" : "s"}`;
-}
-
-function executiveReviewText(insight: IntelligenceInsight | undefined) {
-  if (!insight) {
-    return "Review Business Signals.";
-  }
-
-  const text = compactText(insight.recommendedAction || insight.title, "Review Business Signals.", 120);
-
-  if (/business signal/i.test(`${insight.title} ${insight.summary} ${insight.why}`)) {
-    return "Review Business Signals.";
-  }
-
-  if (/brief|review|determine|evaluate|assess/i.test(text)) {
-    return text;
-  }
-
-  return `Review ${text.charAt(0).toLowerCase()}${text.slice(1)}`;
-}
-
-function InsightCard({ insight }: { insight: IntelligenceInsight }) {
-  const primaryOutputType = outputTypeForInsight(insight);
-  const primaryOutputLabel = primaryOutputType === "risk_brief" ? "Generate Investigation Summary" : primaryOutputType === "executive_briefing" ? "Generate Executive Briefing" : "Generate Improvement Plan";
-
-  return (
-    <article className={`rounded-lg border p-4 shadow-panel ${typeClass(insight.type)}`}>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] opacity-75">{insight.type}</p>
-          <h3 className="mt-2 text-base font-semibold text-white">{insight.title}</h3>
-          <p className="mt-2 text-sm leading-6 opacity-90">{insight.summary}</p>
-        </div>
-        <span className={`w-fit shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(insight.confidence)}`}>
-          {insight.confidence} confidence
-        </span>
-      </div>
-
-      <dl className="mt-4 grid gap-3 text-sm leading-6 md:grid-cols-2">
-        <div>
-          <dt className="font-semibold text-white">Why Vaeroex surfaced it</dt>
-          <dd className="mt-1 opacity-85">{insight.why}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-white">Executive recommendation</dt>
-          <dd className="mt-1 opacity-85">{insight.recommendedAction}</dd>
-        </div>
-      </dl>
-
-      <details className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-3">
-        <summary className="cursor-pointer text-xs font-semibold text-cyan-100">View evidence</summary>
-        <div className="mt-3 grid gap-3 text-xs leading-5 text-slate-200 md:grid-cols-[1fr_.5fr]">
-          <ul className="space-y-2">
-            {insight.evidence.map((item) => (
-              <li key={item} className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-300" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-          <div>
-            <p className="font-semibold text-white">Source types used</p>
-            <p className="mt-1 text-slate-300">{insight.sourceTypes.join(", ")}</p>
-            <p className="mt-3 font-semibold text-white">Evidence count</p>
-            <p className="mt-1 text-slate-300">{insight.evidenceCount} record signal{insight.evidenceCount === 1 ? "" : "s"}</p>
-          </div>
-        </div>
-      </details>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={generatedOutputHref({ type: primaryOutputType, source: insight.id })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-          {primaryOutputLabel}
-        </Link>
-        {primaryOutputType !== "action_plan" ? (
-          <Link href={generatedOutputHref({ type: "action_plan", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-            Generate Improvement Plan
-          </Link>
-        ) : null}
-        <Link href={generatedOutputHref({ type: "executive_briefing", source: insight.id })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Generate Executive Briefing
-        </Link>
-        <ContextualAskVaeroex
-          label="Explain This"
-          prompt={`Explain why this ${insight.type.toLowerCase()} matters, what evidence supports it, what could happen next, and what leadership should review.`}
-          contextType={`intelligence_${insight.type.toLowerCase()}`}
-          contextId={insight.id}
-          sourceTitle={insight.title}
-          sourceSummary={`${insight.summary} Executive recommendation: ${insight.recommendedAction}`}
-          evidence={[
-            insight.why,
-            ...insight.evidence,
-            `Confidence: ${insight.confidence}`,
-            `Source types: ${insight.sourceTypes.join(", ")}`,
-            `Evidence count: ${insight.evidenceCount}`
-          ]}
-          compact
-        />
-      </div>
-
-      <details className="mt-3 rounded-lg border border-white/10 bg-slate-950/30 p-3">
-        <summary className="cursor-pointer text-xs font-semibold text-slate-200">Advanced source options</summary>
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Link href={insight.sourceHref as Route} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
-            Open source record area
-          </Link>
-          <Link href={generatedOutputHref({ type: "checklist", source: insight.id })} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
-            Generate Checklist
-          </Link>
-          <Link href={generatedOutputHref({ type: "sop", source: insight.id })} className="rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-slate-950/30">
-            Generate SOP
-          </Link>
-        </div>
-      </details>
-    </article>
-  );
-}
-
-function ExecutiveSignalCard({
-  label,
-  insight,
-  emptyHeadline,
-  emptySummary,
-  tone
-}: {
-  label: "Risk" | "Opportunity";
-  insight?: IntelligenceInsight;
-  emptyHeadline: string;
-  emptySummary: string;
-  tone: "risk" | "opportunity";
-}) {
-  const toneClass =
-    tone === "risk"
-      ? "border-red-400/30 bg-[radial-gradient(circle_at_12%_0%,rgba(248,113,113,0.14),transparent_38%),rgba(8,17,31,0.96)]"
-      : "border-emerald-400/30 bg-[radial-gradient(circle_at_12%_0%,rgba(16,185,129,0.14),transparent_38%),rgba(8,17,31,0.96)]";
-  const labelClass = tone === "risk" ? "border-red-300/30 bg-red-500/10 text-red-100" : "border-emerald-300/30 bg-emerald-500/10 text-emerald-100";
-  const headline = insight?.title || emptyHeadline;
-  const summary = compactText(insight?.summary, emptySummary, 170);
-
-  return (
-    <article className={`rounded-xl border p-4 text-slate-100 shadow-panel ${toneClass}`}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className={`rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em] ${labelClass}`}>
-          {label}
-        </span>
-        <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(insight?.confidence || "Low")}`}>
-          Confidence: {insight?.confidence || "Low"}
-        </span>
-      </div>
-      <h2 className="mt-3 line-clamp-2 text-lg font-semibold leading-6 text-white">{compactText(headline, emptyHeadline, 96)}</h2>
-      <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-300">{summary}</p>
-      <div className="mt-4 flex flex-wrap items-center gap-3 text-xs font-semibold text-slate-300">
-        <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-          Evidence: {insight ? evidenceCountLabel(insight.evidenceCount) : "Needs source data"}
-        </span>
-        <span className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2">
-          Sources: {insight?.sourceTypes.slice(0, 2).join(", ") || "Not enough context"}
-        </span>
-      </div>
-      {insight ? (
-        <div className="mt-4">
-          <ContextualAskVaeroex
-            label="Explain Why"
-            prompt={`Explain why this ${label.toLowerCase()} matters for leadership. Include what happened, why Vaeroex surfaced it, evidence count, confidence, expected business impact, and what leadership should review. Do not create tasks, assign owners, or suggest due dates.`}
-            contextType={`intelligence_executive_${label.toLowerCase()}`}
-            contextId={insight.id}
-            sourceTitle={insight.title}
-            sourceSummary={insight.summary}
-            evidence={[
-              `Evidence count: ${evidenceCountLabel(insight.evidenceCount)}`,
-              `Confidence: ${insight.confidence}`,
-              `Reason: ${insight.why}`,
-              `Impact: ${insight.impact}`,
-              ...insight.evidence.slice(0, 4)
-            ]}
-            compact
-          />
-        </div>
-      ) : null}
-    </article>
-  );
-}
-
-function LeadershipRecommendationCard({
-  insight,
-  risk,
-  opportunity
-}: {
-  insight?: IntelligenceInsight;
-  risk?: IntelligenceInsight;
-  opportunity?: IntelligenceInsight;
-}) {
-  const headline = executiveReviewText(insight);
-  const reason = compactText(
-    insight?.why,
-    risk
-      ? `Vaeroex surfaced ${risk.title} as the strongest risk pattern.`
-      : opportunity
-        ? `Vaeroex surfaced ${opportunity.title} as the clearest opportunity pattern.`
-        : "Vaeroex needs more source evidence before making a stronger leadership recommendation.",
-    180
-  );
-  const impact = compactText(
-    insight?.impact,
-    "Better source coverage will improve Vaeroex confidence and make future executive briefings more useful.",
-    170
-  );
-  const priority = insight?.priority || risk?.priority || opportunity?.priority || "Low";
-  const sourceSummary = `Recommendation: ${headline}. Reason: ${reason}. Expected impact: ${impact}.`;
-
-  return (
-    <article className="mt-4 rounded-xl border border-cyan-300/25 bg-[radial-gradient(circle_at_8%_0%,rgba(56,189,248,0.16),transparent_34%),linear-gradient(135deg,rgba(8,17,31,0.98),rgba(15,23,42,0.94))] p-4 text-slate-100 shadow-command sm:p-5">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Leadership Recommendation</p>
-          <h2 className="mt-2 text-xl font-semibold leading-7 text-white">{headline}</h2>
-        </div>
-        <span className={`w-fit rounded-full border px-3 py-1.5 text-xs font-semibold ${priorityClass(priority)}`}>
-          Priority: {priority}
-        </span>
-      </div>
-      <div className="mt-4 grid gap-3 lg:grid-cols-2">
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Reason</p>
-          <p className="mt-2 text-sm leading-6 text-slate-200">{reason}</p>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Expected impact</p>
-          <p className="mt-2 text-sm leading-6 text-slate-200">{impact}</p>
-        </div>
-      </div>
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={generatedOutputHref({
-            type: "executive_briefing",
-            source: insight?.id,
-            title: headline,
-            summary: sourceSummary,
-            why: reason,
-            remedy: headline
-          })}
-          className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy"
-        >
-          Generate Executive Brief
-        </Link>
-        <Link
-          href={generatedOutputHref({
-            type: "executive_briefing",
-            source: insight?.id,
-            title: "Leadership Meeting Agenda",
-            summary: sourceSummary,
-            why: reason,
-            remedy: "Determine whether an executive briefing or operational review is warranted."
-          })}
-          className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20"
-        >
-          Generate Meeting Agenda
-        </Link>
-        <ContextualAskVaeroex
-          label="Explain Recommendation"
-          prompt="Explain this leadership recommendation. Include what happened, why Vaeroex surfaced it, evidence, confidence, expected impact, and what leadership should review. Do not create tasks, assign owners, or suggest due dates."
-          contextType="intelligence_leadership_recommendation"
-          contextId={insight?.id || "recommendation"}
-          sourceTitle={headline}
-          sourceSummary={sourceSummary}
-          evidence={[
-            `Priority: ${priority}`,
-            `Reason: ${reason}`,
-            `Expected impact: ${impact}`,
-            `Risk: ${risk?.title || "No top risk visible"}`,
-            `Opportunity: ${opportunity?.title || "No top opportunity visible"}`,
-            ...(insight?.evidence.slice(0, 4) || [])
-          ]}
-          compact
-        />
-      </div>
-    </article>
-  );
 }
 
 export default async function IntelligencePage() {
@@ -414,134 +103,119 @@ export default async function IntelligencePage() {
     operationalMetrics: metricsResult.data || [],
     assets: assetsResult.data || []
   });
-  const { topRisk, topOpportunity, topRecommendation } = intelligence;
+  const { topRisk, topOpportunity, topRecommendation, topForecast } = intelligence;
+  const summaryTiles = [
+    {
+      label: "Business Health",
+      value: `${intelligence.businessHealth.score}/100`,
+      detail: `${intelligence.businessHealth.status} · ${intelligence.businessHealth.trend}`
+    },
+    {
+      label: "Highest Priority Risk",
+      value: topRisk?.title || "No major risk visible",
+      detail: topRisk ? compactText(topRisk.summary, "Risk signal available.", 96) : "Add more evidence to improve risk detection."
+    },
+    {
+      label: "Best Opportunity",
+      value: topOpportunity?.title || "No clear opportunity visible",
+      detail: topOpportunity ? compactText(topOpportunity.summary, "Opportunity signal available.", 96) : "Add customer, KPI, or report history."
+    },
+    {
+      label: "Forecast Summary",
+      value: topForecast?.title || "Forecast not ready",
+      detail: topForecast ? compactText(topForecast.summary, "Forecast signal available.", 96) : "Vaeroex needs more historical data before forecasting responsibly."
+    },
+    {
+      label: "Recommended Next Action",
+      value: topRecommendation?.title || "Add more business context",
+      detail: topRecommendation ? compactText(topRecommendation.recommendedAction, "Review the strongest current signal.", 96) : intelligence.dataQuality.suggestedNextData[0] || "Upload current source evidence."
+    }
+  ];
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Intelligence"
-        title="Leadership Intelligence"
-        description="What should leadership know that is not immediately obvious? Vaeroex turns workspace context into risks, opportunities, business impact, evidence, and executive recommendations."
-        actions={
-          <Link href="/app/agents" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            Ask Vaeroex
-          </Link>
-        }
-      />
-
       {errors.length ? (
         <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm text-red-100">
           {errors[0]?.message || "Some intelligence data could not be loaded."}
         </div>
       ) : null}
 
-      <section className="rounded-2xl border border-cyan-300/20 bg-[#061225] p-4 text-slate-100 shadow-command sm:p-5 xl:p-6">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Executive briefing</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-white">Risk, opportunity, and leadership review.</h2>
-            <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-300">{compactText(intelligence.executiveSummary, "Vaeroex needs more business context before surfacing a stronger leadership briefing.", 220)}</p>
+      <section className="rounded-2xl border border-cyan-300/20 bg-[#061225] p-4 text-slate-100 shadow-command">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Executive Summary</p>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-white">Leadership Intelligence</h1>
+            <p className="mt-2 max-w-5xl text-sm leading-6 text-slate-300">
+              {compactText(intelligence.executiveSummary, "Vaeroex needs more business context before surfacing a stronger leadership briefing.", 190)}
+            </p>
           </div>
-          <div className="grid w-full gap-2 rounded-xl border border-white/10 bg-slate-950/35 p-3 text-sm xl:max-w-md">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-slate-400">Business memory</span>
-              <span className="font-semibold text-white">{intelligence.dataQuality.score}/100</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-slate-400">Sources</span>
-              <span className="font-semibold text-white">{intelligence.memorySummary.sourceRecords}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-slate-400">KPI history</span>
-              <span className="font-semibold text-white">{intelligence.memorySummary.kpiHistoryRecords}</span>
-            </div>
+          <Link href="/app/agents" className="inline-flex min-h-10 w-fit items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
+            Ask Vaeroex
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+          {summaryTiles.map((tile) => (
+            <article key={tile.label} className="rounded-xl border border-white/10 bg-slate-950/35 p-3">
+              <p className="text-[0.68rem] font-semibold uppercase tracking-[0.16em] text-slate-400">{tile.label}</p>
+              <h2 className="mt-2 line-clamp-2 text-sm font-semibold leading-5 text-white">{tile.value}</h2>
+              <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-300">{tile.detail}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <IntelligenceSignalInbox insights={intelligence.insights} />
+
+      <details className="rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-cyan-100">
+          Business Intelligence Coverage
+          <span className="ml-2 rounded-full border border-cyan-300/30 bg-cyan-950/30 px-2 py-0.5 text-xs text-cyan-50">
+            {intelligence.dataQuality.score}/100
+          </span>
+        </summary>
+        <div className="mt-4">
+          <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} />
+        </div>
+      </details>
+
+      <details className="rounded-xl border border-white/10 bg-[#08111f] p-4 text-slate-100">
+        <summary className="cursor-pointer list-none text-sm font-semibold text-cyan-100">
+          Business Memory
+        </summary>
+        <div className="mt-4">
+          <p className="text-sm leading-6 text-slate-300">
+            Vaeroex builds workspace context from uploaded sources, approved imports, reports, KPI history, customer context, actions, issues, and saved Vaeroex runs. It does not replace those systems; it summarizes what leadership should know from them.
+          </p>
+          <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-3">
+            <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">{intelligence.memorySummary.decisions} decision record{intelligence.memorySummary.decisions === 1 ? "" : "s"} stored.</p>
+            <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">{intelligence.memorySummary.recommendationOutcomes} recommendation outcome{intelligence.memorySummary.recommendationOutcomes === 1 ? "" : "s"} tracked.</p>
+            <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">{intelligence.dataQuality.suggestedNextData[0]}</p>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+              Review sources
+            </Link>
+            <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+              Generate Executive Briefing
+            </Link>
+            <ContextualAskVaeroex
+              label="Explain This Briefing"
+              prompt={`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`}
+              contextType="business_memory_summary"
+              contextId={context.activeWorkspace?.id || "workspace"}
+              sourceTitle="Current intelligence and business memory"
+              sourceSummary={`Business memory includes ${intelligence.memorySummary.decisions} decision records, ${intelligence.memorySummary.recommendationOutcomes} recommendation outcomes, and data confidence ${intelligence.dataQuality.confidence}.`}
+              evidence={[
+                `Suggested next data: ${intelligence.dataQuality.suggestedNextData[0]}`,
+                `Top risk: ${topRisk?.title || "No top risk visible"}`,
+                `Top opportunity: ${topOpportunity?.title || "No top opportunity visible"}`,
+                `Top recommendation: ${topRecommendation?.title || "No top recommendation visible"}`
+              ]}
+              compact
+            />
           </div>
         </div>
-
-        <div className="mt-5 grid gap-4 xl:grid-cols-2">
-          <ExecutiveSignalCard
-            label="Risk"
-            insight={topRisk}
-            emptyHeadline="No major risk is visible yet."
-            emptySummary="Add source records, KPI history, reports, or Business Signals so Vaeroex can identify risk patterns responsibly."
-            tone="risk"
-          />
-          <ExecutiveSignalCard
-            label="Opportunity"
-            insight={topOpportunity}
-            emptyHeadline="No clear opportunity is visible yet."
-            emptySummary="Add customer, KPI, file, or report history so Vaeroex can identify stronger upside patterns."
-            tone="opportunity"
-          />
-        </div>
-
-        <LeadershipRecommendationCard insight={topRecommendation} risk={topRisk} opportunity={topOpportunity} />
-      </section>
-
-      <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} />
-
-      <section className="grid gap-4 xl:grid-cols-2">
-        {(["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"] as IntelligenceInsightType[]).map((type) => {
-          const grouped = groupInsights(intelligence.insights, type);
-
-          return (
-            <section key={type} className="space-y-3">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-base font-semibold text-slate-100">{type}s</h2>
-                <StatusBadge value={`${grouped.length} signal${grouped.length === 1 ? "" : "s"}`} />
-              </div>
-              {grouped.length ? (
-                <div className="space-y-3">
-                  {grouped.map((insight) => (
-                    <InsightCard key={insight.id} insight={insight} />
-                  ))}
-                </div>
-              ) : (
-                <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm leading-6 text-slate-300">
-                  {type === "Forecast"
-                    ? "No forecast is shown yet because Vaeroex needs more historical data before forecasting responsibly."
-                    : `No ${type.toLowerCase()} signal is strong enough yet.`}
-                </div>
-              )}
-            </section>
-          );
-        })}
-      </section>
-
-      <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
-        <h2 className="text-base font-semibold text-white">Business memory</h2>
-        <p className="mt-2 text-sm leading-6 text-slate-300">
-          Vaeroex builds workspace context from uploaded sources, approved imports, reports, KPI history, customer context, actions, issues, and saved Vaeroex runs. It does not replace those systems; it summarizes what leadership should know from them.
-        </p>
-        <div className="mt-4 grid gap-2 text-sm text-slate-300 md:grid-cols-3">
-          <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">{intelligence.memorySummary.decisions} decision record{intelligence.memorySummary.decisions === 1 ? "" : "s"} stored.</p>
-          <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">{intelligence.memorySummary.recommendationOutcomes} recommendation outcome{intelligence.memorySummary.recommendationOutcomes === 1 ? "" : "s"} tracked.</p>
-          <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3">{intelligence.dataQuality.suggestedNextData[0]}</p>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href="/app/sources" className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-            Review sources
-          </Link>
-          <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
-            Generate Executive Briefing
-          </Link>
-          <ContextualAskVaeroex
-            label="Explain This Briefing"
-            prompt={`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`}
-            contextType="business_memory_summary"
-            contextId={context.activeWorkspace?.id || "workspace"}
-            sourceTitle="Current intelligence and business memory"
-            sourceSummary={`Business memory includes ${intelligence.memorySummary.decisions} decision records, ${intelligence.memorySummary.recommendationOutcomes} recommendation outcomes, and data confidence ${intelligence.dataQuality.confidence}.`}
-            evidence={[
-              `Suggested next data: ${intelligence.dataQuality.suggestedNextData[0]}`,
-              `Top risk: ${topRisk?.title || "No top risk visible"}`,
-              `Top opportunity: ${topOpportunity?.title || "No top opportunity visible"}`,
-              `Top recommendation: ${topRecommendation?.title || "No top recommendation visible"}`
-            ]}
-            compact
-          />
-        </div>
-      </section>
+      </details>
     </div>
   );
 }
