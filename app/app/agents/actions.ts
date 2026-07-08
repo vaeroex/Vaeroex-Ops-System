@@ -11,6 +11,7 @@ import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-wor
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
@@ -167,6 +168,20 @@ export async function runVaeroexAction(formData: FormData) {
   let destination = "/app/agents";
 
   try {
+    const rateLimit = await enforceRateLimit({
+      action: "vaeroex.run",
+      limit: 12,
+      windowSeconds: 10 * 60,
+      userId: user.id,
+      workspaceId,
+      identifiers: [workflow.key],
+      metadata: { source: "ask_vaeroex", workflow: workflow.key }
+    });
+
+    if (!rateLimit.allowed) {
+      throw new Error(rateLimitMessage(rateLimit));
+    }
+
     const limit = await isUsageLimitReached({
       supabase,
       userId: user.id,

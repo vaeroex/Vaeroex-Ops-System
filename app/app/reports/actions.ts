@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -772,6 +773,19 @@ export async function generateReportAction(formData: FormData) {
   const anchorDate = text(formData, "anchor_date");
   const currentRange = getPeriodRange(period, anchorDate);
   const previousRange = getComparisonRange(period, currentRange);
+  const rateLimit = await enforceRateLimit({
+    action: "report.generate",
+    limit: 20,
+    windowSeconds: 10 * 60,
+    userId: user.id,
+    workspaceId,
+    identifiers: [period, reportType],
+    metadata: { source: "report_generation", period, report_type: reportType }
+  });
+
+  if (!rateLimit.allowed) {
+    redirectWithError(rateLimitMessage(rateLimit), returnPath);
+  }
 
   const [current, previous] = await Promise.all([
     fetchReportSource(supabase, workspaceId, currentRange, category),

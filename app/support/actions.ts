@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -42,6 +43,21 @@ export async function createSupportRequestAction(formData: FormData) {
 
   if (!name || !email || !issueType || !message) {
     redirectBack(formData, "error", "Name, email, issue type, and message are required.");
+  }
+
+  const rateLimit = await enforceRateLimit({
+    action: "support.create_request",
+    limit: 5,
+    windowSeconds: 10 * 60,
+    identifiers: [email],
+    metadata: {
+      source: "public_support_request",
+      issue_type: issueType
+    } satisfies Json
+  });
+
+  if (!rateLimit.allowed) {
+    redirectBack(formData, "error", rateLimitMessage(rateLimit));
   }
 
   let userId: string | null = null;

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function value(formData: FormData, key: string) {
@@ -22,6 +23,19 @@ export async function POST(request: Request) {
 
   if (!name || !email) {
     return redirectWith("/billing-required", "error", "Enter your name and Vaeroex subscription email.");
+  }
+
+  const rateLimit = await enforceRateLimit({
+    action: "subscription.activation_request",
+    limit: 4,
+    windowSeconds: 30 * 60,
+    requestHeaders: request.headers,
+    identifiers: [email],
+    metadata: { source: "manual_activation_request" }
+  });
+
+  if (!rateLimit.allowed) {
+    return redirectWith("/billing-required", "error", rateLimitMessage(rateLimit));
   }
 
   const { error } = await admin.from("manual_activation_requests").insert({

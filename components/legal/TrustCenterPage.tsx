@@ -30,6 +30,7 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
         <h2 className="text-base font-semibold">Important trust notes</h2>
         <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
           <li>Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR compliance certification, or enterprise compliance certification.</li>
+          <li>Vaeroex allowlists supported upload types, but does not currently claim malware scanning, DLP scanning, file sandboxing, or regulated-data detection.</li>
           <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and data they enter.</li>
           <li>Vaeroex outputs may be incomplete or inaccurate and require human review before customers rely on recommendations or save generated records.</li>
           <li>Vaeroex is not intended for unrestricted regulated sensitive data unless appropriate legal, security, and compliance controls are in place.</li>

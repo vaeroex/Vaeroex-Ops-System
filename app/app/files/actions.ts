@@ -15,6 +15,8 @@ import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { cleanExtractedText, extractDocxText, extractPdfText } from "@/lib/imports/document-text";
 import { parseSpreadsheetRows, previewRows, type ImportCellValue, type ImportRow } from "@/lib/imports/spreadsheets";
 import { approvedKpiColor } from "@/lib/kpis/settings";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
+import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
 import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -61,22 +63,11 @@ type ImportField = {
 const FILES_PATH = "/app/files";
 const SOURCES_PATH = "/app/sources";
 const STORAGE_BUCKET = "workspace-files";
-const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 const MAX_ANALYSIS_ROWS = 60;
 const MAX_REPORT_ROWS = 100;
 const MAX_EXTRACTED_TEXT_CHARS = 18_000;
 const MAX_TEXT_PREVIEW_CHARS = 4_000;
-const ALLOWED_EXTENSIONS = ["csv", "xlsx", "pdf", "png", "jpg", "jpeg", "docx"];
 const KPI_IMPORT_CHART_TYPES = ["line", "bar", "mixed"] as const;
-const MIME_BY_EXTENSION: Record<string, string> = {
-  csv: "text/csv",
-  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  pdf: "application/pdf",
-  png: "image/png",
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-};
 const IMPORT_FIELDS: Record<ImportType, ImportField[]> = {
   kpi: [
     { key: "name", label: "KPI name", required: true, candidates: ["name", "kpi", "kpi name", "metric", "metric name", "metric_name"] },
@@ -1639,8 +1630,18 @@ export async function uploadFileAction(formData: FormData) {
     redirectWithPathError(returnPath, "Choose a file to upload.");
   }
 
-  if (uploadedFile.size > MAX_FILE_SIZE_BYTES) {
-    redirectWithPathError(returnPath, "Files must be 25 MB or smaller.");
+  const rateLimit = await enforceRateLimit({
+    action: "file.upload",
+    limit: 20,
+    windowSeconds: 10 * 60,
+    userId: user.id,
+    workspaceId,
+    identifiers: [user.email],
+    metadata: { source: "file_upload" }
+  });
+
+  if (!rateLimit.allowed) {
+    redirectWithPathError(returnPath, rateLimitMessage(rateLimit));
   }
 
   const fileLimit = await isUsageLimitReached({
@@ -1655,18 +1656,24 @@ export async function uploadFileAction(formData: FormData) {
     redirectWithPathError(returnPath, `This workspace has reached the file upload limit for the current Vaeroex plan (${fileLimit.limitValue} files).`);
   }
 
-  const extension = fileExtension(uploadedFile.name);
+  const buffer = Buffer.from(await uploadedFile.arrayBuffer());
+  const validation = validateUploadFileSafety({
+    fileName: uploadedFile.name,
+    browserMimeType: uploadedFile.type,
+    size: uploadedFile.size,
+    buffer
+  });
 
-  if (!ALLOWED_EXTENSIONS.includes(extension)) {
-    redirectWithPathError(returnPath, "Supported file types are CSV, XLSX, PDF, PNG, JPG, and DOCX.");
+  if (!validation.ok) {
+    redirectWithPathError(returnPath, validation.error);
   }
 
-  const storedExtension = extension === "jpeg" ? "jpg" : extension;
+  const extension = validation.extension;
+  const storedExtension = validation.storedExtension;
   const folderId = await validateFolder(workspaceId, text(formData, "folder_id"));
-  const buffer = Buffer.from(await uploadedFile.arrayBuffer());
   const safeName = safeFileName(uploadedFile.name);
   const storagePath = `${workspaceId}/${randomUUID()}/${safeName}`;
-  const mimeType = uploadedFile.type || MIME_BY_EXTENSION[extension] || "application/octet-stream";
+  const mimeType = validation.mimeType;
   const upload = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, buffer, {
     contentType: mimeType,
     upsert: false
@@ -1854,6 +1861,19 @@ export async function importFileAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const importType = validImportType(text(formData, "import_type"));
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const rateLimit = await enforceRateLimit({
+    action: "file.import_stage",
+    limit: 15,
+    windowSeconds: 10 * 60,
+    userId: user.id,
+    workspaceId,
+    identifiers: [file.id, importType],
+    metadata: { source: "file_import_stage", file_id: file.id, import_type: importType }
+  });
+
+  if (!rateLimit.allowed) {
+    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+  }
 
   if (!isSpreadsheet(file)) {
     redirectWithFileError("Only CSV and XLSX files can be imported into KPI, CRM, or business history.", file.id);
@@ -2028,6 +2048,20 @@ export async function saveExtractedImportAction(formData: FormData) {
   }
 
   const importType = validImportType(text(formData, "import_type") || importRecord.import_type);
+  const rateLimit = await enforceRateLimit({
+    action: "file.import_approve",
+    limit: 15,
+    windowSeconds: 10 * 60,
+    userId: user.id,
+    workspaceId,
+    identifiers: [file.id, importId, importType],
+    metadata: { source: "file_import_approval", file_id: file.id, import_id: importId, import_type: importType }
+  });
+
+  if (!rateLimit.allowed) {
+    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+  }
+
   const mapping = mappingFromForm(formData, importType, importRecord.mapping_json);
   const kpiInterpretation = importType === "kpi" ? kpiImportInterpretationFromForm(formData) : null;
   const savedMappingJson = (
@@ -2271,6 +2305,19 @@ export async function createReportFromFileAction(formData: FormData) {
   const reportTitle = text(formData, "report_title") || `File Report - ${file.display_name}`;
   const reportType = text(formData, "report_type") || "File Review";
   const reportFocus = text(formData, "report_focus");
+  const rateLimit = await enforceRateLimit({
+    action: "file.create_report",
+    limit: 12,
+    windowSeconds: 10 * 60,
+    userId: user.id,
+    workspaceId,
+    identifiers: [file.id],
+    metadata: { source: "file_report_generation", file_id: file.id }
+  });
+
+  if (!rateLimit.allowed) {
+    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+  }
 
   try {
     await requireToolExecution(
@@ -2491,6 +2538,19 @@ export async function analyzeFileAction(formData: FormData) {
     text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
     "Review this file and explain trends, useful KPIs, visibility gaps, risks, executive recommendations, and an executive summary.";
+  const rateLimit = await enforceRateLimit({
+    action: "file.analysis",
+    limit: 12,
+    windowSeconds: 10 * 60,
+    userId: user.id,
+    workspaceId,
+    identifiers: [file.id],
+    metadata: { source: "file_analysis", file_id: file.id }
+  });
+
+  if (!rateLimit.allowed) {
+    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+  }
 
   const workflow = getVaeroexWorkflow("file_analysis");
   let inputJson: Json = {

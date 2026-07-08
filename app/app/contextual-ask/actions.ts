@@ -8,6 +8,7 @@ import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
+import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -177,6 +178,20 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
 
   try {
     const { supabase, user, workspaceId } = await requireWorkspaceForContextualAsk();
+    const rateLimit = await enforceRateLimit({
+      action: "vaeroex.contextual_ask",
+      limit: 20,
+      windowSeconds: 10 * 60,
+      userId: user.id,
+      workspaceId,
+      identifiers: [contextType, contextId || sourceTitle],
+      metadata: { source: "contextual_ask", context_type: contextType }
+    });
+
+    if (!rateLimit.allowed) {
+      throw new Error(rateLimitMessage(rateLimit));
+    }
+
     const limit = await isUsageLimitReached({
       supabase,
       userId: user.id,
