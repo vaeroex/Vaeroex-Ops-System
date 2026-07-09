@@ -402,29 +402,40 @@ export async function POST(request: Request) {
 
   const { data: duplicate } = await admin
     .from("subscription_events")
-    .select("id,processed")
+    .select("id,processed,processing_error")
     .eq("stripe_event_id", event.id)
     .maybeSingle();
 
-  if (duplicate) {
+  if (duplicate?.processed) {
     return NextResponse.json({ ok: true, duplicate: true, event_id: duplicate.id, processed: duplicate.processed });
   }
 
   const initialSubscriptionId = stripeObjectId((event.data.object as { subscription?: unknown }).subscription);
-  const { data: eventRow, error: eventError } = await admin
-    .from("subscription_events")
-    .insert({
-      source: "stripe",
-      billing_provider: "stripe",
-      event_type: event.type,
-      stripe_event_id: event.id,
-      stripe_subscription_id: initialSubscriptionId,
-      payload_json: asJson(event),
-      processed: false,
-      processing_error: null
-    })
-    .select("id")
-    .maybeSingle();
+  const { data: eventRow, error: eventError } = duplicate
+    ? await admin
+        .from("subscription_events")
+        .update({
+          payload_json: asJson(event),
+          processing_error: null,
+          stripe_subscription_id: initialSubscriptionId
+        })
+        .eq("id", duplicate.id)
+        .select("id")
+        .maybeSingle()
+    : await admin
+        .from("subscription_events")
+        .insert({
+          source: "stripe",
+          billing_provider: "stripe",
+          event_type: event.type,
+          stripe_event_id: event.id,
+          stripe_subscription_id: initialSubscriptionId,
+          payload_json: asJson(event),
+          processed: false,
+          processing_error: null
+        })
+        .select("id")
+        .maybeSingle();
 
   if (eventError) {
     return NextResponse.json({ ok: false, error: eventError.message }, { status: eventError.code === "23505" ? 200 : 500 });
@@ -504,6 +515,6 @@ export async function POST(request: Request) {
         .eq("id", eventRow.id);
     }
 
-    return NextResponse.json({ ok: false, error: message }, { status: 202 });
+    return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }

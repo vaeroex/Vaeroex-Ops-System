@@ -1494,7 +1494,9 @@ async function runFileVaeroexAnalysis({
     userPrompt: prompt,
     workspaceSnapshot,
     extraInputs,
-    fileAttachment: extraction.fileAttachment
+    fileAttachment: extraction.fileAttachment,
+    supabase,
+    workspaceId
   });
   const outputExtractedText = extractedTextFromOutput(outputJson);
   const finalTextContent = extraction.textContent || outputExtractedText;

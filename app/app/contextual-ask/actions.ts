@@ -250,7 +250,9 @@ Be specific about the data used. Do not expose raw debug details or chain-of-tho
       workspaceSnapshot,
       extraInputs: {
         contextual_ask: contextualInput
-      } satisfies Json
+      } satisfies Json,
+      supabase,
+      workspaceId
     });
 
     const inputJson = {

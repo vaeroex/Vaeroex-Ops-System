@@ -25,7 +25,7 @@ function securityHeaders() {
 
   return [
     {
-      key: "Content-Security-Policy-Report-Only",
+      key: process.env.VAEROEX_ENFORCE_CSP === "true" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only",
       value: csp
     },
     {

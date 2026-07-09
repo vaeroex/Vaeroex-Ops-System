@@ -16,6 +16,9 @@ export type VaeroexTokenUsage = {
 const DEFAULT_MODEL_COST_CENTS_PER_1M: Record<string, { input: number; output: number }> = {
   "gpt-4o-mini": { input: 15, output: 60 }
 };
+const DEFAULT_WORKSPACE_MONTHLY_TOKEN_BUDGET = 2_000_000;
+const DEFAULT_SINGLE_REQUEST_TOKEN_BUDGET = 120_000;
+const MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK = 10_000;
 
 function numberEnv(name: string) {
   const value = Number.parseFloat(process.env[name] || "");
@@ -38,12 +41,101 @@ export function estimateTokenCount(text: string) {
   return Math.max(1, Math.ceil(text.length / 4));
 }
 
+function integerEnv(name: string, fallback: number, min: number, max: number) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
+
+export function getWorkspaceTokenBudget() {
+  return {
+    monthlyTokens: integerEnv("VAEROEX_WORKSPACE_MONTHLY_TOKEN_BUDGET", DEFAULT_WORKSPACE_MONTHLY_TOKEN_BUDGET, 50_000, 50_000_000),
+    singleRequestTokens: integerEnv("VAEROEX_SINGLE_REQUEST_TOKEN_BUDGET", DEFAULT_SINGLE_REQUEST_TOKEN_BUDGET, 5_000, 1_000_000)
+  };
+}
+
+function monthStart() {
+  const date = new Date();
+  date.setUTCDate(1);
+  date.setUTCHours(0, 0, 0, 0);
+  return date.toISOString();
+}
+
 export function estimatedCostCents(usage: Pick<VaeroexTokenUsage, "inputTokens" | "outputTokens" | "model">) {
   const cost = modelCost(usage.model);
   const inputCost = (usage.inputTokens / 1_000_000) * cost.input;
   const outputCost = (usage.outputTokens / 1_000_000) * cost.output;
 
   return Math.max(0, Math.ceil(inputCost + outputCost));
+}
+
+export async function assertWorkspaceTokenBudget({
+  supabase,
+  workspaceId,
+  estimatedRequestTokens
+}: {
+  supabase?: SupabaseClient<Database> | null;
+  workspaceId?: string | null;
+  estimatedRequestTokens: number;
+}) {
+  const budget = getWorkspaceTokenBudget();
+
+  if (estimatedRequestTokens > budget.singleRequestTokens) {
+    throw new Error("This request is too large for a single Vaeroex analysis. Reduce the file size or narrow the question.");
+  }
+
+  if (!supabase || !workspaceId) {
+    return {
+      allowed: true,
+      budget,
+      usedTokens: 0,
+      estimatedRequestTokens,
+      remainingTokens: budget.monthlyTokens
+    };
+  }
+
+  const { data, error } = await supabase
+    .from("ai_usage")
+    .select("tokens_used")
+    .eq("workspace_id", workspaceId)
+    .gte("created_at", monthStart())
+    .limit(MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK);
+
+  if (error) {
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        component: "vaeroex-usage",
+        event: "token_budget_check_failed",
+        workspaceId,
+        message: error.message
+      })
+    );
+    throw new Error("Vaeroex could not verify this workspace’s intelligence usage budget. Please try again shortly.");
+  }
+
+  if ((data || []).length >= MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK) {
+    throw new Error("Vaeroex could not safely calculate this workspace’s monthly token usage. Contact Vaeroex support before running more intelligence requests.");
+  }
+
+  const usedTokens = (data || []).reduce((sum, row) => sum + (row.tokens_used || 0), 0);
+  const projectedTokens = usedTokens + estimatedRequestTokens;
+
+  if (projectedTokens > budget.monthlyTokens) {
+    throw new Error("This workspace has reached its monthly Vaeroex intelligence token budget. Contact Vaeroex support if you need a temporary increase.");
+  }
+
+  return {
+    allowed: true,
+    budget,
+    usedTokens,
+    estimatedRequestTokens,
+    remainingTokens: Math.max(0, budget.monthlyTokens - projectedTokens)
+  };
 }
 
 export async function recordVaeroexAiUsage({

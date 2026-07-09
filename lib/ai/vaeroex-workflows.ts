@@ -15,7 +15,7 @@ export type VaeroexWorkflowKey =
   | "weekly_management_meeting"
   | "business_review_package";
 
-export type VaeroexSaveTarget = "tasks" | "sop" | "form" | "checklist" | "report";
+export type VaeroexSaveTarget = "sop" | "report";
 
 export type VaeroexWorkflow = {
   key: VaeroexWorkflowKey;
@@ -176,7 +176,7 @@ ${sharedJsonInstructions}
     description: "Draft a visibility form with recommended fields, required fields, follow-up rules, and dashboard metrics.",
     actionLabel: "Draft form",
     promptPlaceholder: "What should this form collect?",
-    saveTargets: ["form"],
+    saveTargets: ["report"],
     instructions: `
 Generate a form draft using the form structure from the Vaeroex system prompt.
 Return the form in form with name, description, form_type, fields, required_fields, suggested_follow_up_actions, and suggested_dashboard_metrics.
@@ -192,7 +192,7 @@ ${sharedJsonInstructions}
     description: "Draft a checklist for leadership-reviewed procedures, standards, and evidence capture.",
     actionLabel: "Draft checklist",
     promptPlaceholder: "What recurring work should this checklist control?",
-    saveTargets: ["checklist"],
+    saveTargets: ["report"],
     instructions: `
 Generate a checklist draft using the checklist structure from the Vaeroex system prompt.
 Return the checklist in checklist with name, description, category, frequency, assigned_role, items, completion_standard, missed_standard, and escalation_rules.

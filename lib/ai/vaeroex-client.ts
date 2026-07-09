@@ -1,11 +1,13 @@
 import "server-only";
 import { createHash, randomUUID } from "crypto";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanVaeroexErrorMessage, VAEROEX_INTELLIGENCE_UNAVAILABLE_MESSAGE } from "@/lib/ai/errors";
+import { fetchWithOpenAIResilience, getOpenAICircuitSnapshot, getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
-import type { VaeroexTokenUsage } from "@/lib/ai/usage";
+import { assertWorkspaceTokenBudget, estimateTokenCount, getWorkspaceTokenBudget, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
-import type { Json } from "@/lib/supabase/types";
+import type { Database, Json } from "@/lib/supabase/types";
 
 type RunVaeroexRequest = {
   workflow: VaeroexWorkflow;
@@ -13,6 +15,8 @@ type RunVaeroexRequest = {
   workspaceSnapshot: Json;
   extraInputs?: Json;
   fileAttachment?: VaeroexFileAttachment;
+  supabase?: SupabaseClient<Database>;
+  workspaceId?: string;
 };
 
 export type VaeroexFileAttachment = {
@@ -313,6 +317,9 @@ export function getVaeroexOpenAIRuntimeStatus() {
     openaiEndpoint: "/v1/responses",
     openaiEmbeddingModel: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
     maxEvidenceChunks: Number.parseInt(process.env.VAEROEX_MAX_EVIDENCE_CHUNKS || "8", 10),
+    retrySettings: getOpenAIRetrySettings(),
+    circuit: getOpenAICircuitSnapshot(),
+    workspaceTokenBudget: getWorkspaceTokenBudget(),
     responseFormat: "text.format json_object",
     serverOnly: true
   };
@@ -335,7 +342,9 @@ export async function runVaeroexCompletionWithUsage({
   userPrompt,
   workspaceSnapshot,
   extraInputs = {},
-  fileAttachment
+  fileAttachment,
+  supabase,
+  workspaceId
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     throw new Error("Vaeroex prompt is not configured.");
@@ -357,36 +366,47 @@ export async function runVaeroexCompletionWithUsage({
 
   const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
   const startedAt = Date.now();
+  const requestBody = {
+    model,
+    temperature: 0.2,
+    text: { format: { type: "json_object" } },
+    input: [
+      {
+        role: "system",
+        content: `${VAEROEX_SYSTEM_PROMPT}\n\nWorkflow instructions:\n${workflow.instructions}`
+      },
+      {
+        role: "user",
+        content: buildUserContent({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment })
+      }
+    ]
+  };
+  const requestBodyJson = JSON.stringify(requestBody);
+  const estimatedRequestTokens = estimateTokenCount(requestBodyJson);
+  const tokenBudget = await assertWorkspaceTokenBudget({
+    supabase,
+    workspaceId,
+    estimatedRequestTokens
+  });
+
   logVaeroexOpenAIEvent("request_start", {
     requestId,
     workflow: workflow.key,
     model,
     ...env,
     openaiApiMode: "responses",
-    openaiEndpoint: "/v1/responses"
+    openaiEndpoint: "/v1/responses",
+    estimatedRequestTokens,
+    workspaceTokenBudgetRemaining: tokenBudget.remainingTokens
   });
 
-  const response = await fetch(OPENAI_RESPONSES_ENDPOINT, {
+  const response = await fetchWithOpenAIResilience(OPENAI_RESPONSES_ENDPOINT, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({
-      model,
-      temperature: 0.2,
-      text: { format: { type: "json_object" } },
-      input: [
-        {
-          role: "system",
-          content: `${VAEROEX_SYSTEM_PROMPT}\n\nWorkflow instructions:\n${workflow.instructions}`
-        },
-        {
-          role: "user",
-          content: buildUserContent({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment })
-        }
-      ]
-    })
+    body: requestBodyJson
   });
 
   const payload = (await response.json().catch(() => ({}))) as ResponsesApiResponse;

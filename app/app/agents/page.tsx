@@ -26,18 +26,12 @@ type VaeroexHubPageProps = {
 type JsonRecord = Record<string, unknown>;
 
 const saveLabels: Record<VaeroexSaveTarget, string> = {
-  tasks: "recommended actions",
   sop: "SOP draft",
-  form: "form draft",
-  checklist: "checklist draft",
   report: "briefing draft"
 };
 
 const saveDestinations: Record<string, { label: string; href: Route }> = {
-  tasks: { label: "Actions", href: "/app/actions" },
   sop: { label: "SOPs", href: "/app/sops" },
-  form: { label: "Forms", href: "/app/forms" },
-  checklist: { label: "Checklists", href: "/app/checklists" },
   report: { label: "Briefings", href: "/app/briefings" as Route }
 };
 const vaeroexRunEditFields: ManagedRecordEditField[] = [
@@ -592,18 +586,6 @@ function getReportDrafts(output: JsonRecord) {
 }
 
 function hasDraftForTarget(output: JsonRecord, target: VaeroexSaveTarget, workflowKey: string) {
-  if (target === "tasks") {
-    return Boolean(getTaskDrafts(output).length);
-  }
-
-  if (target === "form") {
-    return Boolean(getFormDrafts(output).length);
-  }
-
-  if (target === "checklist") {
-    return Boolean(getChecklistDrafts(output).length);
-  }
-
   if (target === "sop") {
     return Boolean(getSopDrafts(output).length);
   }
