@@ -10,12 +10,14 @@ export function PendingSubmitButton({
   children,
   pendingLabel = "Working...",
   className,
-  disabled = false
+  disabled = false,
+  activityDisabled = false
 }: {
   children: ReactNode;
   pendingLabel?: string;
   className: string;
   disabled?: boolean;
+  activityDisabled?: boolean;
 }) {
   const { pending } = useFormStatus();
   const [localPending, setLocalPending] = useState(false);
@@ -24,7 +26,7 @@ export function PendingSubmitButton({
   const clickLockedRef = useRef(false);
   const observedFormPendingRef = useRef(false);
   const showingPending = pending || localPending;
-  useActivitySignal(showingPending, pendingLabel, { source: "form-submit", timeoutMs: LOCAL_PENDING_TIMEOUT_MS });
+  useActivitySignal(!activityDisabled && showingPending, pendingLabel, { source: "form-submit", timeoutMs: LOCAL_PENDING_TIMEOUT_MS });
 
   useEffect(() => {
     const button = buttonRef.current;
@@ -91,17 +93,6 @@ export function PendingSubmitButton({
         aria-busy={showingPending}
         data-vaeroex-local-activity="true"
         data-vaeroex-activity-label={pendingLabel}
-        onClick={(event) => {
-          const form = event.currentTarget.form;
-
-          if (disabled || showingPending || clickLockedRef.current || (form && !form.checkValidity())) {
-            return;
-          }
-
-          clickLockedRef.current = true;
-          setLocalError("");
-          setLocalPending(true);
-        }}
       >
         {showingPending ? pendingLabel : children}
       </button>

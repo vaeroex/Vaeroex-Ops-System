@@ -197,16 +197,19 @@ for (const file of customerPages) {
 
 const pendingSubmitButton = read("components/operations/PendingSubmitButton.tsx");
 check(pendingSubmitButton.includes("useFormStatus"), "PendingSubmitButton must keep React form-status awareness for server action submissions.");
-check(pendingSubmitButton.includes("useActivitySignal(showingPending"), "PendingSubmitButton must register active submissions with the global loading cursor manager.");
+check(pendingSubmitButton.includes("useActivitySignal(!activityDisabled && showingPending"), "PendingSubmitButton must support scoped global loading cursor registration.");
 check(pendingSubmitButton.includes("const showingPending = pending || localPending"), "PendingSubmitButton must combine form pending and local pending state.");
 check(pendingSubmitButton.includes("setLocalPending(true)"), "PendingSubmitButton must set local pending immediately when a submit starts.");
 check(!pendingSubmitButton.includes("setTimeout(() => setLocalPending(true)"), "PendingSubmitButton must not delay local pending state with setTimeout.");
+check(!pendingSubmitButton.includes("onClick={"), "PendingSubmitButton must not set pending from a pre-submit click handler that can race native form submission.");
 check(pendingSubmitButton.includes("disabled={disabled || showingPending}"), "PendingSubmitButton must disable itself while a submission is pending.");
 check(pendingSubmitButton.includes("pointer-events-none opacity-70"), "PendingSubmitButton must visually fade and suppress hover while pending.");
 check(pendingSubmitButton.includes("{showingPending ? pendingLabel : children}"), "PendingSubmitButton must swap its label to the pending label while generating.");
 
 const agentsPage = read("app/app/agents/page.tsx");
 check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
+check(agentsPage.includes("data-vaeroex-skip-global-activity={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex form must bypass the document-level global activity submit listener.");
+check(agentsPage.includes("activityDisabled={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex must bypass button-level global activity cursor registration while preserving local pending text.");
 
 const agentsActionsRuntime = read("app/app/agents/actions.ts");
 check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), "Ask Vaeroex must bound Business Memory retrieval so server actions can return.");
