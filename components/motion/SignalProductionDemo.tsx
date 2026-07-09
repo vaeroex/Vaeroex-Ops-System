@@ -41,9 +41,9 @@ const signalExamples = [
   },
   {
     title: "Source Context",
-    description: "Unclear source data is surfaced so leaders can review the underlying workflow.",
+    description: "Unclear source data is surfaced so leaders can review the underlying evidence.",
     steps: ["Signal identified", "Context checked", "Gap surfaced", "Review prepared"],
-    output: "Accountability becomes visible without Vaeroex replacing the execution system."
+    output: "Context becomes visible without Vaeroex replacing the systems teams already use."
   },
   {
     title: "Outcome Signal",
@@ -75,10 +75,7 @@ export function SignalProductionDemo() {
               aria-pressed={isActive}
               title={signal.description}
             >
-              <span className="inline-flex rounded-full border border-vaeroex-accent/30 bg-vaeroex-accent/10 px-2.5 py-1 text-[0.68rem] font-semibold uppercase tracking-[0.14em] text-vaeroex-accent">
-                Signal
-              </span>
-              <h3 className="mt-3 font-semibold text-white">{signal.title}</h3>
+              <h3 className="font-semibold text-white">{signal.title}</h3>
               <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-300">{signal.description}</p>
             </button>
           );

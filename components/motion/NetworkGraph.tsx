@@ -66,12 +66,12 @@ export function NetworkGraph() {
         <div className="col-start-2 row-start-2 self-center rounded-xl border border-vaeroex-blue/30 bg-vaeroex-navy p-4 text-center text-white shadow-command">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Vaeroex Network</p>
           <p className="mt-2 text-sm font-semibold">{active ? active.label : "Strategic ecosystem"}</p>
-          <p className="mt-2 text-xs leading-5 text-slate-300">Visibility • Accountability • Execution</p>
+          <p className="mt-2 text-xs leading-5 text-slate-300">Visibility • Context • Decision Support</p>
         </div>
       </div>
       <p className="mt-4 text-sm leading-6 text-muted">
         The Vaeroex Network brings together business leaders, operators, advisors, investors, consultants, and strategic partners who believe visibility,
-        accountability, and execution drive growth.
+        context, and better decisions drive growth.
       </p>
     </div>
   );

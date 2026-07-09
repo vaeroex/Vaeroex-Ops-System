@@ -4,7 +4,7 @@ const previewSignals = [
   ["Context Retrieved", "Relevant historical signal identified.", "violet"],
   ["Decision Required", "Leadership review recommended.", "blue"],
   ["Action Recommended", "Next step generated from intelligence.", "navy"],
-  ["Ownership Established", "Responsible party assigned.", "green"],
+  ["Evidence Connected", "Supporting source identified.", "green"],
   ["Outcome Tracked", "Impact monitored after action.", "cyan"]
 ] as const;
 

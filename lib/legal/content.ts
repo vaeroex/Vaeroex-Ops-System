@@ -46,7 +46,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   terms: {
     id: "terms",
     title: "Terms of Service",
-    summary: "Plain-English terms for using Vaeroex as an Intelligence Platform.",
+    summary: "Plain-English terms for using Vaeroex as an Operations Intelligence Platform.",
     href: "/terms",
     updated: LEGAL_DOCUMENT_VERSIONS.terms,
     sections: [
@@ -60,8 +60,8 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Description of Service",
         body: [
-          "Vaeroex is an Intelligence Platform designed to help organizations turn information into visibility, awareness, prediction, and action.",
-          "The current Vaeroex product is Operations Intelligence. It may include dashboards, KPI records, CRM records, files, SOPs, checklists, issues, reports, notifications, business memory, predictive insights, and Vaeroex-generated recommendations."
+          "Vaeroex is an Operations Intelligence Platform designed to help organizations turn information into visibility, awareness, prediction, and action.",
+          "Vaeroex may include dashboards, KPI records, files, reports, business memory, evidence retrieval, predictive insights, and Vaeroex-generated recommendations."
         ]
       },
       {
@@ -74,8 +74,8 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Workspace Responsibility",
         body: [
-          "Customers control the records, files, people, roles, and workspace activity they enter into Vaeroex.",
-          "Workspace owners and admins are responsible for inviting the right users, assigning appropriate roles, and reviewing workspace activity."
+          "Customers control the records, files, roles, and workspace activity they enter into Vaeroex.",
+          "Workspace owners and admins are responsible for inviting the right users, choosing appropriate access roles, and reviewing workspace activity."
         ]
       },
       {
@@ -173,7 +173,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
         title: "Beta and Evolving Features",
         body: [
           "Some features may be released as beta, preview, or evolving features.",
-          "Customers should review outputs and workflows carefully before using them for important decisions."
+          "Customers should review outputs carefully before using them for important decisions."
         ]
       },
       {
@@ -222,7 +222,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     sections: [
       { title: "Information We Collect", body: ["Vaeroex may collect account information, workspace data, uploaded files, usage data, support messages, and technical information needed to operate the platform."] },
       { title: "Account Information", body: ["Account information may include name, email address, authentication identifiers, and profile details entered by the user."] },
-      { title: "Workspace Data", body: ["Workspace data may include business records, KPIs, CRM records, reports, SOPs, checklists, issues, follow-ups, assignments, notifications, and workspace settings."] },
+      { title: "Workspace Data", body: ["Workspace data may include business records, KPI records, source evidence, reports, Business Signals, notifications, and workspace settings."] },
       { title: "Uploaded Files", body: ["Uploaded files may be stored and processed so Vaeroex can provide file libraries, imports, analysis, reports, and historical business memory."] },
       { title: "Usage Data", body: ["Vaeroex may collect usage data such as feature activity, report generation, Vaeroex runs, timestamps, user agent, and operational logs. IP address may be processed where available for security, audit, abuse prevention, or platform operation."] },
       { title: "Payment Data", body: ["Payment and subscription checkout are handled through Vaeroex checkout and official Vaeroex sales channels. Vaeroex may process subscription status, customer email, order identifiers, and related billing metadata, but it does not need full payment card details to operate the workspace."] },
@@ -232,7 +232,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Service Providers and Subprocessors", body: ["A subprocessors list should be finalized before broad commercial launch. Examples may include hosting, database, authentication, payment, email, analytics, support, and AI infrastructure providers."] },
       { title: "Data Security", body: ["Vaeroex is designed with workspace-scoped access and role-aware controls. No service can guarantee absolute security, and customers remain responsible for account access, workspace roles, and the data they choose to enter."] },
       { title: "Data Retention", body: ["Vaeroex may retain account, workspace, support, billing, usage, and audit records as needed to operate the service, comply with legal obligations, resolve disputes, and enforce agreements."] },
-      { title: "Customer Controls", body: [`Workspace owners and admins can manage workspace records, roles, and some settings inside the app. Additional data requests can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`] },
+      { title: "Customer Controls", body: [`Workspace owners and admins can manage workspace records, access roles, and some settings inside the app. Additional data requests can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`] },
       { title: "Cookies and Analytics", body: ["Vaeroex may use cookies or similar technologies for authentication, security, preferences, and platform operation. Analytics details should be finalized before commercial launch."] },
       { title: "Children's Privacy", body: ["Vaeroex is intended for business use and is not directed to children."] },
       { title: "Changes to Privacy Policy", body: ["Vaeroex may update this policy as the platform evolves. Material updates may require users to review and accept updated terms."] },
@@ -285,12 +285,12 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/ai-disclaimer",
     updated: LEGAL_DOCUMENT_VERSIONS.aiDisclaimer,
     sections: [
-      { title: "Operational Support", body: ["Vaeroex uses AI-assisted systems to assist with operational analysis, predictive insights, decision support, recommendations, summaries, file reviews, and reports."] },
+      { title: "Operations Intelligence Support", body: ["Vaeroex uses AI-assisted systems to assist with operational analysis, predictive insights, decision support, recommendations, summaries, file reviews, and reports."] },
       { title: "Possible Errors", body: ["Outputs may be incomplete, inaccurate, outdated, or unsuitable for a specific business situation."] },
-      { title: "Human Review Required", body: ["Users must review and approve Vaeroex-generated outputs before relying on them or saving them into tasks, reports, KPIs, SOPs, forms, checklists, or follow-ups."] },
+      { title: "Human Review Required", body: ["Users must review and approve Vaeroex-generated outputs before relying on them or saving them into reports, KPIs, SOP drafts, checklists, or other supporting materials."] },
       { title: "No Professional Advice", body: ["Vaeroex does not provide legal, medical, financial, tax, insurance, employment, compliance, safety, or regulated professional advice."] },
       { title: "No Guarantee", body: ["Vaeroex recommendations are not guarantees of business performance, revenue, compliance, or operational improvement."] },
-      { title: "Manager Responsibility", body: ["Managers and owners remain responsible for decisions, implementation, review, and follow-through."] },
+      { title: "Customer Responsibility", body: ["Customers remain responsible for decisions, implementation, review, and follow-through."] },
       { title: "Sensitive Data", body: ["Sensitive or regulated data should not be uploaded unless appropriate legal, security, and compliance controls exist and Vaeroex explicitly supports that use."] }
     ]
   },
@@ -304,7 +304,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Designed Use", body: ["Vaeroex is designed for operational business records, not regulated sensitive records."] },
       { title: "Do Not Upload or Enter", body: ["Do not upload or enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, payment card numbers, government IDs, highly sensitive personal data, or regulated health, legal, financial, or employment data unless appropriate legal, security, and compliance requirements are in place and Vaeroex explicitly supports that use."] },
       { title: "Customer Responsibility", body: ["Customers are responsible for understanding the laws, contracts, policies, and compliance obligations that apply to their business data."] },
-      { title: "Where This Matters", body: ["This policy applies to setup, forms, files, reports, support requests, Ask Vaeroex, CRM records, SOPs, issues, checklists, and any other place where users enter business information."] }
+      { title: "Where This Matters", body: ["This policy applies to setup, files, reports, support requests, Ask Vaeroex, Business Signals, KPIs, and any other place where users enter business information."] }
     ]
   },
   "subscription-billing-terms": {
@@ -342,7 +342,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     updated: "2026-06-19",
     sections: [
       { title: "Review Before Use", body: ["Vaeroex outputs should be reviewed by a qualified person before they are used for important business actions."] },
-      { title: "Approval Before Saving", body: ["When Vaeroex drafts reports, SOPs, forms, checklists, KPIs, or follow-ups, users should confirm the output before saving or implementing it."] },
+      { title: "Approval Before Saving", body: ["When Vaeroex drafts reports, SOPs, checklists, KPIs, or other supporting materials, users should confirm the output before saving or implementing it."] },
       { title: "Professional Review", body: ["For legal, medical, financial, tax, insurance, employment, compliance, safety, or regulated decisions, customers should involve qualified professionals."] }
     ]
   }
@@ -367,9 +367,9 @@ export const trustSections = [
 export const releaseNotes = [
   {
     date: "June 2026",
-    title: "Intelligence Platform foundation",
+    title: "Operations Intelligence foundation",
     type: "Feature added",
-    body: "Vaeroex now includes the Operations Intelligence foundation: workspace setup, dashboard intelligence, KPIs, CRM, files, reports, SOPs, checklists, follow-ups, business memory, and Vaeroex recommendations."
+    body: "Vaeroex now includes the Operations Intelligence foundation: workspace setup, dashboard intelligence, KPIs, source evidence, reports, Business Signals, business memory, and Vaeroex recommendations."
   },
   {
     date: "June 2026",

@@ -21,7 +21,7 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
       <PageHeader
         eyebrow="Help Center"
         title="Vaeroex customer education"
-        description="Guides for Vaeroex as an Intelligence Platform, Operations Intelligence as the current product, trust, legal safety, billing, and support."
+        description="Guides for Operations Intelligence, trust, legal safety, billing, and support."
         actions={
           <>
             <Link href="/app/support" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">Contact Support</Link>

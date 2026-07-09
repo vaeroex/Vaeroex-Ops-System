@@ -24,7 +24,7 @@ export default async function AppSupportPage({ searchParams }: AppSupportPagePro
       <PageHeader
         eyebrow="Support"
         title="Contact Vaeroex support"
-        description="Send access, subscription, workspace, visibility, accountability, execution, or Vaeroex result questions to the support queue."
+        description="Send account, subscription, workspace, or Vaeroex result questions to the support queue."
       />
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{params.message}</div> : null}
       <ErrorNotice message={params?.error} />
@@ -54,14 +54,10 @@ export default async function AppSupportPage({ searchParams }: AppSupportPagePro
           <TextInput label="Page/module" name="page_module" placeholder="Dashboard, Files, Reports, Billing..." />
           <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Vaeroex result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
-          <label className="block text-sm font-medium">
-            Screenshot/file placeholder
-            <input disabled placeholder="File upload will be added later" className="mt-2 w-full rounded-lg border border-dashed border-line bg-slate-100 px-3 py-2 text-muted" />
-          </label>
           <div className="md:col-span-2">
             <TextArea label="Message" name="message" required rows={6} />
             <p className="mt-2 text-xs leading-5 text-muted">
-              Do not include patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data in support requests.
+              Do not include patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data. Screenshots can be sent by email if Vaeroex support requests them.
             </p>
           </div>
           <div className="md:col-span-2">

@@ -9,7 +9,7 @@ import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton
 const steps = [
   "Organization",
   "Clarity",
-  "Systems",
+  "Context",
   "Environment",
   "Generate"
 ];
@@ -105,23 +105,23 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
       </section>
 
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 2 ? "" : "hidden"}`}>
-          <h2 className="text-xl font-semibold">Structure to build</h2>
+          <h2 className="text-xl font-semibold">Context to understand</h2>
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="block text-sm font-medium">
-              What do you manage?
+              What should Vaeroex understand?
               <textarea
                 required
                 name="managed_items"
-                placeholder="Employees, vehicles, equipment, customers, jobs, appointments, locations..."
+                placeholder="Revenue sources, customers, locations, assets, service lines, reporting rhythms..."
                 className="mt-2 min-h-28 w-full rounded-lg border border-line px-3 py-2"
               />
             </label>
             <label className="block text-sm font-medium">
-              What should Vaeroex help structure first?
+              What should Vaeroex focus on first?
               <textarea
                 required
                 name="desired_systems"
-                placeholder="Visibility dashboard, executive reports, checklists, SOPs, CRM context, KPI tracking..."
+                placeholder="Executive visibility, KPI trends, customer response, operational risk, file analysis..."
                 className="mt-2 min-h-28 w-full rounded-lg border border-line px-3 py-2"
               />
             </label>
@@ -131,7 +131,7 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 3 ? "" : "hidden"}`}>
           <h2 className="text-xl font-semibold">Choose operational environment</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">
-            This selection helps Vaeroex configure initial dashboards, terminology, workflows, and intelligence signals.
+            This selection helps Vaeroex tune initial terminology, dashboards, and intelligence signals.
             It is only a starting point. You can adjust this later.
           </p>
           <div className="mt-5 grid gap-3 lg:grid-cols-2">
@@ -162,9 +162,9 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 4 ? "" : "hidden"}`}>
           <h2 className="text-xl font-semibold">Generate workspace</h2>
           <p className="mt-3 text-sm leading-6 text-muted">
-            Vaeroex will create a practical starting workspace for visibility, accountability, and execution.
+            Vaeroex will create a practical starting workspace for operational visibility and decision support.
             Your selected environment and organization description will shape initial dashboards, terminology,
-            workflows, Business Signals, reports, and intelligence outputs.
+            Business Signals, reports, and intelligence outputs.
           </p>
           <div className="mt-5">
             <ComplianceNotice />
