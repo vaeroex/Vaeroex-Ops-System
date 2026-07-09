@@ -223,8 +223,13 @@ function displayOutput(output: JsonRecord) {
   };
 }
 
-function isSecurityResponseRun(run: { status?: string | null; error_message?: string | null; output_json?: Json }, output?: JsonRecord) {
-  return run.status === "blocked" || isSecurityResponseMessage(run.error_message) || isSecurityResponseOutput(output || asRecord(run.output_json));
+function isSecurityResponseRun(run: { title?: string | null; status?: string | null; error_message?: string | null; output_json?: Json }, output?: JsonRecord) {
+  return (
+    run.status === "blocked" ||
+    isSecurityResponseMessage(run.title) ||
+    isSecurityResponseMessage(run.error_message) ||
+    isSecurityResponseOutput(output || asRecord(run.output_json))
+  );
 }
 
 function vaeroexResultLabel(value: string) {
