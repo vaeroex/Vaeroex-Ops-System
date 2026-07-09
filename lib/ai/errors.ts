@@ -25,5 +25,9 @@ export function cleanVaeroexErrorMessage(message: string | undefined, fallback =
     return "Vaeroex is temporarily busy. Please try again in a few minutes.";
   }
 
+  if (/timed out|timeout|aborterror|aborted/i.test(redacted)) {
+    return "Vaeroex took too long to generate this response. Please retry with a narrower question or try again shortly.";
+  }
+
   return redacted;
 }

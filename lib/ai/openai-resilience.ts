@@ -14,8 +14,8 @@ type CircuitState = {
 };
 
 const DEFAULT_SETTINGS: OpenAIRetrySettings = {
-  timeoutMs: 30_000,
-  maxRetries: 2,
+  timeoutMs: 18_000,
+  maxRetries: 1,
   retryBaseDelayMs: 750,
   circuitFailureThreshold: 5,
   circuitOpenMs: 60_000
