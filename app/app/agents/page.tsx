@@ -243,6 +243,10 @@ function friendlyHubError(message?: string | null) {
   return message ? cleanVaeroexErrorMessage(message, "Vaeroex could not complete that request. Please try again.") : undefined;
 }
 
+function runDiagnosticsFromOutput(output?: Json) {
+  return asRecord(asRecord(output).vaeroex_run_diagnostics);
+}
+
 function workflowDataUsed(key: VaeroexWorkflowKey) {
   if (key === "file_analysis") {
     return "Selected file content, prior imports, KPIs, reports";
@@ -1179,7 +1183,7 @@ function FailurePanel({
   run,
   canViewDebug
 }: {
-  run: { id: string; agent_type: string; status: string; error_message: string | null; input_json?: Json };
+  run: { id: string; agent_type: string; status: string; error_message: string | null; input_json?: Json; output_json?: Json };
   canViewDebug: boolean;
 }) {
   if (isSecurityResponseRun(run)) {
@@ -1189,6 +1193,10 @@ function FailurePanel({
   const input = getRunInput(run);
   const extraInputs = getRunExtraInputs(run);
   const reasons = failureReasons(input, run.error_message);
+  const diagnostics = runDiagnosticsFromOutput(run.output_json);
+  const finalStage = str(diagnostics.final_stage);
+  const requestId = str(diagnostics.request_id);
+  const errorType = str(diagnostics.error_type);
 
   return (
     <div className="space-y-4 rounded-lg border border-red-400/35 bg-red-950/25 p-4 text-red-50">
@@ -1233,6 +1241,24 @@ function FailurePanel({
               <dt className="font-semibold text-red-50">Error</dt>
               <dd>{friendlyHubError(run.error_message) || "No error message was recorded."}</dd>
             </div>
+            {finalStage ? (
+              <div>
+                <dt className="font-semibold text-red-50">Final stage</dt>
+                <dd>{finalStage}</dd>
+              </div>
+            ) : null}
+            {errorType ? (
+              <div>
+                <dt className="font-semibold text-red-50">Error type</dt>
+                <dd>{errorType}</dd>
+              </div>
+            ) : null}
+            {requestId ? (
+              <div className="sm:col-span-2">
+                <dt className="font-semibold text-red-50">Request ID</dt>
+                <dd className="break-all">{requestId}</dd>
+              </div>
+            ) : null}
           </dl>
         </details>
       ) : null}
@@ -1253,6 +1279,27 @@ function SelectedResult({
 }) {
   if (isSecurityResponseRun(run, output)) {
     return <SecurityResponseNotice />;
+  }
+
+  if (run.status === "failed") {
+    return (
+      <SectionCard title="Vaeroex request did not complete" description="The request was saved with a clear failure state so it can be reviewed or retried.">
+        <FailurePanel run={run} canViewDebug={canViewDebug} />
+      </SectionCard>
+    );
+  }
+
+  if (run.status === "running") {
+    return (
+      <SectionCard title="Vaeroex is still generating" description="This request started successfully and has not reached a final state yet.">
+        <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-4 text-sm text-cyan-50">
+          <p className="font-semibold">Generation in progress</p>
+          <p className="mt-1 text-cyan-100/80">
+            Vaeroex created the run record and is still processing. If this remains here, retry the request or check admin diagnostics.
+          </p>
+        </div>
+      </SectionCard>
+    );
   }
 
   const display = displayOutput(output);
@@ -1282,8 +1329,7 @@ function SelectedResult({
           </div>
         </div>
 
-        {run.status === "failed" ? <FailurePanel run={run} canViewDebug={canViewDebug} /> : null}
-        {run.status !== "failed" && run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
+        {run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
         {run.status === "completed" ? (
           <>
             <BusinessResult output={output} runId={run.id} runTitle={title} />
