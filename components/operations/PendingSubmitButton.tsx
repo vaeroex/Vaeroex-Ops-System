@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { useActivitySignal } from "@/components/app/ActivityProvider";
 
-const LOCAL_PENDING_TIMEOUT_MS = 90000;
+const LOCAL_PENDING_TIMEOUT_MS = 120000;
 
 export function PendingSubmitButton({
   children,
@@ -19,6 +19,8 @@ export function PendingSubmitButton({
 }) {
   const { pending } = useFormStatus();
   const [localPending, setLocalPending] = useState(false);
+  const [localError, setLocalError] = useState("");
+  const clickLockedRef = useRef(false);
   const observedFormPendingRef = useRef(false);
   const showingPending = pending || localPending;
   useActivitySignal(showingPending, pendingLabel, { source: "form-submit", timeoutMs: LOCAL_PENDING_TIMEOUT_MS });
@@ -32,6 +34,7 @@ export function PendingSubmitButton({
 
     if (observedFormPendingRef.current) {
       observedFormPendingRef.current = false;
+      clickLockedRef.current = false;
       setLocalPending(false);
     }
   }, [pending]);
@@ -43,7 +46,9 @@ export function PendingSubmitButton({
 
     const timer = window.setTimeout(() => {
       observedFormPendingRef.current = false;
+      clickLockedRef.current = false;
       setLocalPending(false);
+      setLocalError("Vaeroex did not receive a response. Please try again.");
     }, LOCAL_PENDING_TIMEOUT_MS);
 
     return () => window.clearTimeout(timer);
@@ -52,23 +57,32 @@ export function PendingSubmitButton({
   const resolvedClassName = showingPending ? `${className} pointer-events-none opacity-70` : className;
 
   return (
-    <button
-      disabled={disabled || showingPending}
-      className={resolvedClassName}
-      aria-busy={showingPending}
-      data-vaeroex-local-activity="true"
-      data-vaeroex-activity-label={pendingLabel}
-      onClick={(event) => {
-        const form = event.currentTarget.form;
+    <span className="inline-flex flex-col items-start gap-2">
+      <button
+        disabled={disabled || showingPending}
+        className={resolvedClassName}
+        aria-busy={showingPending}
+        data-vaeroex-local-activity="true"
+        data-vaeroex-activity-label={pendingLabel}
+        onClick={(event) => {
+          const form = event.currentTarget.form;
 
-        if (disabled || showingPending || (form && !form.checkValidity())) {
-          return;
-        }
+          if (disabled || showingPending || clickLockedRef.current || (form && !form.checkValidity())) {
+            return;
+          }
 
-        setLocalPending(true);
-      }}
-    >
-      {showingPending ? pendingLabel : children}
-    </button>
+          clickLockedRef.current = true;
+          setLocalError("");
+          window.setTimeout(() => setLocalPending(true), 0);
+        }}
+      >
+        {showingPending ? pendingLabel : children}
+      </button>
+      {localError ? (
+        <span role="status" aria-live="polite" className="text-xs font-medium text-amber-200">
+          {localError}
+        </span>
+      ) : null}
+    </span>
   );
 }

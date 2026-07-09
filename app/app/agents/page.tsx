@@ -25,6 +25,9 @@ type VaeroexHubPageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 };
 
+export const runtime = "nodejs";
+export const maxDuration = 60;
+
 type JsonRecord = Record<string, unknown>;
 
 const saveLabels: Record<VaeroexSaveTarget, string> = {

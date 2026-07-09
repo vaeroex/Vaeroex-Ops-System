@@ -1,5 +1,6 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
@@ -68,6 +69,28 @@ function slugify(value: string) {
 
 function redirectWithError(message: string): never {
   redirect(`/app/agents?error=${encodeURIComponent(message)}`);
+}
+
+function logVaeroexRunEvent(event: string, details: Record<string, unknown>) {
+  console.info(
+    JSON.stringify({
+      level: "info",
+      component: "ask-vaeroex-run",
+      event,
+      ...details
+    })
+  );
+}
+
+function logVaeroexRunError(event: string, details: Record<string, unknown>) {
+  console.error(
+    JSON.stringify({
+      level: "error",
+      component: "ask-vaeroex-run",
+      event,
+      ...details
+    })
+  );
 }
 
 async function requireWorkspace() {
@@ -204,6 +227,16 @@ export async function runVaeroexAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const workflow = getVaeroexWorkflow(text(formData, "workflow_key"));
   const userPrompt = text(formData, "user_prompt");
+  const requestId = randomUUID();
+  const startedAt = Date.now();
+  const logDetails = (details: Record<string, unknown> = {}) => ({
+    requestId,
+    workspaceId,
+    userId: user.id,
+    workflow: workflow.key,
+    elapsedMs: Date.now() - startedAt,
+    ...details
+  });
   const extraInputs = {
     date_range_start: text(formData, "date_range_start"),
     date_range_end: text(formData, "date_range_end"),
@@ -212,8 +245,12 @@ export async function runVaeroexAction(formData: FormData) {
   let workspaceSnapshot = {} as Json;
   let inputJson = buildInputJson(workflow.key, userPrompt, extraInputs, workspaceSnapshot);
   let destination = "/app/agents";
+  let outcome: "success" | "security" | "error" = "success";
+
+  logVaeroexRunEvent("request_started", logDetails({ promptLength: userPrompt.length }));
 
   try {
+    logVaeroexRunEvent("rate_limit_started", logDetails());
     const rateLimit = await enforceRateLimit({
       action: "vaeroex.run",
       limit: 12,
@@ -227,8 +264,10 @@ export async function runVaeroexAction(formData: FormData) {
     if (!rateLimit.allowed) {
       throw new Error(rateLimitMessage(rateLimit));
     }
+    logVaeroexRunEvent("rate_limit_finished", logDetails({ allowed: true }));
 
     if (isSecuritySensitiveRequest(`${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`)) {
+      logVaeroexRunEvent("security_blocked", logDetails({ reason: "preflight" }));
       const blockedRunId = await storeSecurityBlockedRun({
         supabase,
         workspaceId,
@@ -236,9 +275,12 @@ export async function runVaeroexAction(formData: FormData) {
         workflowKey: workflow.key,
         inputJson
       });
+      logVaeroexRunEvent("run_saved", logDetails({ status: "blocked", runId: blockedRunId }));
       revalidatePath("/app/agents");
+      outcome = "security";
       destination = `/app/agents${blockedRunId ? `?run=${blockedRunId}` : `?error=${encodeURIComponent(securityResponseMessage())}`}`;
     } else {
+      logVaeroexRunEvent("usage_limit_started", logDetails());
       const limit = await isUsageLimitReached({
         supabase,
         userId: user.id,
@@ -250,19 +292,30 @@ export async function runVaeroexAction(formData: FormData) {
       if (limit.reached) {
         throw new Error("You’ve reached the monthly Vaeroex usage limit for this workspace.");
       }
+      logVaeroexRunEvent("usage_limit_finished", logDetails({ allowed: true }));
 
+      logVaeroexRunEvent("workspace_snapshot_started", logDetails());
       workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
+      logVaeroexRunEvent("workspace_snapshot_finished", logDetails());
+
+      logVaeroexRunEvent("memory_retrieval_started", logDetails());
       const evidenceContext = await buildWorkspaceEvidenceContext({
         supabase,
         workspaceId,
         query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`
       });
+      logVaeroexRunEvent("memory_retrieval_finished", logDetails({
+        retrievalMode: evidenceContext.retrievalMode,
+        evidenceChunks: evidenceContext.chunks.length,
+        evidenceConfidenceScore: evidenceContext.confidenceScore
+      }));
       const evidenceAwareInputs = {
         ...extraInputs,
         evidence_context: evidenceContextAsJson(evidenceContext)
       } satisfies Json;
       inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
 
+      logVaeroexRunEvent("openai_started", logDetails());
       const { outputJson, usage } = await runVaeroexCompletionWithUsage({
         workflow,
         userPrompt,
@@ -271,7 +324,14 @@ export async function runVaeroexAction(formData: FormData) {
         supabase,
         workspaceId
       });
+      logVaeroexRunEvent("openai_finished", logDetails({
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        totalTokens: usage.totalTokens,
+        latencyMs: usage.latencyMs ?? null
+      }));
 
+      logVaeroexRunEvent("run_save_started", logDetails());
       const { data, error } = await supabase
         .from("ai_agent_runs")
         .insert({
@@ -288,7 +348,9 @@ export async function runVaeroexAction(formData: FormData) {
       if (error || !data) {
         throw new Error(error?.message || "Vaeroex run could not be saved.");
       }
+      logVaeroexRunEvent("run_saved", logDetails({ status: "completed", runId: data.id }));
 
+      logVaeroexRunEvent("usage_record_started", logDetails({ runId: data.id }));
       await recordVaeroexAiUsage({
         supabase,
         workspaceId,
@@ -303,12 +365,20 @@ export async function runVaeroexAction(formData: FormData) {
           }
         }
       });
+      logVaeroexRunEvent("usage_record_finished", logDetails({ runId: data.id }));
 
       revalidatePath("/app/agents");
       destination = `/app/agents?run=${data.id}`;
     }
   } catch (error) {
     const message = cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined);
+    const rawMessage = error instanceof Error ? error.message : "";
+    const isTimeout = /timed out|timeout|aborterror|aborted/i.test(`${error instanceof Error ? error.name : ""} ${rawMessage}`);
+    outcome = "error";
+    logVaeroexRunError(isTimeout ? "timeout" : "error_thrown", logDetails({
+      errorName: error instanceof Error ? error.name : "UnknownError",
+      message
+    }));
     const failedRunId = await storeFailedRun({
       workspaceId,
       userId: user.id,
@@ -316,10 +386,12 @@ export async function runVaeroexAction(formData: FormData) {
       inputJson,
       message
     });
+    logVaeroexRunEvent("run_saved", logDetails({ status: "failed", runId: failedRunId }));
     revalidatePath("/app/agents");
     destination = `/app/agents${failedRunId ? `?run=${failedRunId}&` : "?"}error=${encodeURIComponent(message)}`;
   }
 
+  logVaeroexRunEvent("response_returned", logDetails({ outcome, destination }));
   redirect(destination as Route);
 }
 

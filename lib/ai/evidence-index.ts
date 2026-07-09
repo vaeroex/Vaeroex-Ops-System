@@ -1,6 +1,7 @@
 import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { fetchWithOpenAIResilience } from "@/lib/ai/openai-resilience";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -169,17 +170,29 @@ async function createEmbeddings(inputs: string[]) {
     };
   }
 
-  const response = await fetch("https://api.openai.com/v1/embeddings", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({
+  let response: Response;
+
+  try {
+    response = await fetchWithOpenAIResilience("https://api.openai.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        input: inputs
+      })
+    });
+  } catch (error) {
+    return {
       model,
-      input: inputs
-    })
-  });
+      embeddings: inputs.map(() => null as number[] | null),
+      tokens: 0,
+      error: error instanceof Error ? error.message : "Embedding request failed."
+    };
+  }
+
   const payload = (await response.json().catch(() => ({}))) as EmbeddingResponse;
 
   if (!response.ok) {
