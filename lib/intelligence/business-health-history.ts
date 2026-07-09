@@ -2,6 +2,10 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/supabase/types";
 
 export type BusinessHealthSnapshotRow = Database["public"]["Tables"]["business_health_snapshots"]["Row"];
+export type BusinessHealthSnapshotResult = {
+  snapshots: BusinessHealthSnapshotRow[];
+  errorMessage: string | null;
+};
 
 type BusinessHealthSnapshotInput = {
   workspaceId: string;
@@ -52,6 +56,14 @@ export async function getBusinessHealthSnapshots(
   supabase: SupabaseClient<Database>,
   workspaceId: string
 ): Promise<BusinessHealthSnapshotRow[]> {
+  const result = await getBusinessHealthSnapshotResult(supabase, workspaceId);
+  return result.snapshots;
+}
+
+export async function getBusinessHealthSnapshotResult(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string
+): Promise<BusinessHealthSnapshotResult> {
   const today = new Date();
   const start = new Date(Date.UTC(today.getUTCFullYear() - 1, today.getUTCMonth(), today.getUTCDate()));
   const { data, error } = await supabase
@@ -66,8 +78,14 @@ export async function getBusinessHealthSnapshots(
       console.warn("Could not load Business Health snapshots", error.message);
     }
 
-    return [];
+    return {
+      snapshots: [],
+      errorMessage: "Business Health history is temporarily unavailable."
+    };
   }
 
-  return data || [];
+  return {
+    snapshots: data || [],
+    errorMessage: null
+  };
 }

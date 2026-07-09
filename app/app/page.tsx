@@ -16,7 +16,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
-import { getBusinessHealthSnapshots, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
+import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
@@ -967,10 +967,14 @@ function intelligenceHealthTone(status: IntelligenceLayerResult["businessHealth"
 
 function IntelligenceLayerSummary({
   intelligence,
-  businessHealthHistory
+  businessHealthHistory,
+  businessHealthHistoryError,
+  isDemoWorkspace
 }: {
   intelligence: IntelligenceLayerResult;
   businessHealthHistory: BusinessHealthTrendPoint[];
+  businessHealthHistoryError?: string | null;
+  isDemoWorkspace: boolean;
 }) {
   const briefingCards = [
     {
@@ -1043,7 +1047,14 @@ function IntelligenceLayerSummary({
               <dd className="font-semibold text-slate-100">{intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords} signals</dd>
             </div>
           </dl>
-          <BusinessHealthTrendChart points={businessHealthHistory} />
+          <BusinessHealthTrendChart
+            points={businessHealthHistory}
+            currentScore={intelligence.businessHealth.score}
+            currentStatus={intelligence.businessHealth.status}
+            currentTrend={intelligence.businessHealth.trend}
+            isDemoWorkspace={isDemoWorkspace}
+            errorMessage={businessHealthHistoryError}
+          />
         </div>
 
         <div className="space-y-4">
@@ -1916,7 +1927,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       vaeroex_runs: vaeroexRuns.length
     }
   });
-  const businessHealthHistory: BusinessHealthTrendPoint[] = (await getBusinessHealthSnapshots(supabase, workspaceId)).map((snapshot) => ({
+  const businessHealthSnapshotResult = await getBusinessHealthSnapshotResult(supabase, workspaceId);
+  const businessHealthHistory: BusinessHealthTrendPoint[] = businessHealthSnapshotResult.snapshots.map((snapshot) => ({
     snapshotDate: snapshot.snapshot_date,
     score: snapshot.score,
     status: snapshot.status,
@@ -1979,7 +1991,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       {isExecutiveView ? (
         <>
-          <IntelligenceLayerSummary intelligence={intelligenceLayer} businessHealthHistory={businessHealthHistory} />
+          <IntelligenceLayerSummary
+            intelligence={intelligenceLayer}
+            businessHealthHistory={businessHealthHistory}
+            businessHealthHistoryError={businessHealthSnapshotResult.errorMessage}
+            isDemoWorkspace={isViewingDemoWorkspace}
+          />
           <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} compact />
 
           <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
