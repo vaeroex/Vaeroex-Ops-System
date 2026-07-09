@@ -13,13 +13,13 @@ import { SignalProductionDemo } from "@/components/motion/SignalProductionDemo";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex — Intelligence Platform",
+  title: "Vaeroex — Operations Intelligence Platform",
   description: "Vaeroex helps organizations transform scattered information into visibility, awareness, prediction, and action.",
   path: "/"
 });
 
 const intelligenceDomains = [
-  ["Operations Intelligence", "Current", "Helps organizations understand execution, accountability, performance signals, reviews, and operational decisions."],
+  ["Operations Intelligence", "Current", "Helps organizations understand performance signals, risks, reviews, and operational decisions."],
   ["Industrial Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support assets, equipment, systems, reliability, and field signals."],
   ["Infrastructure Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support distributed systems, remote environments, critical assets, and visibility."],
   ["Security Intelligence", "Expanding domain", "A future-facing area where intelligence architecture can support risk awareness, monitoring context, alerts, and situational understanding."],
@@ -32,14 +32,14 @@ const intelligenceLoop = [
   ["Analyze", "Identify relationships, changes, anomalies, risk patterns, and meaningful signals."],
   ["Predict", "Surface emerging risks, likely outcomes, opportunities, and conditions before they become obvious."],
   ["Prioritize", "Determine what matters most and what requires attention, review, escalation, or response."],
-  ["Execute", "Turn intelligence into review-ready decisions, executive briefs, recommendations, and supporting outputs."],
+  ["Recommend", "Turn intelligence into review-ready decisions, executive briefs, recommendations, and supporting outputs."],
   ["Measure", "Track outcomes over time to understand what changed, what improved, and what needs attention next."]
 ] as const;
 
 const differentCards = [
   ["Most organizations have information.", "Vaeroex turns scattered signals into visibility."],
   ["Most systems show what happened.", "Vaeroex helps explain why it matters and what may happen next."],
-  ["Most intelligence stops at awareness.", "Vaeroex connects understanding to ownership, response, and action."]
+  ["Most intelligence stops at awareness.", "Vaeroex connects understanding to recommended action."]
 ] as const;
 
 function badgeClass(status: string) {
@@ -63,7 +63,7 @@ export default function HomePage() {
         <div className="vaeroex-hero-reveal relative mx-auto grid max-w-6xl gap-6 lg:grid-cols-[0.92fr_1.08fr] lg:items-center">
           <div>
             <VaeroexLogo variant="full" size="md" priority className="mb-3 hidden sm:inline-flex" />
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Intelligence Platform</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Operations Intelligence Platform</p>
             <h1 className="mt-2 max-w-4xl text-5xl font-semibold tracking-tight sm:text-6xl">Vaeroex</h1>
             <p className="mt-3 max-w-3xl text-2xl font-semibold leading-tight text-slate-100 sm:text-3xl">
               Transforming information into visibility, awareness, prediction, and action.
@@ -72,7 +72,7 @@ export default function HomePage() {
               Vaeroex helps organizations transform scattered information into meaningful intelligence, creating the visibility, awareness, prediction, and action needed to understand sooner and move with confidence.
             </p>
             <div className="mt-4 flex flex-wrap gap-2 text-sm font-semibold text-slate-100" aria-label="Vaeroex brand pillars">
-              {["Visibility", "Accountability", "Execution"].map((pillar) => (
+              {["Visibility", "Understanding", "Action"].map((pillar) => (
                 <span key={pillar} className="rounded-full border border-white/15 bg-white/10 px-4 py-2">
                   {pillar}
                 </span>
@@ -98,7 +98,7 @@ export default function HomePage() {
               <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">What Intelligence Means</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-white">Information becomes useful when it creates action.</h2>
               <p className="mt-4 text-sm leading-6 text-slate-300">
-                Information is everywhere. Visibility shows what is happening. Understanding explains why it matters. Prediction shows what may happen next. Action turns intelligence into execution.
+                Information is everywhere. Visibility shows what is happening. Understanding explains why it matters. Prediction shows what may happen next. Action turns intelligence into decisions.
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-300">
                 Vaeroex is built to help organizations move from scattered information to structured intelligence.
@@ -114,7 +114,7 @@ export default function HomePage() {
                 <h2 className="mt-2 text-3xl font-semibold tracking-tight text-white">A preview of intelligence turning into decisions.</h2>
               </div>
               <p className="max-w-xl text-sm leading-6 text-slate-300">
-                These website examples are illustrative only. They show the kind of visibility, accountability, and execution signals Vaeroex is built to organize.
+                These website examples are illustrative only. They show the kind of evidence-backed signals Vaeroex is built to organize.
               </p>
             </div>
             <div className="mt-5">
@@ -146,7 +146,7 @@ export default function HomePage() {
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Applied Intelligence</p>
                 <h3 className="mt-2 text-2xl font-semibold tracking-tight text-white">Operations Intelligence</h3>
                 <p className="mt-3 text-sm leading-6 text-slate-300">
-                  Operations Intelligence is one application of Vaeroex, focused on helping organizations improve visibility, accountability, and execution in operational environments.
+                  Operations Intelligence helps organizations turn operational activity into visibility, context, recommendations, and leadership decision support.
                 </p>
                 <div className="mt-4 flex flex-wrap gap-3">
                   <Link href={operationsIntelligenceRoute} className="inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
@@ -198,9 +198,9 @@ export default function HomePage() {
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">The Vaeroex Intelligence Loop</p>
             <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-white">Capture, remember, analyze, predict, prioritize, execute, and measure.</h2>
+              <h2 className="max-w-3xl text-3xl font-semibold tracking-tight text-white">Capture, remember, analyze, predict, recommend, and measure.</h2>
               <p className="max-w-xl text-sm leading-6 text-slate-300">
-                Vaeroex helps organizations move from raw signals to awareness, prediction, action, and measured outcomes.
+                Vaeroex helps organizations move from raw signals to awareness, prediction, recommended action, and measured outcomes.
               </p>
             </div>
             <div className="mt-5">

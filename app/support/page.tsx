@@ -21,7 +21,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Send workspace access, billing, setup, visibility, accountability, or execution questions to Vaeroex for review.
+          Send account, billing, setup, or Vaeroex result questions for review.
         </p>
         <div className="mt-4 grid gap-2 rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-muted">
           <p>
@@ -51,14 +51,10 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
           <TextInput label="Page/module" name="page_module" placeholder="Dashboard, Files, Reports, Billing..." />
           <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Vaeroex result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
-          <label className="block text-sm font-medium">
-            Screenshot/file placeholder
-            <input disabled placeholder="File upload will be added later" className="mt-2 w-full rounded-lg border border-dashed border-line bg-slate-100 px-3 py-2 text-muted" />
-          </label>
           <div className="md:col-span-2">
             <TextArea label="Message" name="message" required rows={6} />
             <p className="mt-2 text-xs leading-5 text-muted">
-              Do not include patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data in support requests.
+              Do not include patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data. Screenshots can be sent by email if Vaeroex support requests them.
             </p>
           </div>
           <div className="md:col-span-2">

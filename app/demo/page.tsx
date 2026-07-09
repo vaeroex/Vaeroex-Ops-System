@@ -13,11 +13,11 @@ const previewItems = [
   "Executive Dashboard",
   "Business Health Score",
   "KPI trends",
-  "CRM pipeline",
+  "Customer pipeline context",
   "Reports",
   "Profit Leak Detection",
   "Business Memory",
-  "Accountability signals"
+  "Evidence-backed recommendations"
 ];
 
 export default async function DemoPage({ searchParams }: DemoPageProps) {
@@ -31,8 +31,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Demo</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Request a Vaeroex demo.</h1>
           <p className="mt-4 text-sm leading-6 text-muted">
-            Tell us what you are looking to improve. Vaeroex will review your request and help you understand how visibility,
-            accountability, and execution can fit your business.
+            Tell us what you want to understand. Vaeroex will review your request and help you see how Operations Intelligence can support your business.
           </p>
           <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Build the structure your growth depends on.</p>
           <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">

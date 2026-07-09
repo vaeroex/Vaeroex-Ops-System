@@ -23,7 +23,7 @@ export function ContextualHelp({ title, eyebrow }: { title: string; eyebrow?: st
       <div className="absolute right-0 z-20 mt-2 w-[min(24rem,calc(100vw-2rem))] rounded-lg border border-line bg-white p-4 text-left shadow-xl">
         <p className="text-sm font-semibold text-ink">What this page does</p>
         <p className="mt-1 text-sm leading-6 text-muted">{help.what}</p>
-        <p className="mt-3 text-sm font-semibold text-ink">Recommended workflow</p>
+        <p className="mt-3 text-sm font-semibold text-ink">Suggested review path</p>
         <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm leading-6 text-muted">
           {help.workflow.map((item) => (
             <li key={item}>{item}</li>

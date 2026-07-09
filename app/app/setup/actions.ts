@@ -89,17 +89,17 @@ function buildVaeroexAuditSummary(companyName: string, mainProblem: string, orga
     generated_by: "Vaeroex",
     business_summary: `${companyName} is configured as a ${environmentName} environment. ${
       organizationDescription || "The organization"
-    } needs clear visibility, accountability, and execution structure for repeatable growth.`,
-    current_operational_problems: [mainProblem || "Visibility and execution priorities need to be clarified during setup."],
+    } needs clearer business evidence, context, and leadership review rhythms for repeatable growth.`,
+    current_operational_problems: [mainProblem || "Visibility and review priorities need to be clarified during setup."],
     main_bottlenecks: ["Limited visibility", "Missing Business Signals", "No weekly leadership review cadence"],
     accountability_gaps: ["Business Signals need evidence, context, and clear review standards."],
-    recommended_systems_to_build: ["Forms", "Checklists", "SOPs", "Executive review cadence", "Weekly intelligence report"],
+    recommended_systems_to_build: ["Business Signals", "KPI context", "Source evidence", "Executive review cadence", "Weekly intelligence report"],
     suggested_dashboard_metrics: ["Business Signals", "Signals with limited context", "Open risks", "Assets needing attention"],
     thirty_day_action_plan: [
-      "Week 1: Finalize forms and checklists.",
-      "Week 2: Review evidence and checklist patterns.",
-      "Week 3: Convert repeated issues into SOP drafts.",
-      "Week 4: Generate weekly intelligence report and refine next actions."
+      "Week 1: Capture the first Business Signals.",
+      "Week 2: Review evidence and KPI patterns.",
+      "Week 3: Summarize repeated issues for leadership.",
+      "Week 4: Generate a weekly intelligence report and refine review priorities."
     ]
   };
 }

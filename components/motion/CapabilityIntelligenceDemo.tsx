@@ -44,9 +44,9 @@ const capabilities = [
     relationship: "Connects intelligence to human review."
   },
   {
-    title: "Source Accountability",
+    title: "Source Evidence",
     status: "Current",
-    summary: "Clarify source context, response paths, unresolved items, and review status.",
+    summary: "Clarify source context, unresolved signals, and review status.",
     generated: ["Source located", "Gap identified", "Review prepared", "Outcome compared"],
     examples: ["shared reports", "unresolved signals", "response gaps", "leadership review"],
     relationship: "Connects intelligence to evidence and leadership review."
@@ -62,8 +62,8 @@ const capabilities = [
   {
     title: "Operational Intelligence",
     status: "Current",
-    summary: "Apply intelligence to organizational execution, reviews, workflows, and recurring decisions.",
-    generated: ["Workflow signal read", "Execution pattern found", "Process context matched", "Output suggested"],
+    summary: "Apply intelligence to operational reviews, recurring decisions, and source evidence.",
+    generated: ["Source signal read", "Pattern found", "Process context matched", "Output suggested"],
     examples: ["SOP reviews", "checklist misses", "source drift", "operating reports"],
     relationship: "Connects daily work to the intelligence layer."
   },
@@ -84,12 +84,6 @@ const capabilities = [
     relationship: "An area where intelligence can support faster awareness."
   }
 ] as const;
-
-function statusClass(status: string) {
-  return status === "Current"
-    ? "border-vaeroex-accent/40 bg-vaeroex-accent/10 text-vaeroex-accent"
-    : "border-fuchsia-300/30 bg-fuchsia-500/10 text-fuchsia-100";
-}
 
 export function CapabilityIntelligenceDemo() {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -114,10 +108,7 @@ export function CapabilityIntelligenceDemo() {
               aria-pressed={isActive}
               title={capability.summary}
             >
-              <span className={`inline-flex rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold ${statusClass(capability.status)}`}>
-                {capability.status}
-              </span>
-              <h3 className="mt-3 font-semibold text-white">{capability.title}</h3>
+              <h3 className="font-semibold text-white">{capability.title}</h3>
               <p className="mt-2 line-clamp-2 text-sm leading-5 text-slate-300">{capability.summary}</p>
             </button>
           );

@@ -217,7 +217,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
       <PageHeader
         eyebrow="Notifications"
         title="Notification Center"
-        description="Review shared reports, KPI alerts, assigned work, checklist misses, file analysis updates, and Vaeroex recommendations."
+        description="Review shared reports, KPI alerts, file analysis updates, Business Signals, and Vaeroex recommendations."
       />
 
       <ErrorNotice message={params?.error || notificationResult.error?.message || assignmentResult.error?.message} />

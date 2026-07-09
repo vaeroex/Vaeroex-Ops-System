@@ -38,7 +38,7 @@ export function HelpArticleCard({ article }: { article: HelpArticle }) {
             </ul>
           </div>
           <div className="lg:col-span-2">
-            <p className="font-semibold text-ink">Example workflow</p>
+            <p className="font-semibold text-ink">Suggested review path</p>
             <ol className="mt-1 list-decimal space-y-1 pl-5">
               {article.workflow.map((step) => (
                 <li key={step}>{step}</li>

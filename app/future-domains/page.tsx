@@ -18,7 +18,7 @@ const domains = [
   ],
   [
     "Organizational Intelligence",
-    "Areas where intelligence can be applied to accountability, execution patterns, decision context, business memory, and leadership visibility."
+    "Areas where intelligence can be applied to decision context, business memory, operating patterns, and leadership visibility."
   ]
 ] as const;
 
@@ -38,7 +38,7 @@ export default function FutureDomainsPage() {
         <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-start">
           <div className="vaeroex-hero-reveal">
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Future Intelligence Domains</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Where the Vaeroex intelligence platform can expand over time.</h1>
+            <h1 className="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">Where Vaeroex can expand over time.</h1>
             <p className="mt-5 text-sm leading-6 text-muted">
               Operations Intelligence is the current Vaeroex product. Future Domains describes platform direction and areas where intelligence can be applied
               as Vaeroex evolves.
@@ -93,7 +93,7 @@ export default function FutureDomainsPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Current Product</p>
             <h2 className="mt-2 text-2xl font-semibold">Operations Intelligence is what Vaeroex offers today.</h2>
             <p className="mt-3 text-sm leading-6 text-slate-300">
-              For current features, workflows, dashboard previews, subscription details, and customer use cases, review the Operations Intelligence product page.
+              For current capabilities, dashboard previews, subscription details, and customer use cases, review the Operations Intelligence product page.
             </p>
             <Link href="/operations-intelligence" className="mt-5 inline-flex rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Explore Operations Intelligence

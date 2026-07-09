@@ -31,16 +31,8 @@ export function PublicRequestForm({ returnPath, issueType, issueOptions, message
         <TextInput label="Name" name="name" required />
         <TextInput label="Email" name="email" type="email" required />
         <TextInput label="Company" name="company" required />
-        <TextInput label="Role" name="role" placeholder="Owner, Director, Manager..." />
-        <TextInput label="Business type" name="business_type" placeholder="Retail, restaurant, service, construction..." />
-        <SelectInput label="Team size" name="team_size" required options={["1-2", "3-10", "11-25", "26-50", "51+"]} />
-        <SelectInput label="Preferred contact method" name="preferred_contact_method" required options={["Email", "Phone", "Text", "Video call"]} />
-        <TextInput label="Workspace" name="workspace" placeholder="Optional if you already have one" />
         <div className="md:col-span-2">
-          <TextArea label="What are you looking to improve or explore with Vaeroex?" name="improvement_goal" required rows={4} />
-        </div>
-        <div className="md:col-span-2">
-          <TextArea label="Message" name="message" required rows={5} />
+          <TextArea label="How can Vaeroex help?" name="message" required rows={4} />
           <p className="mt-2 text-xs leading-5 text-muted">
             Do not include patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data.
           </p>

@@ -8,22 +8,23 @@ const platformLinks: Array<[string, Route]> = [
   ["Platform", "/"],
   ["Operations Intelligence", "/operations-intelligence"],
   ["Pricing", "/pricing"],
-  ["About", "/about"],
-  ["Careers", "/careers"],
-  ["Network", "/networking"],
-  ["Trust", "/trust"],
-  ["Help", "/help"]
+  ["Trust", "/trust"]
 ] as Array<[string, Route]>;
 
-const accessLinks = [
-  ["Explore Operations Intelligence", "/operations-intelligence"],
+const companyLinks = [
+  ["About", "/about"],
   ["Contact", "/contact"],
-  ["Login", "/login"],
-  ["Signup", "/signup"]
+  ["Careers", "/careers"],
+  ["Network", "/networking"]
 ] as const;
 
-const contactLinks = [
-  ["General", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
+const supportLinks = [
+  ["Help", "/help"],
+  ["Login", "/login"],
+  ["Contact", "/contact"]
+] as const;
+
+const emailLinks = [
   ["Support", VAEROEX_CONTACT_EMAILS.support, VAEROEX_MAILTO_LINKS.support],
   ["Billing", VAEROEX_CONTACT_EMAILS.billing, VAEROEX_MAILTO_LINKS.billing],
   ["Partners", VAEROEX_CONTACT_EMAILS.partners, VAEROEX_MAILTO_LINKS.partners]
@@ -39,9 +40,9 @@ export function PublicFooter() {
             <span className="font-semibold">Vaeroex</span>
           </Link>
           <p className="mt-2 max-w-md leading-5">
-            Intelligence Platform. The Advantage of Knowing First.
+            Operations Intelligence Platform. The Advantage of Knowing First.
           </p>
-          <p className="mt-2 text-xs">Visibility • Awareness • Execution</p>
+          <p className="mt-2 text-xs">Visibility • Understanding • Action</p>
           <p className="mt-2 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-3 text-xs leading-5">
             <p className="font-semibold text-ink">Business Address</p>
@@ -66,9 +67,9 @@ export function PublicFooter() {
             </div>
           </div>
           <div>
-            <p className="font-semibold text-ink">Access</p>
+            <p className="font-semibold text-ink">Company</p>
             <div className="mt-2 grid gap-1.5">
-              {accessLinks.map(([label, href]) => (
+              {companyLinks.map(([label, href]) => (
                 <Link key={href} href={href} className="hover:text-vaeroex-blue">
                   {label}
                 </Link>
@@ -76,9 +77,14 @@ export function PublicFooter() {
             </div>
           </div>
           <div>
-            <p className="font-semibold text-ink">Direct Email</p>
+            <p className="font-semibold text-ink">Support</p>
             <div className="mt-2 grid gap-1.5">
-              {contactLinks.map(([label, email, href]) => (
+              {supportLinks.map(([label, href]) => (
+                <Link key={href} href={href} className="hover:text-vaeroex-blue">
+                  {label}
+                </Link>
+              ))}
+              {emailLinks.map(([label, email, href]) => (
                 <a key={email} href={href} className="hover:text-vaeroex-blue">
                   {label}: {email}
                 </a>

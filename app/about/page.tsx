@@ -8,13 +8,13 @@ const intelligenceFlow = [
   ["Visibility", "Seeing what is happening across an organization, system, or environment."],
   ["Awareness", "Understanding patterns, context, risk, change, and meaning."],
   ["Prediction", "Identifying emerging risks, opportunities, and likely outcomes before they become obvious."],
-  ["Action", "Turning intelligence into ownership, decisions, response, execution, and measurable outcomes."]
+  ["Action", "Turning intelligence into decisions, review, response, and measurable outcomes."]
 ] as const;
 
 const differenceCards = [
   ["Most systems collect information.", "Vaeroex is built to help organizations understand it."],
   ["Most tools show what happened.", "Vaeroex helps connect signals, context, risk, prediction, and action."],
-  ["Most intelligence stops at awareness.", "Vaeroex is designed to connect awareness to ownership, response, execution, and outcomes."]
+  ["Most intelligence stops at awareness.", "Vaeroex is designed to connect awareness to recommended action and outcomes."]
 ] as const;
 
 const longTermDomains = [
@@ -40,7 +40,7 @@ export default function AboutPage() {
         </p>
         <p className="mt-3 text-sm font-semibold text-vaeroex-blue">The Advantage of Knowing First.</p>
         <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
-          {["Visibility", "Awareness", "Execution"].map((pillar) => (
+          {["Visibility", "Awareness", "Action"].map((pillar) => (
             <span key={pillar} className="rounded-full border border-line bg-white px-4 py-2 shadow-sm">
               {pillar}
             </span>
@@ -61,7 +61,7 @@ export default function AboutPage() {
             </p>
             <p>
               Vaeroex exists to help organizations turn information into intelligence - revealing what is happening, why it matters,
-              what may happen next, and what action should follow.
+              what may happen next, and what leadership should review.
             </p>
           </div>
         </div>
@@ -70,7 +70,7 @@ export default function AboutPage() {
       <section className="mx-auto max-w-6xl px-6 py-12">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">From Information to Intelligence</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Information becomes valuable when it creates action.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Information becomes valuable when it clarifies action.</h2>
           <p className="mt-4 text-sm leading-6 text-muted">
             Vaeroex follows a simple intelligence path: Information -&gt; Visibility -&gt; Awareness -&gt; Prediction -&gt; Action.
           </p>
@@ -109,8 +109,8 @@ export default function AboutPage() {
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Current Application</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight">Operations Intelligence is the first major application of Vaeroex.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Operations Intelligence helps organizations apply Vaeroex intelligence to operational visibility, accountability,
-              execution, reporting, decision support, and follow-through.
+              Operations Intelligence helps organizations apply Vaeroex intelligence to operational visibility,
+              evidence-backed reporting, decision support, and review.
             </p>
             <Link href="/operations-intelligence" className="mt-5 inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
               Explore Operations Intelligence
@@ -140,7 +140,7 @@ export default function AboutPage() {
             <p>
               Across operational, leadership, and structured environments, the same pattern appeared repeatedly:
               signals existed, but they were scattered. Decisions were being made, but context was incomplete.
-              Ownership existed, but accountability was difficult to track. The work was happening, but leaders often lacked
+              Responsibility existed, but context was difficult to see. The work was happening, but leaders often lacked
               the intelligence needed to see what mattered most.
             </p>
             <p>
@@ -180,7 +180,7 @@ export default function AboutPage() {
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">The Advantage of Knowing First</p>
           <h2 className="mt-3 text-3xl font-semibold tracking-tight">See further, understand faster, and move first.</h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            Vaeroex helps organizations turn scattered information into intelligence that supports awareness, response, execution, and outcomes.
+            Vaeroex helps organizations turn scattered information into intelligence that supports awareness, response, and outcomes.
           </p>
           <div className="mt-6 flex flex-wrap gap-3">
             <Link href="/" className="inline-flex rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">

@@ -97,7 +97,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
       <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Intelligence Platform</span>
+          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Operations Intelligence Platform</span>
         </Link>
 
         <form action={selectWorkspaceAction} className="mt-5 rounded-lg border border-white/10 bg-white/[0.055] p-3 shadow-sm shadow-black/10">
@@ -155,7 +155,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                   {activeWorkspace?.name || "Setup required"} · {accessLabel}
                 </p>
-                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Vaeroex Intelligence Layer</h1>
+                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Operations Intelligence</h1>
               </div>
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
@@ -191,7 +191,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
           <ComplianceNotice compact />
           {children}
           <footer className="flex flex-col gap-2 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
-            <p>Vaeroex helps teams build visibility, accountability, and execution.</p>
+            <p>Vaeroex turns business evidence into leadership clarity.</p>
             <nav className="flex flex-wrap gap-3" aria-label="In-app help and legal links">
               <Link href="/app/help" className="font-semibold hover:text-vaeroex-blue">Help Center</Link>
               <Link href="/app/help/trust" className="font-semibold hover:text-vaeroex-blue">Trust Center</Link>

@@ -9,18 +9,18 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Vaeroex Network",
-  description: "The Vaeroex Network connects business leaders, operators, advisors, partners, and strategic relationships around visibility, accountability, and execution.",
+  description: "The Vaeroex Network connects business leaders, operators, advisors, partners, and strategic relationships around operational clarity and intelligence.",
   path: "/networking"
 });
 
 const networkGroups = [
-  ["Business Owners", "Leaders building stronger visibility, accountability, and execution inside growing companies."],
-  ["Operators", "People who understand the practical realities of improving workflows, follow-through, and daily execution."],
+  ["Business Owners", "Leaders building stronger visibility and decision rhythm inside growing companies."],
+  ["Operators", "People who understand the practical realities of improving operational clarity."],
   ["Consultants", "Advisors who help businesses improve structure, performance, management rhythm, and implementation."],
   ["Advisors", "Experienced leaders who can contribute judgment, perspective, market context, and operational discipline."],
   ["Investors", "Long-term thinkers interested in the Vaeroex vision, business intelligence category, and disciplined company building."],
   ["Implementation Partners", "Trusted partners who can help teams translate Vaeroex insights into better operating habits."],
-  ["Service Providers", "Aligned providers who support practical business needs around systems, process, execution, and leadership rhythm."],
+  ["Service Providers", "Aligned providers who support practical business needs around systems, process, and leadership rhythm."],
   ["Industry Experts", "People with specialized knowledge who understand how strong operating structure improves business performance."],
   ["Strategic Partners", "Organizations and leaders aligned with Vaeroex's platform direction, customer outcomes, and long-term vision."]
 ];
@@ -35,7 +35,7 @@ const networkPrinciples = [
 ];
 
 const strategicRelationshipCards = [
-  ["Experienced operators", "People who understand how visibility, accountability, and execution actually change day-to-day business performance."],
+  ["Experienced operators", "People who understand how visibility and better decisions change day-to-day business performance."],
   ["Advisory relationships", "Leaders who can bring thoughtful perspective around product direction, customer needs, market context, and operating discipline."],
   ["Strategic alignment", "Partners who share the vision for building an intelligence layer that helps businesses operate with greater clarity."]
 ];
@@ -48,14 +48,14 @@ export default function NetworkingPage() {
       <section className="vaeroex-hero-reveal mx-auto max-w-6xl px-6 py-12">
         <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Network</p>
         <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">
-          A premium professional ecosystem connected to the Vaeroex Intelligence Platform.
+          A premium professional ecosystem connected to the Vaeroex Operations Intelligence Platform.
         </h1>
         <p className="mt-5 max-w-3xl text-base leading-7 text-muted">
           The Vaeroex Network brings together business leaders, operators, advisors, investors, consultants, implementation partners,
-          and strategic relationships who believe that visibility, accountability, and execution drive growth.
+          and strategic relationships who believe that visibility, context, and disciplined decisions drive growth.
         </p>
         <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
-          {["Intelligence Platform", "Operations Intelligence", "Visibility", "Accountability", "Execution"].map((pillar) => (
+          {["Operations Intelligence", "Visibility", "Context", "Decision Support"].map((pillar) => (
             <span key={pillar} className="rounded-full border border-line bg-white px-4 py-2 shadow-sm">
               {pillar}
             </span>
@@ -88,10 +88,10 @@ export default function NetworkingPage() {
         <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr]">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Extension of the Platform</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Business intelligence is stronger when trusted people help turn it into action.</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Business intelligence is stronger with trusted perspective.</h2>
             <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex is an Intelligence Platform first, with Operations Intelligence as a core capability. The Network extends that mission through trusted relationships,
-              implementation support, practical expertise, and strategic conversations that help strong ideas become stronger business structure.
+              Vaeroex is an Operations Intelligence Platform. The Network extends that mission through trusted relationships,
+              practical expertise, and strategic conversations that help leaders make sense of complexity.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -107,9 +107,9 @@ export default function NetworkingPage() {
       <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
         <div>
           <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Strategic ecosystem</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationships organized around visibility, accountability, and execution.</h2>
+          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationships organized around clarity and trust.</h2>
           <p className="mt-4 text-sm leading-6 text-muted">
-            The Vaeroex Network is not an open directory or marketplace. It is designed around credible relationships that can help the Intelligence Platform create practical business value.
+            The Vaeroex Network is not an open directory or marketplace. It is designed around credible relationships that can help Operations Intelligence create practical business value.
           </p>
         </div>
         <NetworkGraph />
@@ -119,7 +119,7 @@ export default function NetworkingPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Network Categories</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">A business-focused network built around practical execution.</h2>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight">A business-focused network built around practical judgment.</h2>
           </div>
           <Link href="/contact" className="text-sm font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
             Partner with Vaeroex
@@ -143,7 +143,7 @@ export default function NetworkingPage() {
               <h2 className="mt-3 text-3xl font-semibold tracking-tight">Advisors, investors, and strategic partners aligned with the Vaeroex vision.</h2>
               <p className="mt-4 text-sm leading-6 text-muted">
                 Vaeroex welcomes conversations with experienced operators, advisors, investors, and strategic partners who share our vision for building the intelligence layer
-                that helps businesses operate with greater clarity, accountability, and execution.
+                that helps businesses operate with greater clarity and intelligence.
               </p>
               <p className="mt-3 text-sm leading-6 text-muted">
                 We believe meaningful growth is driven by strong relationships, shared expertise, aligned incentives, and long-term thinking.
@@ -188,7 +188,7 @@ export default function NetworkingPage() {
               <li>Referral partners who serve growing businesses.</li>
               <li>Implementation partners who help teams improve operating structure.</li>
               <li>Advisors and industry experts who can contribute thoughtful market and operating perspective.</li>
-              <li>Operators who understand performance, accountability, and workflow execution.</li>
+              <li>Operators who understand performance, source evidence, and decision rhythm.</li>
               <li>Trusted service providers who support business growth and management systems.</li>
             </ul>
           </ScrollReveal>

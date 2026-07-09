@@ -247,7 +247,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               ) : (
                 <div className="rounded-xl border border-white/10 bg-white/[0.055] p-4">
                   <p className="text-sm font-semibold text-white">No matching workspace records found.</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a customer name, KPI, issue, report title, file name, owner, or status.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a customer name, KPI, issue, report title, file name, or Business Signal.</p>
                 </div>
               )}
             </div>

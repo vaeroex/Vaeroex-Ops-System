@@ -793,8 +793,8 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
     },
     {
       workspace_id: workspaceId,
-      title: "Assign owner for overdue issue review",
-      description: "Review issues carried from March into April and assign a weekly owner.",
+      title: "Review unresolved March issues",
+      description: "Review issues carried from March into April and decide whether leadership review is needed.",
       status: "In Progress",
       priority: "Medium",
       category: "Issues",
@@ -815,8 +815,8 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
     },
     {
       workspace_id: workspaceId,
-      title: "Create CRM follow-up list",
-      description: "Turn current open proposals into assigned follow-up work before the next month closes.",
+      title: "Review customer follow-up pattern",
+      description: "Compare open proposals, response time, and conversion before the next month closes.",
       status: "In Progress",
       priority: "High",
       category: "CRM",
@@ -857,8 +857,8 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
       issue_type: "Customer Service",
       severity: "High",
       status: "Open",
-      root_cause: "Staffing coverage and missed follow-up ownership.",
-      recommended_fix: "Assign daily response owner and add escalation to the follow-up SOP.",
+      root_cause: "Staffing coverage and follow-up quality changed during the March dip.",
+      recommended_fix: "Review the response workflow and summarize escalation gaps for leadership.",
       due_date: dateFromNow(3),
       created_by: user.id,
       created_at: isoForMonth(year, 2, 19)
@@ -870,8 +870,8 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
       issue_type: "CRM",
       severity: "High",
       status: "In Progress",
-      root_cause: "Follow-up quality declined and proposal next steps were not assigned.",
-      recommended_fix: "Use CRM follow-ups and a weekly proposal review.",
+      root_cause: "Follow-up quality declined while proposal next steps became less consistent.",
+      recommended_fix: "Review customer pipeline evidence and generate an executive improvement plan.",
       due_date: dateFromNow(2),
       created_by: user.id,
       created_at: isoForMonth(year, 2, 21)
@@ -884,7 +884,7 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
       severity: "Medium",
       status: "Open",
       root_cause: "Managers did not have a required weekly checklist review.",
-      recommended_fix: "Review missed checklist runs every Friday and assign an owner.",
+      recommended_fix: "Review missed checklist patterns and summarize operational risk for leadership.",
       due_date: dateFromNow(7),
       created_by: user.id,
       created_at: isoForMonth(year, 3, 5)
@@ -896,21 +896,21 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
       issue_type: "SOP",
       severity: "Medium",
       status: "Closed",
-      root_cause: "No monthly owner for follow-up SOP review.",
-      recommended_fix: "Keep a monthly SOP review follow-up tied to management reports.",
+      root_cause: "Follow-up SOP review did not have a consistent monthly leadership cadence.",
+      recommended_fix: "Keep monthly SOP review evidence tied to executive reports.",
       due_date: dateForMonth(year, 3, 20),
       created_by: user.id,
       created_at: isoForMonth(year, 3, 8)
     },
     {
       workspace_id: workspaceId,
-      title: "Current month overdue follow-ups rising",
+      title: "Current month follow-up risk rising",
       description: "Current month overdue follow-ups increased while conversion softened.",
-      issue_type: "Accountability",
+      issue_type: "Customer Pipeline",
       severity: "Medium",
       status: "Open",
-      root_cause: "Recovery follow-ups are not all assigned to owners.",
-      recommended_fix: "Assign owners to overdue follow-ups and include them in next management review.",
+      root_cause: "Recovery follow-up activity is becoming less consistent.",
+      recommended_fix: "Include customer follow-up evidence in the next leadership review.",
       due_date: dateFromNow(4),
       created_by: user.id,
       created_at: isoFromNow(-3)
@@ -984,7 +984,7 @@ async function seedSopsAndChecklists(supabase: AppSupabaseClient, workspaceId: s
         description: "Review open leads, proposals, next contact dates, and lost opportunities.",
         category: "CRM",
         frequency: "Weekly",
-        items_json: ["Review new leads", "Check proposal status", "Assign follow-up owners", "Convert stalled leads to follow-ups"] satisfies Json,
+        items_json: ["Review new leads", "Check proposal status", "Identify stalled proposals", "Summarize pipeline risk"] satisfies Json,
         assigned_role: "Sales Manager",
         created_by: user.id,
         created_at: isoForMonth(year, 0, 6)
@@ -995,7 +995,7 @@ async function seedSopsAndChecklists(supabase: AppSupabaseClient, workspaceId: s
         description: "Confirm procedures still match how the business actually operates.",
         category: "Process",
         frequency: "Monthly",
-        items_json: ["Review stale SOPs", "Update changed steps", "Assign owner", "Document next review date"] satisfies Json,
+        items_json: ["Review stale SOPs", "Update changed steps", "Summarize process risk", "Document next review date"] satisfies Json,
         assigned_role: "General Manager",
         created_by: user.id,
         created_at: isoForMonth(year, 0, 6)
@@ -1102,7 +1102,7 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       improved: ["Basic operating rhythm was in place.", "Lead volume was enough to support the month."],
       declined: ["Revenue was slightly below the $40,000 target.", "Checklist completion was under the 95% target."],
       risks: ["If checklist ownership stayed loose, issues could compound in later months."],
-      actions: ["Create first KPI review follow-up.", "Assign weekly checklist owner."]
+      actions: ["Review first KPI signals.", "Summarize weekly checklist risk."]
     },
     {
       monthIndex: 1,
@@ -1121,8 +1121,8 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       summary: "March was the main performance dip. Revenue fell below target while lead volume stayed decent, pointing to follow-up quality and response time issues.",
       improved: ["Lead volume stayed healthy at 41 new leads."],
       declined: ["Revenue fell to $31,500.", "Conversion dropped to 18%.", "Response time increased to 32 hours.", "Checklist completion fell to 78%."],
-      risks: ["Missed follow-ups could continue lowering conversion.", "Open issues and overdue follow-ups could slow recovery."],
-      actions: ["Create CRM follow-up list.", "Update customer follow-up SOP.", "Create checklist review.", "Generate recovery report."]
+      risks: ["Missed follow-ups could continue lowering conversion.", "Open issues and overdue follow-up signals could slow recovery."],
+      actions: ["Review customer follow-up evidence.", "Update customer follow-up SOP.", "Summarize checklist risk.", "Generate recovery report."]
     },
     {
       monthIndex: 3,
@@ -1131,8 +1131,8 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       summary: "April recovered part of the March dip, but response time and checklist completion still needed attention.",
       improved: ["Revenue nearly returned to target.", "SOP review improved after process updates."],
       declined: ["Response time stayed above target.", "Open issues remained elevated."],
-      risks: ["Partial recovery could stall without issue ownership."],
-      actions: ["Assign owner for overdue issue review.", "Run weekly sales follow-up review.", "Review response time escalation SOP."]
+      risks: ["Partial recovery could stall without a clear issue review cadence."],
+      actions: ["Review unresolved issue evidence.", "Run weekly sales follow-up review.", "Review response time escalation SOP."]
     },
     {
       monthIndex: 4,
@@ -1169,8 +1169,8 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       "The YTD story shows why Vaeroex is useful: February improved, March exposed follow-up and response-time breakdowns, April recovered partially, May improved, and the current month is mixed.",
       ["May showed strong recovery after SOP and checklist review.", "YTD records make month-over-month changes visible."],
       ["March revenue, conversion, satisfaction, SOP review, and checklist completion missed target.", "The current month still shows response-time and overdue-follow-up risk."],
-      ["Lead volume alone did not protect revenue when follow-up quality declined.", "Open issues increased in weak months and need assigned owners."],
-      ["Create KPI review follow-up.", "Create CRM follow-up.", "Create checklist review.", "Generate monthly recovery report.", "Confirm KPI targets for next month."]
+      ["Lead volume alone did not protect revenue when follow-up quality declined.", "Open issues increased in weak months and need leadership review."],
+      ["Review KPI trends.", "Review customer follow-up evidence.", "Summarize checklist risk.", "Generate monthly recovery report.", "Confirm KPI targets for next month."]
     ),
     source_data_json: { demo: true, demo_version: DEMO_VERSION, period: "YTD" } satisfies Json,
     created_by: user.id,
@@ -1204,7 +1204,7 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
       ],
       recommended_actions: [
         {
-          title: "Create CRM follow-up list",
+          title: "Review customer follow-up evidence",
           priority: "High",
           suggested_owner: "Sales Manager",
           suggested_due_date: dateFromNow(2),
@@ -1220,7 +1220,7 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
           related_module: "SOPs"
         },
         {
-          title: "Create checklist review",
+          title: "Summarize checklist risk",
           priority: "Medium",
           suggested_owner: "General Manager",
           suggested_due_date: dateFromNow(3),
@@ -1228,11 +1228,11 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
           related_module: "Checklists"
         },
         {
-          title: "Create KPI review follow-up",
+          title: "Review KPI trend evidence",
           priority: "Medium",
           suggested_owner: "Owner",
           suggested_due_date: dateFromNow(4),
-          why_it_matters: "YTD trends show which KPIs recovered and which still need ownership.",
+          why_it_matters: "YTD trends show which KPIs recovered and which still need leadership review.",
           related_module: "KPIs"
         },
         {
@@ -1246,8 +1246,8 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
       ],
       suggested_tasks: [
         {
-          title: "Review March missed follow-ups",
-          description: "Audit March lost/proposal leads and assign next follow-up owners.",
+          title: "Review March missed follow-up evidence",
+          description: "Audit March lost/proposal leads and summarize where the process weakened.",
           priority: "High",
           category: "CRM",
           due_date_recommendation: dateFromNow(2),
@@ -1259,16 +1259,16 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
           priority: "Medium",
           category: "KPI Review",
           due_date_recommendation: dateFromNow(5),
-          reason_this_matters: "The current month is mixed and needs owner attention before targets drift."
+          reason_this_matters: "The current month is mixed and needs leadership review before targets drift."
         }
       ],
       suggested_systems: [
         "Use KPI Dashboard YTD view to compare March, April, May, and the current month.",
-        "Use CRM follow-ups to prevent lead leakage.",
+        "Use customer pipeline evidence to detect lead leakage.",
         "Use monthly reports to preserve the business story and recovery plan."
       ],
       response_markdown:
-        "March was the weak month: revenue fell below target while response time rose, conversion dropped, open issues increased, and checklist completion fell. May shows recovery after SOP and checklist review. The current month is mixed, so Vaeroex recommends CRM follow-ups, an SOP update, a checklist review, and a monthly recovery report."
+        "March was the weak month: revenue fell below target while response time rose, conversion dropped, open issues increased, and checklist completion fell. May shows recovery after SOP and checklist review. The current month is mixed, so Vaeroex recommends customer follow-up review, an SOP update, a checklist risk summary, and a monthly recovery report."
     } satisfies Json,
     status: "completed",
     created_by: user.id,
@@ -1283,7 +1283,7 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
   const decisionResult = await supabase.from("business_decisions").insert([
     {
       workspace_id: workspaceId,
-      title: "Change weekly lead follow-up process",
+      title: "Review weekly lead follow-up process",
       reason: "Conversion dropped in March even though lead volume stayed healthy.",
       expected_outcome: "Improve conversion rate from 18% toward the 25% target and reduce proposal-stage stalls.",
       related_kpi: "Conversion Rate",
@@ -1296,14 +1296,14 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
     },
     {
       workspace_id: workspaceId,
-      title: "Add response-time escalation owner",
+      title: "Review response-time escalation process",
       reason: "Average response time rose to 32 hours during the March dip.",
       expected_outcome: "Bring response time back under the 24-hour target.",
       related_kpi: "Average Response Time",
       owner: "Taylor Smith",
       review_date: dateForMonth(year, 4, 20),
       status: "reviewed",
-      outcome_summary: "Response time improved to 18 hours in May after daily ownership was added.",
+      outcome_summary: "Response time improved to 18 hours in May after the escalation process was reviewed.",
       created_by: user.id,
       created_at: isoForMonth(year, 3, 12)
     },
@@ -1345,14 +1345,14 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
     },
     {
       workspace_id: workspaceId,
-      title: "Create CRM follow-up list",
+      title: "Review customer follow-up evidence",
       source_type: "prestige_demo",
       source_title: "Vaeroex YTD Demo Operations Intelligence Review",
       evidence: "Proposal-stage leads stalled after response time increased.",
       related_module: "CRM",
       related_kpi: "Conversion Rate",
-      expected_outcome: "Prevent lost pipeline by giving every open proposal an owner and next date.",
-      created_action_type: "task",
+      expected_outcome: "Prevent lost pipeline by identifying stalled proposals before they age out.",
+      created_action_type: "executive_review",
       owner: "Sales Manager",
       priority: "High",
       review_date: dateFromNow(10),
@@ -1383,14 +1383,14 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
     },
     {
       workspace_id: workspaceId,
-      title: "Create current-month KPI review",
+      title: "Review current-month KPI trend",
       source_type: "prestige_demo",
       source_title: "Current month mixed signal",
       evidence: "Revenue is above target, but conversion, response time, overdue follow-ups, and checklist completion still need attention.",
       related_module: "KPIs",
       related_kpi: "Revenue",
-      expected_outcome: "Confirm next-month targets and assign owners before drift repeats.",
-      created_action_type: "task",
+      expected_outcome: "Confirm next-month targets and leadership review priorities before drift repeats.",
+      created_action_type: "executive_review",
       owner: "Owner",
       priority: "Medium",
       review_date: dateFromNow(7),

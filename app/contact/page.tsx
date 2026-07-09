@@ -8,13 +8,7 @@ import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_L
 const inquiryCategories = [
   "Product Demo",
   "Platform Questions",
-  "Network Interest",
   "Strategic Partnership",
-  "Advisor Interest",
-  "Investor / Strategic Relationship",
-  "Implementation Partner",
-  "Partnership Opportunities",
-  "Business Inquiry",
   "Support Request",
   "Billing or Subscription",
   "General Inquiry"
@@ -43,9 +37,9 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Let's start a conversation.</h1>
           <p className="mt-4 text-sm leading-6 text-muted">
             Whether you're exploring Vaeroex, requesting a product demo, interested in partnerships, or have questions about how intelligence,
-            visibility, accountability, and execution can support your business, we'd like to hear from you.
+            visibility, context, and decision support can help your business, we'd like to hear from you.
           </p>
-          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Visibility • Accountability • Execution</p>
+          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Visibility • Understanding • Action</p>
           <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Looking for a product walkthrough?</p>
             <p className="mt-2 text-sm leading-6 text-muted">Start with the Operations Intelligence page for the current product capability.</p>

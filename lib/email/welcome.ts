@@ -57,7 +57,7 @@ Thank you for your support and trust in Vaeroex.
 The Advantage of Knowing First.
 
 Vaeroex
-Intelligence Platform
+Operations Intelligence Platform
 www.vaeroex.com`;
 }
 
@@ -100,7 +100,7 @@ function welcomeEmailHtml() {
                   <p style="margin:0 0 8px;font-size:15px;line-height:1.7;color:#ffffff;font-weight:700;">The Advantage of Knowing First.</p>
                   <p style="margin:0;font-size:14px;line-height:1.7;color:#cbd5e1;">
                     Vaeroex<br />
-                    Intelligence Platform<br />
+                    Operations Intelligence Platform<br />
                     <a href="https://www.vaeroex.com" style="color:#38bdf8;">www.vaeroex.com</a>
                   </p>
                 </div>
