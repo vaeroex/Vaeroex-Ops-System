@@ -5,6 +5,7 @@ import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoverageSummary } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { GeneratedOutputControls } from "@/components/generated/GeneratedOutputControls";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import {
@@ -165,11 +166,9 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
         }
       />
 
-      {error ? (
-        <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm text-red-100 print:hidden">
-          {error}
-        </div>
-      ) : null}
+      <div className="print:hidden">
+        <ErrorNotice message={error} />
+      </div>
       {errors.length ? (
         <div className="rounded-lg border border-amber-400/35 bg-amber-950/30 p-3 text-sm text-amber-100 print:hidden">
           {errors[0]?.message || "Some workspace context could not be loaded. The output was generated from available evidence."}

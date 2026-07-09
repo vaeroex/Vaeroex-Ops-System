@@ -440,25 +440,30 @@ export async function saveVaeroexOutputAction(formData: FormData) {
     sop: "save_vaeroex_output_sop",
     report: "save_vaeroex_output_report"
   };
-  await requireToolExecution<{ runId: string }>(
-    {
-      supabase,
-      workspaceId,
-      userId: user.id,
-      userRole: membership.role
-    },
-    {
-      toolName: toolByTarget[target],
-      args: { runId },
-      initiatedBy: "user",
-      confirmationReceived: true,
-      targetRecordId: run.id,
-      metadata: {
-        save_target: target,
-        agent_type: run.agent_type
-      } satisfies Json
-    }
-  );
+  try {
+    await requireToolExecution<{ runId: string }>(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: toolByTarget[target],
+        args: { runId },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: run.id,
+        metadata: {
+          save_target: target,
+          agent_type: run.agent_type
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent(error instanceof Error ? error.message : "This request cannot be performed because it conflicts with platform security requirements.")}`);
+  }
+
   const createdIds: string[] = [];
 
   if (target === "sop") {

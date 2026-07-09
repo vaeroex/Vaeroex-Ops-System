@@ -92,7 +92,8 @@ function fakeSupabase() {
 
 const {
   TOOL_EXECUTION_REGISTRY,
-  evaluateToolExecution
+  evaluateToolExecution,
+  requireToolExecution
 } = require("../lib/security/tool-execution-gateway.ts");
 const {
   isRetryableOpenAIStatus,
@@ -239,6 +240,22 @@ async function runToolGatewayTests() {
   });
   assert.equal(viewerDecision.allowed, false, "viewer should not approve KPI imports");
   assert.match(viewerDecision.reasonBlocked || "", /role/);
+
+  await assert.rejects(
+    () =>
+      requireToolExecution(ownerContext, {
+        toolName: "run_raw_sql",
+        args: { sql: "drop table public.workspaces" },
+        initiatedBy: "user",
+        confirmationReceived: true
+      }),
+    (error) => {
+      assert.equal(error.message, "This request cannot be performed because it conflicts with platform security requirements.");
+      assert.doesNotMatch(error.message, /Unknown tool|allowlist|schema|role|confirmation|destructive|privileged/i);
+      return true;
+    },
+    "user-facing tool execution errors must use least-disclosure wording"
+  );
 }
 
 function runBusinessMemoryPoisoningTests() {

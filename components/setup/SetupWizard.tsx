@@ -5,6 +5,7 @@ import type { WorkspaceSetupCategory } from "@/data/workspace-categories";
 import { generateWorkspaceFromSetupAction } from "@/app/app/setup/actions";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { ErrorNotice } from "@/components/operations/ErrorNotice";
 
 const steps = [
   "Organization",
@@ -47,9 +48,9 @@ export function SetupWizard({ categories, error }: SetupWizardProps) {
             </button>
           ))}
         </div>
-        {error ? (
-          <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
-        ) : null}
+        <div className="mt-4">
+          <ErrorNotice message={error} />
+        </div>
       </div>
 
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 0 ? "" : "hidden"}`}>
