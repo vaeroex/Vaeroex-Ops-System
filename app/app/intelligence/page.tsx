@@ -3,9 +3,11 @@ import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
+import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
+import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
@@ -66,6 +68,15 @@ export default async function IntelligencePage() {
     metricsResult.error,
     assetsResult.error
   ].filter(Boolean);
+
+  if (errors.some((error) => isSecurityResponseMessage(error?.message))) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <SecurityResponseNotice />
+      </div>
+    );
+  }
+
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],

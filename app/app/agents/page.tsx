@@ -18,7 +18,7 @@ import { getVaeroexWorkflow, type VaeroexSaveTarget, type VaeroexWorkflowKey } f
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Json } from "@/lib/supabase/types";
-import { isSecurityResponseMessage } from "@/lib/security/security-response";
+import { isSecurityResponseMessage, isSecurityResponseOutput } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type VaeroexHubPageProps = {
@@ -221,6 +221,10 @@ function displayOutput(output: JsonRecord) {
       str(output.executive_summary) ||
       str(output.summary)
   };
+}
+
+function isSecurityResponseRun(run: { status?: string | null; error_message?: string | null; output_json?: Json }, output?: JsonRecord) {
+  return run.status === "blocked" || isSecurityResponseMessage(run.error_message) || isSecurityResponseOutput(output || asRecord(run.output_json));
 }
 
 function vaeroexResultLabel(value: string) {
@@ -1170,7 +1174,7 @@ function FailurePanel({
   run: { id: string; agent_type: string; status: string; error_message: string | null; input_json?: Json };
   canViewDebug: boolean;
 }) {
-  if (isSecurityResponseMessage(run.error_message)) {
+  if (isSecurityResponseRun(run)) {
     return <SecurityResponseNotice />;
   }
 
@@ -1239,7 +1243,7 @@ function SelectedResult({
   canViewDebug: boolean;
   debugMode: boolean;
 }) {
-  if (run.status === "failed" && isSecurityResponseMessage(run.error_message)) {
+  if (isSecurityResponseRun(run, output)) {
     return <SecurityResponseNotice />;
   }
 
@@ -1422,6 +1426,15 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const pageErrorMessage = friendlyHubError(
     (selectedRun ? undefined : (params?.error as string | undefined)) || error?.message || folderResult.error?.message
   );
+
+  if ((selectedRun && isSecurityResponseRun(selectedRun, selectedOutput)) || isSecurityResponseMessage(pageErrorMessage)) {
+    return (
+      <div className="mx-auto max-w-3xl">
+        <SecurityResponseNotice />
+      </div>
+    );
+  }
+
   const managedRuns = (runs || []).map((run) => {
     const management = managedValues(run);
     const output = asRecord(run.output_json);
@@ -1452,7 +1465,9 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
         error_message: run.error_message
       },
       children:
-        run.status === "completed" ? (
+        isSecurityResponseRun(run, output) ? (
+          <SecurityResponseNotice compact />
+        ) : run.status === "completed" ? (
           <BusinessResult output={display} runId={run.id} runTitle={resultTitle(display, vaeroexResultLabel(run.agent_type))} />
         ) : (
           <ErrorNotice message={friendlyHubError(run.error_message) || "This run has not completed yet."} />

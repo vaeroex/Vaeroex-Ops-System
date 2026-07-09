@@ -27,13 +27,10 @@ function ToastContent() {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 w-[min(380px,calc(100vw-2rem))]">
+    <div className={error && isSecurityResponseMessage(error) ? "fixed inset-0 z-[100] flex items-center justify-center bg-[#050b14] p-4" : "fixed bottom-4 right-4 z-50 w-[min(380px,calc(100vw-2rem))]"}>
       {error && isSecurityResponseMessage(error) ? (
-        <div className="space-y-2">
-          <SecurityResponseNotice compact />
-          <button className="rounded-lg border border-white/10 bg-slate-950 px-3 py-2 text-xs font-semibold text-slate-100" onClick={() => setVisible(false)}>
-            Close
-          </button>
+        <div className="w-full max-w-3xl">
+          <SecurityResponseNotice />
         </div>
       ) : (
         <div

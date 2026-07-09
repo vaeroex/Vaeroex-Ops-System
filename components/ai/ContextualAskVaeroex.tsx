@@ -207,7 +207,13 @@ export function ContextualAskVaeroex({
         </div>
       ) : null}
 
-      {!isGenerating && state.status === "error" && isSecurityResponseMessage(state.error) ? <SecurityResponseNotice compact /> : null}
+      {!isGenerating && state.status === "error" && isSecurityResponseMessage(state.error) ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#050b14] p-4">
+          <div className="w-full max-w-3xl">
+            <SecurityResponseNotice />
+          </div>
+        </div>
+      ) : null}
 
       {!isGenerating && state.status === "error" && !isSecurityResponseMessage(state.error) ? (
         <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-4 text-sm leading-6 text-red-100">

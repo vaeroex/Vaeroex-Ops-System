@@ -14,7 +14,8 @@ import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
-import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
+import { isSecuritySensitiveRequest, securityResponseMessage, securityResponseOutput } from "@/lib/security/security-response";
+import { logSecurityAuditEvent, requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type JsonRecord = Record<string, unknown>;
@@ -154,6 +155,51 @@ async function storeFailedRun({
   return data?.id ?? null;
 }
 
+async function storeSecurityBlockedRun({
+  supabase,
+  workspaceId,
+  userId,
+  workflowKey,
+  inputJson
+}: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+  workspaceId: string;
+  userId: string;
+  workflowKey: string;
+  inputJson: Json;
+}) {
+  await logSecurityAuditEvent({
+    supabase,
+    workspaceId,
+    userId,
+    actionName: "vaeroex.security_response",
+    operationType: "SYSTEM",
+    initiatedBy: "user",
+    allowed: false,
+    reasonBlocked: "User request matched security-response preflight.",
+    metadata: {
+      workflow: workflowKey,
+      source: "ask_vaeroex_preflight"
+    } satisfies Json
+  });
+
+  const { data } = await supabase
+    .from("ai_agent_runs")
+    .insert({
+      workspace_id: workspaceId,
+      agent_type: workflowKey,
+      input_json: inputJson,
+      output_json: securityResponseOutput() satisfies Json,
+      status: "blocked",
+      error_message: securityResponseMessage(),
+      created_by: userId
+    })
+    .select("id")
+    .maybeSingle();
+
+  return data?.id ?? null;
+}
+
 export async function runVaeroexAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const workflow = getVaeroexWorkflow(text(formData, "workflow_key"));
@@ -182,73 +228,85 @@ export async function runVaeroexAction(formData: FormData) {
       throw new Error(rateLimitMessage(rateLimit));
     }
 
-    const limit = await isUsageLimitReached({
-      supabase,
-      userId: user.id,
-      email: user.email,
-      workspaceId,
-      limit: "ai_runs_this_month"
-    });
+    if (isSecuritySensitiveRequest(`${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`)) {
+      const blockedRunId = await storeSecurityBlockedRun({
+        supabase,
+        workspaceId,
+        userId: user.id,
+        workflowKey: workflow.key,
+        inputJson
+      });
+      revalidatePath("/app/agents");
+      destination = `/app/agents${blockedRunId ? `?run=${blockedRunId}` : `?error=${encodeURIComponent(securityResponseMessage())}`}`;
+    } else {
+      const limit = await isUsageLimitReached({
+        supabase,
+        userId: user.id,
+        email: user.email,
+        workspaceId,
+        limit: "ai_runs_this_month"
+      });
 
-    if (limit.reached) {
-      throw new Error("You’ve reached the monthly Vaeroex usage limit for this workspace.");
-    }
-
-    workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
-    const evidenceContext = await buildWorkspaceEvidenceContext({
-      supabase,
-      workspaceId,
-      query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`
-    });
-    const evidenceAwareInputs = {
-      ...extraInputs,
-      evidence_context: evidenceContextAsJson(evidenceContext)
-    } satisfies Json;
-    inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
-
-    const { outputJson, usage } = await runVaeroexCompletionWithUsage({
-      workflow,
-      userPrompt,
-      workspaceSnapshot,
-      extraInputs: evidenceAwareInputs,
-      supabase,
-      workspaceId
-    });
-
-    const { data, error } = await supabase
-      .from("ai_agent_runs")
-      .insert({
-        workspace_id: workspaceId,
-        agent_type: workflow.key,
-        input_json: inputJson,
-        output_json: outputJson,
-        status: "completed",
-        created_by: user.id
-      })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      throw new Error(error?.message || "Vaeroex run could not be saved.");
-    }
-
-    await recordVaeroexAiUsage({
-      supabase,
-      workspaceId,
-      userId: user.id,
-      agentType: workflow.key,
-      usage: {
-        ...usage,
-        metadata: {
-          evidence_retrieval_mode: evidenceContext.retrievalMode,
-          evidence_chunks: evidenceContext.chunks.length,
-          evidence_confidence_score: evidenceContext.confidenceScore
-        }
+      if (limit.reached) {
+        throw new Error("You’ve reached the monthly Vaeroex usage limit for this workspace.");
       }
-    });
 
-    revalidatePath("/app/agents");
-    destination = `/app/agents?run=${data.id}`;
+      workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
+      const evidenceContext = await buildWorkspaceEvidenceContext({
+        supabase,
+        workspaceId,
+        query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`
+      });
+      const evidenceAwareInputs = {
+        ...extraInputs,
+        evidence_context: evidenceContextAsJson(evidenceContext)
+      } satisfies Json;
+      inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
+
+      const { outputJson, usage } = await runVaeroexCompletionWithUsage({
+        workflow,
+        userPrompt,
+        workspaceSnapshot,
+        extraInputs: evidenceAwareInputs,
+        supabase,
+        workspaceId
+      });
+
+      const { data, error } = await supabase
+        .from("ai_agent_runs")
+        .insert({
+          workspace_id: workspaceId,
+          agent_type: workflow.key,
+          input_json: inputJson,
+          output_json: outputJson,
+          status: "completed",
+          created_by: user.id
+        })
+        .select("id")
+        .single();
+
+      if (error || !data) {
+        throw new Error(error?.message || "Vaeroex run could not be saved.");
+      }
+
+      await recordVaeroexAiUsage({
+        supabase,
+        workspaceId,
+        userId: user.id,
+        agentType: workflow.key,
+        usage: {
+          ...usage,
+          metadata: {
+            evidence_retrieval_mode: evidenceContext.retrievalMode,
+            evidence_chunks: evidenceContext.chunks.length,
+            evidence_confidence_score: evidenceContext.confidenceScore
+          }
+        }
+      });
+
+      revalidatePath("/app/agents");
+      destination = `/app/agents?run=${data.id}`;
+    }
   } catch (error) {
     const message = cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined);
     const failedRunId = await storeFailedRun({

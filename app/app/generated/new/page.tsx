@@ -7,6 +7,7 @@ import { GeneratedOutputControls } from "@/components/generated/GeneratedOutputC
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import {
   buildGeneratedOutput,
@@ -14,6 +15,7 @@ import {
   sourceFromSearchParams
 } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
+import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
@@ -61,6 +63,15 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
   const params = paramsFromSearchParams((await searchParams) || {});
   const error = params.get("error");
   const outputType = parseGeneratedOutputType(params.get("type"));
+
+  if (isSecurityResponseMessage(error)) {
+    return (
+      <div className="mx-auto max-w-3xl print:hidden">
+        <SecurityResponseNotice />
+      </div>
+    );
+  }
+
   const { supabase, workspaceId, context } = await requireWorkspacePage();
   const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, crmHistoryResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, checklistsResult, checklistRunsResult, metricsResult, assetsResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
