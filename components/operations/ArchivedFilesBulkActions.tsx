@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { bulkManageRecordsAction } from "@/app/app/operations/record-management-actions";
+import { useActivitySignal } from "@/components/app/ActivityProvider";
 
 function plural(count: number, singular: string, pluralValue = `${singular}s`) {
   return `${count} ${count === 1 ? singular : pluralValue}`;
@@ -22,6 +23,7 @@ export function ArchivedFilesBulkActions({
   const [showDelayedFeedback, setShowDelayedFeedback] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [typedConfirmation, setTypedConfirmation] = useState("");
+  useActivitySignal(submitting, feedback || "Updating archived files...", { source: "bulk-archived-files", timeoutMs: 45000 });
 
   const updateSelectedCount = () => {
     const checked = formRef.current?.querySelectorAll<HTMLInputElement>('input[name="record_id"]:checked').length || 0;
@@ -31,18 +33,15 @@ export function ArchivedFilesBulkActions({
   useEffect(() => {
     if (!feedback) {
       setShowDelayedFeedback(false);
-      document.documentElement.style.cursor = "";
       return;
     }
 
     const timer = window.setTimeout(() => {
       setShowDelayedFeedback(true);
-      document.documentElement.style.cursor = "progress";
     }, 500);
 
     return () => {
       window.clearTimeout(timer);
-      document.documentElement.style.cursor = "";
     };
   }, [feedback]);
 

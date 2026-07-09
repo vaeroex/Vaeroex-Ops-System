@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
+import { ActivityProvider } from "@/components/app/ActivityProvider";
 import { PwaServiceWorker } from "@/components/app/PwaServiceWorker";
 import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import "./globals.css";
@@ -95,8 +96,10 @@ export default function RootLayout({
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: organizationSchema }} />
       </head>
       <body>
-        <PwaServiceWorker />
-        {children}
+        <ActivityProvider>
+          <PwaServiceWorker />
+          {children}
+        </ActivityProvider>
       </body>
     </html>
   );

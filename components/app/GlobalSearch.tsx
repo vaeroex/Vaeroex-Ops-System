@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { Command, Loader2, Search, X } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useActivitySignal } from "@/components/app/ActivityProvider";
 import type { GlobalSearchGroup, GlobalSearchResponse } from "@/lib/search/types";
 
 type GlobalSearchProps = {
@@ -28,6 +29,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   const trimmedQuery = query.trim();
   const total = useMemo(() => resultCount(groups), [groups]);
   const isIconVariant = variant === "icon";
+  useActivitySignal(loading, "Searching...", { source: "global-search", timeoutMs: 20000 });
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
