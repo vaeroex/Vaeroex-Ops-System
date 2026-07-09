@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { useActivitySignal } from "@/components/app/ActivityProvider";
 
 const defaultSteps = [
   "Reading file",
@@ -27,6 +28,7 @@ export function AnalysisProgressSubmit({
 }) {
   const { pending } = useFormStatus();
   const [showTimeout, setShowTimeout] = useState(false);
+  useActivitySignal(pending, pendingLabel, { source: "analysis-progress", timeoutMs });
 
   useEffect(() => {
     if (!pending) {
@@ -41,7 +43,7 @@ export function AnalysisProgressSubmit({
 
   return (
     <div className="space-y-3">
-      <button disabled={pending} className={className} aria-busy={pending}>
+      <button disabled={pending} className={className} aria-busy={pending} data-vaeroex-local-activity="true" data-vaeroex-activity-label={pendingLabel}>
         {pending ? pendingLabel : children}
       </button>
       {pending ? (
