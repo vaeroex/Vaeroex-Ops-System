@@ -24,6 +24,7 @@ type JsonRecord = Record<string, unknown>;
 const ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS = 6_500;
 const ASK_VAEROEX_OPENAI_TIMEOUT_MS = 20_000;
 const ASK_VAEROEX_OPENAI_MAX_RETRIES = 1;
+const ASK_VAEROEX_TERMINAL_SAVE_TIMEOUT_MS = 4_000;
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -124,6 +125,60 @@ async function withStageTimeout<T>(stage: string, timeoutMs: number, promise: Pr
   }
 }
 
+function runDiagnostics({
+  requestId,
+  status,
+  finalStage,
+  details = {}
+}: {
+  requestId: string;
+  status: "running" | "completed" | "failed" | "blocked";
+  finalStage: string;
+  details?: Record<string, unknown>;
+}): Json {
+  return {
+    request_id: requestId,
+    status,
+    final_stage: finalStage,
+    recorded_at: new Date().toISOString(),
+    ...details
+  } as Json;
+}
+
+function failureOutput({
+  requestId,
+  workflowKey,
+  message,
+  finalStage,
+  errorType
+}: {
+  requestId: string;
+  workflowKey: string;
+  message: string;
+  finalStage: string;
+  errorType: string;
+}) {
+  return {
+    title: "Vaeroex request did not complete",
+    summary: message,
+    response_markdown: message,
+    error: {
+      type: errorType,
+      message,
+      final_stage: finalStage
+    },
+    vaeroex_run_diagnostics: runDiagnostics({
+      requestId,
+      status: "failed",
+      finalStage,
+      details: {
+        workflow: workflowKey,
+        error_type: errorType
+      }
+    })
+  } satisfies Json;
+}
+
 function reducedEvidenceContext(reason: string): EvidenceContext {
   return {
     available: false,
@@ -156,6 +211,13 @@ function askVaeroexOpenAISettings() {
     timeoutMs: Math.min(base.timeoutMs, ASK_VAEROEX_OPENAI_TIMEOUT_MS),
     maxRetries: Math.min(base.maxRetries, ASK_VAEROEX_OPENAI_MAX_RETRIES)
   };
+}
+
+function withRunDiagnostics(output: Json, diagnostics: Json) {
+  return {
+    ...(isRecord(output) ? output : { response_markdown: String(output || "") }),
+    vaeroex_run_diagnostics: diagnostics
+  } as Json;
 }
 
 async function requireWorkspace() {
@@ -207,23 +269,130 @@ function buildInputJson(workflowKey: string, userPrompt: string, extraInputs: Js
   } satisfies Json;
 }
 
-async function storeFailedRun({
+async function createRunningRun({
+  supabase,
   workspaceId,
   userId,
   workflowKey,
   inputJson,
-  message
+  requestId
 }: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+  workspaceId: string;
+  userId: string;
+  workflowKey: string;
+  inputJson: Json;
+  requestId: string;
+}) {
+  const { data, error } = await supabase
+    .from("ai_agent_runs")
+    .insert({
+      workspace_id: workspaceId,
+      agent_type: workflowKey,
+      input_json: inputJson,
+      output_json: {
+        title: "Vaeroex request in progress",
+        summary: "Vaeroex is preparing this request.",
+        vaeroex_run_diagnostics: runDiagnostics({
+          requestId,
+          status: "running",
+          finalStage: "run_created",
+          details: { workflow: workflowKey }
+        })
+      } satisfies Json,
+      status: "running",
+      error_message: null,
+      created_by: userId
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data?.id) {
+    throw new Error(error?.message || "Vaeroex could not create a run record.");
+  }
+
+  return data?.id ?? null;
+}
+
+async function updateRunRecord({
+  supabase,
+  workspaceId,
+  runId,
+  inputJson,
+  outputJson,
+  status,
+  errorMessage
+}: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
+  workspaceId: string;
+  runId: string;
+  inputJson: Json;
+  outputJson: Json;
+  status: string;
+  errorMessage?: string | null;
+}) {
+  const { data, error } = await withStageTimeout(
+    "Run save",
+    ASK_VAEROEX_TERMINAL_SAVE_TIMEOUT_MS,
+    Promise.resolve(
+      supabase
+        .from("ai_agent_runs")
+        .update({
+          input_json: inputJson,
+          output_json: outputJson,
+          status,
+          error_message: errorMessage ?? null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", runId)
+        .eq("workspace_id", workspaceId)
+        .select("id")
+        .maybeSingle()
+    )
+  );
+
+  if (error || !data?.id) {
+    throw new Error(error?.message || "Vaeroex run could not be saved.");
+  }
+
+  return data.id;
+}
+
+async function storeFailedRun({
+  supabase,
+  workspaceId,
+  userId,
+  workflowKey,
+  inputJson,
+  message,
+  requestId,
+  finalStage,
+  errorType,
+  runId
+}: {
+  supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
   workspaceId: string;
   userId: string;
   workflowKey: string;
   inputJson: Json;
   message: string;
+  requestId: string;
+  finalStage: string;
+  errorType: string;
+  runId?: string | null;
 }) {
-  const supabase = await createSupabaseServerClient();
+  const outputJson = failureOutput({ requestId, workflowKey, message, finalStage, errorType });
 
-  if (!supabase) {
-    return null;
+  if (runId) {
+    return updateRunRecord({
+      supabase,
+      workspaceId,
+      runId,
+      inputJson,
+      outputJson,
+      status: "failed",
+      errorMessage: message
+    });
   }
 
   const { data } = await supabase
@@ -232,7 +401,7 @@ async function storeFailedRun({
       workspace_id: workspaceId,
       agent_type: workflowKey,
       input_json: inputJson,
-      output_json: {} satisfies Json,
+      output_json: outputJson,
       status: "failed",
       error_message: message,
       created_by: userId
@@ -248,13 +417,17 @@ async function storeSecurityBlockedRun({
   workspaceId,
   userId,
   workflowKey,
-  inputJson
+  inputJson,
+  requestId,
+  runId
 }: {
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
   workspaceId: string;
   userId: string;
   workflowKey: string;
   inputJson: Json;
+  requestId: string;
+  runId?: string | null;
 }) {
   await logSecurityAuditEvent({
     supabase,
@@ -271,13 +444,38 @@ async function storeSecurityBlockedRun({
     } satisfies Json
   });
 
+  const outputJson = withRunDiagnostics(
+    securityResponseOutput() satisfies Json,
+    runDiagnostics({
+      requestId,
+      status: "blocked",
+      finalStage: "security_blocked",
+      details: {
+        workflow: workflowKey,
+        block_type: "security_preflight"
+      }
+    })
+  );
+
+  if (runId) {
+    return updateRunRecord({
+      supabase,
+      workspaceId,
+      runId,
+      inputJson,
+      outputJson,
+      status: "blocked",
+      errorMessage: securityResponseMessage()
+    });
+  }
+
   const { data } = await supabase
     .from("ai_agent_runs")
     .insert({
       workspace_id: workspaceId,
       agent_type: workflowKey,
       input_json: inputJson,
-      output_json: securityResponseOutput() satisfies Json,
+      output_json: outputJson,
       status: "blocked",
       error_message: securityResponseMessage(),
       created_by: userId
@@ -311,10 +509,25 @@ export async function runVaeroexAction(formData: FormData) {
   let inputJson = buildInputJson(workflow.key, userPrompt, extraInputs, workspaceSnapshot);
   let destination = "/app/agents";
   let outcome: "success" | "security" | "error" = "success";
+  let currentStage = "request_started";
+  let runId: string | null = null;
 
   logVaeroexRunEvent("request_started", logDetails({ promptLength: userPrompt.length }));
 
   try {
+    currentStage = "run_create";
+    logVaeroexRunEvent("run_create_started", logDetails());
+    runId = await createRunningRun({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      workflowKey: workflow.key,
+      inputJson,
+      requestId
+    });
+    logVaeroexRunEvent("run_created", logDetails({ runId, status: "running" }));
+
+    currentStage = "preflight";
     logVaeroexRunEvent("preflight_started", logDetails());
     logVaeroexRunEvent("rate_limit_started", logDetails());
     const rateLimit = await enforceRateLimit({
@@ -334,19 +547,23 @@ export async function runVaeroexAction(formData: FormData) {
     logVaeroexRunEvent("preflight_finished", logDetails({ allowed: true }));
 
     if (isSecuritySensitiveRequest(`${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`)) {
+      currentStage = "security_blocked";
       logVaeroexRunEvent("security_blocked", logDetails({ reason: "preflight" }));
       const blockedRunId = await storeSecurityBlockedRun({
         supabase,
         workspaceId,
         userId: user.id,
         workflowKey: workflow.key,
-        inputJson
+        inputJson,
+        requestId,
+        runId
       });
       logVaeroexRunEvent("run_saved", logDetails({ status: "blocked", runId: blockedRunId }));
       revalidatePath("/app/agents");
       outcome = "security";
       destination = `/app/agents${blockedRunId ? `?run=${blockedRunId}` : `?error=${encodeURIComponent(securityResponseMessage())}`}`;
     } else {
+      currentStage = "usage_limit";
       logVaeroexRunEvent("usage_limit_started", logDetails());
       const limit = await isUsageLimitReached({
         supabase,
@@ -361,10 +578,12 @@ export async function runVaeroexAction(formData: FormData) {
       }
       logVaeroexRunEvent("usage_limit_finished", logDetails({ allowed: true }));
 
+      currentStage = "workspace_snapshot";
       logVaeroexRunEvent("workspace_snapshot_started", logDetails());
       workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
       logVaeroexRunEvent("workspace_snapshot_finished", logDetails());
 
+      currentStage = "business_memory";
       logVaeroexRunEvent("memory_retrieval_started", logDetails());
       let evidenceContext: EvidenceContext;
 
@@ -403,6 +622,7 @@ export async function runVaeroexAction(formData: FormData) {
       } satisfies Json;
       inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
 
+      currentStage = "openai";
       logVaeroexRunEvent("openai_started", logDetails());
       const { outputJson, usage } = await runVaeroexCompletionWithUsage({
         workflow,
@@ -420,26 +640,38 @@ export async function runVaeroexAction(formData: FormData) {
         latencyMs: usage.latencyMs ?? null
       }));
 
+      currentStage = "run_save";
       logVaeroexRunEvent("run_save_started", logDetails());
-      const { data, error } = await supabase
-        .from("ai_agent_runs")
-        .insert({
-          workspace_id: workspaceId,
-          agent_type: workflow.key,
-          input_json: inputJson,
-          output_json: outputJson,
-          status: "completed",
-          created_by: user.id
-        })
-        .select("id")
-        .single();
-
-      if (error || !data) {
-        throw new Error(error?.message || "Vaeroex run could not be saved.");
+      if (!runId) {
+        throw new Error("Vaeroex run record was not available for saving.");
       }
-      logVaeroexRunEvent("run_saved", logDetails({ status: "completed", runId: data.id }));
+      const completedOutputJson = withRunDiagnostics(
+        outputJson,
+        runDiagnostics({
+          requestId,
+          status: "completed",
+          finalStage: "completed",
+          details: {
+            workflow: workflow.key,
+            evidence_retrieval_mode: evidenceContext.retrievalMode,
+            evidence_chunks: evidenceContext.chunks.length,
+            reduced_context: !evidenceContext.available
+          }
+        })
+      );
+      const savedRunId = await updateRunRecord({
+        supabase,
+        workspaceId,
+        runId,
+        inputJson,
+        outputJson: completedOutputJson,
+        status: "completed",
+        errorMessage: null
+      });
+      logVaeroexRunEvent("run_saved", logDetails({ status: "completed", runId: savedRunId }));
 
-      logVaeroexRunEvent("usage_record_started", logDetails({ runId: data.id }));
+      currentStage = "usage_record";
+      logVaeroexRunEvent("usage_record_started", logDetails({ runId: savedRunId }));
       await recordVaeroexAiUsage({
         supabase,
         workspaceId,
@@ -454,28 +686,49 @@ export async function runVaeroexAction(formData: FormData) {
           }
         }
       });
-      logVaeroexRunEvent("usage_record_finished", logDetails({ runId: data.id }));
+      logVaeroexRunEvent("usage_record_finished", logDetails({ runId: savedRunId }));
 
+      currentStage = "redirect";
       revalidatePath("/app/agents");
-      destination = `/app/agents?run=${data.id}`;
+      destination = `/app/agents?run=${savedRunId}`;
     }
   } catch (error) {
     const message = cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined);
     const rawMessage = error instanceof Error ? error.message : "";
-    const isTimeout = /timed out|timeout|aborterror|aborted/i.test(`${error instanceof Error ? error.name : ""} ${rawMessage}`);
+    const isTimeout = isTimeoutLike(error);
+    const errorType = isTimeout ? "timeout" : /token budget|usage budget|monthly.*token/i.test(rawMessage) ? "token_budget" : /circuit|temporarily unavailable/i.test(rawMessage) ? "circuit_or_provider" : "unexpected_error";
     outcome = "error";
     logVaeroexRunError(isTimeout ? "timeout" : "error_thrown", logDetails({
       errorName: error instanceof Error ? error.name : "UnknownError",
-      message
+      message,
+      finalStage: currentStage,
+      runId
     }));
-    const failedRunId = await storeFailedRun({
-      workspaceId,
-      userId: user.id,
-      workflowKey: workflow.key,
-      inputJson,
-      message
-    });
-    logVaeroexRunEvent("run_saved", logDetails({ status: "failed", runId: failedRunId }));
+    let failedRunId: string | null = null;
+
+    try {
+      failedRunId = await storeFailedRun({
+        supabase,
+        workspaceId,
+        userId: user.id,
+        workflowKey: workflow.key,
+        inputJson,
+        message,
+        requestId,
+        finalStage: currentStage,
+        errorType,
+        runId
+      });
+      logVaeroexRunEvent("run_saved", logDetails({ status: "failed", runId: failedRunId }));
+    } catch (saveError) {
+      logVaeroexRunError("failed_run_save_failed", logDetails({
+        originalFinalStage: currentStage,
+        errorName: saveError instanceof Error ? saveError.name : "UnknownError",
+        message: cleanVaeroexErrorMessage(saveError instanceof Error ? saveError.message : undefined, "Vaeroex could not save the failed run.")
+      }));
+    }
+
+    currentStage = "redirect";
     revalidatePath("/app/agents");
     destination = `/app/agents${failedRunId ? `?run=${failedRunId}&` : "?"}error=${encodeURIComponent(message)}`;
   }

@@ -213,6 +213,9 @@ check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), 
 check(agentsActionsRuntime.includes("withStageTimeout") && agentsActionsRuntime.includes("Business Memory retrieval"), "Ask Vaeroex must apply a stage timeout to Business Memory retrieval.");
 check(agentsActionsRuntime.includes("reducedEvidenceContext") && agentsActionsRuntime.includes("continuingWithReducedContext"), "Ask Vaeroex must continue with reduced context when Business Memory retrieval fails safely.");
 check(agentsActionsRuntime.includes("askVaeroexOpenAISettings") && agentsActionsRuntime.includes("openAISettings"), "Ask Vaeroex must cap OpenAI timeout/retry settings for server-action execution.");
+check(agentsActionsRuntime.includes("createRunningRun") && agentsActionsRuntime.includes('status: "running"'), "Ask Vaeroex must create a run record before long-running analysis starts.");
+check(agentsActionsRuntime.includes("updateRunRecord") && agentsActionsRuntime.includes("failureOutput"), "Ask Vaeroex must update the same run for success, timeout, and failure outcomes.");
+check(agentsActionsRuntime.includes("vaeroex_run_diagnostics") && agentsActionsRuntime.includes("finalStage"), "Ask Vaeroex failed runs must store admin-only lifecycle diagnostics.");
 const vaeroexClientRuntime = read("lib/ai/vaeroex-client.ts");
 check(vaeroexClientRuntime.includes("openAISettings?: OpenAIRetrySettings"), "Vaeroex OpenAI client must accept per-call timeout/retry settings.");
 check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex OpenAI client must log token budget stages.");
