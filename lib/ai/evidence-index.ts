@@ -47,6 +47,8 @@ export type EvidenceContext = {
   policy: string[];
 };
 
+type EvidenceStageLogger = (event: string, details?: Record<string, unknown>) => void;
+
 const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const MAX_CHUNK_CHARACTERS = 1_400;
 const CHUNK_OVERLAP_CHARACTERS = 160;
@@ -309,24 +311,37 @@ async function keywordEvidence({
 export async function buildWorkspaceEvidenceContext({
   supabase,
   workspaceId,
-  query
+  query,
+  stageLogger
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   query: string;
+  stageLogger?: EvidenceStageLogger;
 }): Promise<EvidenceContext> {
   const limit = maxEvidenceChunks();
+  stageLogger?.("embeddings_started", { queryLength: query.length, limit });
   const embedding = await createEmbeddings([query.slice(0, 4_000)]);
+  stageLogger?.("embeddings_finished", {
+    embeddingAvailable: Boolean(embedding.embeddings[0]),
+    embeddingError: embedding.error || null,
+    embeddingTokens: embedding.tokens
+  });
   let chunks: EvidenceContextChunk[] = [];
   let retrievalMode: EvidenceContext["retrievalMode"] = "none";
   const limitations: string[] = [];
 
   if (embedding.embeddings[0]) {
+    stageLogger?.("vector_retrieval_started", { limit });
     const { data, error } = await supabase.rpc("match_business_memory_chunks", {
       target_workspace_id: workspaceId,
       query_embedding: embedding.embeddings[0],
       match_count: limit,
       min_similarity: 0.08
+    });
+    stageLogger?.("vector_retrieval_finished", {
+      matchCount: data?.length || 0,
+      error: error?.message || null
     });
 
     if (!error && data?.length) {
@@ -340,7 +355,9 @@ export async function buildWorkspaceEvidenceContext({
   }
 
   if (!chunks.length) {
+    stageLogger?.("keyword_retrieval_started", { limit });
     chunks = await keywordEvidence({ supabase, workspaceId, query, limit });
+    stageLogger?.("keyword_retrieval_finished", { matchCount: chunks.length });
     retrievalMode = chunks.length ? "keyword" : "none";
   }
 

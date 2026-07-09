@@ -2,7 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanVaeroexErrorMessage, VAEROEX_INTELLIGENCE_UNAVAILABLE_MESSAGE } from "@/lib/ai/errors";
-import { fetchWithOpenAIResilience, getOpenAICircuitSnapshot, getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { fetchWithOpenAIResilience, getOpenAICircuitSnapshot, getOpenAIRetrySettings, type OpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { assertWorkspaceTokenBudget, estimateTokenCount, getWorkspaceTokenBudget, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
@@ -18,6 +18,7 @@ type RunVaeroexRequest = {
   fileAttachment?: VaeroexFileAttachment;
   supabase?: SupabaseClient<Database>;
   workspaceId?: string;
+  openAISettings?: OpenAIRetrySettings;
 };
 
 export type VaeroexFileAttachment = {
@@ -345,7 +346,8 @@ export async function runVaeroexCompletionWithUsage({
   extraInputs = {},
   fileAttachment,
   supabase,
-  workspaceId
+  workspaceId,
+  openAISettings
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     throw new Error("Vaeroex prompt is not configured.");
@@ -384,10 +386,23 @@ export async function runVaeroexCompletionWithUsage({
   };
   const requestBodyJson = JSON.stringify(requestBody);
   const estimatedRequestTokens = estimateTokenCount(requestBodyJson);
+  logVaeroexOpenAIEvent("token_budget_check_started", {
+    requestId,
+    workflow: workflow.key,
+    model,
+    estimatedRequestTokens
+  });
   const tokenBudget = await assertWorkspaceTokenBudget({
     supabase,
     workspaceId,
     estimatedRequestTokens
+  });
+  logVaeroexOpenAIEvent("token_budget_check_finished", {
+    requestId,
+    workflow: workflow.key,
+    model,
+    estimatedRequestTokens,
+    workspaceTokenBudgetRemaining: tokenBudget.remainingTokens
   });
 
   logVaeroexOpenAIEvent("request_start", {
@@ -408,7 +423,7 @@ export async function runVaeroexCompletionWithUsage({
       "Content-Type": "application/json"
     },
     body: requestBodyJson
-  });
+  }, openAISettings);
 
   const payload = (await response.json().catch(() => ({}))) as ResponsesApiResponse;
   const openaiRequestId = response.headers.get("x-request-id") || response.headers.get("openai-request-id");

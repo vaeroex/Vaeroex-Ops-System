@@ -4,8 +4,9 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { buildWorkspaceEvidenceContext, evidenceContextAsJson } from "@/lib/ai/evidence-index";
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
+import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
@@ -20,6 +21,9 @@ import { logSecurityAuditEvent, requireToolExecution, type RegisteredToolName } 
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type JsonRecord = Record<string, unknown>;
+const ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS = 6_500;
+const ASK_VAEROEX_OPENAI_TIMEOUT_MS = 20_000;
+const ASK_VAEROEX_OPENAI_MAX_RETRIES = 1;
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -91,6 +95,67 @@ function logVaeroexRunError(event: string, details: Record<string, unknown>) {
       ...details
     })
   );
+}
+
+function timeoutError(stage: string, timeoutMs: number) {
+  const error = new Error(`${stage} timed out after ${timeoutMs}ms.`);
+  error.name = "TimeoutError";
+  return error;
+}
+
+function isTimeoutLike(error: unknown) {
+  return /timed out|timeout|aborterror|aborted/i.test(`${error instanceof Error ? error.name : ""} ${error instanceof Error ? error.message : ""}`);
+}
+
+async function withStageTimeout<T>(stage: string, timeoutMs: number, promise: Promise<T>) {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(timeoutError(stage, timeoutMs)), timeoutMs);
+      })
+    ]);
+  } finally {
+    if (timer) {
+      clearTimeout(timer);
+    }
+  }
+}
+
+function reducedEvidenceContext(reason: string): EvidenceContext {
+  return {
+    available: false,
+    retrievalMode: "none",
+    chunks: [],
+    maxChunks: 0,
+    confidenceScore: 12,
+    confidenceLabel: "Very Limited",
+    limitations: [
+      reason,
+      "Vaeroex continued with workspace context only because Business Memory evidence was unavailable for this request."
+    ],
+    dataGaps: [
+      "Business Memory evidence was not available for this answer.",
+      "Upload, analyze, or retry relevant source evidence to improve answer confidence."
+    ],
+    policy: [
+      "Use only available workspace context and retrieved evidence.",
+      "Do not invent numbers, dates, customers, revenue, costs, or operational facts that are not present in evidence.",
+      "If evidence is thin, say not enough evidence and ask for the missing data."
+    ]
+  };
+}
+
+function askVaeroexOpenAISettings() {
+  const base = getOpenAIRetrySettings();
+
+  return {
+    ...base,
+    timeoutMs: Math.min(base.timeoutMs, ASK_VAEROEX_OPENAI_TIMEOUT_MS),
+    maxRetries: Math.min(base.maxRetries, ASK_VAEROEX_OPENAI_MAX_RETRIES)
+  };
 }
 
 async function requireWorkspace() {
@@ -250,6 +315,7 @@ export async function runVaeroexAction(formData: FormData) {
   logVaeroexRunEvent("request_started", logDetails({ promptLength: userPrompt.length }));
 
   try {
+    logVaeroexRunEvent("preflight_started", logDetails());
     logVaeroexRunEvent("rate_limit_started", logDetails());
     const rateLimit = await enforceRateLimit({
       action: "vaeroex.run",
@@ -265,6 +331,7 @@ export async function runVaeroexAction(formData: FormData) {
       throw new Error(rateLimitMessage(rateLimit));
     }
     logVaeroexRunEvent("rate_limit_finished", logDetails({ allowed: true }));
+    logVaeroexRunEvent("preflight_finished", logDetails({ allowed: true }));
 
     if (isSecuritySensitiveRequest(`${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`)) {
       logVaeroexRunEvent("security_blocked", logDetails({ reason: "preflight" }));
@@ -299,15 +366,36 @@ export async function runVaeroexAction(formData: FormData) {
       logVaeroexRunEvent("workspace_snapshot_finished", logDetails());
 
       logVaeroexRunEvent("memory_retrieval_started", logDetails());
-      const evidenceContext = await buildWorkspaceEvidenceContext({
-        supabase,
-        workspaceId,
-        query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`
-      });
+      let evidenceContext: EvidenceContext;
+
+      try {
+        evidenceContext = await withStageTimeout(
+          "Business Memory retrieval",
+          ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS,
+          buildWorkspaceEvidenceContext({
+            supabase,
+            workspaceId,
+            query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`,
+            stageLogger: (event, details = {}) => logVaeroexRunEvent(`memory_${event}`, logDetails(details))
+          })
+        );
+      } catch (error) {
+        const reason = isTimeoutLike(error)
+          ? "Business Memory retrieval took too long for this request."
+          : cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined, "Business Memory retrieval failed.");
+        logVaeroexRunError(isTimeoutLike(error) ? "memory_retrieval_timeout" : "memory_retrieval_failed", logDetails({
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          message: reason,
+          continuingWithReducedContext: true
+        }));
+        evidenceContext = reducedEvidenceContext(reason);
+      }
+
       logVaeroexRunEvent("memory_retrieval_finished", logDetails({
         retrievalMode: evidenceContext.retrievalMode,
         evidenceChunks: evidenceContext.chunks.length,
-        evidenceConfidenceScore: evidenceContext.confidenceScore
+        evidenceConfidenceScore: evidenceContext.confidenceScore,
+        reducedContext: !evidenceContext.available
       }));
       const evidenceAwareInputs = {
         ...extraInputs,
@@ -322,7 +410,8 @@ export async function runVaeroexAction(formData: FormData) {
         workspaceSnapshot,
         extraInputs: evidenceAwareInputs,
         supabase,
-        workspaceId
+        workspaceId,
+        openAISettings: askVaeroexOpenAISettings()
       });
       logVaeroexRunEvent("openai_finished", logDetails({
         inputTokens: usage.inputTokens,

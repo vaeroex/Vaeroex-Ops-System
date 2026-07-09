@@ -208,6 +208,15 @@ check(pendingSubmitButton.includes("{showingPending ? pendingLabel : children}")
 const agentsPage = read("app/app/agents/page.tsx");
 check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
 
+const agentsActionsRuntime = read("app/app/agents/actions.ts");
+check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), "Ask Vaeroex must bound Business Memory retrieval so server actions can return.");
+check(agentsActionsRuntime.includes("withStageTimeout") && agentsActionsRuntime.includes("Business Memory retrieval"), "Ask Vaeroex must apply a stage timeout to Business Memory retrieval.");
+check(agentsActionsRuntime.includes("reducedEvidenceContext") && agentsActionsRuntime.includes("continuingWithReducedContext"), "Ask Vaeroex must continue with reduced context when Business Memory retrieval fails safely.");
+check(agentsActionsRuntime.includes("askVaeroexOpenAISettings") && agentsActionsRuntime.includes("openAISettings"), "Ask Vaeroex must cap OpenAI timeout/retry settings for server-action execution.");
+const vaeroexClientRuntime = read("lib/ai/vaeroex-client.ts");
+check(vaeroexClientRuntime.includes("openAISettings?: OpenAIRetrySettings"), "Vaeroex OpenAI client must accept per-call timeout/retry settings.");
+check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex OpenAI client must log token budget stages.");
+
 const workspaceActionFiles = [
   "app/app/operations/actions.ts",
   "app/app/files/actions.ts",
