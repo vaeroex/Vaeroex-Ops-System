@@ -33,7 +33,6 @@ const ActivityContext = createContext<ActivityContextValue>({
 });
 
 const DEFAULT_ACTIVITY_LABEL = "Processing...";
-const ACTIVITY_DELAY_MS = 650;
 const DEFAULT_TIMEOUT_MS = 90000;
 
 function activityLabelFromInput(input?: ActivityInput) {
@@ -96,52 +95,16 @@ function activityLabelFromLink(anchor: HTMLAnchorElement) {
   return activityLabelFromText(`${anchor.href} ${anchor.textContent || ""}`);
 }
 
-function VaeroexActivityGlyph() {
-  return (
-    <svg viewBox="0 0 96 52" className="h-9 w-16" aria-hidden="true">
-      <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 8 L35 44 L63 8" className="stroke-white/15" strokeWidth="7" />
-        <path d="M54 41 L74 13" className="stroke-white/15" strokeWidth="7" />
-        <path d="M61 13 L87 41" className="stroke-white/15" strokeWidth="7" />
-        <g className="vaeroex-activity-light">
-          <path d="M8 8 L35 44 L63 8" strokeWidth="7" />
-          <path d="M54 41 L74 13" strokeWidth="7" />
-          <path d="M61 13 L87 41" strokeWidth="7" />
-        </g>
-      </g>
-    </svg>
-  );
-}
-
-function ActivityIndicator({ label }: { label: string }) {
-  return (
-    <div className="fixed bottom-5 left-1/2 z-[90] w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 rounded-2xl border border-cyan-300/20 bg-[#07111f]/95 p-3 text-slate-100 shadow-2xl shadow-black/35 backdrop-blur-xl" role="status" aria-live="polite">
-      <div className="flex items-center gap-3">
-        <span className="grid h-12 w-16 shrink-0 place-items-center rounded-xl border border-cyan-300/20 bg-slate-950/65 shadow-sm shadow-cyan-950/40">
-          <VaeroexActivityGlyph />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Vaeroex is working</p>
-          <p className="mt-1 truncate text-sm font-semibold text-white">{label}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export function ActivityProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [activities, setActivities] = useState<ActivityRecord[]>([]);
-  const [showIndicator, setShowIndicator] = useState(false);
   const idCounterRef = useRef(0);
   const timersRef = useRef(new Map<string, number>());
-  const showTimerRef = useRef<number | null>(null);
 
   const clearActivity = useCallback(() => {
     timersRef.current.forEach((timer) => window.clearTimeout(timer));
     timersRef.current.clear();
     setActivities([]);
-    setShowIndicator(false);
   }, []);
 
   const endActivity = useCallback((id?: string | null) => {
@@ -188,40 +151,12 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!activities.length) {
-      if (showTimerRef.current) {
-        window.clearTimeout(showTimerRef.current);
-        showTimerRef.current = null;
-      }
-
-      setShowIndicator(false);
-      return;
-    }
-
-    if (showIndicator || showTimerRef.current) {
-      return;
-    }
-
-    showTimerRef.current = window.setTimeout(() => {
-      showTimerRef.current = null;
-      setShowIndicator(true);
-    }, ACTIVITY_DELAY_MS);
-
-    return () => {
-      if (showTimerRef.current) {
-        window.clearTimeout(showTimerRef.current);
-        showTimerRef.current = null;
-      }
-    };
-  }, [activities.length, showIndicator]);
-
-  useEffect(() => {
-    document.documentElement.classList.toggle("vaeroex-activity-active", showIndicator && activities.length > 0);
+    document.documentElement.classList.toggle("vaeroex-activity-active", activities.length > 0);
 
     return () => {
       document.documentElement.classList.remove("vaeroex-activity-active");
     };
-  }, [activities.length, showIndicator]);
+  }, [activities.length]);
 
   useEffect(() => {
     clearActivity();
@@ -249,11 +184,15 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
       const form = event.target instanceof HTMLFormElement ? event.target : null;
       const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
 
-      if (!form || event.defaultPrevented || form.matches("[data-vaeroex-skip-global-activity]") || submitter?.matches("[data-vaeroex-local-activity]")) {
+      if (!form || event.defaultPrevented || form.matches("[data-vaeroex-skip-global-activity]")) {
         return;
       }
 
-      startActivity({ label: activityLabelFromForm(form, submitter), source: "form-submit", timeoutMs: 15000 });
+      startActivity({
+        label: activityLabelFromForm(form, submitter),
+        source: "form-submit",
+        timeoutMs: submitter?.matches("[data-vaeroex-local-activity]") ? 1800 : 15000
+      });
     }
 
     function handleClick(event: MouseEvent) {
@@ -320,7 +259,6 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
     };
   }, [clearActivity]);
 
-  const activeActivity = activities.slice().sort((a, b) => b.startedAt - a.startedAt)[0];
   const value = useMemo<ActivityContextValue>(
     () => ({
       startActivity,
@@ -335,7 +273,6 @@ export function ActivityProvider({ children }: { children: ReactNode }) {
   return (
     <ActivityContext.Provider value={value}>
       {children}
-      {showIndicator && activeActivity ? <ActivityIndicator label={activeActivity.label} /> : null}
     </ActivityContext.Provider>
   );
 }
