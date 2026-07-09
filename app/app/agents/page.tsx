@@ -1212,13 +1212,17 @@ function FailurePanel({
           </li>
         ))}
       </ul>
-      <form action={runVaeroexAction} className="flex flex-wrap gap-2">
+      <form
+        action={runVaeroexAction}
+        className="flex flex-wrap gap-2"
+        data-vaeroex-skip-global-activity={run.agent_type === "ask_vaeroex" ? "true" : undefined}
+      >
         <input type="hidden" name="workflow_key" value={run.agent_type} />
         <input type="hidden" name="user_prompt" value={str(input.user_prompt)} />
         <input type="hidden" name="date_range_start" value={str(extraInputs.date_range_start)} />
         <input type="hidden" name="date_range_end" value={str(extraInputs.date_range_end)} />
         <input type="hidden" name="subject" value={str(extraInputs.subject)} />
-        <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying...">
+        <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying..." activityDisabled={run.agent_type === "ask_vaeroex"}>
           Retry
         </PendingSubmitButton>
         <Link href="/app/ask" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
@@ -1431,7 +1435,11 @@ function WorkflowRunForm({
   const workflow = getVaeroexWorkflow(workflowKey);
 
   return (
-    <form action={runVaeroexAction} className={compact ? "mt-4 space-y-4" : "mt-4 space-y-3"}>
+    <form
+      action={runVaeroexAction}
+      className={compact ? "mt-4 space-y-4" : "mt-4 space-y-3"}
+      data-vaeroex-skip-global-activity={workflow.key === "ask_vaeroex" ? "true" : undefined}
+    >
       <input type="hidden" name="workflow_key" value={workflow.key} />
       <TextArea
         label={workflow.key === "ask_vaeroex" ? "Question" : "Context for Vaeroex"}
@@ -1447,7 +1455,7 @@ function WorkflowRunForm({
           <TextInput label="End date" name="date_range_end" type="date" />
         </div>
       ) : null}
-      <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating...">
+      <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating..." activityDisabled={workflow.key === "ask_vaeroex"}>
         {workflow.actionLabel}
       </PendingSubmitButton>
     </form>
