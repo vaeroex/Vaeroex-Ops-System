@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { deleteGeneratedInsightsAction } from "@/app/app/sources/actions";
+import { useActivitySignal } from "@/components/app/ActivityProvider";
 
 export type GeneratedInsightItem = {
   id: string;
@@ -32,6 +33,7 @@ export function GeneratedInsightsPanel({ insights }: { insights: GeneratedInsigh
   const [pendingText, setPendingText] = useState("");
   const [showDelayedPending, setShowDelayedPending] = useState(false);
   const [notice, setNotice] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  useActivitySignal(pending, pendingText || "Updating Business Memory...", { source: "generated-insights", timeoutMs: 30000 });
 
   useEffect(() => {
     setItems(insights);
@@ -41,18 +43,15 @@ export function GeneratedInsightsPanel({ insights }: { insights: GeneratedInsigh
   useEffect(() => {
     if (!pending) {
       setShowDelayedPending(false);
-      document.documentElement.style.cursor = "";
       return;
     }
 
     const timer = window.setTimeout(() => {
       setShowDelayedPending(true);
-      document.documentElement.style.cursor = "progress";
     }, 500);
 
     return () => {
       window.clearTimeout(timer);
-      document.documentElement.style.cursor = "";
     };
   }, [pending]);
 
@@ -135,7 +134,6 @@ export function GeneratedInsightsPanel({ insights }: { insights: GeneratedInsigh
       setPending(false);
       setPendingText("");
       setShowDelayedPending(false);
-      document.documentElement.style.cursor = "";
     }
   }
 

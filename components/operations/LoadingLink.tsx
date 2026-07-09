@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentProps, type ReactNode } from "react";
+import { useActivitySignal } from "@/components/app/ActivityProvider";
 
 type LoadingLinkProps = Omit<ComponentProps<typeof Link>, "children"> & {
   children: ReactNode;
@@ -15,6 +16,7 @@ export function LoadingLink({ children, loadingLabel = "Loading...", onClick, ..
   const [loading, setLoading] = useState(false);
   const timerRef = useRef<number | null>(null);
   const fallbackTimerRef = useRef<number | null>(null);
+  useActivitySignal(loading, loadingLabel, { source: "loading-link", timeoutMs: 8000 });
 
   function resetLoading() {
     if (timerRef.current) {
@@ -28,7 +30,6 @@ export function LoadingLink({ children, loadingLabel = "Loading...", onClick, ..
     }
 
     setLoading(false);
-    document.documentElement.style.cursor = "";
   }
 
   useEffect(() => resetLoading(), [pathname, searchParams]);
@@ -50,6 +51,8 @@ export function LoadingLink({ children, loadingLabel = "Loading...", onClick, ..
     <Link
       {...props}
       aria-busy={loading}
+      data-vaeroex-local-activity="true"
+      data-vaeroex-activity-label={loadingLabel}
       onClick={(event) => {
         onClick?.(event);
 
@@ -67,7 +70,6 @@ export function LoadingLink({ children, loadingLabel = "Loading...", onClick, ..
 
         timerRef.current = window.setTimeout(() => {
           setLoading(true);
-          document.documentElement.style.cursor = "progress";
           fallbackTimerRef.current = window.setTimeout(resetLoading, 8000);
         }, 500);
       }}

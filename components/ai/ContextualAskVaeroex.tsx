@@ -2,6 +2,7 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { runContextualAskVaeroexAction, type ContextualAskState } from "@/app/app/contextual-ask/actions";
+import { useActivitySignal } from "@/components/app/ActivityProvider";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
 
@@ -89,6 +90,7 @@ export function ContextualAskVaeroex({
   const displayedProgress = isGenerating ? Math.max(progress, 5) : progress;
   const answer = showAnswer ? state.answer : undefined;
   const activePanelId = isGenerating ? `${panelId}-progress` : panelId;
+  useActivitySignal(isGenerating, progressMessage(displayedProgress), { source: "contextual-ask", timeoutMs: 90000 });
 
   useEffect(() => {
     if (!isPending) {
