@@ -210,7 +210,9 @@ export async function runVaeroexAction(formData: FormData) {
       workflow,
       userPrompt,
       workspaceSnapshot,
-      extraInputs: evidenceAwareInputs
+      extraInputs: evidenceAwareInputs,
+      supabase,
+      workspaceId
     });
 
     const { data, error } = await supabase
@@ -429,15 +431,12 @@ export async function saveVaeroexOutputAction(formData: FormData) {
   const runId = text(formData, "run_id");
   const target = text(formData, "save_target") as VaeroexSaveTarget;
 
-  if (!runId || !["tasks", "sop", "form", "checklist", "report"].includes(target)) {
+  if (!runId || !["sop", "report"].includes(target)) {
     redirectWithError("Choose a Vaeroex result and save target.");
   }
 
   const { supabase, user, workspaceId, membership, run, output } = await getRun(runId);
   const toolByTarget: Record<VaeroexSaveTarget, RegisteredToolName> = {
-    tasks: "save_vaeroex_output_tasks",
-    form: "save_vaeroex_output_form",
-    checklist: "save_vaeroex_output_checklist",
     sop: "save_vaeroex_output_sop",
     report: "save_vaeroex_output_report"
   };
@@ -461,102 +460,6 @@ export async function saveVaeroexOutputAction(formData: FormData) {
     }
   );
   const createdIds: string[] = [];
-
-  if (target === "tasks") {
-    const drafts = taskDrafts(output);
-
-    if (!drafts.length) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent("This Vaeroex result has no task drafts to save.")}`);
-    }
-
-    const { data, error } = await supabase
-      .from("tasks")
-      .insert(
-        drafts.map((task) => ({
-          workspace_id: workspaceId,
-          title: task.title,
-          description: task.description,
-          status: "To Do",
-          priority: task.priority,
-          category: task.category,
-          due_date: task.due_date,
-          related_type: "vaeroex_run",
-          related_id: run.id,
-          ai_generated: true,
-          created_by: user.id
-        }))
-      )
-      .select("id");
-
-    if (error) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent(error.message)}`);
-    }
-
-    createdIds.push(...(data || []).map((item) => item.id));
-    revalidatePath("/app/tasks");
-  }
-
-  if (target === "form") {
-    const drafts = formDrafts(output);
-
-    if (!drafts.length) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent("This Vaeroex result has no form draft to save.")}`);
-    }
-
-    const { data, error } = await supabase
-      .from("forms")
-      .insert(
-        drafts.map((form) => ({
-          workspace_id: workspaceId,
-          name: form.name,
-          description: form.description,
-          form_type: form.form_type,
-          schema_json: form.schema_json,
-          is_public: false,
-          public_slug: null,
-          created_by: user.id
-        }))
-      )
-      .select("id");
-
-    if (error) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent(error.message)}`);
-    }
-
-    createdIds.push(...(data || []).map((item) => item.id));
-    revalidatePath("/app/forms");
-  }
-
-  if (target === "checklist") {
-    const drafts = checklistDrafts(output);
-
-    if (!drafts.length) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent("This Vaeroex result has no checklist draft to save.")}`);
-    }
-
-    const { data, error } = await supabase
-      .from("checklists")
-      .insert(
-        drafts.map((checklist) => ({
-          workspace_id: workspaceId,
-          name: checklist.name,
-          description: checklist.description,
-          category: checklist.category,
-          frequency: checklist.frequency,
-          items_json: checklist.items_json,
-          assigned_role: checklist.assigned_role,
-          created_by: user.id
-        }))
-      )
-      .select("id");
-
-    if (error) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent(error.message)}`);
-    }
-
-    createdIds.push(...(data || []).map((item) => item.id));
-    revalidatePath("/app/checklists");
-  }
 
   if (target === "sop") {
     const drafts = sopDrafts(output);

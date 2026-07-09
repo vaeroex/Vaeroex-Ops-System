@@ -10,7 +10,8 @@
     "start": "next start",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "security:check": "node scripts/security-check.ts"
+    "security:check": "node scripts/security-check.ts && node scripts/adversarial-regression-tests.js",
+    "test:adversarial": "node scripts/adversarial-regression-tests.js"
   },
   "dependencies": {
     "@supabase/ssr": "0.5.2",

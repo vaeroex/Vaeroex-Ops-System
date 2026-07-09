@@ -164,33 +164,6 @@ const DEFAULT_BLOCK_RATE_LIMIT = 12;
 const BLOCK_RATE_LIMIT_WINDOW_MINUTES = 10;
 
 export const TOOL_EXECUTION_REGISTRY = {
-  save_vaeroex_output_tasks: {
-    name: "save_vaeroex_output_tasks",
-    operationType: "CREATE_RECORD",
-    targetTable: "tasks",
-    schema: saveTargetSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: ["owner", "admin"] as WorkspaceRole[]
-  },
-  save_vaeroex_output_form: {
-    name: "save_vaeroex_output_form",
-    operationType: "CREATE_RECORD",
-    targetTable: "forms",
-    schema: saveTargetSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: ["owner", "admin"] as WorkspaceRole[]
-  },
-  save_vaeroex_output_checklist: {
-    name: "save_vaeroex_output_checklist",
-    operationType: "CREATE_RECORD",
-    targetTable: "checklists",
-    schema: saveTargetSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: ["owner", "admin"] as WorkspaceRole[]
-  },
   save_vaeroex_output_sop: {
     name: "save_vaeroex_output_sop",
     operationType: "CREATE_RECORD",
