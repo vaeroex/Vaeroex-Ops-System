@@ -10,6 +10,15 @@ export type BusinessHealthTrendPoint = {
 };
 
 type RangeKey = "7D" | "6M" | "YTD";
+type BusinessHealthTrendChartProps = {
+  points: BusinessHealthTrendPoint[];
+  currentScore?: number;
+  currentStatus?: string;
+  currentTrend?: string;
+  isDemoWorkspace?: boolean;
+  errorMessage?: string | null;
+  loading?: boolean;
+};
 type ChartPoint = {
   key: string;
   label: string;
@@ -24,6 +33,11 @@ const ranges: Array<{ key: RangeKey; label: string }> = [
 
 function dateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
+}
+
+function todayKey() {
+  const today = new Date();
+  return dateOnly(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())));
 }
 
 function monthKey(date: Date) {
@@ -44,6 +58,78 @@ function average(values: number[]) {
   return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
 }
 
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function normalizePoints(points: BusinessHealthTrendPoint[]) {
+  const byDate = new Map<string, BusinessHealthTrendPoint>();
+
+  for (const point of points) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(point.snapshotDate) || !Number.isFinite(point.score)) {
+      continue;
+    }
+
+    byDate.set(point.snapshotDate, {
+      ...point,
+      score: clampScore(point.score)
+    });
+  }
+
+  return Array.from(byDate.values()).sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
+}
+
+function pointsWithCurrentScore(points: BusinessHealthTrendPoint[], currentScore?: number, currentStatus?: string, currentTrend?: string) {
+  const normalized = normalizePoints(points);
+
+  if (!normalized.length || typeof currentScore !== "number" || !Number.isFinite(currentScore)) {
+    return normalized;
+  }
+
+  const currentDate = todayKey();
+  return [
+    ...normalized.filter((point) => point.snapshotDate !== currentDate),
+    {
+      snapshotDate: currentDate,
+      score: clampScore(currentScore),
+      status: currentStatus || normalized[normalized.length - 1]?.status || "Current",
+      trend: currentTrend || normalized[normalized.length - 1]?.trend || "Current"
+    }
+  ].sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
+}
+
+function buildDemoTrendPoints(currentScore?: number, currentStatus?: string, currentTrend?: string) {
+  const today = new Date();
+  const year = today.getUTCFullYear();
+  const currentMonth = today.getUTCMonth();
+  const monthScores = [76, 79, 63, 72, 81, 77, 80, 83, 78, 82, 85, 84];
+  const latestScore = clampScore(typeof currentScore === "number" && Number.isFinite(currentScore) ? currentScore : monthScores[currentMonth] || 80);
+  const points: BusinessHealthTrendPoint[] = [];
+
+  for (let month = 0; month <= currentMonth; month += 1) {
+    const score = month === currentMonth ? latestScore : monthScores[month] || latestScore;
+    points.push({
+      snapshotDate: dateOnly(new Date(Date.UTC(year, month, 1))),
+      score,
+      status: month === currentMonth ? currentStatus || "Current" : score >= 80 ? "Strong" : score >= 70 ? "Stable" : "Watch",
+      trend: month === currentMonth ? currentTrend || "Mixed" : month === 2 ? "Declining" : month === 4 ? "Improving" : "Stable"
+    });
+  }
+
+  const dailyOffsets = [-4, -2, 1, -1, 2, 1, 0];
+  for (let index = 6; index >= 0; index -= 1) {
+    const day = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - index));
+    points.push({
+      snapshotDate: dateOnly(day),
+      score: clampScore(latestScore + dailyOffsets[6 - index]),
+      status: currentStatus || "Current",
+      trend: currentTrend || "Mixed"
+    });
+  }
+
+  return normalizePoints(points);
+}
+
 function buildDailyPoints(points: BusinessHealthTrendPoint[]) {
   const today = new Date();
   const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 6));
@@ -51,6 +137,7 @@ function buildDailyPoints(points: BusinessHealthTrendPoint[]) {
 
   return points
     .filter((point) => point.snapshotDate >= startKey)
+    .slice(-7)
     .map((point) => ({
       key: point.snapshotDate,
       label: formatDayLabel(point.snapshotDate),
@@ -125,9 +212,23 @@ function pointCoordinates(points: ChartPoint[]) {
   }));
 }
 
-export function BusinessHealthTrendChart({ points }: { points: BusinessHealthTrendPoint[] }) {
+export function BusinessHealthTrendChart({
+  points,
+  currentScore,
+  currentStatus,
+  currentTrend,
+  isDemoWorkspace = false,
+  errorMessage,
+  loading = false
+}: BusinessHealthTrendChartProps) {
   const [range, setRange] = useState<RangeKey>("7D");
-  const selectedPoints = useMemo(() => chartData(points, range), [points, range]);
+  const realPoints = useMemo(() => pointsWithCurrentScore(points, currentScore, currentStatus, currentTrend), [points, currentScore, currentStatus, currentTrend]);
+  const usingSampleData = realPoints.length < 2 && isDemoWorkspace;
+  const trendPoints = useMemo(
+    () => (usingSampleData ? buildDemoTrendPoints(currentScore, currentStatus, currentTrend) : realPoints),
+    [currentScore, currentStatus, currentTrend, realPoints, usingSampleData]
+  );
+  const selectedPoints = useMemo(() => chartData(trendPoints, range), [trendPoints, range]);
   const coordinates = useMemo(() => pointCoordinates(selectedPoints), [selectedPoints]);
   const linePath = useMemo(() => pathFor(selectedPoints), [selectedPoints]);
   const first = selectedPoints[0]?.score;
@@ -135,6 +236,7 @@ export function BusinessHealthTrendChart({ points }: { points: BusinessHealthTre
   const change = typeof first === "number" && typeof last === "number" ? last - first : 0;
   const rangeLabel = range === "7D" ? "Last 7 days" : range === "6M" ? "Last 6 months" : "Year to date";
   const isLimited = selectedPoints.length > 0 && (range === "7D" ? selectedPoints.length < 4 : selectedPoints.length < 2);
+  const showError = Boolean(errorMessage && !usingSampleData && !trendPoints.length);
 
   return (
     <div className="mt-4 rounded-lg border border-cyan-300/15 bg-slate-950/40 p-3">
@@ -145,31 +247,54 @@ export function BusinessHealthTrendChart({ points }: { points: BusinessHealthTre
             {selectedPoints.length ? `${rangeLabel} · ${change === 0 ? "Stable" : change > 0 ? `+${change}` : change} pts` : rangeLabel}
           </p>
         </div>
-        <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-1">
-          {ranges.map((item) => (
-            <button
-              key={item.key}
-              type="button"
-              onClick={() => setRange(item.key)}
-              className={`min-h-8 rounded-md px-2.5 text-xs font-semibold transition ${
-                range === item.key
-                  ? "bg-vaeroex-blue text-white"
-                  : "text-slate-300 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-              }`}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          {usingSampleData ? (
+            <span className="rounded-full border border-amber-300/35 bg-amber-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-amber-100">
+              Sample demo trend
+            </span>
+          ) : realPoints.length ? (
+            <span className="rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-100">
+              Stored snapshots
+            </span>
+          ) : null}
+          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-1">
+            {ranges.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => setRange(item.key)}
+                className={`min-h-8 rounded-md px-2.5 text-xs font-semibold transition ${
+                  range === item.key
+                    ? "bg-vaeroex-blue text-white"
+                    : "text-slate-300 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {selectedPoints.length ? (
+      {loading ? (
+        <div className="mt-3 h-24 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" aria-live="polite">
+          <span className="sr-only">Loading Business Health history.</span>
+        </div>
+      ) : showError ? (
+        <div className="mt-3 rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-xs leading-5 text-amber-100">
+          {errorMessage}
+        </div>
+      ) : selectedPoints.length ? (
         <div className="mt-3">
           <svg viewBox="0 0 320 92" role="img" aria-label={`Business Health trend for ${rangeLabel}`} className="h-24 w-full overflow-visible">
             <defs>
               <linearGradient id="business-health-line" x1="0" x2="1" y1="0" y2="0">
                 <stop offset="0%" stopColor="#1E6BFF" />
                 <stop offset="100%" stopColor="#38BDF8" />
+              </linearGradient>
+              <linearGradient id="business-health-fill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="rgba(56,189,248,.22)" />
+                <stop offset="100%" stopColor="rgba(30,107,255,0)" />
               </linearGradient>
             </defs>
             <line x1="18" x2="302" y1="10" y2="10" stroke="rgba(148,163,184,.2)" strokeDasharray="3 6" />
@@ -181,7 +306,10 @@ export function BusinessHealthTrendChart({ points }: { points: BusinessHealthTre
               0
             </text>
             {selectedPoints.length > 1 ? (
-              <path d={linePath} fill="none" stroke="url(#business-health-line)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+              <>
+                <path d={`${linePath} L ${coordinates[coordinates.length - 1].x.toFixed(2)} 82 L ${coordinates[0].x.toFixed(2)} 82 Z`} fill="url(#business-health-fill)" opacity="0.85" />
+                <path d={linePath} fill="none" stroke="url(#business-health-line)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+              </>
             ) : null}
             {coordinates.map((point) => (
               <g key={point.key}>
@@ -197,10 +325,15 @@ export function BusinessHealthTrendChart({ points }: { points: BusinessHealthTre
               Limited history available. Vaeroex is showing the Business Health points collected so far.
             </p>
           ) : null}
+          {usingSampleData ? (
+            <p className="mt-2 text-xs leading-5 text-amber-100/80">
+              Demo workspace sample data. This is not customer history.
+            </p>
+          ) : null}
         </div>
       ) : (
         <div className="mt-3 rounded-lg border border-dashed border-white/15 bg-white/[0.03] p-4 text-xs leading-5 text-slate-300">
-          Business Health history will appear as Vaeroex collects more signals.
+          Start collecting signals to build your health trend.
         </div>
       )}
     </div>
