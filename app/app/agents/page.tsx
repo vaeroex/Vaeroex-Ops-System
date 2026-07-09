@@ -11,12 +11,14 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getVaeroexWorkflow, type VaeroexSaveTarget, type VaeroexWorkflowKey } from "@/lib/ai/vaeroex-workflows";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Json } from "@/lib/supabase/types";
+import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type VaeroexHubPageProps = {
@@ -1168,6 +1170,10 @@ function FailurePanel({
   run: { id: string; agent_type: string; status: string; error_message: string | null; input_json?: Json };
   canViewDebug: boolean;
 }) {
+  if (isSecurityResponseMessage(run.error_message)) {
+    return <SecurityResponseNotice />;
+  }
+
   const input = getRunInput(run);
   const extraInputs = getRunExtraInputs(run);
   const reasons = failureReasons(input, run.error_message);
@@ -1233,6 +1239,10 @@ function SelectedResult({
   canViewDebug: boolean;
   debugMode: boolean;
 }) {
+  if (run.status === "failed" && isSecurityResponseMessage(run.error_message)) {
+    return <SecurityResponseNotice />;
+  }
+
   const display = displayOutput(output);
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
   const input = getRunInput(run);

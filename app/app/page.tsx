@@ -10,6 +10,7 @@ import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/Bus
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
+import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
@@ -1970,13 +1971,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       />
 
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{params.message}</div> : null}
-      {params?.error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{params.error}</div> : null}
+      <ErrorNotice message={params?.error} />
 
-      {errors.length ? (
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {errors[0]?.message || "Dashboard data could not be loaded."}
-        </div>
-      ) : null}
+      <ErrorNotice message={errors[0]?.message || null} />
 
       {isViewingDemoWorkspace ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
 

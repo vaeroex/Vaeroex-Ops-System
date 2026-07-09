@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { securityResponseMessage } from "@/lib/security/security-response";
 import type { Database, Json, WorkspaceRole } from "@/lib/supabase/types";
 
 export type ToolOperationType =
@@ -517,7 +518,7 @@ export async function requireToolExecution<TArgs = unknown>(
   const decision = await evaluateToolExecution<TArgs>(context, request);
 
   if (!decision.allowed) {
-    throw new Error(decision.reasonBlocked || "Tool execution was blocked by Vaeroex security policy.");
+    throw new Error(securityResponseMessage());
   }
 
   return decision.args as TArgs;

@@ -7,6 +7,7 @@ import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { assertWorkspaceTokenBudget, estimateTokenCount, getWorkspaceTokenBudget, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
+import { securityResponseMessage } from "@/lib/security/security-response";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type RunVaeroexRequest = {
@@ -490,7 +491,7 @@ export async function runVaeroexCompletionWithUsage({
       latencyMs,
       reasonBlocked: outputValidation.reason
     });
-    throw new Error("Vaeroex blocked an unsafe generated response before it could be saved.");
+    throw new Error(securityResponseMessage());
   }
 
   return {

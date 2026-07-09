@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
+import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
@@ -134,11 +135,7 @@ export default async function IntelligencePage() {
 
   return (
     <div className="space-y-6">
-      {errors.length ? (
-        <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm text-red-100">
-          {errors[0]?.message || "Some intelligence data could not be loaded."}
-        </div>
-      ) : null}
+      <ErrorNotice message={errors[0]?.message || null} />
 
       <section className="rounded-2xl border border-cyan-300/20 bg-[#061225] p-4 text-slate-100 shadow-command">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

@@ -2,6 +2,8 @@
 
 import { useActionState, useEffect, useMemo, useState } from "react";
 import { runContextualAskVaeroexAction, type ContextualAskState } from "@/app/app/contextual-ask/actions";
+import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
+import { isSecurityResponseMessage } from "@/lib/security/security-response";
 
 type ContextualAskVaeroexProps = {
   label?: string;
@@ -205,7 +207,9 @@ export function ContextualAskVaeroex({
         </div>
       ) : null}
 
-      {!isGenerating && state.status === "error" ? (
+      {!isGenerating && state.status === "error" && isSecurityResponseMessage(state.error) ? <SecurityResponseNotice compact /> : null}
+
+      {!isGenerating && state.status === "error" && !isSecurityResponseMessage(state.error) ? (
         <div className="rounded-lg border border-red-400/35 bg-red-950/30 p-4 text-sm leading-6 text-red-100">
           <p className="font-semibold">Vaeroex couldn’t generate this explanation.</p>
           <p className="mt-1">{state.error || "Try again in a moment."}</p>

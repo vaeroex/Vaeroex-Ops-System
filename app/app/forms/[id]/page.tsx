@@ -4,6 +4,7 @@ import { convertSubmissionToTaskAction, createFormSubmissionAction } from "@/app
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
+import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput, SelectInput, PrimaryButton } from "@/components/operations/FormControls";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { ReadableData } from "@/components/operations/ReadableData";
@@ -47,8 +48,7 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
         }
       />
 
-      {query?.error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{query.error}</div> : null}
-      {error ? <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error.message}</div> : null}
+      <ErrorNotice message={query?.error || error?.message} />
 
       <section className="space-y-6">
         <CreateDrawer title="Submit form" description="Capture an operational submission for manager review." triggerLabel="New Submission">
