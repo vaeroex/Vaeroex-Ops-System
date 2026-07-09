@@ -17,9 +17,16 @@ export const SECURITY_RESPONSE_OUTPUT = {
 
 const SECURITY_RESPONSE_PATTERNS = [
   /\baction blocked\b/i,
+  /\brequest denied\b/i,
+  /\brequest blocked\b/i,
   /\bsecurity policy\b/i,
   /\bsecurity requirements\b/i,
   /\bblocked by vaeroex\b/i,
+  /\bdata deletion not permitted\b/i,
+  /\bdeletion not permitted\b/i,
+  /\bnot allowed to delete\b/i,
+  /\bcannot delete\b/i,
+  /\bcan(?:'|’)?t delete\b/i,
   /\bunsafe generated response\b/i,
   /\bunsafe output\b/i,
   /\bunknown tool name\b/i,
@@ -44,6 +51,18 @@ const SECURITY_RESPONSE_PATTERNS = [
   /\bprompt injection\b/i,
   /\bsecret disclosure\b/i,
   /\btool execution\b/i
+];
+
+const LEGACY_SAVED_DENIAL_PATTERNS = [
+  /\baction blocked\b/i,
+  /\brequest denied\b/i,
+  /\brequest blocked\b/i,
+  /\bdata deletion not permitted\b/i,
+  /\bdeletion not permitted\b/i,
+  /\bnot allowed to delete\b/i,
+  /\bcannot delete\b/i,
+  /\bcan(?:'|’)?t delete\b/i,
+  /\bsecurity requirements\b/i
 ];
 
 const SECURITY_REQUEST_PATTERNS = [
@@ -72,6 +91,32 @@ export function isSecurityResponseMessage(message?: string | null) {
   return SECURITY_RESPONSE_PATTERNS.some((pattern) => pattern.test(value));
 }
 
+function isLegacySavedDenialMessage(message?: string | null) {
+  const value = String(message || "").trim();
+
+  if (!value) {
+    return false;
+  }
+
+  return LEGACY_SAVED_DENIAL_PATTERNS.some((pattern) => pattern.test(value));
+}
+
+function containsSecurityResponseString(value: unknown): boolean {
+  if (typeof value === "string") {
+    return isLegacySavedDenialMessage(value);
+  }
+
+  if (Array.isArray(value)) {
+    return value.some(containsSecurityResponseString);
+  }
+
+  if (value && typeof value === "object") {
+    return Object.values(value as Record<string, unknown>).some(containsSecurityResponseString);
+  }
+
+  return false;
+}
+
 export function securityResponseMessage() {
   return SECURITY_RESPONSE_MESSAGE;
 }
@@ -93,7 +138,8 @@ export function isSecurityResponseOutput(value: unknown) {
     isSecurityResponseMessage(typeof record.message === "string" ? record.message : "") ||
     isSecurityResponseMessage(typeof record.error === "string" ? record.error : "") ||
     isSecurityResponseMessage(typeof record.response_markdown === "string" ? record.response_markdown : "") ||
-    isSecurityResponseMessage(typeof record.executive_summary === "string" ? record.executive_summary : "")
+    isSecurityResponseMessage(typeof record.executive_summary === "string" ? record.executive_summary : "") ||
+    containsSecurityResponseString(record)
   );
 }
 

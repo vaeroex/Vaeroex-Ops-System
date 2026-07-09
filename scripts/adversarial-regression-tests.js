@@ -291,11 +291,37 @@ function runSecurityResponseRenderingTests() {
   const serialized = JSON.stringify(output);
   assert.doesNotMatch(serialized, /Executive Summary|Executive Recommendation|Top Problems|Business Health|Confidence|Improvement Plan|Checklist/i);
 
+  const legacyCompletedBlockedRun = {
+    title: "Request Denied: Data Deletion Not Permitted",
+    executive_summary: "I can’t delete workspace data or modify Business Memory from this request.",
+    recommended_actions: ["No records were changed."]
+  };
+  assert.equal(isSecurityResponseOutput(legacyCompletedBlockedRun), true, "legacy saved denied outputs must render as Security Response");
+
+  const nestedLegacyBlockedRun = {
+    title: "Operations review",
+    sections: [
+      {
+        heading: "Request Denied",
+        body: "Data deletion not permitted."
+      }
+    ]
+  };
+  assert.equal(isSecurityResponseOutput(nestedLegacyBlockedRun), true, "nested legacy security denials must render as Security Response");
+
+  const normalOperationsOutput = {
+    title: "Revenue review",
+    executive_summary: "Revenue increased while response time improved.",
+    recommended_actions: ["Leadership should review the revenue trend."]
+  };
+  assert.equal(isSecurityResponseOutput(normalOperationsOutput), false, "normal completed Operations Intelligence output must still render normally");
+
   const securityNotice = read("components/security/SecurityResponseNotice.tsx");
   assert.doesNotMatch(securityNotice, /Executive Summary|Executive Recommendation|Top Problems|Business Health|Confidence|Improvement Plan|Checklist/i);
 
   const agentsPage = read("app/app/agents/page.tsx");
   assert.match(agentsPage, /isSecurityResponseRun/, "Ask Vaeroex page must detect terminal security runs");
+  assert.match(agentsPage, /isSecurityResponseMessage\(run\.title\)/, "legacy saved security-denied run titles must render as Security Response");
   assert.match(agentsPage, /return\s+\(\s*<div className="mx-auto max-w-3xl">\s*<SecurityResponseNotice \/>/s, "selected security runs must return only the security response page");
 }
 
