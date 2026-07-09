@@ -195,6 +195,19 @@ for (const file of customerPages) {
   check(read(file).includes("requireWorkspacePage"), `${file} must call requireWorkspacePage for authenticated workspace access.`);
 }
 
+const pendingSubmitButton = read("components/operations/PendingSubmitButton.tsx");
+check(pendingSubmitButton.includes("useFormStatus"), "PendingSubmitButton must keep React form-status awareness for server action submissions.");
+check(pendingSubmitButton.includes("useActivitySignal(showingPending"), "PendingSubmitButton must register active submissions with the global loading cursor manager.");
+check(pendingSubmitButton.includes("const showingPending = pending || localPending"), "PendingSubmitButton must combine form pending and local pending state.");
+check(pendingSubmitButton.includes("setLocalPending(true)"), "PendingSubmitButton must set local pending immediately when a submit starts.");
+check(!pendingSubmitButton.includes("setTimeout(() => setLocalPending(true)"), "PendingSubmitButton must not delay local pending state with setTimeout.");
+check(pendingSubmitButton.includes("disabled={disabled || showingPending}"), "PendingSubmitButton must disable itself while a submission is pending.");
+check(pendingSubmitButton.includes("pointer-events-none opacity-70"), "PendingSubmitButton must visually fade and suppress hover while pending.");
+check(pendingSubmitButton.includes("{showingPending ? pendingLabel : children}"), "PendingSubmitButton must swap its label to the pending label while generating.");
+
+const agentsPage = read("app/app/agents/page.tsx");
+check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
+
 const workspaceActionFiles = [
   "app/app/operations/actions.ts",
   "app/app/files/actions.ts",

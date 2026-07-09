@@ -20,10 +20,36 @@ export function PendingSubmitButton({
   const { pending } = useFormStatus();
   const [localPending, setLocalPending] = useState(false);
   const [localError, setLocalError] = useState("");
+  const buttonRef = useRef<HTMLButtonElement | null>(null);
   const clickLockedRef = useRef(false);
   const observedFormPendingRef = useRef(false);
   const showingPending = pending || localPending;
   useActivitySignal(showingPending, pendingLabel, { source: "form-submit", timeoutMs: LOCAL_PENDING_TIMEOUT_MS });
+
+  useEffect(() => {
+    const button = buttonRef.current;
+    const form = button?.form;
+
+    if (!button || !form) {
+      return;
+    }
+
+    function handleSubmit(event: SubmitEvent) {
+      const submitter = event.submitter instanceof HTMLElement ? event.submitter : null;
+
+      if (submitter && submitter !== button) {
+        return;
+      }
+
+      clickLockedRef.current = true;
+      setLocalError("");
+      setLocalPending(true);
+    }
+
+    form.addEventListener("submit", handleSubmit, true);
+
+    return () => form.removeEventListener("submit", handleSubmit, true);
+  }, []);
 
   useEffect(() => {
     if (pending) {
@@ -59,6 +85,7 @@ export function PendingSubmitButton({
   return (
     <span className="inline-flex flex-col items-start gap-2">
       <button
+        ref={buttonRef}
         disabled={disabled || showingPending}
         className={resolvedClassName}
         aria-busy={showingPending}
@@ -73,7 +100,7 @@ export function PendingSubmitButton({
 
           clickLockedRef.current = true;
           setLocalError("");
-          window.setTimeout(() => setLocalPending(true), 0);
+          setLocalPending(true);
         }}
       >
         {showingPending ? pendingLabel : children}
