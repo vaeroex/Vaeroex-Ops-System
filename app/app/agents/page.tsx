@@ -422,30 +422,84 @@ function evidenceIsLimited(text: string) {
   );
 }
 
-function outputConfidence(output: JsonRecord, runStatus: string): RecommendationConfidence {
+type QuestionCoverage = "strong" | "moderate" | "limited" | "insufficient";
+
+function evidenceContextFromInput(input: JsonRecord) {
+  return asRecord(asRecord(input.extra_inputs).evidence_context);
+}
+
+function askEvidenceDiagnostics(input: JsonRecord, output: JsonRecord) {
+  const workspaceItems = dataUsedSummary(input).filter((item) => item.value > 0);
+  const workspaceEvidenceTotal = workspaceItems.reduce((sum, item) => sum + item.value, 0);
+  const evidenceContext = evidenceContextFromInput(input);
+  const citations = asArray(evidenceContext.citations);
+  const retrievedEvidenceCount = citations.length;
+  const evidenceActuallyUsed = outputEvidenceItems(output).length;
+  const retrievalConfidence = numberValue(evidenceContext.confidence_score);
+  const hasEvidenceContext = Boolean(
+    str(evidenceContext.retrieval_mode) ||
+      retrievedEvidenceCount ||
+      retrievalConfidence ||
+      asArray(evidenceContext.limitations).length ||
+      asArray(evidenceContext.data_gaps).length
+  );
+  const hasWorkspaceKnowledge = workspaceEvidenceTotal >= 4 || workspaceItems.length >= 2;
+  const hasExtensiveWorkspaceKnowledge = workspaceEvidenceTotal >= 10 || workspaceItems.length >= 3;
+  let questionCoverage: QuestionCoverage = "insufficient";
+
+  if (!hasEvidenceContext) {
+    if (evidenceActuallyUsed >= 3) questionCoverage = "moderate";
+    else if (evidenceActuallyUsed > 0) questionCoverage = "limited";
+  } else if (!retrievedEvidenceCount && !evidenceActuallyUsed) {
+    questionCoverage = "insufficient";
+  } else if (retrievalConfidence >= 66 && retrievedEvidenceCount >= 4 && evidenceActuallyUsed >= 3) {
+    questionCoverage = "strong";
+  } else if (retrievalConfidence >= 46 && (retrievedEvidenceCount >= 2 || evidenceActuallyUsed >= 2)) {
+    questionCoverage = "moderate";
+  } else {
+    questionCoverage = "limited";
+  }
+
+  return {
+    workspaceEvidenceTotal,
+    retrievedEvidenceCount,
+    evidenceActuallyUsed,
+    questionCoverage,
+    hasWorkspaceKnowledge,
+    hasExtensiveWorkspaceKnowledge
+  };
+}
+
+function outputConfidence(output: JsonRecord, runStatus: string, input?: JsonRecord): RecommendationConfidence {
   const explicit = normalizeRecommendationConfidence(str(output.recommendation_confidence) || str(output.confidence));
   const evidence = outputEvidenceItems(output);
   const confidenceText = confidenceEvidenceText(output);
   const hasInsufficientEvidence = evidenceIsInsufficient(confidenceText);
   const hasLimitedEvidence = evidenceIsLimited(confidenceText);
+  const diagnostics = input ? askEvidenceDiagnostics(input, output) : null;
+  const availableEvidenceCount = evidence.length || diagnostics?.retrievedEvidenceCount || 0;
 
-  if (runStatus === "failed" || hasInsufficientEvidence || evidence.length === 0) {
+  if (runStatus === "failed" || hasInsufficientEvidence || diagnostics?.questionCoverage === "insufficient" || availableEvidenceCount === 0) {
     return "Insufficient";
   }
 
   if (explicit) {
-    if (hasLimitedEvidence && (explicit === "High" || explicit === "Medium")) {
+    if ((hasLimitedEvidence || diagnostics?.questionCoverage === "limited") && (explicit === "High" || explicit === "Medium")) {
       return "Low";
     }
 
-    if (explicit === "High" && evidence.length < 3) {
-      return evidence.length <= 1 ? "Low" : "Medium";
+    if (diagnostics?.questionCoverage === "moderate" && explicit === "High") {
+      return "Medium";
+    }
+
+    if (explicit === "High" && availableEvidenceCount < 3) {
+      return availableEvidenceCount <= 1 ? "Low" : "Medium";
     }
 
     return explicit;
   }
 
-  if (hasLimitedEvidence) {
+  if (hasLimitedEvidence || diagnostics?.questionCoverage === "limited") {
     return "Low";
   }
 
@@ -455,13 +509,15 @@ function outputConfidence(output: JsonRecord, runStatus: string): Recommendation
   const hasDataGaps = collectItems(output, ["limitations", "data_gaps", "missing_context"]).length > 0;
 
   let score = 0;
-  if (evidence.length >= 6) score += 2;
-  else if (evidence.length >= 3) score += 1;
+  if (availableEvidenceCount >= 6) score += 2;
+  else if (availableEvidenceCount >= 3) score += 1;
 
   if (hasFreshEvidence) score += 1;
   if (hasHistoricalDepth) score += 1;
   if (hasEvidenceAgreement) score += 1;
   if (hasDataGaps) score -= 1;
+  if (diagnostics?.questionCoverage === "strong") score += 1;
+  if (diagnostics?.questionCoverage === "moderate") score = Math.min(score, 3);
 
   if (score >= 4) return "High";
   if (score >= 2) return "Medium";
@@ -1118,6 +1174,12 @@ function softenAskAnswerText(value: string) {
     .replace(/^(Given (the )?(available|current|workspace) evidence,?\s*)/i, "")
     .replace(/^(The available evidence suggests( that)?\s*)/i, "")
     .replace(/^(The current evidence suggests( that)?\s*)/i, "")
+    .replace(/^(Evidence (indicates|suggests)( that)?\s*)/i, "")
+    .replace(/^Executive summary:?\s*/i, "")
+    .replace(/^Confidence[^.]*\.\s*/i, "")
+    .replace(/^There is (currently )?(very )?limited (information|evidence|financial history|context)[^.]*\.\s*/i, "")
+    .replace(/^There is not enough (workspace |question-specific )?evidence[^.]*\.\s*/i, "")
+    .replace(/^Leadership should review\s+([^.\n]+)\.?/i, "$1 needs leadership attention.")
     .replace(/\bReview Customer Pipeline\b/g, "Customer pipeline needs leadership attention")
     .replace(/\bAddress Overdue Tasks\b/g, "Overdue activity needs leadership review")
     .replace(/\bEnhance Follow-Up\b/g, "Follow-up quality may need attention")
@@ -1127,7 +1189,7 @@ function softenAskAnswerText(value: string) {
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 
-  return softened ? `${softened.charAt(0).toUpperCase()}${softened.slice(1)}` : softened;
+  return softened ? `${softened.charAt(0).toUpperCase()}${softened.slice(1)}` : value.trim();
 }
 
 function evidenceSourceLabel(item: string) {
@@ -1143,9 +1205,32 @@ function evidenceSourceLabel(item: string) {
   return "Workspace Context";
 }
 
-function evidenceUsedLabels(output: JsonRecord) {
+function citationEvidenceItems(input: JsonRecord) {
+  const citations = asArray(evidenceContextFromInput(input).citations);
+
+  return unique(
+    citations.map((item, index) => {
+      const citation = asRecord(item);
+      const title = str(citation.title, `Supporting evidence ${index + 1}`);
+      const sourceType = str(citation.source_type);
+      const excerpt = str(citation.summary) || str(citation.excerpt);
+      const source = sourceType ? `${sourceType}: ${title}` : title;
+      const preview = excerpt.length > 180 ? `${excerpt.slice(0, 177).trim()}...` : excerpt;
+
+      return excerpt ? `${source} - ${preview}` : source;
+    })
+  );
+}
+
+function supportingEvidenceItems(output: JsonRecord, input: JsonRecord) {
   const evidence = outputEvidenceItems(output);
-  return unique((evidence.length ? evidence : ["Workspace Context"]).map(evidenceSourceLabel)).slice(0, 6);
+  return evidence.length ? evidence : citationEvidenceItems(input);
+}
+
+function evidenceUsedLabels(output: JsonRecord, input: JsonRecord) {
+  const evidence = outputEvidenceItems(output);
+  const citationEvidence = citationEvidenceItems(input);
+  return unique((evidence.length ? evidence : citationEvidence.length ? citationEvidence : ["Workspace Context"]).map(evidenceSourceLabel)).slice(0, 6);
 }
 
 function inlineList(items: string[]) {
@@ -1154,12 +1239,28 @@ function inlineList(items: string[]) {
   return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
 }
 
-function briefEvidenceNote(labels: string[], evidenceCount: number, confidence: RecommendationConfidence) {
-  if (confidence === "Insufficient" || evidenceCount === 0) {
+function briefEvidenceNote(labels: string[], diagnostics: ReturnType<typeof askEvidenceDiagnostics>, confidence: RecommendationConfidence) {
+  if (confidence === "Insufficient" || diagnostics.questionCoverage === "insufficient") {
+    if (diagnostics.hasWorkspaceKnowledge) {
+      return "Your workspace contains business information, but Vaeroex does not have enough question-specific evidence to answer this reliably yet.";
+    }
+
     return "There is not enough workspace evidence to answer this reliably yet.";
   }
 
-  return `This answer is supported by ${inlineList(labels)}.`;
+  if (confidence === "Low" || diagnostics.questionCoverage === "limited") {
+    if (diagnostics.hasExtensiveWorkspaceKnowledge) {
+      return "Your workspace contains meaningful business information, but only a limited portion directly supports this question, so this answer is directional.";
+    }
+
+    return "The evidence directly related to this question is limited, so this answer is directional rather than definitive.";
+  }
+
+  if (confidence === "Medium") {
+    return `This recommendation is supported by ${inlineList(labels)}, with some question-specific limits.`;
+  }
+
+  return `This recommendation is based on ${inlineList(labels)}.`;
 }
 
 function ConversationResult({
@@ -1173,11 +1274,16 @@ function ConversationResult({
   const input = getRunInput(run);
   const question = str(input.user_prompt, "Question not recorded.");
   const answer = conversationAnswerText(visibleOutput);
-  const confidence = outputConfidence(visibleOutput, run.status);
-  const evidence = outputEvidenceItems(visibleOutput);
-  const evidenceLabels = evidenceUsedLabels(visibleOutput);
-  const evidencePreview = evidence.length ? evidence.slice(0, 6) : ["Limited workspace evidence was available for this answer."];
-  const evidenceNote = briefEvidenceNote(evidenceLabels, evidence.length, confidence);
+  const confidence = outputConfidence(visibleOutput, run.status, input);
+  const diagnostics = askEvidenceDiagnostics(input, visibleOutput);
+  const evidence = supportingEvidenceItems(visibleOutput, input);
+  const evidenceLabels = evidenceUsedLabels(visibleOutput, input);
+  const evidencePreview = evidence.length
+    ? evidence.slice(0, 6)
+    : diagnostics.hasWorkspaceKnowledge
+      ? ["Vaeroex found workspace information, but not enough evidence directly related to this question."]
+      : ["Limited workspace evidence was available for this answer."];
+  const evidenceNote = briefEvidenceNote(evidenceLabels, diagnostics, confidence);
 
   return (
     <div className="space-y-4">
