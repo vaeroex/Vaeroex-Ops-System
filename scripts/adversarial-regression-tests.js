@@ -111,6 +111,9 @@ const {
 const {
   getWorkspaceTokenBudget
 } = require("../lib/ai/usage.ts");
+const {
+  buildKpiForecastEligibility
+} = require("../lib/kpis/forecast-eligibility.ts");
 
 const ownerContext = {
   supabase: fakeSupabase(),
@@ -421,6 +424,85 @@ function runOpenAIResilienceTests() {
   assert.ok(budget.singleRequestTokens >= 5_000, "single request token budget should have a sane lower bound");
 }
 
+function makeKpi(name, metricDate, actualValue = 100) {
+  return {
+    id: `${name}-${metricDate}`,
+    workspace_id: "11111111-1111-4111-8111-111111111111",
+    folder_id: null,
+    name,
+    category: null,
+    target: 100,
+    actual_value: actualValue,
+    metric_date: metricDate,
+    owner: null,
+    notes: null,
+    source: null,
+    source_file_id: null,
+    import_id: null,
+    import_row_id: null,
+    raw_data_json: {},
+    created_by: null,
+    created_at: `${metricDate}T12:00:00.000Z`,
+    updated_at: `${metricDate}T12:00:00.000Z`,
+    archived_at: null,
+    deleted_at: null
+  };
+}
+
+function runKpiForecastEligibilityTests() {
+  const now = "2026-07-10T12:00:00.000Z";
+  const currentOnly = [
+    "Revenue",
+    "Leads",
+    "Conversion",
+    "Response Time",
+    "Customer Satisfaction",
+    "Expenses",
+    "Gross Margin",
+    "Backlog",
+    "Retention"
+  ].map((name, index) => makeKpi(name, "2026-07-01", 100 + index));
+  const currentOnlyForecast = buildKpiForecastEligibility(currentOnly, { now });
+
+  assert.equal(currentOnlyForecast.currentKpiCount, 9, "current KPI availability should count active KPI names");
+  assert.equal(currentOnlyForecast.state, "building_history", "current one-period KPIs should build history instead of claiming no data");
+  assert.match(currentOnlyForecast.reason, /current KPI/i, "forecast reason should acknowledge current KPI data");
+  assert.doesNotMatch(currentOnlyForecast.reason, /No KPI records are available/i, "forecast reason must not imply missing KPI data when current KPIs exist");
+
+  const readyForecast = buildKpiForecastEligibility(
+    [
+      makeKpi("Revenue", "2026-04-01", 100),
+      makeKpi("Revenue", "2026-05-01", 110),
+      makeKpi("Revenue", "2026-06-01", 120),
+      makeKpi("Revenue", "2026-07-01", 130)
+    ],
+    { now }
+  );
+  assert.equal(readyForecast.state, "ready", "four fresh dated measurements should be forecast ready");
+  assert.equal(readyForecast.ready, true, "ready forecasts should be marked ready");
+
+  const directionalForecast = buildKpiForecastEligibility(
+    [makeKpi("Leads", "2026-06-01", 40), makeKpi("Leads", "2026-07-01", 45)],
+    { now }
+  );
+  assert.equal(directionalForecast.state, "directional_only", "two fresh dated measurements should be directional only");
+  assert.equal(directionalForecast.directional, true, "directional forecasts should be marked directional");
+
+  const staleForecast = buildKpiForecastEligibility(
+    [
+      makeKpi("Conversion", "2026-01-01", 20),
+      makeKpi("Conversion", "2026-02-01", 22),
+      makeKpi("Conversion", "2026-03-01", 23),
+      makeKpi("Conversion", "2026-04-01", 24)
+    ],
+    { now }
+  );
+  assert.equal(staleForecast.state, "stale_data", "old history should report stale data instead of ready forecasts");
+
+  const noKpiForecast = buildKpiForecastEligibility([], { now });
+  assert.equal(noKpiForecast.state, "no_kpi_data", "empty KPI workspace should report no KPI data");
+}
+
 async function main() {
   assert.ok(existsSync(path.join(root, "lib/security/tool-execution-gateway.ts")), "tool gateway source must exist");
 
@@ -430,6 +512,7 @@ async function main() {
   runBusinessMemoryPoisoningTests();
   runWebhookReplayTests();
   runOpenAIResilienceTests();
+  runKpiForecastEligibilityTests();
 
   console.log("Adversarial regression tests passed.");
 }

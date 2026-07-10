@@ -21,6 +21,12 @@ function badgeTone(label: string) {
   return "border-emerald-400/35 bg-emerald-950/30 text-emerald-100";
 }
 
+function forecastTone(coverage: BusinessIntelligenceCoverageResult) {
+  if (coverage.forecastReadiness.ready) return "border-cyan-300/35 bg-cyan-950/30 text-cyan-100";
+  if (coverage.forecastReadiness.directional) return "border-emerald-300/35 bg-emerald-950/30 text-emerald-100";
+  return "border-amber-400/35 bg-amber-950/30 text-amber-100";
+}
+
 function formatDate(value: string | null) {
   if (!value) return "No update yet";
   return new Date(`${value}T12:00:00.000Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -79,7 +85,7 @@ function CoverageRow({ item }: { item: BusinessIntelligenceCoverageItem }) {
             </div>
             <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
               <dt className="font-semibold text-white">Forecast support</dt>
-              <dd className="mt-1">{item.forecastReady ? "Directional support available" : "Needs more history"}</dd>
+              <dd className="mt-1">{item.forecastReady ? "Directional support available" : "Building history"}</dd>
             </div>
           </dl>
         </div>
@@ -189,7 +195,7 @@ export function BusinessIntelligenceCoveragePanel({ coverage, compact = false }:
           <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(coverage.overallConfidenceLabel)}`}>
             {coverage.overallConfidenceLabel}
           </span>
-          <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${coverage.forecastReadiness.ready ? "border-cyan-300/35 bg-cyan-950/30 text-cyan-100" : "border-amber-400/35 bg-amber-950/30 text-amber-100"}`}>
+          <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${forecastTone(coverage)}`}>
             {coverage.forecastReadiness.label}
           </span>
         </div>
@@ -232,6 +238,16 @@ export function BusinessIntelligenceCoveragePanel({ coverage, compact = false }:
         <div className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4">
           <h3 className="text-sm font-semibold text-cyan-100">Recommended Next Upload</h3>
           <p className="mt-3 text-sm leading-6 text-cyan-50/85">{coverage.recommendedNextUpload}</p>
+          <dl className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-2">
+            <div>
+              <dt className="font-semibold text-cyan-100">KPI availability</dt>
+              <dd>{coverage.forecastReadiness.currentKpiCount} current KPI{coverage.forecastReadiness.currentKpiCount === 1 ? "" : "s"}</dd>
+            </div>
+            <div>
+              <dt className="font-semibold text-cyan-100">Historical depth</dt>
+              <dd>{coverage.forecastReadiness.historicalDepthLabel}</dd>
+            </div>
+          </dl>
           <p className="mt-3 text-xs leading-5 text-slate-400">{coverage.forecastReadiness.reason}</p>
         </div>
       </div>
@@ -250,7 +266,7 @@ export function BusinessIntelligenceCoverageSummary({ coverage }: { coverage: Bu
           <h3 className="mt-2 text-lg font-semibold text-white">{coverage.overallCoverage}% · {coverage.overallConfidenceLabel}</h3>
           <p className="mt-2 text-sm leading-6 text-slate-300">{coverage.overallReason}</p>
         </div>
-        <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${badgeTone(coverage.overallConfidenceLabel)}`}>
+        <span className={`w-fit rounded-full border px-3 py-1 text-xs font-semibold ${forecastTone(coverage)}`}>
           {coverage.forecastReadiness.label}
         </span>
       </div>
