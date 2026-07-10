@@ -13,7 +13,7 @@ const previewItems = [
   "Executive Dashboard",
   "Business Health Score",
   "KPI trends",
-  "Customer pipeline context",
+  "Customer activity evidence",
   "Reports",
   "Profit Leak Detection",
   "Business Memory",

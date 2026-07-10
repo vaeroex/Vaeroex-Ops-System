@@ -331,22 +331,26 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       };
     }),
     ...customerContextWithoutFollowup.slice(0, 3).map((lead) => {
-      const evidence = [`Customer status: ${lead.status}`, lead.last_activity_at ? `Last activity: ${lead.last_activity_at}` : "No recent activity recorded", "Customer pipeline context is available"];
+      const evidence = [
+        lead.status ? `Customer activity status: ${lead.status}` : "Customer activity status is not recorded",
+        lead.last_activity_at ? `Last activity: ${lead.last_activity_at}` : "No recent customer activity is recorded",
+        "Customer activity evidence is available"
+      ];
 
       return {
         id: `customer-risk-${lead.id}`,
         type: "Opportunity" as const,
         title: lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name,
-        summary: `${formatMetric(lead.estimated_value, "revenue")} estimated value with limited recent customer activity.`,
-        why: "Customer context can reveal revenue opportunities when response speed and process health are visible.",
-        impact: "Revenue can leak when customer activity exists but follow-through patterns are weak or unclear.",
-        recommendedAction: "Leadership should review the CRM workflow and decide whether this belongs in the leadership review.",
-        confidence: lead.estimated_value ? "Medium" : "Low",
+        summary: "Customer activity evidence exists, but recent activity context is limited.",
+        why: "Customer activity can reveal revenue or retention opportunities when response patterns are visible.",
+        impact: "Revenue or retention risk can build when customer interest exists but recent activity is unclear.",
+        recommendedAction: "Leadership should review the customer activity evidence and decide whether it belongs in the next leadership review.",
+        confidence: lead.last_activity_at || lead.source_file_id || lead.import_id ? "Medium" : "Low",
         evidence,
         evidenceCount: evidence.length,
-        sourceTypes: ["Customer Context"],
-        sourceHref: "/app/crm",
-        priority: lead.estimated_value ? "Medium" : "Low",
+        sourceTypes: ["Customer Evidence"],
+        sourceHref: "/app/sources",
+        priority: lead.last_activity_at || lead.source_file_id || lead.import_id ? "Medium" : "Low",
         lastUpdated: lead.updated_at || lead.created_at
       };
     }),

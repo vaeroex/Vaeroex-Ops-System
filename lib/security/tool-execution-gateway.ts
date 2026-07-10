@@ -56,7 +56,7 @@ export type ToolExecutionDecision<TArgs = unknown> = {
 };
 
 const uuidSchema = z.string().uuid();
-const importTypeSchema = z.enum(["kpi", "crm", "metrics"]);
+const importTypeSchema = z.enum(["kpi", "metrics"]);
 const managedActionSchema = z.enum(["archive", "delete", "restore", "move", "duplicate", "edit"]);
 const unsafeInstructionPattern = /(;\s*(drop|delete|truncate|alter|update|insert)\b|--|\/\*|\bexecute\s+sql\b)/i;
 const safeTextSchema = (maxLength = 240) =>
@@ -205,15 +205,6 @@ export const TOOL_EXECUTION_REGISTRY = {
     name: "approve_kpi_import",
     operationType: "CREATE_RECORD",
     targetTable: "kpis",
-    schema: fileImportApprovalSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: OPERATOR_ROLES
-  },
-  approve_crm_import: {
-    name: "approve_crm_import",
-    operationType: "CREATE_RECORD",
-    targetTable: "crm_leads",
     schema: fileImportApprovalSchema,
     requiresConfirmation: true,
     destructive: false,

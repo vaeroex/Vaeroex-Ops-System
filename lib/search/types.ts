@@ -5,7 +5,7 @@ export type GlobalSearchGroupLabel =
   | "Issues"
   | "Business Signals"
   | "Review Signals"
-  | "CRM"
+  | "Customer Evidence"
   | "SOPs"
   | "Checklists"
   | "People"

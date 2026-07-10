@@ -108,7 +108,7 @@ const CATEGORY_LABELS: Record<BusinessIntelligenceCoverageCategoryId, string> = 
   financials: "Financials",
   operations: "Operations",
   customers: "Customers",
-  sales_pipeline: "Sales Pipeline",
+  sales_pipeline: "Customer Revenue Context",
   processes: "Processes / SOPs",
   staffing: "Staffing / People",
   issues_risks: "Issues / Risks",
@@ -121,7 +121,7 @@ const NEXT_UPLOADS: Record<BusinessIntelligenceCoverageCategoryId, string> = {
   financials: "Upload recent P&L, expense, margin, cost, or cash-flow summaries to improve financial understanding.",
   operations: "Upload operating logs, checklist results, job volume, service activity, or recurring workflow data.",
   customers: "Upload customer complaint, support, retention, or account activity data to improve customer risk detection.",
-  sales_pipeline: "Upload lead source, pipeline stage, conversion, win/loss, and follow-up history.",
+  sales_pipeline: "Upload customer activity, conversion, revenue, win/loss, and response history.",
   processes: "Upload SOPs, process docs, checklists, or recurring procedures to improve process recommendations.",
   staffing: "Add people, role, department, schedule, utilization, staffing, or assignment context.",
   issues_risks: "Add issue logs, risk reviews, incident summaries, blockers, or unresolved problem history.",
@@ -460,8 +460,8 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     ...reportSources(input.reports || [], customerKeywords)
   ];
   const salesSources = [
-    ...activeRows(input.crmLeads || []).map((lead) => evidence(lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name, "Sales Pipeline", lead.last_activity_at || lead.updated_at || lead.created_at, true, lead.estimated_value !== null ? "strong" : "developing", sourceText(lead.status, lead.notes))),
-    ...(input.crmHistory || []).map((row) => evidence(`Pipeline history: ${row.event_type}`, "Pipeline History", row.created_at, true, row.estimated_value !== null ? "strong" : "developing", sourceText(row.status, row.notes))),
+    ...activeRows(input.crmLeads || []).map((lead) => evidence(lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name, "Customer Revenue Context", lead.last_activity_at || lead.updated_at || lead.created_at, true, lead.source_file_id || lead.import_id ? "strong" : "developing", sourceText(lead.status, lead.notes))),
+    ...(input.crmHistory || []).map((row) => evidence(`Customer activity history: ${row.event_type}`, "Customer Activity History", row.created_at, true, row.source_file_id || row.import_id ? "strong" : "developing", sourceText(row.status, row.notes))),
     ...kpiSources(input.kpis || [], salesKeywords, "Sales KPIs"),
     ...fileSources(input.files || [], salesKeywords),
     ...reportSources(input.reports || [], salesKeywords)
@@ -490,7 +490,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   const historicalSources = [
     ...activeRows(input.kpis || []).map((kpi) => evidence(`${kpi.name} history`, "KPI History", kpi.metric_date || kpi.created_at, true, kpi.source_file_id || kpi.import_id ? "strong" : "developing", sourceText(kpi.category, kpi.source))),
     ...activeRows(input.operationalMetrics || []).map((metric) => evidence(`${metric.metric_name} history`, "Metric History", metric.metric_date || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing", sourceText(metric.category))),
-    ...(input.crmHistory || []).map((row) => evidence(`CRM history: ${row.event_type}`, "CRM History", row.created_at, true, "developing", sourceText(row.status, row.notes))),
+    ...(input.crmHistory || []).map((row) => evidence(`Customer activity history: ${row.event_type}`, "Customer Activity History", row.created_at, true, "developing", sourceText(row.status, row.notes))),
     ...(input.reports || []).filter((report) => report.date_range_start || report.date_range_end).map((report) => evidence(report.title, "Period Reports", report.date_range_end || report.created_at, false, "developing", sourceText(report.report_type))),
     ...importSources(input.imports || [], ["kpi", "metric", "crm", "lead", "revenue", "operational"], "Historical Imports")
   ];

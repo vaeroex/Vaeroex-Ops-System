@@ -23,8 +23,8 @@ const engineScenarios = [
     title: "Customer Risk",
     metric: "Review needed",
     question: "What should leadership look at first?",
-    problem: "Lead quality is stable, but conversion pressure is rising.",
-    evidence: "Pipeline movement, response timing, conversion trend, and source confidence.",
+    problem: "Customer interest is stable, but conversion pressure is rising.",
+    evidence: "Customer activity movement, response timing, conversion trend, and source confidence.",
     result: "Vaeroex recommends an executive review before the trend becomes a revenue problem."
   }
 ] as const;

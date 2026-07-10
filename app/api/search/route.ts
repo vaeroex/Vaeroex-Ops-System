@@ -29,7 +29,7 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Issues",
   "Business Signals",
   "Review Signals",
-  "CRM",
+  "Customer Evidence",
   "SOPs",
   "Checklists",
   "People",
@@ -109,7 +109,7 @@ function sourceHref(sourceType: string | null, title: string | null) {
   if (normalized.includes("file")) return hrefWithQuery("/app/files", query);
   if (normalized.includes("checklist")) return hrefWithQuery("/app/checklists", query);
   if (normalized.includes("sop")) return hrefWithQuery("/app/sops", query);
-  if (normalized.includes("crm") || normalized.includes("lead")) return hrefWithQuery("/app/crm", query);
+  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer")) return hrefWithQuery("/app/sources", query);
 
   return "/app/notifications";
 }
@@ -391,14 +391,14 @@ export async function GET(request: Request) {
 
   addGroup(
     groups,
-    "CRM",
+    "Customer Evidence",
     crmLeads.map((lead) => ({
       id: lead.id,
       title: lead.lead_name,
-      sourceType: "CRM",
+      sourceType: "Customer Evidence",
       preview: truncate(compact([lead.company, lead.email, lead.notes])),
-      href: hrefWithQuery("/app/crm", lead.lead_name),
-      meta: compact([lead.status, lead.owner, lead.estimated_value !== null ? `$${lead.estimated_value}` : null])
+      href: hrefWithQuery("/app/sources", lead.lead_name),
+      meta: compact([lead.status, lead.owner ? `Context: ${lead.owner}` : null])
     }))
   );
 

@@ -1206,7 +1206,7 @@ function comparisonNotes(trends: KpiTrend[]) {
     .filter((trend) => trend.volatility !== null)
     .sort((a, b) => (b.volatility ?? 0) - (a.volatility ?? 0))[0];
   const revenue = usable.find((trend) => lower(trend.name).includes("revenue") || lower(trend.name).includes("sales"));
-  const leads = usable.find((trend) => lower(trend.name).includes("lead"));
+  const customerActivity = usable.find((trend) => lower(trend.name).includes("lead") || lower(trend.name).includes("customer"));
   const conversion = usable.find((trend) => metricMatches(trend, ["conversion", "close rate"]));
   const responseTime = usable.find((trend) => metricMatches(trend, ["response", "reply time", "speed"]));
   const satisfaction = usable.find((trend) => metricMatches(trend, ["satisfaction", "csat", "nps"]));
@@ -1224,21 +1224,21 @@ function comparisonNotes(trends: KpiTrend[]) {
       : "Volatility needs more dated values before it becomes useful."
   ];
 
-  if (revenue && leads) {
+  if (revenue && customerActivity) {
     const revenueDirection = trendDirection(revenue);
-    const leadsDirection = trendDirection(leads);
+    const customerActivityDirection = trendDirection(customerActivity);
 
-    if (leadsDirection === "up" && revenueDirection === "down") {
-      notes.push("Leads are rising while revenue is falling, which points to a possible conversion, pricing, qualification, or follow-up bottleneck rather than a demand problem.");
-    } else if (leadsDirection === "down" && revenueDirection === "up") {
-      notes.push("Revenue is rising while leads are falling, which may mean larger deals are offsetting a weaker pipeline. That can be healthy short term, but pipeline quality should be watched.");
-    } else if (leadsDirection === revenueDirection && leadsDirection !== "flat") {
-      notes.push(`Leads and revenue are both moving ${leadsDirection}, which suggests pipeline volume and sales results are currently aligned.`);
+    if (customerActivityDirection === "up" && revenueDirection === "down") {
+      notes.push("Customer activity is rising while revenue is falling, which points to a possible conversion, pricing, qualification, or response-quality bottleneck rather than a demand problem.");
+    } else if (customerActivityDirection === "down" && revenueDirection === "up") {
+      notes.push("Revenue is rising while customer activity is falling, which may mean higher-value work is offsetting weaker activity volume. That can be healthy short term, but customer activity quality should be watched.");
+    } else if (customerActivityDirection === revenueDirection && customerActivityDirection !== "flat") {
+      notes.push(`Customer activity and revenue are both moving ${customerActivityDirection}, which suggests activity volume and revenue results are currently aligned.`);
     }
   }
 
-  if (leads && conversion && trendDirection(leads) === "up" && trendDirection(conversion) === "down") {
-    notes.push("Lead volume is improving while conversion is declining. Vaeroex would treat this as a follow-up quality, qualification, or sales process signal.");
+  if (customerActivity && conversion && trendDirection(customerActivity) === "up" && trendDirection(conversion) === "down") {
+    notes.push("Customer activity is improving while conversion is declining. Vaeroex would treat this as a response quality, qualification, or revenue process signal.");
   }
 
   if (responseTime && (conversion || revenue) && trendDirection(responseTime) === "up") {
@@ -1692,7 +1692,7 @@ function KpiChartSettingsForm({
         <input
           name="display_unit"
           defaultValue={setting?.display_unit ?? ""}
-          placeholder="$, %, hours, leads"
+          placeholder="$, %, hours, units"
           className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
         />
       </label>
@@ -2448,13 +2448,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           <div id="add-kpi">
             <CreateDrawer title="Create KPI" description="Use one metric per row so trends stay easy to review." triggerLabel="New KPI">
               <form action={createKpiAction} className="grid gap-4 lg:grid-cols-2">
-                <TextInput label="Name" name="name" placeholder="Revenue, Leads, Conversion Rate" required />
+                <TextInput label="Name" name="name" placeholder="Revenue, Conversion Rate, Response Time" required />
                 <TextInput label="Category" name="category" placeholder="Sales, Operations, Finance" />
                 <TextInput label="Target" name="target" type="number" step="0.01" />
                 <TextInput label="Actual Value" name="actual_value" type="number" step="0.01" />
                 <TextInput label="Date" name="metric_date" type="date" defaultValue={today} />
                 <TextInput label="Owner" name="owner" placeholder="Manager or department" />
-                <TextInput label="Source" name="source" placeholder="POS, CRM, spreadsheet, manual" />
+                <TextInput label="Source" name="source" placeholder="POS, source system, spreadsheet, manual" />
                 <div className="lg:col-span-2">
                   <TextArea label="Notes" name="notes" rows={4} />
                 </div>
@@ -2472,7 +2472,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             title="KPI records"
             description="Search, filter, group, edit, archive, duplicate, or bulk-manage KPI rows."
             emptyTitle="No KPIs yet"
-            emptyDescription="Create your first KPI for revenue, leads, conversion rate, follow-up completion, or any custom metric your team reviews."
+            emptyDescription="Create your first KPI for revenue, conversion rate, response time, customer activity, or any custom metric leadership reviews."
             searchParams={params}
           />
 

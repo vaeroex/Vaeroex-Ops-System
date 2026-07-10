@@ -185,7 +185,7 @@ Period: ${startDate} to ${endDate}
 Workspace: ${workspaceName}
 
 ## Executive Summary
-Vaeroex generated this scheduled report from current workspace activity, KPI history, customer pipeline records, Business Signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} Business Signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer pipeline record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
+Vaeroex generated this scheduled report from current workspace activity, KPI history, customer activity evidence, Business Signals, uploaded files, and saved Vaeroex insights. This period includes ${source.counts.completed_tasks} Business Signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer activity record${source.counts.crm_leads === 1 ? "" : "s"}, ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}, and ${source.counts.vaeroex_insights} saved Vaeroex insight${source.counts.vaeroex_insights === 1 ? "" : "s"}.
 
 ## What Needs Attention
 ${list(risks, "No urgent risks were detected for this scheduled report.")}
@@ -202,8 +202,8 @@ ${list(source.items.overdue_tasks, "No Business Signal evidence was found.")}
 ## KPI Signals
 ${list(source.items.below_target_kpis, "No below-target KPIs were found for this period.")}
 
-## Customer Pipeline Context
-${list(source.items.crm_leads, "No new customer pipeline records were found in this period.")}
+## Customer Activity Evidence
+${list(source.items.crm_leads, "No new customer activity evidence was found in this period.")}
 
 ## Open Review Signals
 ${list(source.items.open_assignments, "No open review signals were found.")}

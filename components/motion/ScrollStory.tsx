@@ -3,14 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 
 const storySteps = [
-  ["Scattered Information", "Reports, spreadsheets, tasks, CRM activity, files, and team updates live in disconnected places."],
+  ["Scattered Information", "Reports, spreadsheets, customer activity, files, and operational updates live in disconnected places."],
   ["Limited Visibility", "Leaders struggle to understand what is happening across the business."],
   ["Reactive Decisions", "Problems are often discovered late, after opportunities are missed or issues grow."],
-  ["Operational Intelligence", "Vaeroex connects context, performance, accountability, and recommendations."],
-  ["Execution Loop", "Insights become tasks, reports, alerts, assignments, and measurable outcomes."]
+  ["Operations Intelligence", "Vaeroex connects context, performance, risk, and evidence-backed recommendations."],
+  ["Leadership Clarity", "Insights become clearer briefings, better questions, and stronger decisions."]
 ] as const;
 
-const signalCards = ["Reports", "KPIs", "CRM", "Files", "Tasks", "Issues"];
+const signalCards = ["Reports", "KPIs", "Customer Activity", "Files", "Business Signals", "Issues"];
 
 export function ScrollStory() {
   const stepRefs = useRef<Array<HTMLDivElement | null>>([]);

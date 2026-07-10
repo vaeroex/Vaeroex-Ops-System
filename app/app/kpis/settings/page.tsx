@@ -186,7 +186,7 @@ function KpiSettingCard({
             <input
               name="y_axis_label"
               defaultValue={yAxisLabel}
-              placeholder="Revenue ($), Lead Count, Conversion %"
+              placeholder="Revenue ($), Customer Activity, Conversion %"
               className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
             />
           </label>

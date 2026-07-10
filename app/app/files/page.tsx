@@ -57,10 +57,9 @@ type ImportType = "kpi" | "crm" | "metrics";
 type FilePanelKey = "analyze" | "ask" | "intelligence" | "evidence" | "reports" | "import" | "history" | "details";
 type JsonRecord = Record<string, unknown>;
 
-const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "CRM", "Business Memory"];
+const DEFAULT_FILE_FOLDERS = ["KPI Files", "Reports", "SOPs", "Customer Evidence", "Business Memory"];
 const IMPORT_TYPES = [
   { value: "kpi", label: "KPI data" },
-  { value: "crm", label: "CRM leads" },
   { value: "metrics", label: "Business metrics" }
 ];
 const FILE_PANELS: Array<{ key: FilePanelKey; label: string; description: string }> = [
@@ -93,39 +92,29 @@ const KPI_VALUE_FORMAT_OPTIONS = [
   { value: "count", label: "Count" },
   { value: "decimal", label: "Decimal" }
 ];
-const IMPORT_FIELDS: Record<ImportType, Array<{ key: string; label: string; required?: boolean }>> = {
+const IMPORT_FIELDS: Record<Exclude<ImportType, "crm">, Array<{ key: string; label: string; required?: boolean }>> = {
   kpi: [
     { key: "name", label: "KPI name", required: true },
     { key: "category", label: "Category" },
     { key: "target", label: "Target" },
     { key: "actual_value", label: "Actual value", required: true },
     { key: "metric_date", label: "Date" },
-    { key: "owner", label: "Owner" },
+    { key: "owner", label: "Source/context" },
     { key: "notes", label: "Notes" },
     { key: "source", label: "Source" }
-  ],
-  crm: [
-    { key: "lead_name", label: "Lead name", required: true },
-    { key: "company", label: "Company" },
-    { key: "email", label: "Email" },
-    { key: "phone", label: "Phone" },
-    { key: "status", label: "Status" },
-    { key: "estimated_value", label: "Estimated value" },
-    { key: "owner", label: "Owner" },
-    { key: "notes", label: "Notes" }
   ],
   metrics: [
     { key: "metric_name", label: "Metric name", required: true },
     { key: "category", label: "Category" },
     { key: "value", label: "Value", required: true },
     { key: "metric_date", label: "Date" },
-    { key: "owner", label: "Owner" },
+    { key: "owner", label: "Source/context" },
     { key: "notes", label: "Notes" }
   ]
 };
 const fileEditFields: ManagedRecordEditField[] = [
   { name: "display_name", label: "File name", required: true },
-  { name: "import_type", label: "Import type", type: "select", options: ["none", "kpi", "crm", "metrics"] },
+  { name: "import_type", label: "Import type", type: "select", options: ["none", "kpi", "metrics"] },
   { name: "analysis_summary", label: "Vaeroex review summary", type: "textarea", rows: 5 }
 ];
 
@@ -483,7 +472,7 @@ function KpiImportInterpretationControls({ mappingJson }: { mappingJson: unknown
           <input
             name="display_unit"
             defaultValue={kpiInterpretationValue(mappingJson, "display_unit")}
-            placeholder="$, %, hours, leads"
+            placeholder="$, %, hours, customer count"
             className={inputClass}
           />
         </label>
@@ -739,8 +728,7 @@ function cleanAnalysisSections(result: JsonRecord | null, fallbackSummary?: stri
     actions: combineLists(output, ["recommended_actions", "next_actions", "action_items"]),
     tasks: combineLists(output, ["suggested_tasks", "follow_up_tasks", "tasks"]),
     reports: combineLists(output, ["suggested_reports", "reports", "recommended_reports"]),
-    kpiRecords: combineLists(output, ["suggested_kpi_records", "kpi_records", "recommended_kpis"]),
-    crmRecords: combineLists(output, ["suggested_crm_records", "crm_records", "crm_leads", "suggested_leads"])
+    kpiRecords: combineLists(output, ["suggested_kpi_records", "kpi_records", "recommended_kpis"])
   };
 }
 
@@ -1016,7 +1004,7 @@ function FileContextualAskPanel({
       <div className="mt-4">
         <ContextualAskVaeroex
           label="Ask Vaeroex About This File"
-          prompt={`Answer a leadership question about ${file.display_name}. Use only this file evidence and relevant workspace Business Memory. Cover summary, risks, opportunities, KPI suggestions, missing information, and what leadership should review next. Do not create assignments, CRM records, tasks, distribution schedules, or team workflow.`}
+          prompt={`Answer a leadership question about ${file.display_name}. Use only this file evidence and relevant workspace Business Memory. Cover summary, risks, opportunities, KPI suggestions, missing information, and what leadership should review next. Do not create assignments, customer-management records, tasks, distribution schedules, or team workflow.`}
           contextType="file"
           contextId={file.id}
           sourceTitle={`File - ${file.display_name}`}
@@ -1098,7 +1086,7 @@ function FileAnalysisActions({
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Analysis Actions</p>
           <h4 className="mt-2 text-base font-semibold text-white">What would you like to do with this intelligence?</h4>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-300">
-            Preserve, export, copy, or review the intelligence Vaeroex generated. These actions support leadership decision-making and do not create assignments, notifications, CRM records, or internal workflows.
+            Preserve, export, copy, or review the intelligence Vaeroex generated. These actions support leadership decision-making and do not create assignments, notifications, customer-management records, or internal workflows.
           </p>
         </div>
         <StatusBadge value="Leadership intelligence" />
@@ -1522,16 +1510,15 @@ function FileActionCenter({
       <section id="file-import-actions" className="rounded-lg border border-line bg-white p-4">
         <h4 className="text-sm font-semibold text-ink">Import data from {file.display_name} after review</h4>
         <p className="mt-1 text-xs leading-5 text-muted">
-          These actions extract rows and show a mapping review first. Nothing is saved to KPI, CRM, or business history until you approve it.
+          These actions extract rows and show a mapping review first. Nothing is saved to KPI or business metric history until you approve it.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <ImportActionForm file={file} importType="kpi" label="Review KPI Import" />
-          <ImportActionForm file={file} importType="crm" label={`Import ${file.display_name} as CRM Leads`} />
           <ImportActionForm file={file} importType="metrics" label={`Import ${file.display_name} as Business Metrics`} />
         </div>
         {!canImport ? (
           <p className="mt-3 rounded-lg bg-slate-50 p-3 text-xs leading-5 text-muted">
-            CSV and XLSX files can be imported into structured KPI, CRM, or business metric records. PDF, DOCX, PNG, and JPG files can still be reviewed, attached to reports, and organized in the file library.
+            CSV and XLSX files can be imported into structured KPI or business metric records. PDF, DOCX, PNG, and JPG files can still be reviewed, attached to reports, and organized in the file library.
           </p>
         ) : null}
       </section>
@@ -1932,11 +1919,10 @@ function FileImportPanel({
         <div className="rounded-lg border border-cyan-400/30 bg-cyan-950/25 p-4">
           <p className="text-sm font-semibold text-cyan-50">Vaeroex found structured data in this file.</p>
           <p className="mt-1 text-sm leading-6 text-cyan-100">
-            Review KPI data, customer records, or operational metrics before saving approved rows.
+            Review KPI data or operational metrics before saving approved rows.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <ImportActionForm file={file} importType="kpi" label="Review KPI Import" />
-            <ImportActionForm file={file} importType="crm" label={`Review customer data import`} />
             <ImportActionForm file={file} importType="metrics" label={`Review operational metrics import`} />
           </div>
         </div>
@@ -2196,6 +2182,18 @@ function MappingReview({
   rows: FileImportDataRow[];
 }) {
   const importType = asImportType(importRecord.import_type);
+
+  if (importType === "crm") {
+    return (
+      <div className="rounded-lg border border-amber-300/30 bg-amber-950/20 p-4 text-sm leading-6 text-amber-50">
+        <p className="font-semibold">Customer record imports are retired.</p>
+        <p className="mt-2 text-amber-100/85">
+          This older staged import is preserved for audit history, but Vaeroex no longer saves spreadsheet rows into Vaeroex-owned customer records. Analyze the source file or save its findings to Business Memory when the customer activity should inform Operations Intelligence.
+        </p>
+      </div>
+    );
+  }
+
   const fields = IMPORT_FIELDS[importType];
   const columns = columnsForRows(rows);
   const previewRows = rows.slice(0, 5);

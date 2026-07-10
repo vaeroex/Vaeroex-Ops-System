@@ -374,9 +374,9 @@ function buildDataQuality(input: PrestigeInput) {
       .slice(0, 4)
       .map((lead) => ({
         id: `crm-${lead.id}`,
-        title: `${lead.lead_name} shows a response gap`,
-        why: "Customer pipeline activity gaps can become lost pipeline without appearing in headline revenue yet.",
-        href: "/app/crm" as Route,
+        title: `${lead.lead_name} has limited recent activity evidence`,
+        why: "Customer activity gaps can indicate retention, conversion, or response-quality risk without making Vaeroex the customer system.",
+        href: "/app/sources" as Route,
         severity: "High" as const
       })),
     ...latest
@@ -481,9 +481,9 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       name: "Sales Health",
       score: salesScore,
       explanation: `${revenue ? `Revenue is ${formatMetric(revenue.actual_value, revenue.name)} against target ${formatMetric(revenue.target, revenue.name)}.` : "Revenue KPI is missing."} ${conversion ? `Conversion is ${formatMetric(conversion.actual_value, conversion.name)}.` : ""}`,
-      improved: revenue && metricOnTarget(revenue) ? "Revenue is at or above target." : "Lead records are available for response-process review.",
-      declined: conversion && metricOnTarget(conversion) === false ? "Conversion is below target." : leadsWithoutFollowUp.length ? "Some leads show response gaps." : "No major sales decline is visible.",
-      nextAction: leadsWithoutFollowUp.length ? "Review stalled customer pipeline records as a leadership workflow issue." : "Review conversion against recent lead quality."
+      improved: revenue && metricOnTarget(revenue) ? "Revenue is at or above target." : "Customer activity evidence is available for response-quality review.",
+      declined: conversion && metricOnTarget(conversion) === false ? "Conversion is below target." : leadsWithoutFollowUp.length ? "Some customer records show response gaps." : "No major sales decline is visible.",
+      nextAction: leadsWithoutFollowUp.length ? "Review customer activity evidence as a leadership issue." : "Review conversion against recent customer activity evidence."
     }),
     healthCategory({
       name: "Source Visibility",
@@ -534,7 +534,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   return {
     score,
     explanation: `Business Health Score: ${score}/100. ${strong ? `${strong.name} is strongest because ${strong.improved.toLowerCase()}` : "The workspace is still building enough history."} ${weak ? `${weak.name} needs attention because ${weak.declined.toLowerCase()}` : "No category is critically weak right now."}`,
-    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, customer pipeline records, Business Signals, reports, and files are added." : null,
+    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, customer activity evidence, Business Signals, reports, and files are added." : null,
     categories
   };
 }
@@ -551,15 +551,15 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
   if (conversion && metricOnTarget(conversion) === false) {
     priorities.push(action({
       id: "conversion-decline",
-      title: "Review lead conversion decline",
-      why: "Sales Health is at risk when lead volume exists but conversion misses target.",
+      title: "Review customer conversion decline",
+      why: "Sales Health is at risk when customer activity evidence exists but conversion misses target.",
       evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatMetric(conversion.target, conversion.name)}.`,
-      owner: "Sales Manager",
+      owner: "Leadership Review",
       dueDate: addDays(todayDate(), 3),
-      action: "Review proposal-stage lead quality and conversion workflow with leadership.",
+      action: "Review conversion quality and customer activity evidence with leadership.",
       priority: "High",
-      relatedModule: "Customer Pipeline",
-      href: "/app/crm"
+      relatedModule: "Customer Evidence",
+      href: "/app/sources"
     }));
   }
 
@@ -567,7 +567,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
     priorities.push(action({
       id: "revenue-below-target",
       title: "Stabilize revenue below target",
-      why: "Revenue below target needs a fast review of pipeline, conversion, and operational delivery.",
+      why: "Revenue below target needs a fast review of customer activity, conversion quality, and operational delivery.",
       evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatMetric(revenue.target, revenue.name)}.`,
       owner: "Owner",
       dueDate: addDays(todayDate(), 4),
@@ -657,18 +657,18 @@ function buildProfitLeaks(input: PrestigeInput) {
     leaks.push({
       ...action({
         id: "stale-leads",
-        title: "Leads may be leaking because response activity is missing",
-        why: "Unworked leads can quietly turn into lost revenue.",
-        evidence: `${staleLeads.length} active lead${staleLeads.length === 1 ? "" : "s"} have no recent activity. Potential pipeline value: ${currencyFormatter.format(lostValue)}.`,
-        owner: "Sales Manager",
+        title: "Customer response activity may be weakening",
+        why: "Customer records without recent activity can indicate revenue, retention, or response-quality risk.",
+        evidence: `${staleLeads.length} customer activity record${staleLeads.length === 1 ? "" : "s"} have no recent activity evidence.`,
+        owner: "Leadership Review",
         dueDate: addDays(todayDate(), 2),
-        action: "Review customer pipeline response gaps and decide whether the sales process needs an executive report or improvement plan.",
+        action: "Review customer activity evidence and decide whether leadership needs an executive report or improvement plan.",
         priority: "High",
-        relatedModule: "Customer Pipeline",
-        href: "/app/crm"
+        relatedModule: "Customer Evidence",
+        href: "/app/sources"
       }),
       severity: lostValue > 15000 ? "High" : "Medium",
-      estimatedImpact: currencyFormatter.format(lostValue)
+      estimatedImpact: lostValue > 0 ? currencyFormatter.format(lostValue) : "Potential revenue exposure"
     });
   }
 
@@ -676,15 +676,15 @@ function buildProfitLeaks(input: PrestigeInput) {
     leaks.push({
       ...action({
         id: "proposal-stall",
-        title: "Proposal-stage leads are not moving",
-        why: "Proposal-stage deals need timely next steps to avoid preventable loss.",
-        evidence: `${staleProposalLeads.length} proposal-stage lead${staleProposalLeads.length === 1 ? "" : "s"} are stale.`,
-        owner: "Sales Manager",
+      title: "Customer activity with proposal context is not moving",
+      why: "Customer records with proposal context but no recent activity can indicate preventable revenue risk.",
+      evidence: `${staleProposalLeads.length} customer evidence record${staleProposalLeads.length === 1 ? "" : "s"} with proposal context are stale.`,
+        owner: "Leadership Review",
         dueDate: addDays(todayDate(), 3),
-        action: "Review proposal-stage movement and response quality as a leadership concern.",
+        action: "Review proposal-context movement and response quality as a leadership concern.",
         priority: "High",
-        relatedModule: "Customer Pipeline",
-        href: "/app/crm"
+        relatedModule: "Customer Evidence",
+        href: "/app/sources"
       }),
       severity: "High",
       estimatedImpact: "High opportunity risk"
@@ -696,7 +696,7 @@ function buildProfitLeaks(input: PrestigeInput) {
       ...action({
         id: "low-conversion",
         title: "Conversion rate is below operating standard",
-        why: "Low conversion can cancel out healthy lead volume.",
+        why: "Low conversion can offset healthy customer activity and weaken revenue momentum.",
         evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatMetric(conversion.target, conversion.name)}.`,
         owner: "Owner",
         dueDate: addDays(todayDate(), 5),
@@ -715,7 +715,7 @@ function buildProfitLeaks(input: PrestigeInput) {
       ...action({
         id: "revenue-target",
         title: "Revenue is below target",
-        why: "Revenue below target may reflect pipeline leakage, delivery constraints, or pricing/volume problems.",
+        why: "Revenue below target may reflect customer activity gaps, delivery constraints, or pricing/volume problems.",
         evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatMetric(revenue.target, revenue.name)}.`,
         owner: "Owner",
         dueDate: addDays(todayDate(), 4),
@@ -934,7 +934,7 @@ function buildDepartmentScorecards(input: PrestigeInput) {
       openIssues: openIssues.length,
       kpiPerformance: kpiRows.length ? `${Math.round((onTarget || 0) * 100)}% of visible KPIs on target` : "No department KPIs yet",
       checklistPerformance: checkRate === null ? "No department checklist runs yet" : `${numberFormatter.format(checkRate)}% completion`,
-      crmImpact: lower(department).includes("sales") ? `${input.crmLeads.filter((lead) => !isConvertedLead(lead)).length} active customer pipeline records` : "No direct customer pipeline impact",
+      crmImpact: lower(department).includes("sales") ? `${input.crmLeads.filter((lead) => !isConvertedLead(lead)).length} active customer activity records` : "No direct customer evidence impact",
       explanation:
         score < 70
           ? `${department} scores lower because Business Signals, open issues, or missing KPI/checklist signals need attention.`
@@ -946,7 +946,7 @@ function buildDepartmentScorecards(input: PrestigeInput) {
 function buildToolSprawl(input: PrestigeInput) {
   const usage = [
     ["KPIs", input.kpis.length > 0, "manual KPI tracker"],
-    ["Customer pipeline", input.crmLeads.length > 0, "customer pipeline spreadsheet"],
+    ["Customer evidence", input.crmLeads.length > 0, "customer activity source"],
     ["Business Signals", input.tasks.length > 0, "business context notes"],
     ["Checklists", input.checklists.length > 0, "paper checklist"],
     ["Files", input.files.length > 0, "shared drive review"],
@@ -980,10 +980,10 @@ function buildBenchmarkMode(input: PrestigeInput) {
 
   return [
     {
-      title: "Lead response activity should be visible within 24 hours",
+      title: "Customer response activity should be visible within 24 hours",
       status: responseTime ? (metricOnTarget(responseTime) ? "On track" : "Needs attention") : "Missing data",
       evidence: responseTime ? `${responseTime.name}: ${formatMetric(responseTime.actual_value, responseTime.name)}` : "No response-time KPI found.",
-      recommendedAction: "Track average response time and review delayed records as a leadership workflow issue."
+      recommendedAction: "Review response-time evidence and delayed records as a leadership issue."
     },
     {
       title: "SOPs should be reviewed every 90 days",
@@ -1010,10 +1010,10 @@ function buildBenchmarkMode(input: PrestigeInput) {
       recommendedAction: "Generate a weekly management report."
     },
     {
-      title: "Customer pipeline records should show recent activity",
+      title: "Customer activity records should show recent activity",
       status: leadsWithoutFollowup.length ? "Needs attention" : input.crmLeads.length ? "On track" : "Missing data",
-      evidence: `${leadsWithoutFollowup.length} active lead${leadsWithoutFollowup.length === 1 ? "" : "s"} have no recent activity.`,
-      recommendedAction: "Review stalled customer pipeline records with the responsible sales manager."
+      evidence: `${leadsWithoutFollowup.length} customer activity record${leadsWithoutFollowup.length === 1 ? "" : "s"} have no recent activity.`,
+      recommendedAction: "Review stalled customer activity evidence with leadership."
     },
     {
       title: "KPIs should have targets",
@@ -1149,7 +1149,7 @@ function buildMeetingMode(input: PrestigeInput, focus: PrestigeAction[]) {
   const overdue = businessSignalsWithContext(openTasks);
   const agenda = [
     "KPI review: compare current KPIs to targets and prior period.",
-    "Customer pipeline review: inspect stalled leads, proposal-stage records, and response gaps.",
+    "Customer evidence review: inspect stalled customer activity, proposal-stage records, and response gaps.",
     `Open issues: review ${input.issues.filter(isOpenIssue).length} active issue${input.issues.filter(isOpenIssue).length === 1 ? "" : "s"}.`,
     `Business Signals: review ${overdue.length} observation${overdue.length === 1 ? "" : "s"} that may indicate response, handoff, service, market, or operational context.`,
     "Checklist compliance: confirm missed runs, failed runs, and related Business Signals.",

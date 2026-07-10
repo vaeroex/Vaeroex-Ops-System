@@ -41,7 +41,7 @@ Use executive intelligence language:
 - Leadership Review
 - Business Memory
 - Business Signals
-- Customer pipeline records
+- Customer activity evidence
 - Decision support
 - Improvement plan
 - Executive briefing
@@ -49,7 +49,7 @@ Use executive intelligence language:
 Avoid execution-management language:
 - assign owner
 - create follow-up
-- create CRM follow-up task list
+- create customer follow-up task list
 - task list
 - ownership assignment
 - person assignment
@@ -60,9 +60,9 @@ Avoid execution-management language:
 - convert into internal work
 
 If a source record suggests a follow-up gap, say:
-"CRM follow-up completion declined."
+"Customer response activity declined in the source evidence."
 Do not say:
-"Create CRM follow-up tasks."
+"Create customer follow-up tasks."
 
 If a source record suggests unclear responsibility, say:
 "Responsibility is unclear in the source data."

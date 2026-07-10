@@ -60,7 +60,7 @@ Use this root shape whenever possible:
     "Leadership Review",
     "Business Risk",
     "Dashboard / KPI Improvement",
-    "Customer Pipeline / Revenue Improvement",
+    "Customer / Revenue Intelligence",
     "SOP / Process Improvement",
     "File / Report Review"
   ],
@@ -75,9 +75,10 @@ Workspace-aware recommendation rules:
 - First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
 - Treat existing modules as source context for analysis, not as systems Vaeroex owns.
 - Treat Business Signals as evidence, observations, and strategic context, not as Vaeroex-owned tasks, assignments, follow-ups, or work items.
+- Treat customer records as evidence from external systems, imports, or source files. Do not present Vaeroex as a CRM, lead manager, or customer management product.
 - Do not recommend replacing Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or other customer systems.
-- Never say "Create CRM", "Create follow-up tracking", or "Assign owners" as generic advice.
-- Prefer recommendations like "customer pipeline completion declined", "leadership should review the current workflow", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
+- Never recommend creating customer-management records, follow-up tracking, or ownership assignments as generic advice.
+- Prefer recommendations like "customer response activity changed", "leadership should review the current workflow", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
 - Every recommendation should mention what exists, what is missing or stale, why it matters, evidence, recommendation confidence, business impact, and what leadership should review.
 - Classify recommendations into the recommendation_categories listed in the JSON shape.
 `;
@@ -101,7 +102,7 @@ Write like an executive conversation, not an analyst report. Start with the dire
 Only make claims supported by current workspace evidence. If evidence is incomplete, state the limitation and answer only with what the evidence supports. Do not present general business advice as workspace evidence.
 Distinguish total workspace knowledge from question-specific support. If the workspace has broad information but only a narrow portion supports the user's exact question, say that question-specific evidence is limited rather than saying the workspace has very limited evidence.
 Internally consider total workspace evidence, question-specific evidence, evidence actually used, and question coverage. Do not expose retrieval modes, chunk counts, or technical diagnostics to the user.
-Use plain language and short paragraphs. Avoid internal labels, task-manager wording, and command-style headings such as "Review Customer Pipeline", "Address Overdue Tasks", or "Enhance Follow-Up".
+Use plain language and short paragraphs. Avoid internal labels, task-manager wording, and command-style headings that tell the user to review a pipeline, address overdue tasks, or enhance follow-up as if Vaeroex owned those workflows.
 If evidence is limited, say that clearly and set recommendation_confidence to Low or Insufficient. Never claim High confidence when the answer depends on limited evidence.
 Return recommendation_confidence as one of: High, Medium, Low, Insufficient. Base it on evidence quantity, freshness, agreement, and historical depth for the exact answer given.
 Keep the answer practical, evidence-based, and executive-friendly. Do not create or recommend task lists unless the user explicitly asks for a draft record.
@@ -114,7 +115,7 @@ ${sharedJsonInstructions}
     title: "Executive Intelligence Review",
     description: "Review workspace activity and identify risks, evidence, business impact, and what leadership should review.",
     actionLabel: "Run audit",
-    promptPlaceholder: "Optional focus area, such as revenue, customer pipeline, staffing, risk, or service quality.",
+    promptPlaceholder: "Optional focus area, such as revenue, customer activity, staffing, risk, or service quality.",
     saveTargets: ["report"],
     instructions: `
 Generate an operations intelligence review using the structure from the Vaeroex system prompt.
@@ -225,7 +226,7 @@ ${sharedJsonInstructions}
     instructions: `
 Generate a concrete improvement plan from the user's request and workspace context.
 Include what happened, evidence, likely cause, business impact, confidence, what leadership should review, and suggested supporting documents.
-Use existing Business Signals, issues, file reviews, reports, customer pipeline records, KPIs, and SOPs as evidence.
+Use existing Business Signals, issues, file reviews, reports, customer activity evidence, KPIs, and SOPs as evidence.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -274,7 +275,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional focus area, such as this week, Sales, Operations, or Customer Service.",
     saveTargets: ["report"],
     instructions: `
-Scan workspace KPIs, customer pipeline records, Business Signals, issues, reports, SOPs, files, alerts, source context, and checklist completion.
+Scan workspace KPIs, customer activity evidence, Business Signals, issues, reports, SOPs, files, alerts, source context, and checklist completion.
 Return only the top 3-5 priorities. Each priority must include title, what happened, why it matters, evidence, confidence, business impact, and what leadership should review.
 Do not return a long generic list.
 ${workspaceAwareInstructions}
@@ -289,7 +290,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional planning horizon, such as next month or next quarter.",
     saveTargets: ["report"],
     instructions: `
-Analyze declining KPIs, Business Signal patterns, repeated issues, stale SOPs, customer pipeline weakness, checklist misses, and open risks.
+Analyze declining KPIs, Business Signal patterns, repeated issues, stale SOPs, customer activity changes, checklist misses, and open risks.
 Return predicted risks, why each may happen, evidence, confidence, potential business impact, and what leadership should review.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
@@ -303,7 +304,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional team or department focus.",
     saveTargets: ["report"],
     instructions: `
-Generate a weekly leadership meeting agenda with these sections: KPI review, customer pipeline review, open issues, Business Signal patterns, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
+Generate a weekly leadership meeting agenda with these sections: KPI review, customer activity evidence, open issues, Business Signal patterns, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
 Do not build video or chat. This is a leadership meeting agenda, not a task-management workflow.
 Include a report draft.
 ${workspaceAwareInstructions}
@@ -318,7 +319,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Use case, such as board meeting, owner review, or quarterly review.",
     saveTargets: ["report"],
     instructions: `
-Prepare a polished Business Review Package with executive summary, KPI trends, revenue and lead trends, business risks, leadership decisions, progress since last period, open decisions, evidence, confidence, and executive recommendations.
+Prepare a polished Business Review Package with executive summary, KPI trends, revenue and customer activity trends, business risks, leadership decisions, progress since last period, open decisions, evidence, confidence, and executive recommendations.
 Do not expose public links. Keep it authenticated and customer-ready.
 Return a report draft in report with title, report_type, body_markdown, and date range if inferable.
 ${workspaceAwareInstructions}
