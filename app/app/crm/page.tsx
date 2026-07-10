@@ -69,7 +69,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
       <section className="rounded-xl border border-amber-300/25 bg-amber-950/20 p-4 text-amber-50">
         <p className="text-sm font-semibold">Read-only compatibility view</p>
         <p className="mt-2 max-w-4xl text-sm leading-6 text-amber-100/85">
-          Existing rows remain available as historical evidence so reports, Business Memory, and Ask Vaeroex can understand past customer activity. New customer information should enter Vaeroex through Sources, uploaded files, reports, Business Memory, or future external system integrations.
+          Existing rows remain available as historical evidence so reports, Business Memory, and Search or Ask can understand past customer activity. New customer information should enter Vaeroex through Sources, uploaded files, reports, Business Memory, or future external system integrations.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">

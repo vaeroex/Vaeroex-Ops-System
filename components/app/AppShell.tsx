@@ -20,7 +20,6 @@ const baseNavSections = [
       { href: "/app", label: "Home" },
       { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app/kpis", label: "KPIs" },
-      { href: "/app/ask", label: "Ask Vaeroex" },
       { href: "/app/sources", label: "Sources" },
       { href: "/app/tasks", label: "Business Signals" },
       { href: "/app/briefings", label: "Briefings" },
@@ -159,14 +158,8 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
               </div>
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
-              <GlobalSearch className="hidden w-52 shrink-0 2xl:block" />
-              <GlobalSearch variant="icon" className="2xl:hidden" />
-              <Link
-                href="/app/ask"
-                className="hidden items-center justify-center rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-950/20 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 lg:inline-flex"
-              >
-                Ask Vaeroex
-              </Link>
+              <GlobalSearch className="hidden w-64 shrink-0 xl:block 2xl:w-96" />
+              <GlobalSearch variant="icon" className="xl:hidden" />
               <Link
                 href="/app/notifications"
                 className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"

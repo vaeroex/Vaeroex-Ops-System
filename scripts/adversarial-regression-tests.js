@@ -118,6 +118,11 @@ const {
 const {
   buildKpiForecastEligibility
 } = require("../lib/kpis/forecast-eligibility.ts");
+const {
+  classifyKpiOverviewIntent,
+  buildKpiOverviewSummary,
+  buildDeterministicKpiOverviewOutput
+} = require("../lib/ai/kpi-overview.ts");
 
 const ownerContext = {
   supabase: fakeSupabase(),
@@ -541,6 +546,31 @@ function makeKpi(name, metricDate, actualValue = 100) {
   };
 }
 
+function makeKpiSetting(kpiName, overrides = {}) {
+  return {
+    id: `setting-${kpiName}`,
+    workspace_id: "11111111-1111-4111-8111-111111111111",
+    kpi_name: kpiName,
+    category: null,
+    target: null,
+    weight: 1,
+    definition: null,
+    color: "#38BDF8",
+    is_visible: true,
+    sort_order: 0,
+    unit_type: null,
+    display_unit: null,
+    value_format: null,
+    x_axis_label: null,
+    y_axis_label: null,
+    preferred_chart_type: "line",
+    created_by: null,
+    created_at: "2026-07-01T12:00:00.000Z",
+    updated_at: "2026-07-01T12:00:00.000Z",
+    ...overrides
+  };
+}
+
 function runKpiForecastEligibilityTests() {
   const now = "2026-07-10T12:00:00.000Z";
   const currentOnly = [
@@ -593,6 +623,109 @@ function runKpiForecastEligibilityTests() {
 
   const noKpiForecast = buildKpiForecastEligibility([], { now });
   assert.equal(noKpiForecast.state, "no_kpi_data", "empty KPI workspace should report no KPI data");
+}
+
+function runLightweightKpiOverviewTests() {
+  const overviewPrompts = [
+    "Tell me how my KPIs are doing.",
+    "Give me a KPI overview.",
+    "Which KPIs need attention?",
+    "How is business performance looking?",
+    "Summarize my metrics.",
+    "What are my KPIs looking like?",
+    "Which KPI is weakest?"
+  ];
+
+  for (const prompt of overviewPrompts) {
+    const intent = classifyKpiOverviewIntent(prompt);
+    assert.equal(intent.matched, true, `${prompt} should use the lightweight KPI overview workflow`);
+    assert.equal(intent.requiresRetrieval, false, `${prompt} should not require broad retrieval by default`);
+  }
+
+  const whyIntent = classifyKpiOverviewIntent("Why is Revenue declining?");
+  assert.equal(whyIntent.matched, false, "KPI cause questions should not use the lightweight overview workflow");
+  assert.equal(whyIntent.requiresRetrieval, true, "KPI cause questions should invoke evidence retrieval");
+
+  const departmentWeaknessIntent = classifyKpiOverviewIntent("Which department is weakest?");
+  assert.equal(departmentWeaknessIntent.matched, false, "non-KPI weakest questions must not use KPI overview");
+  assert.equal(departmentWeaknessIntent.requiresRetrieval, false, "non-KPI weakest questions should not be treated as KPI causal retrieval");
+
+  const revenueNavigationIntent = classifyKpiOverviewIntent("Show the revenue KPI");
+  assert.equal(revenueNavigationIntent.matched, false, "record lookup should remain search/navigation instead of KPI overview");
+  assert.equal(revenueNavigationIntent.requiresRetrieval, false, "record lookup should not trigger KPI causal retrieval");
+
+  const crossDomainIntent = classifyKpiOverviewIntent("Why did revenue decline while customer satisfaction improved?");
+  assert.equal(crossDomainIntent.matched, false, "cross-domain why questions must not use simple KPI overview");
+  assert.equal(crossDomainIntent.requiresRetrieval, true, "cross-domain why questions should be eligible for bounded evidence reasoning elsewhere");
+
+  const severalKpis = [
+    makeKpi("Revenue", "2026-07-01", 120),
+    makeKpi("Revenue", "2026-06-01", 110),
+    makeKpi("Conversion", "2026-07-01", 82),
+    makeKpi("Conversion", "2026-06-01", 86),
+    makeKpi("Response Time", "2026-07-01", 130),
+    makeKpi("Response Time", "2026-06-01", 120),
+    makeKpi("Customer Satisfaction", "2026-07-01", 104),
+    makeKpi("Customer Satisfaction", "2026-06-01", 101)
+  ];
+  const severalSummary = buildKpiOverviewSummary(severalKpis);
+  assert.equal(severalSummary.metricCount, 4, "KPI overview should summarize current KPI names");
+  assert.ok(severalSummary.counts.needsAttention >= 1, "KPI overview should identify KPIs needing attention");
+  assert.ok(severalSummary.evidenceUsed.length > 0, "KPI overview should produce supporting evidence");
+
+  const severalOutput = buildDeterministicKpiOverviewOutput(severalSummary);
+  assert.match(String(severalOutput.direct_answer), /KPI|metric/i, "deterministic KPI overview should answer directly");
+  assert.match(String(severalOutput.evidence_note), /structured KPI records only/i, "KPI overview must distinguish workspace knowledge from retrieved evidence");
+
+  const noKpiSummary = buildKpiOverviewSummary([]);
+  const noKpiOutput = buildDeterministicKpiOverviewOutput(noKpiSummary);
+  assert.equal(noKpiSummary.recommendationConfidence, "Insufficient", "empty KPI overview should report insufficient confidence");
+  assert.match(String(noKpiOutput.direct_answer), /do not see KPI records/i, "empty KPI overview should be calm and useful");
+
+  const staleSummary = buildKpiOverviewSummary([makeKpi("Revenue", "2025-01-01", 100), makeKpi("Revenue", "2025-02-01", 105)]);
+  assert.ok(staleSummary.counts.stale >= 1, "stale KPIs should be detected");
+  assert.match(staleSummary.limitations.join(" "), /stale|old/i, "stale KPI summary should explain freshness limits");
+
+  const missingTargetSummary = buildKpiOverviewSummary([
+    { ...makeKpi("Leads", "2026-07-01", 45), target: null },
+    { ...makeKpi("Leads", "2026-06-01", 40), target: null }
+  ]);
+  assert.equal(missingTargetSummary.counts.missingTargets, 1, "missing targets should be counted once per KPI");
+  assert.notEqual(missingTargetSummary.recommendationConfidence, "High", "missing targets should prevent high confidence");
+
+  const insufficientHistorySummary = buildKpiOverviewSummary([makeKpi("Revenue", "2026-07-01", 120)]);
+  assert.equal(insufficientHistorySummary.counts.insufficientHistory, 1, "single-point KPIs should report insufficient history");
+  assert.notEqual(insufficientHistorySummary.recommendationConfidence, "High", "insufficient history should prevent high confidence");
+
+  const settingsAwareSummary = buildKpiOverviewSummary(
+    [
+      makeKpi("Revenue", "2026-07-01", 95),
+      makeKpi("Revenue", "2026-06-01", 90),
+      makeKpi("Hidden Margin", "2026-07-01", 10),
+      makeKpi("Hidden Margin", "2026-06-01", 12)
+    ],
+    [
+      makeKpiSetting("Revenue", { target: 120, weight: 10, category: "Executive" }),
+      makeKpiSetting("Hidden Margin", { is_visible: false, target: 20 })
+    ]
+  );
+  assert.deepEqual(settingsAwareSummary.metrics.map((metric) => metric.name), ["Revenue"], "hidden KPI settings should exclude metrics from lightweight overview");
+  assert.equal(settingsAwareSummary.metrics[0]?.target, 120, "workspace KPI settings should override row targets");
+  assert.equal(settingsAwareSummary.metrics[0]?.category, "Executive", "workspace KPI settings should preserve configured category");
+
+  const timeoutFallbackOutput = buildDeterministicKpiOverviewOutput(severalSummary, { fallbackReason: "OpenAI timeout" });
+  assert.match(String(timeoutFallbackOutput.direct_answer), /deeper analysis took longer than expected/i, "OpenAI timeout should still return a useful KPI overview");
+
+  const agentsAction = read("app/app/agents/actions.ts");
+  assert.match(agentsAction, /classifyKpiOverviewIntent/, "Ask Vaeroex should detect lightweight KPI overview intent");
+  assert.match(agentsAction, /runLightweightKpiOverview/, "Ask Vaeroex should route KPI overview prompts to the lightweight workflow");
+  assert.match(agentsAction, /lightweight_kpi_overview/, "Ask Vaeroex should store lightweight KPI overview diagnostics");
+  assert.match(agentsAction, /maxRetries:\s*0/, "KPI overview retry should avoid repeating an expensive identical OpenAI request");
+
+  const kpiOverviewHelper = read("lib/ai/kpi-overview.ts");
+  assert.match(kpiOverviewHelper, /Business Memory or document retrieval/, "KPI overview should explicitly avoid broad retrieval by default");
+  assert.match(kpiOverviewHelper, /KPI_OVERVIEW_MAX_ROWS/, "KPI overview should cap historical KPI rows");
+  assert.match(kpiOverviewHelper, /estimated_context_tokens/, "KPI overview should log estimated context size");
 }
 
 function runLegacyCrmLanguageTests() {
@@ -697,6 +830,39 @@ function runCrmRetirementTests() {
   assert.match(searchRoute, /Customer Evidence/, "search may still expose historical customer evidence as evidence");
 }
 
+function runGlobalSearchAskMergeTests() {
+  const appShell = read("components/app/AppShell.tsx");
+  assert.doesNotMatch(appShell, /href:\s*"\/app\/ask"|href="\/app\/ask"|>Ask Vaeroex</, "Ask Vaeroex must not remain a primary nav or top-bar destination");
+  assert.match(appShell, /GlobalSearch/, "app shell should expose the merged global Search or Ask entry point");
+
+  const globalSearch = read("components/app/GlobalSearch.tsx");
+  assert.match(globalSearch, /Ask a business question or search your workspace/, "global panel placeholder should support questions and search");
+  assert.match(globalSearch, /vaeroex:open-global-search/, "page-level triggers should open the global panel in place");
+  assert.match(globalSearch, /SecurityResponseNotice/, "blocked global prompts must render the dedicated Security Response UI");
+  assert.match(globalSearch, /Direct Answer/, "business questions in global search should render a compact direct answer");
+
+  const globalSearchTrigger = read("components/app/GlobalSearchTrigger.tsx");
+  assert.match(globalSearchTrigger, /CustomEvent\("vaeroex:open-global-search"/, "Search or Ask triggers must use the shared global panel event");
+
+  const searchRoute = read("app/api/search/route.ts");
+  assert.match(searchRoute, /classifySecurityIntent/, "global Search or Ask must classify security-sensitive prompts");
+  assert.match(searchRoute, /kind:\s*"security_response"/, "global Search or Ask must terminate blocked prompts with a security response");
+  assert.match(searchRoute, /buildKpiGlobalAnswer/, "global Search or Ask should answer simple KPI questions through bounded structured data");
+  assert.match(searchRoute, /loadKpiOverviewData/, "global Search or Ask KPI overview must load KPI rows with workspace settings through the shared helper");
+  assert.match(searchRoute, /shouldUseKpiOverviewAnswer/, "global Search or Ask must gate KPI overview routing separately from generic weak/weakest questions");
+  assert.doesNotMatch(searchRoute, /kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/, "weakest must not route to KPI overview unless the query clearly references KPIs or metrics");
+  assert.match(searchRoute, /buildGeneralBusinessAnswer/, "global Search or Ask should provide compact routing answers for broad business questions");
+  assert.doesNotMatch(searchRoute, /buildWorkspaceSnapshot|buildWorkspaceEvidenceContext|runVaeroexCompletionWithUsage/, "global Search or Ask must not default to the full Ask Vaeroex workspace pipeline");
+
+  const legacyAskPage = read("app/app/ask/page.tsx");
+  assert.match(legacyAskPage, /params\.run/, "legacy /app/ask must preserve saved result links");
+  assert.match(legacyAskPage, /redirect\("\/app\?search=1"\)/, "blank /app/ask visits must redirect into the global panel");
+
+  const agentsPage = read("app/app/agents/page.tsx");
+  assert.match(agentsPage, /Saved Vaeroex Result/, "legacy agents route should read as saved results, not a primary Ask destination");
+  assert.match(agentsPage, /redirect\("\/app\?search=1"\)/, "blank /app/agents visits must redirect into global Search or Ask");
+}
+
 async function main() {
   assert.ok(existsSync(path.join(root, "lib/security/tool-execution-gateway.ts")), "tool gateway source must exist");
 
@@ -709,8 +875,10 @@ async function main() {
   runOpenAIResilienceTests();
   runFileAnalysisRequestSizingTests();
   runKpiForecastEligibilityTests();
+  runLightweightKpiOverviewTests();
   runLegacyCrmLanguageTests();
   runCrmRetirementTests();
+  runGlobalSearchAskMergeTests();
 
   console.log("Adversarial regression tests passed.");
 }

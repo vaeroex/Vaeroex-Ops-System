@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 type ComingSoonCopy = {
@@ -111,9 +112,9 @@ export default async function ModuleComingSoonPage({ params }: ModulePageProps) 
           <Link href="/app" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
             Back to dashboard
           </Link>
-          <Link href="/app/agents" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            Ask Vaeroex
-          </Link>
+          <GlobalSearchTrigger className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
+            Search or Ask
+          </GlobalSearchTrigger>
         </div>
       </section>
 

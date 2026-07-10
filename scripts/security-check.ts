@@ -207,6 +207,22 @@ check(pendingSubmitButton.includes("pointer-events-none opacity-70"), "PendingSu
 check(pendingSubmitButton.includes("{showingPending ? pendingLabel : children}"), "PendingSubmitButton must swap its label to the pending label while generating.");
 
 const agentsPage = read("app/app/agents/page.tsx");
+const appShell = read("components/app/AppShell.tsx");
+const globalSearch = read("components/app/GlobalSearch.tsx");
+const globalSearchTrigger = read("components/app/GlobalSearchTrigger.tsx");
+const searchRoute = read("app/api/search/route.ts");
+const legacyAskPage = read("app/app/ask/page.tsx");
+check(!appShell.includes('href: "/app/ask"') && !appShell.includes('href="/app/ask"'), "Ask Vaeroex must not appear as a standalone primary navigation item.");
+check(!appShell.includes(">Ask Vaeroex<") && appShell.includes("GlobalSearch"), "Top navigation must expose one global Search or Ask entry point instead of a separate Ask button.");
+check(globalSearch.includes("Ask a business question or search your workspace") && globalSearch.includes("vaeroex:open-global-search"), "Global search must support the merged Search or Ask panel and in-place triggers.");
+check(globalSearch.includes("SecurityResponseNotice") && globalSearch.includes('answer?.kind === "security_response"'), "Global Search or Ask must render a dedicated security response for blocked prompts.");
+check(globalSearchTrigger.includes("vaeroex:open-global-search"), "Page-level Search or Ask buttons must open the global panel without navigating to a standalone Ask page.");
+check(searchRoute.includes("classifySecurityIntent") && searchRoute.includes('kind: "security_response"'), "Global Search or Ask must classify security-sensitive prompts before returning search or business answers.");
+check(searchRoute.includes("buildKpiGlobalAnswer") && searchRoute.includes("buildGeneralBusinessAnswer"), "Global Search or Ask must support bounded business-question answers instead of keyword results only.");
+check(searchRoute.includes("loadKpiOverviewData") && searchRoute.includes("shouldUseKpiOverviewAnswer"), "Global Search or Ask must route KPI overview through the shared KPI/settings loader with a narrow intent gate.");
+check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/.test(searchRoute), "Global Search or Ask must not route generic weakest questions into KPI overview.");
+check(legacyAskPage.includes('redirect("/app?search=1")') && legacyAskPage.includes("params.run"), "Legacy /app/ask must redirect blank visits to global Search or Ask while preserving saved result links.");
+check(agentsPage.includes('redirect("/app?search=1")') && agentsPage.includes("Saved Vaeroex Result"), "Legacy /app/agents must not remain a blank primary Ask destination.");
 check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
 check(agentsPage.includes("data-vaeroex-skip-global-activity={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex form must bypass the document-level global activity submit listener.");
 check(agentsPage.includes("activityDisabled={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex must bypass button-level global activity cursor registration while preserving local pending text.");
@@ -225,6 +241,13 @@ check(agentsActionsRuntime.includes("updateRunRecord") && agentsActionsRuntime.i
 check(agentsActionsRuntime.includes("vaeroex_run_diagnostics") && agentsActionsRuntime.includes("finalStage"), "Ask Vaeroex failed runs must store admin-only lifecycle diagnostics.");
 check(agentsActionsRuntime.includes("classifySecurityIntent") && agentsActionsRuntime.includes("security_intent_classified"), "Ask Vaeroex must classify security intent before Business Memory and OpenAI generation.");
 check(agentsActionsRuntime.indexOf("classifySecurityIntent") < agentsActionsRuntime.indexOf("business_memory"), "Ask Vaeroex security intent classification must run before Business Memory retrieval.");
+check(agentsActionsRuntime.includes("classifyKpiOverviewIntent") && agentsActionsRuntime.includes("runLightweightKpiOverview"), "Ask Vaeroex must route simple KPI overview prompts through the lightweight KPI workflow.");
+check(agentsActionsRuntime.indexOf("runLightweightKpiOverview") < agentsActionsRuntime.indexOf("buildWorkspaceSnapshot"), "Lightweight KPI overview must run before full workspace snapshot and Business Memory retrieval.");
+const kpiOverviewRuntime = read("lib/ai/kpi-overview.ts");
+check(kpiOverviewRuntime.includes("KPI_OVERVIEW_MAX_ROWS") && kpiOverviewRuntime.includes("KPI_OVERVIEW_HISTORY_PER_METRIC"), "KPI overview must cap historical KPI context.");
+check(kpiOverviewRuntime.includes("loadKpiOverviewData") && kpiOverviewRuntime.includes("kpi_settings"), "KPI overview must load workspace KPI settings through a shared bounded helper.");
+check(kpiOverviewRuntime.includes("Business Memory or document retrieval") && kpiOverviewRuntime.includes("retrieval_ms"), "KPI overview must distinguish structured KPI evidence from broad retrieval.");
+check(kpiOverviewRuntime.includes("maxRetries: 0"), "KPI overview OpenAI retry must avoid repeating an identical expensive request.");
 const vaeroexClientRuntime = read("lib/ai/vaeroex-client.ts");
 check(vaeroexClientRuntime.includes("openAISettings?: OpenAIRetrySettings"), "Vaeroex OpenAI client must accept per-call timeout/retry settings.");
 check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex OpenAI client must log token budget stages.");

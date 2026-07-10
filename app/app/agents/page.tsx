@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
+import { redirect } from "next/navigation";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -846,8 +847,8 @@ function RecommendationActionCards({
             Generate a clear output first. Execution should stay in the systems your company already uses.
           </p>
         </div>
-        <Link href="/app/ask" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
-          Dismiss for now
+        <Link href="/app" className="text-xs font-semibold text-slate-400 underline hover:text-cyan-100">
+          Back to workspace
         </Link>
       </div>
       <div className="mt-4">
@@ -1476,8 +1477,8 @@ function FailurePanel({
         <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying..." activityDisabled={run.agent_type === "ask_vaeroex"}>
           Retry
         </PendingSubmitButton>
-        <Link href="/app/ask" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
-          Start a new request
+        <Link href="/app?search=1" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
+          Open Search or Ask
         </Link>
       </form>
       {canViewDebug ? (
@@ -1675,6 +1676,11 @@ function WorkflowRunForm({
 
 export default async function VaeroexHubPage({ searchParams }: VaeroexHubPageProps) {
   const params = await searchParams;
+
+  if (!params?.run && !params?.error && !params?.saved && !params?.debug) {
+    redirect("/app?search=1");
+  }
+
   const { supabase, workspaceId } = await requireWorkspacePage();
   const {
     data: { user }
@@ -1751,15 +1757,16 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Ask Vaeroex"
-        title="Ask Vaeroex"
-        description="Ask a direct question and get a direct answer first. Evidence, reasoning, and executive outputs stay available when you want to go deeper."
+        eyebrow="Vaeroex Results"
+        title="Saved Vaeroex Result"
+        description="Review a saved Vaeroex answer, workflow result, or diagnostic record. New questions now start from global Search or Ask."
       />
 
       <ErrorNotice message={pageErrorMessage} />
       <SuccessNotice message={params?.saved as string | undefined} />
 
       <section className="space-y-6">
+        {!selectedRun ? (
         <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
           {selectedWorkflow ? (
             <div className="rounded-lg border border-cyan-300/25 bg-[#071526] p-4 text-slate-100">
@@ -1804,7 +1811,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
                 return (
                   <Link
                     key={choice.label}
-                    href={`/app/ask?workflow=${choice.workflowKey}` as Route}
+                    href="/app?search=1"
                     className={className}
                   >
                     <span className="block text-sm font-semibold">{choice.label}</span>
@@ -1815,6 +1822,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
             </div>
           </details>
         </section>
+        ) : null}
 
         {selectedRun ? (
           <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
@@ -1831,7 +1839,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
                 title="Vaeroex result records"
                 description="Organize previous Vaeroex outputs without showing raw structured data to normal users."
                 emptyTitle="No Vaeroex results yet"
-                emptyDescription="Ask Vaeroex or run a workflow to create the first saved result."
+                emptyDescription="Use global Search or Ask, contextual explanations, or generated outputs to create saved Vaeroex results."
                 returnPath="/app/ask"
                 searchParams={params}
               />
