@@ -1051,6 +1051,117 @@ function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId
   );
 }
 
+function conversationAnswerText(output: JsonRecord) {
+  const sections = businessSections(output);
+  const candidates = [
+    cleanReadableText(output.response_markdown),
+    cleanReadableText(output.answer),
+    cleanReadableText(output.response),
+    cleanReadableText(output.summary),
+    cleanReadableText(output.executive_summary),
+    sections.executiveSummary
+  ];
+
+  return candidates.find(Boolean) || "Vaeroex completed the request, but the answer was limited by the available workspace context.";
+}
+
+function ConversationResult({
+  output,
+  run,
+  title
+}: {
+  output: JsonRecord;
+  run: { id: string; agent_type: string; status: string; input_json?: Json };
+  title: string;
+}) {
+  const visibleOutput = displayOutput(output);
+  const input = getRunInput(run);
+  const question = str(input.user_prompt, "Question not recorded.");
+  const answer = conversationAnswerText(visibleOutput);
+  const confidence = outputConfidence(visibleOutput, run.status);
+  const evidence = outputEvidenceItems(visibleOutput);
+  const evidencePreview = evidence.length ? evidence.slice(0, 4) : ["Limited workspace evidence was available for this answer."];
+  const sections = businessSections(visibleOutput);
+  const resultSummary = sections.executiveSummary;
+  const resultRemedy = sections.actions[0] || "Review this answer and decide what leadership should examine next.";
+  const resultWhy = outputReasoning(visibleOutput);
+
+  return (
+    <div className="space-y-5">
+      <div className="rounded-lg border border-white/10 bg-[#071526] p-4">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">You asked</p>
+        <p className="mt-2 text-sm leading-6 text-slate-100">{question}</p>
+      </div>
+
+      <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-5 shadow-sm">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Vaeroex answered</p>
+        <div className="mt-4 max-w-4xl text-base leading-7 text-slate-50">
+          <ReadableText value={answer} />
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[.35fr_1fr]">
+        <div className={`rounded-lg border p-4 ${confidenceClasses(confidence)}`}>
+          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Confidence</p>
+          <p className="mt-2 text-3xl font-semibold">{confidence}</p>
+          <p className="mt-2 text-xs leading-5 opacity-85">
+            Based on available workspace context and supporting evidence.
+          </p>
+        </div>
+
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold">Evidence Summary</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">The main context Vaeroex used to answer.</p>
+            </div>
+            <span className="w-fit rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-100">
+              {evidence.length || 0} sources
+            </span>
+          </div>
+          <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+            {evidencePreview.map((item) => (
+              <li key={item} className="flex gap-2">
+                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+
+      <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
+        <summary className="cursor-pointer text-sm font-semibold text-slate-100">Optional actions</summary>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Link href={generatedOutputHref({ type: "executive_briefing", title: `Executive Strategy: ${title}`, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70">
+            Generate Executive Strategy
+          </Link>
+          <Link href={generatedOutputHref({ type: "action_plan", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+            Create Improvement Plan
+          </Link>
+          <Link href={generatedOutputHref({ type: "executive_briefing", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
+            Generate Executive Briefing
+          </Link>
+          <CopyVaeroexResultButton text={resultCopyText(title, visibleOutput, run)} label="Export" />
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <details className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">View Supporting Evidence</summary>
+            <div className="mt-3">
+              <EvidencePanel output={visibleOutput} status={run.status} />
+            </div>
+          </details>
+          <details className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Explain My Reasoning</summary>
+            <p className="mt-3 text-sm leading-6 text-slate-300">{resultWhy}</p>
+          </details>
+        </div>
+      </details>
+    </div>
+  );
+}
+
 function SuccessNotice({ message }: { message?: string | null }) {
   if (!message) {
     return null;
@@ -1308,15 +1419,9 @@ function SelectedResult({
 
   const display = displayOutput(output);
   const title = resultTitle(display, vaeroexResultLabel(run.agent_type));
-  const input = getRunInput(run);
-  const confidence = outputConfidence(display, run.status);
-  const sections = businessSections(display);
-  const resultSummary = sections.executiveSummary;
-  const resultRemedy = sections.actions[0] || "Review this output and decide the first practical next step.";
-  const resultWhy = outputReasoning(display);
 
   return (
-    <SectionCard title="Vaeroex executive recommendation" description="Review the draft. Nothing is saved into workspace records until you confirm.">
+    <SectionCard title="Vaeroex answer" description="A direct answer first. Evidence and optional outputs are available when you want to go deeper.">
       <div className="space-y-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div>
@@ -1326,47 +1431,13 @@ function SelectedResult({
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${confidenceClasses(confidence)}`}>
-              Confidence: {confidence}
-            </span>
             <StatusBadge value={run.status} />
           </div>
         </div>
 
         {run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
         {run.status === "completed" ? (
-          <>
-            <BusinessResult output={output} runId={run.id} runTitle={title} />
-            <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-100">View evidence</summary>
-              <div className="mt-4 space-y-4">
-                <DataUsedPanel input={input} />
-                <EvidencePanel output={display} status={run.status} />
-              </div>
-            </details>
-            <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
-              <p className="text-sm font-semibold">Result actions</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Generate a clean output from this result, copy it, or ask a follow-up. Execution stays in your existing systems.</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <CopyVaeroexResultButton text={resultCopyText(title, display, run)} />
-                <Link href={generatedOutputHref({ type: "action_plan", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Generate Improvement Plan
-                </Link>
-                <Link href={generatedOutputHref({ type: "executive_briefing", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Generate Executive Briefing
-                </Link>
-                <Link href={generatedOutputHref({ type: "risk_brief", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-                  Generate Investigation Summary
-                </Link>
-                <Link
-                  href={`/app/ask?prompt=${encodeURIComponent(`Follow up on this Vaeroex result: ${title}`)}` as Route}
-                  className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20"
-                >
-                  Ask follow-up
-                </Link>
-              </div>
-            </div>
-          </>
+          <ConversationResult output={output} run={run} title={title} />
         ) : null}
 
         {run.status === "completed" ? (
@@ -1542,7 +1613,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <PageHeader
         eyebrow="Ask Vaeroex"
         title="Ask Vaeroex"
-        description="Question, answer, why, evidence, action. Ask Vaeroex to explain what changed, why it matters, and what leadership should do next."
+        description="Ask a direct question and get a direct answer first. Evidence, reasoning, and executive outputs stay available when you want to go deeper."
       />
 
       <ErrorNotice message={pageErrorMessage} />
