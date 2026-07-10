@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { Route } from "next";
 import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
-import { CopyVaeroexResultButton } from "@/components/ai/CopyVaeroexResultButton";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { TextArea, TextInput } from "@/components/operations/FormControls";
@@ -294,8 +293,8 @@ function formatBusinessItem(item: unknown, fallback: string) {
     str(record.root_cause) ||
     str(record.notes);
   const evidence = str(record.evidence) || str(record.reasoning);
-  const confidence = str(record.confidence);
-  const tail = unique([evidence ? `Evidence: ${evidence}` : "", confidence ? `Confidence: ${confidence}` : ""]).join(" - ");
+  const confidence = str(record.recommendation_confidence) || str(record.confidence);
+  const tail = unique([evidence ? `Evidence: ${evidence}` : "", confidence ? `Recommendation confidence: ${confidence}` : ""]).join(" - ");
 
   if (detail && detail !== title) {
     return tail ? `${title}: ${detail} (${tail})` : `${title}: ${detail}`;
@@ -382,62 +381,105 @@ function outputReasoning(output: JsonRecord) {
   );
 }
 
-function outputConfidence(output: JsonRecord, runStatus: string) {
-  const explicit = str(output.confidence);
+type RecommendationConfidence = "High" | "Medium" | "Low" | "Insufficient";
 
-  if (["High", "Medium", "Low"].includes(explicit)) {
+function normalizeRecommendationConfidence(value: string): RecommendationConfidence | null {
+  const normalized = value.trim().toLowerCase();
+
+  if (normalized === "very high" || normalized === "high") return "High";
+  if (normalized === "medium") return "Medium";
+  if (normalized === "low") return "Low";
+  if (normalized === "insufficient evidence" || normalized === "insufficient") return "Insufficient";
+
+  return null;
+}
+
+function confidenceEvidenceText(output: JsonRecord) {
+  return [
+    str(output.response_markdown),
+    str(output.answer),
+    str(output.response),
+    str(output.summary),
+    str(output.executive_summary),
+    str(output.confidence_reason),
+    str(output.confidence_explanation),
+    ...outputEvidenceItems(output),
+    ...collectItems(output, ["limitations", "data_gaps", "missing_context", "confidence_factors"])
+  ]
+    .join(" ")
+    .toLowerCase();
+}
+
+function evidenceIsInsufficient(text: string) {
+  return /insufficient evidence|not enough evidence|not enough data|not enough historical data|no reliable forecast|cannot reliably|unable to determine|no workspace evidence|little or no/.test(
+    text
+  );
+}
+
+function evidenceIsLimited(text: string) {
+  return /very limited evidence|limited evidence|limited historical|limited context|limited workspace context|thin evidence|only one source|only 1 source|single source|available evidence is limited/.test(
+    text
+  );
+}
+
+function outputConfidence(output: JsonRecord, runStatus: string): RecommendationConfidence {
+  const explicit = normalizeRecommendationConfidence(str(output.recommendation_confidence) || str(output.confidence));
+  const evidence = outputEvidenceItems(output);
+  const confidenceText = confidenceEvidenceText(output);
+  const hasInsufficientEvidence = evidenceIsInsufficient(confidenceText);
+  const hasLimitedEvidence = evidenceIsLimited(confidenceText);
+
+  if (runStatus === "failed" || hasInsufficientEvidence || evidence.length === 0) {
+    return "Insufficient";
+  }
+
+  if (explicit) {
+    if (hasLimitedEvidence && (explicit === "High" || explicit === "Medium")) {
+      return "Low";
+    }
+
+    if (explicit === "High" && evidence.length < 3) {
+      return evidence.length <= 1 ? "Low" : "Medium";
+    }
+
     return explicit;
   }
 
-  if (runStatus === "failed") {
+  if (hasLimitedEvidence) {
     return "Low";
   }
 
-  const evidenceCount = outputEvidenceItems(output).length;
-  if (evidenceCount >= 4) return "High";
-  if (evidenceCount >= 2) return "Medium";
+  const hasFreshEvidence = /\b(current|recent|latest|last 7|last 30|today|this week|this month)\b/.test(confidenceText);
+  const hasHistoricalDepth = /\b(history|historical|trend|trends|month|months|quarter|year|ytd|over time|weekly|daily)\b/.test(confidenceText);
+  const hasEvidenceAgreement = evidence.length >= 2 && !/\b(conflict|conflicting|inconsistent|contradict|mismatch|unclear)\b/.test(confidenceText);
+  const hasDataGaps = collectItems(output, ["limitations", "data_gaps", "missing_context"]).length > 0;
+
+  let score = 0;
+  if (evidence.length >= 6) score += 2;
+  else if (evidence.length >= 3) score += 1;
+
+  if (hasFreshEvidence) score += 1;
+  if (hasHistoricalDepth) score += 1;
+  if (hasEvidenceAgreement) score += 1;
+  if (hasDataGaps) score -= 1;
+
+  if (score >= 4) return "High";
+  if (score >= 2) return "Medium";
   return "Low";
+}
+
+function confidenceDescription(confidence: RecommendationConfidence) {
+  if (confidence === "High") return "Strong, current, consistent evidence supports this answer.";
+  if (confidence === "Medium") return "Useful directional evidence supports this answer, with some limitations.";
+  if (confidence === "Low") return "Limited or weak evidence supports this answer.";
+  return "Vaeroex needs more evidence before making a confident recommendation.";
 }
 
 function confidenceClasses(confidence: string) {
   if (confidence === "High") return "border-emerald-400/40 bg-emerald-950/35 text-emerald-100";
   if (confidence === "Medium") return "border-amber-400/40 bg-amber-950/35 text-amber-100";
+  if (confidence === "Low") return "border-slate-500/40 bg-slate-950/60 text-slate-200";
   return "border-slate-500/40 bg-slate-950/60 text-slate-200";
-}
-
-function resultCopyText(title: string, output: JsonRecord, run: { agent_type: string; status: string; input_json?: Json }) {
-  const sections = businessSections(output);
-  const evidence = outputEvidenceItems(output);
-  const confidence = outputConfidence(output, run.status);
-
-  return [
-    `# ${title}`,
-    "",
-    `Workflow: ${vaeroexResultLabel(run.agent_type)}`,
-    `Status: ${run.status}`,
-    `Confidence: ${confidence}`,
-    "",
-    "## Executive Summary",
-    sections.executiveSummary,
-    "",
-    "## Problems Identified",
-    ...sections.problems.map((item) => `- ${item}`),
-    "",
-    "## Executive Recommendations",
-    ...sections.actions.map((item) => `- ${item}`),
-    "",
-    "## Suggested Systems",
-    ...sections.systems.map((item) => `- ${item}`),
-    "",
-    "## Evidence Used",
-    ...evidence.map((item) => `- ${item}`),
-    "",
-    "## Why This Recommendation",
-    outputReasoning(output),
-    "",
-    "## Data Used",
-    dataUsedText(getRunInput(run))
-  ].join("\n");
 }
 
 function inferRelatedModule(text: string) {
@@ -1054,6 +1096,7 @@ function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId
 function conversationAnswerText(output: JsonRecord) {
   const sections = businessSections(output);
   const candidates = [
+    cleanReadableText(output.direct_answer),
     cleanReadableText(output.response_markdown),
     cleanReadableText(output.answer),
     cleanReadableText(output.response),
@@ -1062,17 +1105,69 @@ function conversationAnswerText(output: JsonRecord) {
     sections.executiveSummary
   ];
 
-  return candidates.find(Boolean) || "Vaeroex completed the request, but the answer was limited by the available workspace context.";
+  return softenAskAnswerText(
+    candidates.find(Boolean) || "Vaeroex completed the request, but the answer was limited by the available workspace context."
+  );
+}
+
+function softenAskAnswerText(value: string) {
+  const softened = value
+    .replace(/^#{1,4}\s*(Executive Summary|Top Problems|Top Executive Recommendation|Why Vaeroex Surfaced This)\s*$/gim, "")
+    .replace(/^(Based on (the )?(available|current|workspace) evidence,?\s*)/i, "")
+    .replace(/^(From (the )?(available|current|workspace) evidence,?\s*)/i, "")
+    .replace(/^(Given (the )?(available|current|workspace) evidence,?\s*)/i, "")
+    .replace(/^(The available evidence suggests( that)?\s*)/i, "")
+    .replace(/^(The current evidence suggests( that)?\s*)/i, "")
+    .replace(/\bReview Customer Pipeline\b/g, "Customer pipeline needs leadership attention")
+    .replace(/\bAddress Overdue Tasks\b/g, "Overdue activity needs leadership review")
+    .replace(/\bEnhance Follow-Up\b/g, "Follow-up quality may need attention")
+    .replace(/\bCreate CRM follow-up task list\b/gi, "Review the customer follow-up process")
+    .replace(/\bAssign owner\b/gi, "Review with the responsible leader")
+    .replace(/\bCreate follow-up\b/gi, "Decide whether a leadership review is needed")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
+  return softened ? `${softened.charAt(0).toUpperCase()}${softened.slice(1)}` : softened;
+}
+
+function evidenceSourceLabel(item: string) {
+  const normalized = item.toLowerCase();
+
+  if (/crm|pipeline|lead|customer|follow-up|follow up/.test(normalized)) return "CRM Pipeline";
+  if (/kpi|metric|revenue|target|trend|history|forecast|score/.test(normalized)) return "KPI History";
+  if (/business signal|signal|business memory|memory/.test(normalized)) return "Business Signals";
+  if (/report|brief|briefing|review/.test(normalized)) return "Reports";
+  if (/file|source|upload|document|spreadsheet|csv|xlsx|pdf/.test(normalized)) return "Source Files";
+  if (/sop|process|procedure|policy/.test(normalized)) return "Process Documents";
+
+  return "Workspace Context";
+}
+
+function evidenceUsedLabels(output: JsonRecord) {
+  const evidence = outputEvidenceItems(output);
+  return unique((evidence.length ? evidence : ["Workspace Context"]).map(evidenceSourceLabel)).slice(0, 6);
+}
+
+function inlineList(items: string[]) {
+  if (items.length <= 1) return items[0] || "";
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(", ")}, and ${items[items.length - 1]}`;
+}
+
+function briefEvidenceNote(labels: string[], evidenceCount: number, confidence: RecommendationConfidence) {
+  if (confidence === "Insufficient" || evidenceCount === 0) {
+    return "There is not enough workspace evidence to answer this reliably yet.";
+  }
+
+  return `This answer is supported by ${inlineList(labels)}.`;
 }
 
 function ConversationResult({
   output,
-  run,
-  title
+  run
 }: {
   output: JsonRecord;
   run: { id: string; agent_type: string; status: string; input_json?: Json };
-  title: string;
 }) {
   const visibleOutput = displayOutput(output);
   const input = getRunInput(run);
@@ -1080,83 +1175,54 @@ function ConversationResult({
   const answer = conversationAnswerText(visibleOutput);
   const confidence = outputConfidence(visibleOutput, run.status);
   const evidence = outputEvidenceItems(visibleOutput);
-  const evidencePreview = evidence.length ? evidence.slice(0, 4) : ["Limited workspace evidence was available for this answer."];
-  const sections = businessSections(visibleOutput);
-  const resultSummary = sections.executiveSummary;
-  const resultRemedy = sections.actions[0] || "Review this answer and decide what leadership should examine next.";
-  const resultWhy = outputReasoning(visibleOutput);
+  const evidenceLabels = evidenceUsedLabels(visibleOutput);
+  const evidencePreview = evidence.length ? evidence.slice(0, 6) : ["Limited workspace evidence was available for this answer."];
+  const evidenceNote = briefEvidenceNote(evidenceLabels, evidence.length, confidence);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="rounded-lg border border-white/10 bg-[#071526] p-4">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">You asked</p>
         <p className="mt-2 text-sm leading-6 text-slate-100">{question}</p>
       </div>
 
       <div className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 p-5 shadow-sm">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Vaeroex answered</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-100">Direct Answer</p>
         <div className="mt-4 max-w-4xl text-base leading-7 text-slate-50">
           <ReadableText value={answer} />
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[.35fr_1fr]">
-        <div className={`rounded-lg border p-4 ${confidenceClasses(confidence)}`}>
-          <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Confidence</p>
-          <p className="mt-2 text-3xl font-semibold">{confidence}</p>
-          <p className="mt-2 text-xs leading-5 opacity-85">
-            Based on available workspace context and supporting evidence.
-          </p>
-        </div>
+      <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
+        <p className="text-sm font-semibold">Evidence Note</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">{evidenceNote}</p>
+        <ul className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-200">
+          {evidenceLabels.map((item) => (
+            <li key={item} className="rounded-full border border-white/10 bg-white/[0.05] px-2.5 py-1">
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
 
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold">Evidence Summary</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">The main context Vaeroex used to answer.</p>
-            </div>
-            <span className="w-fit rounded-full border border-cyan-300/30 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-100">
-              {evidence.length || 0} sources
-            </span>
-          </div>
-          <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-            {evidencePreview.map((item) => (
-              <li key={item} className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
+      <div className={`rounded-lg border p-4 ${confidenceClasses(confidence)}`}>
+        <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Recommendation Confidence</p>
+        <p className="mt-2 text-2xl font-semibold">{confidence}</p>
+        <p className="mt-2 text-xs leading-5 opacity-85">
+          {confidenceDescription(confidence)}
+        </p>
       </div>
 
       <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
-        <summary className="cursor-pointer text-sm font-semibold text-slate-100">Optional actions</summary>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Link href={generatedOutputHref({ type: "executive_briefing", title: `Executive Strategy: ${title}`, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70">
-            Generate Executive Strategy
-          </Link>
-          <Link href={generatedOutputHref({ type: "action_plan", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-            Create Improvement Plan
-          </Link>
-          <Link href={generatedOutputHref({ type: "executive_briefing", title, summary: resultSummary, why: resultWhy, remedy: resultRemedy, run: run.id })} className="rounded-lg border border-cyan-300/35 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-cyan-200 hover:bg-cyan-400/20">
-            Generate Executive Briefing
-          </Link>
-          <CopyVaeroexResultButton text={resultCopyText(title, visibleOutput, run)} label="Export" />
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <details className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-100">View Supporting Evidence</summary>
-            <div className="mt-3">
-              <EvidencePanel output={visibleOutput} status={run.status} />
-            </div>
-          </details>
-          <details className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Explain My Reasoning</summary>
-            <p className="mt-3 text-sm leading-6 text-slate-300">{resultWhy}</p>
-          </details>
-        </div>
+        <summary className="cursor-pointer text-sm font-semibold text-slate-100">Show Supporting Evidence</summary>
+        <ul className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
+          {evidencePreview.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
       </details>
     </div>
   );
@@ -1224,38 +1290,6 @@ function DataUsedPanel({ input }: { input: JsonRecord }) {
             <p className="mt-1 text-xs text-slate-400">{item.label}</p>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-function EvidencePanel({ output, status }: { output: JsonRecord; status: string }) {
-  const evidence = outputEvidenceItems(output);
-  const confidence = outputConfidence(output, status);
-
-  return (
-    <div className="grid gap-4 lg:grid-cols-[1fr_.55fr]">
-      <div className="rounded-lg border border-line bg-white p-4">
-        <h4 className="text-sm font-semibold">Why this recommendation?</h4>
-        <p className="mt-2 text-sm leading-6 text-muted">{outputReasoning(output)}</p>
-        <div className="mt-4">
-          <p className="text-xs font-semibold uppercase tracking-wide text-muted">Evidence used</p>
-          <ul className="mt-2 space-y-2 text-sm leading-6 text-muted">
-            {evidence.map((item) => (
-              <li key={item} className="flex gap-2">
-                <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
-                <span>{item}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      </div>
-      <div className={`rounded-lg border p-4 ${confidenceClasses(confidence)}`}>
-        <p className="text-xs font-semibold uppercase tracking-wide opacity-80">Confidence</p>
-        <p className="mt-2 text-3xl font-semibold">{confidence}</p>
-        <p className="mt-2 text-xs leading-5 opacity-85">
-          Confidence reflects available workspace context, evidence quantity, and whether Vaeroex completed the run successfully.
-        </p>
       </div>
     </div>
   );
@@ -1437,7 +1471,7 @@ function SelectedResult({
 
         {run.error_message ? <ErrorNotice message={friendlyHubError(run.error_message)} /> : null}
         {run.status === "completed" ? (
-          <ConversationResult output={output} run={run} title={title} />
+          <ConversationResult output={output} run={run} />
         ) : null}
 
         {run.status === "completed" ? (

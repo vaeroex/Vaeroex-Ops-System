@@ -32,8 +32,10 @@ Return JSON only. Do not wrap the JSON in markdown.
 Use this root shape whenever possible:
 {
   "title": "Short title",
+  "direct_answer": "One concise sentence that directly answers the user's exact question",
   "summary": "Plain-language summary",
   "response_markdown": "Readable draft or answer for the user",
+  "recommendation_confidence": "High | Medium | Low | Insufficient",
   "recommended_actions": [
     {
       "title": "Executive recommendation title",
@@ -65,7 +67,7 @@ Use this root shape whenever possible:
   "save_recommendations": ["Records the user may confirm and save"]
 }
 Every output that could become a record must be a draft for leadership review. Do not imply it has already been saved.
-Every recommendation must explain what happened, why, evidence, business impact, confidence, what could happen next, and what leadership should review. Do not imply Vaeroex owns execution.
+Every recommendation must explain what happened, why, evidence, business impact, recommendation confidence, what could happen next, and what leadership should review. Do not imply Vaeroex owns execution.
 `;
 
 const workspaceAwareInstructions = `
@@ -76,7 +78,7 @@ Workspace-aware recommendation rules:
 - Do not recommend replacing Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or other customer systems.
 - Never say "Create CRM", "Create follow-up tracking", or "Assign owners" as generic advice.
 - Prefer recommendations like "customer pipeline completion declined", "leadership should review the current workflow", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
-- Every recommendation should mention what exists, what is missing or stale, why it matters, evidence, confidence, business impact, and what leadership should review.
+- Every recommendation should mention what exists, what is missing or stale, why it matters, evidence, recommendation confidence, business impact, and what leadership should review.
 - Classify recommendations into the recommendation_categories listed in the JSON shape.
 `;
 
@@ -90,6 +92,15 @@ export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
     saveTargets: ["report"],
     instructions: `
 Answer the user's business question using the workspace context when it helps.
+The first sentence of response_markdown must directly answer the exact question asked.
+Also set direct_answer to one concise sentence that directly answers the exact question asked.
+Do not start direct_answer or response_markdown with "Based on...", "The available evidence suggests...", "There is limited information...", "Confidence...", or any other qualifier. Put evidence limitations after the direct answer.
+Do not replace the requested answer with a generic leadership briefing, evidence-gap commentary, unrelated recommendations, or a list of everything Vaeroex noticed.
+Write like an executive conversation, not an analyst report. Start with the direct answer, then briefly explain what evidence supports it.
+Only make claims supported by current workspace evidence. If evidence is incomplete, state the limitation and answer only with what the evidence supports. Do not present general business advice as workspace evidence.
+Use plain language and short paragraphs. Avoid internal labels, task-manager wording, and command-style headings such as "Review Customer Pipeline", "Address Overdue Tasks", or "Enhance Follow-Up".
+If evidence is limited, say that clearly and set recommendation_confidence to Low or Insufficient. Never claim High confidence when the answer depends on limited evidence.
+Return recommendation_confidence as one of: High, Medium, Low, Insufficient. Base it on evidence quantity, freshness, agreement, and historical depth for the exact answer given.
 Keep the answer practical, evidence-based, and executive-friendly. Do not create or recommend task lists unless the user explicitly asks for a draft record.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
