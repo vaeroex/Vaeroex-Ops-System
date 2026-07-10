@@ -21,6 +21,16 @@ type RunVaeroexRequest = {
   openAISettings?: OpenAIRetrySettings;
 };
 
+export type VaeroexRequestSizeMetrics = {
+  requestBodyBytes: number;
+  estimatedRequestTokens: number;
+  estimatedTextTokens: number;
+  estimatedAttachmentTokens: number;
+  attachmentBytes: number;
+  attachmentInputType: VaeroexFileAttachment["inputType"] | null;
+  attachmentBudgetMode: "none" | "image_vision" | "direct_file";
+};
+
 export type VaeroexFileAttachment = {
   inputType: "image" | "file";
   fileName: string;
@@ -57,6 +67,8 @@ type JsonRecord = Record<string, unknown>;
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const LEGACY_OPENAI_ENV_NAMES = ["OPENAI_APIKEY", "OPENAI_KEY", "NEXT_PUBLIC_OPENAI", "OPENAI_SECRET"];
+const DEFAULT_MAX_DIRECT_IMAGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
+const DEFAULT_MAX_DIRECT_FILE_ATTACHMENT_BYTES = 8 * 1024 * 1024;
 
 function isRecord(value: unknown): value is JsonRecord {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -234,6 +246,99 @@ function fileDataUrl(attachment: VaeroexFileAttachment) {
   return `data:${attachment.mimeType};base64,${attachment.base64Data}`;
 }
 
+function attachmentBytes(attachment?: VaeroexFileAttachment) {
+  if (!attachment) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((attachment.base64Data.length * 3) / 4));
+}
+
+function integerEnv(name: string, fallback: number, min: number, max: number) {
+  const value = Number.parseInt(process.env[name] || "", 10);
+
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+
+  return Math.min(Math.max(value, min), max);
+}
+
+function directAttachmentByteLimit(attachment: VaeroexFileAttachment) {
+  if (attachment.inputType === "image") {
+    return integerEnv("VAEROEX_MAX_DIRECT_IMAGE_ANALYSIS_BYTES", DEFAULT_MAX_DIRECT_IMAGE_ATTACHMENT_BYTES, 256 * 1024, 20 * 1024 * 1024);
+  }
+
+  return integerEnv("VAEROEX_MAX_DIRECT_FILE_ANALYSIS_BYTES", DEFAULT_MAX_DIRECT_FILE_ATTACHMENT_BYTES, 512 * 1024, 25 * 1024 * 1024);
+}
+
+function attachmentTokenEstimate(attachment?: VaeroexFileAttachment) {
+  if (!attachment) {
+    return 0;
+  }
+
+  const bytes = attachmentBytes(attachment);
+
+  if (attachment.inputType === "image") {
+    return attachment.detail === "low" ? 900 : bytes > 1_500_000 ? 2_500 : 1_800;
+  }
+
+  return Math.max(1_500, Math.ceil(bytes / 350));
+}
+
+export function estimateVaeroexRequestSize(requestBodyJson: string, attachment?: VaeroexFileAttachment): VaeroexRequestSizeMetrics {
+  const bytes = Buffer.byteLength(requestBodyJson, "utf8");
+
+  if (!attachment) {
+    const estimatedRequestTokens = estimateTokenCount(requestBodyJson);
+
+    return {
+      requestBodyBytes: bytes,
+      estimatedRequestTokens,
+      estimatedTextTokens: estimatedRequestTokens,
+      estimatedAttachmentTokens: 0,
+      attachmentBytes: 0,
+      attachmentInputType: null,
+      attachmentBudgetMode: "none"
+    };
+  }
+
+  const dataUrl = fileDataUrl(attachment);
+  const placeholder = `[${attachment.inputType} attachment: ${attachment.fileName}; ${attachmentBytes(attachment)} bytes; base64 omitted from text token estimate]`;
+  const textForBudget = requestBodyJson.includes(dataUrl) ? requestBodyJson.replace(dataUrl, placeholder) : requestBodyJson;
+  const estimatedTextTokens = estimateTokenCount(textForBudget);
+  const estimatedAttachmentTokens = attachmentTokenEstimate(attachment);
+
+  return {
+    requestBodyBytes: bytes,
+    estimatedRequestTokens: estimatedTextTokens + estimatedAttachmentTokens,
+    estimatedTextTokens,
+    estimatedAttachmentTokens,
+    attachmentBytes: attachmentBytes(attachment),
+    attachmentInputType: attachment.inputType,
+    attachmentBudgetMode: attachment.inputType === "image" ? "image_vision" : "direct_file"
+  };
+}
+
+function assertDirectAttachmentSize(attachment?: VaeroexFileAttachment) {
+  if (!attachment) {
+    return;
+  }
+
+  const bytes = attachmentBytes(attachment);
+  const limit = directAttachmentByteLimit(attachment);
+
+  if (bytes <= limit) {
+    return;
+  }
+
+  if (attachment.inputType === "image") {
+    throw new Error("Vaeroex uploaded this image successfully, but direct visual analysis needs a smaller working copy. Try a smaller image export or crop the area you want reviewed.");
+  }
+
+  throw new Error("Vaeroex uploaded this file successfully, but direct document analysis needs a smaller section. Use a text-based PDF/DOCX when possible, or split the file into a smaller page range.");
+}
+
 function buildUserContent({
   workflow,
   userPrompt,
@@ -369,6 +474,7 @@ export async function runVaeroexCompletionWithUsage({
 
   const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
   const startedAt = Date.now();
+  assertDirectAttachmentSize(fileAttachment);
   const requestBody = {
     model,
     temperature: 0.2,
@@ -385,12 +491,18 @@ export async function runVaeroexCompletionWithUsage({
     ]
   };
   const requestBodyJson = JSON.stringify(requestBody);
-  const estimatedRequestTokens = estimateTokenCount(requestBodyJson);
+  const requestSize = estimateVaeroexRequestSize(requestBodyJson, fileAttachment);
+  const estimatedRequestTokens = requestSize.estimatedRequestTokens;
   logVaeroexOpenAIEvent("token_budget_check_started", {
     requestId,
     workflow: workflow.key,
     model,
-    estimatedRequestTokens
+    estimatedRequestTokens,
+    requestBodyBytes: requestSize.requestBodyBytes,
+    estimatedTextTokens: requestSize.estimatedTextTokens,
+    estimatedAttachmentTokens: requestSize.estimatedAttachmentTokens,
+    attachmentBytes: requestSize.attachmentBytes,
+    attachmentBudgetMode: requestSize.attachmentBudgetMode
   });
   const tokenBudget = await assertWorkspaceTokenBudget({
     supabase,
@@ -402,6 +514,11 @@ export async function runVaeroexCompletionWithUsage({
     workflow: workflow.key,
     model,
     estimatedRequestTokens,
+    requestBodyBytes: requestSize.requestBodyBytes,
+    estimatedTextTokens: requestSize.estimatedTextTokens,
+    estimatedAttachmentTokens: requestSize.estimatedAttachmentTokens,
+    attachmentBytes: requestSize.attachmentBytes,
+    attachmentBudgetMode: requestSize.attachmentBudgetMode,
     workspaceTokenBudgetRemaining: tokenBudget.remainingTokens
   });
 
@@ -413,6 +530,11 @@ export async function runVaeroexCompletionWithUsage({
     openaiApiMode: "responses",
     openaiEndpoint: "/v1/responses",
     estimatedRequestTokens,
+    requestBodyBytes: requestSize.requestBodyBytes,
+    estimatedTextTokens: requestSize.estimatedTextTokens,
+    estimatedAttachmentTokens: requestSize.estimatedAttachmentTokens,
+    attachmentBytes: requestSize.attachmentBytes,
+    attachmentBudgetMode: requestSize.attachmentBudgetMode,
     workspaceTokenBudgetRemaining: tokenBudget.remainingTokens
   });
 
@@ -487,7 +609,10 @@ export async function runVaeroexCompletionWithUsage({
     model,
     requestId: openaiRequestId,
     latencyMs,
-    status: "completed"
+    status: "completed",
+    metadata: {
+      request_size: requestSize
+    } satisfies Json
   };
 
   const outputJson = parseVaeroexJson(content);

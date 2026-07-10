@@ -219,21 +219,18 @@ function filteredFiles({
   status,
   query,
   view,
-  fileId,
   runsByFile
 }: {
   files: FileUploadRow[];
   status?: string;
   query?: string;
   view?: string;
-  fileId?: string;
   runsByFile: Map<string, VaeroexRunRow[]>;
 }) {
   const normalizedQuery = (query || "").trim().toLowerCase();
   const includeHidden = view === "hidden";
 
   return files
-    .filter((file) => (fileId ? file.id === fileId : true))
     .filter((file) => (includeHidden ? Boolean(file.archived_at && !file.deleted_at) : !file.deleted_at && !file.archived_at))
     .filter((file) => fileMatchesStatus(file, status || "", runsByFile.get(file.id) || []))
     .filter((file) => {
@@ -379,6 +376,31 @@ function SourceActionButton({
   );
 }
 
+function SourceFilePrimaryActions({ file, selected }: { file: FileUploadRow; selected: boolean }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <form action={analyzeFileAction}>
+        <input type="hidden" name="file_id" value={file.id} />
+        <input
+          type="hidden"
+          name="analysis_prompt"
+          value="What trends do you see? What KPIs should I track? What problems stand out? Create an executive summary and recommended actions."
+        />
+        <SourceActionButton pendingLabel="Analyzing file..." steps={ANALYSIS_PROGRESS_STEPS}>
+          Analyze
+        </SourceActionButton>
+      </form>
+      <LoadingLink
+        href={`/app/sources?file=${file.id}` as Route}
+        className={`rounded-md border px-3 py-2 text-xs font-semibold ${selected ? "border-cyan-300/40 bg-cyan-950/35 text-cyan-50" : "border-white/10 bg-white/[0.04] text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30"}`}
+        loadingLabel="Opening file details..."
+      >
+        {selected ? "Selected" : "View"}
+      </LoadingLink>
+    </div>
+  );
+}
+
 function SourceFileActions({
   file,
   access,
@@ -461,6 +483,68 @@ function SourceFileActions({
         </ConfirmSubmitButton>
       </form>
     </div>
+  );
+}
+
+function SourceFileDetailPanel({
+  file,
+  access,
+  folders,
+  fileImports,
+  linkedKpis,
+  linkedRuns,
+  linkedReports,
+  actionError
+}: {
+  file: FileUploadRow;
+  access?: FileAccessLinks | null;
+  folders: Pick<FolderRow, "id" | "name">[];
+  fileImports: FileImportRow[];
+  linkedKpis: KpiRow[];
+  linkedRuns: VaeroexRunRow[];
+  linkedReports: ReportRow[];
+  actionError?: string | null;
+}) {
+  const status = fileStatus(file, linkedRuns);
+
+  return (
+    <aside className="rounded-lg border border-cyan-300/20 bg-[#08111f] p-4 text-slate-100 shadow-panel xl:sticky xl:top-24">
+      <div className="flex flex-col gap-3 border-b border-white/10 pb-4">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Selected Source</p>
+          <h2 className="mt-2 break-words text-lg font-semibold text-white">{file.display_name}</h2>
+          <p className="mt-1 text-xs leading-5 text-slate-400">{file.original_name}</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <StatusBadge value={status} />
+          <StatusBadge value={file.file_extension.toUpperCase()} />
+          <StatusBadge value={fileCategory(file, folders)} />
+        </div>
+      </div>
+
+      {actionError ? (
+        <div className="mt-4 rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm leading-6 text-red-100">
+          {actionError}
+        </div>
+      ) : null}
+
+      <div className="mt-4 grid gap-3 text-sm">
+        <section className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Last analysis</p>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{file.analysis_summary || "No Vaeroex analysis summary has been saved yet."}</p>
+          <p className="mt-2 text-xs text-slate-500">Last analyzed: {formatDateTime(latestAnalysisAt(file))}</p>
+        </section>
+
+        <section className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Analysis Actions</p>
+          <div className="mt-3">
+            <SourceFileActions file={file} access={access} linkedKpis={linkedKpis} linkedRuns={linkedRuns} />
+          </div>
+        </section>
+
+        <SourceFileDetails file={file} fileImports={fileImports} linkedKpis={linkedKpis} linkedRuns={linkedRuns} linkedReports={linkedReports} />
+      </div>
+    </aside>
   );
 }
 
@@ -551,72 +635,54 @@ function SourceFileDetails({
 function SourceFileRow({
   file,
   folders,
-  imports,
-  reports,
   kpis,
   runs,
   access,
-  selectable = false
+  selectable = false,
+  selected = false
 }: {
   file: FileUploadRow;
   folders: Pick<FolderRow, "id" | "name">[];
-  imports: FileImportRow[];
-  reports: ReportRow[];
   kpis: KpiRow[];
   runs: VaeroexRunRow[];
   access?: FileAccessLinks | null;
   selectable?: boolean;
+  selected?: boolean;
 }) {
   const linkedKpis = kpis.filter((kpi) => kpi.source_file_id === file.id);
   const linkedRuns = runs.filter((run) => runFileId(run) === file.id);
-  const linkedReports = reportsForFile(reports, file.id);
-  const fileImports = imports.filter((item) => item.file_upload_id === file.id);
   const status = fileStatus(file, linkedRuns);
 
   return (
-    <article id={`file-${file.id}`} className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-      {selectable ? (
-        <label className="mb-3 inline-flex min-h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100">
-          <input
-            type="checkbox"
-            name="record_id"
-            value={file.id}
-            className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent"
-          />
-          Select file
-        </label>
-      ) : null}
-      <div className="grid gap-4 xl:grid-cols-[minmax(220px,1.2fr)_110px_120px_130px_130px_minmax(220px,1fr)] xl:items-start">
+    <article id={`file-${file.id}`} className={`rounded-lg border p-4 text-slate-100 shadow-panel transition ${selected ? "border-cyan-300/35 bg-cyan-950/20" : "border-white/10 bg-[#08111f] hover:border-cyan-300/25"}`}>
+      <div className="grid gap-3 lg:grid-cols-[auto_minmax(0,1fr)_auto] lg:items-center">
+        {selectable ? (
+          <label className="inline-flex min-h-10 items-center gap-2 rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100">
+            <input
+              type="checkbox"
+              name="record_id"
+              value={file.id}
+              className="h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent"
+            />
+            <span className="lg:hidden">Select file</span>
+          </label>
+        ) : null}
         <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="break-words text-sm font-semibold text-white">{file.display_name}</h3>
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h3 className="min-w-0 break-words text-sm font-semibold text-white">{file.display_name}</h3>
             <StatusBadge value={status} />
+            <StatusBadge value={file.file_extension.toUpperCase()} />
+            <StatusBadge value={importStatusLabel(file.import_status)} />
           </div>
-          <p className="mt-1 text-xs leading-5 text-slate-400">{file.original_name} · {fileSizeLabel(file.file_size_bytes)}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-400">
+            {file.original_name} · {fileSizeLabel(file.file_size_bytes)} · Uploaded {formatDate(file.created_at)}
+          </p>
           <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{file.analysis_summary || "No Vaeroex analysis summary yet."}</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</p>
-          <p className="mt-1 text-sm font-semibold text-slate-200">{file.file_extension.toUpperCase()}</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Uploaded</p>
-          <p className="mt-1 text-sm font-semibold text-slate-200">{formatDate(file.created_at)}</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Category</p>
-          <p className="mt-1 text-sm font-semibold text-slate-200">{fileCategory(file, folders)}</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Import</p>
-          <p className="mt-1 text-sm font-semibold text-slate-200">{importStatusLabel(file.import_status)}</p>
-        </div>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Used by</p>
-          <p className="mt-1 text-sm font-semibold text-slate-200">
-            {linkedKpis.length} KPI{linkedKpis.length === 1 ? "" : "s"} · {linkedRuns.length} generated insight{linkedRuns.length === 1 ? "" : "s"}
+          <p className="mt-2 text-xs text-slate-500">
+            {fileCategory(file, folders)} · {linkedKpis.length} KPI{linkedKpis.length === 1 ? "" : "s"} · {linkedRuns.length} insight{linkedRuns.length === 1 ? "" : "s"}
           </p>
         </div>
+        <SourceFilePrimaryActions file={file} selected={selected} />
       </div>
 
       {isSpreadsheet(file) && file.import_status === "ready" ? (
@@ -624,11 +690,6 @@ function SourceFileRow({
           Vaeroex found structured data in this file. You can import it as KPI data after review.
         </div>
       ) : null}
-
-      <div className="mt-4 space-y-3">
-        <SourceFileActions file={file} access={access} linkedKpis={linkedKpis} linkedRuns={linkedRuns} />
-        <SourceFileDetails file={file} fileImports={fileImports} linkedKpis={linkedKpis} linkedRuns={linkedRuns} linkedReports={linkedReports} />
-      </div>
     </article>
   );
 }
@@ -672,7 +733,6 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     status: params?.status,
     query: params?.q,
     view: params?.view,
-    fileId: params?.file,
     runsByFile
   });
   const currentFiles = files.filter((file) => !file.deleted_at && !file.archived_at);
@@ -681,7 +741,8 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const importReadyFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Import Ready");
   const pendingReviewFiles = files.filter((file) => fileStatus(file, runsByFile.get(file.id) || []) === "Pending Review");
   const linkedFile = params?.file ? files.find((file) => file.id === params.file) : null;
-  const activeFilterLabel = linkedFile?.display_name || params?.status || (params?.view === "hidden" ? "Archived Files" : "") || params?.q || "";
+  const selectedFile = linkedFile || visibleFiles[0] || null;
+  const activeFilterLabel = params?.status || (params?.view === "hidden" ? "Archived Files" : "") || params?.q || "";
   const isArchivedView = params?.view === "hidden";
   const insightItems: GeneratedInsightItem[] = runs.map((run) => {
     const fileId = runFileId(run);
@@ -753,7 +814,10 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     }
   ];
   const successMessage = cleanNoticeMessage(params?.message, "File action completed.");
-  const errorMessage = cleanNoticeMessage(params?.error || errors[0]?.message, "Source data could not be loaded.");
+  const loadErrorMessage = cleanNoticeMessage(errors[0]?.message, "Source data could not be loaded.");
+  const actionErrorMessage = cleanNoticeMessage(params?.error, "Source data could not be loaded.");
+  const errorMessage = loadErrorMessage || (linkedFile ? null : actionErrorMessage);
+  const selectedFileActionError = linkedFile ? actionErrorMessage : null;
 
   return (
     <div className="space-y-6">
@@ -845,74 +909,98 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
           </div>
         ) : null}
 
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <h2 className="text-base font-semibold text-white">Files</h2>
-              <p className="mt-1 text-sm text-slate-400">Upload, analyze, import, archive, delete, and inspect source evidence directly from Sources.</p>
-            </div>
-            <StatusBadge value={`${visibleFiles.length} showing`} />
-          </div>
-          <div className="mt-4 space-y-3">
-            {visibleFiles.length ? (
-              isArchivedView ? (
-                <ArchivedFilesBulkActions fileCount={visibleFiles.length} returnPath="/app/sources?view=hidden">
-                  <div className="space-y-3">
-                    {visibleFiles.map((file) => (
-                      <SourceFileRow
-                        key={file.id}
-                        file={file}
-                        folders={folders}
-                        imports={imports}
-                        reports={reports}
-                        kpis={kpis}
-                        runs={runs}
-                        access={accessByFileId.get(file.id)}
-                        selectable
-                      />
-                    ))}
-                  </div>
-                </ArchivedFilesBulkActions>
-              ) : (
-                visibleFiles.map((file) => (
-                  <SourceFileRow
-                    key={file.id}
-                    file={file}
-                    folders={folders}
-                    imports={imports}
-                    reports={reports}
-                    kpis={kpis}
-                    runs={runs}
-                    access={accessByFileId.get(file.id)}
-                  />
-                ))
-              )
-            ) : (
-              <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
-                <h3 className="text-lg font-semibold text-white">{isArchivedView ? "No archived files." : files.length ? "No files match this filter" : "No source files yet"}</h3>
-                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
-                  {isArchivedView
-                    ? "Archived source files will appear here after you archive them."
-                    : files.length
-                      ? "Clear filters to view all files, or open Archived Files if the file was archived."
-                      : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
-                </p>
-                <div className="mt-5 flex flex-wrap justify-center gap-2">
-                  {files.length && !isArchivedView ? (
-                    <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-                      Clear filters
-                    </Link>
-                  ) : null}
-                  <UploadSourceDrawer folders={folders} />
-                  {files.length && !isArchivedView ? (
-                    <Link href="/app/sources?view=hidden" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-                      Show archived files
-                    </Link>
-                  ) : null}
-                </div>
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(22rem,28rem)]">
+          <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-base font-semibold text-white">Files</h2>
+                <p className="mt-1 text-sm text-slate-400">Select a source to inspect details, analysis status, and available actions.</p>
               </div>
-            )}
+              <StatusBadge value={`${visibleFiles.length} showing`} />
+            </div>
+            <div className="mt-4 space-y-3">
+              {visibleFiles.length ? (
+                isArchivedView ? (
+                  <ArchivedFilesBulkActions fileCount={visibleFiles.length} returnPath="/app/sources?view=hidden">
+                    <div className="space-y-3">
+                      {visibleFiles.map((file) => (
+                        <SourceFileRow
+                          key={file.id}
+                          file={file}
+                          folders={folders}
+                          kpis={kpis}
+                          runs={runs}
+                          access={accessByFileId.get(file.id)}
+                          selectable
+                          selected={selectedFile?.id === file.id}
+                        />
+                      ))}
+                    </div>
+                  </ArchivedFilesBulkActions>
+                ) : (
+                  visibleFiles.map((file) => (
+                    <SourceFileRow
+                      key={file.id}
+                      file={file}
+                      folders={folders}
+                      kpis={kpis}
+                      runs={runs}
+                      access={accessByFileId.get(file.id)}
+                      selected={selectedFile?.id === file.id}
+                    />
+                  ))
+                )
+              ) : (
+                <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
+                  <h3 className="text-lg font-semibold text-white">{isArchivedView ? "No archived files." : files.length ? "No files match this filter" : "No source files yet"}</h3>
+                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                    {isArchivedView
+                      ? "Archived source files will appear here after you archive them."
+                      : files.length
+                        ? "Clear filters to view all files, or open Archived Files if the file was archived."
+                        : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
+                  </p>
+                  <div className="mt-5 flex flex-wrap justify-center gap-2">
+                    {files.length && !isArchivedView ? (
+                      <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+                        Clear filters
+                      </Link>
+                    ) : null}
+                    <UploadSourceDrawer folders={folders} />
+                    {files.length && !isArchivedView ? (
+                      <Link href="/app/sources?view=hidden" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                        Show archived files
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
+
+          {selectedFile ? (() => {
+            const linkedKpis = kpis.filter((kpi) => kpi.source_file_id === selectedFile.id);
+            const linkedRuns = runs.filter((run) => runFileId(run) === selectedFile.id);
+            const linkedReports = reportsForFile(reports, selectedFile.id);
+            const fileImports = imports.filter((item) => item.file_upload_id === selectedFile.id);
+
+            return (
+              <SourceFileDetailPanel
+                file={selectedFile}
+                folders={folders}
+                fileImports={fileImports}
+                linkedKpis={linkedKpis}
+                linkedRuns={linkedRuns}
+                linkedReports={linkedReports}
+                access={accessByFileId.get(selectedFile.id)}
+                actionError={selectedFileActionError}
+              />
+            );
+          })() : (
+            <aside className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm leading-6 text-slate-400 shadow-panel">
+              Select a source to view analysis status, evidence, and actions.
+            </aside>
+          )}
         </div>
       </section>
 
