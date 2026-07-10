@@ -492,8 +492,28 @@ function runFileAnalysisRequestSizingTests() {
   assert.ok(metrics.estimatedAttachmentTokens > 0, "image attachments should still contribute a bounded attachment estimate");
 
   const sourcesPage = read("app/app/sources/page.tsx");
+  const sourceTabs = sourcesPage.slice(
+    sourcesPage.indexOf("const fileStatusTabs"),
+    sourcesPage.indexOf("] as const;", sourcesPage.indexOf("const fileStatusTabs"))
+  );
   assert.match(sourcesPage, /SourceFileDetailPanel/, "Sources should render selected-file detail in a separate panel");
   assert.match(sourcesPage, /Select a source to inspect details, analysis status, and available actions\./, "Sources rows should stay compact and point users to the detail panel");
+  assert.match(sourcesPage, /Needs Review/, "Sources should expose review only when confidence or risk requires it");
+  assert.match(sourcesPage, /Learned/, "Sources should expose automatically learned file evidence");
+  assert.doesNotMatch(sourceTabs, /Recent Uploads|Imported Data/, "Sources should keep secondary views out of the primary tab set");
+
+  const fileActions = read("app/app/files/actions.ts");
+  const runFileAnalysisSection = fileActions.slice(
+    fileActions.indexOf("async function runFileVaeroexAnalysis"),
+    fileActions.indexOf("export async function uploadFileAction")
+  );
+  assert.match(fileActions, /function classifyFileAnalysisLearning/, "file analysis should classify confidence before learning");
+  assert.match(runFileAnalysisSection, /learningDecision\.status === "auto_learned"/, "high and medium confidence file analyses should be able to auto-learn");
+  assert.match(runFileAnalysisSection, /latest_analysis_status:\s*learningDecision\.status/, "file analysis status should follow the learning decision");
+  assert.match(runFileAnalysisSection, /indexFileAnalysisEvidence\(/, "auto-learned analyses should index Business Memory");
+  assert.match(runFileAnalysisSection, /needs_review/, "low-confidence or risky analyses should stay in review");
+  assert.match(fileActions, /export async function approveFileAnalysisAction/, "file analysis approval action should exist");
+  assert.match(fileActions, /export async function discardFileAnalysisAction/, "file analysis discard action should exist");
 }
 
 function makeKpi(name, metricDate, actualValue = 100) {

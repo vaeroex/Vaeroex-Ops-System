@@ -54,6 +54,21 @@ type FileContentExtraction = {
   extractionFailureReason?: string;
   fileAttachment?: VaeroexFileAttachment;
 };
+type FileAnalysisConfidenceLabel = "High" | "Medium" | "Low";
+type FileAnalysisEvidenceQuality = "strong" | "moderate" | "weak";
+type FileAnalysisBusinessImpact = "low" | "medium" | "high";
+type FileAnalysisRiskLevel = "low" | "medium" | "high";
+type FileAnalysisLearningDecision = {
+  status: "auto_learned" | "needs_review";
+  confidenceLabel: FileAnalysisConfidenceLabel;
+  trustLevel: "trusted" | "tentative" | "needs_review";
+  evidenceQuality: FileAnalysisEvidenceQuality;
+  businessImpact: FileAnalysisBusinessImpact;
+  riskLevel: FileAnalysisRiskLevel;
+  reviewRequired: boolean;
+  reviewReasons: string[];
+  learningMode: "automatic" | "review_required";
+};
 type ImportField = {
   key: string;
   label: string;
@@ -122,8 +137,15 @@ function safeFileReturnPath(value: string) {
   return value === SOURCES_PATH ? SOURCES_PATH : FILES_PATH;
 }
 
-function redirectWithPathError(path: string, message: string): never {
-  redirect(`${path}?error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."))}` as Route);
+function redirectWithPathError(path: string, message: string, fileId?: string): never {
+  const query = new URLSearchParams();
+
+  if (fileId) {
+    query.set("file", fileId);
+  }
+
+  query.set("error", cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."));
+  redirect(`${path}?${query.toString()}` as Route);
 }
 
 function redirectWithPathMessage(path: string, message: string, fileId?: string): never {
@@ -374,6 +396,34 @@ async function updateFileProcessingStatus({
     })
     .eq("id", file.id)
     .eq("workspace_id", file.workspace_id);
+}
+
+async function archiveFileAnalysisMemoryChunks({
+  supabase,
+  workspaceId,
+  fileId,
+  archivedAt
+}: {
+  supabase: SupabaseServerClient;
+  workspaceId: string;
+  fileId: string;
+  archivedAt: string;
+}) {
+  const { error } = await supabase
+    .from("business_memory_chunks")
+    .update({
+      archived_at: archivedAt,
+      deleted_at: archivedAt,
+      updated_at: archivedAt
+    })
+    .eq("workspace_id", workspaceId)
+    .eq("source_type", "file_analysis")
+    .eq("source_file_id", fileId)
+    .is("deleted_at", null);
+
+  if (error) {
+    throw new Error(error.message);
+  }
 }
 
 function normalizeKey(value: string) {
@@ -1029,6 +1079,198 @@ function hasMeaningfulModelContent(outputJson: Json) {
   return directLists.some((key) => asArray(output[key]).length > 0) || str(output.response_markdown).length > 120 || str(output.executive_summary).length > 80;
 }
 
+function scoreFromUnknown(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value <= 1 ? Math.round(value * 100) : Math.round(value);
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const match = value.match(/\b(\d{1,3})(?:\.\d+)?\s*%?\b/);
+  const score = match ? Number(match[1]) : Number.NaN;
+  return Number.isFinite(score) ? Math.max(0, Math.min(100, score)) : null;
+}
+
+function confidenceLabelFromAnalysis(outputJson: Json, extraction: FileContentExtraction, cleanResult: JsonRecord): FileAnalysisConfidenceLabel {
+  const output = isRecord(outputJson) ? outputJson : {};
+  const rawConfidence =
+    str(output.recommendation_confidence) ||
+    str(output.confidence) ||
+    str(output.confidence_level) ||
+    str(output.confidence_label) ||
+    str(output.analysis_confidence);
+  const score =
+    scoreFromUnknown(output.confidence_score) ??
+    scoreFromUnknown(output.evidence_confidence_score) ??
+    scoreFromUnknown(rawConfidence);
+  const evidenceText = [
+    rawConfidence,
+    str(output.executive_summary),
+    str(output.summary),
+    str(output.response_markdown),
+    ...outputList(output, "unclear_fields"),
+    ...outputList(output, "needs_confirmation"),
+    ...outputList(cleanResult, "unclear_fields")
+  ]
+    .join(" ")
+    .toLowerCase();
+  const limitation = /\b(insufficient|not enough|cannot determine|unable to determine|very limited|limited evidence|low confidence|unreadable)\b/.test(evidenceText);
+
+  if (score !== null) {
+    if (score >= 78 && !limitation) return "High";
+    if (score >= 45) return "Medium";
+    return "Low";
+  }
+
+  if (/\b(high|strong)\b/i.test(rawConfidence) && !limitation) return "High";
+  if (/\b(medium|moderate|developing|directional|partial)\b/i.test(rawConfidence)) return "Medium";
+  if (/\b(low|weak|insufficient|limited)\b/i.test(rawConfidence) || limitation) return "Low";
+
+  if (extraction.rows.length >= 10 || extraction.textContent.length >= 1_500) return "Medium";
+  if (cleanAnalysisInsightCount(cleanResult) >= 3 && hasMeaningfulModelContent(outputJson)) return "Medium";
+  return "Low";
+}
+
+function evidenceQualityForAnalysis(outputJson: Json, extraction: FileContentExtraction, cleanResult: JsonRecord): FileAnalysisEvidenceQuality {
+  const insightCount = cleanAnalysisInsightCount(cleanResult);
+
+  if (extraction.extractionFailureReason && extraction.textContent.length < 500) {
+    return "weak";
+  }
+
+  if (extraction.rows.length >= 10 || extraction.textContent.length >= 1_500) {
+    return "strong";
+  }
+
+  if (extraction.rows.length > 0 || extraction.textContent.length >= 300 || insightCount >= 2 || hasMeaningfulModelContent(outputJson)) {
+    return "moderate";
+  }
+
+  return "weak";
+}
+
+function analysisRiskSignals(outputJson: Json, cleanResult: JsonRecord) {
+  const output = isRecord(outputJson) ? outputJson : {};
+  return [
+    str(output.response_markdown),
+    str(output.executive_summary),
+    str(output.summary),
+    ...outputList(output, "recommended_actions"),
+    ...outputList(output, "operational_issues"),
+    ...outputList(output, "unclear_fields"),
+    ...outputList(output, "needs_confirmation"),
+    ...outputList(cleanResult, "recommended_actions"),
+    ...outputList(cleanResult, "operational_issues")
+  ].join(" ");
+}
+
+function businessImpactForAnalysis(outputJson: Json, cleanResult: JsonRecord): FileAnalysisBusinessImpact {
+  const textValue = analysisRiskSignals(outputJson, cleanResult);
+
+  if (/\b(critical|urgent|material risk|legal|regulated|compliance|security|billing|permission|customer data|phi|ephi|social security|medical record|insurance id)\b/i.test(textValue)) {
+    return "high";
+  }
+
+  if (/\b(revenue|financial|invoice|customer|vendor|staffing|inventory|policy|sop|contract|forecast|risk)\b/i.test(textValue)) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function riskLevelForAnalysis(outputJson: Json, cleanResult: JsonRecord): FileAnalysisRiskLevel {
+  const textValue = analysisRiskSignals(outputJson, cleanResult);
+
+  if (/\b(delete|remove records?|drop table|truncate|purge|overwrite|merge customers?|change permissions?|change billing|disable audit|trigger workflow|execute tool|automation|destructive)\b/i.test(textValue)) {
+    return "high";
+  }
+
+  if (/\b(conflict|conflicting|contradict|discrepancy|corrupt|unreadable|unclear|needs confirmation|low confidence)\b/i.test(textValue)) {
+    return "medium";
+  }
+
+  return "low";
+}
+
+function classifyFileAnalysisLearning({
+  outputJson,
+  cleanResult,
+  extraction,
+  existingActiveMemory
+}: {
+  outputJson: Json;
+  cleanResult: JsonRecord;
+  extraction: FileContentExtraction;
+  existingActiveMemory: boolean;
+}): FileAnalysisLearningDecision {
+  const evidenceQuality = evidenceQualityForAnalysis(outputJson, extraction, cleanResult);
+  let confidenceLabel = confidenceLabelFromAnalysis(outputJson, extraction, cleanResult);
+  const businessImpact = businessImpactForAnalysis(outputJson, cleanResult);
+  const riskLevel = riskLevelForAnalysis(outputJson, cleanResult);
+  const riskSignals = analysisRiskSignals(outputJson, cleanResult);
+  const reviewReasons: string[] = [];
+
+  if (confidenceLabel === "High" && evidenceQuality !== "strong") {
+    confidenceLabel = "Medium";
+  }
+
+  if (confidenceLabel === "Low") {
+    reviewReasons.push("Low confidence requires human review.");
+  }
+
+  if (evidenceQuality === "weak") {
+    reviewReasons.push("Evidence quality is weak or extraction was limited.");
+  }
+
+  if (riskLevel === "high") {
+    reviewReasons.push("The result may imply destructive, permission, billing, automation, or record-changing activity.");
+  }
+
+  if (/\b(conflict|conflicting|contradict|discrepancy|corrupt|unreadable|ocr confidence is weak|weak ocr)\b/i.test(riskSignals)) {
+    reviewReasons.push("Evidence appears conflicting, corrupted, unreadable, or weakly extracted.");
+  }
+
+  if (businessImpact === "high") {
+    reviewReasons.push("The source appears to involve high-impact legal, compliance, security, billing, or regulated context.");
+  }
+
+  if (extraction.extractionFailureReason && extraction.textContent.length < 1_000) {
+    reviewReasons.push("Extraction had limitations that should be checked.");
+  }
+
+  if (existingActiveMemory) {
+    reviewReasons.push("This source already has active Business Memory evidence; replacing it requires review.");
+  }
+
+  if (reviewReasons.length) {
+    return {
+      status: "needs_review",
+      confidenceLabel: confidenceLabel === "High" ? "Medium" : confidenceLabel,
+      trustLevel: "needs_review",
+      evidenceQuality,
+      businessImpact,
+      riskLevel,
+      reviewRequired: true,
+      reviewReasons,
+      learningMode: "review_required"
+    };
+  }
+
+  return {
+    status: "auto_learned",
+    confidenceLabel,
+    trustLevel: confidenceLabel === "High" && evidenceQuality === "strong" ? "trusted" : "tentative",
+    evidenceQuality,
+    businessImpact,
+    riskLevel,
+    reviewRequired: false,
+    reviewReasons: [],
+    learningMode: "automatic"
+  };
+}
+
 function spreadsheetRowsAsText(rows: ImportRow[], limit: number) {
   return rows
     .slice(0, limit)
@@ -1626,6 +1868,19 @@ async function runFileVaeroexAnalysis({
   } satisfies FileContentExtraction;
   const summary = summarizeVaeroexOutput(outputJson);
   const cleanResult = cleanAnalysisResult(outputJson, file, finalExtraction);
+  const fileMetadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const existingActiveMemory =
+    file.index_status === "ready" ||
+    str(fileMetadata.latest_analysis_status) === "auto_learned" ||
+    str(fileMetadata.latest_analysis_status) === "approved" ||
+    str(fileMetadata.analysis_review_status) === "auto_learned" ||
+    str(fileMetadata.analysis_review_status) === "approved";
+  let learningDecision = classifyFileAnalysisLearning({
+    outputJson,
+    cleanResult,
+    extraction: finalExtraction,
+    existingActiveMemory
+  });
 
   if (extraction.fileAttachment && !finalTextContent && !hasMeaningfulModelContent(outputJson)) {
     throw new Error(
@@ -1669,6 +1924,50 @@ async function runFileVaeroexAnalysis({
     }
   });
 
+  let indexResult: Awaited<ReturnType<typeof indexFileAnalysisEvidence>> = { indexedChunks: 0, error: undefined };
+  const analysisUpdatedAt = new Date().toISOString();
+
+  if (learningDecision.status === "auto_learned") {
+    await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: analysisUpdatedAt });
+    indexResult = await indexFileAnalysisEvidence({
+      supabase,
+      workspaceId,
+      userId,
+      file,
+      runId: data.id,
+      extractedText: finalExtraction.textContent || extractedTextFromOutput(outputJson) || summary,
+      summary,
+      metadata: {
+        analysis_run_id: data.id,
+        learning_mode: learningDecision.learningMode,
+        review_status: learningDecision.status,
+        trust_level: learningDecision.trustLevel,
+        confidence_label: learningDecision.confidenceLabel,
+        evidence_quality: learningDecision.evidenceQuality,
+        business_impact: learningDecision.businessImpact,
+        risk_level: learningDecision.riskLevel,
+        review_required: learningDecision.reviewRequired,
+        auto_learned_at: analysisUpdatedAt
+      } satisfies Json
+    });
+
+    if (!indexResult.indexedChunks && indexResult.error) {
+      learningDecision = {
+        ...learningDecision,
+        status: "needs_review",
+        trustLevel: "needs_review",
+        reviewRequired: true,
+        reviewReasons: [...learningDecision.reviewReasons, indexResult.error],
+        learningMode: "review_required"
+      };
+    }
+  } else {
+    indexResult = {
+      indexedChunks: 0,
+      error: learningDecision.reviewReasons[0] || "Needs review before Business Memory can use this analysis."
+    };
+  }
+
   await supabase
     .from("file_uploads")
     .update({
@@ -1676,26 +1975,45 @@ async function runFileVaeroexAnalysis({
       analysis_summary: summary,
       processing_status: "ready",
       processing_error: null,
-      processed_at: new Date().toISOString(),
+      processed_at: analysisUpdatedAt,
       metadata_json: {
-        ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
+        ...fileMetadata,
         latest_analysis_run_id: data.id,
-        latest_analysis_status: "completed",
-        latest_analysis_at: new Date().toISOString(),
+        latest_analysis_status: learningDecision.status,
+        analysis_review_status: learningDecision.status,
+        analysis_review_updated_at: analysisUpdatedAt,
+        analysis_review_note:
+          learningDecision.status === "auto_learned"
+            ? learningDecision.trustLevel === "trusted"
+              ? "Vaeroex automatically learned from this source because evidence quality and confidence were strong."
+              : "Vaeroex automatically learned from this source as a medium-confidence directional observation."
+            : "This analysis needs human review before it becomes active Business Memory.",
+        analysis_learning_decision: learningDecision as unknown as Json,
+        business_memory_trust_level: learningDecision.trustLevel,
+        latest_analysis_at: analysisUpdatedAt,
         latest_analysis_prompt: prompt,
         latest_analysis_content_kind: finalExtraction.kind,
         latest_analysis_rows_detected: finalExtraction.rows.length,
         latest_analysis_characters_detected: finalExtraction.textContent.length,
+        latest_analysis_indexed_chunks: indexResult.indexedChunks,
+        latest_analysis_index_error: indexResult.error || null,
         latest_analysis_request_metrics: (requestMetrics || {}) as Json,
         latest_analysis_fallback: {
           used: false,
           reason: null
         },
         latest_analysis_preview: finalExtraction.preview,
-        latest_analysis_output: cleanResult,
+        latest_analysis_output: {
+          ...cleanResult,
+          recommendation_confidence: learningDecision.confidenceLabel,
+          learning_status: learningDecision.status,
+          trust_level: learningDecision.trustLevel,
+          evidence_quality: learningDecision.evidenceQuality,
+          review_required: learningDecision.reviewRequired
+        } satisfies JsonRecord,
         latest_text_extraction: {
           kind: finalExtraction.kind,
-          extracted_at: new Date().toISOString(),
+          extracted_at: analysisUpdatedAt,
           rows_detected: finalExtraction.rows.length,
           columns_detected: finalExtraction.columns,
           character_count: finalExtraction.textContent.length,
@@ -1708,23 +2026,6 @@ async function runFileVaeroexAnalysis({
     .eq("id", file.id)
     .eq("workspace_id", workspaceId);
 
-  const indexResult = await indexFileAnalysisEvidence({
-    supabase,
-    workspaceId,
-    userId,
-    file,
-    runId: data.id,
-    extractedText: finalExtraction.textContent || summary,
-    summary,
-    metadata: {
-      analysis_run_id: data.id,
-      content_kind: finalExtraction.kind,
-      rows_detected: finalExtraction.rows.length,
-      columns_detected: finalExtraction.columns,
-      evidence_retrieval_mode: evidenceContext.retrievalMode
-    }
-  });
-
   return {
     workflow,
     inputJson,
@@ -1733,6 +2034,7 @@ async function runFileVaeroexAnalysis({
     summary,
     extraction: finalExtraction,
     indexResult,
+    learningDecision,
     runId: data.id
   };
 }
@@ -1945,6 +2247,25 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
     redirectWithFileError(error instanceof Error ? error.message : "Saving analysis was blocked by Vaeroex security policy.", file.id);
   }
 
+  await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: savedAt });
+  const indexResult = await indexFileAnalysisEvidence({
+    supabase,
+    workspaceId,
+    userId: user.id,
+    file,
+    runId: runId || null,
+    extractedText: latestExtractedText(file) || extractedTextFromOutput(latestRunOutput) || evidence || summary,
+    summary,
+    metadata: {
+      analysis_run_id: runId || null,
+      review_status: "approved",
+      trust_level: "trusted",
+      learning_mode: "manual_approval",
+      approved_at: savedAt,
+      approved_by: user.id
+    } satisfies Json
+  });
+
   const { error } = await supabase
     .from("file_uploads")
     .update({
@@ -1954,7 +2275,14 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
         business_memory_history: [
           businessMemoryEntry,
           ...(Array.isArray(metadata.business_memory_history) ? metadata.business_memory_history.filter(isRecord).slice(0, 9) : [])
-        ]
+        ],
+        latest_analysis_status: "approved",
+        analysis_review_status: "approved",
+        business_memory_trust_level: "trusted",
+        analysis_review_updated_at: savedAt,
+        analysis_approved_at: savedAt,
+        analysis_approved_by: user.id,
+        latest_analysis_indexed_chunks: indexResult.indexedChunks
       } satisfies Json,
       updated_at: savedAt
     })
@@ -1970,7 +2298,219 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
   revalidatePath("/app/reports");
-  redirectWithMessage("Analysis saved to Business Memory for future Vaeroex context.", file.id);
+  redirectWithMessage("Findings approved and added to Business Memory for future Vaeroex context.", file.id);
+}
+
+function latestAnalysisRunId(file: FileUploadRow) {
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  return str(metadata.latest_analysis_run_id);
+}
+
+function latestAnalysisOutput(file: FileUploadRow) {
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  return isRecord(metadata.latest_analysis_output) ? metadata.latest_analysis_output : {};
+}
+
+function latestExtractedText(file: FileUploadRow) {
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const extraction = isRecord(metadata.latest_text_extraction) ? metadata.latest_text_extraction : {};
+  return str(extraction.extracted_text) || str(extraction.preview) || "";
+}
+
+export async function approveFileAnalysisAction(formData: FormData) {
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const returnPath = safeFileReturnPath(text(formData, "return_path"));
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const runId = text(formData, "run_id") || latestAnalysisRunId(file);
+  const summary = text(formData, "summary") || file.analysis_summary || "Approved file analysis.";
+
+  if (!runId) {
+    redirectWithPathError(returnPath, "Analyze this file before approving findings.", file.id);
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "save_file_analysis_business_memory",
+        args: {
+          fileId: file.id,
+          runId,
+          summary
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: file.id,
+        metadata: {
+          source: "file_analysis_approval",
+          review_status: "approved"
+        } satisfies Json
+      }
+    );
+
+    const { data: latestRun } = await supabase
+      .from("ai_agent_runs")
+      .select("output_json")
+      .eq("id", runId)
+      .eq("workspace_id", workspaceId)
+      .eq("agent_type", "file_analysis")
+      .maybeSingle();
+    const runOutput = latestRun?.output_json || latestAnalysisOutput(file);
+    const approvedAt = new Date().toISOString();
+    const extractedText = latestExtractedText(file) || extractedTextFromOutput(runOutput) || summary;
+
+    await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: approvedAt });
+    const indexResult = await indexFileAnalysisEvidence({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      file,
+      runId,
+      extractedText,
+      summary,
+      metadata: {
+        analysis_run_id: runId,
+        review_status: "approved",
+        trust_level: "trusted",
+        learning_mode: "manual_approval",
+        approved_at: approvedAt,
+        approved_by: user.id
+      } satisfies Json
+    });
+
+    if (!indexResult.indexedChunks && indexResult.error) {
+      throw new Error(indexResult.error);
+    }
+
+    await supabase
+      .from("file_uploads")
+      .update({
+        metadata_json: {
+          ...metadata,
+          latest_analysis_status: "approved",
+          analysis_review_status: "approved",
+          business_memory_trust_level: "trusted",
+          analysis_review_updated_at: approvedAt,
+          analysis_approved_at: approvedAt,
+          analysis_approved_by: user.id,
+          business_memory: {
+            saved: true,
+            saved_at: approvedAt,
+            saved_by: user.id,
+            source: "file_analysis_approval",
+            source_file_id: file.id,
+            source_file_name: file.display_name,
+            run_id: runId,
+            summary,
+            indexed_chunk_count: indexResult.indexedChunks
+          } satisfies JsonObject
+        } satisfies Json,
+        processing_status: "ready",
+        processing_error: null,
+        processed_at: approvedAt,
+        updated_at: approvedAt
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+  } catch (error) {
+    redirectWithPathError(returnPath, error instanceof Error ? error.message : "Findings could not be approved.", file.id);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/agents");
+  redirectWithPathMessage(returnPath, "Findings approved. This source is now available to Business Memory and Ask Vaeroex.", file.id);
+}
+
+export async function discardFileAnalysisAction(formData: FormData) {
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const returnPath = safeFileReturnPath(text(formData, "return_path"));
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const runId = text(formData, "run_id") || latestAnalysisRunId(file);
+
+  if (!runId) {
+    redirectWithPathError(returnPath, "No analysis result was available to discard.", file.id);
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: "delete_generated_insights",
+        args: {
+          runIds: [runId]
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: runId,
+        metadata: {
+          source: "file_analysis_discard",
+          file_id: file.id
+        } satisfies Json
+      }
+    );
+
+    const discardedAt = new Date().toISOString();
+    await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: discardedAt });
+    await supabase
+      .from("ai_agent_runs")
+      .update({
+        deleted_at: discardedAt,
+        status: "failed",
+        error_message: "Analysis discarded by user."
+      })
+      .eq("id", runId)
+      .eq("workspace_id", workspaceId)
+      .eq("agent_type", "file_analysis");
+    await supabase
+      .from("file_uploads")
+      .update({
+        metadata_json: {
+          ...metadata,
+          latest_analysis_status: "discarded",
+          analysis_review_status: "discarded",
+          analysis_review_updated_at: discardedAt,
+          analysis_discarded_at: discardedAt,
+          analysis_discarded_by: user.id,
+          excluded_analysis_run_ids: Array.from(
+            new Set([
+              runId,
+              ...(Array.isArray(metadata.excluded_analysis_run_ids)
+                ? metadata.excluded_analysis_run_ids.filter((item): item is string => typeof item === "string")
+                : [])
+            ])
+          )
+        } satisfies Json,
+        processing_status: "uploaded",
+        processing_error: null,
+        updated_at: discardedAt
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+  } catch (error) {
+    redirectWithPathError(returnPath, error instanceof Error ? error.message : "Analysis could not be discarded.", file.id);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/agents");
+  redirectWithPathMessage(returnPath, "Analysis discarded. It will not be used in future Vaeroex answers.", file.id);
 }
 
 export async function importFileAction(formData: FormData) {
@@ -2649,11 +3189,17 @@ export async function attachFileToReportAction(formData: FormData) {
 
 export async function analyzeFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
+  const returnPath = safeFileReturnPath(text(formData, "return_path"));
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const prompt =
     text(formData, "suggested_prompt") ||
     text(formData, "analysis_prompt") ||
-    "Review this file and explain trends, useful KPIs, visibility gaps, risks, executive recommendations, and an executive summary.";
+    "Analyze only this source file. Extract source-specific facts, readable text, quantities, status signals, risks, opportunities, possible KPIs, unclear fields, and a concise leadership summary. For inventory images, identify item names, readable quantities, possible shortages, possible overstock, and fields that need confirmation. Do not add generic business advice that is not supported by the file.";
+
+  if ((file.processing_status || "") === "processing") {
+    redirectWithPathMessage(returnPath, "Analysis is already running for this source. Refresh shortly to review the result.", file.id);
+  }
+
   const rateLimit = await enforceRateLimit({
     action: "file.analysis",
     limit: 12,
@@ -2665,7 +3211,7 @@ export async function analyzeFileAction(formData: FormData) {
   });
 
   if (!rateLimit.allowed) {
-    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+    redirectWithPathError(returnPath, rateLimitMessage(rateLimit), file.id);
   }
 
   const workflow = getVaeroexWorkflow("file_analysis");
@@ -2700,13 +3246,18 @@ export async function analyzeFileAction(formData: FormData) {
     revalidatePath("/app/reports");
     const insightCount = cleanAnalysisInsightCount(result.cleanResult);
     const limitedContent = result.extraction.kind !== "spreadsheet" && result.extraction.kind !== "image_vision" && result.extraction.textContent.length < 250;
-    const message = insightCount
-      ? `Analysis complete. Vaeroex found ${insightCount} key insight${insightCount === 1 ? "" : "s"} from ${file.display_name}.`
-      : limitedContent
-        ? "Analysis complete, but only limited text was found. Results may be incomplete."
-        : "Analysis complete. Review the Vaeroex result below and choose what to do next.";
+    const message =
+      result.learningDecision.status === "auto_learned"
+        ? insightCount
+          ? `Analysis complete. Vaeroex learned ${insightCount} finding${insightCount === 1 ? "" : "s"} from ${file.display_name} with ${result.learningDecision.confidenceLabel.toLowerCase()} confidence.`
+          : `Analysis complete. Vaeroex added this source to Business Memory with ${result.learningDecision.confidenceLabel.toLowerCase()} confidence.`
+        : insightCount
+          ? `Analysis needs review. Vaeroex found ${insightCount} finding${insightCount === 1 ? "" : "s"}, but confidence or risk requires a human check.`
+          : limitedContent
+            ? "Analysis needs review because only limited text was found."
+            : "Analysis needs review before Business Memory uses it.";
 
-    redirectWithMessage(message, file.id);
+    redirectWithPathMessage(returnPath, message, file.id);
   } catch (error) {
     const message = fileActionErrorMessage(error, "Vaeroex could not analyze the file.", file);
 
@@ -2741,6 +3292,6 @@ export async function analyzeFileAction(formData: FormData) {
     });
 
     revalidatePath(FILES_PATH);
-    redirectWithFileError(message, file.id);
+    redirectWithPathError(returnPath, message, file.id);
   }
 }
