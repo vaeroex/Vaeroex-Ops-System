@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { classifyKpiOverviewIntent, runLightweightKpiOverview } from "@/lib/ai/kpi-overview";
 import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
@@ -24,6 +25,7 @@ type JsonRecord = Record<string, unknown>;
 const ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS = 6_500;
 const ASK_VAEROEX_OPENAI_TIMEOUT_MS = 20_000;
 const ASK_VAEROEX_OPENAI_MAX_RETRIES = 1;
+const ASK_VAEROEX_KPI_OVERVIEW_OPENAI_TIMEOUT_MS = 6_000;
 const ASK_VAEROEX_TERMINAL_SAVE_TIMEOUT_MS = 4_000;
 
 function text(formData: FormData, key: string) {
@@ -210,6 +212,16 @@ function askVaeroexOpenAISettings() {
     ...base,
     timeoutMs: Math.min(base.timeoutMs, ASK_VAEROEX_OPENAI_TIMEOUT_MS),
     maxRetries: Math.min(base.maxRetries, ASK_VAEROEX_OPENAI_MAX_RETRIES)
+  };
+}
+
+function askKpiOverviewOpenAISettings() {
+  const base = getOpenAIRetrySettings();
+
+  return {
+    ...base,
+    timeoutMs: Math.min(base.timeoutMs, ASK_VAEROEX_KPI_OVERVIEW_OPENAI_TIMEOUT_MS),
+    maxRetries: 0
   };
 }
 
@@ -595,6 +607,108 @@ export async function runVaeroexAction(formData: FormData) {
       }
       logVaeroexRunEvent("usage_limit_finished", logDetails({ allowed: true }));
 
+      currentStage = "intent_detection";
+      logVaeroexRunEvent("intent_detection_started", logDetails());
+      const intentStartedAt = Date.now();
+      const kpiOverviewIntent = workflow.key === "ask_vaeroex" ? classifyKpiOverviewIntent(userPrompt) : { matched: false, requiresRetrieval: false, reason: "non_ask_workflow" };
+      const intentClassificationMs = Date.now() - intentStartedAt;
+      logVaeroexRunEvent("intent_detection_finished", logDetails({
+        durationMs: intentClassificationMs,
+        kpiOverviewMatched: kpiOverviewIntent.matched,
+        requiresRetrieval: kpiOverviewIntent.requiresRetrieval,
+        reason: kpiOverviewIntent.reason
+      }));
+
+      if (kpiOverviewIntent.matched) {
+        currentStage = "lightweight_kpi_overview";
+        logVaeroexRunEvent("lightweight_kpi_overview_started", logDetails({
+          reason: kpiOverviewIntent.reason
+        }));
+        const kpiOverview = await runLightweightKpiOverview({
+          supabase,
+          workspaceId,
+          userPrompt,
+          intentClassificationMs,
+          openAISettings: askKpiOverviewOpenAISettings(),
+          stageLogger: (event, details = {}) => logVaeroexRunEvent(event, logDetails(details))
+        });
+        workspaceSnapshot = kpiOverview.workspaceSnapshot;
+        const kpiOverviewInputs = {
+          ...extraInputs,
+          ...kpiOverview.extraInputs
+        } satisfies Json;
+        inputJson = buildInputJson(workflow.key, userPrompt, kpiOverviewInputs, workspaceSnapshot);
+
+        currentStage = "run_save";
+        logVaeroexRunEvent("run_save_started", logDetails({
+          workflowPath: "lightweight_kpi_overview",
+          fallbackUsed: kpiOverview.diagnostics.fallback_used,
+          totalDurationMs: kpiOverview.diagnostics.total_ms
+        }));
+        if (!runId) {
+          throw new Error("Vaeroex run record was not available for saving.");
+        }
+        const completedOutputJson = withRunDiagnostics(
+          {
+            ...(isRecord(kpiOverview.outputJson) ? kpiOverview.outputJson : { response_markdown: String(kpiOverview.outputJson || "") }),
+            vaeroex_run_diagnostics: kpiOverview.diagnostics
+          } as Json,
+          runDiagnostics({
+            requestId,
+            status: "completed",
+            finalStage: "completed",
+            details: {
+              workflow: workflow.key,
+              workflow_path: "lightweight_kpi_overview",
+              intent_classification_ms: kpiOverview.diagnostics.intent_classification_ms,
+              kpi_query_ms: kpiOverview.diagnostics.kpi_query_ms,
+              retrieval_ms: kpiOverview.diagnostics.retrieval_ms,
+              prompt_construction_ms: kpiOverview.diagnostics.prompt_construction_ms,
+              openai_ms: kpiOverview.diagnostics.openai_ms,
+              total_ms: kpiOverview.diagnostics.total_ms,
+              estimated_context_tokens: kpiOverview.diagnostics.estimated_context_tokens,
+              openai_attempted: kpiOverview.diagnostics.openai_attempted,
+              fallback_used: kpiOverview.diagnostics.fallback_used,
+              fallback_reason: kpiOverview.diagnostics.fallback_reason
+            }
+          })
+        );
+        const savedRunId = await updateRunRecord({
+          supabase,
+          workspaceId,
+          runId,
+          inputJson,
+          outputJson: completedOutputJson,
+          status: "completed",
+          errorMessage: null
+        });
+        logVaeroexRunEvent("run_saved", logDetails({ status: "completed", runId: savedRunId, workflowPath: "lightweight_kpi_overview" }));
+
+        if (kpiOverview.usage) {
+          currentStage = "usage_record";
+          logVaeroexRunEvent("usage_record_started", logDetails({ runId: savedRunId, workflowPath: "lightweight_kpi_overview" }));
+          await recordVaeroexAiUsage({
+            supabase,
+            workspaceId,
+            userId: user.id,
+            agentType: workflow.key,
+            usage: {
+              ...kpiOverview.usage,
+              metadata: {
+                ...(isRecord(kpiOverview.usage.metadata) ? kpiOverview.usage.metadata : {}),
+                workflow_path: "lightweight_kpi_overview",
+                fallback_used: kpiOverview.diagnostics.fallback_used,
+                estimated_context_tokens: kpiOverview.diagnostics.estimated_context_tokens
+              }
+            }
+          });
+          logVaeroexRunEvent("usage_record_finished", logDetails({ runId: savedRunId, workflowPath: "lightweight_kpi_overview" }));
+        }
+
+        currentStage = "redirect";
+        revalidatePath("/app/agents");
+        destination = `/app/agents?run=${savedRunId}`;
+      } else {
       currentStage = "workspace_snapshot";
       logVaeroexRunEvent("workspace_snapshot_started", logDetails());
       workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
@@ -708,6 +822,7 @@ export async function runVaeroexAction(formData: FormData) {
       currentStage = "redirect";
       revalidatePath("/app/agents");
       destination = `/app/agents?run=${savedRunId}`;
+      }
     }
   } catch (error) {
     const message = cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined);
