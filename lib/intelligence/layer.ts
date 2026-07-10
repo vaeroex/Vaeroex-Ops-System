@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/types";
+import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -35,6 +36,20 @@ export type IntelligenceLayerResult = {
     reason: string;
     suggestedNextData: string[];
   };
+  forecastReadiness: Pick<
+    KpiForecastEligibilitySummary,
+    | "state"
+    | "label"
+    | "reason"
+    | "ready"
+    | "directional"
+    | "currentKpiCount"
+    | "totalMeasurementCount"
+    | "readyKpiCount"
+    | "directionalKpiCount"
+    | "historicalDepthLabel"
+    | "freshnessLabel"
+  >;
   topRisk?: IntelligenceInsight;
   topOpportunity?: IntelligenceInsight;
   topRecommendation?: IntelligenceInsight;
@@ -187,12 +202,14 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const latestKpis = latestKpisByName(kpis);
   const historyCounts = kpiHistoryCounts(kpis);
+  const forecastEligibility = buildKpiForecastEligibility(kpis);
   const belowTargetKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
   const improvingKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value >= kpi.target);
   const pendingImports = imports.filter((item) => !["completed", "imported"].includes(lower(item.status)));
   const failedRuns = vaeroexRuns.filter((run) => run.status === "failed");
   const completedRuns = vaeroexRuns.filter((run) => run.status === "completed");
-  const forecastReadyKpis = latestKpis.filter((kpi) => (historyCounts.get(kpi.name) || 0) >= 4);
+  const forecastReadyMetricNames = new Set(forecastEligibility.metrics.filter((metric) => metric.state === "ready").map((metric) => metric.name.toLowerCase()));
+  const forecastReadyKpis = latestKpis.filter((kpi) => forecastReadyMetricNames.has(kpi.name.toLowerCase()));
   const staleSops = sops.filter((sop) => {
     const date = new Date(sop.updated_at || sop.created_at);
     const ageDays = (Date.now() - date.getTime()) / 86400000;
@@ -459,6 +476,19 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
             ? "Based on available workspace records, but more history would improve confidence."
             : "Not enough workspace history exists for high-confidence intelligence yet.",
       suggestedNextData: suggestedNextData.length ? suggestedNextData : ["Keep adding current reports, outcomes, and KPI history."]
+    },
+    forecastReadiness: {
+      state: forecastEligibility.state,
+      label: forecastEligibility.label,
+      reason: forecastEligibility.reason,
+      ready: forecastEligibility.ready,
+      directional: forecastEligibility.directional,
+      currentKpiCount: forecastEligibility.currentKpiCount,
+      totalMeasurementCount: forecastEligibility.totalMeasurementCount,
+      readyKpiCount: forecastEligibility.readyKpiCount,
+      directionalKpiCount: forecastEligibility.directionalKpiCount,
+      historicalDepthLabel: forecastEligibility.historicalDepthLabel,
+      freshnessLabel: forecastEligibility.freshnessLabel
     },
     topRisk,
     topOpportunity,

@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/types";
+import { buildKpiForecastEligibility, type KpiForecastReadinessState } from "@/lib/kpis/forecast-eligibility";
 
 type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 
@@ -58,8 +59,16 @@ export type BusinessIntelligenceCoverageResult = {
   recommendedNextUpload: string;
   forecastReadiness: {
     ready: boolean;
+    directional: boolean;
+    state: KpiForecastReadinessState;
     label: string;
     reason: string;
+    currentKpiCount: number;
+    totalMeasurementCount: number;
+    readyKpiCount: number;
+    directionalKpiCount: number;
+    historicalDepthLabel: string;
+    freshnessLabel: string;
   };
 };
 
@@ -513,7 +522,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   const weakestCategories = categories.filter((item) => item.coverage < 46).sort((a, b) => a.coverage - b.coverage).slice(0, 5);
   const dataGaps = weakestCategories.map((item) => `${item.label}: ${item.reason}`);
   const nextCategory = weakestCategories[0] || categories.sort((a, b) => a.coverage - b.coverage)[0];
-  const historical = categories.find((item) => item.id === "historical_trends");
+  const forecastEligibility = buildKpiForecastEligibility(input.kpis || []);
 
   return {
     overallCoverage,
@@ -530,11 +539,17 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     dataGaps: dataGaps.length ? dataGaps : ["No major coverage gap is visible, but Vaeroex still benefits from updated source data and outcome history."],
     recommendedNextUpload: nextCategory?.recommendedNextUpload || NEXT_UPLOADS.business_memory,
     forecastReadiness: {
-      ready: Boolean(historical?.forecastReady),
-      label: historical?.forecastReady ? "Forecast support available" : "Not enough data to forecast reliably",
-      reason: historical?.forecastReady
-        ? "Multiple structured historical sources are available across enough months for directional trend support."
-        : "Vaeroex needs multiple months of structured KPI, financial, customer, or operating history before forecasting responsibly."
+      ready: forecastEligibility.ready,
+      directional: forecastEligibility.directional,
+      state: forecastEligibility.state,
+      label: forecastEligibility.label,
+      reason: forecastEligibility.reason,
+      currentKpiCount: forecastEligibility.currentKpiCount,
+      totalMeasurementCount: forecastEligibility.totalMeasurementCount,
+      readyKpiCount: forecastEligibility.readyKpiCount,
+      directionalKpiCount: forecastEligibility.directionalKpiCount,
+      historicalDepthLabel: forecastEligibility.historicalDepthLabel,
+      freshnessLabel: forecastEligibility.freshnessLabel
     }
   };
 }

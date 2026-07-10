@@ -134,8 +134,8 @@ export default async function IntelligencePage() {
     },
     {
       label: "Forecast Summary",
-      value: topForecast?.title || "Forecast not ready",
-      detail: topForecast ? compactText(topForecast.summary, "Forecast signal available.", 96) : "Vaeroex needs more historical data before forecasting responsibly."
+      value: topForecast?.title || intelligence.forecastReadiness.label,
+      detail: topForecast ? compactText(topForecast.summary, "Forecast signal available.", 96) : compactText(intelligence.forecastReadiness.reason, "Forecast history is still building.", 120)
     },
     {
       label: "Recommended Next Action",

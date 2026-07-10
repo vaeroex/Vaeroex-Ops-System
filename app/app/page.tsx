@@ -1016,7 +1016,7 @@ function IntelligenceLayerSummary({
       : "Executive Recommendation: add source data",
     intelligence.topForecast
       ? `Forecast signal: ${intelligence.topForecast.title}. Confidence: ${intelligence.topForecast.confidence}`
-      : "Forecast signal: not enough history for a reliable forecast"
+      : `Forecast readiness: ${intelligence.forecastReadiness.label}. ${intelligence.forecastReadiness.reason}`
   ];
 
   return (
@@ -1093,7 +1093,7 @@ function IntelligenceLayerSummary({
             </div>
             <ContextualAskVaeroex
               label="Explain This"
-              prompt="Explain the current Home briefing for leadership. Include these sections: Executive Interpretation; Business Relationships connecting Top Risk, Top Opportunity, and Executive Recommendation; Root Cause; Business Impact if ignored; Confidence with High, Medium, or Low and why; Evidence Used from KPIs, Business Memory, uploaded files, reports, and signals; Predicted Trend for 30 days, 90 days, and 6 months only if confidence supports it, otherwise state there is not enough historical data to produce a reliable forecast; What Leadership Should Review with one clear recommendation. Keep it concise, practical, and tied to the current briefing."
+              prompt="Explain the current Home briefing for leadership. Include these sections: Executive Interpretation; Business Relationships connecting Top Risk, Top Opportunity, and Executive Recommendation; Root Cause; Business Impact if ignored; Confidence with High, Medium, or Low and why; Evidence Used from KPIs, Business Memory, uploaded files, reports, and signals; Predicted Trend for 30 days, 90 days, and 6 months only if confidence supports it, otherwise state that forecast history is still building while preserving any current KPI data that exists; What Leadership Should Review with one clear recommendation. Keep it concise, practical, and tied to the current briefing."
               contextType="home_leadership_briefing"
               contextId="home-what-leadership-should-know-now"
               sourceTitle="What leadership should know now"

@@ -13,6 +13,7 @@ import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
+import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import {
   applyKpiSettingsToRows,
   getConfiguredMetricNames,
@@ -1147,6 +1148,7 @@ function comparisonContext({
   const recordCount = trends.reduce((count, trend) => count + trendActualValues(trend).length, 0);
   const actualRange = trendDateRange(trends);
   const confidence = comparisonConfidence({ trends, dataQualityScore, memoryCount });
+  const forecast = buildKpiForecastEligibility(trends.flatMap((trend) => trend.rows));
   const comparedKpis = trends.map((trend) => trend.name).filter(Boolean);
   const historicalCoverage = actualRange
     ? `${monthsBetween(actualRange.startDate, actualRange.endDate)} month${monthsBetween(actualRange.startDate, actualRange.endDate) === 1 ? "" : "s"} (${formatLongDate(actualRange.startDate)} - ${formatLongDate(actualRange.endDate)})`
@@ -1156,11 +1158,15 @@ function comparisonContext({
     timeframe: timeframeDisplay(range),
     recordCount,
     comparedKpis,
+    currentKpiAvailability: forecast.currentAvailabilityLabel,
     historicalCoverage,
-    forecastConfidence: confidence.forecastConfidence,
+    historicalDepth: forecast.historicalDepthLabel,
+    measurementFreshness: forecast.freshnessLabel,
+    forecastReadiness: forecast,
+    forecastConfidence: forecast.label,
     confidenceLabel: confidence.label,
     confidenceScore: confidence.score,
-    dataLimitations: confidence.limitations,
+    dataLimitations: `${forecast.reason} ${confidence.limitations}`,
     businessMemoryCoverage: `${memoryCount} memory signal${memoryCount === 1 ? "" : "s"} available; data quality ${dataQualityScore}/100`
   };
 }
@@ -1277,12 +1283,20 @@ function ComparisonDataContext({
           <dd className="mt-1 text-white">{context.comparedKpis.join(", ") || "None selected"}</dd>
         </div>
         <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Historical coverage</dt>
-          <dd className="mt-1 text-white">{context.historicalCoverage}</dd>
+          <dt className="font-semibold text-slate-400">Current KPI data</dt>
+          <dd className="mt-1 text-white">{context.currentKpiAvailability}</dd>
         </div>
         <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Forecast confidence</dt>
-          <dd className="mt-1 text-white">{context.forecastConfidence} ({context.confidenceScore}/100)</dd>
+          <dt className="font-semibold text-slate-400">Historical depth</dt>
+          <dd className="mt-1 text-white">{context.historicalDepth}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">Measurement freshness</dt>
+          <dd className="mt-1 text-white">{context.measurementFreshness}</dd>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
+          <dt className="font-semibold text-slate-400">Forecast readiness</dt>
+          <dd className="mt-1 text-white">{context.forecastConfidence} ({context.confidenceScore}/100 comparison score)</dd>
         </div>
         <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
           <dt className="font-semibold text-slate-400">Business Memory used</dt>
@@ -1309,8 +1323,11 @@ function ComparisonAnalysis({
     `KPIs compared: ${context.comparedKpis.join(", ") || "None"}`,
     `Comparison mode: ${mode}`,
     `KPI records: ${context.recordCount}`,
+    `Current KPI data: ${context.currentKpiAvailability}`,
     `Historical coverage: ${context.historicalCoverage}`,
-    `Forecast confidence: ${context.forecastConfidence}; confidence score ${context.confidenceScore}/100`,
+    `Historical depth: ${context.historicalDepth}`,
+    `Measurement freshness: ${context.measurementFreshness}`,
+    `Forecast readiness: ${context.forecastConfidence}; comparison score ${context.confidenceScore}/100`,
     `Business Memory coverage: ${context.businessMemoryCoverage}`,
     `Data limitations: ${context.dataLimitations}`,
     ...trends.map((trend) => `${trend.name}: ${percentChangeLabel(trend)}; latest ${formatNumericValue(trend.latest?.actual_value, trend.name)}; records ${trendActualValues(trend).length}`)

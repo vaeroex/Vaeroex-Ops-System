@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import type { Database } from "@/lib/supabase/types";
 
@@ -196,6 +197,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
   ]);
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
   const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(recentKpis.data ?? [], kpiSettingRows), kpiSettingRows);
+  const kpiForecastReadiness = buildKpiForecastEligibility(recentKpiRows as Database["public"]["Tables"]["kpis"]["Row"][]);
   const recentFileRows = recentFiles.data ?? [];
   const recentLeadRows = recentCrmLeads.data ?? [];
   const recentTaskRows = recentTasks.data ?? [];
@@ -215,6 +217,17 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     kpi_dashboard: {
       exists: true,
       records: kpiCount.count ?? 0,
+      current_kpis: kpiForecastReadiness.currentKpiCount,
+      forecast_readiness: {
+        state: kpiForecastReadiness.state,
+        label: kpiForecastReadiness.label,
+        reason: kpiForecastReadiness.reason,
+        current_kpis: kpiForecastReadiness.currentKpiCount,
+        historical_depth: kpiForecastReadiness.historicalDepthLabel,
+        measurement_freshness: kpiForecastReadiness.freshnessLabel,
+        ready_kpis: kpiForecastReadiness.readyKpiCount,
+        directional_kpis: kpiForecastReadiness.directionalKpiCount
+      },
       metric_names: uniqueStrings(recentKpiRows.map((kpi) => kpi.name)),
       categories: uniqueStrings(recentKpiRows.map((kpi) => kpi.category)),
       settings: kpiSettingRows.map((setting) => ({
@@ -307,6 +320,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     workspace_awareness_rules: [
       "Do not recommend creating a Vaeroex module that already exists in module_state.",
       "If a module exists, treat it as source context for analysis and recommend leadership review, evidence gathering, or portable documents.",
+      "Distinguish current KPI availability from forecast readiness. Current KPI records can support visibility even when dated history is still insufficient for responsible forecasting.",
       "Treat Business Signals as evidence, observations, and strategic context. Mention Business Signal patterns only as evidence for Business Memory, risks, opportunities, predictions, confidence, or executive briefings.",
       "Mention the specific existing workspace records, counts, gaps, Business Signals, stale items, file analyses, reports, KPIs, customer pipeline records, SOPs, checklists, issues, assets, or people records that support the recommendation.",
       "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Leadership Review, Business Risk, Dashboard / KPI Improvement, Customer Pipeline / Revenue Improvement, SOP / Process Improvement, or File / Report Review.",
@@ -323,6 +337,9 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       form_submissions: submissions.count ?? 0,
       uploaded_files: fileCount.count ?? 0,
       kpi_history_records: kpiCount.count ?? 0,
+      current_kpis: kpiForecastReadiness.currentKpiCount,
+      forecast_ready_kpis: kpiForecastReadiness.readyKpiCount,
+      directional_forecast_kpis: kpiForecastReadiness.directionalKpiCount,
       crm_leads: crmLeadCount.count ?? 0,
       operational_metrics: operationalMetricCount.count ?? 0,
       forms: formCount.count ?? 0,
