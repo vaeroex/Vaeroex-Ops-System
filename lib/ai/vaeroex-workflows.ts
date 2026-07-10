@@ -233,21 +233,21 @@ ${sharedJsonInstructions}
   {
     key: "file_analysis",
     title: "File Analysis",
-    description: "Review uploaded file content and turn it into plain-language trends, KPI ideas, risks, and executive summaries.",
+    description: "Review uploaded file content and identify source-backed observations with conservative confidence.",
     actionLabel: "Analyze file",
-    promptPlaceholder: "What trends, KPIs, problems, and executive summary should Vaeroex pull from this file?",
+    promptPlaceholder: "What source-backed observations should Vaeroex learn from this file?",
     saveTargets: ["report"],
     instructions: `
-Analyze the uploaded file content and workspace context. The file may be parsed spreadsheet rows, extracted PDF text, extracted DOCX text, a PDF file attached directly for document reading, or a PNG/JPG image attached for OCR and visual analysis.
-Return a polished business-owner-friendly result with executive_summary, extracted_text, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, suggested_systems, and response_markdown.
-For images, perform OCR when readable text is visible and also describe relevant visual business context, visible problems, risks, or execution clues.
+Analyze the uploaded file content first. The file may be parsed spreadsheet rows, extracted PDF text, extracted DOCX text, a PDF file attached directly for document reading, or a PNG/JPG image attached for OCR and visual analysis.
+Return a concise source-backed result with executive_summary, extracted_text, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, opportunities, unclear_fields, confidence, and response_markdown.
+For images, perform OCR when readable text is visible and describe only business context visible in the image. For inventory images, extract item names, readable quantities, stock status, possible shortages, possible overstock, and unclear/unreadable fields.
 For PDFs attached directly, extract readable text when possible and explain clearly if the PDF appears scanned, image-based, locked, corrupted, or otherwise unreadable.
-Compare the new file against prior KPI history, file imports, CRM lead history, and business metrics when those are available.
-Call out trends over time, anomalies, bottlenecks, KPIs worth tracking, visibility gaps that stand out, possible data quality concerns, and practical next steps.
+Use workspace context only to interpret the source. Do not invent missing values, quantities, customers, KPIs, history, or conclusions that are not visible in the file or provided by retrieved evidence.
+Call out trends over time, anomalies, KPIs worth tracking, visibility gaps, possible data quality concerns, and practical next steps only when the source supports them.
 Do not repeat raw rows, long document excerpts, or technical JSON in the user-facing answer.
-For report-style answers, use these visible sections: Executive Summary, Extracted Findings, KPIs Found, Risks, Issues, Executive Recommendations, Source File.
-If the file suggests action, explain what leadership should review and which supporting document would help.
-If the file suggests KPIs, reports, or customer pipeline updates, reference the relevant source context and make clear the user's existing systems remain the execution layer.
+For report-style answers, use these visible sections: Analysis Summary, Findings, KPIs Found, Risks, Opportunities, Needs Confirmation, Source File.
+If the file suggests action, phrase it as what leadership should review. Do not create tasks, ownership, CRM records, workflows, or generic management recommendations.
+If evidence is unclear, say what needs confirmation instead of guessing.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
