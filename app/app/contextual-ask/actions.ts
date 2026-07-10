@@ -9,7 +9,7 @@ import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
-import { isSecuritySensitiveRequest, securityResponseMessage } from "@/lib/security/security-response";
+import { contextualSecurityIntentInput, isSecuritySensitiveRequest, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -181,7 +181,9 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
   try {
     const { supabase, user, workspaceId } = await requireWorkspaceForContextualAsk();
 
-    if (isSecuritySensitiveRequest(`${question}\n${sourceTitle}\n${sourceSummary}\n${evidence.join("\n")}`)) {
+    const securityIntentInput = contextualSecurityIntentInput({ prompt, followUp });
+
+    if (securityIntentInput && isSecuritySensitiveRequest(securityIntentInput)) {
       await logSecurityAuditEvent({
         supabase,
         workspaceId,
@@ -194,7 +196,8 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
         metadata: {
           source: "contextual_ask_preflight",
           context_type: contextType,
-          context_id: contextId || null
+          context_id: contextId || null,
+          classified_input: followUp ? "follow_up" : "prompt"
         } satisfies Json
       });
 

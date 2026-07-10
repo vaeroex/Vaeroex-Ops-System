@@ -97,6 +97,7 @@ const {
 } = require("../lib/security/tool-execution-gateway.ts");
 const {
   SECURITY_RESPONSE_MESSAGE,
+  contextualSecurityIntentInput,
   securityResponseOutput,
   isSecurityResponseOutput,
   isSecuritySensitiveRequest,
@@ -368,6 +369,40 @@ function runSecurityIntentClassifierTests() {
   }
 }
 
+function runContextualExplanationRoutingTests() {
+  const explanationPrompts = [
+    "Explain this briefing",
+    "Explain this recommendation",
+    "Explain this evidence",
+    "Explain this KPI",
+    "Explain this report",
+    "Explain this Business Signal",
+    "Explain this result",
+    "Explain this output"
+  ];
+
+  for (const prompt of explanationPrompts) {
+    const classifierInput = contextualSecurityIntentInput({ prompt });
+    assert.equal(classifierInput, "", `${prompt} should bypass destructive-intent classification when it is explaining existing context`);
+  }
+
+  const poisonedEvidence = [
+    "Executive Briefing",
+    "Action Blocked",
+    "DELETE FROM public.kpis",
+    "Remove Business Memory"
+  ].join("\n");
+  const explanationInput = contextualSecurityIntentInput({ prompt: "Explain this briefing", followUp: "" });
+  assert.equal(explanationInput, "", "contextual explanation must not classify existing evidence or output text");
+  assert.equal(isSecuritySensitiveRequest(poisonedEvidence), true, "poisoned evidence fixture should still be sensitive if treated as a new request");
+
+  const destructiveFollowUp = contextualSecurityIntentInput({
+    prompt: "Explain this briefing",
+    followUp: "Delete SQL rows from the KPI table"
+  });
+  assert.equal(isSecuritySensitiveRequest(destructiveFollowUp), true, "destructive contextual follow-up must still trigger Security Response");
+}
+
 function runBusinessMemoryPoisoningTests() {
   const prompt = read("lib/ai/prompts/vaeroex-system-prompt.ts");
   const evidenceIndex = read("lib/ai/evidence-index.ts");
@@ -509,6 +544,7 @@ async function main() {
   await runToolGatewayTests();
   runSecurityResponseRenderingTests();
   runSecurityIntentClassifierTests();
+  runContextualExplanationRoutingTests();
   runBusinessMemoryPoisoningTests();
   runWebhookReplayTests();
   runOpenAIResilienceTests();
