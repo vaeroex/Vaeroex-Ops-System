@@ -42,6 +42,9 @@ type CollectionConfig = {
   fields: EditableField[];
 };
 
+const RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE =
+  "Customer record management in Vaeroex has been retired. Existing customer activity rows are historical evidence only; use Sources or external system integrations for new customer information.";
+
 const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
   forms: {
     table: "forms",
@@ -205,7 +208,7 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
   },
   crm_leads: {
     table: "crm_leads",
-    path: "/app/crm",
+    path: "/app/sources",
     titleField: "lead_name",
     fields: [
       { name: "lead_name", kind: "requiredText", maxLength: 180 },
@@ -278,6 +281,12 @@ function redirectWithError(path: Route | string, message: string): never {
 
 function redirectWithMessage(path: Route | string, message: string): never {
   redirect(`${path}?message=${encodeURIComponent(message)}` as Route);
+}
+
+function assertMutationAllowed(collection: ManagedCollection, path: Route | string) {
+  if (collection === "crm_leads") {
+    redirectWithError(path, RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE);
+  }
 }
 
 function friendlyMutationError(message: string | undefined, fallback: string) {
@@ -428,6 +437,7 @@ export async function createRecordFolderAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
+  assertMutationAllowed(collection, path);
   const { supabase, user, workspaceId } = await requireWorkspace(path);
   const folderName = text(formData, "folder_name");
 
@@ -454,6 +464,7 @@ export async function renameRecordFolderAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
+  assertMutationAllowed(collection, path);
   const { supabase, workspaceId } = await requireWorkspace(path);
   const folderId = text(formData, "folder_id");
   const folderName = text(formData, "folder_name");
@@ -481,6 +492,7 @@ export async function archiveRecordFolderAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
+  assertMutationAllowed(collection, path);
   const { supabase, workspaceId } = await requireWorkspace(path);
   const folderId = text(formData, "folder_id");
 
@@ -503,6 +515,7 @@ export async function updateManagedRecordAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
+  assertMutationAllowed(collection, path);
   const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const recordId = text(formData, "record_id");
   const update: Record<string, unknown> = {};
@@ -585,6 +598,7 @@ export async function manageRecordAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
+  assertMutationAllowed(collection, path);
   const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const recordId = text(formData, "record_id");
   const action = text(formData, "record_action");
@@ -727,6 +741,7 @@ export async function bulkManageRecordsAction(formData: FormData) {
   const collection = collectionFromForm(formData);
   const config = COLLECTIONS[collection];
   const path = returnPath(formData, config.path);
+  assertMutationAllowed(collection, path);
   const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const ids = formData.getAll("record_id").filter((value): value is string => typeof value === "string" && Boolean(value));
   const action = text(formData, "bulk_action");

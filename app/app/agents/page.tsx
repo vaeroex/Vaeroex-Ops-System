@@ -252,7 +252,7 @@ function workflowDataUsed(key: VaeroexWorkflowKey) {
   }
 
   if (key === "weekly_report" || key === "daily_summary" || key === "business_review_package") {
-    return "KPIs, Business Signals, issues, customer pipeline context, reports, Vaeroex runs";
+    return "KPIs, Business Signals, issues, customer activity evidence, reports, Vaeroex runs";
   }
 
   if (key === "sop_generator" || key === "form_builder" || key === "checklist_builder") {
@@ -542,7 +542,7 @@ function inferRelatedModule(text: string) {
   const normalized = text.toLowerCase();
 
   if (normalized.includes("kpi") || normalized.includes("metric") || normalized.includes("revenue")) return "KPIs";
-  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "Customer Context";
+  if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "Customer Evidence";
   if (normalized.includes("sop") || normalized.includes("procedure")) return "SOPs";
   if (normalized.includes("checklist")) return "Checklists";
   if (normalized.includes("report") || normalized.includes("briefing")) return "Briefings";
@@ -555,8 +555,8 @@ function moduleHref(moduleName: string): Route {
   const normalized = moduleName.toLowerCase();
 
   if (normalized.includes("kpi")) return "/app/kpis";
-  if (normalized.includes("crm")) return "/app/crm";
-  if (normalized.includes("customer")) return "/app/crm";
+  if (normalized.includes("crm")) return "/app/sources";
+  if (normalized.includes("customer")) return "/app/sources";
   if (normalized.includes("sop")) return "/app/sops";
   if (normalized.includes("checklist")) return "/app/checklists";
   if (normalized.includes("report") || normalized.includes("briefing")) return "/app/briefings" as Route;
@@ -1180,10 +1180,10 @@ function softenAskAnswerText(value: string) {
     .replace(/^There is (currently )?(very )?limited (information|evidence|financial history|context)[^.]*\.\s*/i, "")
     .replace(/^There is not enough (workspace |question-specific )?evidence[^.]*\.\s*/i, "")
     .replace(/^Leadership should review\s+([^.\n]+)\.?/i, "$1 needs leadership attention.")
-    .replace(/\bReview Customer Pipeline\b/g, "Customer pipeline needs leadership attention")
+    .replace(/\bReview Customer\s+Pipeline\b/g, "Customer activity evidence needs leadership attention")
     .replace(/\bAddress Overdue Tasks\b/g, "Overdue activity needs leadership review")
     .replace(/\bEnhance Follow-Up\b/g, "Follow-up quality may need attention")
-    .replace(/\bCreate CRM follow-up task list\b/gi, "Review the customer follow-up process")
+    .replace(/\bCreate\s+CRM follow-up task list\b/gi, "Review customer response evidence")
     .replace(/\bAssign owner\b/gi, "Review with the responsible leader")
     .replace(/\bCreate follow-up\b/gi, "Decide whether a leadership review is needed")
     .replace(/\n{3,}/g, "\n\n")
@@ -1195,7 +1195,7 @@ function softenAskAnswerText(value: string) {
 function evidenceSourceLabel(item: string) {
   const normalized = item.toLowerCase();
 
-  if (/crm|pipeline|lead|customer|follow-up|follow up/.test(normalized)) return "CRM Pipeline";
+  if (/crm|pipeline|lead|customer|follow-up|follow up/.test(normalized)) return "Customer Evidence";
   if (/kpi|metric|revenue|target|trend|history|forecast|score/.test(normalized)) return "KPI History";
   if (/business signal|signal|business memory|memory/.test(normalized)) return "Business Signals";
   if (/report|brief|briefing|review/.test(normalized)) return "Reports";

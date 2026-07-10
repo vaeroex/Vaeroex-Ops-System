@@ -131,7 +131,7 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
                 <div className="rounded-lg border border-line bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Usage</p>
                   <p className="mt-2 text-lg font-semibold">{usage} records</p>
-                  <p className="mt-1 text-xs text-muted">KPIs, CRM, files, tasks, Vaeroex runs, reports</p>
+                  <p className="mt-1 text-xs text-muted">KPIs, customer evidence, files, Business Signals, Vaeroex runs, reports</p>
                 </div>
                 <div className="rounded-lg border border-line bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Customer status</p>

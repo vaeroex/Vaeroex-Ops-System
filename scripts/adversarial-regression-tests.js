@@ -595,6 +595,108 @@ function runKpiForecastEligibilityTests() {
   assert.equal(noKpiForecast.state, "no_kpi_data", "empty KPI workspace should report no KPI data");
 }
 
+function runLegacyCrmLanguageTests() {
+  const generatedOutputFiles = [
+    "lib/intelligence/layer.ts",
+    "lib/intelligence/prestige.ts",
+    "lib/intelligence/coverage.ts",
+    "lib/ai/workspace-snapshot.ts",
+    "lib/ai/vaeroex-workflows.ts",
+    "lib/ai/prompts/vaeroex-system-prompt.ts",
+    "app/app/page.tsx",
+    "app/app/agents/page.tsx",
+    "app/app/files/actions.ts",
+    "app/app/reports/actions.ts",
+    "lib/reports/scheduled-generator.ts",
+    "lib/demo/workspace-demo.ts"
+  ];
+  const publicExperienceFiles = [
+    "components/motion/OperationsIntelligenceEngineDemo.tsx",
+    "components/motion/ScrollStory.tsx",
+    "components/intelligence/PrestigeOperationsPanel.tsx",
+    "app/app/crm/page.tsx",
+    "app/api/search/route.ts",
+    "lib/search/types.ts",
+    "lib/help/content.ts"
+  ];
+  const legacyPatterns = [
+    /estimated value with limited recent customer activity/i,
+    /Customer Pipeline/i,
+    /CRM Pipeline/i,
+    /CRM leads?/i,
+    /CRM history/i,
+    /lead history/i,
+    /Leads created/i,
+    /Leads converted/i,
+    /Review lead/i,
+    /Lead response/i,
+    /Potential pipeline value/i,
+    /Leads may be leaking/i,
+    /customer pipeline records/i,
+    /customer pipeline context/i,
+    /pipeline records/i,
+    /pipeline context/i
+  ];
+  const publicLegacyPatterns = [
+    /["'`]CRM["'`]/,
+    /Lead quality/i,
+    /Pipeline movement/i,
+    /Sales Pipeline/i,
+    /opportunity stage/i,
+    /sales stage/i
+  ];
+
+  for (const filePath of generatedOutputFiles) {
+    const source = read(filePath);
+
+    for (const pattern of legacyPatterns) {
+      assert.doesNotMatch(source, pattern, `${filePath} must not reintroduce legacy CRM/pipeline output language`);
+    }
+  }
+
+  for (const filePath of publicExperienceFiles) {
+    const source = read(filePath);
+
+    for (const pattern of [...legacyPatterns, ...publicLegacyPatterns]) {
+      assert.doesNotMatch(source, pattern, `${filePath} must not expose legacy CRM/pipeline product language`);
+    }
+  }
+
+  const intelligenceLayer = read("lib/intelligence/layer.ts");
+  assert.match(intelligenceLayer, /Customer activity evidence exists/, "customer records should be framed as evidence");
+  assert.match(intelligenceLayer, /Customer Evidence/, "customer records should route as evidence, not CRM");
+}
+
+function runCrmRetirementTests() {
+  const crmPage = read("app/app/crm/page.tsx");
+  assert.match(crmPage, /Read-only compatibility view/, "legacy customer evidence route must clearly be read-only");
+  assert.match(crmPage, /Historical Customer Evidence/, "legacy route should preserve existing evidence as historical context");
+  assert.doesNotMatch(crmPage, /CreateDrawer|ManagedRecordList|createCrmLeadAction|New Customer Evidence|<form\b|estimated_value|Related value/, "legacy route must not expose CRM create/edit/delete UI");
+
+  const operationsActions = read("app/app/operations/actions.ts");
+  assert.match(operationsActions, /Customer record creation in Vaeroex has been retired/, "manual customer-record creation action must fail closed");
+  assert.doesNotMatch(operationsActions, /\.from\("crm_leads"\)\s*\.insert|entered_from:\s*"crm_module"/, "manual creation action must not insert CRM rows");
+
+  const recordManagementActions = read("app/app/operations/record-management-actions.ts");
+  assert.match(recordManagementActions, /RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE/, "managed record mutations must carry a retired customer-record guard");
+  assert.match(recordManagementActions, /collection === "crm_leads"/, "managed record mutations must explicitly block crm_leads");
+
+  const filesPage = read("app/app/files/page.tsx");
+  assert.doesNotMatch(filesPage, /importType="crm"|value: "crm"|Customer Activity Data|Review customer data import/, "Sources UI must not expose customer-record import actions");
+  assert.match(filesPage, /Customer record imports are retired/, "old staged customer imports should render as retired/read-only");
+
+  const fileActions = read("app/app/files/actions.ts");
+  assert.match(fileActions, /Customer record imports have been retired/, "customer-record import actions must fail closed");
+  assert.doesNotMatch(fileActions, /"approve_crm_import"/, "file actions must not call the retired CRM import approval tool");
+
+  const toolGateway = read("lib/security/tool-execution-gateway.ts");
+  assert.doesNotMatch(toolGateway, /approve_crm_import|z\.enum\(\["kpi", "crm", "metrics"\]\)/, "tool gateway must not register retired CRM import execution");
+
+  const searchRoute = read("app/api/search/route.ts");
+  assert.doesNotMatch(searchRoute, /hrefWithQuery\("\/app\/crm"|sourceType:\s*"CRM"|groups,\s*"CRM"/, "search must not route users into active CRM management");
+  assert.match(searchRoute, /Customer Evidence/, "search may still expose historical customer evidence as evidence");
+}
+
 async function main() {
   assert.ok(existsSync(path.join(root, "lib/security/tool-execution-gateway.ts")), "tool gateway source must exist");
 
@@ -607,6 +709,8 @@ async function main() {
   runOpenAIResilienceTests();
   runFileAnalysisRequestSizingTests();
   runKpiForecastEligibilityTests();
+  runLegacyCrmLanguageTests();
+  runCrmRetirementTests();
 
   console.log("Adversarial regression tests passed.");
 }

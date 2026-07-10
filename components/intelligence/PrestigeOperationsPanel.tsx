@@ -152,7 +152,7 @@ export function BusinessHealthHero({
           <article className="rounded-lg border border-white/10 bg-white/[0.06] p-4 sm:col-span-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-vaeroex-silver">Monthly change</p>
             <p className="mt-3 text-2xl font-semibold">{trend.icon} {trend.label}</p>
-            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, customer pipeline movement, source-system activity, issues, files, and reports before calling a trend.</p>
+            <p className="mt-1 text-sm text-slate-100">Vaeroex combines KPI history, customer activity evidence, source-system activity, issues, files, and reports before calling a trend.</p>
           </article>
         </div>
       </div>
@@ -205,7 +205,7 @@ function ActionButtons({
       {showAlert ? (
         <form action={createKpiAlertFromPrestigeAction}>
           <input type="hidden" name="return_path" value={returnPath} />
-          <input type="hidden" name="kpi_name" value={item.relatedModule === "Customer Pipeline" ? "Conversion Rate" : item.relatedModule} />
+          <input type="hidden" name="kpi_name" value={item.relatedModule === "Customer Evidence" ? "Conversion Rate" : item.relatedModule} />
           <input type="hidden" name="owner" value={item.owner} />
           <input type="hidden" name="priority" value={item.priority} />
           <ConfirmSubmitButton message={`Create a KPI alert from "${item.title}"?`} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
@@ -419,7 +419,7 @@ export function PrestigeOperationsPanel({
 
         <IntelligenceAccordion
           title="Profit Leak Detector"
-          description="Revenue and opportunity leakage signals from customer pipeline records, KPIs, source-system activity, issues, checklists, SOPs, and files."
+          description="Revenue and opportunity leakage signals from customer activity evidence, KPIs, source-system activity, issues, checklists, SOPs, and files."
           summary={`${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`}
         >
           <div className="mb-4">
@@ -435,7 +435,7 @@ export function PrestigeOperationsPanel({
                 </ActionCard>
               ))
             ) : (
-              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer pipeline records, KPI targets, and Business Signals current.</p>
+              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer activity evidence, KPI targets, and Business Signals current.</p>
             )}
           </div>
         </IntelligenceAccordion>

@@ -603,7 +603,7 @@ function buildSmartAlerts({
           id: "kpis-below-target",
           severity: "High",
           title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} below target`,
-          why: "Below-target metrics should be reviewed against Business Signals, customer pipeline activity, and open risks.",
+          why: "Below-target metrics should be reviewed against Business Signals, customer activity evidence, and open risks.",
           action: "Review KPIs",
           href: "/app/kpis"
         }
@@ -612,10 +612,10 @@ function buildSmartAlerts({
       ? {
           id: "crm-followup",
           severity: "Medium",
-          title: `${crmLeadsWithoutFollowup.length} customer pipeline record${crmLeadsWithoutFollowup.length === 1 ? "" : "s"} show response gaps`,
-          why: "Leads without recent activity or next-step notes can quietly stall revenue.",
-          action: "Review customer pipeline",
-          href: "/app/crm"
+          title: `${crmLeadsWithoutFollowup.length} customer activity record${crmLeadsWithoutFollowup.length === 1 ? "" : "s"} show response gaps`,
+          why: "Customer records without recent activity can indicate retention, conversion, or response-quality risk.",
+          action: "Review customer activity evidence",
+          href: "/app/sources"
         }
       : null,
     staleSops.length
@@ -825,11 +825,11 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
     },
     {
       title: "Profit Leak Detector",
-      href: profitLeak?.href || ("/app/crm" as Route),
+      href: profitLeak?.href || ("/app/sources" as Route),
       evidence: profitLeak?.evidence || `${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`,
       reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and unclear Business Signals.",
       confidence: confidenceForPriority(profitLeak?.priority),
-      action: profitLeak?.action || "Review customer pipeline, KPI, and issue records for avoidable leakage before the next leadership review."
+      action: profitLeak?.action || "Review customer activity, KPI, and issue evidence for avoidable leakage before the next leadership review."
     },
     {
       title: "Business Memory",
@@ -1309,7 +1309,7 @@ function DemoWorkspaceBanner({
 }) {
   const summaryItems = [
     ["Demo KPIs", counts.kpis],
-    ["Demo Leads", counts.crm],
+    ["Demo Customer Evidence", counts.crm],
     ["Demo Business Signals", counts.tasks],
     ["Demo Reports", counts.reports],
     ["Demo Issues", counts.issues]
@@ -1317,7 +1317,7 @@ function DemoWorkspaceBanner({
   const countItems = [
     ["KPIs", counts.kpis],
     ["Business metrics", counts.operationalMetrics],
-    ["Customer pipeline records", counts.crm],
+    ["Customer activity evidence", counts.crm],
     ["Business Signals", counts.tasks],
     ["Open issues", counts.issues],
     ["Reports", counts.reports],
@@ -1338,7 +1338,7 @@ function DemoWorkspaceBanner({
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
             Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails or customer notifications are sent.
-            It includes YTD KPI movement, customer pipeline activity, weak-month alerts, reports, Business Signals, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
+            It includes YTD KPI movement, customer activity evidence, weak-month alerts, reports, Business Signals, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1362,7 +1362,7 @@ function DemoWorkspaceBanner({
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">April and May recovery</p>
           <p className="mt-2 text-xs leading-5">
-            SOP review, checklist review, and customer pipeline visibility helped the business recover from the weak month.
+            SOP review, checklist review, and customer activity visibility helped the business recover from the weak month.
           </p>
         </article>
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
@@ -1525,7 +1525,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
   const names = getConfiguredMetricNames(kpis, kpiSettings);
   const revenueMetric = latestMetric(kpis, ["revenue", "sales"])?.name || names.find((name) => lower(name).includes("revenue")) || "Revenue";
-  const leadsMetric = latestMetric(kpis, ["lead"])?.name || names.find((name) => lower(name).includes("lead")) || "Leads";
+  const leadsMetric = latestMetric(kpis, ["lead", "customer"])?.name || names.find((name) => lower(name).includes("lead") || lower(name).includes("customer")) || "Customer Activity";
   const customMetric =
     names.find((name) => name !== revenueMetric && name !== leadsMetric && !lower(name).includes("conversion")) ||
     operationalMetrics[0]?.metric_name ||
@@ -1574,7 +1574,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     negativeTrends[0] ? `${negativeTrends[0].name} is down ${numberFormatter.format(Math.abs(negativeTrends[0].changePercent || 0))}% vs the previous period.` : ""
   ].filter(Boolean);
   const opportunities = [
-    leadsCreated.length ? `${leadsCreated.length} new lead${leadsCreated.length === 1 ? "" : "s"} can be reviewed for response quality or conversion.` : "",
+    leadsCreated.length ? `${leadsCreated.length} customer activity record${leadsCreated.length === 1 ? "" : "s"} can be reviewed for response quality or conversion.` : "",
     positiveTrends[0] ? `${positiveTrends[0].name} is showing the strongest improvement this period.` : "",
     recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex review.` : "",
     operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
@@ -1584,9 +1584,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
-    negativeTrends.length ? "Review declining KPIs against recent imports, customer pipeline activity, and Business Signals." : "",
+    negativeTrends.length ? "Review declining KPIs against recent imports, customer activity evidence, and Business Signals." : "",
     !kpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
-    !crmLeads.length ? "Connect or import customer pipeline context when available." : "",
+    !crmLeads.length ? "Connect or import customer activity evidence when available." : "",
     !reports.length ? "Generate a report for this period so the management summary is saved." : ""
   ].filter(Boolean);
   const latestKpiRows = latestKpisByName(kpis);
@@ -1698,10 +1698,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...leadsCreated.slice(0, 3).map((lead) => ({
       id: `lead-${lead.id}`,
       title: lead.lead_name,
-      source: lead.company ? `Customer pipeline · ${lead.company}` : "Customer pipeline",
+      source: lead.company ? `Customer evidence · ${lead.company}` : "Customer evidence",
       status: lead.status,
-      context: `${formatMetricValue(lead.estimated_value, "revenue", "No value set")} estimated value · ${lead.last_activity_at ? `Last activity ${new Date(lead.last_activity_at).toLocaleDateString()}` : "No recent activity recorded"}.`,
-      href: "/app/crm" as Route
+      context: `${lead.last_activity_at ? `Last activity ${new Date(lead.last_activity_at).toLocaleDateString()}` : "No recent activity recorded"}. Review only as customer evidence from connected or imported sources.`,
+      href: "/app/sources" as Route
     })),
     ...positiveTrends.slice(0, 3).map((trend) => ({
       id: `trend-opportunity-${trend.name}`,
@@ -1779,7 +1779,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: `Review ${negativeTrends[0].name}`,
           source: "KPI trend",
           status: "Declining",
-          context: "Compare this KPI against recent customer pipeline activity, imports, issues, and Business Signals.",
+          context: "Compare this KPI against recent customer activity evidence, imports, issues, and Business Signals.",
           href: "/app/kpis" as Route
         }
       : null,
@@ -1789,18 +1789,18 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: "Connect a KPI source",
           source: "KPI setup",
           status: "Start here",
-          context: "Add one leadership-level metric such as revenue, leads, jobs completed, or customer issues.",
+          context: "Add one leadership-level metric such as revenue, conversion, jobs completed, response time, or customer issues.",
           href: "/app/kpis" as Route
         }
       : null,
     !crmLeads.length
       ? {
           id: "action-first-crm",
-          title: "Connect customer pipeline context",
-          source: "Customer pipeline setup",
+          title: "Connect customer activity evidence",
+          source: "Customer evidence setup",
           status: "Start here",
-          context: "Even a small customer pipeline sample can improve revenue and response-quality intelligence.",
-          href: "/app/crm" as Route
+          context: "Customer activity evidence can improve revenue, retention, and response-quality intelligence.",
+          href: "/app/sources" as Route
         }
       : null,
     !reports.length
@@ -1961,7 +1961,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     dashboardMode === "Executive View"
       ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next executive recommendation."
       : dashboardMode === "Operations View"
-        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, Business Signals, issues, checklists, responsibility visibility, customer pipeline context, and reports.`
+        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, Business Signals, issues, checklists, source visibility, customer activity evidence, and reports.`
         : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and executive recommendations.`;
 
   return (
@@ -2038,7 +2038,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                 <SignalList items={riskSignals} empty="No major risks found for this period." tone="risk" />
               </SectionCard>
 
-              <SectionCard title="Opportunities" description="Specific pipeline records, KPI gains, imports, or analyses worth reviewing.">
+              <SectionCard title="Opportunities" description="Specific customer evidence, KPI gains, imports, or analyses worth reviewing.">
                 <SignalList items={opportunitySignals} empty="No clear opportunities found yet." tone="opportunity" />
               </SectionCard>
 
@@ -2052,7 +2052,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
                     Review files
                   </Link>
-                  <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+                  <Link href="/app/sources" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
                     Review customer context
                   </Link>
                   <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
@@ -2248,15 +2248,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve current structure" : "Build your first structure"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer pipeline records, Business Signals, SOPs, and reports instead of creating duplicate systems."
-              : "Add KPI sources, customer pipeline samples, Business Signals, SOPs, and reports only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
+              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer activity evidence, Business Signals, SOPs, and reports instead of creating duplicate systems."
+              : "Add KPI sources, customer activity evidence, Business Signals, SOPs, and reports only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/kpis" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {kpis.length ? "Review KPIs" : "Add KPI"}
             </Link>
-            <Link href="/app/crm" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {crmLeads.length ? "Review pipeline context" : "Add pipeline sample"}
+            <Link href="/app/sources" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              {crmLeads.length ? "Review customer evidence" : "Add customer evidence"}
             </Link>
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               {tasks.length ? "Review Business Signals" : "Add Business Signal"}
@@ -2298,7 +2298,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       <section className="grid gap-4 xl:grid-cols-3">
         <LineChart title="Revenue trend" rows={rowsForMetric(kpis, revenueMetric)} color={kpiColor(revenueMetric, kpiSettings, 0)} />
-        <LineChart title="Leads trend" rows={rowsForMetric(kpis, leadsMetric)} color={kpiColor(leadsMetric, kpiSettings, 1)} />
+        <LineChart title="Customer activity trend" rows={rowsForMetric(kpis, leadsMetric)} color={kpiColor(leadsMetric, kpiSettings, 1)} />
         <LineChart title={`${customMetric} trend`} rows={rowsForMetric(kpis, customMetric)} color={kpiColor(customMetric, kpiSettings, 2)} />
       </section>
 
@@ -2397,8 +2397,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Files, SOPs, customer pipeline, and reports"
-            summary={`${recentFiles.length} recent file${recentFiles.length === 1 ? "" : "s"}, ${sopUpdates.length} SOP update${sopUpdates.length === 1 ? "" : "s"}, ${leadsCreated.length} new lead${leadsCreated.length === 1 ? "" : "s"}, and ${reports.length} saved report${reports.length === 1 ? "" : "s"}.`}
+            title="Files, SOPs, customer evidence, and reports"
+            summary={`${recentFiles.length} recent file${recentFiles.length === 1 ? "" : "s"}, ${sopUpdates.length} SOP update${sopUpdates.length === 1 ? "" : "s"}, ${leadsCreated.length} new customer activity record${leadsCreated.length === 1 ? "" : "s"}, and ${reports.length} saved report${reports.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-4">
         <SectionCard title="Files" description="Uploads and approved imports feeding business memory.">
@@ -2470,24 +2470,24 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
-        <SectionCard title="Customer pipeline context" description="Lead status and value from current customer pipeline records plus imported history.">
+        <SectionCard title="Customer activity evidence" description="Customer status and activity evidence from current source records plus imported history.">
           <div className="space-y-3">
             {Object.entries(pipeline).length ? (
               Object.entries(pipeline).map(([status, value]) => (
                 <div key={status} className="grid gap-2 rounded-lg border border-line p-3 sm:grid-cols-[1fr_auto_auto]">
                   <p className="text-sm font-semibold">{status}</p>
-                  <p className="text-sm text-muted">{value.count} lead{value.count === 1 ? "" : "s"}</p>
-                  <p className="text-sm text-muted">{currencyFormatter.format(value.value)}</p>
+                  <p className="text-sm text-muted">{value.count} record{value.count === 1 ? "" : "s"}</p>
+                  <p className="text-sm text-muted">{value.value ? currencyFormatter.format(value.value) : "Value not used"}</p>
                 </div>
               ))
             ) : (
-              <p className="text-sm text-muted">No customer pipeline records yet.</p>
+              <p className="text-sm text-muted">No customer activity evidence yet.</p>
             )}
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <StatCard label="Leads created" value={leadsCreated.length} detail={period} />
-            <StatCard label="Leads converted" value={leadsConverted.length} detail={period} />
-            <StatCard label="Lead history" value={leadHistoryChanges.length} detail="Manual and imported changes" />
+            <StatCard label="Customer records added" value={leadsCreated.length} detail={period} />
+            <StatCard label="Converted records" value={leadsConverted.length} detail={period} />
+            <StatCard label="Activity history" value={leadHistoryChanges.length} detail="Manual and imported changes" />
           </div>
         </SectionCard>
 

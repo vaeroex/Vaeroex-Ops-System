@@ -343,19 +343,19 @@ function monthMetricRows(month: DemoMonth): DemoMetricRow[] {
       note: "Revenue target is $40,000 per month."
     },
     {
-      name: "New Leads",
+      name: "Customer Activity",
       category: "Sales",
       target: 40,
       value: month.leads,
-      owner: "Sales Manager",
-      note: "Lead volume stayed workable even when conversion dropped."
+      owner: "Revenue Review",
+      note: "Customer activity stayed workable even when conversion dropped."
     },
     {
       name: "Conversion Rate",
       category: "Sales",
       target: 25,
       value: month.conversion,
-      owner: "Sales Manager",
+      owner: "Revenue Review",
       note: "Conversion rate target is 25%."
     },
     {
@@ -624,11 +624,11 @@ async function seedPeopleAndAssets(supabase: AppSupabaseClient, workspaceId: str
       workspace_id: workspaceId,
       full_name: "Morgan Lee",
       email: "morgan@example.com",
-      role_title: "Sales Manager",
-      department: "Sales",
+      role_title: "Revenue Review",
+      department: "Revenue",
       status: "active",
       start_date: dateForMonth(year - 1, 5, 12),
-      notes: "Owns lead review, CRM hygiene, and monthly conversion recovery.",
+      notes: "Reviews customer activity evidence and monthly conversion recovery.",
       created_at: isoForMonth(year, 0, 3)
     },
     {
@@ -713,12 +713,12 @@ async function seedCrm(supabase: AppSupabaseClient, workspaceId: string, user: D
         owner: "Morgan Lee",
         notes:
           month.monthIndex === 2
-            ? "March lead: decent volume, but slower response and missed follow-up lowered conversion."
-            : `${month.label} lead from ${source}; follow-up date and outcome included for demo review.`,
+            ? "March customer activity: decent volume, but slower response lowered conversion."
+            : `${month.label} customer activity from ${source}; response date and outcome included for demo review.`,
         raw_data_json: {
           demo: true,
           demo_version: DEMO_VERSION,
-          lead_source: source,
+          customer_activity_source: source,
           follow_up_date: followUpDate,
           outcome: status,
           month: month.label
@@ -734,7 +734,7 @@ async function seedCrm(supabase: AppSupabaseClient, workspaceId: string, user: D
     .from("crm_leads")
     .insert(rows)
     .select("id,lead_name,status,estimated_value,owner,created_at,raw_data_json");
-  throwIfError(error, "Demo CRM leads");
+  throwIfError(error, "Demo customer activity records");
 
   if (leads?.length) {
     const history = await supabase.from("crm_lead_history").insert(
@@ -745,13 +745,13 @@ async function seedCrm(supabase: AppSupabaseClient, workspaceId: string, user: D
         status: lead.status,
         estimated_value: lead.estimated_value,
         owner: lead.owner,
-        notes: `${lead.lead_name} recorded for the YTD demo pipeline. March illustrates lower conversion despite solid lead volume.`,
+        notes: `${lead.lead_name} recorded for YTD demo customer activity evidence. March illustrates lower conversion despite solid customer activity.`,
         raw_data_json: lead.raw_data_json,
         created_by: user.id,
         created_at: lead.created_at
       }))
     );
-    throwIfError(history.error, "Demo CRM history");
+    throwIfError(history.error, "Demo customer activity history");
   }
 }
 
@@ -771,11 +771,11 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
     },
     {
       workspace_id: workspaceId,
-      title: "Review missed follow-ups",
-      description: "Audit March leads with proposal or lost status and identify missed next steps.",
+      title: "Review March customer response evidence",
+      description: "Review March customer records with proposal or lost status and identify response-quality signals.",
       status: "Done",
       priority: "High",
-      category: "CRM",
+      category: "Customer Evidence",
       due_date: dateForMonth(year, 2, 24),
       created_by: user.id,
       created_at: isoForMonth(year, 2, 18)
@@ -783,7 +783,7 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
     {
       workspace_id: workspaceId,
       title: "Update customer follow-up SOP",
-      description: "Add required next-contact date, owner, and escalation steps after the March dip.",
+      description: "Add response evidence and escalation context after the March dip.",
       status: "Done",
       priority: "High",
       category: "SOP",
@@ -815,11 +815,11 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
     },
     {
       workspace_id: workspaceId,
-      title: "Review customer follow-up pattern",
+      title: "Review customer response pattern",
       description: "Compare open proposals, response time, and conversion before the next month closes.",
       status: "In Progress",
       priority: "High",
-      category: "CRM",
+      category: "Customer Evidence",
       due_date: dateFromNow(-1),
       created_by: user.id,
       created_at: isoFromNow(-7)
@@ -865,13 +865,13 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
     },
     {
       workspace_id: workspaceId,
-      title: "Conversion dropped despite stable lead volume",
-      description: "March lead volume was stable, but conversion dropped to 18%.",
-      issue_type: "CRM",
+      title: "Conversion dropped despite stable customer activity",
+      description: "March customer activity was stable, but conversion dropped to 18%.",
+      issue_type: "Customer Evidence",
       severity: "High",
       status: "In Progress",
       root_cause: "Follow-up quality declined while proposal next steps became less consistent.",
-      recommended_fix: "Review customer pipeline evidence and generate an executive improvement plan.",
+      recommended_fix: "Review customer activity evidence and generate an executive improvement plan.",
       due_date: dateFromNow(2),
       created_by: user.id,
       created_at: isoForMonth(year, 2, 21)
@@ -906,7 +906,7 @@ async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: stri
       workspace_id: workspaceId,
       title: "Current month follow-up risk rising",
       description: "Current month overdue follow-ups increased while conversion softened.",
-      issue_type: "Customer Pipeline",
+      issue_type: "Customer Evidence",
       severity: "Medium",
       status: "Open",
       root_cause: "Recovery follow-up activity is becoming less consistent.",
@@ -924,10 +924,10 @@ async function seedSopsAndChecklists(supabase: AppSupabaseClient, workspaceId: s
   const sops = await supabase.from("sops").insert([
     {
       workspace_id: workspaceId,
-      title: "Customer Follow-Up SOP",
-      department: "Sales",
-      category: "CRM",
-      body_markdown: "# Customer Follow-Up SOP\n\n## Purpose\nPrevent lead leakage and missed proposal follow-up.\n\n## Monthly Learning\nMarch conversion dropped while lead volume stayed stable. Vaeroex recommended adding required next-contact dates and a weekly proposal review.\n\n## Steps\n- Review new leads daily.\n- Assign an owner.\n- Set a next follow-up date.\n- Convert stalled leads into follow-ups.\n- Review missed follow-ups every Friday.",
+      title: "Customer Response Evidence SOP",
+      department: "Revenue",
+      category: "Customer Evidence",
+      body_markdown: "# Customer Response Evidence SOP\n\n## Purpose\nPreserve customer response evidence when revenue or conversion changes.\n\n## Monthly Learning\nMarch conversion dropped while customer activity stayed stable. Vaeroex recommended clearer response evidence and a weekly proposal review.\n\n## Steps\n- Review customer activity evidence daily.\n- Confirm source context.\n- Record response dates when available.\n- Flag stalled customer activity as evidence.\n- Review response gaps every Friday.",
       status: "Active",
       version: 2,
       created_by: user.id,
@@ -940,7 +940,7 @@ async function seedSopsAndChecklists(supabase: AppSupabaseClient, workspaceId: s
       title: "Response Time Escalation SOP",
       department: "Customer Service",
       category: "Service",
-      body_markdown: "# Response Time Escalation SOP\n\n## Trigger\nAverage response time exceeds 24 hours or customer complaints rise.\n\n## Steps\n- Assign a daily response owner.\n- Escalate unanswered leads after one business day.\n- Review response time during the weekly management review.",
+      body_markdown: "# Response Time Escalation SOP\n\n## Trigger\nAverage response time exceeds 24 hours or customer complaints rise.\n\n## Steps\n- Review daily response evidence.\n- Escalate unanswered customer activity after one business day.\n- Review response time during the weekly management review.",
       status: "Active",
       version: 1,
       created_by: user.id,
@@ -953,7 +953,7 @@ async function seedSopsAndChecklists(supabase: AppSupabaseClient, workspaceId: s
       title: "Weekly Management Review SOP",
       department: "Execution",
       category: "Management",
-      body_markdown: "# Weekly Management Review SOP\n\nReview revenue, leads, conversion, response time, overdue follow-ups, open issues, checklist completion, SOP review, and Vaeroex decision support.",
+      body_markdown: "# Weekly Management Review SOP\n\nReview revenue, customer activity, conversion, response time, open issues, checklist completion, SOP review, and Vaeroex decision support.",
       status: "Active",
       version: 2,
       created_by: user.id,
@@ -970,22 +970,22 @@ async function seedSopsAndChecklists(supabase: AppSupabaseClient, workspaceId: s
       {
         workspace_id: workspaceId,
         name: "Opening Checklist",
-        description: "Confirm staffing, schedule, urgent follow-ups, and open issues before work begins.",
+        description: "Confirm staffing, schedule, urgent customer evidence, and open issues before work begins.",
         category: "Readiness",
         frequency: "Daily",
-        items_json: ["Review schedule", "Confirm staffing", "Check open issues", "Assign urgent follow-ups"] satisfies Json,
+        items_json: ["Review schedule", "Confirm staffing", "Check open issues", "Flag urgent customer evidence"] satisfies Json,
         assigned_role: "Manager",
         created_by: user.id,
         created_at: isoForMonth(year, 0, 6)
       },
       {
         workspace_id: workspaceId,
-        name: "Weekly Sales Follow-Up Review",
-        description: "Review open leads, proposals, next contact dates, and lost opportunities.",
-        category: "CRM",
+        name: "Weekly Customer Evidence Review",
+        description: "Review open customer activity, proposals, response dates, and lost opportunities.",
+        category: "Customer Evidence",
         frequency: "Weekly",
-        items_json: ["Review new leads", "Check proposal status", "Identify stalled proposals", "Summarize pipeline risk"] satisfies Json,
-        assigned_role: "Sales Manager",
+        items_json: ["Review new customer activity", "Check proposal status", "Identify stalled proposals", "Summarize revenue risk"] satisfies Json,
+        assigned_role: "Revenue Review",
         created_by: user.id,
         created_at: isoForMonth(year, 0, 6)
       },
@@ -1079,7 +1079,7 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       rows_imported: kpiRowCount,
       mapping_json: {
         Revenue: "Revenue",
-        Leads: "New Leads",
+        "Customer Activity": "Customer Activity",
         "Conversion Rate": "Conversion Rate",
         "Average Response Time": "Average Response Time",
         "Checklist Completion Rate": "Checklist Completion Rate"
@@ -1099,30 +1099,30 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       title: "January Intelligence Summary",
       type: "Monthly",
       summary: "January started close to target. Revenue was slightly under the monthly goal, but response time and open issues were manageable.",
-      improved: ["Basic operating rhythm was in place.", "Lead volume was enough to support the month."],
+      improved: ["Basic operating rhythm was in place.", "Customer activity was enough to support the month."],
       declined: ["Revenue was slightly below the $40,000 target.", "Checklist completion was under the 95% target."],
       risks: ["If checklist ownership stayed loose, issues could compound in later months."],
       actions: ["Review first KPI signals.", "Summarize weekly checklist risk."]
     },
     {
       monthIndex: 1,
-      title: "February Pipeline Report",
+      title: "February Customer Activity Report",
       type: "Monthly",
       summary: "February improved across revenue, conversion, response time, and checklist completion.",
       improved: ["Revenue moved above target.", "Conversion reached 27%.", "Checklist completion reached 96%."],
       declined: ["SOP review was still below full completion."],
-      risks: ["Pipeline momentum could hide process drift if SOP review stayed partial."],
-      actions: ["Keep weekly sales follow-up review.", "Schedule monthly SOP review."]
+      risks: ["Customer activity momentum could hide process drift if SOP review stayed partial."],
+      actions: ["Keep weekly customer evidence review.", "Schedule monthly SOP review."]
     },
     {
       monthIndex: 2,
       title: "March Performance Dip Review",
       type: "Monthly",
-      summary: "March was the main performance dip. Revenue fell below target while lead volume stayed decent, pointing to follow-up quality and response time issues.",
-      improved: ["Lead volume stayed healthy at 41 new leads."],
+      summary: "March was the main performance dip. Revenue fell below target while customer activity stayed decent, pointing to response quality and response time issues.",
+      improved: ["Customer activity stayed healthy at 41 records."],
       declined: ["Revenue fell to $31,500.", "Conversion dropped to 18%.", "Response time increased to 32 hours.", "Checklist completion fell to 78%."],
-      risks: ["Missed follow-ups could continue lowering conversion.", "Open issues and overdue follow-up signals could slow recovery."],
-      actions: ["Review customer follow-up evidence.", "Update customer follow-up SOP.", "Summarize checklist risk.", "Generate recovery report."]
+      risks: ["Response gaps could continue lowering conversion.", "Open issues and customer response signals could slow recovery."],
+      actions: ["Review customer response evidence.", "Update customer response SOP.", "Summarize checklist risk.", "Generate recovery report."]
     },
     {
       monthIndex: 3,
@@ -1132,7 +1132,7 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
       improved: ["Revenue nearly returned to target.", "SOP review improved after process updates."],
       declined: ["Response time stayed above target.", "Open issues remained elevated."],
       risks: ["Partial recovery could stall without a clear issue review cadence."],
-      actions: ["Review unresolved issue evidence.", "Run weekly sales follow-up review.", "Review response time escalation SOP."]
+      actions: ["Review unresolved issue evidence.", "Run weekly customer evidence review.", "Review response time escalation SOP."]
     },
     {
       monthIndex: 4,
@@ -1166,11 +1166,11 @@ async function seedFilesAndReports(supabase: AppSupabaseClient, workspaceId: str
     date_range_end: today.toISOString().slice(0, 10),
     body_markdown: reportBody(
       "Year-to-Date Intelligence Review",
-      "The YTD story shows why Vaeroex is useful: February improved, March exposed follow-up and response-time breakdowns, April recovered partially, May improved, and the current month is mixed.",
+      "The YTD story shows why Vaeroex is useful: February improved, March exposed customer response and response-time breakdowns, April recovered partially, May improved, and the current month is mixed.",
       ["May showed strong recovery after SOP and checklist review.", "YTD records make month-over-month changes visible."],
-      ["March revenue, conversion, satisfaction, SOP review, and checklist completion missed target.", "The current month still shows response-time and overdue-follow-up risk."],
-      ["Lead volume alone did not protect revenue when follow-up quality declined.", "Open issues increased in weak months and need leadership review."],
-      ["Review KPI trends.", "Review customer follow-up evidence.", "Summarize checklist risk.", "Generate monthly recovery report.", "Confirm KPI targets for next month."]
+      ["March revenue, conversion, satisfaction, SOP review, and checklist completion missed target.", "The current month still shows response-time and customer response risk."],
+      ["Customer activity alone did not protect revenue when response quality declined.", "Open issues increased in weak months and need leadership review."],
+      ["Review KPI trends.", "Review customer response evidence.", "Summarize checklist risk.", "Generate monthly recovery report.", "Confirm KPI targets for next month."]
     ),
     source_data_json: { demo: true, demo_version: DEMO_VERSION, period: "YTD" } satisfies Json,
     created_by: user.id,
@@ -1197,26 +1197,26 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
         "Vaeroex found a realistic business pattern: January was steady, February improved, March fell below target, April recovered partially, May improved, and the current month is mixed. March revenue fell below target while response time increased, checklist completion dropped, and open issues rose.",
       problems_identified: [
         "March revenue fell below the $40,000 target while response time increased to 32 hours.",
-        "Lead volume was stable in March, but conversion dropped to 18%, suggesting follow-up quality declined.",
+        "Customer activity was stable in March, but conversion dropped to 18%, suggesting response quality declined.",
         "Open issues increased in March and April, especially staffing and response-time issues.",
         "Checklist completion dropped below target during the March dip, increasing execution risk.",
         "The current month has positive revenue but softer conversion, response-time, and overdue-follow-up signals."
       ],
       recommended_actions: [
         {
-          title: "Review customer follow-up evidence",
+          title: "Review customer response evidence",
           priority: "High",
-          suggested_owner: "Sales Manager",
+          suggested_owner: "Leadership Review",
           suggested_due_date: dateFromNow(2),
-          why_it_matters: "Stable lead volume did not convert in March because follow-up quality declined.",
-          related_module: "CRM"
+          why_it_matters: "Stable customer activity did not convert in March because response quality declined.",
+          related_module: "Customer Evidence"
         },
         {
-          title: "Update customer follow-up SOP",
+          title: "Update customer response SOP",
           priority: "High",
           suggested_owner: "General Manager",
           suggested_due_date: dateFromNow(5),
-          why_it_matters: "The March dip shows the team needs required next-contact dates and escalation rules.",
+          why_it_matters: "The March dip shows the business needs clearer response evidence and escalation context.",
           related_module: "SOPs"
         },
         {
@@ -1247,11 +1247,11 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
       suggested_tasks: [
         {
           title: "Review March missed follow-up evidence",
-          description: "Audit March lost/proposal leads and summarize where the process weakened.",
+          description: "Review March lost/proposal customer activity and summarize where the response pattern weakened.",
           priority: "High",
-          category: "CRM",
+          category: "Customer Evidence",
           due_date_recommendation: dateFromNow(2),
-          reason_this_matters: "March lead volume was stable, but conversion dropped."
+          reason_this_matters: "March customer activity was stable, but conversion dropped."
         },
         {
           title: "Confirm next-month KPI targets",
@@ -1264,11 +1264,11 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
       ],
       suggested_systems: [
         "Use KPI Dashboard YTD view to compare March, April, May, and the current month.",
-        "Use customer pipeline evidence to detect lead leakage.",
+        "Use customer activity evidence to detect possible revenue leakage.",
         "Use monthly reports to preserve the business story and recovery plan."
       ],
       response_markdown:
-        "March was the weak month: revenue fell below target while response time rose, conversion dropped, open issues increased, and checklist completion fell. May shows recovery after SOP and checklist review. The current month is mixed, so Vaeroex recommends customer follow-up review, an SOP update, a checklist risk summary, and a monthly recovery report."
+        "March was the weak month: revenue fell below target while response time rose, conversion dropped, open issues increased, and checklist completion fell. May shows recovery after SOP and checklist review. The current month is mixed, so Vaeroex recommends customer response review, an SOP update, a checklist risk summary, and a monthly recovery report."
     } satisfies Json,
     status: "completed",
     created_by: user.id,
@@ -1283,14 +1283,14 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
   const decisionResult = await supabase.from("business_decisions").insert([
     {
       workspace_id: workspaceId,
-      title: "Review weekly lead follow-up process",
-      reason: "Conversion dropped in March even though lead volume stayed healthy.",
+      title: "Review weekly customer response evidence",
+      reason: "Conversion dropped in March even though customer activity stayed healthy.",
       expected_outcome: "Improve conversion rate from 18% toward the 25% target and reduce proposal-stage stalls.",
       related_kpi: "Conversion Rate",
       owner: "Morgan Lee",
       review_date: dateForMonth(year, 4, 15),
       status: "reviewed",
-      outcome_summary: "May conversion improved to 29% after weekly proposal review and required next-contact dates.",
+      outcome_summary: "May conversion improved to 29% after weekly proposal review and clearer response evidence.",
       created_by: user.id,
       created_at: isoForMonth(year, 3, 5)
     },
@@ -1326,34 +1326,34 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
   const recommendationResult = await supabase.from("vaeroex_recommendation_outcomes").insert([
     {
       workspace_id: workspaceId,
-      title: "Update customer follow-up SOP",
+      title: "Update customer response SOP",
       source_type: "prestige_demo",
       source_title: "March Performance Dip Review",
-      evidence: "March conversion dropped to 18% while lead volume stayed healthy.",
+      evidence: "March conversion dropped to 18% while customer activity stayed healthy.",
       related_module: "SOPs",
       related_kpi: "Conversion Rate",
-      expected_outcome: "Improve follow-up discipline and conversion recovery.",
+      expected_outcome: "Improve response discipline and conversion recovery.",
       created_action_type: "sop_review",
       owner: "General Manager",
       priority: "High",
       review_date: dateForMonth(year, 4, 20),
       status: "outcome_measured",
-      outcome_summary: "Follow-up completion improved, conversion rose to 29%, and response time improved after the SOP update.",
+      outcome_summary: "Response evidence improved, conversion rose to 29%, and response time improved after the SOP update.",
       metadata_json: { demo: true, demo_version: DEMO_VERSION, worked: true } satisfies Json,
       created_by: user.id,
       created_at: isoForMonth(year, 3, 10)
     },
     {
       workspace_id: workspaceId,
-      title: "Review customer follow-up evidence",
+      title: "Review customer response evidence",
       source_type: "prestige_demo",
       source_title: "Vaeroex YTD Demo Operations Intelligence Review",
-      evidence: "Proposal-stage leads stalled after response time increased.",
-      related_module: "CRM",
+      evidence: "Proposal-stage customer activity stalled after response time increased.",
+      related_module: "Customer Evidence",
       related_kpi: "Conversion Rate",
-      expected_outcome: "Prevent lost pipeline by identifying stalled proposals before they age out.",
+      expected_outcome: "Prevent missed revenue context by identifying stalled proposals before they age out.",
       created_action_type: "executive_review",
-      owner: "Sales Manager",
+      owner: "Leadership Review",
       priority: "High",
       review_date: dateFromNow(10),
       status: "in_progress",

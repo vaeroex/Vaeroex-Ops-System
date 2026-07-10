@@ -243,7 +243,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       exists: true,
       records: crmLeadCount.count ?? 0,
       statuses: countByStatus(recentLeadRows),
-      guidance: "Customer pipeline records already exist as source context. Recommend reviewing response gaps, status quality, source tracking, or estimated value with leadership."
+      guidance: "Customer activity records may exist as source context from external systems or imports. Use them only as evidence for revenue, retention, response quality, or customer-risk intelligence. Do not describe Vaeroex as a CRM or lead-management system."
     },
     business_signals: {
       exists: true,
@@ -305,7 +305,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
   };
   const gaps = [
     !(kpiCount.count ?? 0) ? "KPI Dashboard exists but has no KPI records yet." : "",
-    !(crmLeadCount.count ?? 0) ? "Customer pipeline context exists but has no lead records yet." : "",
+    !(crmLeadCount.count ?? 0) ? "Customer activity context exists but has no customer evidence records yet." : "",
     !(sopCount.count ?? 0) ? "SOP Library exists but has no SOP records yet." : "",
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
@@ -322,9 +322,9 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       "If a module exists, treat it as source context for analysis and recommend leadership review, evidence gathering, or portable documents.",
       "Distinguish current KPI availability from forecast readiness. Current KPI records can support visibility even when dated history is still insufficient for responsible forecasting.",
       "Treat Business Signals as evidence, observations, and strategic context. Mention Business Signal patterns only as evidence for Business Memory, risks, opportunities, predictions, confidence, or executive briefings.",
-      "Mention the specific existing workspace records, counts, gaps, Business Signals, stale items, file analyses, reports, KPIs, customer pipeline records, SOPs, checklists, issues, assets, or people records that support the recommendation.",
-      "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Leadership Review, Business Risk, Dashboard / KPI Improvement, Customer Pipeline / Revenue Improvement, SOP / Process Improvement, or File / Report Review.",
-      "Never say 'Create KPI Dashboard', 'Create CRM', 'Create follow-up tracking', 'Assign owners', 'Create SOPs', 'Create reports', or 'Upload files' as a generic recommendation. Vaeroex is an intelligence layer, not the system of record."
+      "Mention the specific existing workspace records, counts, gaps, Business Signals, stale items, file analyses, reports, KPIs, customer activity evidence, SOPs, checklists, issues, assets, or role context that support the recommendation.",
+      "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Leadership Review, Business Risk, Dashboard / KPI Improvement, Customer / Revenue Intelligence, SOP / Process Improvement, or File / Report Review.",
+      "Never recommend creating dashboards, CRM records, follow-up tracking, ownership assignments, SOPs, reports, or uploads as generic work. Vaeroex is an intelligence layer, not the system of record."
     ],
     module_state: moduleState,
     workspace_gaps: gaps,

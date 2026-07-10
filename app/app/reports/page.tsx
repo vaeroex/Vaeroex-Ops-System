@@ -71,7 +71,7 @@ const BASE_CATEGORIES = [
   "Assets",
   "KPIs",
   "Files",
-  "CRM",
+  "Customer Evidence",
   "Business metrics",
   "Vaeroex insights"
 ];

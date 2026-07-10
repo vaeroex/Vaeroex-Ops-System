@@ -256,8 +256,8 @@ function matchesCategory(category: string, row: { category?: string | null; issu
   const moduleAliases =
     normalizedModule === "business signals"
       ? ["tasks", "source signals", "follow-ups"]
-      : normalizedModule === "crm"
-        ? ["customer pipeline"]
+      : normalizedModule === "customer evidence"
+        ? ["customer activity", "customer evidence", "crm"]
         : [];
 
   return (
@@ -345,7 +345,7 @@ function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
     .filter((trend) => trend.volatility !== null)
     .sort((a, b) => (b.volatility ?? 0) - (a.volatility ?? 0))[0];
   const revenue = trends.find((trend) => normalizeCategory(trend.name).includes("revenue") || normalizeCategory(trend.name).includes("sales"));
-  const leads = trends.find((trend) => normalizeCategory(trend.name).includes("lead"));
+  const customerActivity = trends.find((trend) => normalizeCategory(trend.name).includes("lead") || normalizeCategory(trend.name).includes("customer"));
   const observations = [
     improving && improving.changePercent !== null
       ? `${improving.name} is improving fastest at ${formatKpiNumber(improving.changePercent)}% across its latest ${improving.count} entries.`
@@ -358,15 +358,15 @@ function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
       : ""
   ].filter(Boolean);
 
-  if (revenue && leads && revenue.change !== null && leads.change !== null) {
-    if (leads.change > 0 && revenue.change < 0) {
-      observations.push("Leads are rising while revenue is falling, which may point to conversion, pricing, response quality, or sales-process issues.");
-    } else if (leads.change < 0 && revenue.change > 0) {
-      observations.push("Revenue is rising while leads are falling, which may mean larger deals are offsetting a weaker pipeline.");
-    } else if (leads.change > 0 && revenue.change > 0) {
-      observations.push("Leads and revenue are both rising, which suggests pipeline volume and sales results are currently aligned.");
-    } else if (leads.change < 0 && revenue.change < 0) {
-      observations.push("Leads and revenue are both falling, which should be reviewed before the next management meeting.");
+  if (revenue && customerActivity && revenue.change !== null && customerActivity.change !== null) {
+    if (customerActivity.change > 0 && revenue.change < 0) {
+      observations.push("Customer activity is rising while revenue is falling, which may point to conversion, pricing, response quality, or sales-process issues.");
+    } else if (customerActivity.change < 0 && revenue.change > 0) {
+      observations.push("Revenue is rising while customer activity is falling, which may mean higher-value work is offsetting weaker activity volume.");
+    } else if (customerActivity.change > 0 && revenue.change > 0) {
+      observations.push("Customer activity and revenue are both rising, which suggests activity volume and sales results are currently aligned.");
+    } else if (customerActivity.change < 0 && revenue.change < 0) {
+      observations.push("Customer activity and revenue are both falling, which should be reviewed before the next management meeting.");
     }
   }
 
@@ -511,8 +511,8 @@ async function fetchReportSource(
   const runRows = ((vaeroexRuns.data ?? []) as VaeroexRunRow[]).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
   const fileRows = ((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));
-  const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "CRM"));
-  const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "CRM"));
+  const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
+  const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
   const operationalMetricRows = ((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter(
     (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
@@ -607,7 +607,7 @@ async function fetchReportSource(
         .map((lead) => `${lead.lead_name}${lead.company ? ` at ${lead.company}` : ""}${lead.status ? ` (${lead.status})` : ""}`),
       crm_lead_changes: crmLeadChanges
         .slice(0, 8)
-        .map((item) => `${item.event_type} lead activity${item.status ? ` (${item.status})` : ""}${item.estimated_value !== null ? ` valued at ${item.estimated_value}` : ""}`),
+        .map((item) => `${item.event_type} customer activity${item.status ? ` (${item.status})` : ""}`),
       operational_metrics: recordedOperationalMetrics
         .slice(0, 8)
         .map((metric) => `${metric.metric_name}: ${metric.value ?? "not set"}${metric.category ? ` (${metric.category})` : ""}`)
@@ -639,7 +639,7 @@ function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>
     source.counts.checklist_exceptions ? "Review incomplete checklist runs and update the checklist or accountability process where needed." : "",
     source.counts.flagged_assets ? "Confirm asset readiness and document any maintenance or replacement decisions." : "",
     source.counts.pending_imports ? "Review pending file mappings and save approved data so dashboards and reports use the latest numbers." : "",
-    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, CRM leads, or business metrics. Manual records can be added any time without imports." : "",
+    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, customer activity evidence, or business metrics. Manual records can be added any time without imports." : "",
     source.counts.sops_created === 0 ? "Pick one repeated workflow from this period and turn it into an SOP draft." : ""
   ].filter(Boolean);
 
@@ -695,7 +695,7 @@ ${summary}
 - KPIs recorded: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)} vs ${previousLabel}
 - Uploaded files: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)} vs ${previousLabel}
 - Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)} vs ${previousLabel}
-- CRM leads: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)} vs ${previousLabel}
+- Customer activity records: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)} vs ${previousLabel}
 
 ## Business Signals and Source Context
 ${readableList(
@@ -732,8 +732,8 @@ ${readableList(current.items.kpi_trend_observations, "No KPI trend observations 
 - Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)}
 - Data extractions waiting for review: ${current.counts.pending_imports}
 - Imported spreadsheet rows: ${trendPhrase(current.counts.imported_file_rows, previous.counts.imported_file_rows)}
-- CRM leads added: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)}
-- CRM lead history changes: ${trendPhrase(current.counts.crm_lead_changes, previous.counts.crm_lead_changes)}
+- Customer activity records added: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)}
+- Customer activity history changes: ${trendPhrase(current.counts.crm_lead_changes, previous.counts.crm_lead_changes)}
 - File analyses completed: ${trendPhrase(current.counts.file_analyses, previous.counts.file_analyses)}
 ${readableList(
   [
@@ -741,11 +741,11 @@ ${readableList(
     ...current.items.completed_imports.map((item) => `Completed import: ${item}`),
     ...current.items.pending_imports.map((item) => `Pending review: ${item}`),
     ...current.items.imported_files.map((item) => `Import completed: ${item}`),
-    ...current.items.crm_leads.map((item) => `CRM lead: ${item}`),
-    ...current.items.crm_lead_changes.map((item) => `CRM history: ${item}`),
+    ...current.items.crm_leads.map((item) => `Customer activity evidence: ${item}`),
+    ...current.items.crm_lead_changes.map((item) => `Customer activity history: ${item}`),
     ...current.items.operational_metrics.map((item) => `Business metric: ${item}`)
   ],
-  "No uploaded files, spreadsheet imports, CRM leads, or business metrics were found in this period."
+  "No uploaded files, spreadsheet imports, customer activity evidence, or business metrics were found in this period."
 )}
 
 ## File Insights

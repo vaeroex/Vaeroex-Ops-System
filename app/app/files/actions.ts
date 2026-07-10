@@ -25,7 +25,7 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
-type ImportType = "kpi" | "crm" | "metrics";
+type ImportType = "kpi" | "metrics";
 type JsonRecord = Record<string, unknown>;
 type JsonObject = { [key: string]: Json | undefined };
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
@@ -96,26 +96,16 @@ const IMPORT_FIELDS: Record<ImportType, ImportField[]> = {
       candidates: ["actual value", "actual_value", "actual", "value", "result", "amount", "total", "count"]
     },
     { key: "metric_date", label: "Date", candidates: ["date", "metric date", "metric_date", "day", "period"] },
-    { key: "owner", label: "Owner", candidates: ["owner", "assigned", "manager"] },
+    { key: "owner", label: "Source/context", candidates: ["owner", "manager", "source", "team"] },
     { key: "notes", label: "Notes", candidates: ["notes", "description", "comment", "comments"] },
     { key: "source", label: "Source", candidates: ["source"] }
-  ],
-  crm: [
-    { key: "lead_name", label: "Lead name", required: true, candidates: ["lead", "lead name", "lead_name", "contact", "name", "customer", "client"] },
-    { key: "company", label: "Company", candidates: ["company", "business", "organization"] },
-    { key: "email", label: "Email", candidates: ["email", "email address", "email_address"] },
-    { key: "phone", label: "Phone", candidates: ["phone", "phone number", "phone_number", "mobile"] },
-    { key: "status", label: "Status", candidates: ["status", "stage"] },
-    { key: "estimated_value", label: "Estimated value", candidates: ["estimated value", "estimated_value", "value", "deal value", "deal_value", "revenue"] },
-    { key: "owner", label: "Owner", candidates: ["owner", "sales owner", "manager", "assigned"] },
-    { key: "notes", label: "Notes", candidates: ["notes", "description", "comment", "comments"] }
   ],
   metrics: [
     { key: "metric_name", label: "Metric name", required: true, candidates: ["metric", "metric name", "metric_name", "name", "kpi", "measure"] },
     { key: "category", label: "Category", candidates: ["category", "type", "department"] },
     { key: "value", label: "Value", required: true, candidates: ["value", "actual", "actual value", "actual_value", "result", "amount", "total", "count"] },
     { key: "metric_date", label: "Date", candidates: ["date", "metric date", "metric_date", "day", "period"] },
-    { key: "owner", label: "Owner", candidates: ["owner", "manager", "assigned"] },
+    { key: "owner", label: "Source/context", candidates: ["owner", "manager", "source", "team"] },
     { key: "notes", label: "Notes", candidates: ["notes", "description", "comment", "comments"] }
   ]
 };
@@ -270,11 +260,15 @@ function safeFileName(value: string) {
 }
 
 function validImportType(value: string): ImportType {
-  if (value === "kpi" || value === "crm" || value === "metrics") {
+  if (value === "crm") {
+    redirectWithError("Customer record imports have been retired. Upload the file as source evidence, analyze it with Vaeroex, or import only KPI/business metric history.");
+  }
+
+  if (value === "kpi" || value === "metrics") {
     return value;
   }
 
-  redirectWithError("Choose KPI data, CRM leads, or business metrics before importing.");
+  redirectWithError("Choose KPI data or business metrics before importing.");
 }
 
 async function requireWorkspace() {
@@ -576,7 +570,7 @@ function extractionSummary(importType: ImportType, rows: ImportRow[], mapping: I
   const mappedRequired = IMPORT_FIELDS[importType].filter((field) => field.required && mapping[field.key]).length;
   const requiredCount = IMPORT_FIELDS[importType].filter((field) => field.required).length;
   const mappedCount = Object.keys(mapping).length;
-  const importLabel = importType === "kpi" ? "KPI history" : importType === "crm" ? "CRM leads" : "business metrics";
+  const importLabel = importType === "kpi" ? "KPI history" : "business metrics";
 
   return `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} for ${importLabel}. ${mappedCount} column${mappedCount === 1 ? "" : "s"} were mapped, including ${mappedRequired} of ${requiredCount} required field${requiredCount === 1 ? "" : "s"}. Review the mappings before saving.`;
 }
@@ -759,42 +753,6 @@ async function removeDuplicateKpiRows({
   return { duplicateRows, rows: uniqueRows };
 }
 
-function buildCrmLeadRecords(
-  importRows: Pick<FileImportRow, "id" | "data_json">[],
-  workspaceId: string,
-  userId: string,
-  sourceFile: FileUploadRow,
-  importId: string,
-  mapping: ImportMapping
-) {
-  return importRows
-    .map((importRow) => {
-      const row = jsonToImportRow(importRow.data_json);
-
-      return {
-        importRowId: importRow.id,
-        record: {
-          workspace_id: workspaceId,
-          source_file_id: sourceFile.id,
-          import_id: importId,
-          import_row_id: importRow.id,
-          lead_name: mappedText(row, mapping, field("crm", "lead_name")),
-          company: mappedText(row, mapping, field("crm", "company")),
-          email: mappedText(row, mapping, field("crm", "email")),
-          phone: mappedText(row, mapping, field("crm", "phone")),
-          status: mappedText(row, mapping, field("crm", "status"), "New"),
-          estimated_value: mappedNumber(row, mapping, field("crm", "estimated_value")),
-          owner: mappedText(row, mapping, field("crm", "owner")),
-          notes: mappedText(row, mapping, field("crm", "notes")),
-          raw_data_json: rowJson(row),
-          last_activity_at: new Date().toISOString(),
-          created_by: userId
-        }
-      };
-    })
-    .filter(({ record }) => record.lead_name);
-}
-
 function buildOperationalMetricRecords(
   importRows: Pick<FileImportRow, "id" | "data_json">[],
   workspaceId: string,
@@ -826,122 +784,6 @@ function buildOperationalMetricRecords(
       };
     })
     .filter(({ record }) => record.metric_name && record.value !== null);
-}
-
-async function saveCrmLeadRows({
-  supabase,
-  rows,
-  workspaceId,
-  userId,
-  sourceFile,
-  importId
-}: {
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>;
-  rows: ReturnType<typeof buildCrmLeadRecords>;
-  workspaceId: string;
-  userId: string;
-  sourceFile: FileUploadRow;
-  importId: string;
-}) {
-  if (!supabase) {
-    throw new Error("Supabase is not configured.");
-  }
-
-  let savedCount = 0;
-
-  for (const row of rows) {
-    const email = row.record.email.trim();
-    let existingLeadId: string | null = null;
-
-    if (email) {
-      const { data, error } = await supabase
-        .from("crm_leads")
-        .select("id")
-        .eq("workspace_id", workspaceId)
-        .eq("email", email)
-        .is("deleted_at", null)
-        .maybeSingle();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      existingLeadId = data?.id ?? null;
-    }
-
-    if (!existingLeadId && row.record.company) {
-      const { data, error } = await supabase
-        .from("crm_leads")
-        .select("id")
-        .eq("workspace_id", workspaceId)
-        .eq("lead_name", row.record.lead_name)
-        .eq("company", row.record.company)
-        .is("deleted_at", null)
-        .maybeSingle();
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      existingLeadId = data?.id ?? null;
-    }
-
-    const eventType = existingLeadId ? "updated" : "created";
-    const leadResult = existingLeadId
-      ? await supabase
-          .from("crm_leads")
-          .update({
-            source_file_id: sourceFile.id,
-            import_id: importId,
-            import_row_id: row.importRowId,
-            lead_name: row.record.lead_name,
-            company: row.record.company || null,
-            email: row.record.email || null,
-            phone: row.record.phone || null,
-            status: row.record.status || "New",
-            estimated_value: row.record.estimated_value,
-            owner: row.record.owner || null,
-            notes: row.record.notes || null,
-            raw_data_json: row.record.raw_data_json,
-            last_activity_at: row.record.last_activity_at
-          })
-          .eq("id", existingLeadId)
-          .eq("workspace_id", workspaceId)
-          .select("id")
-          .single()
-      : await supabase
-          .from("crm_leads")
-          .insert(row.record)
-          .select("id")
-          .single();
-
-    if (leadResult.error || !leadResult.data) {
-      throw new Error(leadResult.error?.message || "CRM lead could not be saved.");
-    }
-
-    const { error: historyError } = await supabase.from("crm_lead_history").insert({
-      workspace_id: workspaceId,
-      lead_id: leadResult.data.id,
-      source_file_id: sourceFile.id,
-      import_id: importId,
-      import_row_id: row.importRowId,
-      event_type: eventType,
-      status: row.record.status || "New",
-      estimated_value: row.record.estimated_value,
-      owner: row.record.owner || null,
-      notes: row.record.notes || null,
-      raw_data_json: row.record.raw_data_json,
-      created_by: userId
-    });
-
-    if (historyError) {
-      throw new Error(historyError.message);
-    }
-
-    savedCount += 1;
-  }
-
-  return savedCount;
 }
 
 function summarizeVaeroexOutput(outputJson: Json) {
@@ -1026,7 +868,7 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
   const suggestedTasks = outputList(output, "suggested_tasks").concat(outputList(output, "follow_up_tasks")).concat(outputList(output, "tasks"));
   const suggestedReports = outputList(output, "suggested_reports").concat(outputList(output, "reports"));
   const suggestedKpiRecords = outputList(output, "suggested_kpi_records").concat(kpis);
-  const suggestedCrmRecords = outputList(output, "suggested_crm_records").concat(outputList(output, "crm_records")).concat(outputList(output, "crm_leads"));
+  const suggestedCustomerEvidence = outputList(output, "suggested_crm_records").concat(outputList(output, "crm_records")).concat(outputList(output, "crm_leads"));
 
   return {
     source_file_name: file.display_name,
@@ -1034,7 +876,7 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
     extraction_status: "ready",
     extraction_note: extraction.contentNote,
     executive_summary: summary,
-    extracted_findings: findings.slice(0, 8),
+    extracted_findings: [...findings, ...suggestedCustomerEvidence].slice(0, 8),
     kpis_found: kpis.slice(0, 8),
     risks: risks.slice(0, 8),
     operational_issues: issues.slice(0, 8),
@@ -1043,7 +885,6 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
     suggested_tasks: suggestedTasks.slice(0, 8),
     suggested_reports: suggestedReports.slice(0, 8),
     suggested_kpi_records: suggestedKpiRecords.slice(0, 8),
-    suggested_crm_records: suggestedCrmRecords.slice(0, 8),
     response_markdown: str(output.response_markdown, summary)
   } satisfies JsonRecord;
 }
@@ -1058,8 +899,7 @@ function cleanAnalysisInsightCount(result: JsonRecord) {
     ...asArray(result.opportunities),
     ...asArray(result.suggested_tasks),
     ...asArray(result.suggested_reports),
-    ...asArray(result.suggested_kpi_records),
-    ...asArray(result.suggested_crm_records)
+    ...asArray(result.suggested_kpi_records)
   ].length;
 }
 
@@ -1635,7 +1475,7 @@ function ensureFileReportSections(body: string, file: FileUploadRow, extraction:
     },
     {
       heading: "KPIs Found",
-      body: "- Review the report body for metrics, counts, revenue, lead, cost, quality, staffing, or business measures worth tracking."
+      body: "- Review the report body for metrics, counts, revenue, customer activity, cost, quality, staffing, or business measures worth tracking."
     },
     {
       heading: "Risks",
@@ -1708,7 +1548,7 @@ ${analysisSummary || "Vaeroex reviewed this file and prepared a report from the 
 - Vaeroex reviewed the extracted content shown in the preview below and used it with workspace context to prepare this report.
 
 ## KPIs Found
-- Review the extracted content for metrics that should be saved into KPI history, CRM history, or business metrics.
+- Review the extracted content for metrics that should be saved into KPI history, customer activity history, or business metrics.
 
 ## Risks
 - Confirm any high-impact findings before leadership relies on the conclusion.
@@ -1734,7 +1574,7 @@ ${contentPreview}
 
 ## Recommended Leadership Review
 - Review the findings before saving or using any recommended output.
-- Import approved spreadsheet rows into KPI, CRM, or business metrics history when appropriate.
+- Import approved spreadsheet rows into KPI, customer activity, or business metrics history when appropriate.
 - Use this file in the next management review so trends are tracked over time.`;
 }
 
@@ -2128,7 +1968,7 @@ export async function uploadFileAction(formData: FormData) {
           storedExtension === "docx" ||
           storedExtension === "png" ||
           storedExtension === "jpg",
-        supported_import_types: extension === "csv" || extension === "xlsx" ? ["kpi", "crm", "metrics"] : [],
+        supported_import_types: extension === "csv" || extension === "xlsx" ? ["kpi", "metrics"] : [],
         extraction_support:
           storedExtension === "csv" || storedExtension === "xlsx"
             ? "Spreadsheet rows can be parsed, analyzed, and imported after review."
@@ -2532,7 +2372,7 @@ export async function importFileAction(formData: FormData) {
   }
 
   if (!isSpreadsheet(file)) {
-    redirectWithFileError("Only CSV and XLSX files can be imported into KPI, CRM, or business history.", file.id);
+    redirectWithFileError("Only CSV and XLSX files can be imported into KPI or business metric history.", file.id);
   }
 
   await updateFileProcessingStatus({ supabase, file, status: "processing" });
@@ -2747,7 +2587,6 @@ export async function saveExtractedImportAction(formData: FormData) {
 
   const importToolByType: Record<ImportType, RegisteredToolName> = {
     kpi: "approve_kpi_import",
-    crm: "approve_crm_import",
     metrics: "approve_operational_metrics_import"
   };
 
@@ -2820,16 +2659,6 @@ export async function saveExtractedImportAction(formData: FormData) {
         });
         kpiSettingsSkippedForPermission = !kpiSettingsSaved;
       }
-    } else if (importType === "crm") {
-      const targetRows = buildCrmLeadRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
-      importedRowCount = await saveCrmLeadRows({
-        supabase,
-        rows: targetRows,
-        workspaceId,
-        userId: user.id,
-        sourceFile: file,
-        importId
-      });
     } else {
       const targetRows = buildOperationalMetricRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
       importedRowCount = targetRows.length;
