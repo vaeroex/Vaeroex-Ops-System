@@ -6,10 +6,10 @@ import {
   createReportFromFileAction,
   discardFileAnalysisAction,
   importFileAction,
+  manageLearnedKnowledgeAction,
+  manageSourceFileAction,
   uploadFileAction
 } from "@/app/app/files/actions";
-import { ArchivedFilesBulkActions } from "@/components/operations/ArchivedFilesBulkActions";
-import { manageRecordAction } from "@/app/app/operations/record-management-actions";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
@@ -26,15 +26,21 @@ import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
 
+type SourceSearchParams = {
+  error?: string;
+  message?: string;
+  status?: string;
+  q?: string;
+  file?: string;
+  view?: string;
+  tab?: string;
+  trust?: string;
+  source_type?: string;
+  sort?: string;
+};
+
 type SourcesPageProps = {
-  searchParams?: Promise<{
-    error?: string;
-    message?: string;
-    status?: string;
-    q?: string;
-    file?: string;
-    view?: string;
-  }>;
+  searchParams?: Promise<SourceSearchParams>;
 };
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
@@ -43,18 +49,19 @@ type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
+type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 type JsonRecord = Record<string, unknown>;
+type SourcesTab = "files" | "knowledge" | "archived";
 
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting key information", "Identifying business signals", "Checking KPI/import opportunities", "Saving analysis", "Done"];
 const IMPORT_PROGRESS_STEPS = ["Parsing file", "Detecting columns", "Preparing mapping review", "Saving staged rows", "Ready for approval"];
 const REPORT_PROGRESS_STEPS = ["Reading source evidence", "Preparing findings", "Creating report", "Saving report", "Done"];
 const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing source record", "Refreshing Sources", "Complete"];
-const fileStatusTabs = [
-  { label: "All Files", href: "/app/sources" },
-  { label: "Needs Review", href: "/app/sources?status=Needs%20Review" },
-  { label: "Learned", href: "/app/sources?status=Learned" },
-  { label: "Archived", href: "/app/sources?view=hidden" }
-] as const;
+const sourceTabs: Array<{ key: SourcesTab; label: string; href: Route }> = [
+  { key: "files", label: "Files", href: "/app/sources" },
+  { key: "knowledge", label: "Learned Knowledge", href: "/app/sources?tab=knowledge" },
+  { key: "archived", label: "Archived", href: "/app/sources?tab=archived" }
+];
 
 function cleanNoticeMessage(message: string | null | undefined, fallback: string) {
   const trimmed = (message || "").trim();
@@ -72,6 +79,12 @@ function isRecord(value: unknown): value is JsonRecord {
 
 function stringValue(value: unknown, fallback = "") {
   return typeof value === "string" && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeSourcesTab(tab?: string | null, legacyView?: string | null): SourcesTab {
+  if (tab === "knowledge" || tab === "learned") return "knowledge";
+  if (tab === "archived" || legacyView === "hidden") return "archived";
+  return "files";
 }
 
 function formatDate(value?: string | null) {
@@ -229,8 +242,8 @@ function analysisStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
 }
 
 function importStatusLabel(value: string) {
-  if (value === "ready") return "Import Ready";
-  if (value === "extracted" || value === "needs_review") return "Pending Review";
+  if (value === "ready") return "Import Review";
+  if (value === "extracted" || value === "needs_review") return "Import Review";
   if (value === "imported") return "Imported";
   if (value === "failed") return "Error";
   return "Not imported";
@@ -245,7 +258,9 @@ function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   if ((file.processing_status || "") === "failed" || file.import_status === "failed" || reviewStatus === "failed") return "Failed";
   if (reviewStatus === "discarded" || reviewStatus === "excluded") return "Uploaded";
   if (reviewStatus === "approved" || reviewStatus === "auto_learned" || file.index_status === "ready") return "Learned";
-  if (reviewStatus === "needs_review" || reviewStatus === "ready_for_review" || reviewStatus === "completed" || analysisStatus(file, runs) === "Needs Review") return "Needs Review";
+  if (reviewStatus === "needs_review" || reviewStatus === "ready_for_review") return "Needs Review";
+  if (file.import_status === "extracted" || file.import_status === "needs_review" || (isSpreadsheet(file) && file.import_status === "ready")) return "Import Review";
+  if (reviewStatus === "completed" || analysisStatus(file, runs) === "Needs Review") return "Ready";
   return "Uploaded";
 }
 
@@ -328,6 +343,12 @@ function UploadSourceForm({ folders }: { folders: Pick<FolderRow, "id" | "name">
       </label>
       <TextInput label="Display name" name="display_name" placeholder="Optional name shown in Vaeroex" />
       <FolderSelect folders={folders} />
+      <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-slate-950/45 p-3 text-xs leading-5 text-slate-300">
+        <input name="allow_duplicate" type="checkbox" className="mt-0.5 h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue focus:ring-vaeroex-accent" />
+        <span>
+          Upload anyway if this is a duplicate source. Vaeroex warns when the file name, type, and size match an existing active source.
+        </span>
+      </label>
       <p className="rounded-lg border border-white/10 bg-slate-950/45 p-3 text-xs leading-5 text-slate-400">
         Do not upload patient data, Social Security numbers, insurance IDs, or regulated healthcare data.
       </p>
@@ -407,9 +428,48 @@ function SourceFilePrimaryActions({ file, status, selected }: { file: FileUpload
   if (status === "Learned") {
     return (
       <div className="flex shrink-0 items-center justify-end">
-        <LoadingLink href={`/app/sources?file=${file.id}` as Route} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening source...">
-          View
+        <LoadingLink href={`/app/sources?file=${file.id}` as Route} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening knowledge...">
+          View Knowledge
         </LoadingLink>
+      </div>
+    );
+  }
+
+  if (status === "Import Review") {
+    return (
+      <div className="flex shrink-0 items-center justify-end">
+        <form action={importFileAction}>
+          <input type="hidden" name="file_id" value={file.id} />
+          <input type="hidden" name="import_type" value="kpi" />
+          <SourceActionButton pendingLabel="Preparing import review..." steps={IMPORT_PROGRESS_STEPS}>
+            Review Import
+          </SourceActionButton>
+        </form>
+      </div>
+    );
+  }
+
+  if (status === "Ready") {
+    return (
+      <div className="flex shrink-0 items-center justify-end">
+        <LoadingLink href={`/app/sources?file=${file.id}` as Route} className="rounded-md bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white" loadingLabel="Opening findings...">
+          View Findings
+        </LoadingLink>
+      </div>
+    );
+  }
+
+  if (status === "Archived") {
+    return (
+      <div className="flex shrink-0 items-center justify-end">
+        <form action={manageSourceFileAction}>
+          <input type="hidden" name="file_id" value={file.id} />
+          <input type="hidden" name="source_action" value="restore" />
+          <input type="hidden" name="return_path" value="/app/sources?tab=archived" />
+          <PendingSubmitButton pendingLabel="Restoring..." className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">
+            Restore
+          </PendingSubmitButton>
+        </form>
       </div>
     );
   }
@@ -496,11 +556,10 @@ function SourceFileActions({
           Download Original
         </a>
       ) : null}
-      <form action={manageRecordAction}>
-        <input type="hidden" name="collection" value="files" />
-        <input type="hidden" name="record_id" value={file.id} />
-        <input type="hidden" name="record_action" value={file.archived_at ? "restore" : "archive"} />
-        <input type="hidden" name="return_path" value="/app/sources" />
+      <form action={manageSourceFileAction}>
+        <input type="hidden" name="file_id" value={file.id} />
+        <input type="hidden" name="source_action" value={file.archived_at ? "restore" : "archive"} />
+        <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
         <ConfirmSubmitButton
           message={file.archived_at ? `Restore "${file.display_name}" to current Sources?` : `Archive "${file.display_name}"? It will leave current views but remain available as historical context.`}
           pendingLabel={file.archived_at ? "Restoring..." : "Archiving..."}
@@ -509,11 +568,10 @@ function SourceFileActions({
           {file.archived_at ? "Restore" : "Archive"}
         </ConfirmSubmitButton>
       </form>
-      <form action={manageRecordAction}>
-        <input type="hidden" name="collection" value="files" />
-        <input type="hidden" name="record_id" value={file.id} />
-        <input type="hidden" name="record_action" value="delete" />
-        <input type="hidden" name="return_path" value="/app/sources" />
+      <form action={manageSourceFileAction}>
+        <input type="hidden" name="file_id" value={file.id} />
+        <input type="hidden" name="source_action" value="delete" />
+        <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
         <ConfirmSubmitButton
           message={`Delete this file from current Sources? This uses a workspace-safe soft delete and may remove supporting evidence from active views.${referenceWarning}`}
           pendingLabel="Deleting file..."
@@ -567,12 +625,12 @@ function SourceFileDetailPanel({
     status === "Learned"
       ? trustLevel === "tentative"
         ? "Available to Intelligence as a medium-confidence, directional observation."
-        : "Available to Intelligence and Business Memory."
+        : "Available to Intelligence and Learned Knowledge."
       : status === "Needs Review"
-        ? "Not yet available. Review is needed before Business Memory uses it."
+        ? "Not yet available. Review is needed before Vaeroex uses it."
         : status === "Failed"
           ? "Not available because analysis failed."
-          : "Not yet available in Business Memory.";
+          : "Not yet available in Learned Knowledge.";
 
   return (
     <aside className="rounded-lg border border-cyan-300/20 bg-[#08111f] p-4 text-slate-100 shadow-panel xl:sticky xl:top-24">
@@ -637,7 +695,7 @@ function SourceFileDetailPanel({
         </section>
 
         <section className="rounded-lg border border-white/10 bg-slate-950/40 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Business Memory</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Learned Knowledge</p>
           <p className="mt-2 text-sm leading-6 text-slate-300">{memoryStatus}</p>
           {reviewReasons.length ? (
             <ul className="mt-2 space-y-1 text-xs leading-5 text-amber-100">
@@ -679,7 +737,7 @@ function SourceFileDetailPanel({
                 <input type="hidden" name="run_id" value={latestRunId} />
                 <input type="hidden" name="return_path" value="/app/sources" />
                 <ConfirmSubmitButton
-                  message={`Remove the current analysis for "${file.display_name}" from active Business Memory? It will not be used in future Vaeroex answers.`}
+                  message={`Remove the current analysis for "${file.display_name}" from active Learned Knowledge? It will not be used in future Vaeroex answers.`}
                   pendingLabel="Removing..."
                   className="rounded-md border border-red-400/35 bg-red-950/35 px-3 py-2 text-xs font-semibold text-red-100 hover:border-red-300/60 hover:bg-red-950/55"
                 >
@@ -836,7 +894,7 @@ function SourceFileRow({
           </p>
           <p className="mt-2 line-clamp-1 text-xs leading-5 text-slate-400">
             {status === "Needs Review"
-              ? "Analysis needs a human check before Business Memory uses it."
+              ? "Analysis needs a human check before Vaeroex uses it."
               : status === "Learned"
                 ? "This source is available to Vaeroex intelligence."
                 : file.analysis_summary || fileCategory(file, folders)}
@@ -845,7 +903,7 @@ function SourceFileRow({
         <SourceFilePrimaryActions file={file} status={status} selected={selected} />
       </div>
 
-      {isSpreadsheet(file) && file.import_status === "ready" && status === "Uploaded" ? (
+      {isSpreadsheet(file) && file.import_status === "ready" && status === "Import Review" ? (
         <div className="mt-3 rounded-lg border border-cyan-400/30 bg-cyan-950/30 p-3 text-xs leading-5 text-cyan-50">
           Vaeroex found structured data in this file. You can import it as KPI data after review.
         </div>
@@ -854,10 +912,263 @@ function SourceFileRow({
   );
 }
 
+function knowledgeMetadata(chunk: MemoryChunkRow) {
+  return isRecord(chunk.source_metadata) ? chunk.source_metadata : {};
+}
+
+function knowledgeTrustStatus(chunk: MemoryChunkRow) {
+  if (chunk.deleted_at || chunk.archived_at) return "Archived";
+
+  const metadata = knowledgeMetadata(chunk);
+  const trustLevel = stringValue(metadata.trust_level);
+  const reviewStatus = stringValue(metadata.review_status);
+  const confidenceLabel = stringValue(metadata.confidence_label).toLowerCase();
+
+  if (reviewStatus === "needs_review" || trustLevel === "needs_review") return "Needs Review";
+  if (trustLevel === "trusted" || confidenceLabel === "high" || chunk.confidence_score >= 80) return "Trusted";
+  if (trustLevel === "tentative" || confidenceLabel === "medium" || chunk.confidence_score >= 45) return "Directional";
+  return "Needs Review";
+}
+
+function knowledgeStatement(chunk: MemoryChunkRow) {
+  return stringValue(chunk.summary) || stringValue(chunk.source_excerpt) || "Learned business context from source evidence.";
+}
+
+function knowledgeSourceType(chunk: MemoryChunkRow) {
+  const metadata = knowledgeMetadata(chunk);
+  const extension = stringValue(metadata.file_extension).toUpperCase();
+  if (extension) return extension;
+  return chunk.source_type.replace(/_/g, " ");
+}
+
+function sourceFileForKnowledge(chunk: MemoryChunkRow, files: FileUploadRow[]) {
+  return files.find((file) => file.id === chunk.source_file_id || file.id === chunk.source_id) || null;
+}
+
+function filterKnowledgeItems({
+  chunks,
+  files,
+  query,
+  trust,
+  sourceType,
+  sort,
+  archivedOnly = false
+}: {
+  chunks: MemoryChunkRow[];
+  files: FileUploadRow[];
+  query?: string;
+  trust?: string;
+  sourceType?: string;
+  sort?: string;
+  archivedOnly?: boolean;
+}) {
+  const normalizedQuery = (query || "").trim().toLowerCase();
+  const normalizedSourceType = (sourceType || "").trim().toLowerCase();
+
+  return chunks
+    .filter((chunk) => (archivedOnly ? Boolean(chunk.archived_at || chunk.deleted_at) : !chunk.archived_at && !chunk.deleted_at))
+    .filter((chunk) => !trust || knowledgeTrustStatus(chunk) === trust)
+    .filter((chunk) => !normalizedSourceType || knowledgeSourceType(chunk).toLowerCase() === normalizedSourceType)
+    .filter((chunk) => {
+      if (!normalizedQuery) return true;
+      const file = sourceFileForKnowledge(chunk, files);
+      return [knowledgeStatement(chunk), chunk.source_title, chunk.source_excerpt, file?.display_name, file?.original_name, knowledgeSourceType(chunk)]
+        .some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
+    })
+    .sort((a, b) => {
+      if (sort === "oldest") return a.indexed_at.localeCompare(b.indexed_at);
+      return b.indexed_at.localeCompare(a.indexed_at);
+    });
+}
+
+function KnowledgeActions({
+  item,
+  sourceFile,
+  archived = false
+}: {
+  item: MemoryChunkRow;
+  sourceFile?: FileUploadRow | null;
+  archived?: boolean;
+}) {
+  const returnPath = archived ? "/app/sources?tab=archived" : "/app/sources?tab=knowledge";
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {sourceFile ? (
+        <LoadingLink href={`/app/sources?file=${sourceFile.id}` as Route} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening source...">
+          View Source
+        </LoadingLink>
+      ) : null}
+      {sourceFile ? (
+        <LoadingLink href={`/app/sources?file=${sourceFile.id}` as Route} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening correction view...">
+          Correct
+        </LoadingLink>
+      ) : null}
+      <details className="relative">
+        <summary className="inline-flex min-h-9 cursor-pointer list-none items-center rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">
+          View Details
+        </summary>
+        <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] rounded-lg border border-white/10 bg-[#08111f] p-4 text-xs leading-5 text-slate-300 shadow-2xl shadow-black/40">
+          <p className="font-semibold text-white">Evidence excerpt</p>
+          <p className="mt-2">{item.source_excerpt}</p>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <p>Trust: {knowledgeTrustStatus(item)}</p>
+            <p>Source: {item.source_title}</p>
+            <p>Created: {formatDateTime(item.created_at)}</p>
+            <p>Updated: {formatDateTime(item.updated_at)}</p>
+          </div>
+        </div>
+      </details>
+      {archived ? (
+        <form action={manageLearnedKnowledgeAction}>
+          <input type="hidden" name="knowledge_id" value={item.id} />
+          <input type="hidden" name="knowledge_action" value="restore" />
+          <input type="hidden" name="return_path" value={returnPath} />
+          <PendingSubmitButton pendingLabel="Restoring..." className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">
+            Restore
+          </PendingSubmitButton>
+        </form>
+      ) : (
+        <form action={manageLearnedKnowledgeAction}>
+          <input type="hidden" name="knowledge_id" value={item.id} />
+          <input type="hidden" name="knowledge_action" value="archive" />
+          <input type="hidden" name="return_path" value={returnPath} />
+          <ConfirmSubmitButton
+            message="Archive this learned knowledge? It will be excluded from future Vaeroex answers."
+            pendingLabel="Archiving..."
+            className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30"
+          >
+            Archive
+          </ConfirmSubmitButton>
+        </form>
+      )}
+      <form action={manageLearnedKnowledgeAction}>
+        <input type="hidden" name="knowledge_id" value={item.id} />
+        <input type="hidden" name="knowledge_action" value="delete" />
+        <input type="hidden" name="return_path" value={returnPath} />
+        <ConfirmSubmitButton
+          message="Delete this learned knowledge? This removes it from future Vaeroex answers."
+          pendingLabel="Deleting..."
+          className="rounded-md border border-red-400/35 bg-red-950/35 px-3 py-2 text-xs font-semibold text-red-100 hover:border-red-300/60 hover:bg-red-950/55"
+        >
+          Delete
+        </ConfirmSubmitButton>
+      </form>
+    </div>
+  );
+}
+
+function LearnedKnowledgeView({
+  items,
+  files,
+  params,
+  archived = false
+}: {
+  items: MemoryChunkRow[];
+  files: FileUploadRow[];
+  params?: SourceSearchParams;
+  archived?: boolean;
+}) {
+  const sourceTypes = Array.from(new Set(items.map(knowledgeSourceType))).sort((a, b) => a.localeCompare(b));
+  const visibleItems = filterKnowledgeItems({
+    chunks: items,
+    files,
+    query: params?.q,
+    trust: params?.trust,
+    sourceType: params?.source_type,
+    sort: params?.sort,
+    archivedOnly: archived
+  });
+
+  return (
+    <section className="space-y-4 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-white">{archived ? "Archived Knowledge" : "Learned Knowledge"}</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">
+            {archived
+              ? "Learned knowledge that is no longer active in Vaeroex answers."
+              : "Everything Vaeroex has learned from your business information."}
+          </p>
+        </div>
+        <StatusBadge value={`${visibleItems.length} showing`} />
+      </div>
+
+      <form method="get" className="grid gap-2 lg:grid-cols-[minmax(14rem,1fr)_170px_170px_150px_auto]">
+        <input type="hidden" name="tab" value={archived ? "archived" : "knowledge"} />
+        <input
+          name="q"
+          defaultValue={params?.q || ""}
+          placeholder="Search learned knowledge..."
+          className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
+        />
+        <select name="trust" defaultValue={params?.trust || ""} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100">
+          <option value="">All trust levels</option>
+          {["Trusted", "Directional", "Needs Review", "Archived"].map((item) => (
+            <option key={item}>{item}</option>
+          ))}
+        </select>
+        <select name="source_type" defaultValue={params?.source_type || ""} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100">
+          <option value="">All source types</option>
+          {sourceTypes.map((item) => (
+            <option key={item}>{item}</option>
+          ))}
+        </select>
+        <select name="sort" defaultValue={params?.sort || "newest"} className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100">
+          <option value="newest">Newest</option>
+          <option value="oldest">Oldest</option>
+          <option value="recently_used">Recently used</option>
+        </select>
+        <PendingSubmitButton pendingLabel="Filtering..." className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+          Apply
+        </PendingSubmitButton>
+      </form>
+
+      <div className="space-y-3">
+        {visibleItems.length ? (
+          visibleItems.map((item) => {
+            const sourceFile = sourceFileForKnowledge(item, files);
+            const trust = knowledgeTrustStatus(item);
+
+            return (
+              <article key={item.id} className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <StatusBadge value={trust} />
+                      <StatusBadge value={knowledgeSourceType(item)} />
+                      {item.archived_at || item.deleted_at ? <StatusBadge value="Inactive" /> : <StatusBadge value="Active" />}
+                    </div>
+                    <p className="mt-3 text-sm font-semibold leading-6 text-white">{knowledgeStatement(item)}</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Source: {sourceFile?.display_name || item.source_title} · Created {formatDateTime(item.created_at)} · Updated {formatDateTime(item.updated_at)}
+                    </p>
+                  </div>
+                  <KnowledgeActions item={item} sourceFile={sourceFile} archived={archived || Boolean(item.archived_at || item.deleted_at)} />
+                </div>
+              </article>
+            );
+          })
+        ) : (
+          <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
+            <h3 className="text-lg font-semibold text-white">{archived ? "No archived knowledge." : "No learned knowledge yet."}</h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+              {archived
+                ? "Archived or deleted knowledge will appear here with restore and delete actions."
+                : "Analyze a trusted source and Vaeroex will add supported findings here automatically when confidence is high or directional."}
+            </p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
 export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [filesResult, foldersResult, importsResult, reportsResult, kpisResult, runsResult] = await Promise.all([
+  const activeTab = normalizeSourcesTab(params?.tab, params?.view);
+  const [filesResult, foldersResult, importsResult, reportsResult, kpisResult, runsResult, memoryResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
@@ -869,7 +1180,13 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       .eq("workspace_id", workspaceId)
       .eq("agent_type", "file_analysis")
       .is("deleted_at", null)
-      .order("created_at", { ascending: false })
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("business_memory_chunks")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .order("indexed_at", { ascending: false })
+      .limit(300)
   ]);
 
   const files = (filesResult.data || []) as FileUploadRow[];
@@ -878,6 +1195,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const reports = (reportsResult.data || []) as ReportRow[];
   const kpis = (kpisResult.data || []) as KpiRow[];
   const runs = (runsResult.data || []) as VaeroexRunRow[];
+  const memoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
   const accessByFileId = await createFileAccessLinkMap(supabase, files);
   const runsByFile = new Map<string, VaeroexRunRow[]>();
 
@@ -887,18 +1205,18 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     runsByFile.set(fileId, [...(runsByFile.get(fileId) || []), run]);
   });
 
-  const errors = [filesResult.error, foldersResult.error, importsResult.error, reportsResult.error, kpisResult.error, runsResult.error].filter(Boolean);
+  const errors = [filesResult.error, foldersResult.error, importsResult.error, reportsResult.error, kpisResult.error, runsResult.error, memoryResult.error].filter(Boolean);
   const visibleFiles = filteredFiles({
     files,
     status: params?.status,
     query: params?.q,
-    view: params?.view,
+    view: activeTab === "archived" ? "hidden" : params?.view,
     runsByFile
   });
   const linkedFile = params?.file ? files.find((file) => file.id === params.file) : null;
   const selectedFile = linkedFile || visibleFiles[0] || null;
-  const activeFilterLabel = params?.status || (params?.view === "hidden" ? "Archived" : "") || params?.q || "";
-  const isArchivedView = params?.view === "hidden";
+  const activeFilterLabel = params?.status || (activeTab === "archived" ? "Archived" : "") || params?.q || params?.trust || params?.source_type || "";
+  const isArchivedView = activeTab === "archived";
   const successMessage = cleanNoticeMessage(params?.message, "File action completed.");
   const loadErrorMessage = cleanNoticeMessage(errors[0]?.message, "Source data could not be loaded.");
   const actionErrorMessage = cleanNoticeMessage(params?.error, "Source data could not be loaded.");
@@ -924,7 +1242,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
               What is this?
             </summary>
             <p className="mt-2 text-xs leading-5 text-slate-400">
-              Sources are business evidence Vaeroex can analyze, reference in briefings, or preserve as Business Memory. Strong evidence is learned automatically; structured imports still require review before records change.
+              Sources are business evidence Vaeroex can analyze, reference in briefings, or preserve as Learned Knowledge. Strong evidence is learned automatically; structured imports still require review before records change.
             </p>
           </details>
           <details className="rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2">
@@ -945,40 +1263,46 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
         </div>
       ) : null}
 
-      <section className="space-y-3">
-        <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Source file views">
-          {fileStatusTabs.map((tab) => {
-            const active =
-              (!params?.status && !params?.view && tab.href === "/app/sources") ||
-              (params?.status && tab.href.toLowerCase().includes(`status=${encodeURIComponent(params.status).replace(/%20/g, "%20")}`.toLowerCase())) ||
-              (params?.view && tab.href.includes(`view=${params.view}`));
+      <section className="space-y-4">
+        <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Sources views">
+          {sourceTabs.map((tab) => {
+            const active = activeTab === tab.key;
+            const count =
+              tab.key === "files"
+                ? files.filter((file) => !file.archived_at && !file.deleted_at).length
+                : tab.key === "knowledge"
+                  ? memoryChunks.filter((chunk) => !chunk.archived_at && !chunk.deleted_at).length
+                  : files.filter((file) => file.archived_at && !file.deleted_at).length + memoryChunks.filter((chunk) => chunk.archived_at || chunk.deleted_at).length;
 
             return (
               <LoadingLink
-                key={tab.href}
-                href={tab.href as Route}
-                className={`inline-flex min-h-11 items-center whitespace-nowrap rounded-md px-3 py-2 text-xs font-semibold ${active ? "bg-vaeroex-blue text-white" : "border border-white/10 bg-white/[0.04] text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30"}`}
-                loadingLabel={tab.label === "Archived" ? "Loading archived files..." : `Loading ${tab.label.toLowerCase()}...`}
+                key={tab.key}
+                href={tab.href}
+                className={`inline-flex min-h-11 items-center gap-2 whitespace-nowrap rounded-md px-3 py-2 text-xs font-semibold ${active ? "bg-vaeroex-blue text-white" : "border border-white/10 bg-white/[0.04] text-slate-100 hover:border-vaeroex-accent/40 hover:bg-cyan-950/30"}`}
+                loadingLabel={`Loading ${tab.label.toLowerCase()}...`}
               >
-                {tab.label}
+                <span>{tab.label}</span>
+                <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px]">{count}</span>
               </LoadingLink>
             );
           })}
         </nav>
 
-        <form method="get" className="grid gap-3 rounded-lg border border-white/10 bg-[#08111f] p-3 sm:grid-cols-[1fr_auto]">
-          <input
-            name="q"
-            defaultValue={params?.q || ""}
-            placeholder="Search files..."
-            className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
-          />
-          <PendingSubmitButton pendingLabel="Searching files..." className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-            Search files
-          </PendingSubmitButton>
-        </form>
+        {activeTab === "files" ? (
+          <form method="get" className="grid gap-3 rounded-lg border border-white/10 bg-[#08111f] p-3 sm:grid-cols-[1fr_auto]">
+            <input
+              name="q"
+              defaultValue={params?.q || ""}
+              placeholder="Search files..."
+              className="min-h-11 rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-vaeroex-accent"
+            />
+            <PendingSubmitButton pendingLabel="Searching files..." className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+              Search files
+            </PendingSubmitButton>
+          </form>
+        ) : null}
 
-        {activeFilterLabel ? (
+        {activeFilterLabel && activeTab === "files" ? (
           <div className="flex flex-col gap-2 rounded-lg border border-cyan-400/25 bg-cyan-950/30 p-3 text-sm text-cyan-50 sm:flex-row sm:items-center sm:justify-between">
             <p>
               Showing: <span className="font-semibold">{activeFilterLabel}</span>
@@ -989,34 +1313,20 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
           </div>
         ) : null}
 
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(24rem,0.85fr)]">
-          <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <h2 className="text-base font-semibold text-white">Files</h2>
-                <p className="mt-1 text-sm text-slate-400">Select a source to inspect details, analysis status, and available actions.</p>
+        {activeTab === "knowledge" ? (
+          <LearnedKnowledgeView items={memoryChunks} files={files} params={params} />
+        ) : activeTab === "archived" ? (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+            <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-white">Archived Files</h2>
+                  <p className="mt-1 text-sm text-slate-400">Source files removed from current views.</p>
+                </div>
+                <StatusBadge value={`${visibleFiles.length} showing`} />
               </div>
-              <StatusBadge value={`${visibleFiles.length} showing`} />
-            </div>
-            <div className="mt-4 space-y-3">
-              {visibleFiles.length ? (
-                isArchivedView ? (
-                  <ArchivedFilesBulkActions fileCount={visibleFiles.length} returnPath="/app/sources?view=hidden">
-                    <div className="space-y-3">
-                      {visibleFiles.map((file) => (
-                        <SourceFileRow
-                          key={file.id}
-                          file={file}
-                          folders={folders}
-                          runs={runs}
-                          access={accessByFileId.get(file.id)}
-                          selectable
-                          selected={selectedFile?.id === file.id}
-                        />
-                      ))}
-                    </div>
-                  </ArchivedFilesBulkActions>
-                ) : (
+              <div className="mt-4 space-y-3">
+                {visibleFiles.length ? (
                   visibleFiles.map((file) => (
                     <SourceFileRow
                       key={file.id}
@@ -1027,59 +1337,84 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                       selected={selectedFile?.id === file.id}
                     />
                   ))
-                )
-              ) : (
-                <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
-                  <h3 className="text-lg font-semibold text-white">{isArchivedView ? "No archived files." : files.length ? "No files match this filter" : "No source files yet"}</h3>
-                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
-                    {isArchivedView
-                      ? "Archived source files will appear here after you archive them."
-                      : files.length
-                        ? "Clear filters to view all files, or open Archived Files if the file was archived."
-                        : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
-                  </p>
-                  <div className="mt-5 flex flex-wrap justify-center gap-2">
-                    {files.length && !isArchivedView ? (
-                      <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
-                        Clear filters
-                      </Link>
-                    ) : null}
-                    <UploadSourceDrawer folders={folders} />
-                    {files.length && !isArchivedView ? (
-                      <Link href="/app/sources?view=hidden" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-                        Show archived files
-                      </Link>
-                    ) : null}
+                ) : (
+                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
+                    <h3 className="text-lg font-semibold text-white">No archived files.</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Archived source files will appear here after you archive them.</p>
                   </div>
-                </div>
-              )}
-            </div>
+                )}
+              </div>
+            </section>
+            <LearnedKnowledgeView items={memoryChunks} files={files} params={params} archived />
           </div>
+        ) : (
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1.25fr)_minmax(24rem,0.85fr)]">
+            <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-white">Files</h2>
+                  <p className="mt-1 text-sm text-slate-400">Select a source to inspect details, analysis status, and available actions.</p>
+                </div>
+                <StatusBadge value={`${visibleFiles.length} showing`} />
+              </div>
+              <div className="mt-4 space-y-3">
+                {visibleFiles.length ? (
+                  visibleFiles.map((file) => (
+                    <SourceFileRow
+                      key={file.id}
+                      file={file}
+                      folders={folders}
+                      runs={runs}
+                      access={accessByFileId.get(file.id)}
+                      selected={selectedFile?.id === file.id}
+                    />
+                  ))
+                ) : (
+                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
+                    <h3 className="text-lg font-semibold text-white">{files.length ? "No files match this search" : "No source files yet"}</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+                      {files.length
+                        ? "Clear search to view all current files."
+                        : "Upload a CSV, XLSX, PDF, DOCX, PNG, or JPG so Vaeroex can start building source evidence."}
+                    </p>
+                    <div className="mt-5 flex flex-wrap justify-center gap-2">
+                      {files.length ? (
+                        <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white">
+                          Clear search
+                        </Link>
+                      ) : null}
+                      <UploadSourceDrawer folders={folders} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
 
-          {selectedFile ? (() => {
-            const linkedKpis = kpis.filter((kpi) => kpi.source_file_id === selectedFile.id);
-            const linkedRuns = runs.filter((run) => runFileId(run) === selectedFile.id);
-            const linkedReports = reportsForFile(reports, selectedFile.id);
-            const fileImports = imports.filter((item) => item.file_upload_id === selectedFile.id);
+            {selectedFile ? (() => {
+              const linkedKpis = kpis.filter((kpi) => kpi.source_file_id === selectedFile.id);
+              const linkedRuns = runs.filter((run) => runFileId(run) === selectedFile.id);
+              const linkedReports = reportsForFile(reports, selectedFile.id);
+              const fileImports = imports.filter((item) => item.file_upload_id === selectedFile.id);
 
-            return (
-              <SourceFileDetailPanel
-                file={selectedFile}
-                folders={folders}
-                fileImports={fileImports}
-                linkedKpis={linkedKpis}
-                linkedRuns={linkedRuns}
-                linkedReports={linkedReports}
-                access={accessByFileId.get(selectedFile.id)}
-                actionError={selectedFileActionError}
-              />
-            );
-          })() : (
-            <aside className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm leading-6 text-slate-400 shadow-panel">
-              Select a source to view analysis status, evidence, and actions.
-            </aside>
-          )}
-        </div>
+              return (
+                <SourceFileDetailPanel
+                  file={selectedFile}
+                  folders={folders}
+                  fileImports={fileImports}
+                  linkedKpis={linkedKpis}
+                  linkedRuns={linkedRuns}
+                  linkedReports={linkedReports}
+                  access={accessByFileId.get(selectedFile.id)}
+                  actionError={selectedFileActionError}
+                />
+              );
+            })() : (
+              <aside className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm leading-6 text-slate-400 shadow-panel">
+                Select a source to view analysis status, evidence, and actions.
+              </aside>
+            )}
+          </div>
+        )}
       </section>
 
     </div>

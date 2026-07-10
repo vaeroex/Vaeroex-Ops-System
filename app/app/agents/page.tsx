@@ -1733,7 +1733,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       archivedAt: management.archivedAt,
       deletedAt: management.deletedAt,
       preview: shortPreview(sections.executiveSummary || run.error_message, "No output yet."),
-      href: `/app/ask?run=${run.id}` as Route,
+      href: `/app/agents?run=${run.id}` as Route,
       meta: [
         { label: "Workflow", value: vaeroexResultLabel(run.agent_type) },
         { label: "Status", value: run.status }
@@ -1759,7 +1759,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <PageHeader
         eyebrow="Vaeroex Results"
         title="Saved Vaeroex Result"
-        description="Review a saved Vaeroex answer, workflow result, or diagnostic record. New questions now start from global Search or Ask."
+        description={canViewDebug ? "Review a saved Vaeroex answer or admin diagnostic record. New questions now start from global Search or Ask." : "Review this saved Vaeroex answer. New questions now start from global Search or Ask."}
       />
 
       <ErrorNotice message={pageErrorMessage} />
@@ -1828,48 +1828,50 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
           <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
         ) : null}
 
-        <div className="grid gap-4 lg:grid-cols-2">
-          <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-100">History</summary>
-            <div className="mt-4">
-              <ManagedRecordList
-                collection="ai_agent_runs"
-                records={managedRuns}
-                folders={folderResult.folders}
-                title="Vaeroex result records"
-                description="Organize previous Vaeroex outputs without showing raw structured data to normal users."
-                emptyTitle="No Vaeroex results yet"
-                emptyDescription="Use global Search or Ask, contextual explanations, or generated outputs to create saved Vaeroex results."
-                returnPath="/app/ask"
-                searchParams={params}
-              />
-            </div>
-          </details>
+        {canViewDebug ? (
+          <section className="space-y-4 rounded-lg border border-white/10 bg-[#08111f] p-4">
+            <details open={Boolean(!selectedRun)} className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-100">Admin result records</summary>
+              <div className="mt-4">
+                <ManagedRecordList
+                  collection="ai_agent_runs"
+                  records={managedRuns}
+                  folders={folderResult.folders}
+                  title="Vaeroex result records"
+                  description="Admin-only execution history and diagnostics. Customer-facing business knowledge is managed in Sources → Learned Knowledge."
+                  emptyTitle="No Vaeroex results yet"
+                  emptyDescription="Use global Search or Ask, contextual explanations, or generated outputs to create saved Vaeroex results."
+                  returnPath="/app/agents"
+                  searchParams={params}
+                />
+              </div>
+            </details>
 
-          <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced workflows</summary>
-            <div className="mt-4 space-y-4">
-              {WORKFLOW_GROUPS.map((group) => (
-                <details key={group.title} className="rounded-lg border border-white/10 bg-white/[0.04]">
-                  <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="font-semibold text-white">{group.title}</h3>
-                      <p className="mt-1 text-sm leading-6 text-slate-400">{group.description}</p>
+            <details className="rounded-lg border border-white/10 bg-white/[0.04] p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-100">Admin workflows</summary>
+              <div className="mt-4 space-y-4">
+                {WORKFLOW_GROUPS.map((group) => (
+                  <details key={group.title} className="rounded-lg border border-white/10 bg-[#08111f]">
+                    <summary className="flex cursor-pointer list-none flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <h3 className="font-semibold text-white">{group.title}</h3>
+                        <p className="mt-1 text-sm leading-6 text-slate-400">{group.description}</p>
+                      </div>
+                      <span className="w-fit rounded-full border border-cyan-300/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
+                        {group.keys.length} tool{group.keys.length === 1 ? "" : "s"}
+                      </span>
+                    </summary>
+                    <div className="grid gap-4 border-t border-white/10 p-4 lg:grid-cols-2">
+                      {group.keys.map((workflowKey) => (
+                        <WorkflowCard key={workflowKey} workflowKey={workflowKey} />
+                      ))}
                     </div>
-                    <span className="w-fit rounded-full border border-cyan-300/25 bg-cyan-400/10 px-3 py-1 text-xs font-semibold text-cyan-100">
-                      {group.keys.length} tool{group.keys.length === 1 ? "" : "s"}
-                    </span>
-                  </summary>
-                  <div className="grid gap-4 border-t border-white/10 p-4 lg:grid-cols-2">
-                    {group.keys.map((workflowKey) => (
-                      <WorkflowCard key={workflowKey} workflowKey={workflowKey} />
-                    ))}
-                  </div>
-                </details>
-              ))}
-            </div>
-          </details>
-        </div>
+                  </details>
+                ))}
+              </div>
+            </details>
+          </section>
+        ) : null}
       </section>
     </div>
   );

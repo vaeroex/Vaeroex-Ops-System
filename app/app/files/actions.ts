@@ -124,29 +124,37 @@ function redirectWithError(message: string): never {
 }
 
 function safeFileReturnPath(value: string) {
-  return value === SOURCES_PATH ? SOURCES_PATH : FILES_PATH;
+  if (value === SOURCES_PATH || value.startsWith(`${SOURCES_PATH}?`)) {
+    return value;
+  }
+
+  return FILES_PATH;
 }
 
 function redirectWithPathError(path: string, message: string, fileId?: string): never {
+  const [pathname, existingQuery = ""] = path.split("?");
   const query = new URLSearchParams();
+  new URLSearchParams(existingQuery).forEach((value, key) => query.set(key, value));
 
   if (fileId) {
     query.set("file", fileId);
   }
 
   query.set("error", cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."));
-  redirect(`${path}?${query.toString()}` as Route);
+  redirect(`${pathname}?${query.toString()}` as Route);
 }
 
 function redirectWithPathMessage(path: string, message: string, fileId?: string): never {
+  const [pathname, existingQuery = ""] = path.split("?");
   const query = new URLSearchParams();
+  new URLSearchParams(existingQuery).forEach((value, key) => query.set(key, value));
 
   if (fileId) {
     query.set("file", fileId);
   }
 
   query.set("message", cleanNoticeMessage(message, "Done."));
-  redirect(`${path}?${query.toString()}` as Route);
+  redirect(`${pathname}?${query.toString()}` as Route);
 }
 
 function redirectWithFileError(message: string, fileId?: string): never {
@@ -1883,6 +1891,7 @@ export async function uploadFileAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const returnPath = safeFileReturnPath(text(formData, "return_path"));
   const uploadedFile = formData.get("file");
+  const allowDuplicateUpload = formData.get("allow_duplicate") === "on";
 
   if (!(uploadedFile instanceof File) || uploadedFile.size === 0) {
     redirectWithPathError(returnPath, "Choose a file to upload.");
@@ -1932,6 +1941,26 @@ export async function uploadFileAction(formData: FormData) {
   const safeName = safeFileName(uploadedFile.name);
   const storagePath = `${workspaceId}/${randomUUID()}/${safeName}`;
   const mimeType = validation.mimeType;
+  const { data: possibleDuplicate } = await supabase
+    .from("file_uploads")
+    .select("id,display_name,created_at")
+    .eq("workspace_id", workspaceId)
+    .eq("original_name", uploadedFile.name)
+    .eq("file_size_bytes", uploadedFile.size)
+    .eq("file_extension", storedExtension)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (possibleDuplicate && !allowDuplicateUpload) {
+    redirectWithPathError(
+      returnPath,
+      `This looks like a duplicate of "${possibleDuplicate.display_name}". Check "Upload anyway" if you intentionally want another copy.`
+    );
+  }
+
   const upload = await supabase.storage.from(STORAGE_BUCKET).upload(storagePath, buffer, {
     contentType: mimeType,
     upsert: false
@@ -2010,6 +2039,164 @@ export async function uploadFileAction(formData: FormData) {
         ? "File uploaded. Next: analyze it with Vaeroex or create a report from extracted document text."
         : "File uploaded. Next: analyze it with Vaeroex for image text, visible issues, KPIs, and recommendations.",
     data.id
+  );
+}
+
+export async function manageSourceFileAction(formData: FormData) {
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const returnPath = safeFileReturnPath(text(formData, "return_path") || SOURCES_PATH);
+  const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const action = text(formData, "source_action");
+  const now = new Date().toISOString();
+
+  if (action !== "archive" && action !== "restore" && action !== "delete") {
+    redirectWithPathError(returnPath, "Source action is not supported.", file.id);
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: action === "delete" ? "delete_record" : action === "archive" ? "archive_record" : "manage_record",
+        args: {
+          recordId: file.id,
+          collection: "files",
+          action
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: file.id,
+        metadata: {
+          source: "source_file_action",
+          file_id: file.id
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithPathError(returnPath, error instanceof Error ? error.message : "Source action was blocked by Vaeroex security policy.", file.id);
+  }
+
+  const fileUpdate =
+    action === "archive"
+      ? { archived_at: now, updated_at: now }
+      : action === "delete"
+        ? { deleted_at: now, updated_at: now }
+        : { archived_at: null, deleted_at: null, updated_at: now };
+
+  const { error } = await supabase
+    .from("file_uploads")
+    .update(fileUpdate)
+    .eq("id", file.id)
+    .eq("workspace_id", workspaceId);
+
+  if (error) {
+    redirectWithPathError(returnPath, error.message, file.id);
+  }
+
+  if (action === "archive" || action === "delete") {
+    await supabase
+      .from("business_memory_chunks")
+      .update({
+        archived_at: now,
+        deleted_at: action === "delete" ? now : null,
+        updated_at: now
+      })
+      .eq("workspace_id", workspaceId)
+      .eq("source_file_id", file.id);
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  redirectWithPathMessage(
+    returnPath,
+    action === "archive"
+      ? "Source archived. Its learned evidence is excluded from future Vaeroex answers until it is analyzed again."
+      : action === "delete"
+        ? "Source deleted from active views. Its learned evidence is excluded from future Vaeroex answers."
+        : "Source restored. Reanalyze it if you want its knowledge active again.",
+    file.id
+  );
+}
+
+export async function manageLearnedKnowledgeAction(formData: FormData) {
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const returnPath = safeFileReturnPath(text(formData, "return_path") || `${SOURCES_PATH}?tab=knowledge`);
+  const chunkId = text(formData, "knowledge_id");
+  const action = text(formData, "knowledge_action");
+  const now = new Date().toISOString();
+
+  if (!chunkId) {
+    redirectWithPathError(returnPath, "Choose a learned knowledge item.");
+  }
+
+  if (action !== "archive" && action !== "delete" && action !== "restore") {
+    redirectWithPathError(returnPath, "Knowledge action is not supported.");
+  }
+
+  try {
+    await requireToolExecution(
+      {
+        supabase,
+        workspaceId,
+        userId: user.id,
+        userRole: membership.role
+      },
+      {
+        toolName: action === "delete" ? "delete_record" : action === "archive" ? "archive_record" : "manage_record",
+        args: {
+          recordId: chunkId,
+          collection: "learned_knowledge",
+          action
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: chunkId,
+        metadata: {
+          source: "learned_knowledge_action"
+        } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithPathError(returnPath, error instanceof Error ? error.message : "Knowledge action was blocked by Vaeroex security policy.");
+  }
+
+  const update =
+    action === "archive"
+      ? { archived_at: now, updated_at: now }
+      : action === "delete"
+        ? { archived_at: now, deleted_at: now, updated_at: now }
+        : { archived_at: null, deleted_at: null, updated_at: now };
+
+  const { error } = await supabase
+    .from("business_memory_chunks")
+    .update(update)
+    .eq("id", chunkId)
+    .eq("workspace_id", workspaceId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    redirectWithPathError(returnPath, error.message);
+  }
+
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/briefings");
+  redirectWithPathMessage(
+    returnPath,
+    action === "delete"
+      ? "Learned knowledge deleted and excluded from future Vaeroex answers."
+      : action === "archive"
+        ? "Learned knowledge archived and excluded from future Vaeroex answers."
+        : "Learned knowledge restored."
   );
 }
 

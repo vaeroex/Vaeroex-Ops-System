@@ -221,8 +221,12 @@ check(searchRoute.includes("classifySecurityIntent") && searchRoute.includes('ki
 check(searchRoute.includes("buildKpiGlobalAnswer") && searchRoute.includes("buildGeneralBusinessAnswer"), "Global Search or Ask must support bounded business-question answers instead of keyword results only.");
 check(searchRoute.includes("loadKpiOverviewData") && searchRoute.includes("shouldUseKpiOverviewAnswer"), "Global Search or Ask must route KPI overview through the shared KPI/settings loader with a narrow intent gate.");
 check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/.test(searchRoute), "Global Search or Ask must not route generic weakest questions into KPI overview.");
+check(searchRoute.includes("business_memory_chunks") && searchRoute.includes('"Learned Knowledge"'), "Global Search or Ask must search active Learned Knowledge instead of implementation-only result records.");
+check(searchRoute.includes("shouldSearchDiagnostics") && searchRoute.includes("isVaeroexAdminUser"), "Global Search or Ask must keep execution diagnostics admin-explicit.");
+check(!/sourceType:\s*"Vaeroex Result"/.test(searchRoute), "Global Search or Ask must not expose Vaeroex Result records as ordinary customer-facing knowledge.");
 check(legacyAskPage.includes('redirect("/app?search=1")') && legacyAskPage.includes("params.run"), "Legacy /app/ask must redirect blank visits to global Search or Ask while preserving saved result links.");
 check(agentsPage.includes('redirect("/app?search=1")') && agentsPage.includes("Saved Vaeroex Result"), "Legacy /app/agents must not remain a blank primary Ask destination.");
+check(agentsPage.includes("canViewDebug ?") && agentsPage.includes("Admin result records"), "Legacy Vaeroex result records must be admin/debug-only outside bookmarked saved runs.");
 check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
 check(agentsPage.includes("data-vaeroex-skip-global-activity={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex form must bypass the document-level global activity submit listener.");
 check(agentsPage.includes("activityDisabled={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex must bypass button-level global activity cursor registration while preserving local pending text.");
