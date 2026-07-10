@@ -165,6 +165,13 @@ const EDUCATIONAL_SQL_PATTERNS = [
   /^\s*how\s+does\s+(sql\s+)?(delete|delete\s+from|drop\s+table|truncate|truncate\s+table)\s+work\b/i
 ];
 
+const CONTEXTUAL_EXPLANATION_PATTERNS = [
+  /^\s*explain\s+(this|the|my|current)\s+(briefing|recommendation|evidence|result|report|output|kpi|metric|business\s+signal|file|analysis|comparison|forecast|confidence)\b/i,
+  /^\s*explain\s+this\b/i,
+  /^\s*tell\s+me\s+more\s+about\s+(this|the|my|current)\b/i,
+  /^\s*why\s+did\s+vaeroex\s+surface\s+this\b/i
+];
+
 const ACTIONABLE_SQL_PATTERNS = [
   /^\s*(run|execute|perform|write|generate|create|give\s+me|show\s+me|build)\b[\s\S]*\b(delete\s+from|drop\s+table|truncate\s+table|alter\s+table|update\s+["'`[\]\w.]+\s+set|insert\s+into)\b/i,
   /\b(how\s+do\s+i|how\s+can\s+i|help\s+me)\b[\s\S]*\b(delete|remove|wipe|purge|drop|truncate)\b[\s\S]*\b(rows?|records?|table|database|customer\s+data|business\s+memory|evidence)\b/i
@@ -203,6 +210,33 @@ function includesAnyTerm(text: string, terms: string[]) {
 
 function matchesAnyPattern(text: string, patterns: RegExp[]) {
   return patterns.some((pattern) => pattern.test(text));
+}
+
+export function isContextualExplanationRequest(value?: string | null) {
+  const text = normalizeIntentText(value);
+  return Boolean(text && matchesAnyPattern(text, CONTEXTUAL_EXPLANATION_PATTERNS));
+}
+
+export function contextualSecurityIntentInput({
+  prompt,
+  followUp
+}: {
+  prompt?: string | null;
+  followUp?: string | null;
+}) {
+  const userFollowUp = normalizeIntentText(followUp);
+
+  if (userFollowUp) {
+    return userFollowUp;
+  }
+
+  const controlledPrompt = normalizeIntentText(prompt);
+
+  if (!controlledPrompt || isContextualExplanationRequest(controlledPrompt)) {
+    return "";
+  }
+
+  return controlledPrompt;
 }
 
 function isEducationalSecurityQuestion(text: string) {
