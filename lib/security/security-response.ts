@@ -81,6 +81,234 @@ const SECURITY_REQUEST_PATTERNS = [
   /\btool\s+execution\b.*\b(delete|admin|system|database|billing)\b/i
 ];
 
+export type SecurityIntentCategory =
+  | "Business Intelligence"
+  | "Educational"
+  | "Administrative"
+  | "Security Sensitive"
+  | "Operational";
+
+export type SecurityIntentClassification = {
+  category: SecurityIntentCategory;
+  securitySensitive: boolean;
+  confidence: "Low" | "Medium" | "High";
+  reasons: string[];
+};
+
+const DESTRUCTIVE_INTENT_TERMS = [
+  "delete",
+  "remove",
+  "wipe",
+  "erase",
+  "destroy",
+  "purge",
+  "truncate",
+  "drop",
+  "disable",
+  "bypass",
+  "exfiltrate",
+  "reveal",
+  "retrieve",
+  "access"
+];
+
+const PROTECTED_DATA_TERMS = [
+  "sql row",
+  "sql rows",
+  "database row",
+  "database rows",
+  "database record",
+  "database records",
+  "customer data",
+  "workspace data",
+  "business memory",
+  "evidence",
+  "kpi",
+  "kpis",
+  "report",
+  "reports",
+  "audit log",
+  "audit logging",
+  "secrets",
+  "api key",
+  "service role",
+  "environment variable",
+  "system prompt",
+  "another workspace",
+  "other workspace",
+  "different workspace",
+  "another customer",
+  "other customer",
+  "tenant data"
+];
+
+const SQL_MUTATION_PATTERNS = [
+  /\bdelete\s+from\b/i,
+  /\bdrop\s+table\b/i,
+  /\btruncate\s+table\b/i,
+  /\balter\s+table\b/i,
+  /\bupdate\s+["'`[\]\w.]+\s+set\b/i,
+  /\binsert\s+into\b/i
+];
+
+const EDUCATIONAL_FRAMING_PATTERNS = [
+  /^\s*(explain|define|what\s+is|what\s+are|teach\s+me|compare)\b/i,
+  /^\s*difference\s+between\b/i,
+  /^\s*how\s+does\b/i,
+  /\b(for\s+learning|conceptually|in\s+general|educational|tutorial)\b/i
+];
+
+const EDUCATIONAL_SQL_PATTERNS = [
+  /^\s*(explain|define|what\s+is|what\s+are)\s+(sql\s+)?(delete|delete\s+from|drop\s+table|truncate|truncate\s+table)\b/i,
+  /^\s*difference\s+between\s+(sql\s+)?(delete|truncate|drop\s+table)\b/i,
+  /^\s*teach\s+me\s+sql\b/i,
+  /^\s*how\s+does\s+(sql\s+)?(delete|delete\s+from|drop\s+table|truncate|truncate\s+table)\s+work\b/i
+];
+
+const ACTIONABLE_SQL_PATTERNS = [
+  /^\s*(run|execute|perform|write|generate|create|give\s+me|show\s+me|build)\b[\s\S]*\b(delete\s+from|drop\s+table|truncate\s+table|alter\s+table|update\s+["'`[\]\w.]+\s+set|insert\s+into)\b/i,
+  /\b(how\s+do\s+i|how\s+can\s+i|help\s+me)\b[\s\S]*\b(delete|remove|wipe|purge|drop|truncate)\b[\s\S]*\b(rows?|records?|table|database|customer\s+data|business\s+memory|evidence)\b/i
+];
+
+const BUSINESS_INTELLIGENCE_TERMS = [
+  "risk",
+  "opportunity",
+  "forecast",
+  "trend",
+  "insight",
+  "revenue",
+  "customer",
+  "operations",
+  "performance",
+  "business health",
+  "kpi",
+  "briefing"
+];
+
+const ADMINISTRATIVE_TERMS = ["billing", "subscription", "account", "settings", "invite", "workspace settings", "user role"];
+const OPERATIONAL_TERMS = ["workflow", "process", "implementation", "setup", "configure", "upload", "import", "export"];
+
+function normalizeIntentText(value?: string | null) {
+  return String(value || "")
+    .replace(/[“”]/g, '"')
+    .replace(/[‘’]/g, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function includesAnyTerm(text: string, terms: string[]) {
+  const normalized = text.toLowerCase();
+  return terms.some((term) => normalized.includes(term));
+}
+
+function matchesAnyPattern(text: string, patterns: RegExp[]) {
+  return patterns.some((pattern) => pattern.test(text));
+}
+
+function isEducationalSecurityQuestion(text: string) {
+  if (!matchesAnyPattern(text, EDUCATIONAL_FRAMING_PATTERNS)) {
+    return false;
+  }
+
+  if (matchesAnyPattern(text, ACTIONABLE_SQL_PATTERNS)) {
+    return false;
+  }
+
+  if (/\b(my|our|this|the|workspace|customer|company|production)\b[\s\S]*\b(rows?|records?|data|database|business\s+memory|evidence|reports?|kpis?)\b/i.test(text)) {
+    return false;
+  }
+
+  return matchesAnyPattern(text, EDUCATIONAL_SQL_PATTERNS) || !includesAnyTerm(text, PROTECTED_DATA_TERMS);
+}
+
+export function classifySecurityIntent(value?: string | null): SecurityIntentClassification {
+  const text = normalizeIntentText(value);
+
+  if (!text) {
+    return {
+      category: "Business Intelligence",
+      securitySensitive: false,
+      confidence: "Low",
+      reasons: ["empty_request"]
+    };
+  }
+
+  const reasons: string[] = [];
+  const educational = isEducationalSecurityQuestion(text);
+  const destructiveIntent = includesAnyTerm(text, DESTRUCTIVE_INTENT_TERMS);
+  const protectedDataTarget = includesAnyTerm(text, PROTECTED_DATA_TERMS);
+  const sqlMutation = matchesAnyPattern(text, SQL_MUTATION_PATTERNS);
+  const actionableSql = matchesAnyPattern(text, ACTIONABLE_SQL_PATTERNS);
+  const legacyPatternMatch = SECURITY_REQUEST_PATTERNS.some((pattern) => pattern.test(text));
+
+  if (legacyPatternMatch) reasons.push("security_pattern");
+  if (destructiveIntent) reasons.push("destructive_intent");
+  if (protectedDataTarget) reasons.push("protected_data_target");
+  if (sqlMutation) reasons.push("sql_mutation");
+  if (actionableSql) reasons.push("actionable_sql");
+
+  if (!educational && (legacyPatternMatch || actionableSql || (destructiveIntent && protectedDataTarget) || sqlMutation)) {
+    return {
+      category: "Security Sensitive",
+      securitySensitive: true,
+      confidence: reasons.length >= 2 ? "High" : "Medium",
+      reasons: reasons.length ? reasons : ["security_sensitive_intent"]
+    };
+  }
+
+  if (educational) {
+    return {
+      category: "Educational",
+      securitySensitive: false,
+      confidence: "High",
+      reasons: ["educational_framing"]
+    };
+  }
+
+  if (matchesAnyPattern(text, EDUCATIONAL_FRAMING_PATTERNS)) {
+    return {
+      category: "Educational",
+      securitySensitive: false,
+      confidence: "Medium",
+      reasons: ["educational_framing"]
+    };
+  }
+
+  if (includesAnyTerm(text, ADMINISTRATIVE_TERMS)) {
+    return {
+      category: "Administrative",
+      securitySensitive: false,
+      confidence: "Medium",
+      reasons: ["administrative_intent"]
+    };
+  }
+
+  if (includesAnyTerm(text, OPERATIONAL_TERMS)) {
+    return {
+      category: "Operational",
+      securitySensitive: false,
+      confidence: "Medium",
+      reasons: ["operational_intent"]
+    };
+  }
+
+  if (includesAnyTerm(text, BUSINESS_INTELLIGENCE_TERMS)) {
+    return {
+      category: "Business Intelligence",
+      securitySensitive: false,
+      confidence: "Medium",
+      reasons: ["business_intelligence_intent"]
+    };
+  }
+
+  return {
+    category: "Business Intelligence",
+    securitySensitive: false,
+    confidence: "Low",
+    reasons: ["default_business_intelligence"]
+  };
+}
+
 export function isSecurityResponseMessage(message?: string | null) {
   const value = String(message || "").trim();
 
@@ -144,11 +372,5 @@ export function isSecurityResponseOutput(value: unknown) {
 }
 
 export function isSecuritySensitiveRequest(value?: string | null) {
-  const text = String(value || "").trim();
-
-  if (!text) {
-    return false;
-  }
-
-  return SECURITY_REQUEST_PATTERNS.some((pattern) => pattern.test(text));
+  return classifySecurityIntent(value).securitySensitive;
 }

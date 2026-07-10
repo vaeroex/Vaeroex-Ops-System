@@ -16,7 +16,7 @@ import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
-import { isSecuritySensitiveRequest, securityResponseMessage, securityResponseOutput } from "@/lib/security/security-response";
+import { classifySecurityIntent, securityResponseMessage, securityResponseOutput, type SecurityIntentClassification } from "@/lib/security/security-response";
 import { logSecurityAuditEvent, requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
@@ -419,7 +419,8 @@ async function storeSecurityBlockedRun({
   workflowKey,
   inputJson,
   requestId,
-  runId
+  runId,
+  securityIntent
 }: {
   supabase: NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
   workspaceId: string;
@@ -428,6 +429,7 @@ async function storeSecurityBlockedRun({
   inputJson: Json;
   requestId: string;
   runId?: string | null;
+  securityIntent?: SecurityIntentClassification;
 }) {
   await logSecurityAuditEvent({
     supabase,
@@ -437,10 +439,13 @@ async function storeSecurityBlockedRun({
     operationType: "SYSTEM",
     initiatedBy: "user",
     allowed: false,
-    reasonBlocked: "User request matched security-response preflight.",
+    reasonBlocked: "User request was classified as security sensitive.",
     metadata: {
       workflow: workflowKey,
-      source: "ask_vaeroex_preflight"
+      source: "ask_vaeroex_preflight",
+      classification_category: securityIntent?.category || "Security Sensitive",
+      classification_confidence: securityIntent?.confidence || "Medium",
+      classification_reasons: securityIntent?.reasons || []
     } satisfies Json
   });
 
@@ -546,9 +551,20 @@ export async function runVaeroexAction(formData: FormData) {
     logVaeroexRunEvent("rate_limit_finished", logDetails({ allowed: true }));
     logVaeroexRunEvent("preflight_finished", logDetails({ allowed: true }));
 
-    if (isSecuritySensitiveRequest(`${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`)) {
+    const securityIntent = classifySecurityIntent(`${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`);
+    logVaeroexRunEvent("security_intent_classified", logDetails({
+      category: securityIntent.category,
+      securitySensitive: securityIntent.securitySensitive,
+      confidence: securityIntent.confidence
+    }));
+
+    if (securityIntent.securitySensitive) {
       currentStage = "security_blocked";
-      logVaeroexRunEvent("security_blocked", logDetails({ reason: "preflight" }));
+      logVaeroexRunEvent("security_blocked", logDetails({
+        reason: "intent_classifier",
+        category: securityIntent.category,
+        confidence: securityIntent.confidence
+      }));
       const blockedRunId = await storeSecurityBlockedRun({
         supabase,
         workspaceId,
@@ -556,7 +572,8 @@ export async function runVaeroexAction(formData: FormData) {
         workflowKey: workflow.key,
         inputJson,
         requestId,
-        runId
+        runId,
+        securityIntent
       });
       logVaeroexRunEvent("run_saved", logDetails({ status: "blocked", runId: blockedRunId }));
       revalidatePath("/app/agents");
