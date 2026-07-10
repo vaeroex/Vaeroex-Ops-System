@@ -304,7 +304,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Designed Use", body: ["Vaeroex is designed for operational business records, not regulated sensitive records."] },
       { title: "Do Not Upload or Enter", body: ["Do not upload or enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, payment card numbers, government IDs, highly sensitive personal data, or regulated health, legal, financial, or employment data unless appropriate legal, security, and compliance requirements are in place and Vaeroex explicitly supports that use."] },
       { title: "Customer Responsibility", body: ["Customers are responsible for understanding the laws, contracts, policies, and compliance obligations that apply to their business data."] },
-      { title: "Where This Matters", body: ["This policy applies to setup, files, reports, support requests, Ask Vaeroex, Business Signals, KPIs, and any other place where users enter business information."] }
+      { title: "Where This Matters", body: ["This policy applies to setup, files, reports, support requests, Search or Ask, Business Signals, KPIs, and any other place where users enter business information."] }
     ]
   },
   "subscription-billing-terms": {

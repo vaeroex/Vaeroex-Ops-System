@@ -1812,7 +1812,7 @@ function SelectedFileSummary({
           View Intelligence
         </Link>
         <Link href={selectedFileRoute(file.id, "ask")} className={actionClass("ask")}>
-          Ask Vaeroex
+          Ask About File
         </Link>
       </div>
     </section>

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createSopAction } from "@/app/app/operations/actions";
+import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
@@ -74,9 +75,9 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
               <Link href="/app/files" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
                 View Files
               </Link>
-              <Link href="/app/agents" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
+              <GlobalSearchTrigger initialQuery={sop.title} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
                 View Vaeroex Results
-              </Link>
+              </GlobalSearchTrigger>
             </div>
           </div>
           <div className="whitespace-pre-wrap text-sm leading-6 text-muted">{sop.body_markdown || "No SOP body yet."}</div>

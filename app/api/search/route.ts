@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
+import { classifySecurityIntent, securityResponseMessage } from "@/lib/security/security-response";
+import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
-import type { GlobalSearchGroup, GlobalSearchGroupLabel, GlobalSearchResult } from "@/lib/search/types";
+import type { GlobalSearchAnswer, GlobalSearchDestination, GlobalSearchGroup, GlobalSearchGroupLabel, GlobalSearchResult } from "@/lib/search/types";
 
 export const dynamic = "force-dynamic";
 
@@ -114,6 +117,173 @@ function sourceHref(sourceType: string | null, title: string | null) {
   return "/app/notifications";
 }
 
+function questionLike(query: string) {
+  return /[?]$/.test(query) || /^(what|why|how|which|where|when|tell me|give me|summarize|show me|take me|find|open)\b/i.test(query);
+}
+
+function businessQuestionLike(query: string) {
+  return (
+    questionLike(query) &&
+    /\b(kpi|metric|metrics|performance|business health|health|risk|opportunity|changed|change|week|priority|priorities|revenue|profit|margin|customer|department|briefing|report|forecast)\b/i.test(query)
+  );
+}
+
+function destination(label: string, href: string, context?: string): GlobalSearchDestination {
+  return { label, href, context };
+}
+
+function destinationsFromGroups(groups: GlobalSearchGroup[], limit = 4) {
+  return groups
+    .flatMap((group) =>
+      group.results.map((result) =>
+        destination(result.title, result.href, `${result.sourceType}${result.preview ? ` · ${truncate(result.preview, 72)}` : ""}`)
+      )
+    )
+    .slice(0, limit);
+}
+
+function confidenceFromEvidence(count: number): GlobalSearchAnswer["recommendationConfidence"] {
+  if (count >= 6) return "High";
+  if (count >= 3) return "Medium";
+  if (count >= 1) return "Low";
+  return "Insufficient";
+}
+
+function latestDate(...values: Array<string | null | undefined>) {
+  return values.find((value) => value && /^\d{4}-\d{2}-\d{2}/.test(value)) || null;
+}
+
+function daysAgo(value: string | null | undefined) {
+  if (!value) return Number.POSITIVE_INFINITY;
+  const parsed = new Date(value).getTime();
+  if (!Number.isFinite(parsed)) return Number.POSITIVE_INFINITY;
+  return Math.floor((Date.now() - parsed) / 86_400_000);
+}
+
+function recentRecordLabel(record: { title?: string | null; name?: string | null; display_name?: string | null; original_name?: string | null; updated_at?: string | null; created_at?: string | null; metric_date?: string | null }) {
+  return {
+    label: record.title || record.name || record.display_name || record.original_name || "Workspace record",
+    date: latestDate(record.updated_at, record.created_at, record.metric_date)
+  };
+}
+
+function shouldUseKpiOverviewAnswer(query: string, intent: KpiOverviewIntent) {
+  if (intent.matched) {
+    return true;
+  }
+
+  const normalized = query.toLowerCase().replace(/\s+/g, " ").trim();
+  const clearKpiReference = /\b(kpi|kpis|metric|metrics|measurement|measurements|target|targets|performance indicators?)\b/.test(normalized);
+  const asksForWeakOrAttention = /\b(weakest|worst|needs? attention|underperforming|below target|off target)\b/.test(normalized);
+
+  return clearKpiReference && asksForWeakOrAttention;
+}
+
+function buildKpiGlobalAnswer(query: string, summary: KpiOverviewSummary, groups: GlobalSearchGroup[]): GlobalSearchAnswer {
+  const deterministicOutput = buildDeterministicKpiOverviewOutput(summary);
+  const directAnswer = typeof deterministicOutput.direct_answer === "string" ? deterministicOutput.direct_answer : "I do not see enough structured KPI data to answer that reliably.";
+  const evidenceNote = typeof deterministicOutput.evidence_note === "string" ? deterministicOutput.evidence_note : "This used structured KPI records only.";
+  const weakestMetric = summary.metrics.find((metric) => metric.status === "needs_attention") || summary.metrics.find((metric) => metric.status === "missing_value" || metric.status === "missing_target");
+  const asksWeakest = /\b(weakest|worst|needs? attention|focus on first)\b/i.test(query);
+
+  return {
+    kind: asksWeakest ? "navigation_answer" : "business_answer",
+    directAnswer:
+      asksWeakest && weakestMetric
+        ? `${weakestMetric.name} appears to need the most attention from the structured KPI records currently available.`
+        : directAnswer,
+    recommendationConfidence: summary.recommendationConfidence,
+    evidenceNote,
+    relevantDestinations: [
+      weakestMetric ? destination(`Open ${weakestMetric.name}`, `/app/kpis?q=${encodeURIComponent(weakestMetric.name)}`, `${weakestMetric.status.replace(/_/g, " ")} · ${weakestMetric.trend.replace(/_/g, " ")}`) : null,
+      destination("Open KPI overview", "/app/kpis", `${summary.metricCount} KPI${summary.metricCount === 1 ? "" : "s"} reviewed`),
+      ...destinationsFromGroups(groups.filter((group) => group.label === "KPIs"), 2)
+    ].filter(Boolean) as GlobalSearchDestination[]
+  };
+}
+
+function buildRiskAnswer(issues: IssueRow[], recommendations: RecommendationRow[], groups: GlobalSearchGroup[]): GlobalSearchAnswer {
+  const issue = issues.find((item) => /urgent|high|critical/i.test(`${item.severity} ${item.status}`)) || issues[0];
+  const recommendation = recommendations.find((item) => /urgent|high/i.test(`${item.priority} ${item.status}`)) || recommendations[0];
+  const top = issue?.title || recommendation?.title || "No high-priority risk is obvious from the bounded records this panel loaded.";
+  const evidenceCount = [issue, recommendation, ...issues.slice(1, 3), ...recommendations.slice(1, 3)].filter(Boolean).length;
+
+  return {
+    kind: "business_answer",
+    directAnswer: issue || recommendation ? `${top} is the clearest risk signal available in this quick workspace scan.` : top,
+    recommendationConfidence: confidenceFromEvidence(evidenceCount),
+    evidenceNote: issue || recommendation ? `This used bounded workspace records: issues, recommendations, and matching Business Memory entries.` : "I did not find enough current risk evidence in the bounded search results.",
+    relevantDestinations: [
+      issue ? destination("Open risks and issues", `/app/issues?q=${encodeURIComponent(issue.title)}`, compact([issue.severity, issue.status])) : null,
+      recommendation ? destination("Open supporting recommendation", sourceHref(recommendation.source_type, recommendation.source_title || recommendation.title), compact([recommendation.priority, recommendation.status])) : null,
+      ...destinationsFromGroups(groups, 3)
+    ].filter(Boolean) as GlobalSearchDestination[]
+  };
+}
+
+function buildChangeAnswer({
+  kpis,
+  reports,
+  files,
+  tasks,
+  groups
+}: {
+  kpis: KpiRow[];
+  reports: ReportRow[];
+  files: FileUploadRow[];
+  tasks: TaskRow[];
+  groups: GlobalSearchGroup[];
+}): GlobalSearchAnswer {
+  const recent = [
+    ...kpis.map((item) => ({ ...recentRecordLabel(item), href: `/app/kpis?q=${encodeURIComponent(item.name)}`, type: "KPI" })),
+    ...reports.map((item) => ({ ...recentRecordLabel(item), href: `/app/reports?q=${encodeURIComponent(item.title)}`, type: "Briefing" })),
+    ...files.map((item) => ({ ...recentRecordLabel(item), href: `/app/files?file=${encodeURIComponent(item.id)}`, type: "Source" })),
+    ...tasks.map((item) => ({ ...recentRecordLabel(item), href: `/app/tasks?q=${encodeURIComponent(item.title)}`, type: "Business Signal" }))
+  ]
+    .filter((item) => daysAgo(item.date) <= 14)
+    .sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")))
+    .slice(0, 4);
+
+  return {
+    kind: "business_answer",
+    directAnswer: recent.length
+      ? `The most visible recent movement is in ${recent.slice(0, 3).map((item) => item.label).join(", ")}.`
+      : "I do not see enough recent workspace activity in this quick scan to say what changed this week.",
+    recommendationConfidence: confidenceFromEvidence(recent.length),
+    evidenceNote: recent.length
+      ? "This quick answer used recently updated KPIs, source files, briefings, and Business Signals only."
+      : "This quick answer did not run deep Business Memory retrieval. Open a relevant area or ask a narrower question for deeper evidence.",
+    relevantDestinations: recent.length
+      ? recent.map((item) => destination(item.label, item.href, `${item.type}${item.date ? ` · ${item.date}` : ""}`))
+      : destinationsFromGroups(groups, 4)
+  };
+}
+
+function buildGeneralBusinessAnswer(groups: GlobalSearchGroup[]): GlobalSearchAnswer | null {
+  const destinations = destinationsFromGroups(groups, 4);
+
+  if (!destinations.length) {
+    return {
+      kind: "business_answer",
+      directAnswer: "I do not see enough matching workspace evidence in this quick panel to answer that reliably.",
+      recommendationConfidence: "Insufficient",
+      evidenceNote: "This panel uses bounded workspace search first. Add more specific terms or open the relevant module for contextual analysis.",
+      relevantDestinations: [
+        destination("Open Intelligence", "/app/intelligence", "Review current risks, opportunities, and forecasts"),
+        destination("Open Sources", "/app/sources", "Upload or review business evidence")
+      ]
+    };
+  }
+
+  return {
+    kind: "navigation_answer",
+    directAnswer: `I found matching workspace evidence. The best place to start is ${destinations[0].label}.`,
+    recommendationConfidence: confidenceFromEvidence(destinations.length),
+    evidenceNote: "This used bounded workspace search results rather than broad Business Memory retrieval.",
+    relevantDestinations: destinations
+  };
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const query = normalizeQuery(url.searchParams.get("q"));
@@ -164,12 +334,49 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: rateLimitMessage(rateLimit) }, { status: 429 });
   }
 
+  const securityIntent = classifySecurityIntent(query);
+
+  if (securityIntent.securitySensitive) {
+    await logSecurityAuditEvent({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      actionName: "global_search.security_response",
+      operationType: "SYSTEM",
+      initiatedBy: "user",
+      allowed: false,
+      reasonBlocked: "Global search request was classified as security sensitive.",
+      metadata: {
+        source: "global_search",
+        classification_category: securityIntent.category,
+        classification_confidence: securityIntent.confidence,
+        classification_reasons: securityIntent.reasons
+      } satisfies Json
+    });
+
+    return NextResponse.json({
+      query,
+      groups: [],
+      answer: {
+        kind: "security_response",
+        directAnswer: securityResponseMessage()
+      } satisfies GlobalSearchAnswer
+    });
+  }
+
   const words = queryWords(query);
   const groups = new Map<GlobalSearchGroupLabel, GlobalSearchResult[]>();
 
   if (!words.length) {
     return NextResponse.json({ query, groups: [] });
   }
+
+  const kpiOverviewIntent = classifyKpiOverviewIntent(query);
+  const useKpiOverviewAnswer = shouldUseKpiOverviewAnswer(query, kpiOverviewIntent);
+  const shouldBuildAnswer =
+    businessQuestionLike(query) ||
+    useKpiOverviewAnswer ||
+    /\b(weakest|worst|biggest risk|biggest opportunity|current priorities|what changed|changed this week|take me to)\b/i.test(query);
 
   const [
     kpis,
@@ -310,6 +517,81 @@ export async function GET(request: Request) {
         .limit(80)
     )
   ]);
+
+  let answerKpis = kpis;
+  let answerReports = reports;
+  let answerFiles = files;
+  let answerIssues = issues;
+  let answerTasks = tasks;
+  let answerRecommendations = recommendations;
+  let answerKpiSummary: KpiOverviewSummary | null = null;
+
+  if (useKpiOverviewAnswer) {
+    const overviewData = await loadKpiOverviewData({ supabase, workspaceId });
+    answerKpis = overviewData.rows;
+    answerKpiSummary = overviewData.summary;
+  } else if (shouldBuildAnswer) {
+    const [recentKpis, recentReports, recentFiles, recentIssues, recentTasks, recentRecommendations] = await Promise.all([
+      safeResults<KpiRow>(
+        supabase
+          .from("kpis")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .order("metric_date", { ascending: false })
+          .limit(120)
+      ),
+      safeResults<ReportRow>(
+        supabase
+          .from("reports")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .order("created_at", { ascending: false })
+          .limit(12)
+      ),
+      safeResults<FileUploadRow>(
+        supabase
+          .from("file_uploads")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .order("updated_at", { ascending: false })
+          .limit(12)
+      ),
+      safeResults<IssueRow>(
+        supabase
+          .from("issues")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .order("updated_at", { ascending: false })
+          .limit(12)
+      ),
+      safeResults<TaskRow>(
+        supabase
+          .from("tasks")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .order("updated_at", { ascending: false })
+          .limit(12)
+      ),
+      safeResults<RecommendationRow>(
+        supabase
+          .from("vaeroex_recommendation_outcomes")
+          .select("*")
+          .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .order("updated_at", { ascending: false })
+          .limit(12)
+      )
+    ]);
+
+    answerKpis = recentKpis.length ? recentKpis : kpis;
+    answerReports = recentReports.length ? recentReports : reports;
+    answerFiles = recentFiles.length ? recentFiles : files;
+    answerIssues = recentIssues.length ? recentIssues : issues;
+    answerTasks = recentTasks.length ? recentTasks : tasks;
+    answerRecommendations = recentRecommendations.length ? recentRecommendations : recommendations;
+  }
 
   addGroup(
     groups,
@@ -489,5 +771,26 @@ export async function GET(request: Request) {
     results: groups.get(label) || []
   })).filter((group) => group.results.length);
 
-  return NextResponse.json({ query, groups: responseGroups });
+  let answer: GlobalSearchAnswer | null = null;
+
+  if (shouldBuildAnswer) {
+    if (useKpiOverviewAnswer) {
+      const summary = answerKpiSummary || (await loadKpiOverviewData({ supabase, workspaceId })).summary;
+      answer = buildKpiGlobalAnswer(query, summary, responseGroups);
+    } else if (/\b(risk|risks|attention|priority|priorities)\b/i.test(query)) {
+      answer = buildRiskAnswer(answerIssues, answerRecommendations, responseGroups);
+    } else if (/\b(changed|change|this week|recently|latest)\b/i.test(query)) {
+      answer = buildChangeAnswer({
+        kpis: answerKpis,
+        reports: answerReports,
+        files: answerFiles,
+        tasks: answerTasks,
+        groups: responseGroups
+      });
+    } else {
+      answer = buildGeneralBusinessAnswer(responseGroups);
+    }
+  }
+
+  return NextResponse.json({ query, groups: responseGroups, answer });
 }

@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -1997,9 +1998,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <Link href="/app/files?status=Import%20Ready" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
               Import KPI Data
             </Link>
-            <Link href="/app/ask" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-              Ask Vaeroex
-            </Link>
+            <GlobalSearchTrigger initialQuery="How are my KPIs doing?" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
+              Search or Ask
+            </GlobalSearchTrigger>
           </div>
         }
       />

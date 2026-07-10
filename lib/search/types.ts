@@ -25,7 +25,22 @@ export type GlobalSearchGroup = {
   results: GlobalSearchResult[];
 };
 
+export type GlobalSearchDestination = {
+  label: string;
+  href: string;
+  context?: string;
+};
+
+export type GlobalSearchAnswer = {
+  kind: "business_answer" | "navigation_answer" | "security_response";
+  directAnswer: string;
+  recommendationConfidence?: "High" | "Medium" | "Low" | "Insufficient";
+  evidenceNote?: string;
+  relevantDestinations?: GlobalSearchDestination[];
+};
+
 export type GlobalSearchResponse = {
   query: string;
   groups: GlobalSearchGroup[];
+  answer?: GlobalSearchAnswer | null;
 };

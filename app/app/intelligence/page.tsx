@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
+import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -157,9 +158,9 @@ export default async function IntelligencePage() {
               {compactText(intelligence.executiveSummary, "Vaeroex needs more business context before surfacing a stronger leadership briefing.", 190)}
             </p>
           </div>
-          <Link href="/app/agents" className="inline-flex min-h-10 w-fit items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
-            Ask Vaeroex
-          </Link>
+          <GlobalSearchTrigger className="inline-flex min-h-10 w-fit items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+            Search or Ask
+          </GlobalSearchTrigger>
         </div>
         <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           {summaryTiles.map((tile) => (
