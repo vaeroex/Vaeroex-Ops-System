@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
@@ -24,6 +25,7 @@ type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 type RecommendationRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
+type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 
 const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "KPIs",
@@ -36,7 +38,8 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "SOPs",
   "Checklists",
   "People",
-  "Business Memory"
+  "Learned Knowledge",
+  "Diagnostics"
 ];
 
 function normalizeQuery(value: string | null) {
@@ -109,12 +112,16 @@ function sourceHref(sourceType: string | null, title: string | null) {
   if (normalized.includes("issue")) return hrefWithQuery("/app/issues", query);
   if (normalized.includes("report")) return hrefWithQuery("/app/reports", query);
   if (normalized.includes("kpi")) return hrefWithQuery("/app/kpis", query);
-  if (normalized.includes("file")) return hrefWithQuery("/app/files", query);
+  if (normalized.includes("file")) return hrefWithQuery("/app/sources", query);
   if (normalized.includes("checklist")) return hrefWithQuery("/app/checklists", query);
   if (normalized.includes("sop")) return hrefWithQuery("/app/sops", query);
   if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer")) return hrefWithQuery("/app/sources", query);
 
   return "/app/notifications";
+}
+
+function shouldSearchDiagnostics(query: string, user: { email?: string | null; app_metadata?: Record<string, unknown> | null }) {
+  return isVaeroexAdminUser(user) && /\b(diagnostic|diagnostics|execution|run|runs|failed ask|ask history|workflow history|old failed)\b/i.test(query);
 }
 
 function questionLike(query: string) {
@@ -212,7 +219,7 @@ function buildRiskAnswer(issues: IssueRow[], recommendations: RecommendationRow[
     kind: "business_answer",
     directAnswer: issue || recommendation ? `${top} is the clearest risk signal available in this quick workspace scan.` : top,
     recommendationConfidence: confidenceFromEvidence(evidenceCount),
-    evidenceNote: issue || recommendation ? `This used bounded workspace records: issues, recommendations, and matching Business Memory entries.` : "I did not find enough current risk evidence in the bounded search results.",
+    evidenceNote: issue || recommendation ? `This used bounded workspace records: issues, recommendations, and matching Learned Knowledge entries.` : "I did not find enough current risk evidence in the bounded search results.",
     relevantDestinations: [
       issue ? destination("Open risks and issues", `/app/issues?q=${encodeURIComponent(issue.title)}`, compact([issue.severity, issue.status])) : null,
       recommendation ? destination("Open supporting recommendation", sourceHref(recommendation.source_type, recommendation.source_title || recommendation.title), compact([recommendation.priority, recommendation.status])) : null,
@@ -252,7 +259,7 @@ function buildChangeAnswer({
     recommendationConfidence: confidenceFromEvidence(recent.length),
     evidenceNote: recent.length
       ? "This quick answer used recently updated KPIs, source files, briefings, and Business Signals only."
-      : "This quick answer did not run deep Business Memory retrieval. Open a relevant area or ask a narrower question for deeper evidence.",
+      : "This quick answer did not run deep Learned Knowledge retrieval. Open a relevant area or ask a narrower question for deeper evidence.",
     relevantDestinations: recent.length
       ? recent.map((item) => destination(item.label, item.href, `${item.type}${item.date ? ` · ${item.date}` : ""}`))
       : destinationsFromGroups(groups, 4)
@@ -279,7 +286,7 @@ function buildGeneralBusinessAnswer(groups: GlobalSearchGroup[]): GlobalSearchAn
     kind: "navigation_answer",
     directAnswer: `I found matching workspace evidence. The best place to start is ${destinations[0].label}.`,
     recommendationConfidence: confidenceFromEvidence(destinations.length),
-    evidenceNote: "This used bounded workspace search results rather than broad Business Memory retrieval.",
+    evidenceNote: "This used bounded workspace search results rather than broad Learned Knowledge retrieval.",
     relevantDestinations: destinations
   };
 }
@@ -373,6 +380,7 @@ export async function GET(request: Request) {
 
   const kpiOverviewIntent = classifyKpiOverviewIntent(query);
   const useKpiOverviewAnswer = shouldUseKpiOverviewAnswer(query, kpiOverviewIntent);
+  const includeDiagnostics = shouldSearchDiagnostics(query, user);
   const shouldBuildAnswer =
     businessQuestionLike(query) ||
     useKpiOverviewAnswer ||
@@ -391,6 +399,7 @@ export async function GET(request: Request) {
     people,
     decisions,
     recommendations,
+    learnedKnowledge,
     vaeroexRuns
   ] = await Promise.all([
     safeResults<KpiRow>(
@@ -418,6 +427,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["display_name", "original_name", "file_extension", "import_status", "processing_status", "analysis_summary"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -508,14 +518,27 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<VaeroexRunRow>(
+    safeResults<MemoryChunkRow>(
       supabase
-        .from("ai_agent_runs")
+        .from("business_memory_chunks")
         .select("*")
         .eq("workspace_id", workspaceId)
-        .order("created_at", { ascending: false })
-        .limit(80)
-    )
+        .is("deleted_at", null)
+        .is("archived_at", null)
+        .or(orFilter(["source_title", "source_excerpt", "summary", "source_type"], words))
+        .order("indexed_at", { ascending: false })
+        .limit(6)
+    ),
+    includeDiagnostics
+      ? safeResults<VaeroexRunRow>(
+          supabase
+            .from("ai_agent_runs")
+            .select("*")
+            .eq("workspace_id", workspaceId)
+            .order("created_at", { ascending: false })
+            .limit(80)
+        )
+      : Promise.resolve([])
   ]);
 
   let answerKpis = kpis;
@@ -555,6 +578,7 @@ export async function GET(request: Request) {
           .select("*")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
           .limit(12)
       ),
@@ -627,7 +651,7 @@ export async function GET(request: Request) {
       title: file.display_name || file.original_name,
       sourceType: "File",
       preview: truncate(file.analysis_summary || compact([file.file_extension, file.import_status, file.processing_status])),
-      href: `/app/files?file=${encodeURIComponent(file.id)}`,
+      href: `/app/sources?file=${encodeURIComponent(file.id)}`,
       meta: compact([file.file_extension?.toUpperCase(), file.processing_status])
     }))
   );
@@ -723,22 +747,32 @@ export async function GET(request: Request) {
     }))
   );
 
-  const runMatches = vaeroexRuns
-    .map((run) => {
-      const outputText = textFromJson(run.output_json);
-      return {
-        run,
-        outputText,
-        haystack: compact([run.agent_type, run.status, run.error_message, outputText])
-      };
-    })
-    .filter((item) => matchesWords(item.haystack, words))
-    .slice(0, 4);
+  const runMatches = includeDiagnostics
+    ? vaeroexRuns
+        .map((run) => {
+          const outputText = textFromJson(run.output_json);
+          return {
+            run,
+            outputText,
+            haystack: compact([run.agent_type, run.status, run.error_message, outputText])
+          };
+        })
+        .filter((item) => matchesWords(item.haystack, words))
+        .slice(0, 4)
+    : [];
 
   addGroup(
     groups,
-    "Business Memory",
+    "Learned Knowledge",
     [
+      ...learnedKnowledge.map((chunk) => ({
+        id: chunk.id,
+        title: chunk.source_title || "Learned knowledge",
+        sourceType: "Learned Knowledge",
+        preview: truncate(chunk.summary || chunk.source_excerpt),
+        href: chunk.source_file_id ? `/app/sources?file=${encodeURIComponent(chunk.source_file_id)}` : "/app/sources?tab=knowledge",
+        meta: compact([chunk.source_type.replace(/_/g, " "), chunk.confidence_score ? `Confidence ${Math.round(chunk.confidence_score)}%` : null])
+      })),
       ...decisions.map((decision) => ({
         id: decision.id,
         title: decision.title,
@@ -754,16 +788,21 @@ export async function GET(request: Request) {
         preview: truncate(recommendation.evidence || recommendation.expected_outcome || recommendation.outcome_summary),
         href: sourceHref(recommendation.source_type, recommendation.source_title || recommendation.title),
         meta: compact([recommendation.status, recommendation.priority, recommendation.related_module])
-      })),
-      ...runMatches.map(({ run, outputText }) => ({
+      }))
+    ].slice(0, 6)
+  );
+
+  addGroup(
+    groups,
+    "Diagnostics",
+    runMatches.map(({ run, outputText }) => ({
         id: run.id,
         title: run.agent_type.replace(/_/g, " "),
-        sourceType: "Vaeroex Result",
+        sourceType: "Diagnostic Run",
         preview: truncate(outputText || run.error_message || "Saved Vaeroex result."),
         href: `/app/agents?run=${encodeURIComponent(run.id)}`,
         meta: compact([run.status, run.created_at])
       }))
-    ].slice(0, 6)
   );
 
   const responseGroups: GlobalSearchGroup[] = GROUP_ORDER.map((label) => ({

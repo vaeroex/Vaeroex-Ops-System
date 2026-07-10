@@ -498,14 +498,19 @@ function runFileAnalysisRequestSizingTests() {
 
   const sourcesPage = read("app/app/sources/page.tsx");
   const sourceTabs = sourcesPage.slice(
-    sourcesPage.indexOf("const fileStatusTabs"),
-    sourcesPage.indexOf("] as const;", sourcesPage.indexOf("const fileStatusTabs"))
+    sourcesPage.indexOf("const sourceTabs"),
+    sourcesPage.indexOf("];", sourcesPage.indexOf("const sourceTabs"))
   );
   assert.match(sourcesPage, /SourceFileDetailPanel/, "Sources should render selected-file detail in a separate panel");
   assert.match(sourcesPage, /Select a source to inspect details, analysis status, and available actions\./, "Sources rows should stay compact and point users to the detail panel");
   assert.match(sourcesPage, /Needs Review/, "Sources should expose review only when confidence or risk requires it");
   assert.match(sourcesPage, /Learned/, "Sources should expose automatically learned file evidence");
-  assert.doesNotMatch(sourceTabs, /Recent Uploads|Imported Data/, "Sources should keep secondary views out of the primary tab set");
+  assert.match(sourceTabs, /Files/);
+  assert.match(sourceTabs, /Learned Knowledge/);
+  assert.match(sourceTabs, /Archived/);
+  assert.doesNotMatch(sourceTabs, /All Files|Needs Review|Recent Uploads|Imported Data/, "Sources should keep secondary status views out of the primary tab set");
+  assert.match(sourcesPage, /LearnedKnowledgeView/, "Sources should expose a customer-facing Learned Knowledge view");
+  assert.doesNotMatch(sourcesPage, /AI run ID|workflow name|prompt payload|execution stage|provider error|internal chunk IDs/i, "Sources must not expose implementation diagnostics in customer-facing learned knowledge");
 
   const fileActions = read("app/app/files/actions.ts");
   const runFileAnalysisSection = fileActions.slice(
@@ -519,6 +524,8 @@ function runFileAnalysisRequestSizingTests() {
   assert.match(runFileAnalysisSection, /needs_review/, "low-confidence or risky analyses should stay in review");
   assert.match(fileActions, /export async function approveFileAnalysisAction/, "file analysis approval action should exist");
   assert.match(fileActions, /export async function discardFileAnalysisAction/, "file analysis discard action should exist");
+  assert.match(fileActions, /export async function manageLearnedKnowledgeAction/, "learned knowledge must be safely archivable/deletable");
+  assert.match(fileActions, /business_memory_chunks[\s\S]+archived_at[\s\S]+deleted_at/, "archived or deleted learned knowledge must be excluded from retrieval");
 }
 
 function makeKpi(name, metricDate, actualValue = 100) {

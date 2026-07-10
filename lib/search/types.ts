@@ -9,7 +9,8 @@ export type GlobalSearchGroupLabel =
   | "SOPs"
   | "Checklists"
   | "People"
-  | "Business Memory";
+  | "Learned Knowledge"
+  | "Diagnostics";
 
 export type GlobalSearchResult = {
   id: string;
