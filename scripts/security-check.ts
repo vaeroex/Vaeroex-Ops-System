@@ -210,6 +210,9 @@ const agentsPage = read("app/app/agents/page.tsx");
 check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
 check(agentsPage.includes("data-vaeroex-skip-global-activity={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex form must bypass the document-level global activity submit listener.");
 check(agentsPage.includes("activityDisabled={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex must bypass button-level global activity cursor registration while preserving local pending text.");
+check(agentsPage.includes("Direct Answer") && agentsPage.includes("Evidence Note") && agentsPage.includes("Recommendation Confidence") && agentsPage.includes("Show Supporting Evidence"), "Ask Vaeroex must use direct-answer mode with confidence and collapsed supporting evidence.");
+check(!agentsPage.includes("Evidence Summary") && !agentsPage.includes("Vaeroex answered"), "Ask Vaeroex must not regress to report-style Evidence Summary or Vaeroex answered labels.");
+check(!agentsPage.includes("Generate Executive Strategy") && !agentsPage.includes("Create Improvement Plan"), "Ask Vaeroex direct-answer mode must not preemptively show generated-output action buttons.");
 
 const agentsActionsRuntime = read("app/app/agents/actions.ts");
 check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), "Ask Vaeroex must bound Business Memory retrieval so server actions can return.");
