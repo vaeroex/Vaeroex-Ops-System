@@ -6,7 +6,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment } from "@/lib/ai/vaeroex-client";
+import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment, type VaeroexRequestSizeMetrics } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
@@ -23,6 +23,7 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
+type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
 type ImportType = "kpi" | "crm" | "metrics";
 type JsonRecord = Record<string, unknown>;
@@ -173,6 +174,13 @@ function actionErrorMessage(error: unknown, fallback: string) {
 
 function fileActionErrorMessage(error: unknown, fallback: string, file: Pick<FileUploadRow, "file_extension">) {
   const message = actionErrorMessage(error, fallback);
+
+  if (/too large for a single Vaeroex analysis|direct visual analysis needs|direct document analysis needs/i.test(message)) {
+    return message.replace(
+      "This request is too large for a single Vaeroex analysis. Reduce the file size or narrow the question.",
+      "Vaeroex uploaded this file successfully, but the assembled analysis request included more context than one pass can safely process. The file remains available in Sources; retry with a narrower question or review a smaller section."
+    );
+  }
 
   if (
     file.file_extension === "pdf" &&
@@ -1099,8 +1107,99 @@ function fileAttachment(file: FileUploadRow, buffer: Buffer, inputType: "image" 
     fileName: file.original_name,
     mimeType: file.mime_type,
     base64Data: buffer.toString("base64"),
-    detail: inputType === "image" ? "auto" : undefined
+    detail: inputType === "image" ? (buffer.length > 1_500_000 ? "low" : "auto") : undefined
   };
+}
+
+function truncateForAnalysis(value: unknown, max = 700) {
+  if (typeof value !== "string") {
+    return value;
+  }
+
+  return value.length > max ? `${value.slice(0, max).trim()}...` : value;
+}
+
+function compactRecordForAnalysis(value: unknown, keys: string[]) {
+  if (!isRecord(value)) {
+    return {};
+  }
+
+  return keys.reduce<JsonObject>((record, key) => {
+    const item = value[key];
+
+    if (item !== null && item !== undefined) {
+      record[key] = truncateForAnalysis(item) as Json;
+    }
+
+    return record;
+  }, {});
+}
+
+function compactArrayForAnalysis(value: unknown, keys: string[], limit: number) {
+  return asArray(value)
+    .filter(isRecord)
+    .slice(0, limit)
+    .map((item) => compactRecordForAnalysis(item, keys));
+}
+
+function boundedWorkspaceSnapshotForFileAnalysis(snapshot: Json): Json {
+  if (!isRecord(snapshot)) {
+    return snapshot;
+  }
+
+  return {
+    generated_at: snapshot.generated_at,
+    workspace: compactRecordForAnalysis(snapshot.workspace, ["id", "name", "industry", "size", "created_at"]),
+    metrics: snapshot.metrics,
+    workspace_gaps: asArray(snapshot.workspace_gaps).slice(0, 6),
+    module_state: {
+      kpi_dashboard: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.kpi_dashboard : null, ["exists", "records", "metric_names", "forecast_readiness", "guidance"]),
+      files: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.files : null, ["exists", "records", "analyzed_records", "pending_imports", "guidance"]),
+      business_signals: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.business_signals : null, ["exists", "open_records", "observations_needing_review", "guidance"]),
+      reports: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.reports : null, ["exists", "records", "names", "guidance"])
+    },
+    kpi_history: compactArrayForAnalysis(snapshot.kpi_history, ["id", "name", "category", "target", "actual_value", "metric_date", "source"], 20),
+    recent_issues: compactArrayForAnalysis(snapshot.recent_issues, ["id", "title", "issue_type", "severity", "status", "created_at"], 8),
+    recent_tasks: compactArrayForAnalysis(snapshot.recent_tasks, ["id", "title", "status", "priority", "category", "created_at"], 8),
+    reports: compactArrayForAnalysis(snapshot.reports, ["id", "title", "report_type", "date_range_start", "date_range_end", "created_at"], 6),
+    operational_metrics: compactArrayForAnalysis(snapshot.operational_metrics, ["id", "metric_name", "category", "value", "metric_date"], 20),
+    business_decisions: compactArrayForAnalysis(snapshot.business_decisions, ["id", "title", "status", "related_kpi", "review_date"], 8)
+  } satisfies Json;
+}
+
+function compactFileMetadataForAnalysis(metadata: Json) {
+  if (!isRecord(metadata)) {
+    return {};
+  }
+
+  return compactRecordForAnalysis(metadata, [
+    "business_memory_status",
+    "latest_analysis_status",
+    "latest_analysis_at",
+    "latest_analysis_content_kind",
+    "latest_analysis_rows_detected",
+    "latest_analysis_characters_detected",
+    "index_status",
+    "indexed_chunk_count",
+    "indexed_at"
+  ]);
+}
+
+function reportReferencesFile(report: Pick<ReportRow, "source_data_json">, fileId: string) {
+  const source = isRecord(report.source_data_json) ? report.source_data_json : {};
+  const file = isRecord(source.file) ? source.file : {};
+  const attachedFiles = Array.isArray(source.attached_files) ? source.attached_files.filter(isRecord) as JsonRecord[] : [];
+
+  return file.id === fileId || attachedFiles.some((item) => item.id === fileId);
+}
+
+function requestMetricsFromUsage(metadata: Json | undefined): VaeroexRequestSizeMetrics | null {
+  if (!isRecord(metadata)) {
+    return null;
+  }
+
+  const requestSize = metadata.request_size;
+  return isRecord(requestSize) ? (requestSize as VaeroexRequestSizeMetrics) : null;
 }
 
 function spreadsheetExtraction(rows: ImportRow[], rowLimit: number): FileContentExtraction {
@@ -1426,7 +1525,7 @@ async function runFileVaeroexAnalysis({
     throw new Error(unsupportedFileContentMessage(file));
   }
 
-  const [workspaceSnapshot, fileImports, fileReports, evidenceContext] = await Promise.all([
+  const [rawWorkspaceSnapshot, fileImports, fileReports, evidenceContext] = await Promise.all([
     buildWorkspaceSnapshot(supabase, workspaceId),
     supabase
       .from("file_imports")
@@ -1444,9 +1543,14 @@ async function runFileVaeroexAnalysis({
     buildWorkspaceEvidenceContext({
       supabase,
       workspaceId,
-      query: `${prompt}\nFile: ${file.display_name}\nExisting summary: ${file.analysis_summary || ""}`
+      query: `${prompt}\nFile: ${file.display_name}\nType: ${file.file_extension}`
     })
   ]);
+  const workspaceSnapshot = boundedWorkspaceSnapshotForFileAnalysis(rawWorkspaceSnapshot as Json);
+  const relatedReports = (fileReports.data ?? [])
+    .filter((report) => reportReferencesFile(report as Pick<ReportRow, "source_data_json">, file.id))
+    .slice(0, 5)
+    .map((report) => compactRecordForAnalysis(report, ["id", "title", "report_type", "created_at"]));
   const extraInputs = {
     file: {
       id: file.id,
@@ -1458,13 +1562,15 @@ async function runFileVaeroexAnalysis({
       columns_detected: extraction.columns,
       characters_extracted: extraction.textContent.length,
       attachment_analysis: Boolean(extraction.fileAttachment),
-      metadata: file.metadata_json,
-      analysis_summary: file.analysis_summary,
+      attachment_bytes: extraction.fileAttachment ? Math.floor((extraction.fileAttachment.base64Data.length * 3) / 4) : 0,
+      attachment_detail: extraction.fileAttachment?.detail || null,
+      metadata: compactFileMetadataForAnalysis(file.metadata_json),
+      previous_analysis_available: Boolean(file.analysis_summary),
       content_note: extraction.contentNote,
       extraction_failure_reason: extraction.extractionFailureReason || null
     },
     import_history: fileImports.data ?? [],
-    related_reports: fileReports.data ?? [],
+    related_reports: relatedReports,
     spreadsheet_preview: extraction.kind === "spreadsheet" ? extraction.preview : [],
     spreadsheet_row_text: extraction.kind === "spreadsheet" ? extraction.rowText : "",
     extracted_text: extraction.textContent,
@@ -1498,6 +1604,7 @@ async function runFileVaeroexAnalysis({
     supabase,
     workspaceId
   });
+  const requestMetrics = requestMetricsFromUsage(usage.metadata);
   const outputExtractedText = extractedTextFromOutput(outputJson);
   const finalTextContent = extraction.textContent || outputExtractedText;
   const finalExtraction = {
@@ -1552,10 +1659,12 @@ async function runFileVaeroexAnalysis({
     usage: {
       ...usage,
       metadata: {
+        ...(isRecord(usage.metadata) ? usage.metadata : {}),
         evidence_retrieval_mode: evidenceContext.retrievalMode,
         evidence_chunks: evidenceContext.chunks.length,
         evidence_confidence_score: evidenceContext.confidenceScore,
-        source_file_id: file.id
+        source_file_id: file.id,
+        fallback_chunking_used: false
       }
     }
   });
@@ -1577,6 +1686,11 @@ async function runFileVaeroexAnalysis({
         latest_analysis_content_kind: finalExtraction.kind,
         latest_analysis_rows_detected: finalExtraction.rows.length,
         latest_analysis_characters_detected: finalExtraction.textContent.length,
+        latest_analysis_request_metrics: (requestMetrics || {}) as Json,
+        latest_analysis_fallback: {
+          used: false,
+          reason: null
+        },
         latest_analysis_preview: finalExtraction.preview,
         latest_analysis_output: cleanResult,
         latest_text_extraction: {
@@ -2605,7 +2719,13 @@ export async function analyzeFileAction(formData: FormData) {
           latest_analysis_status: "failed",
           latest_analysis_at: new Date().toISOString(),
           latest_analysis_prompt: prompt,
-          latest_analysis_error: message
+          latest_analysis_error: message,
+          latest_analysis_failure: {
+            stage: /too large|direct visual analysis|direct document analysis/i.test(message) ? "request_size_preflight" : "analysis",
+            type: /too large|direct visual analysis|direct document analysis/i.test(message) ? "request_size" : "analysis_failed",
+            retry_eligible: true,
+            user_message: message
+          }
         } satisfies Json
       })
       .eq("id", file.id)

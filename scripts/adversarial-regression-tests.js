@@ -113,6 +113,9 @@ const {
   getWorkspaceTokenBudget
 } = require("../lib/ai/usage.ts");
 const {
+  estimateVaeroexRequestSize
+} = require("../lib/ai/vaeroex-client.ts");
+const {
   buildKpiForecastEligibility
 } = require("../lib/kpis/forecast-eligibility.ts");
 
@@ -459,6 +462,40 @@ function runOpenAIResilienceTests() {
   assert.ok(budget.singleRequestTokens >= 5_000, "single request token budget should have a sane lower bound");
 }
 
+function runFileAnalysisRequestSizingTests() {
+  const base64Png = Buffer.alloc(454 * 1024, 1).toString("base64");
+  const attachment = {
+    inputType: "image",
+    fileName: "inventory.png",
+    mimeType: "image/png",
+    base64Data: base64Png,
+    detail: "auto"
+  };
+  const dataUrl = `data:${attachment.mimeType};base64,${attachment.base64Data}`;
+  const requestBodyJson = JSON.stringify({
+    input: [
+      {
+        role: "user",
+        content: [
+          { type: "input_text", text: "Analyze this inventory source." },
+          { type: "input_image", image_url: dataUrl, detail: "auto" }
+        ]
+      }
+    ]
+  });
+  const naiveTextTokenEstimate = Math.ceil(requestBodyJson.length / 4);
+  const metrics = estimateVaeroexRequestSize(requestBodyJson, attachment);
+
+  assert.ok(naiveTextTokenEstimate > 120_000, "fixture should reproduce the old base64-as-text failure threshold");
+  assert.ok(metrics.estimatedRequestTokens < 120_000, "454 KB image analysis should not exceed the single-request budget because base64 is not prompt text");
+  assert.equal(metrics.attachmentBudgetMode, "image_vision", "image attachments should be budgeted as vision attachments");
+  assert.ok(metrics.estimatedAttachmentTokens > 0, "image attachments should still contribute a bounded attachment estimate");
+
+  const sourcesPage = read("app/app/sources/page.tsx");
+  assert.match(sourcesPage, /SourceFileDetailPanel/, "Sources should render selected-file detail in a separate panel");
+  assert.match(sourcesPage, /Select a source to inspect details, analysis status, and available actions\./, "Sources rows should stay compact and point users to the detail panel");
+}
+
 function makeKpi(name, metricDate, actualValue = 100) {
   return {
     id: `${name}-${metricDate}`,
@@ -548,6 +585,7 @@ async function main() {
   runBusinessMemoryPoisoningTests();
   runWebhookReplayTests();
   runOpenAIResilienceTests();
+  runFileAnalysisRequestSizingTests();
   runKpiForecastEligibilityTests();
 
   console.log("Adversarial regression tests passed.");
