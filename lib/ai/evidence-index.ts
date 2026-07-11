@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchWithOpenAIResilience } from "@/lib/ai/openai-resilience";
+import { fetchWithOpenAIResilience, getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -159,7 +159,7 @@ function terms(value: string) {
   ).slice(0, 16);
 }
 
-async function createEmbeddings(inputs: string[]) {
+async function createEmbeddings(inputs: string[], timeoutMs?: number) {
   const apiKey = process.env.OPENAI_API_KEY;
   const model = process.env.OPENAI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
 
@@ -175,17 +175,28 @@ async function createEmbeddings(inputs: string[]) {
   let response: Response;
 
   try {
-    response = await fetchWithOpenAIResilience("https://api.openai.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
+    const baseSettings = getOpenAIRetrySettings();
+    response = await fetchWithOpenAIResilience(
+      "https://api.openai.com/v1/embeddings",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          model,
+          input: inputs
+        })
       },
-      body: JSON.stringify({
-        model,
-        input: inputs
-      })
-    });
+      timeoutMs
+        ? {
+            ...baseSettings,
+            timeoutMs: Math.min(baseSettings.timeoutMs, timeoutMs),
+            maxRetries: 0
+          }
+        : baseSettings
+    );
   } catch (error) {
     return {
       model,
@@ -312,46 +323,58 @@ export async function buildWorkspaceEvidenceContext({
   supabase,
   workspaceId,
   query,
-  stageLogger
+  stageLogger,
+  maxChunks,
+  retrievalStrategy = "auto",
+  embeddingTimeoutMs
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   query: string;
   stageLogger?: EvidenceStageLogger;
+  maxChunks?: number;
+  retrievalStrategy?: "auto" | "keyword_only";
+  embeddingTimeoutMs?: number;
 }): Promise<EvidenceContext> {
-  const limit = maxEvidenceChunks();
-  stageLogger?.("embeddings_started", { queryLength: query.length, limit });
-  const embedding = await createEmbeddings([query.slice(0, 4_000)]);
-  stageLogger?.("embeddings_finished", {
-    embeddingAvailable: Boolean(embedding.embeddings[0]),
-    embeddingError: embedding.error || null,
-    embeddingTokens: embedding.tokens
-  });
+  const configuredLimit = maxEvidenceChunks();
+  const limit = Math.min(Math.max(maxChunks ?? configuredLimit, 1), configuredLimit);
   let chunks: EvidenceContextChunk[] = [];
   let retrievalMode: EvidenceContext["retrievalMode"] = "none";
   const limitations: string[] = [];
 
-  if (embedding.embeddings[0]) {
-    stageLogger?.("vector_retrieval_started", { limit });
-    const { data, error } = await supabase.rpc("match_business_memory_chunks", {
-      target_workspace_id: workspaceId,
-      query_embedding: embedding.embeddings[0],
-      match_count: limit,
-      min_similarity: 0.08
-    });
-    stageLogger?.("vector_retrieval_finished", {
-      matchCount: data?.length || 0,
-      error: error?.message || null
+  if (retrievalStrategy === "auto") {
+    stageLogger?.("embeddings_started", { queryLength: query.length, limit });
+    const embedding = await createEmbeddings([query.slice(0, 4_000)], embeddingTimeoutMs);
+    stageLogger?.("embeddings_finished", {
+      embeddingAvailable: Boolean(embedding.embeddings[0]),
+      embeddingError: embedding.error || null,
+      embeddingTokens: embedding.tokens
     });
 
-    if (!error && data?.length) {
-      chunks = data.map((row) => toEvidenceChunk(row, row.similarity));
-      retrievalMode = "vector";
-    } else if (error) {
-      limitations.push("Vector retrieval is not available yet. Vaeroex used keyword evidence fallback.");
+    if (embedding.embeddings[0]) {
+      stageLogger?.("vector_retrieval_started", { limit });
+      const { data, error } = await supabase.rpc("match_business_memory_chunks", {
+        target_workspace_id: workspaceId,
+        query_embedding: embedding.embeddings[0],
+        match_count: limit,
+        min_similarity: 0.08
+      });
+      stageLogger?.("vector_retrieval_finished", {
+        matchCount: data?.length || 0,
+        error: error?.message || null
+      });
+
+      if (!error && data?.length) {
+        chunks = data.map((row) => toEvidenceChunk(row, row.similarity));
+        retrievalMode = "vector";
+      } else if (error) {
+        limitations.push("Vector retrieval is not available yet. Vaeroex used keyword evidence fallback.");
+      }
+    } else if (embedding.error) {
+      limitations.push("Embedding retrieval is unavailable. Vaeroex used keyword evidence fallback where possible.");
     }
-  } else if (embedding.error) {
-    limitations.push("Embedding retrieval is unavailable. Vaeroex used keyword evidence fallback where possible.");
+  } else {
+    stageLogger?.("embeddings_skipped", { reason: "focused_keyword_scope", limit });
   }
 
   if (!chunks.length) {

@@ -361,7 +361,7 @@ export function IntelligenceSignalInbox({ insights }: { insights: IntelligenceIn
                 </Link>
                 <ContextualAskVaeroex
                   label="Explain This"
-                  prompt={`Explain why this ${selectedInsight.type.toLowerCase()} matters, what evidence supports it, what could happen next, and what leadership should review.`}
+                  prompt={`Explain what this ${selectedInsight.type.toLowerCase()} means, why it matters, which evidence supports it, and what remains uncertain. Stay focused on this signal.`}
                   contextType={`intelligence_${selectedInsight.type.toLowerCase()}`}
                   contextId={selectedInsight.id}
                   sourceTitle={selectedInsight.title}

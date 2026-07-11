@@ -2,6 +2,7 @@ import "server-only";
 import { createHash, randomUUID } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanVaeroexErrorMessage, VAEROEX_INTELLIGENCE_UNAVAILABLE_MESSAGE } from "@/lib/ai/errors";
+import { getVaeroexModelRoutingStatus, resolveVaeroexModel, type VaeroexModelRoute } from "@/lib/ai/model-routing";
 import { fetchWithOpenAIResilience, getOpenAICircuitSnapshot, getOpenAIRetrySettings, type OpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { assertWorkspaceTokenBudget, estimateTokenCount, getWorkspaceTokenBudget, type VaeroexTokenUsage } from "@/lib/ai/usage";
@@ -19,6 +20,9 @@ type RunVaeroexRequest = {
   supabase?: SupabaseClient<Database>;
   workspaceId?: string;
   openAISettings?: OpenAIRetrySettings;
+  modelRoute?: VaeroexModelRoute;
+  executionPath?: string;
+  maxOutputTokens?: number;
 };
 
 export type VaeroexRequestSizeMetrics = {
@@ -64,7 +68,6 @@ type ResponsesApiResponse = {
 };
 
 type JsonRecord = Record<string, unknown>;
-const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const LEGACY_OPENAI_ENV_NAMES = ["OPENAI_APIKEY", "OPENAI_KEY", "NEXT_PUBLIC_OPENAI", "OPENAI_SECRET"];
 const DEFAULT_MAX_DIRECT_IMAGE_ATTACHMENT_BYTES = 5 * 1024 * 1024;
@@ -80,6 +83,24 @@ function str(value: unknown, fallback = "") {
 
 function asArray(value: unknown) {
   return Array.isArray(value) ? value : value ? [value] : [];
+}
+
+function collectBoundedSourceIds(value: Json, output = new Set<string>()) {
+  if (typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)) {
+    output.add(value.toLowerCase());
+    return output;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectBoundedSourceIds(item, output));
+    return output;
+  }
+
+  if (value && typeof value === "object") {
+    Object.values(value).forEach((item) => collectBoundedSourceIds(item as Json, output));
+  }
+
+  return output;
 }
 
 function normalizeVaeroexOutput(value: Json): Json {
@@ -103,7 +124,7 @@ function normalizeVaeroexOutput(value: Json): Json {
           ...asArray(output.current_operational_problems),
           ...asArray(output.main_bottlenecks)
         ]
-      : ["Review the summary for the main operational gaps Vaeroex identified."];
+      : [];
   const recommendedActions =
     asArray(output.recommended_actions).length ||
     asArray(output.suggested_tasks).length ||
@@ -113,7 +134,7 @@ function normalizeVaeroexOutput(value: Json): Json {
           ...asArray(output.suggested_tasks),
           ...asArray(output.thirty_day_action_plan)
         ]
-      : ["Review this draft, identify the highest-priority executive recommendation, and decide what leadership should examine next."];
+      : [];
   const suggestedSystems =
     asArray(output.suggested_systems).length ||
     asArray(output.recommended_systems_to_build).length ||
@@ -125,7 +146,7 @@ function normalizeVaeroexOutput(value: Json): Json {
           ...asArray(output.suggested_forms),
           ...asArray(output.suggested_checklists)
         ]
-      : ["Executive briefing", "Improvement plan", "Manager review cadence"];
+      : [];
 
   return {
     ...output,
@@ -419,7 +440,8 @@ export function getVaeroexOpenAIRuntimeStatus() {
 
   return {
     ...env,
-    openaiModel: process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL,
+    openaiModel: resolveVaeroexModel("default"),
+    modelRouting: getVaeroexModelRoutingStatus(),
     openaiApiMode: "responses",
     openaiEndpoint: "/v1/responses",
     openaiEmbeddingModel: process.env.OPENAI_EMBEDDING_MODEL || "text-embedding-3-small",
@@ -452,7 +474,10 @@ export async function runVaeroexCompletionWithUsage({
   fileAttachment,
   supabase,
   workspaceId,
-  openAISettings
+  openAISettings,
+  modelRoute = "default",
+  executionPath = "default",
+  maxOutputTokens
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     throw new Error("Vaeroex prompt is not configured.");
@@ -472,12 +497,13 @@ export async function runVaeroexCompletionWithUsage({
     throw new Error("OpenAI API key is not configured.");
   }
 
-  const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+  const model = resolveVaeroexModel(modelRoute);
   const startedAt = Date.now();
   assertDirectAttachmentSize(fileAttachment);
   const requestBody = {
     model,
     temperature: 0.2,
+    ...(maxOutputTokens ? { max_output_tokens: maxOutputTokens } : {}),
     text: { format: { type: "json_object" } },
     input: [
       {
@@ -497,6 +523,8 @@ export async function runVaeroexCompletionWithUsage({
     requestId,
     workflow: workflow.key,
     model,
+    modelRoute,
+    executionPath,
     estimatedRequestTokens,
     requestBodyBytes: requestSize.requestBodyBytes,
     estimatedTextTokens: requestSize.estimatedTextTokens,
@@ -513,6 +541,8 @@ export async function runVaeroexCompletionWithUsage({
     requestId,
     workflow: workflow.key,
     model,
+    modelRoute,
+    executionPath,
     estimatedRequestTokens,
     requestBodyBytes: requestSize.requestBodyBytes,
     estimatedTextTokens: requestSize.estimatedTextTokens,
@@ -556,6 +586,8 @@ export async function runVaeroexCompletionWithUsage({
       requestId,
       workflow: workflow.key,
       model,
+      modelRoute,
+      executionPath,
       ...env,
       openaiApiMode: "responses",
       openaiEndpoint: "/v1/responses",
@@ -574,6 +606,8 @@ export async function runVaeroexCompletionWithUsage({
       requestId,
       workflow: workflow.key,
       model,
+      modelRoute,
+      executionPath,
       ...env,
       openaiApiMode: "responses",
       openaiEndpoint: "/v1/responses",
@@ -588,6 +622,8 @@ export async function runVaeroexCompletionWithUsage({
     requestId,
     workflow: workflow.key,
     model,
+    modelRoute,
+    executionPath,
     ...env,
     openaiApiMode: "responses",
     openaiEndpoint: "/v1/responses",
@@ -611,12 +647,19 @@ export async function runVaeroexCompletionWithUsage({
     latencyMs,
     status: "completed",
     metadata: {
-      request_size: requestSize
+      request_size: requestSize,
+      model_route: modelRoute,
+      execution_path: executionPath,
+      max_output_tokens: maxOutputTokens || null
     } satisfies Json
   };
 
   const outputJson = parseVaeroexJson(content);
-  const outputValidation = validateAiGeneratedOutput(outputJson);
+  const allowedSourceIds = collectBoundedSourceIds(workspaceSnapshot);
+  if (isRecord(extraInputs) && isRecord(extraInputs.evidence_context)) {
+    collectBoundedSourceIds(extraInputs.evidence_context as Json, allowedSourceIds);
+  }
+  const outputValidation = validateAiGeneratedOutput(outputJson, { allowedSourceIds });
 
   if (!outputValidation.ok) {
     logVaeroexOpenAIError("unsafe_output_blocked", {

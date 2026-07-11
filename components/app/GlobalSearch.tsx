@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Command, Loader2, Search, X } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
 import { useActivitySignal } from "@/components/app/ActivityProvider";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import type { GlobalSearchAnswer, GlobalSearchGroup, GlobalSearchResponse } from "@/lib/search/types";
@@ -23,19 +23,27 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   const [groups, setGroups] = useState<GlobalSearchGroup[]>([]);
   const [answer, setAnswer] = useState<GlobalSearchAnswer | null>(null);
   const [loading, setLoading] = useState(false);
+  const [loadingLabel, setLoadingLabel] = useState("Searching...");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const requestVersionRef = useRef(0);
   const inputId = useId();
   const resultsId = useId();
   const titleId = useId();
   const trimmedQuery = query.trim();
   const total = useMemo(() => resultCount(groups), [groups]);
   const isIconVariant = variant === "icon";
-  useActivitySignal(loading, "Searching...", { source: "global-search", timeoutMs: 20000 });
+  useActivitySignal(loading, loadingLabel, { source: "global-search", timeoutMs: 30000 });
+
+  const closeSearch = useCallback(() => {
+    requestVersionRef.current += 1;
+    setLoading(false);
+    setOpen(false);
+  }, []);
 
   useEffect(() => {
     function openSearch(nextQuery = "") {
@@ -52,7 +60,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
       }
 
       if (event.key === "Escape") {
-        setOpen(false);
+        closeSearch();
       }
     }
 
@@ -67,7 +75,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
       window.removeEventListener("keydown", handleShortcut);
       window.removeEventListener("vaeroex:open-global-search", handleGlobalSearchEvent);
     };
-  }, []);
+  }, [closeSearch]);
 
   useEffect(() => {
     const shouldOpen = searchParams.get("search") === "1" || searchParams.get("ask") === "1";
@@ -101,6 +109,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
 
   useEffect(() => {
     if (trimmedQuery.length < 2) {
+      requestVersionRef.current += 1;
       setGroups([]);
       setAnswer(null);
       setError(null);
@@ -109,8 +118,10 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
     }
 
     const controller = new AbortController();
+    const requestVersion = ++requestVersionRef.current;
     const timeout = window.setTimeout(async () => {
       setLoading(true);
+      setLoadingLabel("Searching...");
       setError(null);
 
       try {
@@ -126,10 +137,11 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
         }
 
         const payload = (await response.json()) as GlobalSearchResponse;
+        if (requestVersion !== requestVersionRef.current) return;
         setGroups(payload.groups || []);
         setAnswer(payload.answer || null);
       } catch (searchError) {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || requestVersion !== requestVersionRef.current) {
           return;
         }
 
@@ -137,7 +149,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
         setAnswer(null);
         setError(searchError instanceof Error ? searchError.message : "Vaeroex search is temporarily unavailable.");
       } finally {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && requestVersion === requestVersionRef.current) {
           setLoading(false);
         }
       }
@@ -148,6 +160,45 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
       controller.abort();
     };
   }, [trimmedQuery]);
+
+  async function submitQuestion(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (trimmedQuery.length < 2) return;
+
+    const requestVersion = ++requestVersionRef.current;
+    setLoading(true);
+    setLoadingLabel("Analyzing...");
+    setError(null);
+
+    try {
+      const response = await fetch("/api/search", {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ query: trimmedQuery })
+      });
+
+      const payload = (await response.json().catch(() => ({}))) as GlobalSearchResponse & { error?: string };
+
+      if (!response.ok) {
+        throw new Error(payload.error || "Vaeroex could not answer that question right now.");
+      }
+
+      if (requestVersion !== requestVersionRef.current) return;
+      setAnswer(payload.answer || null);
+      setGroups((current) => payload.groups?.length ? payload.groups : current);
+    } catch (answerError) {
+      if (requestVersion !== requestVersionRef.current) return;
+      setError(answerError instanceof Error ? answerError.message : "Vaeroex could not answer that question right now.");
+    } finally {
+      if (requestVersion === requestVersionRef.current) {
+        setLoading(false);
+      }
+    }
+  }
 
   return (
     <div className={isIconVariant ? className : `${className || "w-full"} max-w-xl`}>
@@ -184,7 +235,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
             type="button"
             className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
             aria-label="Close Vaeroex search"
-            onClick={() => setOpen(false)}
+            onClick={closeSearch}
           />
 
           <section className="relative mx-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-vaeroex-accent/25 bg-[#07111f]/98 text-slate-100 shadow-command sm:max-h-[min(82dvh,44rem)]">
@@ -199,7 +250,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                 <button
                   type="button"
                   className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/10 bg-slate-950/40 text-slate-300 hover:border-vaeroex-accent/45 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
-                  onClick={() => setOpen(false)}
+                  onClick={closeSearch}
                   aria-label="Close search"
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
@@ -209,7 +260,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               <label className="sr-only" htmlFor={inputId}>
                 Ask or search Vaeroex
               </label>
-              <div className="relative mt-4">
+              <form className="relative mt-4" onSubmit={submitQuestion}>
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-vaeroex-accent" aria-hidden="true" />
                 <input
                   ref={inputRef}
@@ -229,6 +280,8 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-md text-slate-300 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
                       onClick={() => {
+                        requestVersionRef.current += 1;
+                        setLoading(false);
                         setQuery("");
                         setGroups([]);
                         setAnswer(null);
@@ -241,7 +294,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                     </button>
                   ) : null}
                 </div>
-              </div>
+              </form>
             </header>
 
             <div id={resultsId} className="vaeroex-mobile-safe-scroll min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
@@ -278,7 +331,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                               key={`${destination.href}-${destination.label}`}
                               href={destination.href as Route}
                               className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm font-semibold text-white transition hover:border-vaeroex-accent/50 hover:bg-cyan-950/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
-                              onClick={() => setOpen(false)}
+                              onClick={closeSearch}
                             >
                               <span>{destination.label}</span>
                               {destination.context ? <span className="mt-1 block text-xs font-normal leading-5 text-slate-400">{destination.context}</span> : null}
@@ -300,7 +353,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                             key={`${group.label}-${result.id}`}
                             href={result.href as Route}
                             className="group rounded-lg border border-transparent p-3 transition hover:border-vaeroex-accent/45 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
-                            onClick={() => setOpen(false)}
+                            onClick={closeSearch}
                           >
                             <span className="flex flex-wrap items-center gap-2">
                               <span className="text-sm font-semibold text-white group-hover:text-vaeroex-accent">{result.title}</span>
@@ -325,7 +378,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
             </div>
 
             <footer className="border-t border-white/10 bg-slate-950/45 px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-wide text-slate-500 sm:px-4">
-              Cmd/Ctrl + K opens Search or Ask anywhere in Vaeroex.
+              Press Enter to ask · Cmd/Ctrl + K opens Search or Ask anywhere in Vaeroex.
             </footer>
           </section>
         </div>

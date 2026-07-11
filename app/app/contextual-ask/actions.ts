@@ -1,15 +1,18 @@
 "use server";
 
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson } from "@/lib/ai/evidence-index";
+import { buildDeterministicFocusedExplanation, buildFocusedExplanationContext } from "@/lib/ai/bounded-context";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
+import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { resolveVaeroexModel } from "@/lib/ai/model-routing";
+import { planVaeroexQuery } from "@/lib/ai/query-depth-planner";
 import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
-import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
-import { contextualSecurityIntentInput, isSecuritySensitiveRequest, securityResponseMessage } from "@/lib/security/security-response";
+import { contextualSecurityIntentInput, isSecurityResponseMessage, isSecuritySensitiveRequest, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -17,12 +20,11 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 export type ContextualAskAnswer = {
   title: string;
-  shortAnswer: string;
-  why: string;
-  dataUsed: string[];
+  directExplanation: string;
+  whyItMatters: string;
+  evidence: string[];
   confidence: string;
   limitations: string;
-  suggestedNextStep: string;
   responseMarkdown?: string;
   copyText: string;
 };
@@ -121,46 +123,46 @@ async function requireWorkspaceForContextualAsk() {
 function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext: string): ContextualAskAnswer {
   const output = isRecord(outputJson) ? outputJson : {};
   const title = str(output.title, fallbackTitle || INITIAL_ANSWER_TITLE);
-  const shortAnswer =
+  const directExplanation =
+    str(output.direct_explanation) ||
     str(output.short_answer) ||
+    str(output.direct_answer) ||
     str(output.executive_summary) ||
     str(output.summary) ||
     str(output.response_markdown, "Vaeroex reviewed the current context and prepared a short explanation.");
-  const why = str(output.why_vaeroex_thinks_this) || str(output.reasoning) || str(output.reason) || shortAnswer;
-  const dataUsed = compactList(asStringArray(output.data_used).length ? asStringArray(output.data_used) : asStringArray(output.evidence_used));
-  const confidence = str(output.confidence, "Limited");
-  const limitations = str(output.limitations) || str(output.limitation) || "Confidence depends on the depth, quality, and recency of workspace data.";
-  const suggestedNextStep =
-    str(output.suggested_next_step) ||
-    str(output.recommended_next_step) ||
-    str(output.next_step) ||
-    "Review the explanation, compare it with what you know, and decide whether to act or ask a follow-up.";
+  const whyItMatters = str(output.why_it_matters) || str(output.why_vaeroex_thinks_this) || str(output.reasoning) || str(output.reason);
+  const outputEvidence = asStringArray(output.evidence);
+  const evidence = compactList(
+    outputEvidence.length
+      ? outputEvidence
+      : asStringArray(output.data_used).length
+        ? asStringArray(output.data_used)
+        : asStringArray(output.evidence_used)
+  );
+  const confidence = str(output.recommendation_confidence) || str(output.confidence, "Low");
+  const limitationItems = asStringArray(output.limitations);
+  const limitations = limitationItems.join(" ") || str(output.limitation);
   const responseMarkdown = str(output.response_markdown);
-  const normalizedDataUsed = dataUsed.length ? dataUsed : compactList([fallbackContext || "Current page context", "Current workspace snapshot"]);
+  const normalizedEvidence = evidence.length ? evidence : compactList([fallbackContext || "Current page context"]);
   const copyText = [
     title,
     "",
-    `Short answer: ${shortAnswer}`,
-    "",
-    `Why Vaeroex thinks this: ${why}`,
-    "",
-    "Data used:",
-    ...normalizedDataUsed.map((item) => `- ${item}`),
-    "",
-    `Confidence / limitations: ${confidence}. ${limitations}`,
-    "",
-    `Suggested next step: ${suggestedNextStep}`,
+    directExplanation,
+    whyItMatters ? `\nWhy it matters: ${whyItMatters}` : "",
+    "\nEvidence:",
+    ...normalizedEvidence.map((item) => `- ${item}`),
+    `\nRecommendation Confidence: ${confidence}`,
+    limitations ? `\nLimitations: ${limitations}` : "",
     responseMarkdown ? `\nDetailed explanation:\n${responseMarkdown}` : ""
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 
   return {
     title,
-    shortAnswer,
-    why,
-    dataUsed: normalizedDataUsed,
+    directExplanation,
+    whyItMatters,
+    evidence: normalizedEvidence,
     confidence,
     limitations,
-    suggestedNextStep,
     responseMarkdown,
     copyText
   };
@@ -233,11 +235,29 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
       throw new Error("You’ve reached the monthly Vaeroex usage limit for this workspace.");
     }
 
-    workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
+    const queryPlan = planVaeroexQuery({
+      query: question,
+      contextType,
+      hasSelectedContext: Boolean(contextId || sourceTitle)
+    });
+    const focusedContext = await buildFocusedExplanationContext({
+      supabase,
+      workspaceId,
+      input: {
+        contextType,
+        contextId,
+        sourceTitle,
+        sourceSummary,
+        evidence
+      }
+    });
+    workspaceSnapshot = focusedContext.workspaceSnapshot;
     const evidenceContext = await buildWorkspaceEvidenceContext({
       supabase,
       workspaceId,
-      query: `${question}\n${sourceTitle}\n${sourceSummary}\n${evidence.join("\n")}`
+      query: focusedContext.evidenceQuery || question,
+      maxChunks: queryPlan.maxEvidenceChunks,
+      retrievalStrategy: "keyword_only"
     });
 
     const contextualInput = {
@@ -248,41 +268,116 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
       evidence,
       retrieved_evidence: evidenceContextAsJson(evidenceContext),
       follow_up: followUp || null,
+      query_plan: {
+        classification: queryPlan.classification,
+        tier: queryPlan.tier,
+        domains: queryPlan.domains,
+        retrieval_depth: queryPlan.retrievalDepth,
+        max_evidence_chunks: queryPlan.maxEvidenceChunks,
+        context_token_budget: queryPlan.contextTokenBudget
+      },
       answer_format: {
         title: "Short contextual title",
-        short_answer: "One direct paragraph.",
-        why_vaeroex_thinks_this: "Specific reason without chain-of-thought.",
-        data_used: ["Specific records, counts, dates, or evidence used."],
-        confidence: "Low | Medium | High | Limited",
-        limitations: "What would improve confidence.",
-        suggested_next_step: "One practical next step.",
-        response_markdown: "Optional concise formatted explanation with requested headings when the prompt asks for sections."
+        direct_explanation: "One concise answer that explains the selected item in its first sentence.",
+        why_it_matters: "One short paragraph only when the evidence supports why it matters.",
+        evidence: ["Specific source-backed records, values, dates, or observations used."],
+        recommendation_confidence: "High | Medium | Low | Insufficient",
+        limitations: ["Only meaningful missing, stale, or conflicting evidence."],
+        response_markdown: "The same concise explanation in plain business language."
       }
     } satisfies Json;
 
     const userPrompt = `
-Answer inline on the current Vaeroex page. Do not write a long report.
+Explain the selected item inline on the current Vaeroex page.
 Question: ${question}
 Context type: ${contextType}
 Source title: ${sourceTitle || "Current page item"}
 Source summary: ${sourceSummary || "No source summary provided."}
 Evidence:
-${evidence.map((item) => `- ${item}`).join("\n") || "- Current workspace snapshot"}
+${evidence.map((item) => `- ${item}`).join("\n") || "- No direct page evidence was supplied."}
 
-Return concise JSON with title, short_answer, why_vaeroex_thinks_this, data_used, confidence, limitations, suggested_next_step, and response_markdown.
-Be specific about the data used. Do not expose raw debug details or chain-of-thought.
+Return concise JSON with title, direct_explanation, why_it_matters, evidence, recommendation_confidence, limitations, and response_markdown.
+The first sentence must explain this selected item directly. Stay within this item and its related evidence. Interpret the evidence instead of repeating it. Do not add generic advice, unrelated recommendations, report sections, action cards, or fabricated facts. Do not expose raw debug details or chain-of-thought.
 `;
 
-    const { outputJson, usage } = await runVaeroexCompletionWithUsage({
-      workflow,
-      userPrompt,
-      workspaceSnapshot,
-      extraInputs: {
-        contextual_ask: contextualInput
-      } satisfies Json,
-      supabase,
-      workspaceId
+    const fallbackOutput = buildDeterministicFocusedExplanation({
+      sourceTitle: sourceTitle || INITIAL_ANSWER_TITLE,
+      sourceSummary,
+      evidence: [
+        ...focusedContext.directEvidence,
+        ...evidenceContext.chunks.map((chunk) => `${chunk.title}: ${chunk.summary || chunk.excerpt}`)
+      ],
+      verifiedRecordCount: focusedContext.verifiedRecordCount,
+      limitations: [...focusedContext.limitations, ...evidenceContext.limitations]
     });
+    let generation: Awaited<ReturnType<typeof runVaeroexCompletionWithUsage>> | null = null;
+    let outputJson: Json = fallbackOutput;
+    let fallbackUsed = false;
+    const generationStartedAt = Date.now();
+
+    try {
+      const baseSettings = getOpenAIRetrySettings();
+      generation = await runVaeroexCompletionWithUsage({
+        workflow,
+        userPrompt,
+        workspaceSnapshot,
+        extraInputs: {
+          contextual_ask: contextualInput
+        } satisfies Json,
+        supabase,
+        workspaceId,
+        modelRoute: "focused_explanation",
+        executionPath: queryPlan.classification,
+        maxOutputTokens: 700,
+        openAISettings: {
+          ...baseSettings,
+          timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
+          maxRetries: 0
+        }
+      });
+      outputJson = generation.outputJson;
+    } catch (generationError) {
+      const message = generationError instanceof Error ? generationError.message : "";
+
+      if (isSecurityResponseMessage(message)) {
+        return { status: "error", error: securityResponseMessage() };
+      }
+
+      fallbackUsed = true;
+      await recordVaeroexAiUsage({
+        supabase,
+        workspaceId,
+        userId: user.id,
+        agentType: workflow.key,
+        usage: {
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+          model: resolveVaeroexModel("focused_explanation"),
+          latencyMs: Date.now() - generationStartedAt,
+          status: "failed",
+          metadata: {
+            execution_tier: queryPlan.tier,
+            execution_path: queryPlan.classification,
+            context_type: contextType,
+            evidence_count: focusedContext.directEvidence.length + evidenceContext.chunks.length,
+            timeout: /timed out|timeout|abort/i.test(message),
+            fallback_used: true
+          }
+        }
+      });
+      outputJson = buildDeterministicFocusedExplanation({
+        sourceTitle: sourceTitle || INITIAL_ANSWER_TITLE,
+        sourceSummary,
+        evidence: [
+          ...focusedContext.directEvidence,
+          ...evidenceContext.chunks.map((chunk) => `${chunk.title}: ${chunk.summary || chunk.excerpt}`)
+        ],
+        verifiedRecordCount: focusedContext.verifiedRecordCount,
+        limitations: [...focusedContext.limitations, ...evidenceContext.limitations],
+        failureReason: "The generated explanation was unavailable, so Vaeroex used the selected item and its bounded evidence instead."
+      });
+    }
 
     const inputJson = {
       workflow: workflow.key,
@@ -308,22 +403,31 @@ Be specific about the data used. Do not expose raw debug details or chain-of-tho
       throw new Error(error.message);
     }
 
-    await recordVaeroexAiUsage({
-      supabase,
-      workspaceId,
-      userId: user.id,
-      agentType: workflow.key,
-      usage: {
-        ...usage,
-        metadata: {
-          context_type: contextType,
-          context_id: contextId || null,
-          evidence_retrieval_mode: evidenceContext.retrievalMode,
-          evidence_chunks: evidenceContext.chunks.length,
-          evidence_confidence_score: evidenceContext.confidenceScore
+    if (generation) {
+      await recordVaeroexAiUsage({
+        supabase,
+        workspaceId,
+        userId: user.id,
+        agentType: workflow.key,
+        usage: {
+          ...generation.usage,
+          metadata: {
+            ...(isRecord(generation.usage.metadata) ? generation.usage.metadata : {}),
+            execution_tier: queryPlan.tier,
+            execution_path: queryPlan.classification,
+            context_type: contextType,
+            context_id: contextId || null,
+            selected_records: focusedContext.verifiedRecordCount,
+            estimated_context_tokens: focusedContext.estimatedContextTokens,
+            context_load_ms: focusedContext.loadMs,
+            evidence_retrieval_mode: evidenceContext.retrievalMode,
+            evidence_chunks: evidenceContext.chunks.length,
+            evidence_confidence_score: evidenceContext.confidenceScore,
+            fallback_used: fallbackUsed
+          }
         }
-      }
-    });
+      });
+    }
 
     return {
       status: "success",

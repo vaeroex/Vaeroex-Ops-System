@@ -1353,7 +1353,7 @@ function ComparisonAnalysis({
         </div>
         <ContextualAskVaeroex
           label="Explain This Comparison"
-          prompt="Analyze this KPI comparison for leadership. Return a concise executive analytics briefing with: Executive Summary, Key Relationships, Biggest Trend, Biggest Risk, Biggest Opportunity, Forecast only if confidence is sufficient, Confidence Score, Data Limitations, Executive Recommendations, and Follow-up Questions. Explain why the relationships matter for business decisions. Do not overstate certainty when the data is limited."
+          prompt="Explain what this KPI comparison shows. Identify only the strongest supported relationship, why it matters, the evidence in the selected timeframe, and any meaningful uncertainty. Do not turn it into a general business briefing."
           contextType="kpi_comparison"
           contextId={`kpi-comparison-${context.comparedKpis.join("-")}-${mode}`}
           sourceTitle="KPI comparison"
@@ -1520,7 +1520,7 @@ function KpiTargetRecommendationPanel({
       <div className="mt-4">
         <ContextualAskVaeroex
           label="Explain This"
-          prompt={`Explain why Vaeroex recommended ${recommendation.value} as the target for ${metricName}. Explain whether the user should apply it or manually adjust it.`}
+          prompt={`Explain why ${recommendation.value} was recommended as the target for ${metricName}, which KPI evidence supports it, and what uncertainty should be considered.`}
           contextType="kpi_recommended_target"
           contextId={latest?.id || metricName}
           sourceTitle={`${metricName} recommended target`}
@@ -2143,7 +2143,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <div className="mt-4">
               <ContextualAskVaeroex
                 label="Explain These KPIs"
-                prompt="Review these KPI trends and recommend the next leadership action."
+                prompt="Explain what these KPI trends mean, which metric most needs attention, the supporting values, and any meaningful uncertainty."
                 contextType="kpi_summary"
                 contextId={topAttentionKpi?.id || "kpi-summary"}
                 sourceTitle="KPI summary"

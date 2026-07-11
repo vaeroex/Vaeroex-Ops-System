@@ -216,9 +216,12 @@ check(!appShell.includes('href: "/app/ask"') && !appShell.includes('href="/app/a
 check(!appShell.includes(">Ask Vaeroex<") && appShell.includes("GlobalSearch"), "Top navigation must expose one global Search or Ask entry point instead of a separate Ask button.");
 check(globalSearch.includes("Ask a business question or search your workspace") && globalSearch.includes("vaeroex:open-global-search"), "Global search must support the merged Search or Ask panel and in-place triggers.");
 check(globalSearch.includes("SecurityResponseNotice") && globalSearch.includes('answer?.kind === "security_response"'), "Global Search or Ask must render a dedicated security response for blocked prompts.");
+check(globalSearch.includes("submitQuestion") && globalSearch.includes('method: "POST"'), "Global Search or Ask must reserve model-backed answers for explicit submissions.");
 check(globalSearchTrigger.includes("vaeroex:open-global-search"), "Page-level Search or Ask buttons must open the global panel without navigating to a standalone Ask page.");
 check(searchRoute.includes("classifySecurityIntent") && searchRoute.includes('kind: "security_response"'), "Global Search or Ask must classify security-sensitive prompts before returning search or business answers.");
 check(searchRoute.includes("buildKpiGlobalAnswer") && searchRoute.includes("buildGeneralBusinessAnswer"), "Global Search or Ask must support bounded business-question answers instead of keyword results only.");
+check(searchRoute.includes("planVaeroexQuery") && searchRoute.includes("scopedResults"), "Global Search or Ask must plan data domains and avoid querying unrelated sources.");
+check(searchRoute.includes("export async function POST") && searchRoute.includes("buildBoundedWorkspaceContext"), "Explicit global questions must use bounded planner-selected context.");
 check(searchRoute.includes("loadKpiOverviewData") && searchRoute.includes("shouldUseKpiOverviewAnswer"), "Global Search or Ask must route KPI overview through the shared KPI/settings loader with a narrow intent gate.");
 check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/.test(searchRoute), "Global Search or Ask must not route generic weakest questions into KPI overview.");
 check(searchRoute.includes("business_memory_chunks") && searchRoute.includes('"Learned Knowledge"'), "Global Search or Ask must search active Learned Knowledge instead of implementation-only result records.");
@@ -246,7 +249,8 @@ check(agentsActionsRuntime.includes("vaeroex_run_diagnostics") && agentsActionsR
 check(agentsActionsRuntime.includes("classifySecurityIntent") && agentsActionsRuntime.includes("security_intent_classified"), "Ask Vaeroex must classify security intent before Business Memory and OpenAI generation.");
 check(agentsActionsRuntime.indexOf("classifySecurityIntent") < agentsActionsRuntime.indexOf("business_memory"), "Ask Vaeroex security intent classification must run before Business Memory retrieval.");
 check(agentsActionsRuntime.includes("classifyKpiOverviewIntent") && agentsActionsRuntime.includes("runLightweightKpiOverview"), "Ask Vaeroex must route simple KPI overview prompts through the lightweight KPI workflow.");
-check(agentsActionsRuntime.indexOf("runLightweightKpiOverview") < agentsActionsRuntime.indexOf("buildWorkspaceSnapshot"), "Lightweight KPI overview must run before full workspace snapshot and Business Memory retrieval.");
+check(!agentsActionsRuntime.includes("buildWorkspaceSnapshot") && agentsActionsRuntime.includes("buildBoundedWorkspaceContext"), "Ask Vaeroex must use bounded planned context instead of a full workspace snapshot.");
+check(agentsActionsRuntime.includes("executionPlanForWorkflow") && agentsActionsRuntime.includes("query_plan"), "Ask Vaeroex must record and enforce a server-side query-depth plan.");
 const kpiOverviewRuntime = read("lib/ai/kpi-overview.ts");
 check(kpiOverviewRuntime.includes("KPI_OVERVIEW_MAX_ROWS") && kpiOverviewRuntime.includes("KPI_OVERVIEW_HISTORY_PER_METRIC"), "KPI overview must cap historical KPI context.");
 check(kpiOverviewRuntime.includes("loadKpiOverviewData") && kpiOverviewRuntime.includes("kpi_settings"), "KPI overview must load workspace KPI settings through a shared bounded helper.");
@@ -255,6 +259,15 @@ check(kpiOverviewRuntime.includes("maxRetries: 0"), "KPI overview OpenAI retry m
 const vaeroexClientRuntime = read("lib/ai/vaeroex-client.ts");
 check(vaeroexClientRuntime.includes("openAISettings?: OpenAIRetrySettings"), "Vaeroex OpenAI client must accept per-call timeout/retry settings.");
 check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex OpenAI client must log token budget stages.");
+check(vaeroexClientRuntime.includes("modelRoute") && vaeroexClientRuntime.includes("executionPath"), "Vaeroex OpenAI usage must identify model route and execution path.");
+check(vaeroexClientRuntime.includes("collectBoundedSourceIds") && vaeroexClientRuntime.includes("allowedSourceIds"), "Vaeroex output citations must be validated against bounded request evidence.");
+const contextualAskRuntime = read("app/app/contextual-ask/actions.ts");
+check(!contextualAskRuntime.includes("buildWorkspaceSnapshot") && contextualAskRuntime.includes("buildFocusedExplanationContext"), "Contextual explanations must use selected-item context instead of a broad workspace snapshot.");
+check(contextualAskRuntime.includes('retrievalStrategy: "keyword_only"') && contextualAskRuntime.includes("maxEvidenceChunks"), "Contextual explanations must use bounded low-cost evidence retrieval.");
+const usageRuntime = read("lib/ai/usage.ts");
+check(usageRuntime.includes("CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M") && !usageRuntime.includes("{ input: 0, output: 0 }"), "Unknown OpenAI models must never record zero estimated cost.");
+const evidenceIndexRuntime = read("lib/ai/evidence-index.ts");
+check(evidenceIndexRuntime.includes("embeddingTimeoutMs") && evidenceIndexRuntime.includes("maxRetries: 0"), "Semantic retrieval must have a bounded timeout and avoid repeated embedding requests.");
 
 const workspaceActionFiles = [
   "app/app/operations/actions.ts",

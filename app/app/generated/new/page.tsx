@@ -161,7 +161,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     workspaceName: context.activeWorkspace?.name,
     coverage: businessIntelligenceCoverage
   });
-  const askPrompt = `Review this Vaeroex generated output and answer with evidence, confidence, and the first practical step: ${output.title}`;
+  const askPrompt = `Explain the central conclusion in this generated output, why it matters, which evidence supports it, and any meaningful limitation: ${output.title}`;
   const sourceDataJson = outputSourceData(output);
 
   return (
@@ -296,40 +296,6 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
         </div>
       </section>
 
-      <section className="grid gap-3 md:grid-cols-2 print:hidden">
-        {[
-          "Why did Vaeroex recommend this?",
-          "What evidence supports this?",
-          "What should I do first?",
-          "What data would improve confidence?",
-          "Make this more concise.",
-          "Turn this into a checklist.",
-          "Turn this into an SOP.",
-          "Turn this into an executive briefing."
-        ].map((question) => (
-          <div
-            key={question}
-            className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/35 hover:bg-cyan-950/30"
-          >
-            <ContextualAskVaeroex
-              label={question}
-              prompt={`${question} Context: ${output.title}`}
-              contextType="generated_output_follow_up"
-              contextId={`${output.type}-${output.sourceHref}`}
-              sourceTitle={output.title}
-              sourceSummary={`${output.summary} Recommended remedy: ${output.recommendedRemedy}`}
-              evidence={[
-                output.whyMatters,
-                ...output.evidence,
-                `Confidence: ${output.confidence}`,
-                `Source types: ${output.sourceTypes.join(", ")}`,
-                `Limitations: ${output.limitations}`
-              ]}
-              compact
-            />
-          </div>
-        ))}
-      </section>
     </div>
   );
 }

@@ -937,7 +937,7 @@ function SignalList({
           <div className="mt-3">
             <ContextualAskVaeroex
               label="Explain This"
-              prompt="Explain this intelligence signal for leadership. Include what happened, why it matters, evidence, confidence, what could happen next, and what leadership should review. Do not create tasks, assign owners, or suggest due dates."
+              prompt="Explain what this intelligence signal means, why it matters, which evidence supports it, and what remains uncertain. Stay focused on this signal."
               contextType={`home_${tone}_signal`}
               contextId={item.id}
               sourceTitle={item.title}
@@ -1094,7 +1094,7 @@ function IntelligenceLayerSummary({
             </div>
             <ContextualAskVaeroex
               label="Explain This"
-              prompt="Explain the current Home briefing for leadership. Include these sections: Executive Interpretation; Business Relationships connecting Top Risk, Top Opportunity, and Executive Recommendation; Root Cause; Business Impact if ignored; Confidence with High, Medium, or Low and why; Evidence Used from KPIs, Business Memory, uploaded files, reports, and signals; Predicted Trend for 30 days, 90 days, and 6 months only if confidence supports it, otherwise state that forecast history is still building while preserving any current KPI data that exists; What Leadership Should Review with one clear recommendation. Keep it concise, practical, and tied to the current briefing."
+              prompt="Explain the current Home briefing directly. Describe what it means, why it matters, which supplied evidence supports it, and any meaningful uncertainty. Do not expand into a general report or forecast."
               contextType="home_leadership_briefing"
               contextId="home-what-leadership-should-know-now"
               sourceTitle="What leadership should know now"
@@ -1180,7 +1180,7 @@ function IntelligenceBriefingHero({
           <div className="w-full max-w-md rounded-lg border border-cyan-300/20 bg-slate-950/30 p-3 lg:w-auto">
             <ContextualAskVaeroex
               label="Explain This"
-              prompt="Explain this Leadership Intelligence Briefing. Include Executive Interpretation, Business Relationships, Root Cause, Business Impact, Confidence, Evidence Used, Predicted Trend only when confidence supports it, and one Recommended Executive Decision. Keep it concise and tied to the current risk, opportunity, attention item, and executive recommendation."
+              prompt="Explain this leadership briefing directly. Connect only the selected risk, opportunity, and recommendation when the supplied evidence supports that relationship, then state any meaningful uncertainty."
               contextType="home_intelligence_briefing"
               contextId={`home-intelligence-briefing-${period}`}
               sourceTitle="Leadership Intelligence Briefing"
@@ -1248,7 +1248,7 @@ function IntelligenceBriefingHero({
                   ) : (
                     <ContextualAskVaeroex
                       label="Explain This"
-                      prompt="Explain this briefing card for leadership. Include what happened, why Vaeroex surfaced it, evidence, confidence, possible business impact, and what leadership should review. Do not assign work, create tasks, name owners, or suggest due dates."
+                      prompt="Explain what this briefing card means, why it matters, which evidence supports it, and what remains uncertain. Stay focused on this card."
                       contextType={`home_briefing_${id}`}
                       contextId={item.id}
                       sourceTitle={item.title}

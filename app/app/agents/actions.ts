@@ -5,19 +5,21 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
+import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { classifyKpiOverviewIntent, runLightweightKpiOverview } from "@/lib/ai/kpi-overview";
+import { resolveVaeroexModel } from "@/lib/ai/model-routing";
+import { planVaeroexQuery, type VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
 import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
-import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
-import { classifySecurityIntent, securityResponseMessage, securityResponseOutput, type SecurityIntentClassification } from "@/lib/security/security-response";
+import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage, securityResponseOutput, type SecurityIntentClassification } from "@/lib/security/security-response";
 import { logSecurityAuditEvent, requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
@@ -205,6 +207,25 @@ function reducedEvidenceContext(reason: string): EvidenceContext {
   };
 }
 
+function structuredEvidenceContext(recordCount: number): EvidenceContext {
+  const confidenceScore = Math.min(88, recordCount ? 35 + recordCount * 5 : 10);
+
+  return {
+    available: false,
+    retrievalMode: "none",
+    chunks: [],
+    maxChunks: 0,
+    confidenceScore,
+    confidenceLabel: recordCount >= 6 ? "Good" : recordCount >= 2 ? "Partial" : "Very Limited",
+    limitations: [],
+    dataGaps: recordCount ? [] : ["No matching structured workspace records were available."],
+    policy: [
+      "This path intentionally used bounded structured records without semantic retrieval.",
+      "Do not infer facts that are absent from those records."
+    ]
+  };
+}
+
 function askVaeroexOpenAISettings() {
   const base = getOpenAIRetrySettings();
 
@@ -223,6 +244,35 @@ function askKpiOverviewOpenAISettings() {
     timeoutMs: Math.min(base.timeoutMs, ASK_VAEROEX_KPI_OVERVIEW_OPENAI_TIMEOUT_MS),
     maxRetries: 0
   };
+}
+
+function executionPlanForWorkflow(workflowKey: string, query: string, workflowDescription: string) {
+  const planningQuery = workflowKey === "ask_vaeroex" ? query : `${query}\n${workflowDescription}`;
+  const plan = planVaeroexQuery({ query: planningQuery });
+
+  if (workflowKey === "ask_vaeroex" || plan.requiresOpenAI || plan.classification === "security_sensitive") {
+    return plan;
+  }
+
+  const crossDomain = plan.domains.length > 1;
+
+  return {
+    ...plan,
+    classification: crossDomain ? "cross_business_reasoning" : "focused_explanation",
+    tier: crossDomain ? 3 : 2,
+    retrievalDepth: crossDomain ? "bounded_cross_domain" : "focused",
+    maxEvidenceChunks: crossDomain ? 6 : 3,
+    requiresOpenAI: true,
+    modelTier: crossDomain ? "reasoning" : "focused",
+    timeoutMs: crossDomain ? 18_000 : 10_000,
+    contextTokenBudget: crossDomain ? 16_000 : 6_000,
+    fallback: crossDomain ? "bounded_summary" : "focused_context",
+    reason: `The ${workflowKey} workflow explicitly requests a generated output, but remains bounded to relevant domains.`
+  } satisfies VaeroexQueryPlan;
+}
+
+function modelRouteForPlan(plan: VaeroexQueryPlan) {
+  return plan.tier === 3 ? "cross_business_reasoning" as const : plan.tier === 2 ? "focused_explanation" as const : "default" as const;
 }
 
 function withRunDiagnostics(output: Json, diagnostics: Json) {
@@ -709,119 +759,248 @@ export async function runVaeroexAction(formData: FormData) {
         revalidatePath("/app/agents");
         destination = `/app/agents?run=${savedRunId}`;
       } else {
-      currentStage = "workspace_snapshot";
-      logVaeroexRunEvent("workspace_snapshot_started", logDetails());
-      workspaceSnapshot = (await buildWorkspaceSnapshot(supabase, workspaceId)) as Json;
-      logVaeroexRunEvent("workspace_snapshot_finished", logDetails());
+        const queryPlan = executionPlanForWorkflow(workflow.key, userPrompt, workflow.description);
+        logVaeroexRunEvent("query_plan_created", logDetails({
+          classification: queryPlan.classification,
+          tier: queryPlan.tier,
+          domains: queryPlan.domains,
+          retrievalDepth: queryPlan.retrievalDepth,
+          requiresOpenAI: queryPlan.requiresOpenAI,
+          maxEvidenceChunks: queryPlan.maxEvidenceChunks,
+          contextTokenBudget: queryPlan.contextTokenBudget,
+          fallback: queryPlan.fallback
+        }));
 
-      currentStage = "business_memory";
-      logVaeroexRunEvent("memory_retrieval_started", logDetails());
-      let evidenceContext: EvidenceContext;
+        currentStage = "bounded_context";
+        logVaeroexRunEvent("bounded_context_started", logDetails({ domains: queryPlan.domains }));
+        const boundedContext = await buildBoundedWorkspaceContext({
+          supabase,
+          workspaceId,
+          query: userPrompt || workflow.title,
+          plan: queryPlan
+        });
+        workspaceSnapshot = boundedContext.workspaceSnapshot;
+        logVaeroexRunEvent("bounded_context_finished", logDetails({
+          durationMs: boundedContext.loadMs,
+          loadedDomains: boundedContext.loadedDomains,
+          structuredEvidenceCount: boundedContext.structuredEvidenceCount,
+          estimatedContextTokens: boundedContext.estimatedContextTokens
+        }));
 
-      try {
-        evidenceContext = await withStageTimeout(
-          "Business Memory retrieval",
-          ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS,
-          buildWorkspaceEvidenceContext({
-            supabase,
-            workspaceId,
-            query: `${workflow.title}\n${userPrompt}\n${extraInputs.subject || ""}`,
-            stageLogger: (event, details = {}) => logVaeroexRunEvent(`memory_${event}`, logDetails(details))
+        let evidenceContext = structuredEvidenceContext(boundedContext.structuredEvidenceCount);
+
+        if (queryPlan.requiresOpenAI && queryPlan.maxEvidenceChunks > 0) {
+          currentStage = "business_memory";
+          logVaeroexRunEvent("memory_retrieval_started", logDetails({
+            maxEvidenceChunks: queryPlan.maxEvidenceChunks,
+            retrievalStrategy: queryPlan.tier === 2 ? "keyword_only" : "auto"
+          }));
+
+          try {
+            evidenceContext = await withStageTimeout(
+              "Business Memory retrieval",
+              Math.min(ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS, queryPlan.timeoutMs),
+              buildWorkspaceEvidenceContext({
+                supabase,
+                workspaceId,
+                query: boundedContext.evidenceQuery,
+                maxChunks: queryPlan.maxEvidenceChunks,
+                retrievalStrategy: queryPlan.tier === 2 ? "keyword_only" : "auto",
+                embeddingTimeoutMs: queryPlan.tier === 3 ? 4_000 : 3_000,
+                stageLogger: (event, details = {}) => logVaeroexRunEvent(`memory_${event}`, logDetails(details))
+              })
+            );
+          } catch (error) {
+            const reason = isTimeoutLike(error)
+              ? "Business Memory retrieval took too long for this request."
+              : cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined, "Business Memory retrieval failed.");
+            logVaeroexRunError(isTimeoutLike(error) ? "memory_retrieval_timeout" : "memory_retrieval_failed", logDetails({
+              errorName: error instanceof Error ? error.name : "UnknownError",
+              message: reason,
+              continuingWithReducedContext: true
+            }));
+            evidenceContext = reducedEvidenceContext(reason);
+          }
+
+          logVaeroexRunEvent("memory_retrieval_finished", logDetails({
+            retrievalMode: evidenceContext.retrievalMode,
+            evidenceChunks: evidenceContext.chunks.length,
+            evidenceConfidenceScore: evidenceContext.confidenceScore,
+            reducedContext: !evidenceContext.available
+          }));
+        } else {
+          logVaeroexRunEvent("memory_retrieval_skipped", logDetails({ reason: queryPlan.classification }));
+        }
+
+        const evidenceAwareInputs = {
+          ...extraInputs,
+          query_plan: {
+            classification: queryPlan.classification,
+            tier: queryPlan.tier,
+            domains: queryPlan.domains,
+            retrieval_depth: queryPlan.retrievalDepth,
+            max_evidence_chunks: queryPlan.maxEvidenceChunks,
+            context_token_budget: queryPlan.contextTokenBudget,
+            fallback: queryPlan.fallback
+          },
+          evidence_context: evidenceContextAsJson(evidenceContext)
+        } satisfies Json;
+        inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
+
+        let outputJson: Json = buildDeterministicBoundedAnswer({ query: userPrompt, context: boundedContext });
+        let usage: Awaited<ReturnType<typeof runVaeroexCompletionWithUsage>>["usage"] | null = null;
+        let fallbackUsed = false;
+
+        if (queryPlan.requiresOpenAI) {
+          currentStage = "openai";
+          logVaeroexRunEvent("openai_started", logDetails({
+            modelRoute: modelRouteForPlan(queryPlan),
+            executionPath: queryPlan.classification
+          }));
+          const baseSettings = askVaeroexOpenAISettings();
+          const modelRoute = modelRouteForPlan(queryPlan);
+          const generationStartedAt = Date.now();
+
+          try {
+            const generation = await runVaeroexCompletionWithUsage({
+              workflow,
+              userPrompt,
+              workspaceSnapshot,
+              extraInputs: evidenceAwareInputs,
+              supabase,
+              workspaceId,
+              modelRoute,
+              executionPath: queryPlan.classification,
+              maxOutputTokens: queryPlan.tier === 3 ? 1_200 : 700,
+              openAISettings: {
+                ...baseSettings,
+                timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
+                maxRetries: queryPlan.tier === 3 ? Math.min(baseSettings.maxRetries, 1) : 0
+              }
+            });
+            outputJson = generation.outputJson;
+            usage = generation.usage;
+            logVaeroexRunEvent("openai_finished", logDetails({
+              inputTokens: usage.inputTokens,
+              outputTokens: usage.outputTokens,
+              totalTokens: usage.totalTokens,
+              latencyMs: usage.latencyMs ?? null
+            }));
+          } catch (generationError) {
+            const rawMessage = generationError instanceof Error ? generationError.message : "";
+
+            if (isSecurityResponseMessage(rawMessage)) {
+              throw generationError;
+            }
+
+            fallbackUsed = true;
+            await recordVaeroexAiUsage({
+              supabase,
+              workspaceId,
+              userId: user.id,
+              agentType: workflow.key,
+              usage: {
+                inputTokens: 0,
+                outputTokens: 0,
+                totalTokens: 0,
+                model: resolveVaeroexModel(modelRoute),
+                latencyMs: Date.now() - generationStartedAt,
+                status: "failed",
+                metadata: {
+                  execution_tier: queryPlan.tier,
+                  execution_path: queryPlan.classification,
+                  data_domains: queryPlan.domains,
+                  evidence_count: boundedContext.structuredEvidenceCount + evidenceContext.chunks.length,
+                  timeout: isTimeoutLike(generationError),
+                  fallback_used: true
+                }
+              }
+            });
+            outputJson = buildDeterministicBoundedAnswer({
+              query: userPrompt,
+              context: boundedContext,
+              failureReason: isTimeoutLike(generationError)
+                ? "The deeper analysis reached its time limit."
+                : "The deeper analysis was temporarily unavailable."
+            });
+            logVaeroexRunError(isTimeoutLike(generationError) ? "openai_timeout_fallback" : "openai_fallback", logDetails({
+              finalStage: currentStage,
+              fallback: queryPlan.fallback,
+              errorName: generationError instanceof Error ? generationError.name : "UnknownError"
+            }));
+          }
+        } else {
+          logVaeroexRunEvent("openai_skipped", logDetails({ classification: queryPlan.classification }));
+        }
+
+        currentStage = "run_save";
+        logVaeroexRunEvent("run_save_started", logDetails({ fallbackUsed }));
+        if (!runId) {
+          throw new Error("Vaeroex run record was not available for saving.");
+        }
+        const completedOutputJson = withRunDiagnostics(
+          outputJson,
+          runDiagnostics({
+            requestId,
+            status: "completed",
+            finalStage: "completed",
+            details: {
+              workflow: workflow.key,
+              execution_tier: queryPlan.tier,
+              execution_path: queryPlan.classification,
+              data_domains: queryPlan.domains,
+              loaded_domains: boundedContext.loadedDomains,
+              bounded_context_ms: boundedContext.loadMs,
+              estimated_context_tokens: boundedContext.estimatedContextTokens,
+              structured_evidence_count: boundedContext.structuredEvidenceCount,
+              evidence_retrieval_mode: evidenceContext.retrievalMode,
+              evidence_chunks: evidenceContext.chunks.length,
+              reduced_context: !evidenceContext.available,
+              fallback_used: fallbackUsed
+            }
           })
         );
-      } catch (error) {
-        const reason = isTimeoutLike(error)
-          ? "Business Memory retrieval took too long for this request."
-          : cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined, "Business Memory retrieval failed.");
-        logVaeroexRunError(isTimeoutLike(error) ? "memory_retrieval_timeout" : "memory_retrieval_failed", logDetails({
-          errorName: error instanceof Error ? error.name : "UnknownError",
-          message: reason,
-          continuingWithReducedContext: true
-        }));
-        evidenceContext = reducedEvidenceContext(reason);
-      }
-
-      logVaeroexRunEvent("memory_retrieval_finished", logDetails({
-        retrievalMode: evidenceContext.retrievalMode,
-        evidenceChunks: evidenceContext.chunks.length,
-        evidenceConfidenceScore: evidenceContext.confidenceScore,
-        reducedContext: !evidenceContext.available
-      }));
-      const evidenceAwareInputs = {
-        ...extraInputs,
-        evidence_context: evidenceContextAsJson(evidenceContext)
-      } satisfies Json;
-      inputJson = buildInputJson(workflow.key, userPrompt, evidenceAwareInputs, workspaceSnapshot);
-
-      currentStage = "openai";
-      logVaeroexRunEvent("openai_started", logDetails());
-      const { outputJson, usage } = await runVaeroexCompletionWithUsage({
-        workflow,
-        userPrompt,
-        workspaceSnapshot,
-        extraInputs: evidenceAwareInputs,
-        supabase,
-        workspaceId,
-        openAISettings: askVaeroexOpenAISettings()
-      });
-      logVaeroexRunEvent("openai_finished", logDetails({
-        inputTokens: usage.inputTokens,
-        outputTokens: usage.outputTokens,
-        totalTokens: usage.totalTokens,
-        latencyMs: usage.latencyMs ?? null
-      }));
-
-      currentStage = "run_save";
-      logVaeroexRunEvent("run_save_started", logDetails());
-      if (!runId) {
-        throw new Error("Vaeroex run record was not available for saving.");
-      }
-      const completedOutputJson = withRunDiagnostics(
-        outputJson,
-        runDiagnostics({
-          requestId,
+        const savedRunId = await updateRunRecord({
+          supabase,
+          workspaceId,
+          runId,
+          inputJson,
+          outputJson: completedOutputJson,
           status: "completed",
-          finalStage: "completed",
-          details: {
-            workflow: workflow.key,
-            evidence_retrieval_mode: evidenceContext.retrievalMode,
-            evidence_chunks: evidenceContext.chunks.length,
-            reduced_context: !evidenceContext.available
-          }
-        })
-      );
-      const savedRunId = await updateRunRecord({
-        supabase,
-        workspaceId,
-        runId,
-        inputJson,
-        outputJson: completedOutputJson,
-        status: "completed",
-        errorMessage: null
-      });
-      logVaeroexRunEvent("run_saved", logDetails({ status: "completed", runId: savedRunId }));
+          errorMessage: null
+        });
+        logVaeroexRunEvent("run_saved", logDetails({ status: "completed", runId: savedRunId, fallbackUsed }));
 
-      currentStage = "usage_record";
-      logVaeroexRunEvent("usage_record_started", logDetails({ runId: savedRunId }));
-      await recordVaeroexAiUsage({
-        supabase,
-        workspaceId,
-        userId: user.id,
-        agentType: workflow.key,
-        usage: {
-          ...usage,
-          metadata: {
-            evidence_retrieval_mode: evidenceContext.retrievalMode,
-            evidence_chunks: evidenceContext.chunks.length,
-            evidence_confidence_score: evidenceContext.confidenceScore
-          }
+        if (usage) {
+          currentStage = "usage_record";
+          logVaeroexRunEvent("usage_record_started", logDetails({ runId: savedRunId }));
+          await recordVaeroexAiUsage({
+            supabase,
+            workspaceId,
+            userId: user.id,
+            agentType: workflow.key,
+            usage: {
+              ...usage,
+              metadata: {
+                ...(isRecord(usage.metadata) ? usage.metadata : {}),
+                execution_tier: queryPlan.tier,
+                execution_path: queryPlan.classification,
+                data_domains: queryPlan.domains,
+                loaded_domains: boundedContext.loadedDomains,
+                estimated_context_tokens: boundedContext.estimatedContextTokens,
+                evidence_retrieval_mode: evidenceContext.retrievalMode,
+                evidence_chunks: evidenceContext.chunks.length,
+                evidence_confidence_score: evidenceContext.confidenceScore,
+                fallback_used: fallbackUsed
+              }
+            }
+          });
+          logVaeroexRunEvent("usage_record_finished", logDetails({ runId: savedRunId }));
         }
-      });
-      logVaeroexRunEvent("usage_record_finished", logDetails({ runId: savedRunId }));
 
-      currentStage = "redirect";
-      revalidatePath("/app/agents");
-      destination = `/app/agents?run=${savedRunId}`;
+        currentStage = "redirect";
+        revalidatePath("/app/agents");
+        destination = `/app/agents?run=${savedRunId}`;
       }
     }
   } catch (error) {

@@ -209,7 +209,7 @@ export default async function IntelligencePage() {
             </Link>
             <ContextualAskVaeroex
               label="Explain This Briefing"
-              prompt={`Summarize the current intelligence for ${context.activeWorkspace?.name || "this workspace"}. Include evidence, confidence, and recommended action.`}
+              prompt={`Explain the current intelligence summary for ${context.activeWorkspace?.name || "this workspace"}. State what it means, why it matters, the evidence supporting it, and any meaningful limitation.`}
               contextType="business_memory_summary"
               contextId={context.activeWorkspace?.id || "workspace"}
               sourceTitle="Current intelligence and business memory"
