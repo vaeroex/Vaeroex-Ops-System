@@ -6,6 +6,10 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import {
+  filterBusinessEvidence,
+  sanitizeBusinessEvidenceText
+} from "@/lib/intelligence/evidence-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -460,13 +464,13 @@ async function fetchReportSource(
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase
       .from("ai_agent_runs")
-      .select("id,agent_type,input_json,output_json,status,error_message,created_at")
+      .select("id,agent_type,input_json,output_json,status,error_message,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(100),
     supabase
       .from("file_uploads")
-      .select("id,display_name,original_name,file_extension,import_type,import_status,imported_rows,analysis_summary,created_at,updated_at")
+      .select("id,display_name,original_name,file_extension,import_type,import_status,imported_rows,analysis_summary,metadata_json,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(300),
@@ -496,6 +500,27 @@ async function fetchReportSource(
       .limit(300)
   ]);
 
+  const sourceErrors = [
+    tasks.error,
+    issues.error,
+    checklistRuns.error,
+    sops.error,
+    submissions.error,
+    assets.error,
+    kpis.error,
+    kpiSettings.error,
+    vaeroexRuns.error,
+    files.error,
+    fileImports.error,
+    crmLeads.error,
+    crmLeadHistory.error,
+    operationalMetrics.error
+  ].filter(Boolean);
+
+  if (sourceErrors.length) {
+    throw new Error("Required report source data could not be loaded. No report was created.");
+  }
+
   const taskRows = ((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
   const issueRows = ((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
   const checklistRunRows = ((checklistRuns.data ?? []) as ChecklistRunRow[]).filter(() =>
@@ -508,8 +533,8 @@ async function fetchReportSource(
   const kpiRows = (sortKpiRowsBySettings(applyKpiSettingsToRows((kpis.data ?? []) as KpiRow[], kpiSettingRows), kpiSettingRows) as KpiRow[]).filter((kpi) =>
     matchesCategory(category, kpi, "KPIs")
   );
-  const runRows = ((vaeroexRuns.data ?? []) as VaeroexRunRow[]).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
-  const fileRows = ((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
+  const runRows = filterBusinessEvidence((vaeroexRuns.data ?? []) as VaeroexRunRow[], { sourceKind: "platform_run" }).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
+  const fileRows = filterBusinessEvidence((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
   const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
@@ -538,12 +563,12 @@ async function fetchReportSource(
   const flaggedAssets = assetRows.filter((asset) => asset.status !== "Ready");
   const recordedKpis = kpiRows.filter((kpi) => kpi.metric_date >= range.startDate && kpi.metric_date <= range.endDate);
   const kpiTrendObservations = buildKpiTrendObservations(kpiRows, range);
-  const vaeroexInsights = runRows.filter((run) => run.status === "completed" && inIsoRange(run.created_at, range));
+  const vaeroexInsights = runRows.filter((run) => inIsoRange(run.created_at, range));
   const uploadedFiles = fileRows.filter((file) => inIsoRange(file.created_at, range));
   const importedFiles = fileRows.filter((file) => file.import_status === "imported" && inIsoRange(file.updated_at || file.created_at, range));
   const completedImports = fileImportRows.filter((item) => item.status === "completed" && inIsoRange(item.imported_at || item.created_at, range));
   const pendingImports = fileImportRows.filter((item) => item.status === "needs_review" || item.status === "extracted");
-  const analyzedFiles = fileRows.filter((file) => Boolean(file.analysis_summary) && inIsoRange(file.updated_at || file.created_at, range));
+  const analyzedFiles = fileRows.filter((file) => Boolean(sanitizeBusinessEvidenceText(file.analysis_summary)) && inIsoRange(file.updated_at || file.created_at, range));
   const newCrmLeads = crmLeadRows.filter((lead) => inIsoRange(lead.created_at, range));
   const crmLeadChanges = crmLeadHistoryRows.filter((item) => inIsoRange(item.created_at, range));
   const recordedOperationalMetrics = operationalMetricRows.filter(
@@ -601,7 +626,7 @@ async function fetchReportSource(
       pending_imports: pendingImports
         .slice(0, 8)
         .map((item) => `${item.import_type}: ${item.rows_total} row${item.rows_total === 1 ? "" : "s"} waiting for review`),
-      file_insights: analyzedFiles.map((file) => `${file.display_name}: ${file.analysis_summary || ""}`).filter(Boolean).slice(0, 5),
+      file_insights: analyzedFiles.map((file) => `${file.display_name}: ${sanitizeBusinessEvidenceText(file.analysis_summary)}`).filter(Boolean).slice(0, 5),
       crm_leads: newCrmLeads
         .slice(0, 8)
         .map((lead) => `${lead.lead_name}${lead.company ? ` at ${lead.company}` : ""}${lead.status ? ` (${lead.status})` : ""}`),

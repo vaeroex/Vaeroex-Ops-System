@@ -16,6 +16,7 @@ import { ReportExportActions } from "@/components/reports/ReportExportActions";
 import { createBusinessReviewPackageAction } from "@/app/app/intelligence/actions";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
+import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import {
   REPORT_QUARTER_MONTH_OPTIONS,
@@ -756,7 +757,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     imports: importResult.data || [],
     crmLeads: crmResult.data || [],
     reports: (rawReports || []) as ReportRow[],
-    vaeroexRuns: vaeroexRunResult.data || [],
+    vaeroexRuns: filterBusinessEvidence(vaeroexRunResult.data || [], { sourceKind: "platform_run" }),
     operationalMetrics: [],
     notifications: notificationResult.data || [],
     assignments: assignmentResult.data || [],

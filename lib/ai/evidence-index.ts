@@ -3,12 +3,26 @@ import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchWithOpenAIResilience, getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { estimateTokenCount } from "@/lib/ai/usage";
+import { isBusinessEvidenceEligible, isPlatformFailureText } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type MemoryChunkInsert = Database["public"]["Tables"]["business_memory_chunks"]["Insert"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 type MatchMemoryChunk = Database["public"]["Functions"]["match_business_memory_chunks"]["Returns"][number];
+type AiAgentRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
+
+type JsonRecord = Record<string, unknown>;
+
+export type FileAnalysisEvidenceAssessment = {
+  eligible: boolean;
+  classification: "business_evidence" | "invalid_evidence";
+  extractionOutcome: "facts_extracted" | "no_readable_data" | "technical_failure";
+  reason: string | null;
+  factCount: number;
+  requiresReview: boolean;
+  sourceGrounding: "local_extraction" | "model_extraction";
+};
 
 type EmbeddingResponse = {
   data?: Array<{ embedding?: number[] }>;
@@ -54,6 +68,19 @@ const MAX_CHUNK_CHARACTERS = 1_400;
 const CHUNK_OVERLAP_CHARACTERS = 160;
 const DEFAULT_MAX_EVIDENCE_CHUNKS = 8;
 const MAX_INDEXED_CHUNKS_PER_FILE = 80;
+const TECHNICAL_FAILURE_LANGUAGE = /\b(?:image|document|file|text|data|content|ocr|vision)\s+(?:extraction|processing|analysis|parsing)?\s*(?:failed|failure|error|timed?\s*out|unavailable|unsupported)\b|\b(?:extraction|ocr|parser|provider|model request|analysis request)\s+(?:failed|failure|error|timed?\s*out|unavailable)\b|\b(?:unable|could not|cannot|can't)\s+(?:to\s+)?(?:read|extract|analy[sz]e|parse|process|access)|\bno\s+(?:usable|readable|meaningful)\s+(?:data|text|content|information)|\bimage quality (?:is )?too low\b/i;
+const UNGROUNDED_VISIBILITY_LANGUAGE = /\b(?:lack|lacking|limited|insufficient|no)\s+(?:operational\s+)?visibility\b|\b(?:establish|implement|improve|create)\s+(?:a\s+)?(?:kpi|tracking|monitoring|reporting|visibility)\b/i;
+const BUSINESS_FACT_KEYS = [
+  "extracted_findings",
+  "findings",
+  "kpis_found",
+  "problems_identified",
+  "operational_issues",
+  "facts",
+  "observations",
+  "records",
+  "line_items"
+] as const;
 const STOP_WORDS = new Set([
   "the",
   "and",
@@ -123,6 +150,132 @@ function chunkConfidenceScore({
 
 function normalizeText(text: string) {
   return text.replace(/\r/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function metadataRecord(value: Json | undefined): JsonRecord {
+  return isRecord(value) ? value : {};
+}
+
+function stringItems(value: unknown): string[] {
+  const values = Array.isArray(value) ? value : value === null || value === undefined ? [] : [value];
+  return values
+    .map((item) => {
+      if (typeof item === "string") return item.trim();
+      if (!isRecord(item)) return "";
+      return Object.values(item)
+        .filter((entry) => typeof entry === "string" || typeof entry === "number")
+        .map(String)
+        .join(" ")
+        .trim();
+    })
+    .filter(Boolean);
+}
+
+function evidenceTerms(value: string) {
+  return new Set(
+    value
+      .toLowerCase()
+      .match(/[a-z0-9$%]+/g)
+      ?.filter((term) => term.length >= 3 && !STOP_WORDS.has(term)) || []
+  );
+}
+
+function isClaimSupportedBySource(claim: string, sourceTerms: Set<string>) {
+  const claimTerms = evidenceTerms(claim);
+  if (!claimTerms.size || !sourceTerms.size) return false;
+
+  const sharedTerms = Array.from(claimTerms).filter((term) => sourceTerms.has(term));
+  const numericTerms = Array.from(claimTerms).filter((term) => /\d|[$%]/.test(term));
+  const numericSupport = numericTerms.length > 0 && numericTerms.every((term) => sourceTerms.has(term));
+
+  return numericSupport ? sharedTerms.length >= 2 : sharedTerms.length >= Math.min(3, claimTerms.size);
+}
+
+export function assessFileAnalysisEvidence({
+  outputJson,
+  extractedSourceText,
+  extractedRowCount = 0,
+  extractionFailureReason,
+  sourceGrounding = "local_extraction"
+}: {
+  outputJson: Json;
+  extractedSourceText: string;
+  extractedRowCount?: number;
+  extractionFailureReason?: string | null;
+  sourceGrounding?: "local_extraction" | "model_extraction";
+}): FileAnalysisEvidenceAssessment {
+  const output = metadataRecord(outputJson);
+  const extractedOutput = [output.extracted_text, output.ocr_text, output.document_text, output.file_text]
+    .find((value) => typeof value === "string" && value.trim());
+  const factCandidates = BUSINESS_FACT_KEYS.flatMap((key) => stringItems(output[key]));
+  const narrative = [output.executive_summary, output.summary, output.response_markdown]
+    .filter((value): value is string => typeof value === "string" && Boolean(value.trim()))
+    .join("\n");
+  const combined = [
+    extractionFailureReason || "",
+    typeof extractedOutput === "string" ? extractedOutput : "",
+    typeof output.executive_summary === "string" ? output.executive_summary : "",
+    typeof output.summary === "string" ? output.summary : "",
+    typeof output.response_markdown === "string" ? output.response_markdown : "",
+    ...factCandidates
+  ].join("\n");
+  const cleanFacts = factCandidates.filter(
+    (item) => !TECHNICAL_FAILURE_LANGUAGE.test(item) && !UNGROUNDED_VISIBILITY_LANGUAGE.test(item)
+  );
+  const sourceText = normalizeText(extractedSourceText);
+  const sourceTerms = evidenceTerms(sourceText);
+  const supportedFacts = cleanFacts.filter((item) => isClaimSupportedBySource(item, sourceTerms));
+  const sourceHasContent = extractedRowCount > 0 || sourceText.length >= 80;
+  const hasTechnicalFailure = isPlatformFailureText(combined) || TECHNICAL_FAILURE_LANGUAGE.test(combined);
+  const narrativeHasBusinessDetail = /\b\d+(?:\.\d+)?%?\b|[$€£]|\b(?:revenue|sales|orders?|inventory|customers?|employees?|delivery|invoice|margin|cost|owner|department|policy|procedure|deadline|status)\b/i.test(
+    `${sourceText}\n${narrative}`
+  );
+  const groundedNarrative =
+    sourceHasContent &&
+    (extractedRowCount > 0 || sourceText.length >= 160) &&
+    narrative.length >= 80 &&
+    narrativeHasBusinessDetail &&
+    isClaimSupportedBySource(narrative, sourceTerms) &&
+    !UNGROUNDED_VISIBILITY_LANGUAGE.test(narrative);
+  const factsExtracted = sourceHasContent && (supportedFacts.length > 0 || groundedNarrative);
+
+  if (hasTechnicalFailure) {
+    return {
+      eligible: false,
+      classification: "invalid_evidence",
+      extractionOutcome: TECHNICAL_FAILURE_LANGUAGE.test(extractionFailureReason || "") ? "technical_failure" : "no_readable_data",
+      reason: "The analysis reported a technical extraction, provider, or parser failure instead of business facts.",
+      factCount: supportedFacts.length,
+      requiresReview: true,
+      sourceGrounding
+    };
+  }
+
+  if (!factsExtracted) {
+    return {
+      eligible: false,
+      classification: "invalid_evidence",
+      extractionOutcome: "no_readable_data",
+      reason: cleanFacts.length ? "The reported findings could not be verified against the extracted source content." : "No source-grounded business facts were extracted.",
+      factCount: supportedFacts.length,
+      requiresReview: true,
+      sourceGrounding
+    };
+  }
+
+  return {
+    eligible: true,
+    classification: "business_evidence",
+    extractionOutcome: "facts_extracted",
+    reason: null,
+    factCount: supportedFacts.length,
+    requiresReview: sourceGrounding === "model_extraction",
+    sourceGrounding
+  };
 }
 
 export function chunkEvidenceText(text: string, maxCharacters = MAX_CHUNK_CHARACTERS) {
@@ -265,6 +418,25 @@ function contextConfidence(chunks: EvidenceContextChunk[]) {
   return Math.min(94, Math.round(avg + depthBonus + sourceDiversityBonus));
 }
 
+export function rebuildEvidenceContext(context: EvidenceContext, chunks: EvidenceContextChunk[]): EvidenceContext {
+  const confidenceScore = contextConfidence(chunks);
+  const nonConfidenceLimitations = context.limitations.filter((item) => !item.startsWith("Confidence is limited because"));
+
+  return {
+    ...context,
+    available: chunks.length > 0,
+    retrievalMode: chunks.length ? context.retrievalMode : "none",
+    chunks,
+    confidenceScore,
+    confidenceLabel: confidenceLabel(confidenceScore),
+    dataGaps: dataGapsFor(chunks),
+    limitations: [
+      ...nonConfidenceLimitations,
+      ...(confidenceScore < 46 ? ["Confidence is limited because Vaeroex has sparse matching evidence for this question."] : [])
+    ]
+  };
+}
+
 function toEvidenceChunk(row: MatchMemoryChunk | MemoryChunkRow, similarity?: number): EvidenceContextChunk {
   return {
     id: row.id,
@@ -281,6 +453,125 @@ function toEvidenceChunk(row: MatchMemoryChunk | MemoryChunkRow, similarity?: nu
   };
 }
 
+function runIdForChunk(row: Pick<MemoryChunkRow, "source_metadata"> | Pick<MatchMemoryChunk, "source_metadata">) {
+  const sourceMetadata = metadataRecord(row.source_metadata);
+  const nestedMetadata = metadataRecord(sourceMetadata.metadata as Json | undefined);
+  const candidate = sourceMetadata.run_id || sourceMetadata.source_run_id || nestedMetadata.analysis_run_id || nestedMetadata.run_id;
+  return typeof candidate === "string" && candidate.trim() ? candidate.trim() : null;
+}
+
+function classificationForMetadata(value: Json) {
+  const metadata = metadataRecord(value);
+  const nested = metadataRecord(metadata.metadata as Json | undefined);
+  const candidate = metadata.evidence_classification || nested.evidence_classification;
+  return typeof candidate === "string" ? candidate : null;
+}
+
+function metadataIsEligible(value: Json) {
+  const metadata = metadataRecord(value);
+  const nested = metadataRecord(metadata.metadata as Json | undefined);
+  const classification = classificationForMetadata(value);
+  const extractionOutcome = metadata.extraction_outcome || nested.extraction_outcome;
+
+  if (classification && classification !== "business_evidence") return false;
+  if (metadata.invalidated_at || nested.invalidated_at || metadata.invalidation_reason || nested.invalidation_reason) return false;
+  if (typeof extractionOutcome === "string" && extractionOutcome !== "facts_extracted" && extractionOutcome !== "completed") return false;
+  return true;
+}
+
+function legacyFileAnalysisWithoutRunIsEligible(value: Json) {
+  const metadata = metadataRecord(value);
+  const nested = metadataRecord(metadata.metadata as Json | undefined);
+  const classification = classificationForMetadata(value);
+  const reviewStatus = metadata.review_status || nested.review_status;
+  const trustLevel = metadata.trust_level || nested.trust_level;
+
+  return classification === "business_evidence" && (
+    reviewStatus === "approved" ||
+    reviewStatus === "auto_learned" ||
+    trustLevel === "trusted" ||
+    trustLevel === "auto_trusted"
+  );
+}
+
+export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryChunk>({
+  rows,
+  files,
+  runs
+}: {
+  rows: T[];
+  files: Array<Pick<FileUploadRow, "id" | "deleted_at" | "archived_at" | "metadata_json">>;
+  runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json">>;
+}) {
+  const filesById = new Map(files.map((file) => [file.id, file]));
+  const runsById = new Map(runs.map((run) => [run.id, run]));
+
+  return rows.filter((row) => {
+    if (("deleted_at" in row && row.deleted_at) || ("archived_at" in row && row.archived_at)) return false;
+    if (!isBusinessEvidenceEligible(row, { sourceKind: "business_memory" })) return false;
+    if (!metadataIsEligible(row.source_metadata)) return false;
+
+    const isFileEvidence = row.source_type === "file_analysis" || row.source_type === "file" || Boolean(row.source_file_id);
+    const fileId = row.source_file_id || (isFileEvidence ? row.source_id : null);
+    if (isFileEvidence) {
+      const sourceFile = fileId ? filesById.get(fileId) : null;
+      if (!sourceFile || !isBusinessEvidenceEligible(sourceFile) || !metadataIsEligible(sourceFile.metadata_json)) return false;
+    }
+
+    const runId = runIdForChunk(row);
+    if (row.source_type === "file_analysis" && !runId && !legacyFileAnalysisWithoutRunIsEligible(row.source_metadata)) return false;
+    if (runId) {
+      const sourceRun = runsById.get(runId);
+      if (
+        !sourceRun ||
+        sourceRun.status !== "completed" ||
+        !isBusinessEvidenceEligible(sourceRun, { sourceKind: "platform_run" }) ||
+        !metadataIsEligible(sourceRun.input_json) ||
+        !metadataIsEligible(sourceRun.output_json)
+      ) return false;
+    }
+
+    return true;
+  });
+}
+
+export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkRow | MatchMemoryChunk>({
+  supabase,
+  workspaceId,
+  rows
+}: {
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+  rows: T[];
+}) {
+  if (!rows.length) return [];
+
+  const fileIds = Array.from(new Set(rows.flatMap((row) => {
+    const isFileEvidence = row.source_type === "file_analysis" || row.source_type === "file" || Boolean(row.source_file_id);
+    const fileId = row.source_file_id || (isFileEvidence ? row.source_id : null);
+    return fileId ? [fileId] : [];
+  })));
+  const runIds = Array.from(new Set(rows.flatMap((row) => {
+    const runId = runIdForChunk(row);
+    return runId ? [runId] : [];
+  })));
+  const [filesResult, runsResult] = await Promise.all([
+    fileIds.length
+      ? supabase.from("file_uploads").select("id,deleted_at,archived_at,metadata_json").eq("workspace_id", workspaceId).in("id", fileIds)
+      : Promise.resolve({ data: [], error: null }),
+    runIds.length
+      ? supabase.from("ai_agent_runs").select("id,status,deleted_at,archived_at,input_json,output_json").eq("workspace_id", workspaceId).in("id", runIds)
+      : Promise.resolve({ data: [], error: null })
+  ]);
+
+  if (filesResult.error || runsResult.error) return [];
+  return filterEligibleMemoryRows({
+    rows,
+    files: filesResult.data || [],
+    runs: runsResult.data || []
+  });
+}
+
 async function keywordEvidence({
   supabase,
   workspaceId,
@@ -293,20 +584,36 @@ async function keywordEvidence({
   limit: number;
 }) {
   const queryTerms = terms(query);
-  const { data, error } = await supabase
-    .from("business_memory_chunks")
-    .select("*")
-    .eq("workspace_id", workspaceId)
-    .is("deleted_at", null)
-    .is("archived_at", null)
-    .order("indexed_at", { ascending: false })
-    .limit(80);
+  if (!queryTerms.length) return [];
 
-  if (error || !data) {
-    return [];
+  const pageSize = Math.min(120, Math.max(40, limit * 10));
+  const textFilter = queryTerms
+    .flatMap((term) => ["source_title", "summary", "source_excerpt"].map((column) => `${column}.ilike.%${term}%`))
+    .join(",");
+  const eligibleRows: MemoryChunkRow[] = [];
+  let offset = 0;
+  let pageLength = pageSize;
+  let pagesScanned = 0;
+
+  while (eligibleRows.length < limit && pageLength === pageSize && pagesScanned < 10) {
+    const { data, error } = await supabase
+      .from("business_memory_chunks")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .or(textFilter)
+      .order("indexed_at", { ascending: false })
+      .range(offset, offset + pageSize - 1);
+
+    if (error || !data) return [];
+    pageLength = data.length;
+    offset += data.length;
+    pagesScanned += 1;
+    eligibleRows.push(...await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: data }));
   }
 
-  return data
+  return eligibleRows
     .map((row) => {
       const haystack = `${row.source_title} ${row.summary || ""} ${row.source_excerpt}`.toLowerCase();
       const score = queryTerms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
@@ -343,6 +650,7 @@ export async function buildWorkspaceEvidenceContext({
   const limitations: string[] = [];
 
   if (retrievalStrategy === "auto") {
+    const candidateLimit = Math.min(48, Math.max(limit, limit * 4));
     stageLogger?.("embeddings_started", { queryLength: query.length, limit });
     const embedding = await createEmbeddings([query.slice(0, 4_000)], embeddingTimeoutMs);
     stageLogger?.("embeddings_finished", {
@@ -356,7 +664,7 @@ export async function buildWorkspaceEvidenceContext({
       const { data, error } = await supabase.rpc("match_business_memory_chunks", {
         target_workspace_id: workspaceId,
         query_embedding: embedding.embeddings[0],
-        match_count: limit,
+        match_count: candidateLimit,
         min_similarity: 0.08
       });
       stageLogger?.("vector_retrieval_finished", {
@@ -365,7 +673,10 @@ export async function buildWorkspaceEvidenceContext({
       });
 
       if (!error && data?.length) {
-        chunks = data.map((row) => toEvidenceChunk(row, row.similarity));
+        const eligibleRows = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: data });
+        chunks = eligibleRows
+          .slice(0, limit)
+          .map((row) => toEvidenceChunk(row, "similarity" in row ? row.similarity : undefined));
         retrievalMode = "vector";
       } else if (error) {
         limitations.push("Vector retrieval is not available yet. Vaeroex used keyword evidence fallback.");
@@ -451,6 +762,44 @@ export async function indexFileAnalysisEvidence({
   const normalized = normalizeText(extractedText);
   const chunks = chunkEvidenceText(normalized);
   const startedAt = new Date().toISOString();
+  const sourceMetadata = metadataRecord(metadata);
+  const assessment = assessFileAnalysisEvidence({
+    outputJson: sourceMetadata.analysis_output as Json || {},
+    extractedSourceText: normalized,
+    extractedRowCount: typeof sourceMetadata.extracted_row_count === "number" ? sourceMetadata.extracted_row_count : 0,
+    extractionFailureReason: typeof sourceMetadata.extraction_failure_reason === "string" ? sourceMetadata.extraction_failure_reason : null,
+    sourceGrounding: sourceMetadata.source_grounding === "model_extraction" ? "model_extraction" : "local_extraction"
+  });
+
+  if (file.deleted_at || file.archived_at) {
+    return { indexedChunks: 0, error: "Inactive source files cannot be added to Business Memory." };
+  }
+
+  if (!runId) {
+    return { indexedChunks: 0, error: "A completed source analysis run is required before Business Memory can be indexed." };
+  }
+
+  const { data: sourceRun, error: sourceRunError } = await supabase
+    .from("ai_agent_runs")
+    .select("id,status,deleted_at,archived_at,input_json,output_json")
+    .eq("id", runId)
+    .eq("workspace_id", workspaceId)
+    .maybeSingle();
+
+  if (
+    sourceRunError ||
+    !sourceRun ||
+    sourceRun.status !== "completed" ||
+    !isBusinessEvidenceEligible(sourceRun, { sourceKind: "platform_run" }) ||
+    !metadataIsEligible(sourceRun.input_json) ||
+    !metadataIsEligible(sourceRun.output_json)
+  ) {
+    return { indexedChunks: 0, error: "The source analysis run is inactive, failed, or ineligible for Business Memory." };
+  }
+
+  if (!assessment.eligible) {
+    return { indexedChunks: 0, error: assessment.reason || "No source-grounded business facts were available to index." };
+  }
 
   if (!chunks.length) {
     await supabase
@@ -480,7 +829,9 @@ export async function indexFileAnalysisEvidence({
       metadata_json: {
         source: "file_analysis",
         run_id: runId || null,
-        chunk_count: chunks.length
+        chunk_count: chunks.length,
+        evidence_classification: "business_evidence",
+        extraction_outcome: "facts_extracted"
       }
     })
     .select("id")
@@ -512,6 +863,14 @@ export async function indexFileAnalysisEvidence({
       original_name: file.original_name,
       file_extension: file.file_extension,
       run_id: runId || null,
+      source_run_id: runId || null,
+      source_file_id: file.id,
+      source_record_type: "file_upload",
+      source_record_id: file.id,
+      evidence_classification: "business_evidence",
+      extraction_outcome: "facts_extracted",
+      invalidated_at: null,
+      invalidation_reason: null,
       indexing_method: embedding.embeddings[index] ? "openai_embedding" : "text_only",
       embedding_error: embedding.error || null,
       metadata: metadata || {}
@@ -570,6 +929,8 @@ export async function indexFileAnalysisEvidence({
               source: "file_analysis",
               run_id: runId || null,
               chunk_count: rows.length,
+              evidence_classification: "business_evidence",
+              extraction_outcome: "facts_extracted",
               embedding_model: embedding.model,
               embedding_tokens: embedding.tokens,
               embedding_error: embedding.error || null

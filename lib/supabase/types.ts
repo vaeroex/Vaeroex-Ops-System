@@ -1134,6 +1134,10 @@ export type Database = {
           source_data_json: Json;
           created_by: string | null;
           created_at: string;
+          folder_id: string | null;
+          archived_at: string | null;
+          deleted_at: string | null;
+          updated_at: string;
         };
         Insert: {
           id?: string;
@@ -1146,6 +1150,10 @@ export type Database = {
           source_data_json?: Json;
           created_by?: string | null;
           created_at?: string;
+          folder_id?: string | null;
+          archived_at?: string | null;
+          deleted_at?: string | null;
+          updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["reports"]["Insert"]>;
         Relationships: [];

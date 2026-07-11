@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import {
+  filterBusinessEvidence,
+  sanitizeBusinessEvidenceText
+} from "@/lib/intelligence/evidence-eligibility";
 import type { Database } from "@/lib/supabase/types";
 
 function uniqueStrings(values: Array<string | null | undefined>) {
@@ -118,13 +122,13 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .limit(10),
     supabase
       .from("reports")
-      .select("id,title,report_type,date_range_start,date_range_end,created_at")
+      .select("id,title,report_type,date_range_start,date_range_end,source_data_json,created_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(8),
     supabase
       .from("ai_agent_runs")
-      .select("id,agent_type,status,output_json,created_at")
+      .select("id,agent_type,status,output_json,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(5),
@@ -158,7 +162,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .limit(20),
     supabase
       .from("file_uploads")
-      .select("id,display_name,file_extension,import_type,import_status,imported_rows,analysis_summary,created_at")
+      .select("id,display_name,file_extension,import_type,import_status,imported_rows,analysis_summary,processing_status,metadata_json,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(10),
@@ -198,17 +202,21 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
   const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(recentKpis.data ?? [], kpiSettingRows), kpiSettingRows);
   const kpiForecastReadiness = buildKpiForecastEligibility(recentKpiRows as Database["public"]["Tables"]["kpis"]["Row"][]);
-  const recentFileRows = recentFiles.data ?? [];
+  const recentFileRows = filterBusinessEvidence(recentFiles.data ?? []).map((file) => ({
+    ...file,
+    analysis_summary: sanitizeBusinessEvidenceText(file.analysis_summary) || null
+  }));
   const recentLeadRows = recentCrmLeads.data ?? [];
   const recentTaskRows = recentTasks.data ?? [];
   const recentIssueRows = recentIssues.data ?? [];
   const recentChecklistRows = checklists.data ?? [];
   const recentSopRows = sops.data ?? [];
-  const recentReportRows = reports.data ?? [];
+  const recentReportRows = filterBusinessEvidence(reports.data ?? []);
   const recentFormRows = recentForms.data ?? [];
   const recentPeopleRows = people.data ?? [];
+  const eligibleVaeroexRuns = filterBusinessEvidence(vaeroexRuns.data ?? [], { sourceKind: "platform_run" });
   const analyzedFiles = recentFileRows.filter((file) => Boolean(file.analysis_summary));
-  const pendingImports = (recentFileImports.data ?? []).filter((item) => item.status !== "completed");
+  const pendingImports = (recentFileImports.data ?? []).filter((item) => ["extracted", "needs_review"].includes(item.status));
   const moduleState = {
     executive_dashboard: {
       exists: true,
@@ -359,7 +367,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     people: recentPeopleRows,
     sops: recentSopRows,
     reports: recentReportRows,
-    recent_vaeroex_results: vaeroexRuns.data ?? [],
+    recent_vaeroex_results: eligibleVaeroexRuns,
     kpi_history: recentKpiRows,
     kpi_settings: kpiSettingRows,
     file_import_history: recentFileImports.data ?? [],

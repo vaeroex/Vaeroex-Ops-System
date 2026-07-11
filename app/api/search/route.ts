@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
-import { buildWorkspaceEvidenceContext, evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
@@ -460,7 +460,7 @@ export async function GET(request: Request) {
     people,
     decisions,
     recommendations,
-    learnedKnowledge,
+    learnedKnowledgeCandidates,
     vaeroexRuns
   ] = await Promise.all([
     scopedResults<KpiRow>(
@@ -601,7 +601,7 @@ export async function GET(request: Request) {
         .is("archived_at", null)
         .or(orFilter(["source_title", "source_excerpt", "summary", "source_type"], words))
         .order("indexed_at", { ascending: false })
-        .limit(6)
+        .limit(24)
     ),
     includeDiagnostics
       ? safeResults<VaeroexRunRow>(
@@ -614,6 +614,35 @@ export async function GET(request: Request) {
         )
       : Promise.resolve([])
   ]);
+  let learnedKnowledgePage = learnedKnowledgeCandidates;
+  let learnedKnowledge = await filterEligibleMemoryRowsByLifecycle({
+    supabase,
+    workspaceId,
+    rows: learnedKnowledgePage
+  }) as MemoryChunkRow[];
+  let learnedKnowledgeOffset = learnedKnowledgePage.length;
+  let learnedKnowledgePages = 1;
+
+  while (learnedKnowledge.length < 6 && learnedKnowledgePage.length === 24 && learnedKnowledgePages < 10) {
+    const { data: nextPage, error: nextPageError } = await supabase
+      .from("business_memory_chunks")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .or(orFilter(["source_title", "source_excerpt", "summary", "source_type"], words))
+      .order("indexed_at", { ascending: false })
+      .range(learnedKnowledgeOffset, learnedKnowledgeOffset + 23);
+
+    if (nextPageError) break;
+    learnedKnowledgePage = nextPage || [];
+    learnedKnowledgeOffset += learnedKnowledgePage.length;
+    learnedKnowledgePages += 1;
+    const eligiblePage = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: learnedKnowledgePage });
+    learnedKnowledge = [...learnedKnowledge, ...eligiblePage];
+  }
+
+  learnedKnowledge = learnedKnowledge.slice(0, 6);
 
   let answerKpis = kpis;
   let answerReports = reports;

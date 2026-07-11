@@ -6,6 +6,7 @@ import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceS
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
+import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
@@ -78,6 +79,7 @@ export default async function IntelligencePage() {
     );
   }
 
+  const eligibleRuns = filterBusinessEvidence(runsResult.data || [], { sourceKind: "platform_run" });
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],
@@ -85,7 +87,7 @@ export default async function IntelligencePage() {
     kpis: kpisResult.data || [],
     files: filesResult.data || [],
     reports: reportsResult.data || [],
-    vaeroexRuns: runsResult.data || [],
+    vaeroexRuns: eligibleRuns,
     crmLeads: crmResult.data || [],
     imports: importsResult.data || [],
     sops: sopsResult.data || [],
@@ -101,7 +103,7 @@ export default async function IntelligencePage() {
     kpis: kpisResult.data || [],
     files: filesResult.data || [],
     reports: reportsResult.data || [],
-    vaeroexRuns: runsResult.data || [],
+    vaeroexRuns: eligibleRuns,
     crmLeads: crmResult.data || [],
     crmHistory: crmHistoryResult.data || [],
     imports: importsResult.data || [],

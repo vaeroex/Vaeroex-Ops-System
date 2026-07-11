@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence } from "@/lib/ai/evidence-index";
+import { assessFileAnalysisEvidence, buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment, type VaeroexRequestSizeMetrics } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -74,6 +74,22 @@ type ImportField = {
   required?: boolean;
   candidates: string[];
 };
+
+class FileAnalysisEvidenceError extends Error {
+  readonly inputJson: Json;
+  readonly outputJson: Json;
+  readonly extractionOutcome: FileAnalysisEvidenceAssessment["extractionOutcome"];
+
+  constructor(message: string, details: { inputJson: Json; outputJson: Json; extractionOutcome: FileAnalysisEvidenceAssessment["extractionOutcome"] }) {
+    super(message);
+    this.name = "FileAnalysisEvidenceError";
+    this.inputJson = details.inputJson;
+    this.outputJson = details.outputJson;
+    this.extractionOutcome = details.extractionOutcome;
+  }
+}
+
+type FileAnalysisEvidenceAssessment = ReturnType<typeof assessFileAnalysisEvidence>;
 
 const FILES_PATH = "/app/files";
 const SOURCES_PATH = "/app/sources";
@@ -1689,6 +1705,7 @@ async function runFileVaeroexAnalysis({
   const requestMetrics = requestMetricsFromUsage(usage.metadata);
   const outputExtractedText = extractedTextFromOutput(outputJson);
   const finalTextContent = extraction.textContent || outputExtractedText;
+  const sourceGrounding = extraction.textContent ? "local_extraction" : "model_extraction";
   const finalExtraction = {
     ...extraction,
     textContent: finalTextContent,
@@ -1704,8 +1721,47 @@ async function runFileVaeroexAnalysis({
     contentNote:
       finalTextContent && extraction.fileAttachment
         ? `Vaeroex extracted readable content using ${extraction.kind === "image_vision" ? "image analysis" : "direct file analysis"}.`
-        : extraction.contentNote
+        : extraction.contentNote,
+    extractionFailureReason: finalTextContent && extraction.fileAttachment ? undefined : extraction.extractionFailureReason
   } satisfies FileContentExtraction;
+  const evidenceAssessment = assessFileAnalysisEvidence({
+    outputJson,
+    extractedSourceText: finalExtraction.textContent,
+    extractedRowCount: finalExtraction.rows.length,
+    extractionFailureReason: finalExtraction.extractionFailureReason,
+    sourceGrounding
+  });
+  const evidenceLineage = {
+    source_record_type: "file_upload",
+    source_record_id: file.id,
+    source_file_id: file.id,
+    evidence_classification: evidenceAssessment.classification,
+    extraction_outcome: evidenceAssessment.extractionOutcome,
+    source_grounding: evidenceAssessment.sourceGrounding,
+    invalidation_reason: evidenceAssessment.reason
+  } satisfies JsonObject;
+  const classifiedInputJson = {
+    ...(isRecord(inputJson) ? inputJson : {}),
+    evidence_lineage: evidenceLineage
+  } satisfies Json;
+  const classifiedOutputJson = {
+    ...(isRecord(outputJson) ? outputJson : {}),
+    evidence_classification: evidenceAssessment.classification,
+    extraction_outcome: evidenceAssessment.extractionOutcome,
+    source_grounding: evidenceAssessment.sourceGrounding,
+    evidence_lineage: evidenceLineage
+  } satisfies Json;
+
+  if (!evidenceAssessment.eligible) {
+    throw new FileAnalysisEvidenceError(
+      "Vaeroex could not find usable business information in this file. Try a clearer source or confirm that the file contains readable business details.",
+      {
+        inputJson: classifiedInputJson,
+        outputJson: classifiedOutputJson,
+        extractionOutcome: evidenceAssessment.extractionOutcome
+      }
+    );
+  }
   const summary = summarizeVaeroexOutput(outputJson);
   const cleanResult = cleanAnalysisResult(outputJson, file, finalExtraction);
   const fileMetadata = isRecord(file.metadata_json) ? file.metadata_json : {};
@@ -1722,6 +1778,18 @@ async function runFileVaeroexAnalysis({
     existingActiveMemory
   });
 
+  if (evidenceAssessment.requiresReview && learningDecision.status === "auto_learned") {
+    learningDecision = {
+      ...learningDecision,
+      status: "needs_review",
+      confidenceLabel: learningDecision.confidenceLabel === "High" ? "Medium" : learningDecision.confidenceLabel,
+      trustLevel: "needs_review",
+      reviewRequired: true,
+      reviewReasons: [...learningDecision.reviewReasons, "Direct visual extraction requires review before it becomes Business Memory."],
+      learningMode: "review_required"
+    };
+  }
+
   if (extraction.fileAttachment && !finalTextContent && !hasMeaningfulModelContent(outputJson)) {
     throw new Error(
       finalExtraction.extractionFailureReason ||
@@ -1734,8 +1802,8 @@ async function runFileVaeroexAnalysis({
     .insert({
       workspace_id: workspaceId,
       agent_type: workflow.key,
-      input_json: inputJson,
-      output_json: outputJson,
+      input_json: classifiedInputJson,
+      output_json: classifiedOutputJson,
       status: "completed",
       created_by: userId
     })
@@ -1779,6 +1847,16 @@ async function runFileVaeroexAnalysis({
       summary,
       metadata: {
         analysis_run_id: data.id,
+        source_run_id: data.id,
+        source_file_id: file.id,
+        source_record_type: "file_upload",
+        source_record_id: file.id,
+        evidence_classification: evidenceAssessment.classification,
+        extraction_outcome: evidenceAssessment.extractionOutcome,
+        source_grounding: evidenceAssessment.sourceGrounding,
+        analysis_output: classifiedOutputJson,
+        extracted_row_count: finalExtraction.rows.length,
+        extraction_failure_reason: finalExtraction.extractionFailureReason || null,
         learning_mode: learningDecision.learningMode,
         review_status: learningDecision.status,
         trust_level: learningDecision.trustLevel,
@@ -1820,6 +1898,16 @@ async function runFileVaeroexAnalysis({
         ...fileMetadata,
         latest_analysis_run_id: data.id,
         latest_analysis_status: learningDecision.status,
+        evidence_classification: evidenceAssessment.classification,
+        extraction_outcome: evidenceAssessment.extractionOutcome,
+        source_grounding: evidenceAssessment.sourceGrounding,
+        invalidated_at: null,
+        invalidation_reason: null,
+        latest_analysis_lineage: {
+          ...evidenceLineage,
+          source_run_id: data.id,
+          derived_from: [{ source_record_type: "file_upload", source_record_id: file.id }]
+        },
         analysis_review_status: learningDecision.status,
         analysis_review_updated_at: analysisUpdatedAt,
         analysis_review_note:
@@ -1868,8 +1956,8 @@ async function runFileVaeroexAnalysis({
 
   return {
     workflow,
-    inputJson,
-    outputJson,
+    inputJson: classifiedInputJson,
+    outputJson: classifiedOutputJson,
     cleanResult,
     summary,
     extraction: finalExtraction,
@@ -2200,16 +2288,30 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
   const confidence = text(formData, "confidence") || "Context saved";
   const evidence = text(formData, "evidence");
   let latestRunOutput: Json | null = null;
+  let latestRunEligible = false;
 
   if (runId) {
     const { data: latestRun } = await supabase
       .from("ai_agent_runs")
-      .select("output_json")
+      .select("output_json,status,deleted_at,archived_at")
       .eq("id", runId)
       .eq("workspace_id", workspaceId)
       .maybeSingle();
 
     latestRunOutput = latestRun?.output_json || null;
+    latestRunEligible = Boolean(latestRun?.status === "completed" && !latestRun.deleted_at && !latestRun.archived_at);
+  }
+
+  const extractedText = latestExtractedText(file) || extractedTextFromOutput(latestRunOutput) || evidence || summary;
+  const fileMetadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const evidenceAssessment = assessFileAnalysisEvidence({
+    outputJson: latestRunOutput || {},
+    extractedSourceText: extractedText,
+    sourceGrounding: fileMetadata.source_grounding === "model_extraction" ? "model_extraction" : "local_extraction"
+  });
+
+  if (!runId || !latestRunEligible || !evidenceAssessment.eligible) {
+    redirectWithFileError("This analysis did not produce eligible source-grounded business facts and cannot be added to Business Memory.", file.id);
   }
 
   const savedAt = new Date().toISOString();
@@ -2273,10 +2375,17 @@ export async function saveFileAnalysisToMemoryAction(formData: FormData) {
     userId: user.id,
     file,
     runId: runId || null,
-    extractedText: latestExtractedText(file) || extractedTextFromOutput(latestRunOutput) || evidence || summary,
+    extractedText,
     summary,
     metadata: {
       analysis_run_id: runId || null,
+      source_run_id: runId,
+      source_file_id: file.id,
+      source_record_type: "file_upload",
+      source_record_id: file.id,
+      evidence_classification: "business_evidence",
+      extraction_outcome: "facts_extracted",
+      analysis_output: latestRunOutput,
       review_status: "approved",
       trust_level: "trusted",
       learning_mode: "manual_approval",
@@ -2375,7 +2484,7 @@ export async function approveFileAnalysisAction(formData: FormData) {
 
     const { data: latestRun } = await supabase
       .from("ai_agent_runs")
-      .select("output_json")
+      .select("output_json,status,deleted_at,archived_at")
       .eq("id", runId)
       .eq("workspace_id", workspaceId)
       .eq("agent_type", "file_analysis")
@@ -2383,6 +2492,16 @@ export async function approveFileAnalysisAction(formData: FormData) {
     const runOutput = latestRun?.output_json || latestAnalysisOutput(file);
     const approvedAt = new Date().toISOString();
     const extractedText = latestExtractedText(file) || extractedTextFromOutput(runOutput) || summary;
+    const sourceMetadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+    const evidenceAssessment = assessFileAnalysisEvidence({
+      outputJson: runOutput,
+      extractedSourceText: extractedText,
+      sourceGrounding: sourceMetadata.source_grounding === "model_extraction" ? "model_extraction" : "local_extraction"
+    });
+
+    if (!latestRun || latestRun.status !== "completed" || latestRun.deleted_at || latestRun.archived_at || !evidenceAssessment.eligible) {
+      throw new Error("This analysis did not produce eligible source-grounded business facts and cannot be approved as Business Memory.");
+    }
 
     await archiveFileAnalysisMemoryChunks({ supabase, workspaceId, fileId: file.id, archivedAt: approvedAt });
     const indexResult = await indexFileAnalysisEvidence({
@@ -2395,6 +2514,13 @@ export async function approveFileAnalysisAction(formData: FormData) {
       summary,
       metadata: {
         analysis_run_id: runId,
+        source_run_id: runId,
+        source_file_id: file.id,
+        source_record_type: "file_upload",
+        source_record_id: file.id,
+        evidence_classification: "business_evidence",
+        extraction_outcome: "facts_extracted",
+        analysis_output: runOutput,
         review_status: "approved",
         trust_level: "trusted",
         learning_mode: "manual_approval",
@@ -3268,6 +3394,10 @@ export async function analyzeFileAction(formData: FormData) {
     redirectWithPathMessage(returnPath, message, file.id);
   } catch (error) {
     const message = fileActionErrorMessage(error, "Vaeroex could not analyze the file.", file);
+    const evidenceFailure = error instanceof FileAnalysisEvidenceError ? error : null;
+    const failureInputJson = evidenceFailure?.inputJson || inputJson;
+    const failureOutputJson = evidenceFailure?.outputJson || ({} satisfies Json);
+    const failedAt = new Date().toISOString();
 
     await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
     await supabase
@@ -3276,14 +3406,19 @@ export async function analyzeFileAction(formData: FormData) {
         metadata_json: {
           ...(isRecord(file.metadata_json) ? file.metadata_json : {}),
           latest_analysis_status: "failed",
-          latest_analysis_at: new Date().toISOString(),
+          latest_analysis_at: failedAt,
           latest_analysis_prompt: prompt,
           latest_analysis_error: message,
           latest_analysis_failure: {
             stage: /too large|direct visual analysis|direct document analysis/i.test(message) ? "request_size_preflight" : "analysis",
             type: /too large|direct visual analysis|direct document analysis/i.test(message) ? "request_size" : "analysis_failed",
             retry_eligible: true,
-            user_message: message
+            user_message: message,
+            evidence_classification: evidenceFailure ? "invalid_evidence" : "user_failure_state",
+            extraction_outcome: evidenceFailure?.extractionOutcome || "technical_failure",
+            source_record_type: "file_upload",
+            source_record_id: file.id,
+            source_file_id: file.id
           }
         } satisfies Json
       })
@@ -3292,8 +3427,8 @@ export async function analyzeFileAction(formData: FormData) {
     await supabase.from("ai_agent_runs").insert({
       workspace_id: workspaceId,
       agent_type: workflow.key,
-      input_json: inputJson,
-      output_json: {} satisfies Json,
+      input_json: failureInputJson,
+      output_json: failureOutputJson,
       status: "failed",
       error_message: message,
       created_by: user.id

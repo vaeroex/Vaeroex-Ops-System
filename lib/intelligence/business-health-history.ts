@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 export type BusinessHealthSnapshotRow = Database["public"]["Tables"]["business_health_snapshots"]["Row"];
@@ -85,7 +86,7 @@ export async function getBusinessHealthSnapshotResult(
   }
 
   return {
-    snapshots: data || [],
+      snapshots: filterBusinessEvidence(data || []),
     errorMessage: null
   };
 }

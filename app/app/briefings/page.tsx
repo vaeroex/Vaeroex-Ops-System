@@ -5,6 +5,7 @@ import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -97,7 +98,7 @@ export default async function BriefingsPage() {
     .eq("workspace_id", workspaceId)
     .order("created_at", { ascending: false })
     .limit(24);
-  const reports = (data || []) as ReportRow[];
+  const reports = filterBusinessEvidence((data || []) as ReportRow[]);
   const latestBriefing = reports[0];
 
   return (

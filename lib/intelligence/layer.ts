@@ -1,5 +1,6 @@
 import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
+import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -176,26 +177,22 @@ function latestDate(values: Array<string | null | undefined>) {
   return values.filter(Boolean).sort().at(-1) || new Date().toISOString();
 }
 
-function activeRows<T extends { archived_at?: string | null; deleted_at?: string | null }>(rows: T[]) {
-  return rows.filter((row) => !row.archived_at && !row.deleted_at);
-}
-
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
-  const kpis = activeRows(input.kpis || []);
-  const tasks = input.tasks || [];
-  const issues = input.issues || [];
-  const files = activeRows(input.files || []);
-  const reports = input.reports || [];
-  const vaeroexRuns = input.vaeroexRuns || [];
-  const crmLeads = activeRows(input.crmLeads || []);
-  const imports = input.imports || [];
-  const sops = input.sops || [];
-  const forms = input.forms || [];
-  const submissions = input.submissions || [];
-  const people = activeRows(input.people || []);
-  const decisions = input.decisions || [];
-  const recommendationOutcomes = activeRows(input.recommendationOutcomes || []);
+  const kpis = filterBusinessEvidence(input.kpis);
+  const tasks = filterBusinessEvidence(input.tasks);
+  const issues = filterBusinessEvidence(input.issues);
+  const files = filterBusinessEvidence(input.files);
+  const reports = filterBusinessEvidence(input.reports);
+  const vaeroexRuns = filterBusinessEvidence(input.vaeroexRuns, { sourceKind: "platform_run" });
+  const crmLeads = filterBusinessEvidence(input.crmLeads);
+  const imports = filterBusinessEvidence(input.imports);
+  const sops = filterBusinessEvidence(input.sops);
+  const forms = filterBusinessEvidence(input.forms);
+  const submissions = filterBusinessEvidence(input.submissions);
+  const people = filterBusinessEvidence(input.people);
+  const decisions = filterBusinessEvidence(input.decisions);
+  const recommendationOutcomes = filterBusinessEvidence(input.recommendationOutcomes);
   const openTasks = tasks.filter((task) => !isClosed(task.status));
   const businessSignalsForReview = openTasks.filter((task) => Boolean(task.description || task.category || task.related_type || task.due_date));
   const signalsWithLimitedContext = openTasks.filter((task) => !task.description || !task.category);
@@ -205,8 +202,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const forecastEligibility = buildKpiForecastEligibility(kpis);
   const belowTargetKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
   const improvingKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value >= kpi.target);
-  const pendingImports = imports.filter((item) => !["completed", "imported"].includes(lower(item.status)));
-  const failedRuns = vaeroexRuns.filter((run) => run.status === "failed");
+  const pendingImports = imports.filter((item) => ["extracted", "needs_review"].includes(lower(item.status)));
   const completedRuns = vaeroexRuns.filter((run) => run.status === "completed");
   const forecastReadyMetricNames = new Set(forecastEligibility.metrics.filter((metric) => metric.state === "ready").map((metric) => metric.name.toLowerCase()));
   const forecastReadyKpis = latestKpis.filter((kpi) => forecastReadyMetricNames.has(kpi.name.toLowerCase()));
@@ -423,23 +419,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           priority: "Medium",
           lastUpdated: latestDate(staleSops.map((sop) => sop.updated_at || sop.created_at))
         }
-      : null,
-    ...failedRuns.slice(0, 2).map((run) => ({
-      id: `run-${run.id}`,
-      type: "Anomaly" as const,
-      title: `Vaeroex run failed: ${run.agent_type.replace(/_/g, " ")}`,
-      summary: run.error_message || "The run did not complete.",
-      why: "Failed intelligence runs reduce confidence until the underlying data or service issue is resolved.",
-      impact: "The workspace may be missing a recent intelligence answer.",
-      recommendedAction: "Retry the analysis or review technical details if you are an admin.",
-      confidence: "High" as const,
-      evidence: [`Run status: ${run.status}`, `Created: ${new Date(run.created_at).toLocaleString()}`, run.error_message || "No error message recorded"],
-      evidenceCount: 3,
-      sourceTypes: ["Vaeroex Runs"],
-      sourceHref: "/app/agents",
-      priority: "High" as const,
-      lastUpdated: run.created_at
-    }))
+      : null
   ].filter(Boolean) as IntelligenceInsight[];
   const sortedInsights = sortInsights(insights);
   const risks = sortedInsights.filter((insight) => insight.type === "Risk" || insight.type === "Bottleneck" || insight.type === "Anomaly");
