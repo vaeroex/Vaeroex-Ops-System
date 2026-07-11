@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
+import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { fetchWithOpenAIResilience, getOpenAIRetrySettings, type OpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
@@ -10,7 +11,6 @@ type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
-const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
 const KPI_OVERVIEW_OPENAI_TIMEOUT_MS = 6_000;
 const KPI_OVERVIEW_MAX_ROWS = 160;
 const KPI_OVERVIEW_MAX_METRICS = 12;
@@ -505,7 +505,7 @@ async function runCompactOpenAIKpiAnswer({
   openAISettings?: OpenAIRetrySettings;
 }) {
   const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_MODEL || DEFAULT_OPENAI_MODEL;
+  const model = resolveVaeroexModel("kpi_overview");
 
   if (!apiKey) {
     throw new Error("OpenAI API key is not configured.");
@@ -591,6 +591,8 @@ async function runCompactOpenAIKpiAnswer({
       status: "completed",
       metadata: {
         workflow_path: "lightweight_kpi_overview",
+        model_route: "kpi_overview",
+        execution_path: "structured_answer",
         estimated_request_tokens: estimatedRequestTokens,
         request_body_bytes: Buffer.byteLength(requestBodyJson, "utf8")
       } satisfies Json
@@ -605,7 +607,8 @@ export async function runLightweightKpiOverview({
   userPrompt,
   intentClassificationMs,
   openAISettings,
-  stageLogger
+  stageLogger,
+  useOpenAI = false
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
@@ -613,6 +616,7 @@ export async function runLightweightKpiOverview({
   intentClassificationMs: number;
   openAISettings?: OpenAIRetrySettings;
   stageLogger?: StageLogger;
+  useOpenAI?: boolean;
 }) {
   const startedAt = Date.now();
   const diagnostics: KpiOverviewDiagnostics = {
@@ -656,7 +660,7 @@ export async function runLightweightKpiOverview({
   let outputJson: Json = fallbackOutput;
   let usage: VaeroexTokenUsage | null = null;
 
-  if (summary.metricCount) {
+  if (summary.metricCount && useOpenAI) {
     diagnostics.openai_attempted = true;
     stageLogger?.("kpi_openai_started", {
       estimatedContextTokens: diagnostics.estimated_context_tokens
@@ -694,9 +698,14 @@ export async function runLightweightKpiOverview({
         message: cleanVaeroexErrorMessage(error instanceof Error ? error.message : undefined, "KPI overview fallback used.")
       });
     }
-  } else {
+  } else if (!summary.metricCount) {
     diagnostics.fallback_used = true;
     diagnostics.fallback_reason = "no_kpi_records";
+  } else {
+    stageLogger?.("kpi_openai_skipped", {
+      reason: "tier_1_structured_answer",
+      estimatedContextTokens: diagnostics.estimated_context_tokens
+    });
   }
 
   diagnostics.total_ms = Date.now() - startedAt;

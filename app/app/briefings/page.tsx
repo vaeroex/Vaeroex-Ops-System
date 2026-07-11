@@ -215,7 +215,7 @@ export default async function BriefingsPage() {
                     </Link>
                     <ContextualAskVaeroex
                       label="Explain This"
-                      prompt={`Explain the key point from this briefing: ${report.title}`}
+                      prompt={`Explain the key point in this briefing, why it matters, which briefing evidence supports it, and what remains uncertain: ${report.title}`}
                       contextType="briefing"
                       contextId={report.id}
                       sourceTitle={report.title}

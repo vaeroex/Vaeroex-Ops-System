@@ -1004,7 +1004,7 @@ function FileContextualAskPanel({
       <div className="mt-4">
         <ContextualAskVaeroex
           label="Ask Vaeroex About This File"
-          prompt={`Answer a leadership question about ${file.display_name}. Use only this file evidence and relevant workspace Business Memory. Cover summary, risks, opportunities, KPI suggestions, missing information, and what leadership should review next. Do not create assignments, customer-management records, tasks, distribution schedules, or team workflow.`}
+          prompt={`Explain the most important point in ${file.display_name}. Use only this file and directly related Business Memory evidence. State what it means, why it matters, and what information is missing.`}
           contextType="file"
           contextId={file.id}
           sourceTitle={`File - ${file.display_name}`}
@@ -1120,7 +1120,7 @@ function FileAnalysisActions({
       <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-3">
         <ContextualAskVaeroex
           label="Ask Vaeroex About This File"
-          prompt="Explain this file analysis for leadership. Focus on what happened, why it matters, evidence, confidence, data limitations, and the one leadership discussion this should trigger."
+          prompt="Explain this file analysis directly. State what it means, why it matters, which file evidence supports it, and any meaningful limitation."
           contextType="file_analysis"
           contextId={latestRun?.id || file.id}
           sourceTitle={title}

@@ -9,7 +9,6 @@ import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment, type VaeroexRequestSizeMetrics } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
-import { buildWorkspaceSnapshot } from "@/lib/ai/workspace-snapshot";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { cleanExtractedText, extractDocxText, extractPdfText } from "@/lib/imports/document-text";
@@ -1225,38 +1224,6 @@ function compactRecordForAnalysis(value: unknown, keys: string[]) {
   }, {});
 }
 
-function compactArrayForAnalysis(value: unknown, keys: string[], limit: number) {
-  return asArray(value)
-    .filter(isRecord)
-    .slice(0, limit)
-    .map((item) => compactRecordForAnalysis(item, keys));
-}
-
-function boundedWorkspaceSnapshotForFileAnalysis(snapshot: Json): Json {
-  if (!isRecord(snapshot)) {
-    return snapshot;
-  }
-
-  return {
-    generated_at: snapshot.generated_at,
-    workspace: compactRecordForAnalysis(snapshot.workspace, ["id", "name", "industry", "size", "created_at"]),
-    metrics: snapshot.metrics,
-    workspace_gaps: asArray(snapshot.workspace_gaps).slice(0, 6),
-    module_state: {
-      kpi_dashboard: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.kpi_dashboard : null, ["exists", "records", "metric_names", "forecast_readiness", "guidance"]),
-      files: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.files : null, ["exists", "records", "analyzed_records", "pending_imports", "guidance"]),
-      business_signals: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.business_signals : null, ["exists", "open_records", "observations_needing_review", "guidance"]),
-      reports: compactRecordForAnalysis(isRecord(snapshot.module_state) ? snapshot.module_state.reports : null, ["exists", "records", "names", "guidance"])
-    },
-    kpi_history: compactArrayForAnalysis(snapshot.kpi_history, ["id", "name", "category", "target", "actual_value", "metric_date", "source"], 20),
-    recent_issues: compactArrayForAnalysis(snapshot.recent_issues, ["id", "title", "issue_type", "severity", "status", "created_at"], 8),
-    recent_tasks: compactArrayForAnalysis(snapshot.recent_tasks, ["id", "title", "status", "priority", "category", "created_at"], 8),
-    reports: compactArrayForAnalysis(snapshot.reports, ["id", "title", "report_type", "date_range_start", "date_range_end", "created_at"], 6),
-    operational_metrics: compactArrayForAnalysis(snapshot.operational_metrics, ["id", "metric_name", "category", "value", "metric_date"], 20),
-    business_decisions: compactArrayForAnalysis(snapshot.business_decisions, ["id", "title", "status", "related_kpi", "review_date"], 8)
-  } satisfies Json;
-}
-
 function compactFileMetadataForAnalysis(metadata: Json) {
   if (!isRecord(metadata)) {
     return {};
@@ -1615,8 +1582,7 @@ async function runFileVaeroexAnalysis({
     throw new Error(unsupportedFileContentMessage(file));
   }
 
-  const [rawWorkspaceSnapshot, fileImports, fileReports, evidenceContext] = await Promise.all([
-    buildWorkspaceSnapshot(supabase, workspaceId),
+  const [fileImports, fileReports, evidenceContext] = await Promise.all([
     supabase
       .from("file_imports")
       .select("id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
@@ -1633,10 +1599,33 @@ async function runFileVaeroexAnalysis({
     buildWorkspaceEvidenceContext({
       supabase,
       workspaceId,
-      query: `${prompt}\nFile: ${file.display_name}\nType: ${file.file_extension}`
+      query: `${prompt}\nFile: ${file.display_name}\nType: ${file.file_extension}`,
+      maxChunks: 3,
+      retrievalStrategy: "keyword_only"
     })
   ]);
-  const workspaceSnapshot = boundedWorkspaceSnapshotForFileAnalysis(rawWorkspaceSnapshot as Json);
+  const workspaceSnapshot = {
+    scope: "selected_file_analysis",
+    selected_file: {
+      id: file.id,
+      display_name: file.display_name,
+      original_name: file.original_name,
+      file_extension: file.file_extension,
+      import_type: file.import_type,
+      import_status: file.import_status,
+      processing_status: file.processing_status,
+      index_status: file.index_status,
+      indexed_chunk_count: file.indexed_chunk_count,
+      previous_analysis_summary: file.analysis_summary,
+      created_at: file.created_at,
+      updated_at: file.updated_at
+    },
+    scope_policy: {
+      selected_file_only: true,
+      full_workspace_snapshot_excluded: true,
+      unrelated_workspace_records_excluded: true
+    }
+  } satisfies Json;
   const relatedReports = (fileReports.data ?? [])
     .filter((report) => reportReferencesFile(report as Pick<ReportRow, "source_data_json">, file.id))
     .slice(0, 5)
@@ -1692,7 +1681,10 @@ async function runFileVaeroexAnalysis({
     extraInputs,
     fileAttachment: extraction.fileAttachment,
     supabase,
-    workspaceId
+    workspaceId,
+    modelRoute: "file_analysis",
+    executionPath: "focused_file_analysis",
+    maxOutputTokens: 1_200
   });
   const requestMetrics = requestMetricsFromUsage(usage.metadata);
   const outputExtractedText = extractedTextFromOutput(outputJson);

@@ -21,14 +21,6 @@ type ContextualAskVaeroexProps = {
 
 const initialState: ContextualAskState = { status: "idle" };
 
-function formattedBlocks(value: string) {
-  return value
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean)
-    .slice(0, 12);
-}
-
 function progressMessage(progress: number) {
   if (progress >= 100) return "Explanation ready.";
   if (progress >= 88) return "Finalizing answer...";
@@ -204,7 +196,7 @@ export function ContextualAskVaeroex({
             />
           </div>
           <p className="mt-3 text-xs leading-5 text-slate-300">
-            Vaeroex is reviewing the page context, workspace evidence, and limitations before showing the inline answer.
+            Vaeroex is reviewing the selected item and its directly related evidence.
           </p>
         </div>
       ) : null}
@@ -257,41 +249,19 @@ export function ContextualAskVaeroex({
           {!collapsed ? (
             <div className="space-y-4 p-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Short answer</p>
-                <p className="mt-2 leading-6 text-slate-100">{answer.shortAnswer}</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Direct Explanation</p>
+                <p className="mt-2 leading-6 text-slate-100">{answer.directExplanation}</p>
               </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Why Vaeroex thinks this</p>
-                <p className="mt-2 leading-6 text-slate-100">{answer.why}</p>
-              </div>
-              {answer.responseMarkdown ? (
+              {answer.whyItMatters ? (
                 <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Detailed explanation</p>
-                  <div className="mt-2 space-y-3 leading-6 text-slate-100">
-                    {formattedBlocks(answer.responseMarkdown).map((block) => {
-                      const [firstLine, ...rest] = block.split("\n").map((line) => line.trim()).filter(Boolean);
-                      const heading = firstLine?.replace(/^#{1,4}\s*/, "").replace(/\*\*/g, "");
-                      const body = rest.join(" ");
-                      const looksLikeHeading = Boolean(firstLine && (firstLine.startsWith("#") || firstLine.endsWith(":") || firstLine.length < 46));
-
-                      return (
-                        <div key={block} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-                          {looksLikeHeading ? <p className="font-semibold text-white">{heading}</p> : null}
-                          {!looksLikeHeading || body ? (
-                            <p className={`${looksLikeHeading && body ? "mt-1" : ""} whitespace-pre-line text-slate-100`}>
-                              {looksLikeHeading ? body : block}
-                            </p>
-                          ) : null}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Why It Matters</p>
+                  <p className="mt-2 leading-6 text-slate-100">{answer.whyItMatters}</p>
                 </div>
               ) : null}
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Data used</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Evidence</p>
                 <ul className="mt-2 space-y-1 leading-6 text-slate-100">
-                  {answer.dataUsed.map((item) => (
+                  {answer.evidence.map((item) => (
                     <li key={item} className="flex gap-2">
                       <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-accent" />
                       <span>{item}</span>
@@ -299,17 +269,19 @@ export function ContextualAskVaeroex({
                   ))}
                 </ul>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className={`grid gap-3 ${answer.limitations ? "sm:grid-cols-2" : ""}`}>
                 <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Confidence / limitations</p>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Recommendation Confidence</p>
                   <p className="mt-2 leading-6 text-slate-100">
-                    <span className="font-semibold text-white">{answer.confidence}.</span> {answer.limitations}
+                    <span className="font-semibold text-white">{answer.confidence}</span>
                   </p>
                 </div>
-                <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Suggested next step</p>
-                  <p className="mt-2 leading-6 text-slate-100">{answer.suggestedNextStep}</p>
-                </div>
+                {answer.limitations ? (
+                  <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Limitations</p>
+                    <p className="mt-2 leading-6 text-slate-100">{answer.limitations}</p>
+                  </div>
+                ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
                 <button
@@ -366,7 +338,7 @@ export function ContextualAskVaeroex({
             </div>
           ) : (
             <div className="p-4">
-              <p className="line-clamp-2 text-sm leading-6 text-slate-100">{answer.shortAnswer}</p>
+              <p className="line-clamp-2 text-sm leading-6 text-slate-100">{answer.directExplanation}</p>
             </div>
           )}
         </div>

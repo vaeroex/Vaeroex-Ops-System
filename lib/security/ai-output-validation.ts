@@ -59,7 +59,7 @@ function collectStrings(value: Json, path = "$", output: Array<{ path: string; v
   return output;
 }
 
-function validateSourceCitations(value: Json, path = "$"): ValidationResult {
+function validateSourceCitations(value: Json, path = "$", allowedSourceIds?: ReadonlySet<string>): ValidationResult {
   if (Array.isArray(value)) {
     if (path.split(".").some((segment) => CITATION_COLLECTION_KEYS.has(segment.toLowerCase())) && value.length > 25) {
       return {
@@ -69,7 +69,7 @@ function validateSourceCitations(value: Json, path = "$"): ValidationResult {
     }
 
     for (const [index, item] of value.entries()) {
-      const result = validateSourceCitations(item, `${path}[${index}]`);
+      const result = validateSourceCitations(item, `${path}[${index}]`, allowedSourceIds);
       if (!result.ok) {
         return result;
       }
@@ -93,6 +93,19 @@ function validateSourceCitations(value: Json, path = "$"): ValidationResult {
       };
     }
 
+    if (
+      SOURCE_REFERENCE_KEYS.has(normalizedKey) &&
+      typeof item === "string" &&
+      UUID_PATTERN.test(item.trim()) &&
+      allowedSourceIds !== undefined &&
+      !allowedSourceIds.has(item.trim().toLowerCase())
+    ) {
+      return {
+        ok: false,
+        reason: `Source citation does not match the bounded evidence supplied to this request. Field: ${itemPath}.`
+      };
+    }
+
     if (CITATION_COLLECTION_KEYS.has(normalizedKey) && typeof item === "string" && item.length > 500) {
       return {
         ok: false,
@@ -100,7 +113,7 @@ function validateSourceCitations(value: Json, path = "$"): ValidationResult {
       };
     }
 
-    const result = validateSourceCitations(item as Json, itemPath);
+    const result = validateSourceCitations(item as Json, itemPath, allowedSourceIds);
     if (!result.ok) {
       return result;
     }
@@ -109,7 +122,7 @@ function validateSourceCitations(value: Json, path = "$"): ValidationResult {
   return { ok: true };
 }
 
-export function validateAiGeneratedOutput(output: Json): ValidationResult {
+export function validateAiGeneratedOutput(output: Json, options: { allowedSourceIds?: Iterable<string> } = {}): ValidationResult {
   for (const item of collectStrings(output)) {
     for (const rule of FORBIDDEN_OUTPUT_PATTERNS) {
       if (rule.pattern.test(item.value)) {
@@ -121,5 +134,9 @@ export function validateAiGeneratedOutput(output: Json): ValidationResult {
     }
   }
 
-  return validateSourceCitations(output);
+  const allowedSourceIds = options.allowedSourceIds
+    ? new Set(Array.from(options.allowedSourceIds, (value) => value.toLowerCase()))
+    : undefined;
+
+  return validateSourceCitations(output, "$", allowedSourceIds);
 }

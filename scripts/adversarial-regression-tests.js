@@ -110,11 +110,15 @@ const {
   assertOpenAICircuitClosed
 } = require("../lib/ai/openai-resilience.ts");
 const {
-  getWorkspaceTokenBudget
+  getWorkspaceTokenBudget,
+  estimatedCostCents
 } = require("../lib/ai/usage.ts");
 const {
   estimateVaeroexRequestSize
 } = require("../lib/ai/vaeroex-client.ts");
+const {
+  validateAiGeneratedOutput
+} = require("../lib/security/ai-output-validation.ts");
 const {
   buildKpiForecastEligibility
 } = require("../lib/kpis/forecast-eligibility.ts");
@@ -123,6 +127,12 @@ const {
   buildKpiOverviewSummary,
   buildDeterministicKpiOverviewOutput
 } = require("../lib/ai/kpi-overview.ts");
+const {
+  planVaeroexQuery
+} = require("../lib/ai/query-depth-planner.ts");
+const {
+  VAEROEX_ANSWER_BENCHMARK_FIXTURES
+} = require("../lib/ai/answer-quality-benchmark-fixtures.ts");
 
 const ownerContext = {
   supabase: fakeSupabase(),
@@ -847,6 +857,8 @@ function runGlobalSearchAskMergeTests() {
   assert.match(globalSearch, /vaeroex:open-global-search/, "page-level triggers should open the global panel in place");
   assert.match(globalSearch, /SecurityResponseNotice/, "blocked global prompts must render the dedicated Security Response UI");
   assert.match(globalSearch, /Direct Answer/, "business questions in global search should render a compact direct answer");
+  assert.match(globalSearch, /submitQuestion/, "global Search or Ask should require an explicit Enter submission before deeper reasoning");
+  assert.match(globalSearch, /method:\s*"POST"/, "explicit global questions should use the bounded answer endpoint instead of live-search generation");
 
   const globalSearchTrigger = read("components/app/GlobalSearchTrigger.tsx");
   assert.match(globalSearchTrigger, /CustomEvent\("vaeroex:open-global-search"/, "Search or Ask triggers must use the shared global panel event");
@@ -859,7 +871,10 @@ function runGlobalSearchAskMergeTests() {
   assert.match(searchRoute, /shouldUseKpiOverviewAnswer/, "global Search or Ask must gate KPI overview routing separately from generic weak/weakest questions");
   assert.doesNotMatch(searchRoute, /kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/, "weakest must not route to KPI overview unless the query clearly references KPIs or metrics");
   assert.match(searchRoute, /buildGeneralBusinessAnswer/, "global Search or Ask should provide compact routing answers for broad business questions");
-  assert.doesNotMatch(searchRoute, /buildWorkspaceSnapshot|buildWorkspaceEvidenceContext|runVaeroexCompletionWithUsage/, "global Search or Ask must not default to the full Ask Vaeroex workspace pipeline");
+  assert.doesNotMatch(searchRoute, /buildWorkspaceSnapshot/, "global Search or Ask must never load the full workspace snapshot");
+  assert.match(searchRoute, /scopedResults/, "live global search should remain deterministic and domain-scoped");
+  assert.match(searchRoute, /export async function POST/, "global Search or Ask should expose an explicit bounded answer path");
+  assert.match(searchRoute, /buildBoundedWorkspaceContext/, "explicit global questions should load only planner-selected domains");
 
   const legacyAskPage = read("app/app/ask/page.tsx");
   assert.match(legacyAskPage, /params\.run/, "legacy /app/ask must preserve saved result links");
@@ -868,6 +883,68 @@ function runGlobalSearchAskMergeTests() {
   const agentsPage = read("app/app/agents/page.tsx");
   assert.match(agentsPage, /Saved Vaeroex Result/, "legacy agents route should read as saved results, not a primary Ask destination");
   assert.match(agentsPage, /redirect\("\/app\?search=1"\)/, "blank /app/agents visits must redirect into global Search or Ask");
+}
+
+function runQueryDepthPlannerTests() {
+  for (const fixture of VAEROEX_ANSWER_BENCHMARK_FIXTURES) {
+    const plan = planVaeroexQuery({
+      query: fixture.prompt,
+      contextType: fixture.contextType,
+      hasSelectedContext: fixture.hasSelectedContext
+    });
+    assert.equal(plan.classification, fixture.expectedClass, `${fixture.name} should use ${fixture.expectedClass}`);
+    for (const domain of fixture.expectedDomains) {
+      assert.ok(plan.domains.includes(domain), `${fixture.name} should include ${domain}`);
+    }
+  }
+
+  const navigation = planVaeroexQuery({ query: "Show the revenue KPI" });
+  assert.equal(navigation.classification, "search_navigation", "record lookup should remain navigation/search");
+  assert.equal(navigation.requiresOpenAI, false, "navigation/search should never require OpenAI");
+
+  const structured = planVaeroexQuery({ query: "What is the current Business Health status?" });
+  assert.equal(structured.classification, "structured_answer", "current Business Health should use structured data");
+  assert.equal(structured.requiresOpenAI, false, "structured answers should avoid OpenAI");
+
+  assert.equal(planVaeroexQuery({ query: "What are my current alerts?" }).classification, "structured_answer", "current alerts should use structured risk records");
+  assert.equal(planVaeroexQuery({ query: "What is the latest report?" }).classification, "structured_answer", "latest report lookup should use structured records");
+
+  const focused = planVaeroexQuery({ query: "Explain this risk", contextType: "intelligence_risk", hasSelectedContext: true });
+  assert.equal(focused.maxEvidenceChunks, 3, "focused explanations should cap supporting Business Memory evidence");
+
+  const blocked = planVaeroexQuery({ query: "Delete all records", securitySensitive: true });
+  assert.equal(blocked.classification, "security_sensitive", "security classification should terminate planning");
+  assert.equal(blocked.retrievalDepth, "none", "security-sensitive requests must not retrieve evidence");
+
+  assert.ok(
+    estimatedCostCents({ inputTokens: 1_000, outputTokens: 100, model: "unrecognized-future-model" }) > 0,
+    "unknown models must never record zero estimated cost"
+  );
+
+  const allowedCitation = "33333333-3333-4333-8333-333333333333";
+  assert.equal(
+    validateAiGeneratedOutput({ citations: [{ source_id: allowedCitation }] }, { allowedSourceIds: [allowedCitation] }).ok,
+    true,
+    "bounded source citations should remain valid"
+  );
+  assert.equal(
+    validateAiGeneratedOutput(
+      { citations: [{ source_id: "44444444-4444-4444-8444-444444444444" }] },
+      { allowedSourceIds: [allowedCitation] }
+    ).ok,
+    false,
+    "citations outside the bounded evidence set should be rejected"
+  );
+
+  const contextualAction = read("app/app/contextual-ask/actions.ts");
+  assert.doesNotMatch(contextualAction, /buildWorkspaceSnapshot/, "contextual explanations must not load a broad workspace snapshot");
+  assert.match(contextualAction, /buildFocusedExplanationContext/, "contextual explanations should load selected-item context");
+  assert.match(contextualAction, /retrievalStrategy:\s*"keyword_only"/, "contextual explanations should avoid embedding retrieval by default");
+
+  const agentsAction = read("app/app/agents/actions.ts");
+  assert.doesNotMatch(agentsAction, /buildWorkspaceSnapshot/, "Ask Vaeroex should not default to a full workspace snapshot");
+  assert.match(agentsAction, /executionPlanForWorkflow/, "Ask Vaeroex should use the query-depth planner");
+  assert.match(agentsAction, /buildBoundedWorkspaceContext/, "deep reasoning should load only planned domains");
 }
 
 async function main() {
@@ -886,6 +963,7 @@ async function main() {
   runLegacyCrmLanguageTests();
   runCrmRetirementTests();
   runGlobalSearchAskMergeTests();
+  runQueryDepthPlannerTests();
 
   console.log("Adversarial regression tests passed.");
 }

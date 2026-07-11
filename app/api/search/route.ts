@@ -1,9 +1,18 @@
 import { NextResponse } from "next/server";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
+import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { resolveVaeroexModel } from "@/lib/ai/model-routing";
+import { planVaeroexQuery, type VaeroexEvidenceDomain } from "@/lib/ai/query-depth-planner";
+import { recordVaeroexAiUsage } from "@/lib/ai/usage";
+import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
+import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
+import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
-import { classifySecurityIntent, securityResponseMessage } from "@/lib/security/security-response";
+import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -11,6 +20,7 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 import type { GlobalSearchAnswer, GlobalSearchDestination, GlobalSearchGroup, GlobalSearchGroupLabel, GlobalSearchResult } from "@/lib/search/types";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -44,6 +54,47 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
 
 function normalizeQuery(value: string | null) {
   return (value || "").replace(/[%,()]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
+
+function normalizeQuestion(value: unknown) {
+  return (typeof value === "string" ? value : "").replace(/\s+/g, " ").trim().slice(0, 600);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function stringValue(value: unknown) {
+  return typeof value === "string" && value.trim() ? value.trim() : "";
+}
+
+function normalizedRecommendationConfidence(value: unknown, evidenceCount: number): GlobalSearchAnswer["recommendationConfidence"] {
+  const candidate = stringValue(value);
+  return ["High", "Medium", "Low", "Insufficient"].includes(candidate)
+    ? candidate as GlobalSearchAnswer["recommendationConfidence"]
+    : confidenceFromEvidence(evidenceCount);
+}
+
+function answerFromOutput(output: Json, evidenceCount: number, fallback: GlobalSearchAnswer): GlobalSearchAnswer {
+  const record = isRecord(output) ? output : {};
+  const directAnswer =
+    stringValue(record.direct_answer) ||
+    stringValue(record.direct_explanation) ||
+    stringValue(record.response_markdown) ||
+    stringValue(record.summary) ||
+    fallback.directAnswer;
+  const limitations = Array.isArray(record.limitations)
+    ? record.limitations.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).join(" ")
+    : stringValue(record.limitations);
+  const evidenceNote = stringValue(record.evidence_note) || fallback.evidenceNote || (limitations || undefined);
+
+  return {
+    kind: "business_answer",
+    directAnswer,
+    recommendationConfidence: normalizedRecommendationConfidence(record.recommendation_confidence || record.confidence, evidenceCount),
+    evidenceNote,
+    relevantDestinations: fallback.relevantDestinations
+  };
 }
 
 function queryWords(query: string) {
@@ -102,6 +153,10 @@ async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { 
   }
 
   return data || [];
+}
+
+async function scopedResults<T>(enabled: boolean, request: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+  return enabled ? safeResults(request()) : [];
 }
 
 function sourceHref(sourceType: string | null, title: string | null) {
@@ -380,10 +435,16 @@ export async function GET(request: Request) {
 
   const kpiOverviewIntent = classifyKpiOverviewIntent(query);
   const useKpiOverviewAnswer = shouldUseKpiOverviewAnswer(query, kpiOverviewIntent);
+  const queryPlan = planVaeroexQuery({ query });
+  const plannedDomains = new Set<VaeroexEvidenceDomain>(queryPlan.domains);
+  const searchAllDomains = queryPlan.domains.length === 0 || (!questionLike(query) && queryPlan.classification === "unsupported");
+  const includesDomain = (...domains: VaeroexEvidenceDomain[]) => searchAllDomains || domains.some((domain) => plannedDomains.has(domain));
   const includeDiagnostics = shouldSearchDiagnostics(query, user);
   const shouldBuildAnswer =
     businessQuestionLike(query) ||
     useKpiOverviewAnswer ||
+    queryPlan.classification === "structured_answer" ||
+    queryPlan.classification === "cross_business_reasoning" ||
     /\b(weakest|worst|biggest risk|biggest opportunity|current priorities|what changed|changed this week|take me to)\b/i.test(query);
 
   const [
@@ -402,8 +463,9 @@ export async function GET(request: Request) {
     learnedKnowledge,
     vaeroexRuns
   ] = await Promise.all([
-    safeResults<KpiRow>(
-      supabase
+    scopedResults<KpiRow>(
+      includesDomain("kpis", "financials", "business_health"),
+      () => supabase
         .from("kpis")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -412,8 +474,9 @@ export async function GET(request: Request) {
         .order("metric_date", { ascending: false })
         .limit(6)
     ),
-    safeResults<ReportRow>(
-      supabase
+    scopedResults<ReportRow>(
+      includesDomain("reports", "decisions"),
+      () => supabase
         .from("reports")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -421,8 +484,9 @@ export async function GET(request: Request) {
         .order("created_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<FileUploadRow>(
-      supabase
+    scopedResults<FileUploadRow>(
+      includesDomain("files", "data_quality"),
+      () => supabase
         .from("file_uploads")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -432,8 +496,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<IssueRow>(
-      supabase
+    scopedResults<IssueRow>(
+      includesDomain("risks", "priorities", "operations"),
+      () => supabase
         .from("issues")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -441,8 +506,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<TaskRow>(
-      supabase
+    scopedResults<TaskRow>(
+      includesDomain("business_signals", "operations", "priorities"),
+      () => supabase
         .from("tasks")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -450,8 +516,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<AssignmentRow>(
-      supabase
+    scopedResults<AssignmentRow>(
+      includesDomain("operations", "priorities"),
+      () => supabase
         .from("operational_assignments")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -460,8 +527,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<CrmLeadRow>(
-      supabase
+    scopedResults<CrmLeadRow>(
+      includesDomain("customers"),
+      () => supabase
         .from("crm_leads")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -470,8 +538,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<SopRow>(
-      supabase
+    scopedResults<SopRow>(
+      includesDomain("compliance", "operations"),
+      () => supabase
         .from("sops")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -479,8 +548,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<ChecklistRow>(
-      supabase
+    scopedResults<ChecklistRow>(
+      includesDomain("compliance", "operations"),
+      () => supabase
         .from("checklists")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -488,8 +558,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<PersonRow>(
-      supabase
+    scopedResults<PersonRow>(
+      includesDomain("people", "operations"),
+      () => supabase
         .from("people")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -498,8 +569,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<DecisionRow>(
-      supabase
+    scopedResults<DecisionRow>(
+      includesDomain("decisions", "priorities"),
+      () => supabase
         .from("business_decisions")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -508,8 +580,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<RecommendationRow>(
-      supabase
+    scopedResults<RecommendationRow>(
+      includesDomain("decisions", "priorities", "risks"),
+      () => supabase
         .from("vaeroex_recommendation_outcomes")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -518,8 +591,9 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
-    safeResults<MemoryChunkRow>(
-      supabase
+    scopedResults<MemoryChunkRow>(
+      includesDomain("business_memory", "reports", "files", "risks", "financials", "customers", "operations"),
+      () => supabase
         .from("business_memory_chunks")
         .select("*")
         .eq("workspace_id", workspaceId)
@@ -555,8 +629,9 @@ export async function GET(request: Request) {
     answerKpiSummary = overviewData.summary;
   } else if (shouldBuildAnswer) {
     const [recentKpis, recentReports, recentFiles, recentIssues, recentTasks, recentRecommendations] = await Promise.all([
-      safeResults<KpiRow>(
-        supabase
+      scopedResults<KpiRow>(
+        includesDomain("kpis", "financials", "business_health"),
+        () => supabase
           .from("kpis")
           .select("*")
           .eq("workspace_id", workspaceId)
@@ -564,16 +639,18 @@ export async function GET(request: Request) {
           .order("metric_date", { ascending: false })
           .limit(120)
       ),
-      safeResults<ReportRow>(
-        supabase
+      scopedResults<ReportRow>(
+        includesDomain("reports", "decisions"),
+        () => supabase
           .from("reports")
           .select("*")
           .eq("workspace_id", workspaceId)
           .order("created_at", { ascending: false })
           .limit(12)
       ),
-      safeResults<FileUploadRow>(
-        supabase
+      scopedResults<FileUploadRow>(
+        includesDomain("files", "data_quality"),
+        () => supabase
           .from("file_uploads")
           .select("*")
           .eq("workspace_id", workspaceId)
@@ -582,24 +659,27 @@ export async function GET(request: Request) {
           .order("updated_at", { ascending: false })
           .limit(12)
       ),
-      safeResults<IssueRow>(
-        supabase
+      scopedResults<IssueRow>(
+        includesDomain("risks", "priorities", "operations"),
+        () => supabase
           .from("issues")
           .select("*")
           .eq("workspace_id", workspaceId)
           .order("updated_at", { ascending: false })
           .limit(12)
       ),
-      safeResults<TaskRow>(
-        supabase
+      scopedResults<TaskRow>(
+        includesDomain("business_signals", "operations", "priorities"),
+        () => supabase
           .from("tasks")
           .select("*")
           .eq("workspace_id", workspaceId)
           .order("updated_at", { ascending: false })
           .limit(12)
       ),
-      safeResults<RecommendationRow>(
-        supabase
+      scopedResults<RecommendationRow>(
+        includesDomain("decisions", "priorities", "risks"),
+        () => supabase
           .from("vaeroex_recommendation_outcomes")
           .select("*")
           .eq("workspace_id", workspaceId)
@@ -832,4 +912,255 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({ query, groups: responseGroups, answer });
+}
+
+export async function POST(request: Request) {
+  const body = (await request.json().catch(() => ({}))) as { query?: unknown };
+  const query = normalizeQuestion(body.query);
+
+  if (query.length < 2) {
+    return NextResponse.json({ error: "Enter a question for Vaeroex." }, { status: 400 });
+  }
+
+  const supabase = await createSupabaseServerClient();
+
+  if (!supabase) {
+    return NextResponse.json({ error: "Vaeroex is temporarily unavailable." }, { status: 503 });
+  }
+
+  const {
+    data: { user }
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
+  }
+
+  const context = await getWorkspaceContext();
+
+  if (!context.activeWorkspace || !context.membership || context.membership.status !== "active") {
+    return NextResponse.json({ error: "Workspace access is required." }, { status: 403 });
+  }
+
+  const workspaceId = context.activeWorkspace.id;
+  const subscriptionStatus = await getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId });
+
+  if (!subscriptionStatus.allowed) {
+    return NextResponse.json({ error: "Subscription access is required." }, { status: 402 });
+  }
+
+  const rateLimit = await enforceRateLimit({
+    action: "global.answer",
+    limit: 20,
+    windowSeconds: 10 * 60,
+    requestHeaders: request.headers,
+    userId: user.id,
+    workspaceId,
+    identifiers: [query.slice(0, 120)],
+    metadata: { source: "global_search_or_ask" }
+  });
+
+  if (!rateLimit.allowed) {
+    return NextResponse.json({ error: rateLimitMessage(rateLimit) }, { status: 429 });
+  }
+
+  const securityIntent = classifySecurityIntent(query);
+
+  if (securityIntent.securitySensitive) {
+    await logSecurityAuditEvent({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      actionName: "global_answer.security_response",
+      operationType: "SYSTEM",
+      initiatedBy: "user",
+      allowed: false,
+      reasonBlocked: "Global Search or Ask request was classified as security sensitive.",
+      metadata: {
+        source: "global_search_or_ask",
+        classification_category: securityIntent.category,
+        classification_confidence: securityIntent.confidence
+      } satisfies Json
+    });
+
+    return NextResponse.json({
+      query,
+      groups: [],
+      answer: { kind: "security_response", directAnswer: securityResponseMessage() } satisfies GlobalSearchAnswer
+    });
+  }
+
+  const kpiIntent = classifyKpiOverviewIntent(query);
+  if (shouldUseKpiOverviewAnswer(query, kpiIntent)) {
+    const { summary } = await loadKpiOverviewData({ supabase, workspaceId });
+    return NextResponse.json({ query, groups: [], answer: buildKpiGlobalAnswer(query, summary, []) });
+  }
+
+  const queryPlan = planVaeroexQuery({ query });
+
+  if (queryPlan.classification === "search_navigation") {
+    return NextResponse.json({
+      query,
+      groups: [],
+      answer: {
+        kind: "navigation_answer",
+        directAnswer: "Matching workspace records are shown in the search results.",
+        evidenceNote: "Navigation requests use workspace search and do not call OpenAI."
+      } satisfies GlobalSearchAnswer
+    });
+  }
+
+  const boundedContext = await buildBoundedWorkspaceContext({ supabase, workspaceId, query, plan: queryPlan });
+  let evidenceContext: EvidenceContext = {
+    available: false,
+    retrievalMode: "none" as const,
+    chunks: [],
+    maxChunks: 0,
+    confidenceScore: boundedContext.structuredEvidenceCount ? 45 : 10,
+    confidenceLabel: boundedContext.structuredEvidenceCount ? "Partial" : "Very Limited",
+    limitations: boundedContext.limitations,
+    dataGaps: boundedContext.structuredEvidenceCount ? [] : ["No matching structured workspace evidence was available."],
+    policy: ["Use only the bounded structured context supplied for this question."]
+  };
+
+  if (queryPlan.requiresOpenAI && queryPlan.maxEvidenceChunks > 0) {
+    evidenceContext = await buildWorkspaceEvidenceContext({
+      supabase,
+      workspaceId,
+      query: boundedContext.evidenceQuery,
+      maxChunks: queryPlan.maxEvidenceChunks,
+      retrievalStrategy: queryPlan.tier === 2 ? "keyword_only" : "auto",
+      embeddingTimeoutMs: queryPlan.tier === 3 ? 4_000 : 3_000
+    });
+  }
+
+  const fallbackOutput = buildDeterministicBoundedAnswer({ query, context: boundedContext });
+  const evidenceCount = boundedContext.structuredEvidenceCount + evidenceContext.chunks.length;
+  const fallbackAnswer = answerFromOutput(fallbackOutput, evidenceCount, {
+    kind: "business_answer",
+    directAnswer: "Vaeroex did not find enough relevant workspace evidence to answer without guessing.",
+    recommendationConfidence: confidenceFromEvidence(evidenceCount),
+    evidenceNote: evidenceCount
+      ? `This used ${evidenceCount} bounded evidence item${evidenceCount === 1 ? "" : "s"}.`
+      : "No relevant structured or Learned Knowledge evidence was available."
+  });
+
+  if (!queryPlan.requiresOpenAI) {
+    return NextResponse.json({ query, groups: [], answer: fallbackAnswer });
+  }
+
+  const limit = await isUsageLimitReached({
+    supabase,
+    userId: user.id,
+    email: user.email,
+    workspaceId,
+    limit: "ai_runs_this_month"
+  });
+
+  if (limit.reached) {
+    return NextResponse.json({ error: "This workspace has reached its monthly Vaeroex usage limit." }, { status: 429 });
+  }
+
+  const workflow = getVaeroexWorkflow("ask_vaeroex");
+  const baseSettings = getOpenAIRetrySettings();
+  const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
+  const generationStartedAt = Date.now();
+
+  try {
+    const generation = await runVaeroexCompletionWithUsage({
+      workflow,
+      userPrompt: `Answer this exact question directly: ${query}\n\nUse only the bounded workspace context and retrieved evidence. Do not add generic management advice, unrelated recommendations, fabricated facts, or report sections. Return JSON with direct_answer, evidence_note, recommendation_confidence, limitations, and response_markdown.`,
+      workspaceSnapshot: boundedContext.workspaceSnapshot,
+      extraInputs: {
+        query_plan: {
+          classification: queryPlan.classification,
+          tier: queryPlan.tier,
+          domains: queryPlan.domains,
+          retrieval_depth: queryPlan.retrievalDepth,
+          context_token_budget: queryPlan.contextTokenBudget
+        },
+        evidence_context: evidenceContextAsJson(evidenceContext)
+      } satisfies Json,
+      supabase,
+      workspaceId,
+      modelRoute,
+      executionPath: queryPlan.classification,
+      maxOutputTokens: queryPlan.tier === 3 ? 1_000 : 650,
+      openAISettings: {
+        ...baseSettings,
+        timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
+        maxRetries: queryPlan.tier === 3 ? Math.min(baseSettings.maxRetries, 1) : 0
+      }
+    });
+
+    await recordVaeroexAiUsage({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      agentType: "global_search_or_ask",
+      usage: {
+        ...generation.usage,
+        metadata: {
+          ...(isRecord(generation.usage.metadata) ? generation.usage.metadata : {}),
+          execution_tier: queryPlan.tier,
+          execution_path: queryPlan.classification,
+          data_domains: queryPlan.domains,
+          loaded_domains: boundedContext.loadedDomains,
+          bounded_context_ms: boundedContext.loadMs,
+          estimated_context_tokens: boundedContext.estimatedContextTokens,
+          evidence_count: evidenceCount,
+          fallback_used: false
+        }
+      }
+    });
+
+    return NextResponse.json({
+      query,
+      groups: [],
+      answer: answerFromOutput(generation.outputJson, evidenceCount, fallbackAnswer)
+    });
+  } catch (error) {
+    if (isSecurityResponseMessage(error instanceof Error ? error.message : "")) {
+      return NextResponse.json({
+        query,
+        groups: [],
+        answer: { kind: "security_response", directAnswer: securityResponseMessage() } satisfies GlobalSearchAnswer
+      });
+    }
+
+    await recordVaeroexAiUsage({
+      supabase,
+      workspaceId,
+      userId: user.id,
+      agentType: "global_search_or_ask",
+      usage: {
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        model: resolveVaeroexModel(modelRoute),
+        latencyMs: Date.now() - generationStartedAt,
+        status: "failed",
+        metadata: {
+          execution_tier: queryPlan.tier,
+          execution_path: queryPlan.classification,
+          data_domains: queryPlan.domains,
+          evidence_count: evidenceCount,
+          timeout: /timed out|timeout|abort/i.test(error instanceof Error ? error.message : ""),
+          fallback_used: true
+        }
+      }
+    });
+
+    const fallbackWithReason = buildDeterministicBoundedAnswer({
+      query,
+      context: boundedContext,
+      failureReason: "The deeper analysis was unavailable, so Vaeroex returned the bounded workspace evidence it could verify."
+    });
+
+    return NextResponse.json({
+      query,
+      groups: [],
+      answer: answerFromOutput(fallbackWithReason, evidenceCount, fallbackAnswer)
+    });
+  }
 }

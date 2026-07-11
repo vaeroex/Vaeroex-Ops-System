@@ -14,8 +14,13 @@ export type VaeroexTokenUsage = {
 };
 
 const DEFAULT_MODEL_COST_CENTS_PER_1M: Record<string, { input: number; output: number }> = {
-  "gpt-4o-mini": { input: 15, output: 60 }
+  "gpt-4o-mini": { input: 15, output: 60 },
+  "gpt-5.4-mini": { input: 75, output: 450 },
+  "gpt-5.6-luna": { input: 100, output: 600 },
+  "gpt-5.6-terra": { input: 250, output: 1_500 },
+  "gpt-5.6-sol": { input: 500, output: 3_000 }
 };
+const CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M = { input: 500, output: 3_000 };
 const DEFAULT_WORKSPACE_MONTHLY_TOKEN_BUDGET = 2_000_000;
 const DEFAULT_SINGLE_REQUEST_TOKEN_BUDGET = 120_000;
 const MAX_MONTHLY_USAGE_ROWS_FOR_BUDGET_CHECK = 10_000;
@@ -25,15 +30,18 @@ function numberEnv(name: string) {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
-function modelCost(model: string) {
+export function modelCost(model: string) {
   const inputOverride = numberEnv("OPENAI_INPUT_COST_CENTS_PER_1M");
   const outputOverride = numberEnv("OPENAI_OUTPUT_COST_CENTS_PER_1M");
   const normalized = model.trim().toLowerCase();
-  const defaults = DEFAULT_MODEL_COST_CENTS_PER_1M[normalized] || { input: 0, output: 0 };
+  const exact = DEFAULT_MODEL_COST_CENTS_PER_1M[normalized];
+  const matchedPrefix = Object.entries(DEFAULT_MODEL_COST_CENTS_PER_1M).find(([name]) => normalized.startsWith(`${name}-`))?.[1];
+  const defaults = exact || matchedPrefix || CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M;
 
   return {
     input: inputOverride ?? defaults.input,
-    output: outputOverride ?? defaults.output
+    output: outputOverride ?? defaults.output,
+    estimated: !exact && !matchedPrefix && inputOverride === null && outputOverride === null
   };
 }
 

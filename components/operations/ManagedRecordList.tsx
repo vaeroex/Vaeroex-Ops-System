@@ -654,7 +654,7 @@ export function ManagedRecordList({
   const currentCount = activeCount;
   const chips = activeFilterChips({ params: baseParams, folders, returnPath, labels, defaultView });
   const hasFilter = Boolean(chips.length || param(searchParams?.limit));
-  const askPrompt = `Review these ${collectionLabel(collection)} and tell me what needs attention.`;
+  const askPrompt = `Explain what the current ${collectionLabel(collection)} view shows. Focus on the most important supported pattern, why it matters, and any meaningful limitation.`;
   const summaryChips =
     collection === "files"
       ? ([
