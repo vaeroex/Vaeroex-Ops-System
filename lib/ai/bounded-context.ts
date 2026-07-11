@@ -1,8 +1,14 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { loadKpiOverviewData } from "@/lib/ai/kpi-overview";
 import type { VaeroexEvidenceDomain, VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
 import { estimateTokenCount } from "@/lib/ai/usage";
+import {
+  filterBusinessEvidence,
+  isBusinessEvidenceEligible,
+  sanitizeBusinessEvidenceText
+} from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type JsonRecord = { [key: string]: Json | undefined };
@@ -41,7 +47,7 @@ function compactText(value: string | null | undefined, max = 900) {
 }
 
 function compactEvidence(values: string[] = [], limit = 8) {
-  return values.map((value) => compactText(value, 500)).filter(Boolean).slice(0, limit);
+  return values.map((value) => sanitizeBusinessEvidenceText(compactText(value, 500))).filter(Boolean).slice(0, limit);
 }
 
 function isUuid(value: string | null | undefined) {
@@ -98,7 +104,7 @@ export function buildDeterministicFocusedExplanation({
   failureReason?: string;
 }) {
   const directEvidence = compactEvidence(evidence, 4);
-  const directExplanation = compactText(sourceSummary, 700) || `${sourceTitle || "This item"} does not yet include enough detail for a reliable explanation.`;
+  const directExplanation = sanitizeBusinessEvidenceText(compactText(sourceSummary, 700)) || `${sourceTitle || "This item"} does not yet include enough detail for a reliable explanation.`;
   const whyItMatters = directEvidence[0] && directEvidence[0] !== directExplanation ? directEvidence[0] : "";
   const evidenceLines = directEvidence.length
     ? directEvidence
@@ -171,39 +177,47 @@ export async function buildFocusedExplanationContext({
   } else if (isUuid(contextId) && (contextType.includes("briefing") || contextType.includes("report"))) {
     const { data, error } = await supabase
       .from("reports")
-      .select("id,title,report_type,date_range_start,date_range_end,body_markdown,source_data_json,created_at")
+      .select("id,title,report_type,date_range_start,date_range_end,body_markdown,source_data_json,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .eq("id", contextId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
 
     if (error) limitations.push("The selected briefing or report could not be verified.");
-    if (data) verifiedRecords.push({ ...data, body_markdown: compactText(data.body_markdown, 1_500) });
+    if (data && isBusinessEvidenceEligible(data)) verifiedRecords.push({ ...data, body_markdown: compactText(data.body_markdown, 1_500) });
   } else if (isUuid(contextId) && contextType.includes("file_analysis")) {
     const { data, error } = await supabase
       .from("ai_agent_runs")
-      .select("id,agent_type,output_json,status,created_at,updated_at")
+      .select("id,agent_type,input_json,output_json,status,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .eq("id", contextId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
 
     if (error) limitations.push("The selected file analysis could not be verified.");
-    if (data) verifiedRecords.push({ ...data, output_json: jsonRecord(data.output_json) });
+    if (data && isBusinessEvidenceEligible(data, { sourceKind: "platform_run" })) {
+      verifiedRecords.push({ ...data, output_json: jsonRecord(data.output_json) });
+    } else if (data) {
+      limitations.push("That analysis did not produce active business evidence, so Vaeroex left its platform diagnostics out.");
+    }
   } else if (isUuid(contextId) && (contextType === "file" || contextType.includes("source"))) {
     const { data, error } = await supabase
       .from("file_uploads")
-      .select("id,display_name,file_extension,analysis_summary,processing_status,index_status,indexed_chunk_count,processed_at,indexed_at,updated_at")
+      .select("id,display_name,file_extension,analysis_summary,processing_status,index_status,indexed_chunk_count,processed_at,indexed_at,updated_at,metadata_json,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
       .eq("id", contextId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
 
     if (error) limitations.push("The selected source file could not be verified.");
-    if (data) verifiedRecords.push(data);
+    if (data && isBusinessEvidenceEligible(data)) verifiedRecords.push(data);
   } else if (isUuid(contextId) && (contextType.includes("memory") || contextType.includes("knowledge"))) {
     const { data, error } = await supabase
       .from("business_memory_chunks")
-      .select("id,source_type,source_id,source_file_id,source_title,source_excerpt,summary,source_quality,confidence_score,indexed_at")
+      .select("*")
       .eq("workspace_id", workspaceId)
       .eq("id", contextId)
       .is("deleted_at", null)
@@ -211,7 +225,14 @@ export async function buildFocusedExplanationContext({
       .maybeSingle();
 
     if (error) limitations.push("The selected Learned Knowledge record could not be verified.");
-    if (data) verifiedRecords.push({ ...data, source_excerpt: compactText(data.source_excerpt, 1_200) });
+    if (data) {
+      const [eligibleMemory] = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: [data] });
+      if (eligibleMemory) {
+        verifiedRecords.push({ ...eligibleMemory, source_excerpt: compactText(eligibleMemory.source_excerpt, 1_200) });
+      } else {
+        limitations.push("That Learned Knowledge record is inactive or its source lineage is no longer eligible.");
+      }
+    }
   } else if (isUuid(contextId) && (contextType.includes("risk") || contextType.includes("opportunity") || contextType.includes("intelligence"))) {
     const [{ data: issue }, { data: recommendation }] = await Promise.all([
       supabase
@@ -219,6 +240,8 @@ export async function buildFocusedExplanationContext({
         .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,created_at,updated_at")
         .eq("workspace_id", workspaceId)
         .eq("id", contextId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .maybeSingle(),
       supabase
         .from("vaeroex_recommendation_outcomes")
@@ -226,6 +249,7 @@ export async function buildFocusedExplanationContext({
         .eq("workspace_id", workspaceId)
         .eq("id", contextId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .maybeSingle()
     ]);
 
@@ -239,7 +263,7 @@ export async function buildFocusedExplanationContext({
       context_type: input.contextType,
       context_id: input.contextId || null,
       source_title: compactText(input.sourceTitle, 180),
-      source_summary: compactText(input.sourceSummary, 1_200),
+      source_summary: sanitizeBusinessEvidenceText(compactText(input.sourceSummary, 1_200)),
       page_evidence: directEvidence
     },
     verified_workspace_records: verifiedRecords,
@@ -300,14 +324,15 @@ export async function buildBoundedWorkspaceContext({
         "Business Health history",
         supabase
           .from("business_health_snapshots")
-          .select("id,snapshot_date,score,status,trend,data_confidence,data_quality_score,memory_signal_count")
+          .select("id,snapshot_date,score,status,trend,data_confidence,data_quality_score,memory_signal_count,source_summary")
           .eq("workspace_id", workspaceId)
           .order("snapshot_date", { ascending: false })
           .limit(12),
         limitations
       ).then((rows) => {
-        context.business_health = rows;
-        structuredEvidenceCount += rows.length;
+        const eligibleRows = filterBusinessEvidence(rows);
+        context.business_health = eligibleRows;
+        structuredEvidenceCount += eligibleRows.length;
         loadedDomains.push("business_health");
       })
     );
@@ -354,14 +379,15 @@ export async function buildBoundedWorkspaceContext({
         "Briefings and reports",
         supabase
           .from("reports")
-          .select("id,title,report_type,date_range_start,date_range_end,body_markdown,created_at")
+          .select("id,title,report_type,date_range_start,date_range_end,body_markdown,source_data_json,created_at")
           .eq("workspace_id", workspaceId)
           .order("created_at", { ascending: false })
           .limit(6),
         limitations
       ).then((rows) => {
-        context.reports = rows.map((row) => ({ ...row, body_markdown: compactText(row.body_markdown, 1_000) }));
-        structuredEvidenceCount += rows.length;
+        const eligibleRows = filterBusinessEvidence(rows);
+        context.reports = eligibleRows.map((row) => ({ ...row, body_markdown: compactText(row.body_markdown, 1_000) }));
+        structuredEvidenceCount += eligibleRows.length;
         loadedDomains.push("reports");
       })
     );
@@ -381,8 +407,12 @@ export async function buildBoundedWorkspaceContext({
           .limit(8),
         limitations
       ).then((rows) => {
-        context.sources = rows;
-        structuredEvidenceCount += rows.length;
+        const eligibleRows = filterBusinessEvidence(rows);
+        context.sources = eligibleRows.map((row) => ({
+          ...row,
+          analysis_summary: sanitizeBusinessEvidenceText(row.analysis_summary) || null
+        }));
+        structuredEvidenceCount += eligibleRows.length;
         if (domainSet.has("files")) loadedDomains.push("files");
         if (domainSet.has("data_quality")) loadedDomains.push("data_quality");
       })

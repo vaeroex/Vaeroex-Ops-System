@@ -9,6 +9,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
+import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import {
   buildGeneratedOutput,
   parseGeneratedOutputType,
@@ -115,6 +116,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     metricsResult.error,
     assetsResult.error
   ].filter(Boolean);
+  const eligibleRuns = filterBusinessEvidence(runsResult.data || [], { sourceKind: "platform_run" });
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],
@@ -122,7 +124,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     kpis: kpisResult.data || [],
     files: filesResult.data || [],
     reports: reportsResult.data || [],
-    vaeroexRuns: runsResult.data || [],
+    vaeroexRuns: eligibleRuns,
     crmLeads: crmResult.data || [],
     imports: importsResult.data || [],
     sops: sopsResult.data || [],
@@ -138,7 +140,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     kpis: kpisResult.data || [],
     files: filesResult.data || [],
     reports: reportsResult.data || [],
-    vaeroexRuns: runsResult.data || [],
+    vaeroexRuns: eligibleRuns,
     crmLeads: crmResult.data || [],
     crmHistory: crmHistoryResult.data || [],
     imports: importsResult.data || [],

@@ -19,6 +19,7 @@ import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
+import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
@@ -1479,26 +1480,27 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
-  const kpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
-  const tasks = (taskResult.data || []) as TaskRow[];
-  const issues = (issueResult.data || []) as IssueRow[];
-  const checklists = (checklistResult.data || []) as ChecklistRow[];
-  const checklistRuns = (checklistRunResult.data || []) as ChecklistRunRow[];
-  const sops = (sopResult.data || []) as SopRow[];
-  const files = (fileResult.data || []) as FileUploadRow[];
-  const imports = (importResult.data || []) as FileImportRow[];
-  const assets = (assetResult.data || []) as AssetRow[];
-  const crmLeads = (crmLeadResult.data || []) as CrmLeadRow[];
-  const crmHistory = (crmHistoryResult.data || []) as CrmLeadHistoryRow[];
-  const reports = (reportResult.data || []) as ReportRow[];
+  const kpis = filterBusinessEvidence(sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[]);
+  const tasks = filterBusinessEvidence((taskResult.data || []) as TaskRow[]);
+  const issues = filterBusinessEvidence((issueResult.data || []) as IssueRow[]);
+  const checklists = filterBusinessEvidence((checklistResult.data || []) as ChecklistRow[]);
+  const checklistRuns = filterBusinessEvidence((checklistRunResult.data || []) as ChecklistRunRow[]);
+  const sops = filterBusinessEvidence((sopResult.data || []) as SopRow[]);
+  const files = filterBusinessEvidence((fileResult.data || []) as FileUploadRow[]);
+  const imports = filterBusinessEvidence((importResult.data || []) as FileImportRow[]);
+  const assets = filterBusinessEvidence((assetResult.data || []) as AssetRow[]);
+  const crmLeads = filterBusinessEvidence((crmLeadResult.data || []) as CrmLeadRow[]);
+  const crmHistory = filterBusinessEvidence((crmHistoryResult.data || []) as CrmLeadHistoryRow[]);
+  const reports = filterBusinessEvidence((reportResult.data || []) as ReportRow[]);
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
-  const operationalMetrics = (metricResult.data || []) as OperationalMetricRow[];
+  const businessEvidenceRuns = filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" });
+  const operationalMetrics = filterBusinessEvidence((metricResult.data || []) as OperationalMetricRow[]);
   const notifications = (notificationResult.data || []) as NotificationRow[];
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
   const shares = (shareResult.data || []) as ShareRow[];
-  const people = (peopleResult.data || []) as PersonRow[];
-  const decisions = (decisionResult.data || []) as BusinessDecisionRow[];
-  const recommendationOutcomes = (recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[];
+  const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
+  const decisions = filterBusinessEvidence((decisionResult.data || []) as BusinessDecisionRow[]);
+  const recommendationOutcomes = filterBusinessEvidence((recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[]);
   const errors = [
     kpiResult.error,
     kpiSettingsResult.error,
@@ -1518,6 +1520,26 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     notificationResult.error,
     assignmentResult.error,
     shareResult.error,
+    peopleResult.error,
+    decisionResult.error,
+    recommendationOutcomeResult.error
+  ].filter(Boolean);
+  const businessHealthSourceErrors = [
+    kpiResult.error,
+    kpiSettingsResult.error,
+    taskResult.error,
+    issueResult.error,
+    checklistResult.error,
+    checklistRunResult.error,
+    sopResult.error,
+    fileResult.error,
+    importResult.error,
+    assetResult.error,
+    crmLeadResult.error,
+    crmHistoryResult.error,
+    reportResult.error,
+    vaeroexRunResult.error,
+    metricResult.error,
     peopleResult.error,
     decisionResult.error,
     recommendationOutcomeResult.error
@@ -1828,7 +1850,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assets: demoWorkspaceCounts?.assets ?? 0,
     checklists: demoWorkspaceCounts?.checklists ?? checklists.length,
     alerts: smartAlerts.length,
-    insights: demoWorkspaceCounts?.vaeroexInsights ?? vaeroexRuns.filter((run) => run.status === "completed").length
+    insights: demoWorkspaceCounts?.vaeroexInsights ?? businessEvidenceRuns.length
   };
   const hasWorkspaceData = Boolean(kpis.length || tasks.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
   const todayDate = dateOnly(new Date());
@@ -1885,7 +1907,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assets,
     crmLeads,
     reports,
-    vaeroexRuns,
+    vaeroexRuns: businessEvidenceRuns,
     operationalMetrics,
     notifications,
     assignments,
@@ -1901,7 +1923,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     issues,
     files,
     reports,
-    vaeroexRuns,
+    vaeroexRuns: businessEvidenceRuns,
     crmLeads,
     imports,
     sops,
@@ -1910,24 +1932,27 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     recommendationOutcomes
   });
   const businessHealthMemorySignals = intelligenceLayer.memorySummary.sourceRecords + intelligenceLayer.memorySummary.kpiHistoryRecords;
-  await recordDailyBusinessHealthSnapshot(supabase, {
-    workspaceId,
-    score: intelligenceLayer.businessHealth.score,
-    status: intelligenceLayer.businessHealth.status,
-    trend: intelligenceLayer.businessHealth.trend,
-    dataConfidence: intelligenceLayer.dataQuality.confidence,
-    dataQualityScore: intelligenceLayer.dataQuality.score,
-    memorySignalCount: businessHealthMemorySignals,
-    sourceSummary: {
-      kpis: kpis.length,
-      reports: reports.length,
-      files: files.length,
-      issues: issues.length,
-      crm_leads: crmLeads.length,
-      business_memory_signals: businessHealthMemorySignals,
-      vaeroex_runs: vaeroexRuns.length
-    }
-  });
+  if (!businessHealthSourceErrors.length) {
+    await recordDailyBusinessHealthSnapshot(supabase, {
+      workspaceId,
+      score: intelligenceLayer.businessHealth.score,
+      status: intelligenceLayer.businessHealth.status,
+      trend: intelligenceLayer.businessHealth.trend,
+      dataConfidence: intelligenceLayer.dataQuality.confidence,
+      dataQualityScore: intelligenceLayer.dataQuality.score,
+      memorySignalCount: businessHealthMemorySignals,
+      sourceSummary: {
+        kpis: kpis.length,
+        reports: reports.length,
+        files: files.length,
+        issues: issues.length,
+        crm_leads: crmLeads.length,
+        business_memory_signals: businessHealthMemorySignals,
+        vaeroex_runs: businessEvidenceRuns.length,
+        ...evidenceLineageMetadata({ sourceType: "business_health_snapshot" })
+      }
+    });
+  }
   const businessHealthSnapshotResult = await getBusinessHealthSnapshotResult(supabase, workspaceId);
   const businessHealthHistory: BusinessHealthTrendPoint[] = businessHealthSnapshotResult.snapshots.map((snapshot) => ({
     snapshotDate: snapshot.snapshot_date,
@@ -1947,7 +1972,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     crmLeads,
     crmHistory,
     reports,
-    vaeroexRuns,
+    vaeroexRuns: businessEvidenceRuns,
     operationalMetrics,
     assets,
     people,
@@ -2510,7 +2535,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <div>
               <h3 className="text-sm font-semibold text-ink">Latest Vaeroex insights</h3>
               <SimpleList
-                items={vaeroexRuns.slice(0, 5)}
+                items={businessEvidenceRuns.slice(0, 5)}
                 empty="No Vaeroex decision support saved yet."
                 render={(run: VaeroexRunRow) => (
                   <div key={run.id} className="rounded-lg border border-line p-3">

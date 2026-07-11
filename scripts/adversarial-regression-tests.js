@@ -133,6 +133,13 @@ const {
 const {
   VAEROEX_ANSWER_BENCHMARK_FIXTURES
 } = require("../lib/ai/answer-quality-benchmark-fixtures.ts");
+const {
+  classifyEvidenceEligibility,
+  filterBusinessEvidence,
+  sanitizeBusinessEvidenceText
+} = require("../lib/intelligence/evidence-eligibility.ts");
+const { buildIntelligenceLayer } = require("../lib/intelligence/layer.ts");
+const { buildBusinessIntelligenceCoverage } = require("../lib/intelligence/coverage.ts");
 
 const ownerContext = {
   supabase: fakeSupabase(),
@@ -947,6 +954,68 @@ function runQueryDepthPlannerTests() {
   assert.match(agentsAction, /buildBoundedWorkspaceContext/, "deep reasoning should load only planned domains");
 }
 
+function runEvidenceEligibilityTests() {
+  const completedRun = {
+    id: "completed-run",
+    agent_type: "ask_vaeroex",
+    status: "completed",
+    created_at: "2026-07-10T12:00:00.000Z",
+    updated_at: "2026-07-10T12:00:00.000Z",
+    archived_at: null,
+    deleted_at: null,
+    output_json: { summary: "Revenue review completed from current KPI evidence." }
+  };
+  const failedRun = {
+    ...completedRun,
+    id: "failed-run",
+    status: "failed",
+    error_message: "OpenAI service error: model request timed out.",
+    output_json: {
+      evidence_classification: "platform_failure",
+      evidence_lifecycle: "failed",
+      summary: "Vaeroex run failed: model request timed out."
+    }
+  };
+  const archivedRun = { ...completedRun, id: "archived-run", archived_at: "2026-07-11T00:00:00.000Z" };
+  const blockedRun = { ...completedRun, id: "blocked-run", status: "blocked" };
+  const invalidRun = {
+    ...completedRun,
+    id: "invalid-run",
+    output_json: { evidence_classification: "invalid_evidence", summary: "Unverified result." }
+  };
+  const completedTechnicalFailure = {
+    ...completedRun,
+    id: "technical-failure-run",
+    output_json: { summary: "OpenAI service error: model request timed out." }
+  };
+
+  assert.equal(classifyEvidenceEligibility(failedRun, { sourceKind: "platform_run" }).reason, "platform_failure");
+  assert.equal(classifyEvidenceEligibility(archivedRun, { sourceKind: "platform_run" }).reason, "archived");
+  assert.equal(classifyEvidenceEligibility(blockedRun, { sourceKind: "platform_run" }).classification, "user_failure_state");
+  assert.equal(classifyEvidenceEligibility(invalidRun, { sourceKind: "platform_run" }).classification, "invalid_evidence");
+  assert.equal(classifyEvidenceEligibility(completedTechnicalFailure, { sourceKind: "platform_run" }).classification, "invalid_evidence");
+  assert.deepEqual(
+    filterBusinessEvidence([completedRun, failedRun, archivedRun, blockedRun, invalidRun, completedTechnicalFailure], { sourceKind: "platform_run" }).map((run) => run.id),
+    ["completed-run"],
+    "only active completed platform runs with valid content and metadata may become business evidence"
+  );
+  assert.equal(sanitizeBusinessEvidenceText(failedRun.error_message), "", "platform error prose must not survive evidence sanitization");
+  assert.equal(sanitizeBusinessEvidenceText("Equipment failure increased downtime by 8%."), "Equipment failure increased downtime by 8%.", "real business failure evidence must remain valid");
+
+  const intelligence = buildIntelligenceLayer({ vaeroexRuns: [failedRun] });
+  assert.equal(intelligence.insights.length, 0, "failed platform runs must not become risks or anomalies");
+  assert.equal(intelligence.memorySummary.vaeroexRuns, 0, "failed platform runs must not count as business memory");
+  assert.equal(intelligence.dataQuality.score, 0, "failed platform runs must not increase confidence");
+
+  const coverage = buildBusinessIntelligenceCoverage({ vaeroexRuns: [failedRun] });
+  assert.equal(coverage.sourceMix.some((source) => source.label === "Vaeroex Memory"), false, "failed platform runs must not enter source coverage");
+  assert.equal(coverage.confidenceOverTime.length, 0, "failed platform runs must not create confidence trends");
+  assert.equal(coverage.categories.find((category) => category.id === "issues_risks").sourceCount, 0, "failed platform runs must not become business risks");
+
+  const validCoverage = buildBusinessIntelligenceCoverage({ vaeroexRuns: [completedRun] });
+  assert.equal(validCoverage.categories.find((category) => category.id === "business_memory").sourceCount, 1, "valid completed runs must continue to support business memory");
+}
+
 async function main() {
   assert.ok(existsSync(path.join(root, "lib/security/tool-execution-gateway.ts")), "tool gateway source must exist");
 
@@ -964,6 +1033,7 @@ async function main() {
   runCrmRetirementTests();
   runGlobalSearchAskMergeTests();
   runQueryDepthPlannerTests();
+  runEvidenceEligibilityTests();
 
   console.log("Adversarial regression tests passed.");
 }

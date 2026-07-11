@@ -1,6 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { categoryConfig, categoryLabel, type ReportSubscriptionCategory } from "@/lib/reports/subscriptions";
+import {
+  filterBusinessEvidence,
+  sanitizeBusinessEvidenceText
+} from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type AdminSupabase = SupabaseClient<Database>;
@@ -98,15 +102,31 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100)
   ]);
 
+  const sourceErrors = [
+    tasks.error,
+    issues.error,
+    checklists.error,
+    kpis.error,
+    kpiSettings.error,
+    crm.error,
+    insights.error,
+    assignments.error,
+    files.error
+  ].filter(Boolean);
+
+  if (sourceErrors.length) {
+    throw new Error("Required scheduled-report source data could not be loaded. No report was created.");
+  }
+
   const taskRows = tasks.data || [];
   const issueRows = issues.data || [];
   const checklistRows = checklists.data || [];
   const kpiSettingRows = (kpiSettings.data || []) as KpiSettingRow[];
   const kpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(kpis.data || [], kpiSettingRows), kpiSettingRows);
   const crmRows = crm.data || [];
-  const insightRows = insights.data || [];
+  const insightRows = filterBusinessEvidence(insights.data || [], { sourceKind: "platform_run" });
   const assignmentRows = assignments.data || [];
-  const fileRows = files.data || [];
+  const fileRows = filterBusinessEvidence(files.data || []);
   const openTasks = taskRows.filter((task) => !["Done", "Complete"].includes(task.status || ""));
   const businessSignalsInPeriod = taskRows.filter((task) => inRange(task.due_date || task.created_at, start, end) || inRange(task.created_at, start, end));
   const contextualBusinessSignals = businessSignalsInPeriod.filter((task) =>
@@ -119,7 +139,7 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const currentKpis = kpiRows.filter((kpi) => kpi.metric_date >= dateOnly(start) && kpi.metric_date <= dateOnly(end));
   const belowTargetKpis = currentKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target);
   const newLeads = crmRows.filter((lead) => inRange(lead.created_at, start, end));
-  const recentInsights = insightRows.filter((run) => run.status === "completed" && inRange(run.created_at, start, end));
+  const recentInsights = insightRows.filter((run) => inRange(run.created_at, start, end));
   const openAssignments = assignmentRows.filter((assignment) => !["Done", "Dismissed"].includes(assignment.status || ""));
   const uploadedFiles = fileRows.filter((file) => inRange(file.created_at, start, end));
 
@@ -144,7 +164,7 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
       checklist_exceptions: checklistExceptions.slice(0, 8).map((run) => run.notes || `Checklist run ${run.id.slice(0, 8)} needs review`),
       below_target_kpis: belowTargetKpis.slice(0, 8).map((kpi) => `${kpi.name}: ${kpi.actual_value} vs target ${kpi.target}`),
       crm_leads: newLeads.slice(0, 8).map((lead) => `${lead.lead_name}${lead.company ? ` at ${lead.company}` : ""}${lead.status ? ` (${lead.status})` : ""}`),
-      vaeroex_insights: recentInsights.map((run) => firstInsightText(run.output_json)).filter(Boolean).slice(0, 6),
+      vaeroex_insights: recentInsights.map((run) => sanitizeBusinessEvidenceText(firstInsightText(run.output_json))).filter(Boolean).slice(0, 6),
       open_assignments: openAssignments.slice(0, 8).map((assignment) => assignment.title),
       uploaded_files: uploadedFiles.slice(0, 8).map((file) => `${file.display_name} (${file.import_status.replace(/_/g, " ")})`)
     }

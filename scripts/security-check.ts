@@ -409,6 +409,21 @@ check(outputValidation.includes("validateAiGeneratedOutput"), "AI output validat
 check(outputValidation.includes("FORBIDDEN_OUTPUT_PATTERNS"), "AI output validation helper must define forbidden output patterns.");
 check(outputValidation.includes("SOURCE_REFERENCE_KEYS") && outputValidation.includes("UUID_PATTERN"), "AI output validation must validate source citation record IDs.");
 
+const evidenceEligibility = read("lib/intelligence/evidence-eligibility.ts");
+check(evidenceEligibility.includes("classifyEvidenceEligibility") && evidenceEligibility.includes("filterBusinessEvidence"), "Business derivations must use a centralized evidence lifecycle classifier.");
+check(evidenceEligibility.includes("platform_telemetry") && evidenceEligibility.includes("platform_failure"), "Platform telemetry and failures must be classified separately from business evidence.");
+check(evidenceEligibility.includes("user_failure_state") && evidenceEligibility.includes("invalid_evidence"), "Evidence classification must distinguish user failure state and invalid evidence.");
+const intelligenceLayer = read("lib/intelligence/layer.ts");
+const intelligenceCoverage = read("lib/intelligence/coverage.ts");
+check(intelligenceLayer.includes('sourceKind: "platform_run"') && !intelligenceLayer.includes("Vaeroex run failed:"), "Failed platform runs must not become intelligence risks or health penalties.");
+check(intelligenceCoverage.includes('sourceKind: "platform_run"') && !intelligenceCoverage.includes("Failed Vaeroex run:"), "Failed platform runs must not increase business coverage, memory, or confidence trends.");
+check(contextualAskRuntime.includes("sanitizeBusinessEvidenceText") && contextualAskRuntime.includes("eligibleEvidenceChunks"), "Contextual explanations must sanitize platform failures and reject ineligible retrieved evidence.");
+const dashboardRuntime = read("app/app/page.tsx");
+check(dashboardRuntime.includes("businessHealthSourceErrors") && dashboardRuntime.includes("if (!businessHealthSourceErrors.length)"), "Business Health snapshots must not persist when required source queries fail.");
+const evidenceRetrievalMigration = read("supabase/migrations/202607110001_business_memory_evidence_eligibility.sql");
+check(evidenceRetrievalMigration.includes("left join public.file_uploads source_file") && evidenceRetrievalMigration.includes("left join public.ai_agent_runs source_run"), "Vector retrieval must validate source file and source run lifecycle before limiting evidence.");
+check(evidenceRetrievalMigration.includes("security invoker") && evidenceRetrievalMigration.includes("public.is_workspace_member"), "Evidence retrieval migration must preserve invoker security and workspace authorization.");
+
 const rawDebugFiles = sourceFiles.filter((file) => {
   const content = read(file);
   return content.includes("JsonPreview") || content.includes("DebugData") || content.includes("debugMode");

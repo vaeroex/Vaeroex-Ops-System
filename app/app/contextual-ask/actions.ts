@@ -1,6 +1,6 @@
 "use server";
 
-import { buildWorkspaceEvidenceContext, evidenceContextAsJson } from "@/lib/ai/evidence-index";
+import { buildWorkspaceEvidenceContext, evidenceContextAsJson, rebuildEvidenceContext } from "@/lib/ai/evidence-index";
 import { buildDeterministicFocusedExplanation, buildFocusedExplanationContext } from "@/lib/ai/bounded-context";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
@@ -11,6 +11,10 @@ import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
+import {
+  filterBusinessEvidence,
+  sanitizeBusinessEvidenceText
+} from "@/lib/intelligence/evidence-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { contextualSecurityIntentInput, isSecurityResponseMessage, isSecuritySensitiveRequest, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
@@ -122,15 +126,16 @@ async function requireWorkspaceForContextualAsk() {
 
 function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext: string): ContextualAskAnswer {
   const output = isRecord(outputJson) ? outputJson : {};
-  const title = str(output.title, fallbackTitle || INITIAL_ANSWER_TITLE);
+  const title = sanitizeBusinessEvidenceText(str(output.title)) || fallbackTitle || INITIAL_ANSWER_TITLE;
   const directExplanation =
-    str(output.direct_explanation) ||
-    str(output.short_answer) ||
-    str(output.direct_answer) ||
-    str(output.executive_summary) ||
-    str(output.summary) ||
-    str(output.response_markdown, "Vaeroex reviewed the current context and prepared a short explanation.");
-  const whyItMatters = str(output.why_it_matters) || str(output.why_vaeroex_thinks_this) || str(output.reasoning) || str(output.reason);
+    sanitizeBusinessEvidenceText(str(output.direct_explanation)) ||
+    sanitizeBusinessEvidenceText(str(output.short_answer)) ||
+    sanitizeBusinessEvidenceText(str(output.direct_answer)) ||
+    sanitizeBusinessEvidenceText(str(output.executive_summary)) ||
+    sanitizeBusinessEvidenceText(str(output.summary)) ||
+    sanitizeBusinessEvidenceText(str(output.response_markdown)) ||
+    "Vaeroex does not have active business evidence for this item yet.";
+  const whyItMatters = sanitizeBusinessEvidenceText(str(output.why_it_matters) || str(output.why_vaeroex_thinks_this) || str(output.reasoning) || str(output.reason));
   const outputEvidence = asStringArray(output.evidence);
   const evidence = compactList(
     outputEvidence.length
@@ -138,12 +143,13 @@ function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext
       : asStringArray(output.data_used).length
         ? asStringArray(output.data_used)
         : asStringArray(output.evidence_used)
-  );
+  ).map((item) => sanitizeBusinessEvidenceText(item)).filter(Boolean);
   const confidence = str(output.recommendation_confidence) || str(output.confidence, "Low");
   const limitationItems = asStringArray(output.limitations);
   const limitations = limitationItems.join(" ") || str(output.limitation);
-  const responseMarkdown = str(output.response_markdown);
-  const normalizedEvidence = evidence.length ? evidence : compactList([fallbackContext || "Current page context"]);
+  const responseMarkdown = sanitizeBusinessEvidenceText(str(output.response_markdown));
+  const safeFallbackContext = sanitizeBusinessEvidenceText(fallbackContext);
+  const normalizedEvidence = evidence.length ? evidence : compactList([safeFallbackContext]).filter(Boolean);
   const copyText = [
     title,
     "",
@@ -173,9 +179,11 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
   const followUp = text(formData, "follow_up");
   const contextType = text(formData, "context_type") || "contextual_explanation";
   const contextId = text(formData, "context_id");
-  const sourceTitle = text(formData, "source_title");
-  const sourceSummary = text(formData, "source_summary");
-  const evidence = parseEvidence(text(formData, "evidence_json"));
+  const sourceTitle = sanitizeBusinessEvidenceText(text(formData, "source_title"));
+  const sourceSummary = sanitizeBusinessEvidenceText(text(formData, "source_summary"));
+  const evidence = parseEvidence(text(formData, "evidence_json"))
+    .map((item) => sanitizeBusinessEvidenceText(item))
+    .filter(Boolean);
   const question = followUp || prompt || "Explain this recommendation in plain language.";
   let workspaceSnapshot = {} as Json;
   const workflow = getVaeroexWorkflow("ask_vaeroex");
@@ -259,6 +267,16 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
       maxChunks: queryPlan.maxEvidenceChunks,
       retrievalStrategy: "keyword_only"
     });
+    const eligibleEvidenceChunks = filterBusinessEvidence(evidenceContext.chunks, { sourceKind: "business_memory" });
+    const sanitizedEvidenceChunks = eligibleEvidenceChunks
+      .map((chunk) => ({
+        ...chunk,
+        title: sanitizeBusinessEvidenceText(chunk.title) || "Workspace evidence",
+        excerpt: sanitizeBusinessEvidenceText(chunk.excerpt),
+        summary: sanitizeBusinessEvidenceText(chunk.summary)
+      }))
+      .filter((chunk) => Boolean(chunk.excerpt || chunk.summary));
+    const safeEvidenceContext = rebuildEvidenceContext(evidenceContext, sanitizedEvidenceChunks);
 
     const contextualInput = {
       context_type: contextType,
@@ -266,7 +284,7 @@ export async function runContextualAskVaeroexAction(_previousState: ContextualAs
       source_title: sourceTitle,
       source_summary: sourceSummary,
       evidence,
-      retrieved_evidence: evidenceContextAsJson(evidenceContext),
+      retrieved_evidence: evidenceContextAsJson(safeEvidenceContext),
       follow_up: followUp || null,
       query_plan: {
         classification: queryPlan.classification,
@@ -305,10 +323,10 @@ The first sentence must explain this selected item directly. Stay within this it
       sourceSummary,
       evidence: [
         ...focusedContext.directEvidence,
-        ...evidenceContext.chunks.map((chunk) => `${chunk.title}: ${chunk.summary || chunk.excerpt}`)
+        ...safeEvidenceContext.chunks.map((chunk) => `${chunk.title}: ${chunk.summary || chunk.excerpt}`)
       ],
       verifiedRecordCount: focusedContext.verifiedRecordCount,
-      limitations: [...focusedContext.limitations, ...evidenceContext.limitations]
+      limitations: [...focusedContext.limitations, ...safeEvidenceContext.limitations]
     });
     let generation: Awaited<ReturnType<typeof runVaeroexCompletionWithUsage>> | null = null;
     let outputJson: Json = fallbackOutput;
@@ -371,10 +389,10 @@ The first sentence must explain this selected item directly. Stay within this it
         sourceSummary,
         evidence: [
           ...focusedContext.directEvidence,
-          ...evidenceContext.chunks.map((chunk) => `${chunk.title}: ${chunk.summary || chunk.excerpt}`)
+          ...safeEvidenceContext.chunks.map((chunk) => `${chunk.title}: ${chunk.summary || chunk.excerpt}`)
         ],
         verifiedRecordCount: focusedContext.verifiedRecordCount,
-        limitations: [...focusedContext.limitations, ...evidenceContext.limitations],
+        limitations: [...focusedContext.limitations, ...safeEvidenceContext.limitations],
         failureReason: "The generated explanation was unavailable, so Vaeroex used the selected item and its bounded evidence instead."
       });
     }
@@ -420,9 +438,9 @@ The first sentence must explain this selected item directly. Stay within this it
             selected_records: focusedContext.verifiedRecordCount,
             estimated_context_tokens: focusedContext.estimatedContextTokens,
             context_load_ms: focusedContext.loadMs,
-            evidence_retrieval_mode: evidenceContext.retrievalMode,
-            evidence_chunks: evidenceContext.chunks.length,
-            evidence_confidence_score: evidenceContext.confidenceScore,
+            evidence_retrieval_mode: safeEvidenceContext.retrievalMode,
+            evidence_chunks: safeEvidenceContext.chunks.length,
+            evidence_confidence_score: safeEvidenceContext.confidenceScore,
             fallback_used: fallbackUsed
           }
         }

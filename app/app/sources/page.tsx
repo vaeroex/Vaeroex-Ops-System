@@ -15,6 +15,7 @@ import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgress
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
+import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { TextInput } from "@/components/operations/FormControls";
 import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
@@ -1180,6 +1181,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       .eq("workspace_id", workspaceId)
       .eq("agent_type", "file_analysis")
       .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false }),
     supabase
       .from("business_memory_chunks")
@@ -1195,7 +1197,16 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   const reports = (reportsResult.data || []) as ReportRow[];
   const kpis = (kpisResult.data || []) as KpiRow[];
   const runs = (runsResult.data || []) as VaeroexRunRow[];
-  const memoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
+  const rawMemoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
+  const activeMemoryChunks = await filterEligibleMemoryRowsByLifecycle({
+    supabase,
+    workspaceId,
+    rows: rawMemoryChunks.filter((chunk) => !chunk.deleted_at && !chunk.archived_at)
+  }) as MemoryChunkRow[];
+  const memoryChunks = [
+    ...activeMemoryChunks,
+    ...rawMemoryChunks.filter((chunk) => chunk.deleted_at || chunk.archived_at)
+  ];
   const accessByFileId = await createFileAccessLinkMap(supabase, files);
   const runsByFile = new Map<string, VaeroexRunRow[]>();
 
