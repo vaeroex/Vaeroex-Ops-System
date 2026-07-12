@@ -177,6 +177,19 @@ function latestDate(values: Array<string | null | undefined>) {
   return values.filter(Boolean).sort().at(-1) || new Date().toISOString();
 }
 
+function businessSignalPatternTitle(signals: TaskRow[]) {
+  const sourceText = signals
+    .flatMap((signal) => [signal.title, signal.description, signal.category])
+    .filter((value): value is string => Boolean(value))
+    .join(" ")
+    .toLowerCase();
+
+  if (/follow.?up|response/.test(sourceText)) return "Follow-up process requires review";
+  if (/handoff|handover/.test(sourceText)) return "Handoffs require review";
+  if (/process|procedure|sop/.test(sourceText)) return "Current process requires review";
+  return "Repeated operating signals require review";
+}
+
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
   const kpis = filterBusinessEvidence(input.kpis);
@@ -244,9 +257,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         type: "Risk" as const,
         title: issue.title,
         summary: issue.description || issue.recommended_fix || `Issue is currently ${issue.status}.`,
-        why: "Open issues indicate unresolved risk or a process gap leadership may need to prioritize.",
-        impact: "Work can stall, repeat, or spread when the same issue remains unresolved.",
-        recommendedAction: "Leadership should review the issue evidence and decide whether an executive report or improvement plan is needed.",
+        why: "The issue remains open and its recorded severity or root cause has not yet been resolved.",
+        impact: "An unresolved issue can continue to affect the work described in the record.",
+        recommendedAction: "Review the issue record and determine whether a leadership brief is warranted.",
         confidence: confidenceFromEvidence(evidence.length, priority),
         evidence,
         evidenceCount: evidence.length,
@@ -272,11 +285,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           return {
             id: "source-signal-review-pattern",
             type: "Risk" as const,
-            title: "Business Signals may indicate a pattern",
-            summary: `${businessSignalsForReview.length} Business Signal${businessSignalsForReview.length === 1 ? "" : "s"} may affect customer response, conversion, service quality, market timing, or operational reliability.`,
-            why: "Vaeroex treats Business Signals as evidence and context from the organization. The pattern matters because it may reveal slower response speed, unresolved customer needs, or process friction.",
-            impact: "If ignored, leadership may miss a developing retention, conversion, or service-quality risk.",
-            recommendedAction: "Leadership should review the Business Signal evidence and decide whether an executive brief, meeting agenda, or improvement plan is needed.",
+            title: businessSignalPatternTitle(businessSignalsForReview),
+            summary: `Vaeroex found ${businessSignalsForReview.length} related operating record${businessSignalsForReview.length === 1 ? "" : "s"}. The records do not confirm a company-wide problem, but the repeated context warrants management review.`,
+            why: "The entries share operating context and appear across more than one record. Direct timing, outcome, or customer-impact data is not yet available in this finding.",
+            impact: "The available records may point to inconsistent follow-up, handoffs, or process completion; the underlying cause is not confirmed.",
+            recommendedAction: "Review the underlying records together and confirm whether they describe one recurring operating issue or unrelated events.",
             confidence: confidenceFromEvidence(evidence.length, signalPriority),
             evidence,
             evidenceCount: evidence.length,
@@ -291,11 +304,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       ? {
           id: "unclear-source-signals",
           type: "Bottleneck" as const,
-          title: "Business Signal context is unclear",
-          summary: `${signalsWithLimitedContext.length} Business Signal${signalsWithLimitedContext.length === 1 ? " has" : "s have"} limited context visible in the source data.`,
-          why: "Vaeroex looks for Business Signals with limited context because those patterns can weaken leadership confidence.",
-          impact: "If ignored, customer response, issue recovery, or internal decision speed may slow without leadership noticing.",
-          recommendedAction: "Leadership should review the underlying workflow and decide whether clearer reporting or a meeting agenda is needed.",
+          title: "More context is needed to interpret current operating signals",
+          summary: `${signalsWithLimitedContext.length} operating record${signalsWithLimitedContext.length === 1 ? " has" : "s have"} limited description or category information.`,
+          why: "The records cannot be reliably connected to a specific process, outcome, or business impact with the available context.",
+          impact: "This limits confidence in related operational conclusions rather than confirming a business problem.",
+          recommendedAction: "Add a clear description, category, or source reference before using these records in a leadership decision.",
           confidence: signalsWithLimitedContext.length >= 5 ? "High" : "Medium",
           evidence: [`Business Signals with limited context: ${signalsWithLimitedContext.length}`, `Business Signals in memory: ${openTasks.length}`, signalsWithLimitedContext[0]?.title ? `Example: ${signalsWithLimitedContext[0].title}` : "No example available"],
           evidenceCount: 3,
@@ -314,9 +327,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         type: "Risk" as const,
         title: `${kpi.name} is below target`,
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
-        why: "A below-target KPI is a signal that performance changed or the target needs leadership review.",
-        impact: "The metric may point to execution risk, weak process, or a target that needs a management decision.",
-        recommendedAction: "Review related reports, files, customer activity, and Business Signal history before making a leadership decision.",
+        why: "The latest recorded value is below the current target.",
+        impact: "The gap needs context before it can be tied to a cause or business impact.",
+        recommendedAction: "Review the KPI history and the most relevant supporting records before deciding whether the target or operating conditions need attention.",
         confidence: history >= 3 ? "High" : "Medium",
         evidence,
         evidenceCount: evidence.length,
@@ -338,9 +351,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         type: "Opportunity" as const,
         title: lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name,
         summary: "Customer activity evidence exists, but recent activity context is limited.",
-        why: "Customer activity can reveal revenue or retention opportunities when response patterns are visible.",
-        impact: "Revenue or retention risk can build when customer interest exists but recent activity is unclear.",
-        recommendedAction: "Leadership should review the customer activity evidence and decide whether it belongs in the next leadership review.",
+        why: "Recent customer activity is not fully documented in the available record.",
+        impact: "The available record is insufficient to confirm a revenue or retention effect.",
+        recommendedAction: "Review the source activity record and add current context before drawing a customer or revenue conclusion.",
         confidence: lead.last_activity_at || lead.source_file_id || lead.import_id ? "Medium" : "Low",
         evidence,
         evidenceCount: evidence.length,
@@ -358,9 +371,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         type: "Opportunity" as const,
         title: `${kpi.name} is on or above target`,
         summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
-        why: "Positive KPI movement can point to a repeatable practice worth preserving.",
-        impact: "Leadership can identify what changed and protect the practice that produced the result.",
-        recommendedAction: "Review what changed and decide whether leadership needs an executive report, SOP, checklist, or improvement plan.",
+        why: "The latest recorded value meets or exceeds the current target.",
+        impact: "The result may be worth preserving, but the current records do not establish its cause.",
+        recommendedAction: "Review the period and supporting records to determine whether a repeatable practice is present.",
         confidence: history >= 3 ? "High" : "Medium",
         evidence: [`Metric date: ${kpi.metric_date}`, `Historical records: ${history}`, kpi.source ? `Source: ${kpi.source}` : "Source not recorded"],
         evidenceCount: 3,
@@ -375,9 +388,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       type: "Forecast" as const,
       title: `${kpi.name} has enough history for trend review`,
       summary: `${historyCounts.get(kpi.name)} historical records are available for directional forecasting.`,
-      why: "Vaeroex can forecast more responsibly when historical records exist across multiple periods.",
-      impact: "This can support a management review, but should still be treated as directional decision support.",
-      recommendedAction: "Compare this metric against recent files, reports, and action outcomes before making a decision.",
+      why: "The metric has enough dated history for directional trend review.",
+      impact: "The trend can inform a discussion, but it does not establish a forecasted outcome on its own.",
+      recommendedAction: "Compare the trend with the most relevant current records before relying on it in a decision.",
       confidence: "Medium" as const,
       evidence: [`Latest value: ${formatMetric(kpi.actual_value, kpi.name)}`, `Target: ${formatMetric(kpi.target, kpi.name)}`, `History count: ${historyCounts.get(kpi.name)}`],
       evidenceCount: 3,
@@ -391,8 +404,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       type: "Recommendation" as const,
       title: `${item.import_type.replace(/_/g, " ")} import needs review`,
       summary: `${item.rows_imported} of ${item.rows_total} rows have been imported.`,
-      why: "Unreviewed imported data can keep dashboards and reports from reflecting the newest business context.",
-      impact: "Vaeroex may miss current patterns until source data is approved.",
+      why: "The import has not completed its required review step.",
+      impact: "Current intelligence may not include the staged data until it is approved.",
       recommendedAction: "Review the import mapping before allowing the data to influence future intelligence.",
       confidence: "Medium" as const,
       evidence: [`Status: ${item.status}`, `Rows staged: ${item.rows_total}`, item.extraction_summary || "No extraction summary recorded"],
@@ -408,9 +421,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           type: "Recommendation" as const,
           title: "Process knowledge may be stale",
           summary: `${staleSops.length} SOP${staleSops.length === 1 ? " is" : "s are"} older than 90 days.`,
-          why: "Vaeroex uses process knowledge as source context for executive intelligence.",
-          impact: "Old source knowledge can lower confidence in process-related intelligence.",
-          recommendedAction: "Review stale process documents and decide whether a refreshed SOP or improvement plan is needed.",
+          why: "The process documents have not been updated in more than 90 days.",
+          impact: "Older process documentation can limit confidence in process-related conclusions.",
+          recommendedAction: "Confirm whether the documents still reflect current operations and update the source material if they do not.",
           confidence: "Medium",
           evidence: [`Stale SOPs: ${staleSops.length}`, staleSops[0]?.title ? `Oldest example: ${staleSops[0].title}` : "No example available"],
           evidenceCount: 2,
