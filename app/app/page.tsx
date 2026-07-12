@@ -7,8 +7,8 @@ import {
 } from "@/app/app/demo/actions";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
-import { BusinessIntelligenceCoveragePanel } from "@/components/intelligence/BusinessIntelligenceCoverage";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
+import { ExecutiveHomepage } from "@/components/intelligence/ExecutiveHomepage";
 import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -20,6 +20,7 @@ import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRe
 import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
@@ -357,6 +358,27 @@ function readableOutput(run: VaeroexRunRow) {
   }
 
   return run.status === "failed" ? "A Vaeroex run failed and needs review." : "Vaeroex generated an insight.";
+}
+
+function firstNameFromUser(user: { user_metadata?: Record<string, unknown> } | null) {
+  const fullName = user?.user_metadata?.full_name;
+  const firstName = user?.user_metadata?.first_name;
+  const candidate = typeof firstName === "string" ? firstName : typeof fullName === "string" ? fullName.split(/\s+/)[0] : "";
+  return candidate.trim() || null;
+}
+
+function lastUpdatedLabel(value: string | null) {
+  if (!value) return "after more evidence is added";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "recently";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
 }
 
 function StatCard({ label, value, detail, tone }: { label: string; value: string | number; detail: string; tone?: string }) {
@@ -1979,6 +2001,23 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisions,
     recommendationOutcomes
   });
+  const latestEvidenceUpdate = [
+    ...kpis.map((row) => row.updated_at || row.created_at),
+    ...tasks.map((row) => row.updated_at || row.created_at),
+    ...issues.map((row) => row.updated_at || row.created_at),
+    ...files.map((row) => row.updated_at || row.created_at),
+    ...reports.map((row) => row.updated_at || row.created_at),
+    ...businessEvidenceRuns.map((row) => row.updated_at || row.created_at),
+    ...decisions.map((row) => row.updated_at || row.created_at),
+    ...recommendationOutcomes.map((row) => row.updated_at || row.created_at)
+  ].filter(Boolean).sort().at(-1) || null;
+  const executiveHomepageModel = buildExecutiveHomepageModel({
+    intelligence: intelligenceLayer,
+    coverage: businessIntelligenceCoverage,
+    snapshots: businessHealthSnapshotResult.snapshots,
+    kpiTrends: comparisonTrends,
+    sourceDataAvailable: businessHealthSourceErrors.length === 0
+  });
   const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
@@ -1992,57 +2031,40 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Home"
-        title={context.activeWorkspace?.name ?? "Vaeroex workspace"}
-        description={modeDescription}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <GlobalSearchTrigger className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
-              Search or Ask
-            </GlobalSearchTrigger>
-            <Link href="/app/intelligence" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-              View Intelligence
-            </Link>
-          </div>
-        }
-      />
+      {!isExecutiveView ? (
+        <PageHeader
+          eyebrow="Home"
+          title={context.activeWorkspace?.name ?? "Vaeroex workspace"}
+          description={modeDescription}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <GlobalSearchTrigger className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+                Search or Ask
+              </GlobalSearchTrigger>
+              <Link href="/app/intelligence" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
+                View Intelligence
+              </Link>
+            </div>
+          }
+        />
+      ) : null}
 
       {params?.message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">{params.message}</div> : null}
       <ErrorNotice message={params?.error} />
 
-      <ErrorNotice message={errors[0]?.message || null} />
+      {!isExecutiveView ? <ErrorNotice message={errors[0]?.message || null} /> : null}
 
-      {isViewingDemoWorkspace ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
+      {isViewingDemoWorkspace && !isExecutiveView ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
 
       {isExecutiveView ? (
-        <>
-          <IntelligenceLayerSummary
-            intelligence={intelligenceLayer}
-            businessHealthHistory={businessHealthHistory}
-            businessHealthHistoryError={businessHealthSnapshotResult.errorMessage}
-            isDemoWorkspace={isViewingDemoWorkspace}
-          />
-          <BusinessIntelligenceCoveragePanel coverage={businessIntelligenceCoverage} compact />
-
-          <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Advanced workspace views</summary>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3">
-              <Link href={dashboardHref(period, "Intelligence View")} className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-                Intelligence View
-                <span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Signals, memory, benchmarks, and evidence.</span>
-              </Link>
-              <Link href={dashboardHref(period, "Operations View")} className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-                Operations View
-                <span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Supporting records when deeper detail is needed.</span>
-              </Link>
-              <Link href="/app/settings" className="rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
-                Business Profile
-                <span className="mt-2 block text-xs font-normal leading-5 text-slate-400">Update context, setup, billing, and workspace preferences.</span>
-              </Link>
-            </div>
-          </details>
-        </>
+        <ExecutiveHomepage
+          firstName={firstNameFromUser(user)}
+          lastUpdatedLabel={lastUpdatedLabel(latestEvidenceUpdate)}
+          model={executiveHomepageModel}
+          healthHistory={businessHealthHistory}
+          healthHistoryError={businessHealthSnapshotResult.errorMessage}
+          isDemoWorkspace={isViewingDemoWorkspace}
+        />
       ) : null}
 
       {isIntelligenceView ? (
