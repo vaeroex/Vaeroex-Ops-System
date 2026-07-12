@@ -336,8 +336,8 @@ function isChecklistFailure(run: ChecklistRunRow) {
 }
 
 function isOpenTask(task: TaskRow) {
-  const deletedAt = (task as TaskRow & { deleted_at?: string | null }).deleted_at;
-  return lower(task.status) !== "done" && lower(task.status) !== "complete" && !deletedAt;
+  const lifecycle = task as TaskRow & { deleted_at?: string | null; archived_at?: string | null };
+  return lower(task.status) !== "done" && lower(task.status) !== "complete" && !lifecycle.deleted_at && !lifecycle.archived_at;
 }
 
 function isOpenIssue(issue: IssueRow) {

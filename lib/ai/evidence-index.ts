@@ -497,14 +497,17 @@ function legacyFileAnalysisWithoutRunIsEligible(value: Json) {
 export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryChunk>({
   rows,
   files,
-  runs
+  runs,
+  businessSignals = []
 }: {
   rows: T[];
   files: Array<Pick<FileUploadRow, "id" | "deleted_at" | "archived_at" | "metadata_json">>;
   runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json">>;
+  businessSignals?: Array<{ id: string; deleted_at?: string | null; archived_at?: string | null }>;
 }) {
   const filesById = new Map(files.map((file) => [file.id, file]));
   const runsById = new Map(runs.map((run) => [run.id, run]));
+  const signalsById = new Map(businessSignals.map((signal) => [signal.id, signal]));
 
   return rows.filter((row) => {
     if (("deleted_at" in row && row.deleted_at) || ("archived_at" in row && row.archived_at)) return false;
@@ -531,6 +534,11 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
       ) return false;
     }
 
+    if (row.source_type === "business_signal") {
+      const sourceSignal = row.source_id ? signalsById.get(row.source_id) : null;
+      if (!sourceSignal || sourceSignal.deleted_at || sourceSignal.archived_at) return false;
+    }
+
     return true;
   });
 }
@@ -555,20 +563,25 @@ export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkR
     const runId = runIdForChunk(row);
     return runId ? [runId] : [];
   })));
-  const [filesResult, runsResult] = await Promise.all([
+  const signalIds = Array.from(new Set(rows.flatMap((row) => row.source_type === "business_signal" && row.source_id ? [row.source_id] : [])));
+  const [filesResult, runsResult, signalsResult] = await Promise.all([
     fileIds.length
       ? supabase.from("file_uploads").select("id,deleted_at,archived_at,metadata_json").eq("workspace_id", workspaceId).in("id", fileIds)
       : Promise.resolve({ data: [], error: null }),
     runIds.length
       ? supabase.from("ai_agent_runs").select("id,status,deleted_at,archived_at,input_json,output_json").eq("workspace_id", workspaceId).in("id", runIds)
+      : Promise.resolve({ data: [], error: null }),
+    signalIds.length
+      ? supabase.from("tasks").select("id").eq("workspace_id", workspaceId).in("id", signalIds).is("deleted_at", null).is("archived_at", null)
       : Promise.resolve({ data: [], error: null })
   ]);
 
-  if (filesResult.error || runsResult.error) return [];
+  if (filesResult.error || runsResult.error || signalsResult.error) return [];
   return filterEligibleMemoryRows({
     rows,
     files: filesResult.data || [],
-    runs: runsResult.data || []
+    runs: runsResult.data || [],
+    businessSignals: signalsResult.data || []
   });
 }
 

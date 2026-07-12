@@ -427,6 +427,8 @@ export async function buildBoundedWorkspaceContext({
           .from("tasks")
           .select("id,title,description,category,created_at,updated_at")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
           .limit(8),
         limitations
