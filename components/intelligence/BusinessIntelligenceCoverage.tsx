@@ -54,7 +54,7 @@ function CoverageRow({ item }: { item: BusinessIntelligenceCoverageItem }) {
         <div>
           <span className="font-semibold text-white">{item.label}</span>
           <span className="mt-1 block text-xs leading-5 text-slate-400">
-            {item.sourceCount} source{item.sourceCount === 1 ? "" : "s"} · {item.dataQualityLabel}
+            {item.sourceCount} original evidence item{item.sourceCount === 1 ? "" : "s"} · {item.dataQualityLabel}
           </span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-slate-950/80">
@@ -80,7 +80,7 @@ function CoverageRow({ item }: { item: BusinessIntelligenceCoverageItem }) {
               <dd className="mt-1">{item.historyMonths} month{item.historyMonths === 1 ? "" : "s"} visible</dd>
             </div>
             <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-              <dt className="font-semibold text-white">Structured sources</dt>
+              <dt className="font-semibold text-white">Structured evidence</dt>
               <dd className="mt-1">{item.structuredSourceCount} of {item.sourceCount}</dd>
             </div>
             <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
@@ -155,8 +155,8 @@ function ConfidenceLine({ coverage }: { coverage: BusinessIntelligenceCoverageRe
 function SourceMix({ coverage }: { coverage: BusinessIntelligenceCoverageResult }) {
   return (
     <div className="rounded-lg border border-white/10 bg-white/[0.04] p-4">
-      <h3 className="text-sm font-semibold text-white">Source Mix</h3>
-      <p className="mt-1 text-xs leading-5 text-slate-400">What Vaeroex is learning from right now.</p>
+      <h3 className="text-sm font-semibold text-white">Original Evidence Mix</h3>
+      <p className="mt-1 text-xs leading-5 text-slate-400">Independent business inputs only. Memory and generated findings are not counted here.</p>
       <div className="mt-4 space-y-3">
         {coverage.sourceMix.length ? (
           coverage.sourceMix.slice(0, 7).map((item) => (
@@ -172,7 +172,7 @@ function SourceMix({ coverage }: { coverage: BusinessIntelligenceCoverageResult 
           ))
         ) : (
           <p className="rounded-lg border border-white/10 bg-slate-950/35 p-3 text-sm leading-6 text-slate-300">
-            No sources have been added yet.
+            No original evidence has been added yet.
           </p>
         )}
       </div>
@@ -220,6 +220,24 @@ export function BusinessIntelligenceCoveragePanel({ coverage, compact = false }:
         <div className="space-y-4">
           <ConfidenceLine coverage={coverage} />
           <SourceMix coverage={coverage} />
+        </div>
+      </div>
+
+      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold text-slate-400">Original evidence</p>
+          <p className="mt-1 text-xl font-semibold text-white">{coverage.evidenceSummary.originalEvidenceCount}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">Independent inputs that can support coverage.</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold text-slate-400">Business Memory</p>
+          <p className="mt-1 text-xl font-semibold text-white">{coverage.evidenceSummary.memoryItemCount}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">Retained evidence items, not additional sources.</p>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold text-slate-400">Derived analyses</p>
+          <p className="mt-1 text-xl font-semibold text-white">{coverage.evidenceSummary.derivedFindingCount}</p>
+          <p className="mt-1 text-xs leading-5 text-slate-300">Generated findings never increase coverage.</p>
         </div>
       </div>
 

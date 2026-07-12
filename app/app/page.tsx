@@ -61,6 +61,7 @@ type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type BusinessDecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 type RecommendationOutcomeRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
+type BusinessMemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 type DateRange = {
   start: Date;
   end: Date;
@@ -1456,7 +1457,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     shareResult,
     peopleResult,
     decisionResult,
-    recommendationOutcomeResult
+    recommendationOutcomeResult,
+    memoryChunksResult
   ] = await Promise.all([
     supabase
       .from("kpis")
@@ -1497,7 +1499,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       .eq("workspace_id", workspaceId)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(40)
+      .limit(40),
+    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).limit(500)
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
@@ -1523,6 +1526,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
   const decisions = filterBusinessEvidence((decisionResult.data || []) as BusinessDecisionRow[]);
   const recommendationOutcomes = filterBusinessEvidence((recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[]);
+  const memoryChunks = (memoryChunksResult.data || []) as BusinessMemoryChunkRow[];
   const errors = [
     kpiResult.error,
     kpiSettingsResult.error,
@@ -1544,7 +1548,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     shareResult.error,
     peopleResult.error,
     decisionResult.error,
-    recommendationOutcomeResult.error
+    recommendationOutcomeResult.error,
+    memoryChunksResult.error
   ].filter(Boolean);
   const businessHealthSourceErrors = [
     kpiResult.error,
@@ -1564,7 +1569,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     metricResult.error,
     peopleResult.error,
     decisionResult.error,
-    recommendationOutcomeResult.error
+    recommendationOutcomeResult.error,
+    memoryChunksResult.error
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
@@ -1954,7 +1960,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     recommendationOutcomes
   });
   const businessHealthMemorySignals = intelligenceLayer.memorySummary.sourceRecords + intelligenceLayer.memorySummary.kpiHistoryRecords;
-  if (!businessHealthSourceErrors.length) {
+  if (!businessHealthSourceErrors.length && intelligenceLayer.businessHealth.available) {
     await recordDailyBusinessHealthSnapshot(supabase, {
       workspaceId,
       score: intelligenceLayer.businessHealth.score,
@@ -1999,7 +2005,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assets,
     people,
     decisions,
-    recommendationOutcomes
+    recommendationOutcomes,
+    memoryChunks
   });
   const latestEvidenceUpdate = [
     ...kpis.map((row) => row.updated_at || row.created_at),

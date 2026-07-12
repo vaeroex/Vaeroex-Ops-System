@@ -103,7 +103,7 @@ export function ExecutiveHomepage({
                 <span className="pb-2 text-lg text-slate-300">/ 100</span>
               </div>
             ) : (
-              <p className="mt-5 text-2xl font-semibold">Business Health is temporarily unavailable.</p>
+              <p className="mt-5 text-2xl font-semibold">Business Health needs more eligible evidence.</p>
             )}
             {model.health.available ? (
               <p className="mt-3 text-sm text-slate-300">
@@ -200,7 +200,7 @@ export function ExecutiveHomepage({
               </dl>
             </>
           ) : (
-            <p className="mt-4 text-sm leading-6 text-muted">Readiness is temporarily unavailable because required business information could not be retrieved.</p>
+            <p className="mt-4 text-sm leading-6 text-muted">Readiness is limited until Vaeroex has enough eligible original evidence to assess the business reliably.</p>
           )}
           <div className="mt-5 flex flex-wrap gap-2">
             <Link href="/app/intelligence" className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink hover:bg-blue-950/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60">View coverage details</Link>

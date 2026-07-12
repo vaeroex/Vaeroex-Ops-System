@@ -23,7 +23,7 @@ function compactText(value: string | null | undefined, fallback: string, maxLeng
 
 export default async function IntelligencePage() {
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, crmHistoryResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, checklistsResult, checklistRunsResult, metricsResult, assetsResult] = await Promise.all([
+  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, crmHistoryResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, checklistsResult, checklistRunsResult, metricsResult, assetsResult, memoryChunksResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
@@ -42,7 +42,8 @@ export default async function IntelligencePage() {
     supabase.from("checklists").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }),
-    supabase.from("assets").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("updated_at", { ascending: false })
+    supabase.from("assets").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("updated_at", { ascending: false }),
+    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null)
   ]);
 
   const errors = [
@@ -64,7 +65,8 @@ export default async function IntelligencePage() {
     checklistsResult.error,
     checklistRunsResult.error,
     metricsResult.error,
-    assetsResult.error
+    assetsResult.error,
+    memoryChunksResult.error
   ].filter(Boolean);
 
   if (errors.some((error) => isSecurityResponseMessage(error?.message))) {
@@ -112,14 +114,15 @@ export default async function IntelligencePage() {
     checklists: checklistsResult.data || [],
     checklistRuns: checklistRunsResult.data || [],
     operationalMetrics: metricsResult.data || [],
-    assets: assetsResult.data || []
+    assets: assetsResult.data || [],
+    memoryChunks: memoryChunksResult.data || []
   });
   const { topRisk, topOpportunity, topRecommendation } = intelligence;
   const summaryTiles = [
     {
       label: "Business Health",
-      value: `${intelligence.businessHealth.score}/100`,
-      detail: `${intelligence.businessHealth.status} · ${intelligence.businessHealth.trend}`
+      value: intelligence.businessHealth.available ? `${intelligence.businessHealth.score}/100` : "Limited evidence",
+      detail: intelligence.businessHealth.available ? `${intelligence.businessHealth.status} · ${intelligence.businessHealth.trend}` : "More eligible original evidence is needed before Vaeroex scores Business Health."
     },
     {
       label: "Highest Priority Risk",
