@@ -1,187 +1,102 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import type { Route } from "next";
+import { ArrowRight, LifeBuoy, Mail } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { PublicPageHero, PublicSectionHeading } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
-import { legalDocuments } from "@/lib/legal/content";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Vaeroex Help",
-  description: "Find Vaeroex account access, billing, subscription, trust, legal, and support resources.",
+  description: "Find direct help for Vaeroex account access, workspaces, evidence, Business Health, Business Memory, billing, privacy, and support.",
   path: "/help"
 });
 
-type SupportCard = {
-  title: string;
-  description: string;
-  links: Array<{ label: string; href: Route } | { label: string; href: `mailto:${string}`; external: true }>;
-};
-
-const supportCards: SupportCard[] = [
-  {
-    title: "Account Access",
-    description: "Sign in, create an account, reset your password, or return to your workspace.",
-    links: [
-      { label: "Login", href: "/login" },
-      { label: "Create Account", href: "/signup" },
-      { label: "Reset Password", href: "/forgot-password" }
-    ]
-  },
-  {
-    title: "Billing & Subscriptions",
-    description: "Review pricing, subscription terms, refund policy, or contact Vaeroex billing.",
-    links: [
-      { label: "Pricing", href: "/pricing" },
-      { label: "Subscription Terms", href: "/subscription-billing-terms" },
-      { label: "Refund Policy", href: "/refund-policy" },
-      { label: "Email Billing", href: VAEROEX_MAILTO_LINKS.billing, external: true }
-    ]
-  },
-  {
-    title: "Support Requests",
-    description: "Ask for help with account access, workspace setup, billing, or product questions.",
-    links: [
-      { label: "Open Support Request", href: "/support" },
-      { label: "Email Support", href: VAEROEX_MAILTO_LINKS.support, external: true },
-      { label: "Contact Vaeroex", href: "/contact" }
-    ]
-  },
-  {
-    title: "Trust & Legal",
-    description: "Review trust posture, sensitive data guidance, human review notices, and policies.",
-    links: [
-      { label: "Trust Center", href: "/trust" },
-      { label: "Privacy Policy", href: "/privacy" },
-      { label: "Terms of Service", href: "/terms" },
-      { label: "Sensitive Data Policy", href: "/sensitive-data-policy" }
-    ]
-  }
-];
-
-const contactChannels = [
-  ["General questions", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
-  ["Support", VAEROEX_CONTACT_EMAILS.support, VAEROEX_MAILTO_LINKS.support],
-  ["Billing", VAEROEX_CONTACT_EMAILS.billing, VAEROEX_MAILTO_LINKS.billing],
-  ["Partnerships", VAEROEX_CONTACT_EMAILS.partners, VAEROEX_MAILTO_LINKS.partners]
-] as const;
+type HelpLink = { label: string; href: Route };
+type HelpCategory = { title: string; description: string; links: HelpLink[] };
 
 async function getLoggedIn() {
   const supabase = await createSupabaseServerClient();
-
-  if (!supabase) {
-    return false;
-  }
-
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
-
+  if (!supabase) return false;
+  const { data: { user } } = await supabase.auth.getUser();
   return Boolean(user);
 }
 
 export default async function PublicHelpPage() {
   const loggedIn = await getLoggedIn();
-  const policyCards = Object.values(legalDocuments).slice(0, 8);
+  const workspaceHref = (loggedIn ? "/app/help" : "/login") as Route;
+  const categories: HelpCategory[] = [
+    { title: "Getting started", description: "Understand the current product, pricing, and first workspace steps.", links: [{ label: "Explore Operations Intelligence", href: "/operations-intelligence" }, { label: "View pricing", href: "/pricing" }, { label: loggedIn ? "Open workspace guides" : "Login for workspace guides", href: workspaceHref }] },
+    { title: "Account and workspace", description: "Sign in, create an account, reset access, or return to workspace guidance.", links: [{ label: "Login", href: "/login" }, { label: "Create account", href: "/signup" }, { label: "Reset password", href: "/forgot-password" }] },
+    { title: "Sources and evidence", description: "Learn how to add files, import structured data, and understand source status.", links: [{ label: loggedIn ? "Open evidence guides" : "Login for evidence guides", href: workspaceHref }, { label: "Review Trust Center", href: "/trust" }] },
+    { title: "Business Health", description: "Understand score availability, historical trends, and insufficient-evidence states.", links: [{ label: loggedIn ? "Open Business Health guide" : "Login for product guides", href: workspaceHref }, { label: "See the product", href: "/operations-intelligence" }] },
+    { title: "Business Memory", description: "Learn how organizational context, provenance, confidence, archive, and deletion work.", links: [{ label: loggedIn ? "Open Business Memory guide" : "Login for product guides", href: workspaceHref }, { label: "Evidence and AI boundaries", href: "/trust" }] },
+    { title: "Billing", description: "Review pricing, subscription terms, refunds, or ask a billing question.", links: [{ label: "Pricing", href: "/pricing" }, { label: "Subscription terms", href: "/subscription-billing-terms" }, { label: "Refund policy", href: "/refund-policy" }] },
+    { title: "Privacy and trust", description: "Review current platform protections, data boundaries, and customer responsibilities.", links: [{ label: "Trust Center", href: "/trust" }, { label: "Privacy Policy", href: "/privacy" }, { label: "Sensitive Data Policy", href: "/sensitive-data-policy" }] },
+    { title: "Contact support", description: "Send an account, workspace, product, or technical support request.", links: [{ label: "Open support request", href: "/support" }, { label: "Contact Vaeroex", href: "/contact" }] }
+  ];
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-          <div className="vaeroex-hero-reveal">
-            <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Support</p>
-            <h1 className="mt-3 text-4xl font-semibold tracking-tight">How can we help?</h1>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Find account access, billing, subscription, trust, legal, and support resources for Vaeroex.
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/support" className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-                Submit Support Request
-              </Link>
-              {loggedIn ? (
-                <Link href="/app/help" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-                  Open App Documentation
-                </Link>
-              ) : (
-                <Link href="/login" className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-                  Login
-                </Link>
-              )}
-            </div>
-          </div>
-
-          <ScrollReveal delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Direct Contact</p>
-            <div className="mt-4 grid gap-2 text-sm">
-              {contactChannels.map(([label, email, href]) => (
-                <a key={email} href={href} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-slate-50 px-3 py-2 font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-                  <span>{label}</span>
-                  <span className="text-muted">{email}</span>
-                </a>
-              ))}
-            </div>
-            <p className="mt-4 text-xs leading-5 text-muted">
-              Please do not send patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data in support requests.
-            </p>
-          </ScrollReveal>
-        </div>
-
-        <section className="mt-10 grid gap-4 md:grid-cols-2">
-          {supportCards.map((card, index) => (
-            <ScrollReveal key={card.title} as="article" delayMs={index * 70} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-semibold">{card.title}</h2>
-              <p className="mt-2 text-sm leading-6 text-muted">{card.description}</p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {card.links.map((link) =>
-                  "external" in link ? (
-                    <a key={link.label} href={link.href} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-                      {link.label}
-                    </a>
-                  ) : (
-                    <Link key={link.label} href={link.href} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-                      {link.label}
-                    </Link>
-                  )
-                )}
-              </div>
-            </ScrollReveal>
-          ))}
-        </section>
-
-        <section className="mt-10 rounded-lg border border-line bg-white p-5 shadow-panel">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Legal Resources</p>
-              <h2 className="mt-1 text-2xl font-semibold">Policies and customer notices</h2>
-            </div>
-            <Link href="/trust" className="text-sm font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
-              Visit Trust Center
+      <PublicPageHero
+        eyebrow="Vaeroex Help"
+        title="Find the answer or reach the right team."
+        description="Choose the area that matches what you are trying to do. Product-specific guidance stays close to the authenticated workspace, while public billing, privacy, and trust resources remain available here."
+        actions={
+          <>
+            <Link href="/support" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+              Submit a support request
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
-          </div>
-          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {policyCards.map((document) => (
-              <Link key={document.id} href={document.href} className="rounded-lg border border-line bg-slate-50 p-4 hover:border-vaeroex-blue">
-                <p className="text-sm font-semibold text-ink">{document.title}</p>
-                <p className="mt-2 text-xs leading-5 text-muted">{document.summary}</p>
-              </Link>
+            <Link href={workspaceHref} className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">{loggedIn ? "Open app guidance" : "Login"}</Link>
+          </>
+        }
+      />
+
+      <section className="border-b border-white/10 bg-[#050b18] px-5 py-14 sm:px-6 sm:py-16">
+        <div className="mx-auto max-w-7xl">
+          <PublicSectionHeading eyebrow="Help by task" title="Start with what you need to accomplish." />
+          <div className="mt-7 grid gap-3 md:grid-cols-2">
+            {categories.map((category) => (
+              <details key={category.title} className="group rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-4 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                  <span>
+                    <span className="block font-semibold text-white">{category.title}</span>
+                    <span className="mt-1 block text-sm leading-5 text-slate-400">{category.description}</span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-cyan-200 group-open:hidden">Open</span>
+                  <span className="hidden shrink-0 text-xs font-semibold text-cyan-200 group-open:block">Close</span>
+                </summary>
+                <div className="mt-2 flex flex-wrap gap-2 border-t border-white/10 pt-4">
+                  {category.links.map((link) => (
+                    <Link key={`${category.title}-${link.label}`} href={link.href} className="inline-flex min-h-11 items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-semibold text-slate-200 hover:border-cyan-300/40 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">{link.label}</Link>
+                  ))}
+                </div>
+              </details>
             ))}
           </div>
-        </section>
 
-        <section className="mt-8 rounded-lg border border-line bg-vaeroex-navy p-6 text-white shadow-command">
-          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Product Documentation</p>
-          <h2 className="mt-2 text-2xl font-semibold">Operations Intelligence guides live inside the app.</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300">
-            Detailed workspace guides and product documentation are available after login so they can stay close to the tools they support.
-          </p>
-          <Link href={loggedIn ? "/app/help" : "/login"} className="mt-5 inline-flex rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-            {loggedIn ? "Open App Documentation" : "Login for Documentation"}
-          </Link>
-        </section>
+          <div className="mt-10 grid gap-6 border-t border-white/10 pt-10 lg:grid-cols-2">
+            <div className="flex gap-3">
+              <LifeBuoy className="mt-0.5 h-5 w-5 shrink-0 text-cyan-200" aria-hidden="true" />
+              <div>
+                <h2 className="font-semibold text-white">Need product or account help?</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Use the support request form, or email <a href={VAEROEX_MAILTO_LINKS.support} className="font-semibold text-cyan-200 hover:text-white">{VAEROEX_CONTACT_EMAILS.support}</a>.</p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <Mail className="mt-0.5 h-5 w-5 shrink-0 text-cyan-200" aria-hidden="true" />
+              <div>
+                <h2 className="font-semibold text-white">Have a billing question?</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">Email <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-cyan-200 hover:text-white">{VAEROEX_CONTACT_EMAILS.billing}</a>. Do not send regulated or highly sensitive data in support messages.</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </section>
       <PublicFooter />
     </main>

@@ -49,7 +49,7 @@ export const organizationJsonLd = {
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
   logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-symbol.png`,
-  description: "Vaeroex is an Operations Intelligence Platform that helps organizations transform information into visibility, awareness, prediction, and action.",
+  description: "Vaeroex is an Operations Intelligence Platform that turns fragmented business information into evidence-backed visibility, risks, priorities, and leadership recommendations.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",
@@ -80,5 +80,5 @@ export const operationsIntelligenceJsonLd = {
     name: "Vaeroex",
     url: PUBLIC_SITE_URL
   },
-  description: "Operations Intelligence by Vaeroex transforms operational activity into visibility, context, prediction, evidence, and executive recommendations."
+  description: "Operations Intelligence by Vaeroex turns fragmented business activity into evidence-backed performance context, risk, opportunity, and leadership recommendations."
 };

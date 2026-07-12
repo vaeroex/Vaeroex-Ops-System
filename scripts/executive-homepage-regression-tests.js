@@ -191,10 +191,18 @@ assert.equal(partial.readiness.largestGap, "Financials");
 
 const loadingSource = fs.readFileSync(path.join(root, "app/app/loading.tsx"), "utf8");
 const homepageSource = fs.readFileSync(path.join(root, "components/intelligence/ExecutiveHomepage.tsx"), "utf8");
+const appShellSource = fs.readFileSync(path.join(root, "components/app/AppShell.tsx"), "utf8");
+const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
 assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visible loading state");
 assert.match(homepageSource, /md:grid-cols-2 xl:grid-cols-3/, "priority cards must stack responsively");
 assert.match(homepageSource, /grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3/, "priority cards must not stretch to the tallest sibling");
 assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
+for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Briefings", "Settings"]) {
+  assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
+}
+assert.doesNotMatch(appShellSource, /href: "\/app", label: "Home"/, "authenticated navigation must use Overview instead of Home");
+assert.match(sourcesPageSource, />Evidence<\//, "the Sources workspace must present the broader Evidence purpose");
+assert.match(sourcesPageSource, /update_source_file_lifecycle|manageSourceFileAction/, "evidence presentation changes must retain lifecycle controls");
 
 process.stdout.write("Executive homepage regressions passed.\n");

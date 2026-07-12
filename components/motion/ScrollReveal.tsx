@@ -31,6 +31,7 @@ export function ScrollReveal({
 }: ScrollRevealProps) {
   const ref = useRef<HTMLElement | null>(null);
   const delayTimeoutRef = useRef<number | null>(null);
+  const visibilityFallbackRef = useRef<number | null>(null);
   const [isVisible, setIsVisible] = useState(true);
   const [delayActive, setDelayActive] = useState(false);
   const [motionDisabled, setMotionDisabled] = useState(disabled);
@@ -58,6 +59,9 @@ export function ScrollReveal({
     setDelayActive(true);
     setIsVisible(false);
 
+    // Reveal content even when a browser pauses or misses intersection events.
+    visibilityFallbackRef.current = window.setTimeout(() => setIsVisible(true), Math.max(1400, delayMs + 900));
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry?.isIntersecting) {
@@ -79,6 +83,10 @@ export function ScrollReveal({
 
       if (delayTimeoutRef.current) {
         window.clearTimeout(delayTimeoutRef.current);
+      }
+
+      if (visibilityFallbackRef.current) {
+        window.clearTimeout(visibilityFallbackRef.current);
       }
     };
   }, [delayMs, disabled, threshold]);

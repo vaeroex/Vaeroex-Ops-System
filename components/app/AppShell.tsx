@@ -14,22 +14,22 @@ import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
   {
-    label: "Vaeroex",
+    label: "Workspace",
     defaultOpen: true,
     items: [
-      { href: "/app", label: "Home" },
+      { href: "/app", label: "Overview" },
       { href: "/app/intelligence", label: "Intelligence" },
-      { href: "/app/kpis", label: "KPIs" },
-      { href: "/app/sources", label: "Sources" },
-      { href: "/app/tasks", label: "Business Signals" },
+      { href: "/app/kpis", label: "Performance" },
+      { href: "/app/sources", label: "Evidence" },
       { href: "/app/briefings", label: "Briefings" },
       { href: "/app/settings", label: "Settings" }
     ]
   },
   {
-    label: "Optional Outputs",
+    label: "Organizational Context",
     defaultOpen: false,
     items: [
+      { href: "/app/tasks", label: "Business Signals" },
       { href: "/app/actions", label: "Generated Outputs" }
     ]
   }

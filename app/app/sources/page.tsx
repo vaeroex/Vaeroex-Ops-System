@@ -59,7 +59,7 @@ const IMPORT_PROGRESS_STEPS = ["Parsing file", "Detecting columns", "Preparing m
 const REPORT_PROGRESS_STEPS = ["Reading source evidence", "Preparing findings", "Creating report", "Saving report", "Done"];
 const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing source record", "Refreshing Sources", "Complete"];
 const sourceTabs: Array<{ key: SourcesTab; label: string; href: Route }> = [
-  { key: "files", label: "Files", href: "/app/sources" },
+  { key: "files", label: "Source Files", href: "/app/sources" },
   { key: "knowledge", label: "Learned Knowledge", href: "/app/sources?tab=knowledge" },
   { key: "archived", label: "Archived", href: "/app/sources?tab=archived" }
 ];
@@ -1239,8 +1239,8 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
       <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
-            <h1 className="text-2xl font-semibold tracking-tight text-white">Sources</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-300">Upload, analyze, and organize business evidence.</p>
+            <h1 className="text-2xl font-semibold tracking-normal text-white">Evidence</h1>
+            <p className="mt-1 text-sm leading-6 text-slate-300">Upload, analyze, and organize the information Vaeroex can use.</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <p className="max-w-sm text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
@@ -1363,7 +1363,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
             <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                 <div>
-                  <h2 className="text-base font-semibold text-white">Files</h2>
+                  <h2 className="text-base font-semibold text-white">Source Files</h2>
                   <p className="mt-1 text-sm text-slate-400">Select a source to inspect details, analysis status, and available actions.</p>
                 </div>
                 <StatusBadge value={`${visibleFiles.length} showing`} />

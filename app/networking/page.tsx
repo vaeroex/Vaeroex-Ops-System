@@ -1,223 +1,100 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import { ArrowRight, Handshake, Network, ShieldCheck } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { NetworkGraph } from "@/components/motion/NetworkGraph";
-import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { PublicCtaBand, PublicPageHero, PublicSectionHeading } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Vaeroex Network",
-  description: "The Vaeroex Network connects business leaders, operators, advisors, partners, and strategic relationships around operational clarity and intelligence.",
+  description: "The Vaeroex Network is a curated professional relationship network for operators, advisors, integration partners, and organizations aligned with Operations Intelligence.",
   path: "/networking"
 });
 
-const networkGroups = [
-  ["Business Owners", "Leaders building stronger visibility and decision rhythm inside growing companies."],
-  ["Operators", "People who understand the practical realities of improving operational clarity."],
-  ["Consultants", "Advisors who help businesses improve structure, performance, management rhythm, and implementation."],
-  ["Advisors", "Experienced leaders who can contribute judgment, perspective, market context, and operational discipline."],
-  ["Investors", "Long-term thinkers interested in the Vaeroex vision, business intelligence category, and disciplined company building."],
-  ["Implementation Partners", "Trusted partners who can help teams translate Vaeroex insights into better operating habits."],
-  ["Service Providers", "Aligned providers who support practical business needs around systems, process, and leadership rhythm."],
-  ["Industry Experts", "People with specialized knowledge who understand how strong operating structure improves business performance."],
-  ["Strategic Partners", "Organizations and leaders aligned with Vaeroex's platform direction, customer outcomes, and long-term vision."]
-];
+const relationshipTypes = [
+  ["Operators and advisors", "Experienced leaders who understand evidence, operating performance, and executive decision rhythms."],
+  ["Technology and integration partners", "Organizations that can help connect Vaeroex with the external systems customers already use."],
+  ["Implementation relationships", "Qualified professionals who help organizations improve how they review and respond to intelligence."],
+  ["Strategic relationships", "Industry experts and aligned organizations interested in the long-term Vaeroex direction."]
+] as const;
 
-const networkPrinciples = [
-  "Trusted relationships",
-  "Practical business support",
-  "Aligned incentives",
-  "Long-term thinking",
-  "Trusted expertise",
-  "Strategic introductions"
-];
-
-const strategicRelationshipCards = [
-  ["Experienced operators", "People who understand how visibility and better decisions change day-to-day business performance."],
-  ["Advisory relationships", "Leaders who can bring thoughtful perspective around product direction, customer needs, market context, and operating discipline."],
-  ["Strategic alignment", "Partners who share the vision for building an intelligence layer that helps businesses operate with greater clarity."]
-];
+const process = [
+  ["Share your interest", "Describe your background, organization, and the relationship you want to explore."],
+  ["Vaeroex reviews fit", "We consider relevance, credibility, customer value, and alignment with the current platform."],
+  ["Continue the conversation", "If there is a practical fit, Vaeroex will contact you about a focused next discussion."]
+] as const;
 
 export default function NetworkingPage() {
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
-
-      <section className="vaeroex-hero-reveal mx-auto max-w-6xl px-6 py-12">
-        <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Network</p>
-        <h1 className="mt-3 max-w-4xl text-4xl font-semibold tracking-tight sm:text-5xl">
-          A premium professional ecosystem connected to the Vaeroex Operations Intelligence Platform.
-        </h1>
-        <p className="mt-5 max-w-3xl text-base leading-7 text-muted">
-          The Vaeroex Network brings together business leaders, operators, advisors, investors, consultants, implementation partners,
-          and strategic relationships who believe that visibility, context, and disciplined decisions drive growth.
-        </p>
-        <div className="mt-6 flex flex-wrap gap-2 text-sm font-semibold">
-          {["Operations Intelligence", "Visibility", "Context", "Decision Support"].map((pillar) => (
-            <span key={pillar} className="rounded-full border border-line bg-white px-4 py-2 shadow-sm">
-              {pillar}
-            </span>
-          ))}
-        </div>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <Link href="/contact" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-            Join the Vaeroex Network
-          </Link>
-          <Link href="#strategic-relationships" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-            Explore Strategic Partnerships
-          </Link>
-          <Link href="/contact" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-            Start a Conversation
-          </Link>
-          <a href={VAEROEX_MAILTO_LINKS.partners} className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-            Email Partners
+      <PublicPageHero
+        eyebrow="Vaeroex Network"
+        title="A curated network for relationships that strengthen Operations Intelligence."
+        description="The Vaeroex Network connects credible operators, advisors, technology partners, and strategic organizations around one goal: helping leadership understand business conditions with greater clarity."
+        actions={
+          <a href={VAEROEX_MAILTO_LINKS.partners} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+            Start a partner conversation
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </a>
-        </div>
-        <p className="mt-4 text-sm leading-6 text-muted">
-          Network and strategic relationship inquiries can be sent directly to{" "}
-          <a href={VAEROEX_MAILTO_LINKS.partners} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
-            {VAEROEX_CONTACT_EMAILS.partners}
-          </a>
-          .
-        </p>
-      </section>
+        }
+      />
 
-      <section className="border-y border-line bg-white px-6 py-12">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.8fr_1.2fr]">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Extension of the Platform</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">Business intelligence is stronger with trusted perspective.</h2>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex is an Operations Intelligence Platform. The Network extends that mission through trusted relationships,
-              practical expertise, and strategic conversations that help leaders make sense of complexity.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {networkPrinciples.map((principle, index) => (
-              <ScrollReveal key={principle} delayMs={index * 55} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-4 text-sm font-semibold shadow-sm">
-                {principle}
-              </ScrollReveal>
+      <section className="border-b border-white/10 bg-[#050b18] px-5 py-14 sm:px-6 sm:py-16">
+        <div className="mx-auto max-w-7xl">
+          <PublicSectionHeading
+            eyebrow="Who should reach out"
+            title="Focused relationships, not an open directory."
+            description="The Network is for people and organizations with a credible way to improve product context, integrations, implementation quality, or customer understanding."
+          />
+          <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2">
+            {relationshipTypes.map(([title, body]) => (
+              <article key={title} className="bg-[#07111f] p-5">
+                <Handshake className="h-5 w-5 text-cyan-200" aria-hidden="true" />
+                <h2 className="mt-4 text-lg font-semibold text-white">{title}</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-400">{body}</p>
+              </article>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
-        <div>
-          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Strategic ecosystem</p>
-          <h2 className="mt-3 text-3xl font-semibold tracking-tight">Relationships organized around clarity and trust.</h2>
-          <p className="mt-4 text-sm leading-6 text-muted">
-            The Vaeroex Network is not an open directory or marketplace. It is designed around credible relationships that can help Operations Intelligence create practical business value.
-          </p>
-        </div>
-        <NetworkGraph />
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+      <section className="border-b border-white/10 px-5 py-14 sm:px-6 sm:py-16">
+        <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-[minmax(0,.74fr)_minmax(0,1.26fr)]">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Network Categories</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">A business-focused network built around practical judgment.</h2>
-          </div>
-          <Link href="/contact" className="text-sm font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
-            Partner with Vaeroex
-          </Link>
-        </div>
-        <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {networkGroups.map(([title, description], index) => (
-            <ScrollReveal key={title} as="article" delayMs={(index % 3) * 80} className="vaeroex-hover-card rounded-lg border border-line bg-white p-5 shadow-panel">
-              <h3 className="text-lg font-semibold text-vaeroex-blue">{title}</h3>
-              <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-            </ScrollReveal>
-          ))}
-        </div>
-      </section>
-
-      <section id="strategic-relationships" className="border-y border-line bg-white px-6 py-12">
-        <div className="mx-auto max-w-6xl">
-          <div className="grid gap-8 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Strategic Relationships</p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight">Advisors, investors, and strategic partners aligned with the Vaeroex vision.</h2>
-              <p className="mt-4 text-sm leading-6 text-muted">
-                Vaeroex welcomes conversations with experienced operators, advisors, investors, and strategic partners who share our vision for building the intelligence layer
-                that helps businesses operate with greater clarity and intelligence.
-              </p>
-              <p className="mt-3 text-sm leading-6 text-muted">
-                We believe meaningful growth is driven by strong relationships, shared expertise, aligned incentives, and long-term thinking.
-              </p>
+            <Network className="h-6 w-6 text-cyan-200" aria-hidden="true" />
+            <h2 className="mt-4 text-3xl font-semibold tracking-normal">What participation means.</h2>
+            <p className="mt-4 text-sm leading-6 text-slate-300">A Network conversation is an evaluation of potential fit. It is not automatic membership, an endorsement, a marketplace listing, or a promise of commercial activity.</p>
+            <div className="mt-5 flex items-start gap-3 rounded-lg border border-amber-300/20 bg-amber-950/10 p-4">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-amber-100" aria-hidden="true" />
+              <p className="text-xs leading-5 text-slate-400">Vaeroex does not guarantee referrals, revenue, contracts, partnership status, investment opportunities, or customer access through the Network.</p>
             </div>
-            <div className="grid gap-4 md:grid-cols-3">
-              {strategicRelationshipCards.map(([title, description], index) => (
-                <ScrollReveal key={title} as="article" delayMs={index * 80} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
-                  <h3 className="font-semibold text-vaeroex-blue">{title}</h3>
-                  <p className="mt-2 text-sm leading-6 text-muted">{description}</p>
-                </ScrollReveal>
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">What happens after you inquire</p>
+            <ol className="mt-4 divide-y divide-white/10 border-y border-white/10">
+              {process.map(([title, body], index) => (
+                <li key={title} className="grid gap-2 py-5 sm:grid-cols-[2rem_minmax(0,.34fr)_minmax(0,.66fr)]">
+                  <span className="text-xs font-semibold text-cyan-200">0{index + 1}</span>
+                  <h3 className="font-semibold text-white">{title}</h3>
+                  <p className="text-sm leading-6 text-slate-400">{body}</p>
+                </li>
               ))}
-            </div>
-          </div>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <Link href="/contact" className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-              Start a Conversation
-            </Link>
-            <Link href="/contact" className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-              Explore Strategic Partnerships
-            </Link>
-            <a href={VAEROEX_MAILTO_LINKS.partners} className="rounded-lg border border-line bg-white px-5 py-3 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-              Contact {VAEROEX_CONTACT_EMAILS.partners}
-            </a>
+            </ol>
           </div>
         </div>
       </section>
 
-      <section className="px-6 py-12">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_0.9fr]">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">What It Supports</p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-tight">The network is designed for trusted business support, not casual networking.</h2>
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Vaeroex Network conversations are focused on fit, capability, credibility, and practical value for growing businesses.
-              The goal is to help leaders find aligned support where it strengthens the platform outcome.
-            </p>
-          </div>
-          <ScrollReveal delayMs={120} className="vaeroex-hover-card rounded-lg border border-line bg-slate-50 p-5 shadow-sm">
-            <p className="text-sm font-semibold text-vaeroex-blue">Examples of fit</p>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-muted">
-              <li>Referral partners who serve growing businesses.</li>
-              <li>Implementation partners who help teams improve operating structure.</li>
-              <li>Advisors and industry experts who can contribute thoughtful market and operating perspective.</li>
-              <li>Operators who understand performance, source evidence, and decision rhythm.</li>
-              <li>Trusted service providers who support business growth and management systems.</li>
-            </ul>
-          </ScrollReveal>
-        </div>
-      </section>
-
-      <section className="border-t border-line bg-white px-6 py-12">
-        <div className="mx-auto max-w-6xl rounded-lg border border-line bg-slate-50 p-5 text-xs leading-5 text-muted shadow-sm">
-          Vaeroex does not operate as a broker-dealer, investment marketplace, or fundraising platform. Any strategic, advisory, or investment-related discussions are handled independently and subject to appropriate professional review.
-        </div>
-      </section>
-
-      <section className="mx-auto max-w-6xl px-6 py-12">
-        <ScrollReveal className="vaeroex-ambient rounded-lg border border-line bg-vaeroex-navy p-8 text-white shadow-command">
-          <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-accent">Strategic Partner Interest</p>
-          <div className="mt-3 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
-              <h2 className="text-3xl font-semibold tracking-tight">Aligned with the Vaeroex vision?</h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Contact Vaeroex to discuss network interest, strategic partnerships, advisor relationships, implementation support, or trusted business relationships.
-              </p>
-            </div>
-            <a href={VAEROEX_MAILTO_LINKS.partners} className="inline-flex shrink-0 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy">
-              Partner with Vaeroex
-            </a>
-          </div>
-        </ScrollReveal>
-      </section>
-
+      <PublicCtaBand
+        eyebrow="Partner interest"
+        title="Tell Vaeroex where your experience creates practical value."
+        description={`Send a concise introduction to ${VAEROEX_CONTACT_EMAILS.partners}. Include your background, organization, and the relationship you want to explore.`}
+        primaryHref="/contact"
+        primaryLabel="Contact Vaeroex"
+        secondaryHref="/operations-intelligence"
+        secondaryLabel="Understand the product"
+      />
       <PublicFooter />
     </main>
   );
