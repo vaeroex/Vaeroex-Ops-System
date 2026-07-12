@@ -2,6 +2,7 @@ import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastReadinessState } from "@/lib/kpis/forecast-eligibility";
 import {
   filterBusinessEvidence,
+  filterOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
 
@@ -59,6 +60,11 @@ export type BusinessIntelligenceCoverageResult = {
     count: number;
     percentage: number;
   }>;
+  evidenceSummary: {
+    originalEvidenceCount: number;
+    memoryItemCount: number;
+    derivedFindingCount: number;
+  };
   dataGaps: string[];
   recommendedNextUpload: string;
   forecastReadiness: {
@@ -96,9 +102,11 @@ export type BusinessIntelligenceCoverageInput = {
   assets?: TableRow<"assets">[];
   decisions?: TableRow<"business_decisions">[];
   recommendationOutcomes?: TableRow<"vaeroex_recommendation_outcomes">[];
+  memoryChunks?: TableRow<"business_memory_chunks">[];
 };
 
 type EvidenceSource = {
+  key: string;
   label: string;
   type: string;
   date: string | null;
@@ -143,7 +151,7 @@ const HISTORY_REQUIRED = new Set<BusinessIntelligenceCoverageCategoryId>([
 ]);
 
 function activeRows<T>(rows: T[] = []) {
-  return filterBusinessEvidence(rows as Array<T & { archived_at?: string | null; deleted_at?: string | null }>);
+  return filterOriginalBusinessEvidence(rows as Array<T & { archived_at?: string | null; deleted_at?: string | null }>);
 }
 
 function lower(value: string | null | undefined) {
@@ -216,8 +224,9 @@ function qualityLabel(score: number, sourceCount: number, historyMonths: number,
   return "Recent source coverage";
 }
 
-function evidence(label: string, type: string, date: string | null | undefined, structured: boolean, quality: EvidenceSource["quality"], text = ""): EvidenceSource {
+function evidence(key: string, label: string, type: string, date: string | null | undefined, structured: boolean, quality: EvidenceSource["quality"], text = ""): EvidenceSource {
   return {
+    key,
     label,
     type,
     date: dateOnly(date),
@@ -225,6 +234,15 @@ function evidence(label: string, type: string, date: string | null | undefined, 
     quality,
     text: lower(`${label} ${type} ${text}`)
   };
+}
+
+function uniqueSources(sources: EvidenceSource[]) {
+  const unique = new Map<string, EvidenceSource>();
+  for (const source of sources) {
+    const current = unique.get(source.key);
+    if (!current || (source.date || "") > (current.date || "")) unique.set(source.key, source);
+  }
+  return [...unique.values()];
 }
 
 function historyStats(sources: EvidenceSource[]) {
@@ -278,6 +296,7 @@ function buildItem({
   outcomes?: number;
   recommendedNextUpload?: string;
 }): BusinessIntelligenceCoverageItem {
+  sources = uniqueSources(sources);
   const coverage = scoreCoverage(id, sources, outcomes);
   const sourceTypes = Array.from(new Set(sources.map((source) => source.type))).sort();
   const { spanMonths } = historyStats(sources);
@@ -319,7 +338,7 @@ function kpiSources(kpis: TableRow<"kpis">[], keywords: string[], fallbackType =
   return activeRows(kpis)
     .filter((kpi) => includesAny(sourceText(kpi.name, kpi.category, kpi.source, kpi.notes), keywords))
     .map((kpi) =>
-      evidence(`${kpi.name} KPI`, fallbackType, kpi.metric_date || kpi.updated_at || kpi.created_at, Boolean(kpi.actual_value !== null || kpi.target !== null), kpi.source_file_id || kpi.import_id ? "strong" : "developing", sourceText(kpi.category, kpi.source, kpi.notes))
+      evidence(`kpi:${kpi.source_file_id || kpi.import_id || "manual"}:${lower(kpi.name)}`, `${kpi.name} KPI`, fallbackType, kpi.metric_date || kpi.updated_at || kpi.created_at, Boolean(kpi.actual_value !== null || kpi.target !== null), kpi.source_file_id || kpi.import_id ? "strong" : "developing", sourceText(kpi.category, kpi.source, kpi.notes))
     );
 }
 
@@ -327,7 +346,7 @@ function operationalMetricSources(metrics: TableRow<"operational_metrics">[], ke
   return activeRows(metrics)
     .filter((metric) => includesAny(sourceText(metric.metric_name, metric.category, metric.notes), keywords))
     .map((metric) =>
-      evidence(`${metric.metric_name} metric`, type, metric.metric_date || metric.updated_at || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing", sourceText(metric.category, metric.notes))
+      evidence(`metric:${metric.source_file_id || metric.import_id || "manual"}:${lower(metric.metric_name)}`, `${metric.metric_name} metric`, type, metric.metric_date || metric.updated_at || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing", sourceText(metric.category, metric.notes))
     );
 }
 
@@ -335,36 +354,27 @@ function fileSources(files: TableRow<"file_uploads">[], keywords: string[], type
   return activeRows(files)
     .filter((file) => includesAny(sourceText(file.display_name, file.original_name, file.import_type, sanitizeBusinessEvidenceText(file.analysis_summary), file.file_extension), keywords))
     .map((file) =>
-      evidence(file.display_name, type, file.processed_at || file.updated_at || file.created_at, ["csv", "xlsx"].includes(lower(file.file_extension)) || file.imported_rows > 0, file.imported_rows > 0 || file.processing_status === "ready" ? "strong" : "developing", sourceText(file.import_type, sanitizeBusinessEvidenceText(file.analysis_summary), file.file_extension))
-    );
-}
-
-function importSources(imports: TableRow<"file_imports">[], keywords: string[], type = "Imports") {
-  return imports
-    .filter((item) => ["completed", "imported"].includes(lower(item.status)))
-    .filter((item) => includesAny(sourceText(item.import_type, item.extraction_summary), keywords))
-    .map((item) =>
-      evidence(`${item.import_type.replace(/_/g, " ")} import`, type, item.imported_at || item.reviewed_at || item.created_at, item.rows_imported > 0, item.rows_imported > 0 ? "strong" : "developing", sourceText(item.extraction_summary, item.status))
+      evidence(`file:${file.id}`, file.display_name, type, file.processed_at || file.updated_at || file.created_at, ["csv", "xlsx"].includes(lower(file.file_extension)) || file.imported_rows > 0, file.imported_rows > 0 || file.processing_status === "ready" ? "strong" : "developing", sourceText(file.import_type, sanitizeBusinessEvidenceText(file.analysis_summary), file.file_extension))
     );
 }
 
 function reportSources(reports: TableRow<"reports">[], keywords: string[], type = "Reports") {
   return activeRows(reports)
     .filter((report) => includesAny(sourceText(report.title, report.report_type, report.body_markdown), keywords))
-    .map((report) => evidence(report.title, type, report.date_range_end || report.created_at, false, report.body_markdown ? "developing" : "limited", sourceText(report.report_type, report.body_markdown)));
+    .map((report) => evidence(`report:${report.id}`, report.title, type, report.date_range_end || report.created_at, false, report.body_markdown ? "developing" : "limited", sourceText(report.report_type, report.body_markdown)));
 }
 
 function makeSourceMix(input: BusinessIntelligenceCoverageInput) {
+  const kpiSeries = uniqueSources((input.kpis || []).map((kpi) => evidence(`kpi:${kpi.source_file_id || kpi.import_id || "manual"}:${lower(kpi.name)}`, kpi.name, "KPI series", kpi.metric_date || kpi.created_at, true, kpi.source_file_id || kpi.import_id ? "strong" : "developing")));
   const rows = [
-    { label: "KPIs", count: activeRows(input.kpis || []).length },
+    { label: "KPI series", count: kpiSeries.length },
     { label: "Files", count: activeRows(input.files || []).length },
     { label: "Reports", count: activeRows(input.reports || []).length },
-    { label: "SOPs", count: input.sops?.length || 0 },
-    { label: "Customer Context", count: activeRows(input.crmLeads || []).length + (input.crmHistory?.length || 0) },
+    { label: "SOPs", count: activeRows(input.sops || []).length },
+    { label: "Business Signals", count: activeRows(input.tasks || []).length },
     { label: "Financials", count: activeRows(input.operationalMetrics || []).filter((metric) => includesAny(sourceText(metric.metric_name, metric.category), ["revenue", "cost", "expense", "profit", "margin", "cash", "financial"])).length },
-    { label: "Issues", count: input.issues?.length || 0 },
-    { label: "People", count: activeRows(input.people || []).length },
-    { label: "Vaeroex Memory", count: filterBusinessEvidence(input.vaeroexRuns, { sourceKind: "platform_run" }).length + activeRows(input.decisions || []).length + activeRows(input.recommendationOutcomes || []).length }
+    { label: "Issues", count: activeRows(input.issues || []).length },
+    { label: "People context", count: activeRows(input.people || []).length }
   ].filter((row) => row.count > 0);
   const total = rows.reduce((sum, row) => sum + row.count, 0) || 1;
 
@@ -379,12 +389,9 @@ function makeConfidenceOverTime(input: BusinessIntelligenceCoverageInput) {
     ...activeRows(input.kpis || []).map((row) => ({ date: row.metric_date || row.created_at, type: "KPI", structured: true })),
     ...activeRows(input.files || []).map((row) => ({ date: row.created_at, type: "File", structured: row.imported_rows > 0 || ["csv", "xlsx"].includes(lower(row.file_extension)) })),
     ...activeRows(input.reports || []).map((row) => ({ date: row.created_at, type: "Report", structured: false })),
-    ...(input.sops || []).map((row) => ({ date: row.updated_at || row.created_at, type: "SOP", structured: false })),
-    ...activeRows(input.crmLeads || []).map((row) => ({ date: row.created_at, type: "Customer", structured: true })),
-    ...(input.crmHistory || []).map((row) => ({ date: row.created_at, type: "Customer History", structured: true })),
+    ...activeRows(input.sops || []).map((row) => ({ date: row.updated_at || row.created_at, type: "SOP", structured: false })),
     ...activeRows(input.operationalMetrics || []).map((row) => ({ date: row.metric_date || row.created_at, type: "Metric", structured: true })),
-    ...(input.issues || []).map((row) => ({ date: row.updated_at || row.created_at, type: "Issue", structured: true })),
-    ...filterBusinessEvidence(input.vaeroexRuns, { sourceKind: "platform_run" }).map((row) => ({ date: row.created_at, type: "Vaeroex Run", structured: false }))
+    ...activeRows(input.issues || []).map((row) => ({ date: row.updated_at || row.created_at, type: "Issue", structured: true }))
   ].filter((event) => Boolean(event.date));
   const byMonth = new Map<string, { sourceCount: number; structured: number; types: Set<string> }>();
 
@@ -422,6 +429,10 @@ function makeConfidenceOverTime(input: BusinessIntelligenceCoverageInput) {
 }
 
 export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCoverageInput): BusinessIntelligenceCoverageResult {
+  const derivedFindingCount =
+    filterBusinessEvidence(input.vaeroexRuns || [], { sourceKind: "platform_run" }).length +
+    filterBusinessEvidence(input.decisions || []).length +
+    filterBusinessEvidence(input.recommendationOutcomes || []).length;
   input = {
     ...input,
     kpis: activeRows(input.kpis || []),
@@ -438,13 +449,12 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     crmLeads: activeRows(input.crmLeads || []),
     crmHistory: activeRows(input.crmHistory || []),
     reports: activeRows(input.reports || []),
-    vaeroexRuns: filterBusinessEvidence(input.vaeroexRuns, { sourceKind: "platform_run" }),
+    vaeroexRuns: [],
     operationalMetrics: activeRows(input.operationalMetrics || []),
     assets: activeRows(input.assets || []),
-    decisions: activeRows(input.decisions || []),
-    recommendationOutcomes: activeRows(input.recommendationOutcomes || [])
+    decisions: [],
+    recommendationOutcomes: []
   };
-  const eligibleRuns = filterBusinessEvidence(input.vaeroexRuns, { sourceKind: "platform_run" });
   const revenueKeywords = ["revenue", "sales", "income", "booking", "invoice", "receivable", "arpu", "arr", "mrr"];
   const financialKeywords = ["financial", "expense", "cost", "profit", "margin", "cash", "payroll", "budget", "p&l", "loss", "invoice", "revenue"];
   const operationsKeywords = ["operation", "job", "work order", "checklist", "task", "service", "volume", "utilization", "dispatch", "route", "inspection", "asset"];
@@ -458,65 +468,54 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     ...kpiSources(input.kpis || [], revenueKeywords),
     ...operationalMetricSources(input.operationalMetrics || [], revenueKeywords, "Financial Metrics"),
     ...fileSources(input.files || [], revenueKeywords),
-    ...importSources(input.imports || [], revenueKeywords),
     ...reportSources(input.reports || [], revenueKeywords)
   ];
   const financialSources = [
     ...kpiSources(input.kpis || [], financialKeywords),
     ...operationalMetricSources(input.operationalMetrics || [], financialKeywords, "Financial Metrics"),
     ...fileSources(input.files || [], financialKeywords),
-    ...importSources(input.imports || [], financialKeywords),
     ...reportSources(input.reports || [], financialKeywords)
   ];
   const operationsSources = [
     ...kpiSources(input.kpis || [], operationsKeywords),
     ...operationalMetricSources(input.operationalMetrics || [], operationsKeywords),
-    ...activeRows(input.tasks || []).slice(0, 80).map((task) => evidence(task.title, "Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category))),
-    ...(input.checklistRuns || []).slice(0, 80).map((run) => evidence(`Checklist run ${run.status}`, "Checklist Runs", run.created_at, true, "developing", sourceText(run.status, run.notes))),
-    ...activeRows(input.assets || []).slice(0, 40).map((asset) => evidence(asset.asset_name, "Assets", asset.updated_at || asset.created_at, true, "developing", sourceText(asset.asset_type, asset.status, asset.notes))),
+    ...activeRows(input.tasks || []).slice(0, 80).map((task) => evidence(`signal:${task.id}`, task.title, "Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category))),
     ...fileSources(input.files || [], operationsKeywords),
     ...reportSources(input.reports || [], operationsKeywords)
   ];
   const customerSources = [
-    ...activeRows(input.crmLeads || []).map((lead) => evidence(lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name, "Customer Context", lead.last_activity_at || lead.updated_at || lead.created_at, true, lead.source_file_id || lead.import_id ? "strong" : "developing", sourceText(lead.status, lead.notes))),
-    ...(input.crmHistory || []).map((row) => evidence(`Customer history: ${row.event_type}`, "Customer History", row.created_at, true, row.source_file_id || row.import_id ? "strong" : "developing", sourceText(row.status, row.notes))),
+    ...activeRows(input.crmLeads || []).filter((lead) => Boolean(lead.source_file_id || lead.import_id)).map((lead) => evidence(`customer:${lead.source_file_id || lead.import_id}`, lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name, "Imported customer activity", lead.last_activity_at || lead.updated_at || lead.created_at, true, "strong", sourceText(lead.status, lead.notes))),
     ...kpiSources(input.kpis || [], customerKeywords, "Customer KPIs"),
     ...fileSources(input.files || [], customerKeywords),
     ...reportSources(input.reports || [], customerKeywords)
   ];
   const salesSources = [
-    ...activeRows(input.crmLeads || []).map((lead) => evidence(lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name, "Customer Revenue Context", lead.last_activity_at || lead.updated_at || lead.created_at, true, lead.source_file_id || lead.import_id ? "strong" : "developing", sourceText(lead.status, lead.notes))),
-    ...(input.crmHistory || []).map((row) => evidence(`Customer activity history: ${row.event_type}`, "Customer Activity History", row.created_at, true, row.source_file_id || row.import_id ? "strong" : "developing", sourceText(row.status, row.notes))),
+    ...activeRows(input.crmLeads || []).filter((lead) => Boolean(lead.source_file_id || lead.import_id)).map((lead) => evidence(`customer:${lead.source_file_id || lead.import_id}`, lead.company ? `${lead.lead_name} at ${lead.company}` : lead.lead_name, "Imported customer activity", lead.last_activity_at || lead.updated_at || lead.created_at, true, "strong", sourceText(lead.status, lead.notes))),
     ...kpiSources(input.kpis || [], salesKeywords, "Sales KPIs"),
     ...fileSources(input.files || [], salesKeywords),
     ...reportSources(input.reports || [], salesKeywords)
   ];
   const processSources = [
-    ...(input.sops || []).map((sop) => evidence(sop.title, "SOPs", sop.updated_at || sop.created_at, false, sop.body_markdown ? "developing" : "limited", sourceText(sop.department, sop.category, sop.body_markdown))),
-    ...(input.checklists || []).map((checklist) => evidence(checklist.name, "Checklists", checklist.updated_at || checklist.created_at, true, "developing", sourceText(checklist.description, checklist.frequency))),
-    ...(input.forms || []).map((form) => evidence(form.name, "Forms", form.updated_at || form.created_at, true, "developing", sourceText(form.description, form.form_type))),
+    ...(input.sops || []).map((sop) => evidence(`sop:${sop.id}`, sop.title, "SOPs", sop.updated_at || sop.created_at, false, sop.body_markdown ? "developing" : "limited", sourceText(sop.department, sop.category, sop.body_markdown))),
     ...fileSources(input.files || [], processKeywords, "Process Files"),
     ...reportSources(input.reports || [], processKeywords, "Process Reports")
   ];
   const staffingSources = [
-    ...activeRows(input.people || []).map((person) => evidence(person.full_name, "People", person.updated_at || person.created_at, true, person.role_title || person.department ? "strong" : "developing", sourceText(person.role_title, person.department, person.status))),
-    ...activeRows(input.tasks || []).filter((task) => task.assigned_to || task.assigned_person_id || task.assigned_role || task.assigned_department).map((task) => evidence(task.title, "Business Signal Context", task.updated_at || task.created_at, true, "developing", sourceText(task.assigned_to, task.assigned_role, task.assigned_department))),
+    ...activeRows(input.people || []).map((person) => evidence(`person:${person.id}`, person.full_name, "People", person.updated_at || person.created_at, true, person.role_title || person.department ? "strong" : "developing", sourceText(person.role_title, person.department, person.status))),
     ...operationalMetricSources(input.operationalMetrics || [], staffingKeywords, "Staffing Metrics"),
     ...fileSources(input.files || [], staffingKeywords, "Staffing Files"),
     ...reportSources(input.reports || [], staffingKeywords, "Staffing Reports")
   ];
   const riskSources = [
-    ...(input.issues || []).map((issue) => evidence(issue.title, "Issues", issue.updated_at || issue.created_at, true, issue.root_cause || issue.recommended_fix ? "strong" : "developing", sourceText(issue.description, issue.issue_type, issue.severity, issue.root_cause, issue.recommended_fix))),
-    ...activeRows(input.tasks || []).filter((task) => includesAny(sourceText(task.title, task.description, task.category, task.status), riskKeywords)).map((task) => evidence(task.title, "Risk Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category, task.status))),
+    ...(input.issues || []).map((issue) => evidence(`issue:${issue.id}`, issue.title, "Issues", issue.updated_at || issue.created_at, true, issue.root_cause || issue.recommended_fix ? "strong" : "developing", sourceText(issue.description, issue.issue_type, issue.severity, issue.root_cause, issue.recommended_fix))),
+    ...activeRows(input.tasks || []).filter((task) => includesAny(sourceText(task.title, task.description, task.category, task.status), riskKeywords)).map((task) => evidence(`signal:${task.id}`, task.title, "Risk Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category, task.status))),
     ...fileSources(input.files || [], riskKeywords, "Risk Files"),
     ...reportSources(input.reports || [], riskKeywords, "Risk Reports"),
   ];
   const historicalSources = [
-    ...activeRows(input.kpis || []).map((kpi) => evidence(`${kpi.name} history`, "KPI History", kpi.metric_date || kpi.created_at, true, kpi.source_file_id || kpi.import_id ? "strong" : "developing", sourceText(kpi.category, kpi.source))),
-    ...activeRows(input.operationalMetrics || []).map((metric) => evidence(`${metric.metric_name} history`, "Metric History", metric.metric_date || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing", sourceText(metric.category))),
-    ...(input.crmHistory || []).map((row) => evidence(`Customer activity history: ${row.event_type}`, "Customer Activity History", row.created_at, true, "developing", sourceText(row.status, row.notes))),
-    ...(input.reports || []).filter((report) => report.date_range_start || report.date_range_end).map((report) => evidence(report.title, "Period Reports", report.date_range_end || report.created_at, false, "developing", sourceText(report.report_type))),
-    ...importSources(input.imports || [], ["kpi", "metric", "crm", "lead", "revenue", "operational"], "Historical Imports")
+    ...activeRows(input.kpis || []).map((kpi) => evidence(`kpi:${kpi.source_file_id || kpi.import_id || "manual"}:${lower(kpi.name)}`, `${kpi.name} history`, "KPI History", kpi.metric_date || kpi.created_at, true, kpi.source_file_id || kpi.import_id ? "strong" : "developing", sourceText(kpi.category, kpi.source))),
+    ...activeRows(input.operationalMetrics || []).map((metric) => evidence(`metric:${metric.source_file_id || metric.import_id || "manual"}:${lower(metric.metric_name)}`, `${metric.metric_name} history`, "Metric History", metric.metric_date || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing", sourceText(metric.category))),
+    ...(input.reports || []).filter((report) => report.date_range_start || report.date_range_end).map((report) => evidence(`report:${report.id}`, report.title, "Period Reports", report.date_range_end || report.created_at, false, "developing", sourceText(report.report_type)))
   ];
   const businessMemorySources = [
     ...revenueSources.slice(0, 25),
@@ -525,9 +524,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     ...customerSources.slice(0, 40),
     ...processSources.slice(0, 30),
     ...riskSources.slice(0, 40),
-    ...eligibleRuns.map((run) => evidence(`Vaeroex run: ${run.agent_type}`, "Vaeroex Runs", run.created_at, false, "developing", sourceText(run.status))),
-    ...activeRows(input.decisions || []).map((decision) => evidence(decision.title, "Decision Journal", decision.updated_at || decision.created_at, false, decision.outcome_summary ? "strong" : "developing", sourceText(decision.reason, decision.expected_outcome, decision.outcome_summary))),
-    ...activeRows(input.recommendationOutcomes || []).map((outcome) => evidence(outcome.title, "Recommendation Outcomes", outcome.updated_at || outcome.created_at, false, outcome.outcome_summary ? "strong" : "developing", sourceText(outcome.evidence, outcome.expected_outcome, outcome.outcome_summary)))
+    ...uniqueSources([...revenueSources, ...financialSources, ...operationsSources, ...customerSources, ...processSources, ...riskSources])
   ];
 
   const categories = [
@@ -543,6 +540,23 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     buildItem({ id: "business_memory", sources: businessMemorySources, outcomes: activeRows(input.decisions || []).length + activeRows(input.recommendationOutcomes || []).length })
   ];
   const overallCoverage = Math.round(categories.reduce((sum, item) => sum + item.coverage, 0) / categories.length);
+  const allOriginalEvidence = uniqueSources([
+    ...activeRows(input.kpis || []).map((kpi) => evidence(`kpi:${kpi.source_file_id || kpi.import_id || "manual"}:${lower(kpi.name)}`, kpi.name, "KPI series", kpi.metric_date || kpi.created_at, true, kpi.source_file_id || kpi.import_id ? "strong" : "developing")),
+    ...activeRows(input.files || []).map((file) => evidence(`file:${file.id}`, file.display_name, "Files", file.processed_at || file.created_at, true, "strong")),
+    ...activeRows(input.reports || []).map((report) => evidence(`report:${report.id}`, report.title, "Reports", report.date_range_end || report.created_at, false, "developing")),
+    ...activeRows(input.sops || []).map((sop) => evidence(`sop:${sop.id}`, sop.title, "SOPs", sop.updated_at || sop.created_at, false, "developing")),
+    ...activeRows(input.tasks || []).map((task) => evidence(`signal:${task.id}`, task.title, "Business Signals", task.updated_at || task.created_at, true, "developing")),
+    ...activeRows(input.issues || []).map((issue) => evidence(`issue:${issue.id}`, issue.title, "Issues", issue.updated_at || issue.created_at, true, "developing")),
+    ...activeRows(input.operationalMetrics || []).map((metric) => evidence(`metric:${metric.source_file_id || metric.import_id || "manual"}:${lower(metric.metric_name)}`, metric.metric_name, "Operational metrics", metric.metric_date || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing"))
+  ]);
+  const activeSignalIds = new Set(activeRows(input.tasks || []).map((signal) => signal.id));
+  const activeFileIds = new Set(activeRows(input.files || []).map((file) => file.id));
+  const memoryItemCount = filterBusinessEvidence(input.memoryChunks || []).filter((chunk) => {
+    const sourceType = lower(chunk.source_type);
+    if (sourceType.includes("signal") || sourceType === "task") return Boolean(chunk.source_id && activeSignalIds.has(chunk.source_id));
+    if (chunk.source_file_id) return activeFileIds.has(chunk.source_file_id);
+    return sourceType !== "platform_run" && sourceType !== "ai_agent_run";
+  }).length;
   const weakestCategories = categories.filter((item) => item.coverage < 46).sort((a, b) => a.coverage - b.coverage).slice(0, 5);
   const dataGaps = weakestCategories.map((item) => `${item.label}: ${item.reason}`);
   const nextCategory = weakestCategories[0] || categories.sort((a, b) => a.coverage - b.coverage)[0];
@@ -560,6 +574,11 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     categories,
     confidenceOverTime: makeConfidenceOverTime(input),
     sourceMix: makeSourceMix(input),
+    evidenceSummary: {
+      originalEvidenceCount: allOriginalEvidence.length,
+      memoryItemCount,
+      derivedFindingCount
+    },
     dataGaps: dataGaps.length ? dataGaps : ["No major coverage gap is visible, but Vaeroex still benefits from updated source data and outcome history."],
     recommendedNextUpload: nextCategory?.recommendedNextUpload || NEXT_UPLOADS.business_memory,
     forecastReadiness: {

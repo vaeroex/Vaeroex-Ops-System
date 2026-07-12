@@ -277,24 +277,29 @@ export function buildExecutiveHomepageModel({
   kpiTrends,
   sourceDataAvailable
 }: BuildExecutiveHomepageInput): ExecutiveHomepageModel {
-  const risk = sourceDataAvailable ? intelligence.topRisk : undefined;
-  const opportunity = sourceDataAvailable ? intelligence.topOpportunity : undefined;
+  const hasUsableHealth = sourceDataAvailable && intelligence.businessHealth.available !== false;
+  const risk = hasUsableHealth ? intelligence.topRisk : undefined;
+  const opportunity = hasUsableHealth ? intelligence.topOpportunity : undefined;
   const memorySignals = intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords;
   const previousSnapshot = previousReviewSnapshot(snapshots);
   const trendDelta = previousSnapshot ? intelligence.businessHealth.score - previousSnapshot.score : null;
   const strongest = [...coverage.categories].sort((a, b) => b.coverage - a.coverage)[0];
   const weakest = [...coverage.categories].sort((a, b) => a.coverage - b.coverage)[0];
 
-  const healthSummary = !sourceDataAvailable
-    ? "Some required business information could not be retrieved. Existing evidence remains available in Intelligence and Sources."
+  const healthSummary = !hasUsableHealth
+    ? sourceDataAvailable
+      ? "Vaeroex needs more eligible original evidence before it can score Business Health reliably."
+      : "Some required business information could not be retrieved. Existing evidence remains available in Intelligence and Sources."
     : risk
       ? conciseSentences(risk.summary, intelligence.executiveSummary)
       : opportunity
         ? conciseSentences(opportunity.summary, intelligence.executiveSummary)
         : conciseSentences(intelligence.executiveSummary, "No material business risk is visible in the current eligible evidence.");
 
-  const healthDriver = !sourceDataAvailable
-    ? "No business conclusion was generated from the unavailable source queries."
+  const healthDriver = !hasUsableHealth
+    ? sourceDataAvailable
+      ? "Setup context, generated outputs, and Business Memory do not count as independent business evidence."
+      : "No business conclusion was generated from the unavailable source queries."
     : conciseSentences(
       risk?.evidence[0] || opportunity?.evidence[0],
       "No single evidence-backed driver currently dominates Business Health.",
@@ -303,17 +308,17 @@ export function buildExecutiveHomepageModel({
 
   return {
     health: {
-      available: sourceDataAvailable,
-      score: sourceDataAvailable ? intelligence.businessHealth.score : null,
-      status: sourceDataAvailable ? healthStatusLabel(intelligence.businessHealth.status) : "Temporarily unavailable",
-      trend: sourceDataAvailable && trendDelta !== null ? intelligence.businessHealth.trend : null,
+      available: hasUsableHealth,
+      score: hasUsableHealth ? intelligence.businessHealth.score : null,
+      status: hasUsableHealth ? healthStatusLabel(intelligence.businessHealth.status) : "Limited evidence",
+      trend: hasUsableHealth && trendDelta !== null ? intelligence.businessHealth.trend : null,
       trendDelta,
       summary: healthSummary,
       driver: healthDriver,
-      confidence: sourceDataAvailable ? intelligence.dataQuality.confidence : "Low",
+      confidence: hasUsableHealth ? intelligence.dataQuality.confidence : "Low",
       memorySignals: sourceDataAvailable ? memorySignals : 0
     },
-    priorities: sourceDataAvailable
+    priorities: hasUsableHealth
       ? [priorityFromInsight(risk, "risk"), priorityFromInsight(opportunity, "opportunity"), decisionFromIntelligence(intelligence)]
       : [emptyPriority("risk"), emptyPriority("opportunity"), emptyPriority("decision")],
     changes: buildChanges({
@@ -321,7 +326,7 @@ export function buildExecutiveHomepageModel({
       currentScore: intelligence.businessHealth.score,
       currentConfidence: intelligence.dataQuality.confidence,
       kpiTrends,
-      sourceDataAvailable
+      sourceDataAvailable: hasUsableHealth
     }),
     readiness: {
       available: sourceDataAvailable,

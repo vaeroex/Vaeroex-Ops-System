@@ -1,6 +1,6 @@
 import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
-import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -26,6 +26,7 @@ export type IntelligenceInsight = {
 export type IntelligenceLayerResult = {
   executiveSummary: string;
   businessHealth: {
+    available: boolean;
     score: number;
     status: "Strong" | "Watch" | "At Risk" | "Insufficient Data";
     trend: "Improving" | "Holding steady" | "Declining" | "Not enough history";
@@ -192,20 +193,21 @@ function businessSignalPatternTitle(signals: TaskRow[]) {
 
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
-  const kpis = filterBusinessEvidence(input.kpis);
-  const tasks = filterBusinessEvidence(input.tasks);
-  const issues = filterBusinessEvidence(input.issues);
-  const files = filterBusinessEvidence(input.files);
-  const reports = filterBusinessEvidence(input.reports);
-  const vaeroexRuns = filterBusinessEvidence(input.vaeroexRuns, { sourceKind: "platform_run" });
-  const crmLeads = filterBusinessEvidence(input.crmLeads);
-  const imports = filterBusinessEvidence(input.imports);
-  const sops = filterBusinessEvidence(input.sops);
-  const forms = filterBusinessEvidence(input.forms);
-  const submissions = filterBusinessEvidence(input.submissions);
-  const people = filterBusinessEvidence(input.people);
-  const decisions = filterBusinessEvidence(input.decisions);
-  const recommendationOutcomes = filterBusinessEvidence(input.recommendationOutcomes);
+  const kpis = filterOriginalBusinessEvidence(input.kpis);
+  const tasks = filterOriginalBusinessEvidence(input.tasks);
+  const issues = filterOriginalBusinessEvidence(input.issues);
+  const files = filterOriginalBusinessEvidence(input.files);
+  const reports = filterOriginalBusinessEvidence(input.reports);
+  const vaeroexRuns: VaeroexRunRow[] = [];
+  // Customer activity is evidence only when it is traceable to an import or file.
+  const crmLeads = filterOriginalBusinessEvidence(input.crmLeads).filter((lead) => Boolean(lead.source_file_id || lead.import_id));
+  const imports = [] as FileImportRow[];
+  const sops = filterOriginalBusinessEvidence(input.sops);
+  const forms = filterOriginalBusinessEvidence(input.forms);
+  const submissions = filterOriginalBusinessEvidence(input.submissions);
+  const people = filterOriginalBusinessEvidence(input.people);
+  const decisions: DecisionRow[] = [];
+  const recommendationOutcomes: RecommendationOutcomeRow[] = [];
   const openTasks = tasks.filter((task) => !isClosed(task.status));
   const businessSignalsForReview = openTasks.filter((task) => Boolean(task.description || task.category || task.related_type || task.due_date));
   const signalsWithLimitedContext = openTasks.filter((task) => !task.description || !task.category);
@@ -216,7 +218,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const belowTargetKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
   const improvingKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value >= kpi.target);
   const pendingImports = imports.filter((item) => ["extracted", "needs_review"].includes(lower(item.status)));
-  const completedRuns = vaeroexRuns.filter((run) => run.status === "completed");
   const forecastReadyMetricNames = new Set(forecastEligibility.metrics.filter((metric) => metric.state === "ready").map((metric) => metric.name.toLowerCase()));
   const forecastReadyKpis = latestKpis.filter((kpi) => forecastReadyMetricNames.has(kpi.name.toLowerCase()));
   const staleSops = sops.filter((sop) => {
@@ -225,7 +226,19 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     return ageDays > 90;
   });
   const customerContextWithoutFollowup = crmLeads.filter((lead) => !isClosed(lead.status) && (!lead.last_activity_at || isOverdue(lead.last_activity_at)));
-  const sourceRecords = files.length + reports.length + sops.length + forms.length + submissions.length + crmLeads.length;
+  const originalKpiSeries = new Set(kpis.map((kpi) => `${kpi.source_file_id || kpi.import_id || "manual"}:${kpi.name.toLowerCase()}`));
+  const originalSourceRecords = originalKpiSeries.size + files.length + reports.length + sops.length + forms.length + submissions.length + tasks.length + issues.length + crmLeads.length + people.length;
+  const originalSourceTypes = [
+    originalKpiSeries.size > 0,
+    files.length > 0,
+    reports.length > 0,
+    sops.length > 0,
+    tasks.length > 0,
+    issues.length > 0,
+    crmLeads.length > 0,
+    people.length > 0
+  ].filter(Boolean).length;
+  const hasHealthEvidence = originalSourceRecords >= 3 && originalSourceTypes >= 2 && (originalKpiSeries.size > 0 || files.length > 0 || reports.length > 0 || issues.length > 0);
   const suggestedNextData = [
     !kpis.length ? "Upload KPI history or connect one leadership-level KPI source." : "",
     !reports.length ? "Upload or generate prior management reports." : "",
@@ -240,7 +253,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         (files.length ? 15 : 0) +
         (kpis.length ? 25 : 0) +
         (reports.length ? 15 : 0) +
-        (completedRuns.length ? 15 : 0) +
         (crmLeads.length || issues.length || tasks.length ? 10 : 0) +
         (decisions.length || recommendationOutcomes.length ? 10 : 0)
     )
@@ -440,9 +452,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const recommendations = sortedInsights.filter((insight) => insight.type === "Recommendation" || insight.type === "Risk" || insight.type === "Bottleneck");
   const forecasts = sortedInsights.filter((insight) => insight.type === "Forecast");
   const riskPenalty = Math.min(45, risks.filter((risk) => risk.priority === "High").length * 12 + risks.filter((risk) => risk.priority === "Medium").length * 6);
-  const healthScore = Math.max(10, Math.min(100, dataQualityScore - riskPenalty + Math.min(15, opportunities.length * 4)));
-  const healthStatus = dataQualityScore < 25 ? "Insufficient Data" : healthScore >= 75 ? "Strong" : healthScore >= 50 ? "Watch" : "At Risk";
-  const trend = risks.length > opportunities.length + 1 ? "Declining" : opportunities.length > risks.length ? "Improving" : dataQualityScore < 35 ? "Not enough history" : "Holding steady";
+  const healthScore = hasHealthEvidence ? Math.max(10, Math.min(100, dataQualityScore - riskPenalty + Math.min(15, opportunities.length * 4))) : 0;
+  const healthStatus = !hasHealthEvidence || dataQualityScore < 25 ? "Insufficient Data" : healthScore >= 75 ? "Strong" : healthScore >= 50 ? "Watch" : "At Risk";
+  const trend = !hasHealthEvidence ? "Not enough history" : risks.length > opportunities.length + 1 ? "Declining" : opportunities.length > risks.length ? "Improving" : dataQualityScore < 35 ? "Not enough history" : "Holding steady";
   const topRisk = risks[0];
   const topOpportunity = opportunities[0];
   const topRecommendation = recommendations[0];
@@ -458,6 +470,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   return {
     executiveSummary,
     businessHealth: {
+      available: hasHealthEvidence,
       score: healthScore,
       status: healthStatus,
       trend
@@ -494,7 +507,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     insights: sortedInsights,
     memorySummary: {
       profileSignals: [workspace?.industry, workspace?.size].filter(Boolean).length,
-      sourceRecords,
+      sourceRecords: originalSourceRecords,
       kpiHistoryRecords: kpis.length,
       reports: reports.length,
       vaeroexRuns: vaeroexRuns.length,

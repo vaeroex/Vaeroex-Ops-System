@@ -194,7 +194,7 @@ const homepageSource = fs.readFileSync(path.join(root, "components/intelligence/
 assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visible loading state");
 assert.match(homepageSource, /md:grid-cols-2 xl:grid-cols-3/, "priority cards must stack responsively");
 assert.match(homepageSource, /grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3/, "priority cards must not stretch to the tallest sibling");
-assert.match(homepageSource, /Business Health is temporarily unavailable/, "homepage must include a calm unavailable state");
+assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
 
 process.stdout.write("Executive homepage regressions passed.\n");

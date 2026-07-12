@@ -1013,7 +1013,7 @@ function runEvidenceEligibilityTests() {
   assert.equal(coverage.categories.find((category) => category.id === "issues_risks").sourceCount, 0, "failed platform runs must not become business risks");
 
   const validCoverage = buildBusinessIntelligenceCoverage({ vaeroexRuns: [completedRun] });
-  assert.equal(validCoverage.categories.find((category) => category.id === "business_memory").sourceCount, 1, "valid completed runs must continue to support business memory");
+  assert.equal(validCoverage.categories.find((category) => category.id === "business_memory").sourceCount, 0, "completed runs are derived output, not original business evidence");
 }
 
 async function main() {

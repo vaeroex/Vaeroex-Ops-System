@@ -35,6 +35,13 @@ type EvidenceRecord = {
   body_markdown?: string | null;
   analysis_summary?: string | null;
   error_message?: string | null;
+  title?: string | null;
+  name?: string | null;
+  category?: string | null;
+  description?: string | null;
+  root_cause?: string | null;
+  notes?: string | null;
+  ai_generated?: boolean | null;
 };
 
 const TELEMETRY_CLASSIFICATIONS = new Set([
@@ -200,6 +207,55 @@ export function filterBusinessEvidence<T extends object>(
   options?: { sourceKind?: EvidenceSourceKind }
 ) {
   return (values || []).filter((value) => isBusinessEvidenceEligible(value, options));
+}
+
+/**
+ * Original evidence is a workspace input, not a product-generated interpretation
+ * of that input. Keeping this boundary here prevents reports, runs, and setup
+ * placeholders from inflating coverage or feeding Business Health.
+ */
+export function isOriginalBusinessEvidence<T extends object>(
+  value: T,
+  { sourceKind = "business_record" }: { sourceKind?: EvidenceSourceKind } = {}
+) {
+  const recordValue = value as T & EvidenceRecord;
+  if (!isBusinessEvidenceEligible(recordValue, { sourceKind })) return false;
+  if (sourceKind === "platform_run" || sourceKind === "business_memory") return false;
+
+  const metadata = metadataRecords(recordValue);
+  const generatedFrom = normalized(nestedValue(metadata, ["generated_from", "generatedFrom", "generated_by", "generatedBy"]));
+  const lineageType = normalized(nestedValue(metadata, ["source_type", "sourceType"]));
+  const context = [
+    recordValue.title,
+    recordValue.name,
+    recordValue.category,
+    recordValue.description,
+    recordValue.root_cause,
+    recordValue.notes
+  ].filter(Boolean).join(" ").toLowerCase();
+
+  if (recordValue.ai_generated || generatedFrom || ["setup", "bootstrap", "demo", "generated_output", "operations_intelligence", "period_report", "file"].includes(lineageType)) {
+    return false;
+  }
+
+  // Legacy setup rows predate provenance metadata. These phrases are the
+  // explicit setup markers written by the onboarding flow, not inferred risk.
+  if (
+    /\b(starter|initial) (category|sop|forms?|checklists?|asset)\b/.test(context) ||
+    /\b(created|generated) during (workspace )?setup\b/.test(context) ||
+    (/\bsetup\b/.test(context) && /\b(starter|customize|generated|configured)\b/.test(context))
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+export function filterOriginalBusinessEvidence<T extends object>(
+  values: T[] | null | undefined,
+  options?: { sourceKind?: EvidenceSourceKind }
+) {
+  return (values || []).filter((value) => isOriginalBusinessEvidence(value, options));
 }
 
 export function isPlatformFailureText(value: string | null | undefined) {
