@@ -14,6 +14,7 @@
     "test:adversarial": "node scripts/adversarial-regression-tests.js",
     "test:evidence-boundary": "node scripts/platform-failure-evidence-regression-tests.js",
     "test:homepage": "node scripts/executive-homepage-regression-tests.js",
+    "test:intelligence": "node scripts/intelligence-experience-regression-tests.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
   "dependencies": {

@@ -10,7 +10,7 @@ export type GeneratedOutputType = "action_plan" | "risk_brief" | "checklist" | "
 
 export type GeneratedOutputSource = Pick<
   IntelligenceInsight,
-  "title" | "summary" | "why" | "impact" | "recommendedAction" | "confidence" | "evidence" | "evidenceCount" | "sourceTypes" | "sourceHref" | "suggestedNextData"
+  "title" | "summary" | "why" | "impact" | "recommendedAction" | "confidence" | "evidence" | "evidenceCount" | "sourceTypes" | "sourceHref" | "suggestedNextData" | "priority"
 > & {
   type?: IntelligenceInsightType;
 };
@@ -26,6 +26,7 @@ export type GeneratedOutput = {
   evidence: string[];
   evidenceCount: number;
   confidence: IntelligenceConfidence;
+  priority: "High" | "Medium" | "Low";
   sourceTypes: string[];
   sourceHref: string;
   limitations: string;
@@ -44,17 +45,17 @@ export type GeneratedOutputCoverageSummary = {
 };
 
 const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
-  action_plan: "Generated Improvement Plan",
-  risk_brief: "Generated Investigation Summary",
-  checklist: "Generated Checklist Draft",
-  sop: "Generated SOP Draft",
-  executive_briefing: "Generated Executive Briefing",
-  meeting_agenda: "Generated Meeting Brief"
+  action_plan: "Improvement Plan",
+  risk_brief: "Executive Brief",
+  checklist: "Checklist Draft",
+  sop: "SOP Draft",
+  executive_briefing: "Executive Brief",
+  meeting_agenda: "Meeting Brief"
 };
 
 const OUTPUT_NAMES: Record<GeneratedOutputType, string> = {
   action_plan: "Improvement Plan",
-  risk_brief: "Investigation Summary",
+  risk_brief: "Executive Brief",
   checklist: "Checklist Draft",
   sop: "SOP Draft",
   executive_briefing: "Executive Briefing",
@@ -154,6 +155,7 @@ export function fallbackGeneratedOutputSource(type: GeneratedOutputType, intelli
     impact: "More complete source data improves visibility, confidence, and decision support.",
     recommendedAction: intelligence.dataQuality.suggestedNextData[0] || "Upload current reports, KPI history, or source files.",
     confidence: intelligence.dataQuality.confidence,
+    priority: "Low",
     evidence: [`Business memory score: ${intelligence.dataQuality.score}/100`, intelligence.dataQuality.reason],
     evidenceCount: Math.max(1, intelligence.memorySummary.sourceRecords),
     sourceTypes: ["Business Memory"],
@@ -266,28 +268,23 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
   }
 
   if (type === "executive_briefing") {
-    const topRisk = intelligence.topRisk;
-    const topOpportunity = intelligence.topOpportunity;
-    const topRecommendation = intelligence.topRecommendation;
-
     return [
-      "## Executive Summary",
-      intelligence.executiveSummary,
+      "## Issue",
+      source.title,
       "",
-      "## Top Risk",
-      topRisk ? `${topRisk.title}: ${topRisk.summary}` : "No major risk signal is strong enough yet.",
+      "## What Vaeroex Found",
+      `${source.summary} ${source.why}`,
       "",
-      "## Top Opportunity",
-      topOpportunity ? `${topOpportunity.title}: ${topOpportunity.summary}` : "No clear opportunity signal is strong enough yet.",
+      "## Business Impact",
+      source.impact,
       "",
-      "## Executive Recommendations",
-      bulletList(
-        [topRecommendation?.recommendedAction, source.recommendedAction]
-          .filter((item): item is string => Boolean(item))
-          .filter((item, index, array) => array.indexOf(item) === index)
-      ),
+      "## Recommended Leadership Response",
+      bulletList([source.recommendedAction]),
       "",
-      "## Evidence",
+      "## What To Verify",
+      source.suggestedNextData || (source.confidence === "Low" ? "The available evidence is limited. Confirm the underlying records before drawing a broader conclusion." : "Confirm the evidence remains current before acting on this brief."),
+      "",
+      "## Supporting Evidence",
       bulletList(source.evidence)
     ].join("\n");
   }
@@ -377,6 +374,7 @@ export function buildGeneratedOutput({
     `# ${name}: ${source.title}`,
     "",
     `Workspace: ${workspaceName || "Current workspace"}`,
+    `Priority: ${source.priority || "Medium"}`,
     `Confidence: ${source.confidence}`,
     `Source records/signals: ${source.evidenceCount}`,
     "",
@@ -403,13 +401,14 @@ export function buildGeneratedOutput({
     type,
     label,
     title: `${label}: ${source.title}`,
-    subtitle: "Based on Vaeroex intelligence from this workspace.",
+    subtitle: "Evidence-backed workspace brief.",
     summary: source.summary,
     whyMatters: source.why,
     recommendedRemedy: source.recommendedAction,
     evidence: source.evidence,
     evidenceCount: source.evidenceCount,
     confidence: source.confidence,
+    priority: source.priority || "Medium",
     sourceTypes,
     sourceHref: source.sourceHref,
     limitations,
