@@ -16,11 +16,12 @@ export function PublicRequestForm({ returnPath, issueType, issueOptions, message
 
   return (
     <div className="rounded-lg border border-line bg-white p-6 shadow-panel">
-      {message ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
-      <div className="mt-4">
-        <ErrorNotice message={error} />
-      </div>
-      <form action={createSupportRequestAction} className="mt-6 grid gap-4 md:grid-cols-2">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Contact form</p>
+      <h2 className="mt-2 text-2xl font-semibold text-ink">Send a message to Vaeroex.</h2>
+      <p className="mt-2 text-sm leading-6 text-muted">Choose the request type and provide enough context for the right team to respond.</p>
+      {message ? <div className="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">{message}</div> : null}
+      {error ? <div className="mt-4"><ErrorNotice message={error} /></div> : null}
+      <form action={createSupportRequestAction} className="mt-5 grid gap-4 md:grid-cols-2">
         <input type="hidden" name="return_path" value={returnPath} />
         {showInquiryType ? (
           <SelectInput label="Inquiry type" name="issue_type" required defaultValue={issueType} options={issueOptions || []} />
@@ -38,7 +39,7 @@ export function PublicRequestForm({ returnPath, issueType, issueOptions, message
           </p>
         </div>
         <div className="md:col-span-2">
-          <button className="rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white">{submitLabel}</button>
+          <button className="min-h-11 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">{submitLabel}</button>
         </div>
       </form>
     </div>

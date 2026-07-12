@@ -1,22 +1,23 @@
-import Link from "next/link";
+import type { Metadata } from "next";
+import { Clock3, Mail, MapPin } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicRequestForm } from "@/components/legal/PublicRequestForm";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
-import { ScrollReveal } from "@/components/motion/ScrollReveal";
+import { PublicPageHero } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
+import { publicPageMetadata } from "@/lib/seo/public-seo";
 
-const inquiryCategories = [
-  "Product Demo",
-  "Platform Questions",
-  "Strategic Partnership",
-  "Support Request",
-  "Billing or Subscription",
-  "General Inquiry"
-];
+export const metadata: Metadata = publicPageMetadata({
+  title: "Contact Vaeroex",
+  description: "Contact Vaeroex about Operations Intelligence, product questions, support, billing, or strategic partnerships.",
+  path: "/contact"
+});
+
+const inquiryCategories = ["Product Demo", "Platform Questions", "Strategic Partnership", "Support Request", "Billing or Subscription", "General Inquiry"];
 
 const contactChannels = [
-  ["General & demo", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
-  ["Support", VAEROEX_CONTACT_EMAILS.support, VAEROEX_MAILTO_LINKS.support],
+  ["Product and general questions", VAEROEX_CONTACT_EMAILS.general, VAEROEX_MAILTO_LINKS.general],
+  ["Customer support", VAEROEX_CONTACT_EMAILS.support, VAEROEX_MAILTO_LINKS.support],
   ["Billing", VAEROEX_CONTACT_EMAILS.billing, VAEROEX_MAILTO_LINKS.billing],
   ["Partnerships", VAEROEX_CONTACT_EMAILS.partners, VAEROEX_MAILTO_LINKS.partners]
 ] as const;
@@ -29,47 +30,52 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
   const params = await searchParams;
 
   return (
-    <main className="min-h-screen bg-slate-50 text-ink">
+    <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
-      <section className="mx-auto grid max-w-6xl gap-8 px-6 py-12 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
-        <div className="vaeroex-hero-reveal">
-          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Contact Vaeroex</p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight">Let's start a conversation.</h1>
-          <p className="mt-4 text-sm leading-6 text-muted">
-            Whether you're exploring Vaeroex, requesting a product demo, interested in partnerships, or have questions about how intelligence,
-            visibility, context, and decision support can help your business, we'd like to hear from you.
-          </p>
-          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Visibility • Understanding • Action</p>
-          <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-vaeroex-blue">Looking for a product walkthrough?</p>
-            <p className="mt-2 text-sm leading-6 text-muted">Start with the Operations Intelligence page for the current product capability.</p>
-            <Link href="/operations-intelligence" className="mt-4 inline-flex rounded-lg border border-line px-4 py-2 text-sm font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-              Explore Operations Intelligence
-            </Link>
-          </ScrollReveal>
-          <ScrollReveal delayMs={180} className="vaeroex-hover-card mt-4 rounded-lg border border-line bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-vaeroex-blue">Prefer direct email?</p>
-            <div className="mt-3 grid gap-2 text-sm">
-              {contactChannels.map(([label, email, href]) => (
-                <a key={email} href={href} className="flex items-center justify-between gap-3 rounded-lg border border-line bg-slate-50 px-3 py-2 font-semibold hover:border-vaeroex-blue hover:text-vaeroex-blue">
-                  <span>{label}</span>
-                  <span>{email}</span>
-                </a>
-              ))}
+      <PublicPageHero
+        eyebrow="Contact Vaeroex"
+        title="Tell us what you want to understand."
+        description="Use the form for product questions, a walkthrough, support, billing, or a strategic conversation. Your request goes to the appropriate Vaeroex team."
+      />
+
+      <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,.72fr)_minmax(30rem,1.28fr)] lg:items-start">
+          <div>
+            <div className="divide-y divide-white/10 border-y border-white/10">
+              <div className="flex gap-3 py-4">
+                <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-cyan-200" aria-hidden="true" />
+                <div>
+                  <h2 className="font-semibold text-white">What happens next</h2>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">Vaeroex reviews the category and message, then responds through the contact information you provide. Urgent account matters should use Customer Support.</p>
+                </div>
+              </div>
+              <div className="flex gap-3 py-4">
+                <Mail className="mt-0.5 h-5 w-5 shrink-0 text-cyan-200" aria-hidden="true" />
+                <div className="min-w-0">
+                  <h2 className="font-semibold text-white">Direct email</h2>
+                  <div className="mt-2 grid gap-2">
+                    {contactChannels.map(([label, email, href]) => (
+                      <a key={email} href={href} className="group block rounded-md py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                        <span className="block text-xs text-slate-500">{label}</span>
+                        <span className="mt-0.5 block break-all text-sm font-semibold text-slate-200 group-hover:text-cyan-200">{email}</span>
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-3 py-4">
+                <MapPin className="mt-0.5 h-5 w-5 shrink-0 text-cyan-200" aria-hidden="true" />
+                <div>
+                  <h2 className="font-semibold text-white">Business address</h2>
+                  <address className="mt-2 not-italic text-sm leading-6 text-slate-400">
+                    {VAEROEX_COMPANY_ADDRESS_LINES.map((line) => <span key={line} className="block">{line}</span>)}
+                  </address>
+                </div>
+              </div>
             </div>
-          </ScrollReveal>
-          <ScrollReveal delayMs={220} className="mt-4 rounded-lg border border-line bg-white p-5 shadow-sm">
-            <p className="text-sm font-semibold text-vaeroex-blue">Company mailing address</p>
-            <address className="mt-3 not-italic text-sm leading-6 text-muted">
-              {VAEROEX_COMPANY_ADDRESS_LINES.map((line) => (
-                <span key={line} className="block">
-                  {line}
-                </span>
-              ))}
-            </address>
-          </ScrollReveal>
-        </div>
-        <ScrollReveal delayMs={140}>
+            <p className="mt-5 text-xs leading-5 text-slate-500">Do not submit patient data, Social Security numbers, payment card numbers, government IDs, or regulated sensitive information through this form.</p>
+          </div>
+
           <PublicRequestForm
             returnPath="/contact"
             issueType="General Inquiry"
@@ -78,7 +84,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
             error={params?.error}
             submitLabel="Send contact request"
           />
-        </ScrollReveal>
+        </div>
       </section>
       <PublicFooter />
     </main>

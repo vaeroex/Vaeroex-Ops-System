@@ -14,7 +14,7 @@ const config: Config = {
         line: "#D1D5DB",
         muted: "#9CA3AF",
         vaeroex: {
-          blue: "#1E6BFF",
+          blue: "#2563EB",
           accent: "#38BDF8",
           navy: "#0B1F4D",
           silver: "#D1D5DB",

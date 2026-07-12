@@ -94,7 +94,8 @@ const nextConfig = {
       { source: "/store/p/full-support-retainer", destination: "/pricing", statusCode: 301 },
       { source: "/services/hourly-consulting", destination: "/contact", statusCode: 301 },
       { source: "/services/full-support-retainer", destination: "/pricing", statusCode: 301 },
-      { source: "/consulting", destination: "/contact", statusCode: 301 }
+      { source: "/consulting", destination: "/contact", statusCode: 301 },
+      { source: "/network", destination: "/networking", statusCode: 301 }
     ];
   }
 };

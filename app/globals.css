@@ -94,6 +94,41 @@ button.bg-vaeroex-blue:hover {
   color: #0b1f4d;
 }
 
+.vaeroex-public-hero {
+  background:
+    radial-gradient(circle at 16% 12%, rgba(37, 99, 235, 0.24), transparent 31%),
+    radial-gradient(circle at 84% 18%, rgba(34, 211, 238, 0.12), transparent 28%),
+    linear-gradient(145deg, #030712 0%, #07111f 52%, #0b1220 100%);
+}
+
+.vaeroex-public-grid {
+  background-image:
+    linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: linear-gradient(to bottom, black, transparent 88%);
+  opacity: 0.58;
+}
+
+.vaeroex-cta-band {
+  position: relative;
+  isolation: isolate;
+}
+
+.vaeroex-cta-band::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  background:
+    radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.24), transparent 34%),
+    linear-gradient(100deg, transparent 50%, rgba(34, 211, 238, 0.08));
+}
+
+.vaeroex-story-change {
+  animation: vaeroex-story-change 260ms ease-out both;
+}
+
 .pulsar .vaeroex-app-shell {
   background:
     radial-gradient(circle at 12% 0%, rgba(30, 107, 255, 0.15), transparent 30%),
@@ -238,6 +273,18 @@ button.bg-vaeroex-blue:hover {
   from {
     opacity: 0;
     transform: translate3d(-10px, 0, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes vaeroex-story-change {
+  from {
+    opacity: 0.72;
+    transform: translate3d(0, 5px, 0);
   }
 
   to {
