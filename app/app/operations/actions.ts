@@ -435,15 +435,16 @@ export async function deleteBusinessSignalAction(formData: FormData) {
     redirectWithError(path, error instanceof Error ? error.message : "Business Signal deletion was blocked by Vaeroex security policy.");
   }
 
-  const { data, error } = await supabase
-    .from("tasks")
-    .delete()
-    .eq("id", recordId)
-    .eq("workspace_id", workspaceId)
-    .select("id")
-    .single();
+  const lifecycleClient = supabase as unknown as {
+    rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id: string }> | null; error: { message: string } | null }>;
+  };
+  const { data, error } = await lifecycleClient.rpc("update_business_signal_lifecycle", {
+    p_workspace_id: workspaceId,
+    p_signal_id: recordId,
+    p_action: "delete"
+  });
 
-  if (error || !data) {
+  if (error || !data?.length) {
     redirectWithError(path, error?.message || "Business Signal could not be deleted.");
   }
 
@@ -451,7 +452,7 @@ export async function deleteBusinessSignalAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
   revalidatePath("/app/reports");
-  redirectWithMessage(path, "Business Signal permanently deleted.");
+  redirectWithMessage(path, "Business Signal deleted and removed from active intelligence.");
 }
 
 export async function createKpiAction(formData: FormData) {

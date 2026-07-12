@@ -512,6 +512,8 @@ export async function GET(request: Request) {
         .from("tasks")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "description", "status", "priority", "category", "assigned_role", "assigned_department"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -703,6 +705,8 @@ export async function GET(request: Request) {
           .from("tasks")
           .select("*")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
           .limit(12)
       ),

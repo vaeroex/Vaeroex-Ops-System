@@ -61,8 +61,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     recentRecommendationOutcomes
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).lt("due_date", today).neq("status", "Done"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).neq("status", "Done"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).lt("due_date", today).neq("status", "Done"),
     supabase.from("issues").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Closed"),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Ready"),
     supabase.from("form_submissions").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
@@ -70,6 +70,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .from("tasks")
       .select("id,title,description,status,priority,category,due_date,ai_generated,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),
     supabase

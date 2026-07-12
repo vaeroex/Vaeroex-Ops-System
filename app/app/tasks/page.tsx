@@ -252,7 +252,7 @@ function BusinessSignalDetails({ signal }: { signal: BusinessSignalRow }) {
 const menuItemClass =
   "block min-h-10 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45";
 
-function BusinessSignalActions({ signal }: { signal: BusinessSignalRow }) {
+function BusinessSignalActions({ signal, archived = false }: { signal: BusinessSignalRow; archived?: boolean }) {
   return (
     <details className="relative">
       <summary
@@ -283,18 +283,18 @@ function BusinessSignalActions({ signal }: { signal: BusinessSignalRow }) {
         <form action={manageRecordAction}>
           <input type="hidden" name="collection" value="tasks" />
           <input type="hidden" name="record_id" value={signal.id} />
-          <input type="hidden" name="record_action" value="archive" />
-          <input type="hidden" name="return_path" value="/app/tasks" />
+          <input type="hidden" name="record_action" value={archived ? "restore" : "archive"} />
+          <input type="hidden" name="return_path" value={archived ? "/app/tasks?view=archived" : "/app/tasks"} />
           <ConfirmSubmitButton
-            message={`Archive "${signal.title}"? It will leave active memory but remain in historical context.`}
+            message={archived ? `Restore "${signal.title}" to active Business Memory?` : `Archive "${signal.title}"? It will leave active memory but remain in historical context.`}
             className={menuItemClass}
           >
-            Archive
+            {archived ? "Restore" : "Archive"}
           </ConfirmSubmitButton>
         </form>
         <form action={deleteBusinessSignalAction}>
           <input type="hidden" name="record_id" value={signal.id} />
-          <input type="hidden" name="return_path" value="/app/tasks" />
+          <input type="hidden" name="return_path" value={archived ? "/app/tasks?view=archived" : "/app/tasks"} />
           <ConfirmSubmitButton
             message={`Permanently delete "${signal.title}"? This may affect future Vaeroex intelligence, forecasts, and briefings.`}
             className="block min-h-10 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-100 hover:bg-red-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/45"
@@ -307,7 +307,7 @@ function BusinessSignalActions({ signal }: { signal: BusinessSignalRow }) {
   );
 }
 
-function BusinessSignalRowCard({ signal }: { signal: BusinessSignalRow }) {
+function BusinessSignalRowCard({ signal, archived = false }: { signal: BusinessSignalRow; archived?: boolean }) {
   const confidence = businessSignalConfidence(signal);
   const source = sourceLabel(signal);
 
@@ -347,7 +347,7 @@ function BusinessSignalRowCard({ signal }: { signal: BusinessSignalRow }) {
           <SignalBadge label="Source" value={source} explanation={sourceExplanation(source)} />
         </div>
         <div className="md:justify-self-end">
-          <BusinessSignalActions signal={signal} />
+          <BusinessSignalActions signal={signal} archived={archived} />
         </div>
       </div>
     </article>
@@ -357,16 +357,16 @@ function BusinessSignalRowCard({ signal }: { signal: BusinessSignalRow }) {
 export default async function TasksPage({ searchParams }: TasksPageProps) {
   const params = await searchParams;
   const query = param(params?.q).toLowerCase().trim();
+  const showArchived = param(params?.view) === "archived";
   const { supabase, workspaceId } = await requireWorkspacePage();
   const { data: tasks, error } = await supabase
     .from("tasks")
     .select("*")
     .eq("workspace_id", workspaceId)
-    .is("archived_at", null)
-    .is("deleted_at", null)
     .order("created_at", { ascending: false });
 
   const signals = ((tasks || []) as BusinessSignalRow[]).filter((signal) => {
+    if (showArchived ? !(signal.archived_at && !signal.deleted_at) : Boolean(signal.archived_at || signal.deleted_at)) return false;
     if (!query) return true;
     return [signal.title, signal.description, signal.category, sourceLabel(signal)]
       .join(" ")
@@ -384,7 +384,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
         <PageHeader
           eyebrow="Business Memory"
           title="Business Signals"
-          description="Capture meaningful business events, observations, or strategic context that help Vaeroex build long-term understanding of your business."
+          description={showArchived ? "Archived context is retained for history and excluded from active intelligence." : "Capture meaningful business events, observations, or strategic context that help Vaeroex build long-term understanding of your business."}
         />
         <CreateDrawer title="Add Business Signal" description="Save context that should become part of Business Memory." triggerLabel="New Business Signal">
           <form action={createBusinessSignalAction} className="grid gap-4 lg:grid-cols-2">
@@ -418,6 +418,11 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       {params?.message ? (
         <div className="rounded-lg border border-emerald-400/30 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-100">{params.message as string}</div>
       ) : null}
+
+      <nav className="flex gap-2 text-sm" aria-label="Business Signal views">
+        <a href="/app/tasks" className={`rounded-md px-3 py-2 font-semibold ${showArchived ? "text-slate-400 hover:text-white" : "bg-cyan-950/40 text-cyan-100"}`}>Active Signals</a>
+        <a href="/app/tasks?view=archived" className={`rounded-md px-3 py-2 font-semibold ${showArchived ? "bg-cyan-950/40 text-cyan-100" : "text-slate-400 hover:text-white"}`}>Archived Signals</a>
+      </nav>
 
       <section className="rounded-lg border border-white/10 bg-[#08111f] p-3 shadow-panel">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
@@ -478,7 +483,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
                 </summary>
                 <div>
                   {group.items.map((signal) => (
-                    <BusinessSignalRowCard key={signal.id} signal={signal} />
+                    <BusinessSignalRowCard key={signal.id} signal={signal} archived={showArchived} />
                   ))}
                 </div>
               </details>
@@ -486,7 +491,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           </div>
         ) : (
           <div className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-sm text-slate-400">
-            No Business Signals yet. Add meaningful context when something happens that Vaeroex should remember.
+            {showArchived ? "No archived Business Signals." : "No Business Signals yet. Add meaningful context when something happens that Vaeroex should remember."}
           </div>
         )}
       </section>

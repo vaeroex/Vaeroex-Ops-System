@@ -427,9 +427,15 @@ function parsedFieldValue(field: EditableField, formData: FormData, path: Route 
 function revalidateRelatedPaths(collection: ManagedCollection, path: Route | string) {
   revalidatePath(path);
 
-  if (collection === "kpis" || collection === "files" || collection === "crm_leads") {
+  // These collections can be used as active business evidence. Keep every
+  // intelligence surface in sync after a lifecycle change.
+  if (["tasks", "kpis", "files", "reports", "issues", "checklists", "ai_agent_runs", "crm_leads"].includes(collection)) {
     revalidatePath("/app");
+    revalidatePath("/app/intelligence");
+    revalidatePath("/app/sources");
+    revalidatePath("/app/files");
     revalidatePath("/app/reports");
+    revalidatePath("/app/briefings");
   }
 }
 
@@ -559,11 +565,11 @@ export async function updateManagedRecordAction(formData: FormData) {
   const scopedQuery = query.eq("id", recordId) as {
     eq: (column: string, value: string) => {
       select: (columns: string) => {
-        single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+        maybeSingle: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
       };
     };
   };
-  const { data, error } = await scopedQuery.eq("workspace_id", workspaceId).select("id").single();
+  const { data, error } = await scopedQuery.eq("workspace_id", workspaceId).select("id").maybeSingle();
 
   if (error || !data) {
     redirectWithError(path, friendlyMutationError(error?.message, "Record could not be updated. Refresh and try again."));
@@ -717,17 +723,42 @@ export async function manageRecordAction(formData: FormData) {
     redirectWithError(path, error instanceof Error ? error.message : "Record action was blocked by Vaeroex security policy.");
   }
 
+  if (collection === "tasks" && (action === "archive" || action === "delete" || action === "restore")) {
+    const lifecycleClient = supabase as unknown as {
+      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id: string }> | null; error: { message: string } | null }>;
+    };
+    const { data, error } = await lifecycleClient.rpc("update_business_signal_lifecycle", {
+      p_workspace_id: workspaceId,
+      p_signal_id: recordId,
+      p_action: action
+    });
+
+    if (error || !data?.length) {
+      redirectWithError(path, friendlyMutationError(error?.message, "Business Signal could not be changed. Refresh and try again."));
+    }
+
+    revalidateRelatedPaths(collection, path);
+    redirectWithMessage(
+      path,
+      action === "delete"
+        ? "Business Signal deleted and removed from active intelligence."
+        : action === "archive"
+          ? "Business Signal archived and excluded from active intelligence."
+          : "Business Signal restored without duplicating its learned evidence."
+    );
+  }
+
   const updateQuery = dbClient(supabase).from(config.table).update(update) as {
     eq: (column: string, value: string) => unknown;
   };
   const scopedQuery = updateQuery.eq("id", recordId) as {
     eq: (column: string, value: string) => {
       select: (columns: string) => {
-        single: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
+        maybeSingle: () => Promise<{ data: { id: string } | null; error: { message: string } | null }>;
       };
     };
   };
-  const { data, error } = await scopedQuery.eq("workspace_id", workspaceId).select("id").single();
+  const { data, error } = await scopedQuery.eq("workspace_id", workspaceId).select("id").maybeSingle();
 
   if (error || !data) {
     redirectWithError(path, friendlyMutationError(error?.message, "Record could not be changed. Refresh and try again."));

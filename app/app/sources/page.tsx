@@ -967,7 +967,7 @@ function filterKnowledgeItems({
   const normalizedSourceType = (sourceType || "").trim().toLowerCase();
 
   return chunks
-    .filter((chunk) => (archivedOnly ? Boolean(chunk.archived_at || chunk.deleted_at) : !chunk.archived_at && !chunk.deleted_at))
+    .filter((chunk) => (archivedOnly ? Boolean(chunk.archived_at && !chunk.deleted_at) : !chunk.archived_at && !chunk.deleted_at))
     .filter((chunk) => !trust || knowledgeTrustStatus(chunk) === trust)
     .filter((chunk) => !normalizedSourceType || knowledgeSourceType(chunk).toLowerCase() === normalizedSourceType)
     .filter((chunk) => {
@@ -1155,7 +1155,7 @@ function LearnedKnowledgeView({
             <h3 className="text-lg font-semibold text-white">{archived ? "No archived knowledge." : "No learned knowledge yet."}</h3>
             <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
               {archived
-                ? "Archived or deleted knowledge will appear here with restore and delete actions."
+                ? "Archived knowledge appears here with restore and delete actions. Deleted knowledge is removed from this view."
                 : "Analyze a trusted source and Vaeroex will add supported findings here automatically when confidence is high or directional."}
             </p>
           </div>
@@ -1205,7 +1205,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
   }) as MemoryChunkRow[];
   const memoryChunks = [
     ...activeMemoryChunks,
-    ...rawMemoryChunks.filter((chunk) => chunk.deleted_at || chunk.archived_at)
+    ...rawMemoryChunks.filter((chunk) => chunk.archived_at && !chunk.deleted_at)
   ];
   const accessByFileId = await createFileAccessLinkMap(supabase, files);
   const runsByFile = new Map<string, VaeroexRunRow[]>();
@@ -1283,7 +1283,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
                 ? files.filter((file) => !file.archived_at && !file.deleted_at).length
                 : tab.key === "knowledge"
                   ? memoryChunks.filter((chunk) => !chunk.archived_at && !chunk.deleted_at).length
-                  : files.filter((file) => file.archived_at && !file.deleted_at).length + memoryChunks.filter((chunk) => chunk.archived_at || chunk.deleted_at).length;
+                  : files.filter((file) => file.archived_at && !file.deleted_at).length + memoryChunks.filter((chunk) => chunk.archived_at && !chunk.deleted_at).length;
 
             return (
               <LoadingLink

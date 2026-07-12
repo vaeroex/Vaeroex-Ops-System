@@ -2127,7 +2127,6 @@ export async function manageSourceFileAction(formData: FormData) {
   const returnPath = safeFileReturnPath(text(formData, "return_path") || SOURCES_PATH);
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const action = text(formData, "source_action");
-  const now = new Date().toISOString();
 
   if (action !== "archive" && action !== "restore" && action !== "delete") {
     redirectWithPathError(returnPath, "Source action is not supported.", file.id);
@@ -2161,46 +2160,31 @@ export async function manageSourceFileAction(formData: FormData) {
     redirectWithPathError(returnPath, error instanceof Error ? error.message : "Source action was blocked by Vaeroex security policy.", file.id);
   }
 
-  const fileUpdate =
-    action === "archive"
-      ? { archived_at: now, updated_at: now }
-      : action === "delete"
-        ? { deleted_at: now, updated_at: now }
-        : { archived_at: null, deleted_at: null, updated_at: now };
+  const lifecycleClient = supabase as unknown as {
+    rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ file_id: string }> | null; error: { message: string } | null }>;
+  };
+  const { data: updatedFile, error } = await lifecycleClient.rpc("update_source_file_lifecycle", {
+    p_workspace_id: workspaceId,
+    p_file_id: file.id,
+    p_action: action
+  });
 
-  const { error } = await supabase
-    .from("file_uploads")
-    .update(fileUpdate)
-    .eq("id", file.id)
-    .eq("workspace_id", workspaceId);
-
-  if (error) {
-    redirectWithPathError(returnPath, error.message, file.id);
-  }
-
-  if (action === "archive" || action === "delete") {
-    await supabase
-      .from("business_memory_chunks")
-      .update({
-        archived_at: now,
-        deleted_at: action === "delete" ? now : null,
-        updated_at: now
-      })
-      .eq("workspace_id", workspaceId)
-      .eq("source_file_id", file.id);
+  if (error || !updatedFile?.length) {
+    redirectWithPathError(returnPath, error?.message || "Source could not be changed. Refresh and try again.", file.id);
   }
 
   revalidatePath(FILES_PATH);
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
+  revalidatePath("/app/briefings");
   redirectWithPathMessage(
     returnPath,
     action === "archive"
       ? "Source archived. Its learned evidence is excluded from future Vaeroex answers until it is analyzed again."
       : action === "delete"
         ? "Source deleted from active views. Its learned evidence is excluded from future Vaeroex answers."
-        : "Source restored. Reanalyze it if you want its knowledge active again.",
+        : "Source restored. Its eligible learned evidence is active again.",
     file.id
   );
 }
@@ -2254,7 +2238,7 @@ export async function manageLearnedKnowledgeAction(formData: FormData) {
         ? { archived_at: now, deleted_at: now, updated_at: now }
         : { archived_at: null, deleted_at: null, updated_at: now };
 
-  const { error } = await supabase
+  const { data: updatedKnowledge, error } = await supabase
     .from("business_memory_chunks")
     .update(update)
     .eq("id", chunkId)
@@ -2262,8 +2246,8 @@ export async function manageLearnedKnowledgeAction(formData: FormData) {
     .select("id")
     .maybeSingle();
 
-  if (error) {
-    redirectWithPathError(returnPath, error.message);
+  if (error || !updatedKnowledge) {
+    redirectWithPathError(returnPath, error?.message || "Learned knowledge could not be changed. Refresh and try again.");
   }
 
   revalidatePath(SOURCES_PATH);
