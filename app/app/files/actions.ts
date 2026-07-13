@@ -20,6 +20,7 @@ import { requireToolExecution, type RegisteredToolName } from "@/lib/security/to
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
+import { assertWorkspaceBusinessWritesAllowed } from "@/lib/workspaces/reset-guard";
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -2003,6 +2004,12 @@ export async function uploadFileAction(formData: FormData) {
     redirectWithPathError(returnPath, `This workspace has reached the file upload limit for the current Vaeroex plan (${fileLimit.limitValue} files).`);
   }
 
+  try {
+    await assertWorkspaceBusinessWritesAllowed(workspaceId);
+  } catch (error) {
+    redirectWithPathError(returnPath, actionErrorMessage(error, "File uploads are temporarily unavailable for this workspace."));
+  }
+
   const buffer = Buffer.from(await uploadedFile.arrayBuffer());
   const validation = validateUploadFileSafety({
     fileName: uploadedFile.name,
@@ -2050,6 +2057,13 @@ export async function uploadFileAction(formData: FormData) {
     redirectWithPathError(returnPath, upload.error.message);
   }
 
+  try {
+    await assertWorkspaceBusinessWritesAllowed(workspaceId);
+  } catch (error) {
+    await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
+    redirectWithPathError(returnPath, actionErrorMessage(error, "File uploads are temporarily unavailable for this workspace."));
+  }
+
   const displayName = text(formData, "display_name") || uploadedFile.name;
   const { data, error } = await supabase
     .from("file_uploads")
@@ -2091,10 +2105,11 @@ export async function uploadFileAction(formData: FormData) {
     .single();
 
   if (error || !data) {
+    await supabase.storage.from(STORAGE_BUCKET).remove([storagePath]);
     redirectWithPathError(returnPath, error?.message || "File metadata could not be saved.");
   }
 
-  await supabase.from("file_processing_jobs").insert({
+  const { error: processingJobError } = await supabase.from("file_processing_jobs").insert({
     workspace_id: workspaceId,
     file_upload_id: data.id,
     job_type: "extract",
@@ -2107,6 +2122,16 @@ export async function uploadFileAction(formData: FormData) {
       file_size_bytes: uploadedFile.size
     }
   });
+
+  if (processingJobError) {
+    redirectWithPathError(
+      returnPath,
+      /temporarily locked for reset/i.test(processingJobError.message)
+        ? "Workspace business data is temporarily locked for reset. The upload was not treated as ready."
+        : "The file was saved, but Vaeroex could not queue it for processing. Try again shortly.",
+      data.id
+    );
+  }
 
   revalidatePath(FILES_PATH);
   revalidatePath(SOURCES_PATH);
