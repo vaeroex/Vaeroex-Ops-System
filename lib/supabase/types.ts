@@ -700,6 +700,8 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -713,6 +715,8 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["forms"]["Insert"]>;
         Relationships: [];
@@ -730,6 +734,8 @@ export type Database = {
           ai_detected_priority: string | null;
           ai_detected_followups_json: Json;
           created_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -743,6 +749,8 @@ export type Database = {
           ai_detected_priority?: string | null;
           ai_detected_followups_json?: Json;
           created_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["form_submissions"]["Insert"]>;
         Relationships: [];
@@ -760,6 +768,8 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -773,6 +783,8 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["checklists"]["Insert"]>;
         Relationships: [];
@@ -793,6 +805,8 @@ export type Database = {
           priority: string;
           completed_at: string | null;
           created_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -809,6 +823,8 @@ export type Database = {
           priority?: string;
           completed_at?: string | null;
           created_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["checklist_runs"]["Insert"]>;
         Relationships: [];
@@ -833,6 +849,8 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -853,6 +871,8 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["tasks"]["Insert"]>;
         Relationships: [];
@@ -970,6 +990,8 @@ export type Database = {
           created_by: string | null;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -989,6 +1011,8 @@ export type Database = {
           created_by?: string | null;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["issues"]["Insert"]>;
         Relationships: [];
@@ -1104,6 +1128,8 @@ export type Database = {
           ai_generated: boolean;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
@@ -1118,6 +1144,8 @@ export type Database = {
           ai_generated?: boolean;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["sops"]["Insert"]>;
         Relationships: [];

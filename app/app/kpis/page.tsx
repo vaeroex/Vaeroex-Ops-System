@@ -14,6 +14,7 @@ import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import {
   applyKpiSettingsToRows,
@@ -1817,28 +1818,35 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       .from("kpis")
       .select("*")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "Done"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).eq("status", "Done"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).neq("status", "Done"),
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("kpi_alert_rules").select("*").eq("workspace_id", workspaceId).eq("is_active", true).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
     supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const rawCustomerEvidence = crmResult.data || [];
+  const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: [...rawKpis, ...rawCustomerEvidence] });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const eligibleKpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
+  const eligibleCustomerEvidence = filterBySourceParentEligibility(rawCustomerEvidence, sourceParentEligibility);
   const sourceFiles = (fileResult.data || []) as FileUploadRow[];
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
-  const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
+  const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(eligibleKpis, kpiSettings), kpiSettings) as KpiRow[];
   const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
   const selectedTimelineRange = timelineRange(timeline, adjustedKpis.length ? adjustedKpis : rawKpis, params?.start, params?.end);
   const activeStatusFilter = isKpiStatusFilter(params?.status) ? params.status : "all";
@@ -1863,12 +1871,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     issues: issueResult.data || [],
     assets: [],
     checklists: [],
-    checklistRuns: checklistRunResult.data || [],
+    checklistRuns: [],
     sops: [],
     files: fileResult.data || [],
     imports: [],
-    crmLeads: crmResult.data || [],
-    reports: reportResult.data || [],
+    crmLeads: eligibleCustomerEvidence,
+    reports: [],
     vaeroexRuns: [],
     operationalMetrics: [],
     notifications: notificationResult.data || [],
@@ -2033,7 +2041,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     fileResult.error?.message ||
     reportResult.error?.message ||
     notificationResult.error?.message ||
-    kpiSettingsResult.error?.message
+    kpiSettingsResult.error?.message ||
+    sourceParentResult.error?.message
         }
       />
       <SuccessNotice message={params?.message} />

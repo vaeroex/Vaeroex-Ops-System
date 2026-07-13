@@ -5,7 +5,8 @@ import { generateReportAction } from "@/app/app/reports/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { ReportLifecycleMenu } from "@/components/reports/ReportLifecycleMenu";
-import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import {
   REPORT_FILTERS,
   isPrimaryReportType,
@@ -163,16 +164,23 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     supabase.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("archived_at", "is", null).is("deleted_at", null),
     supabase.from("file_uploads").select("id,display_name,metadata_json,analysis_summary,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(100),
     supabase.from("kpis").select("id,name,source,notes,source_file_id,import_id,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(300),
-    supabase.from("tasks").select("id,title,description,category,ai_generated,created_at").eq("workspace_id", workspaceId).limit(100),
-    supabase.from("issues").select("id,title,description,root_cause,created_at").eq("workspace_id", workspaceId).limit(100)
+    supabase.from("tasks").select("id,title,description,category,related_type,ai_generated,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(100),
+    supabase.from("issues").select("id,title,description,root_cause,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(100)
   ]);
 
-  const evidenceErrors = [filesResult.error, kpisResult.error, signalsResult.error, issuesResult.error].filter(Boolean);
+  const parentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: kpisResult.data || [] });
+  const evidenceErrors = [filesResult.error, kpisResult.error, signalsResult.error, issuesResult.error, parentResult.error].filter(Boolean);
   const files = filterOriginalBusinessEvidence(filesResult.data || []);
-  const kpiSeries = new Set(filterOriginalBusinessEvidence(kpisResult.data || []).map((row) => row.name.trim().toLowerCase()).filter(Boolean));
+  const parentEligibility = parentResult.eligibility;
+  const kpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpisResult.data || []), parentEligibility);
   const signals = filterOriginalBusinessEvidence(signalsResult.data || []);
   const issues = filterOriginalBusinessEvidence(issuesResult.data || []);
-  const originalEvidenceCount = files.length + kpiSeries.size + signals.length + issues.length;
+  const originalEvidenceCount = independentOriginalEvidenceKeys([
+    { kind: "file", values: files },
+    { kind: "kpi", values: kpis },
+    { kind: "business_signal", values: signals },
+    { kind: "issue", values: issues }
+  ]).size;
   const canManage = ["owner", "admin", "manager"].includes(context.membership?.role || "");
   const canGenerate = canManage && !evidenceErrors.length && originalEvidenceCount >= 1;
   const canGenerateBoard = canManage && !evidenceErrors.length && originalEvidenceCount >= 3;

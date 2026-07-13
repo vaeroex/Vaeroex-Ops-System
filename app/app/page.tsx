@@ -22,6 +22,7 @@ import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { normalizedReportType } from "@/lib/reports/presentation";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
@@ -1505,22 +1506,40 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const rawCrmLeads = (crmLeadResult.data || []) as CrmLeadRow[];
+  const rawCrmHistory = (crmHistoryResult.data || []) as CrmLeadHistoryRow[];
+  const rawOperationalMetrics = (metricResult.data || []) as OperationalMetricRow[];
+  const sourceParentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [...rawKpis, ...rawCrmLeads, ...rawCrmHistory, ...rawOperationalMetrics]
+  });
+  const sourceParentEligibility = sourceParentResult.eligibility;
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
-  const kpis = filterBusinessEvidence(sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[]);
+  const kpis = filterBySourceParentEligibility(
+    filterBusinessEvidence(sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[]),
+    sourceParentEligibility
+  );
   const tasks = filterBusinessEvidence((taskResult.data || []) as TaskRow[]);
   const issues = filterBusinessEvidence((issueResult.data || []) as IssueRow[]);
   const checklists = filterBusinessEvidence((checklistResult.data || []) as ChecklistRow[]);
-  const checklistRuns = filterBusinessEvidence((checklistRunResult.data || []) as ChecklistRunRow[]);
+  const activeChecklistIds = new Set(checklists.map((checklist) => checklist.id));
+  const checklistRuns = filterBusinessEvidence((checklistRunResult.data || []) as ChecklistRunRow[])
+    .filter((run) => activeChecklistIds.has(run.checklist_id));
   const sops = filterBusinessEvidence((sopResult.data || []) as SopRow[]);
   const files = filterBusinessEvidence((fileResult.data || []) as FileUploadRow[]);
-  const imports = filterBusinessEvidence((importResult.data || []) as FileImportRow[]);
+  const activeFileIds = new Set(files.map((file) => file.id));
+  const imports = filterBusinessEvidence((importResult.data || []) as FileImportRow[])
+    .filter((item) => activeFileIds.has(item.file_upload_id));
   const assets = filterBusinessEvidence((assetResult.data || []) as AssetRow[]);
-  const crmLeads = filterBusinessEvidence((crmLeadResult.data || []) as CrmLeadRow[]);
-  const crmHistory = filterBusinessEvidence((crmHistoryResult.data || []) as CrmLeadHistoryRow[]);
+  const crmLeads = filterBySourceParentEligibility(filterBusinessEvidence(rawCrmLeads), sourceParentEligibility);
+  const activeCustomerEvidenceIds = new Set(crmLeads.map((lead) => lead.id));
+  const crmHistory = filterBySourceParentEligibility(filterBusinessEvidence(rawCrmHistory), sourceParentEligibility)
+    .filter((history) => activeCustomerEvidenceIds.has(history.lead_id));
   const reports = filterBusinessEvidence((reportResult.data || []) as ReportRow[]);
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
   const businessEvidenceRuns = filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" });
-  const operationalMetrics = filterBusinessEvidence((metricResult.data || []) as OperationalMetricRow[]);
+  const operationalMetrics = filterBySourceParentEligibility(filterBusinessEvidence(rawOperationalMetrics), sourceParentEligibility);
   const notifications = (notificationResult.data || []) as NotificationRow[];
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
   const shares = (shareResult.data || []) as ShareRow[];
@@ -1550,7 +1569,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     peopleResult.error,
     decisionResult.error,
     recommendationOutcomeResult.error,
-    memoryChunksResult.error
+    memoryChunksResult.error,
+    sourceParentResult.error
   ].filter(Boolean);
   const businessHealthSourceErrors = [
     kpiResult.error,
@@ -1571,7 +1591,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     peopleResult.error,
     decisionResult.error,
     recommendationOutcomeResult.error,
-    memoryChunksResult.error
+    memoryChunksResult.error,
+    sourceParentResult.error
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
@@ -1935,7 +1956,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     imports,
     assets,
     crmLeads,
-    reports,
+    reports: [],
     vaeroexRuns: businessEvidenceRuns,
     operationalMetrics,
     notifications,
@@ -1972,7 +1993,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       memorySignalCount: businessHealthMemorySignals,
       sourceSummary: {
         kpis: kpis.length,
-        reports: reports.length,
+        reports: 0,
         files: files.length,
         issues: issues.length,
         crm_leads: crmLeads.length,

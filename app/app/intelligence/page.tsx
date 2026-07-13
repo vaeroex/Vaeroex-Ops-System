@@ -5,6 +5,7 @@ import { SecurityResponseNotice } from "@/components/security/SecurityResponseNo
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -77,16 +78,32 @@ export default async function IntelligencePage() {
     );
   }
 
+  const sourceParentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [
+      ...(kpisResult.data || []),
+      ...(crmResult.data || []),
+      ...(crmHistoryResult.data || []),
+      ...(metricsResult.data || [])
+    ]
+  });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const displayErrors = [...errors, sourceParentResult.error].filter(Boolean) as Array<{ message: string }>;
+  const eligibleKpis = filterBySourceParentEligibility(kpisResult.data || [], sourceParentEligibility);
+  const eligibleCustomerEvidence = filterBySourceParentEligibility(crmResult.data || [], sourceParentEligibility);
+  const eligibleCustomerHistory = filterBySourceParentEligibility(crmHistoryResult.data || [], sourceParentEligibility);
+  const eligibleOperationalMetrics = filterBySourceParentEligibility(metricsResult.data || [], sourceParentEligibility);
   const eligibleRuns = filterBusinessEvidence(runsResult.data || [], { sourceKind: "platform_run" });
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],
     issues: issuesResult.data || [],
-    kpis: kpisResult.data || [],
+    kpis: eligibleKpis,
     files: filesResult.data || [],
     reports: reportsResult.data || [],
     vaeroexRuns: eligibleRuns,
-    crmLeads: crmResult.data || [],
+    crmLeads: eligibleCustomerEvidence,
     imports: importsResult.data || [],
     sops: sopsResult.data || [],
     forms: formsResult.data || [],
@@ -98,12 +115,12 @@ export default async function IntelligencePage() {
   const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
     tasks: tasksResult.data || [],
     issues: issuesResult.data || [],
-    kpis: kpisResult.data || [],
+    kpis: eligibleKpis,
     files: filesResult.data || [],
     reports: reportsResult.data || [],
     vaeroexRuns: eligibleRuns,
-    crmLeads: crmResult.data || [],
-    crmHistory: crmHistoryResult.data || [],
+    crmLeads: eligibleCustomerEvidence,
+    crmHistory: eligibleCustomerHistory,
     imports: importsResult.data || [],
     sops: sopsResult.data || [],
     forms: formsResult.data || [],
@@ -113,7 +130,7 @@ export default async function IntelligencePage() {
     recommendationOutcomes: outcomesResult.data || [],
     checklists: checklistsResult.data || [],
     checklistRuns: checklistRunsResult.data || [],
-    operationalMetrics: metricsResult.data || [],
+    operationalMetrics: eligibleOperationalMetrics,
     assets: assetsResult.data || [],
     memoryChunks: memoryChunksResult.data || []
   });
@@ -143,7 +160,7 @@ export default async function IntelligencePage() {
 
   return (
     <div className="space-y-6">
-      <ErrorNotice message={errors[0]?.message || null} />
+      <ErrorNotice message={displayErrors[0]?.message || null} />
 
       <section className="rounded-xl border border-cyan-300/20 bg-[#061225] p-4 text-slate-100 shadow-command">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">

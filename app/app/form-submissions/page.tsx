@@ -31,6 +31,8 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
       .from("forms")
       .select("*")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("name", { ascending: true }),
     supabase
       .from("form_submissions")
@@ -40,7 +42,8 @@ export default async function FormSubmissionsPage({ searchParams }: FormSubmissi
     getRecordFolders(supabase, workspaceId, "form_submissions")
   ]);
   const formNameById = new Map((forms || []).map((form) => [form.id, form.name]));
-  const managedSubmissions = (submissions || []).map((submission) => {
+  const activeFormIds = new Set((forms || []).map((form) => form.id));
+  const managedSubmissions = (submissions || []).filter((submission) => activeFormIds.has(submission.form_id)).map((submission) => {
     const management = managedValues(submission);
     const formName = formNameById.get(submission.form_id) || "Form";
 

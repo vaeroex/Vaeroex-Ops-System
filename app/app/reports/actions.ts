@@ -6,7 +6,8 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
-import { filterOriginalBusinessEvidence, sanitizeBusinessEvidenceText } from "@/lib/intelligence/evidence-eligibility";
+import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys, sanitizeBusinessEvidenceText } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -24,8 +25,10 @@ type DateRange = {
 type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
+type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FormSubmissionRow = Database["public"]["Tables"]["form_submissions"]["Row"];
+type FormRow = Database["public"]["Tables"]["forms"]["Row"];
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
@@ -403,8 +406,10 @@ async function fetchReportSource(
     tasks,
     issues,
     checklistRuns,
+    checklistDefinitions,
     sops,
     submissions,
+    forms,
     assets,
     kpis,
     kpiSettings,
@@ -416,38 +421,64 @@ async function fetchReportSource(
   ] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id,title,description,status,priority,category,related_type,ai_generated,due_date,created_at,updated_at")
+      .select("id,title,description,status,priority,category,related_type,ai_generated,due_date,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase
       .from("issues")
-      .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,due_date,created_at,updated_at")
+      .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,due_date,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase
       .from("checklist_runs")
-      .select("id,checklist_id,status,responses_json,notes,completed_at,created_at")
+      .select("id,checklist_id,status,responses_json,notes,completed_at,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase
-      .from("sops")
-      .select("id,title,department,category,status,version,ai_generated,created_at,updated_at")
+      .from("checklists")
+      .select("id,name,description,category,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
+      .limit(500),
+    supabase
+      .from("sops")
+      .select("id,title,department,category,status,version,ai_generated,created_at,updated_at,archived_at,deleted_at")
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
       .from("form_submissions")
-      .select("id,form_id,submitter_name,data_json,ai_summary,ai_detected_priority,created_at")
+      .select("id,form_id,submitter_name,data_json,ai_summary,ai_detected_priority,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(500),
     supabase
-      .from("assets")
-      .select("id,asset_name,asset_type,location,status,last_checked_at,notes,created_at,updated_at")
+      .from("forms")
+      .select("id,name,description,form_type,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
+      .limit(500),
+    supabase
+      .from("assets")
+      .select("id,asset_name,asset_type,location,status,last_checked_at,notes,created_at,updated_at,archived_at,deleted_at")
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
@@ -475,8 +506,10 @@ async function fetchReportSource(
       .limit(300),
     supabase
       .from("crm_leads")
-      .select("id,lead_name,company,status,estimated_value,owner,notes,source_file_id,import_id,last_activity_at,created_at,updated_at")
+      .select("id,lead_name,company,status,estimated_value,owner,notes,source_file_id,import_id,last_activity_at,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
@@ -499,8 +532,10 @@ async function fetchReportSource(
     tasks.error,
     issues.error,
     checklistRuns.error,
+    checklistDefinitions.error,
     sops.error,
     submissions.error,
+    forms.error,
     assets.error,
     kpis.error,
     kpiSettings.error,
@@ -515,25 +550,48 @@ async function fetchReportSource(
     throw new Error("Required report source data could not be loaded. No report was created.");
   }
 
+  const parentEligibility = await loadSourceParentEligibility({
+    supabase,
+    workspaceId,
+    rows: [
+      ...((kpis.data ?? []) as KpiRow[]),
+      ...((crmLeads.data ?? []) as CrmLeadRow[]),
+      ...((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]),
+      ...((operationalMetrics.data ?? []) as OperationalMetricRow[])
+    ]
+  });
+
   const taskRows = filterOriginalBusinessEvidence((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
   const issueRows = filterOriginalBusinessEvidence((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
-  const checklistRunRows = ((checklistRuns.data ?? []) as ChecklistRunRow[]).filter(() =>
+  const eligibleChecklistIds = new Set(filterOriginalBusinessEvidence((checklistDefinitions.data ?? []) as ChecklistRow[]).map((row) => row.id));
+  const checklistRunRows = filterOriginalBusinessEvidence((checklistRuns.data ?? []) as ChecklistRunRow[]).filter((row) =>
+    eligibleChecklistIds.has(row.checklist_id) &&
     matchesCategory(category, {}, "Checklists")
   );
-  const sopRows = ((sops.data ?? []) as SopRow[]).filter((sop) => matchesCategory(category, sop, "SOPs"));
-  const submissionRows = ((submissions.data ?? []) as FormSubmissionRow[]).filter(() => matchesCategory(category, {}, "Forms"));
-  const assetRows = ((assets.data ?? []) as AssetRow[]).filter(() => matchesCategory(category, {}, "Assets"));
+  const sopRows = filterOriginalBusinessEvidence((sops.data ?? []) as SopRow[]).filter((sop) => matchesCategory(category, sop, "SOPs"));
+  const eligibleFormIds = new Set(filterOriginalBusinessEvidence((forms.data ?? []) as FormRow[]).map((row) => row.id));
+  const submissionRows = filterOriginalBusinessEvidence((submissions.data ?? []) as FormSubmissionRow[]).filter((row) => eligibleFormIds.has(row.form_id) && matchesCategory(category, {}, "Forms"));
+  const assetRows = filterOriginalBusinessEvidence((assets.data ?? []) as AssetRow[]).filter(() => matchesCategory(category, {}, "Assets"));
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
-  const eligibleKpis = filterOriginalBusinessEvidence((kpis.data ?? []) as KpiRow[]);
+  const eligibleKpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence((kpis.data ?? []) as KpiRow[]), parentEligibility);
   const kpiRows = (sortKpiRowsBySettings(applyKpiSettingsToRows(eligibleKpis, kpiSettingRows), kpiSettingRows) as KpiRow[]).filter((kpi) =>
     matchesCategory(category, kpi, "KPIs")
   );
   // Execution history is platform telemetry, never original business evidence.
   const fileRows = filterOriginalBusinessEvidence((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
-  const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));
-  const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
-  const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
-  const operationalMetricRows = filterOriginalBusinessEvidence((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter(
+  const activeFileIds = new Set(fileRows.map((row) => row.id));
+  const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter((row) => activeFileIds.has(row.file_upload_id) && matchesCategory(category, {}, "Files"));
+  const crmLeadRows = filterBySourceParentEligibility(
+    filterOriginalBusinessEvidence((crmLeads.data ?? []) as CrmLeadRow[]),
+    parentEligibility
+  ).filter(() => matchesCategory(category, {}, "Customer Evidence"));
+  const activeCustomerEvidenceIds = new Set(crmLeadRows.map((row) => row.id));
+  const crmLeadHistoryRows = filterBySourceParentEligibility((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[], parentEligibility)
+    .filter((row) => activeCustomerEvidenceIds.has(row.lead_id) && matchesCategory(category, {}, "Customer Evidence"));
+  const operationalMetricRows = filterBySourceParentEligibility(
+    filterOriginalBusinessEvidence((operationalMetrics.data ?? []) as OperationalMetricRow[]),
+    parentEligibility
+  ).filter(
     (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
 
@@ -569,12 +627,12 @@ async function fetchReportSource(
     (metric) => metric.metric_date >= range.startDate && metric.metric_date <= range.endDate
   );
   const sourceLinkedKpis = recordedKpis.filter((kpi) => Boolean(kpi.source_file_id || kpi.import_id));
-  const originalSourceIds = new Set([
-    ...taskRows.map((row) => `signal:${row.id}`),
-    ...issueRows.map((row) => `issue:${row.id}`),
-    ...fileRows.map((row) => `file:${row.id}`),
-    ...kpiRows.map((row) => `kpi:${row.name.trim().toLowerCase()}`),
-    ...operationalMetricRows.map((row) => `metric:${row.id}`)
+  const originalSourceIds = independentOriginalEvidenceKeys([
+    { kind: "business_signal", values: taskRows },
+    { kind: "issue", values: issueRows },
+    { kind: "file", values: fileRows },
+    { kind: "kpi", values: kpiRows },
+    { kind: "operational_metric", values: operationalMetricRows }
   ]);
 
   return {

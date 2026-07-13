@@ -5,6 +5,7 @@ import {
   filterOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
+import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 
 type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 
@@ -433,24 +434,36 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     filterBusinessEvidence(input.vaeroexRuns || [], { sourceKind: "platform_run" }).length +
     filterBusinessEvidence(input.decisions || []).length +
     filterBusinessEvidence(input.recommendationOutcomes || []).length;
+  const activeFiles = activeRows(input.files || []);
+  const activeSourceFileIds = new Set(activeFiles.map((file) => file.id));
+  const activeImports = (input.imports || []).filter((item) => activeSourceFileIds.has(item.file_upload_id));
+  const parentEligibility = buildSourceParentEligibility({ files: activeFiles, imports: activeImports });
+  const activeChecklists = activeRows(input.checklists || []);
+  const activeChecklistIds = new Set(activeChecklists.map((checklist) => checklist.id));
+  const activeForms = activeRows(input.forms || []);
+  const activeFormIds = new Set(activeForms.map((form) => form.id));
+  const activeCrmLeads = filterBySourceParentEligibility(activeRows(input.crmLeads || []), parentEligibility);
+  const activeCrmLeadIds = new Set(activeCrmLeads.map((lead) => lead.id));
   input = {
     ...input,
-    kpis: activeRows(input.kpis || []),
+    kpis: filterBySourceParentEligibility(activeRows(input.kpis || []), parentEligibility),
     tasks: activeRows(input.tasks || []),
     issues: activeRows(input.issues || []),
-    checklists: activeRows(input.checklists || []),
-    checklistRuns: activeRows(input.checklistRuns || []),
-    files: activeRows(input.files || []),
-    imports: activeRows(input.imports || []),
+    checklists: activeChecklists,
+    checklistRuns: activeRows(input.checklistRuns || []).filter((run) => activeChecklistIds.has(run.checklist_id)),
+    files: activeFiles,
+    imports: activeImports,
     sops: activeRows(input.sops || []),
-    forms: activeRows(input.forms || []),
-    submissions: activeRows(input.submissions || []),
+    forms: activeForms,
+    submissions: activeRows(input.submissions || []).filter((submission) => activeFormIds.has(submission.form_id)),
     people: activeRows(input.people || []),
-    crmLeads: activeRows(input.crmLeads || []),
-    crmHistory: activeRows(input.crmHistory || []),
-    reports: activeRows(input.reports || []),
+    crmLeads: activeCrmLeads,
+    crmHistory: filterBySourceParentEligibility(activeRows(input.crmHistory || []), parentEligibility)
+      .filter((history) => activeCrmLeadIds.has(history.lead_id)),
+    // Saved reports are derived analysis, not additional business evidence.
+    reports: [],
     vaeroexRuns: [],
-    operationalMetrics: activeRows(input.operationalMetrics || []),
+    operationalMetrics: filterBySourceParentEligibility(activeRows(input.operationalMetrics || []), parentEligibility),
     assets: activeRows(input.assets || []),
     decisions: [],
     recommendationOutcomes: []

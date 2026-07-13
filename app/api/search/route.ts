@@ -14,6 +14,8 @@ import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
+import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -145,7 +147,7 @@ function addGroup(groups: Map<GlobalSearchGroupLabel, GlobalSearchResult[]>, lab
   groups.set(label, [...(groups.get(label) || []), ...results].slice(0, 6));
 }
 
-async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const { data, error } = await request;
   if (error) {
     console.warn("[global-search] skipped source:", error.message);
@@ -155,7 +157,7 @@ async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { 
   return data || [];
 }
 
-async function scopedResults<T>(enabled: boolean, request: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+async function scopedResults<T>(enabled: boolean, request: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   return enabled ? safeResults(request()) : [];
 }
 
@@ -448,13 +450,13 @@ export async function GET(request: Request) {
     /\b(weakest|worst|biggest risk|biggest opportunity|current priorities|what changed|changed this week|take me to)\b/i.test(query);
 
   const [
-    kpis,
+    rawKpis,
     reports,
     files,
     issues,
     tasks,
     assignments,
-    crmLeads,
+    rawCrmLeads,
     sops,
     checklists,
     people,
@@ -470,6 +472,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["name", "category", "notes", "source"], words))
         .order("metric_date", { ascending: false })
         .limit(6)
@@ -480,6 +483,8 @@ export async function GET(request: Request) {
         .from("reports")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "report_type", "body_markdown"], words))
         .order("created_at", { ascending: false })
         .limit(6)
@@ -502,10 +507,12 @@ export async function GET(request: Request) {
         .from("issues")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "description", "issue_type", "severity", "status", "root_cause", "recommended_fix"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<IssueRow>(rows as IssueRow[]).slice(0, 6)),
     scopedResults<TaskRow>(
       includesDomain("business_signals", "operations", "priorities"),
       () => supabase
@@ -516,8 +523,8 @@ export async function GET(request: Request) {
         .is("archived_at", null)
         .or(orFilter(["title", "description", "status", "priority", "category", "assigned_role", "assigned_department"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<TaskRow>(rows as TaskRow[]).slice(0, 6)),
     scopedResults<AssignmentRow>(
       includesDomain("operations", "priorities"),
       () => supabase
@@ -525,6 +532,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "description", "status", "priority", "source_type", "source_title"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -536,6 +544,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["lead_name", "company", "email", "status", "owner", "notes"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -546,20 +555,24 @@ export async function GET(request: Request) {
         .from("sops")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "department", "category", "body_markdown", "status"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<SopRow>(rows as SopRow[]).slice(0, 6)),
     scopedResults<ChecklistRow>(
       includesDomain("compliance", "operations"),
       () => supabase
         .from("checklists")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["name", "description", "category", "frequency", "assigned_role"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<ChecklistRow>(rows as ChecklistRow[]).slice(0, 6)),
     scopedResults<PersonRow>(
       includesDomain("people", "operations"),
       () => supabase
@@ -567,6 +580,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["full_name", "email", "phone", "role_title", "department", "status", "notes"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -578,6 +592,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "reason", "expected_outcome", "related_kpi", "owner", "status", "outcome_summary"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -589,6 +604,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "source_type", "source_title", "evidence", "related_module", "related_kpi", "expected_outcome", "owner", "priority", "status", "outcome_summary"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -616,6 +632,14 @@ export async function GET(request: Request) {
         )
       : Promise.resolve([])
   ]);
+  const sourceParentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [...rawKpis, ...rawCrmLeads]
+  });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const kpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
+  const crmLeads = filterBySourceParentEligibility(rawCrmLeads, sourceParentEligibility);
   let learnedKnowledgePage = learnedKnowledgeCandidates;
   let learnedKnowledge = await filterEligibleMemoryRowsByLifecycle({
     supabase,
@@ -647,7 +671,7 @@ export async function GET(request: Request) {
   learnedKnowledge = learnedKnowledge.slice(0, 6);
 
   let answerKpis = kpis;
-  let answerReports = reports;
+  let answerReports: ReportRow[] = [];
   let answerFiles = files;
   let answerIssues = issues;
   let answerTasks = tasks;
@@ -659,7 +683,7 @@ export async function GET(request: Request) {
     answerKpis = overviewData.rows;
     answerKpiSummary = overviewData.summary;
   } else if (shouldBuildAnswer) {
-    const [recentKpis, recentReports, recentFiles, recentIssues, recentTasks, recentRecommendations] = await Promise.all([
+    const [recentKpis, recentFiles, recentIssues, recentTasks, recentRecommendations] = await Promise.all([
       scopedResults<KpiRow>(
         includesDomain("kpis", "financials", "business_health"),
         () => supabase
@@ -667,17 +691,9 @@ export async function GET(request: Request) {
           .select("*")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
+          .is("archived_at", null)
           .order("metric_date", { ascending: false })
           .limit(120)
-      ),
-      scopedResults<ReportRow>(
-        includesDomain("reports", "decisions"),
-        () => supabase
-          .from("reports")
-          .select("*")
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false })
-          .limit(12)
       ),
       scopedResults<FileUploadRow>(
         includesDomain("files", "data_quality"),
@@ -696,9 +712,11 @@ export async function GET(request: Request) {
           .from("issues")
           .select("*")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
-          .limit(12)
-      ),
+          .limit(36)
+      ).then((rows) => filterOriginalBusinessEvidence<IssueRow>(rows as IssueRow[]).slice(0, 12)),
       scopedResults<TaskRow>(
         includesDomain("business_signals", "operations", "priorities"),
         () => supabase
@@ -708,8 +726,8 @@ export async function GET(request: Request) {
           .is("deleted_at", null)
           .is("archived_at", null)
           .order("updated_at", { ascending: false })
-          .limit(12)
-      ),
+          .limit(36)
+      ).then((rows) => filterOriginalBusinessEvidence<TaskRow>(rows as TaskRow[]).slice(0, 12)),
       scopedResults<RecommendationRow>(
         includesDomain("decisions", "priorities", "risks"),
         () => supabase
@@ -717,13 +735,16 @@ export async function GET(request: Request) {
           .select("*")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
           .limit(12)
       )
     ]);
 
     answerKpis = recentKpis.length ? recentKpis : kpis;
-    answerReports = recentReports.length ? recentReports : reports;
+    // Reports remain navigation results, but derived report activity is not
+    // treated as a new business condition in Search or Ask answers.
+    answerReports = [];
     answerFiles = recentFiles.length ? recentFiles : files;
     answerIssues = recentIssues.length ? recentIssues : issues;
     answerTasks = recentTasks.length ? recentTasks : tasks;
@@ -749,8 +770,8 @@ export async function GET(request: Request) {
     reports.map((report) => ({
       id: report.id,
       title: report.title,
-      sourceType: report.report_type,
-      preview: truncate(report.body_markdown),
+      sourceType: `Derived report · ${report.report_type}`,
+      preview: "Saved derived analysis. Review its original evidence before using its conclusions.",
       href: hrefWithQuery("/app/reports", report.title),
       meta: report.created_at
     }))
