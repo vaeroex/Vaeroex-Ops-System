@@ -9,61 +9,6 @@ export type Database = {
         Args: Record<string, never>;
         Returns: void;
       };
-      claim_source_file_purge: {
-        Args: { p_workspace_id: string; p_file_id: string };
-        Returns: boolean;
-      };
-      finalize_source_file_purge: {
-        Args: { p_workspace_id: string; p_file_id: string };
-        Returns: boolean;
-      };
-      begin_workspace_data_reset: {
-        Args: {
-          p_workspace_id: string;
-          p_confirmation_name: string;
-          p_storage_mode: string;
-          p_setup_mode: string;
-          p_operation_id: string;
-          p_permanent_phrase?: string | null;
-        };
-        Returns: Json;
-      };
-      reset_workspace_data: {
-        Args: {
-          p_workspace_id: string;
-          p_confirmation_name: string;
-          p_storage_mode: string;
-          p_setup_mode: string;
-          p_operation_id: string;
-        };
-        Returns: Json;
-      };
-      restore_workspace_data: {
-        Args: { p_workspace_id: string; p_operation_id: string };
-        Returns: Json;
-      };
-      finalize_workspace_data_reset: {
-        Args: { p_workspace_id: string; p_operation_id: string };
-        Returns: Json;
-      };
-      complete_workspace_reset_guided_setup: {
-        Args: {
-          p_workspace_id: string;
-          p_operation_id: string;
-          p_business_name: string;
-          p_industry: string;
-          p_team_size: string;
-          p_locations: string;
-          p_current_tools: string;
-          p_main_problem: string;
-          p_organization_description: string;
-          p_missed_often: string;
-          p_managed_items: string;
-          p_desired_focus: string;
-          p_raw_answers: Json;
-        };
-        Returns: string;
-      };
       match_business_memory_chunks: {
         Args: {
           target_workspace_id: string;
@@ -350,10 +295,6 @@ export type Database = {
           updated_at: string;
           archived_at: string | null;
           deleted_at: string | null;
-          purge_after: string | null;
-          legal_hold: boolean;
-          purged_at: string | null;
-          purge_error: string | null;
         };
         Insert: {
           id?: string;
@@ -384,10 +325,6 @@ export type Database = {
           updated_at?: string;
           archived_at?: string | null;
           deleted_at?: string | null;
-          purge_after?: string | null;
-          legal_hold?: boolean;
-          purged_at?: string | null;
-          purge_error?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["file_uploads"]["Insert"]>;
         Relationships: [];
@@ -580,132 +517,6 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["business_health_snapshots"]["Insert"]>;
-        Relationships: [];
-      };
-      workspace_reset_operations: {
-        Row: {
-          id: string;
-          workspace_id: string;
-          initiated_by: string;
-          storage_mode: string;
-          setup_mode: string;
-          status: string;
-          setup_status: string;
-          confirmation_name: string;
-          permanent_confirmation_verified: boolean;
-          reauthenticated_at: string;
-          storage_prefix: string;
-          workspace_context_before: Json;
-          pre_reset_counts: Json;
-          deleted_counts: Json;
-          restored_counts: Json;
-          storage_summary: Json;
-          manifest_completed_at: string | null;
-          reset_completed_at: string | null;
-          purge_after: string | null;
-          completed_at: string | null;
-          restored_at: string | null;
-          failure_summary: string | null;
-          legal_hold: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id: string;
-          workspace_id: string;
-          initiated_by: string;
-          storage_mode: string;
-          setup_mode: string;
-          status: string;
-          setup_status?: string;
-          confirmation_name: string;
-          permanent_confirmation_verified?: boolean;
-          reauthenticated_at: string;
-          storage_prefix: string;
-          workspace_context_before?: Json;
-          pre_reset_counts?: Json;
-          deleted_counts?: Json;
-          restored_counts?: Json;
-          storage_summary?: Json;
-          manifest_completed_at?: string | null;
-          reset_completed_at?: string | null;
-          purge_after?: string | null;
-          completed_at?: string | null;
-          restored_at?: string | null;
-          failure_summary?: string | null;
-          legal_hold?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["workspace_reset_operations"]["Insert"]>;
-        Relationships: [];
-      };
-      workspace_reset_record_backups: {
-        Row: {
-          id: string;
-          operation_id: string;
-          workspace_id: string;
-          table_name: string;
-          record_id: string;
-          row_data: Json;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          operation_id: string;
-          workspace_id: string;
-          table_name: string;
-          record_id: string;
-          row_data: Json;
-          created_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["workspace_reset_record_backups"]["Insert"]>;
-        Relationships: [];
-      };
-      workspace_reset_storage_objects: {
-        Row: {
-          id: string;
-          operation_id: string;
-          workspace_id: string;
-          bucket_id: string;
-          object_path: string;
-          source_file_id: string | null;
-          size_bytes: number | null;
-          content_type: string | null;
-          checksum: string | null;
-          etag: string | null;
-          retention_deadline: string | null;
-          purge_status: string;
-          purge_attempts: number;
-          last_attempted_at: string | null;
-          purged_at: string | null;
-          failure_summary: string | null;
-          legal_hold: boolean;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: {
-          id?: string;
-          operation_id: string;
-          workspace_id: string;
-          bucket_id: string;
-          object_path: string;
-          source_file_id?: string | null;
-          size_bytes?: number | null;
-          content_type?: string | null;
-          checksum?: string | null;
-          etag?: string | null;
-          retention_deadline?: string | null;
-          purge_status?: string;
-          purge_attempts?: number;
-          last_attempted_at?: string | null;
-          purged_at?: string | null;
-          failure_summary?: string | null;
-          legal_hold?: boolean;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database["public"]["Tables"]["workspace_reset_storage_objects"]["Insert"]>;
         Relationships: [];
       };
       security_audit_events: {

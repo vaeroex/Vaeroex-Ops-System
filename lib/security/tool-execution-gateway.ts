@@ -158,21 +158,6 @@ const deleteGeneratedInsightsSchema = z
       });
     }
   });
-const workspaceResetExecutionSchema = z
-  .object({
-    workspaceId: uuidSchema,
-    operationId: uuidSchema,
-    storageMode: z.enum(["recoverable", "permanent"]),
-    setupMode: z.enum(["blank", "guided"])
-  })
-  .strict();
-const workspaceResetRecoverySchema = z
-  .object({
-    workspaceId: uuidSchema,
-    operationId: uuidSchema,
-    action: z.enum(["restore", "retry_purge"])
-  })
-  .strict();
 
 const OPERATOR_ROLES = ["owner", "admin", "manager"] as WorkspaceRole[];
 const ADMIN_ROLES = ["owner", "admin"] as WorkspaceRole[];
@@ -325,24 +310,6 @@ export const TOOL_EXECUTION_REGISTRY = {
     operationType: "DELETE_RECORD",
     targetTable: "ai_agent_runs",
     schema: deleteGeneratedInsightsSchema,
-    requiresConfirmation: true,
-    destructive: true,
-    allowedRoles: ADMIN_ROLES
-  },
-  reset_workspace_data: {
-    name: "reset_workspace_data",
-    operationType: "DELETE_RECORD",
-    targetTable: "workspace_business_data",
-    schema: workspaceResetExecutionSchema,
-    requiresConfirmation: true,
-    destructive: true,
-    allowedRoles: ADMIN_ROLES
-  },
-  recover_workspace_data: {
-    name: "recover_workspace_data",
-    operationType: "UPDATE_RECORD",
-    targetTable: "workspace_reset_operations",
-    schema: workspaceResetRecoverySchema,
     requiresConfirmation: true,
     destructive: true,
     allowedRoles: ADMIN_ROLES
