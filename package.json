@@ -16,8 +16,6 @@
     "test:evidence-lineage": "node scripts/evidence-lineage-regression-tests.js",
     "test:deletion-integrity": "node scripts/deletion-integrity-regression-tests.js",
     "test:lifecycle-consistency": "node scripts/lifecycle-consistency-regression-tests.js",
-    "test:workspace-reset": "node scripts/workspace-reset-regression-tests.js && node scripts/workspace-reset-controls-regression-tests.js",
-    "test:workspace-reset:staging": "node scripts/workspace-reset-staging-harness.js",
     "test:homepage": "node scripts/executive-homepage-regression-tests.js",
     "test:reports": "node scripts/report-consolidation-regression-tests.js",
     "test:profit-leakage": "node scripts/profit-leakage-regression-tests.js",

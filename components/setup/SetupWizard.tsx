@@ -18,11 +18,9 @@ const steps = [
 type SetupWizardProps = {
   categories: WorkspaceSetupCategory[];
   error?: string;
-  resetOperationId?: string;
-  existingWorkspaceName?: string;
 };
 
-export function SetupWizard({ categories, error, resetOperationId, existingWorkspaceName }: SetupWizardProps) {
+export function SetupWizard({ categories, error }: SetupWizardProps) {
   const [step, setStep] = useState(0);
   const [categoryId, setCategoryId] = useState(categories[0]?.id || "");
   const selectedCategory = useMemo(
@@ -34,7 +32,6 @@ export function SetupWizard({ categories, error, resetOperationId, existingWorks
     <form action={generateWorkspaceFromSetupAction} noValidate className="space-y-6">
       <input type="hidden" name="category_id" value={categoryId} />
       <input type="hidden" name="organization_type" value={selectedCategory?.name || ""} />
-      {resetOperationId ? <input type="hidden" name="reset_operation_id" value={resetOperationId} /> : null}
 
       <div className="rounded-lg border border-line bg-white p-5 shadow-panel">
         <div className="flex flex-wrap gap-2">
@@ -61,7 +58,7 @@ export function SetupWizard({ categories, error, resetOperationId, existingWorks
           <div className="mt-5 grid gap-4 md:grid-cols-2">
             <label className="block text-sm font-medium">
               Organization name
-              <input required name="business_name" defaultValue={existingWorkspaceName || ""} className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
+              <input required name="business_name" className="mt-2 w-full rounded-lg border border-line px-3 py-2" />
             </label>
             <label className="block text-sm font-medium">
               Team size
@@ -164,11 +161,11 @@ export function SetupWizard({ categories, error, resetOperationId, existingWorks
       </section>
 
       <section className={`rounded-lg border border-line bg-white p-6 shadow-panel ${step === 4 ? "" : "hidden"}`}>
-          <h2 className="text-xl font-semibold">{resetOperationId ? "Finish guided setup" : "Generate workspace"}</h2>
+          <h2 className="text-xl font-semibold">Generate workspace</h2>
           <p className="mt-3 text-sm leading-6 text-muted">
-            {resetOperationId
-              ? "Vaeroex will save this as setup-only organizational context. It will not create sample KPIs, Business Signals, reports, or other original evidence."
-              : "Vaeroex will create a practical starting workspace for operational visibility and decision support. Your selected environment and organization description will shape initial dashboards, terminology, Business Signals, reports, and intelligence outputs."}
+            Vaeroex will create a practical starting workspace for operational visibility and decision support.
+            Your selected environment and organization description will shape initial dashboards, terminology,
+            Business Signals, reports, and intelligence outputs.
           </p>
           <div className="mt-5">
             <ComplianceNotice />
@@ -179,14 +176,10 @@ export function SetupWizard({ categories, error, resetOperationId, existingWorks
             </div>
           ) : null}
           <ConfirmSubmitButton
-            message={
-              resetOperationId
-                ? "Finish guided setup for this reset workspace? Vaeroex will save setup context only and will not create sample business evidence."
-                : "Generate this workspace now? Vaeroex will create the first records for review before you use them with real activity."
-            }
+            message="Generate this workspace now? Vaeroex will create the first records for review before you use them with real activity."
             className="mt-6 min-h-11 rounded-lg bg-vaeroex-blue px-5 py-2.5 text-sm font-semibold text-white"
           >
-            {resetOperationId ? "Finish guided setup" : "Generate workspace"}
+            Generate workspace
           </ConfirmSubmitButton>
       </section>
 

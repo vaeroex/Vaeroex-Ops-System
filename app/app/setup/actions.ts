@@ -8,7 +8,6 @@ import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
-import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 function value(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
@@ -106,9 +105,7 @@ function buildVaeroexAuditSummary(companyName: string, mainProblem: string, orga
 }
 
 export async function generateWorkspaceFromSetupAction(formData: FormData) {
-  const resetOperationId = value(formData, "reset_operation_id");
-
-  if (!resetOperationId && !VAEROEX_SYSTEM_PROMPT.trim()) {
+  if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     redirect("/app/setup?error=Vaeroex%20prompt%20is%20not%20configured.");
   }
 
@@ -136,17 +133,15 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     redirect(`/billing-required?reason=${encodeURIComponent(subscription.reason)}`);
   }
 
-  if (!resetOperationId) {
-    const workspaceLimit = await isUsageLimitReached({
-      supabase,
-      userId: user.id,
-      email: user.email,
-      limit: "workspaces"
-    });
+  const workspaceLimit = await isUsageLimitReached({
+    supabase,
+    userId: user.id,
+    email: user.email,
+    limit: "workspaces"
+  });
 
-    if (workspaceLimit.reached) {
-      redirect("/billing-required?reason=You%E2%80%99ve%20reached%20the%20limit%20for%20your%20current%20Vaeroex%20plan.");
-    }
+  if (workspaceLimit.reached) {
+    redirect("/billing-required?reason=You%E2%80%99ve%20reached%20the%20limit%20for%20your%20current%20Vaeroex%20plan.");
   }
 
   const businessName = value(formData, "business_name");
@@ -177,8 +172,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     !managedItems ||
     !desiredSystems
   ) {
-    const resetQuery = resetOperationId ? `&reset_operation=${encodeURIComponent(resetOperationId)}` : "";
-    redirect(`/app/setup?error=Complete%20all%20setup%20steps%20before%20generating%20the%20workspace.${resetQuery}`);
+    redirect("/app/setup?error=Complete%20all%20setup%20steps%20before%20generating%20the%20workspace.");
   }
 
   await supabase.from("profiles").upsert({
@@ -186,72 +180,6 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     email: user.email ?? null,
     full_name: user.user_metadata?.full_name ?? user.email ?? "Workspace Owner"
   });
-
-  if (resetOperationId) {
-    const { data: operation, error: operationError } = await supabase
-      .from("workspace_reset_operations")
-      .select("id,workspace_id,setup_mode,setup_status,status")
-      .eq("id", resetOperationId)
-      .eq("setup_mode", "guided")
-      .in("setup_status", ["pending", "in_progress"])
-      .in("status", ["recoverable", "completed", "partial"])
-      .maybeSingle();
-
-    if (operationError || !operation) {
-      redirect(`/app/setup?reset_operation=${encodeURIComponent(resetOperationId)}&error=This%20guided%20setup%20operation%20is%20not%20available.`);
-    }
-
-    const workspaceContext = await getWorkspaceContext();
-    if (workspaceContext.activeWorkspace?.id !== operation.workspace_id) {
-      redirect(`/app/setup?reset_operation=${encodeURIComponent(resetOperationId)}&error=This%20guided%20setup%20operation%20does%20not%20match%20your%20active%20workspace.`);
-    }
-
-    const { data: membership } = await supabase
-      .from("workspace_members")
-      .select("id")
-      .eq("workspace_id", operation.workspace_id)
-      .eq("user_id", user.id)
-      .eq("status", "active")
-      .in("role", ["owner", "admin"])
-      .maybeSingle();
-
-    if (!membership) {
-      redirect(`/app/setup?reset_operation=${encodeURIComponent(resetOperationId)}&error=Workspace%20owner%20or%20admin%20access%20is%20required.`);
-    }
-
-    const { error: setupError } = await supabase.rpc("complete_workspace_reset_guided_setup", {
-      p_workspace_id: operation.workspace_id,
-      p_operation_id: resetOperationId,
-      p_business_name: businessName,
-      p_industry: category.name,
-      p_team_size: teamSize,
-      p_locations: locations,
-      p_current_tools: currentTools,
-      p_main_problem: mainProblem,
-      p_organization_description: organizationDescription,
-      p_missed_often: missedOften,
-      p_managed_items: managedItems,
-      p_desired_focus: desiredSystems,
-      p_raw_answers: {
-        businessName,
-        categoryId: category.id,
-        organizationType: category.name,
-        organizationDescription,
-        locations,
-        currentTools,
-        missedOften,
-        managedItems,
-        desiredSystems,
-        complianceNotice: category.complianceNotice || null
-      }
-    });
-
-    if (setupError) {
-      redirect(`/app/setup?reset_operation=${encodeURIComponent(resetOperationId)}&error=${encodeURIComponent("Vaeroex could not save guided setup safely. No sample business evidence was created.")}`);
-    }
-
-    redirect(`/app?message=${encodeURIComponent("Guided setup completed. Add original business evidence when you are ready.")}`);
-  }
 
   const { data: workspace, error: workspaceError } = await supabase
     .from("workspaces")
