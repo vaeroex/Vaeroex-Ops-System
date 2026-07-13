@@ -36,6 +36,8 @@ export default async function ChecklistRunsPage({ searchParams }: ChecklistRunsP
       .from("checklists")
       .select("*")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("name", { ascending: true }),
     supabase
       .from("checklist_runs")
@@ -47,8 +49,9 @@ export default async function ChecklistRunsPage({ searchParams }: ChecklistRunsP
   ]);
   const people = (peopleResult.data || []) as TeamPersonOption[];
   const checklistNameById = new Map((checklists || []).map((checklist) => [checklist.id, checklist.name]));
+  const activeChecklistIds = new Set((checklists || []).map((checklist) => checklist.id));
   const peopleById = new Map(people.map((person) => [person.id, person.full_name]));
-  const managedRuns = (runs || []).map((run) => {
+  const managedRuns = (runs || []).filter((run) => activeChecklistIds.has(run.checklist_id)).map((run) => {
     const management = managedValues(run);
     const checklistName = checklistNameById.get(run.checklist_id) || "Checklist";
     const owner =

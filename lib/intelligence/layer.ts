@@ -1,6 +1,7 @@
 import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -193,18 +194,23 @@ function businessSignalPatternTitle(signals: TaskRow[]) {
 
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
-  const kpis = filterOriginalBusinessEvidence(input.kpis);
+  const files = filterOriginalBusinessEvidence(input.files);
+  const parentEligibility = buildSourceParentEligibility({ files, imports: input.imports || [] });
+  const kpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility);
   const tasks = filterOriginalBusinessEvidence(input.tasks);
   const issues = filterOriginalBusinessEvidence(input.issues);
-  const files = filterOriginalBusinessEvidence(input.files);
-  const reports = filterOriginalBusinessEvidence(input.reports);
+  // Reports are derived outputs. They remain reviewable, but never become
+  // original evidence for new health, coverage, risk, or recommendation logic.
+  const reports: ReportRow[] = [];
   const vaeroexRuns: VaeroexRunRow[] = [];
   // Customer activity is evidence only when it is traceable to an import or file.
-  const crmLeads = filterOriginalBusinessEvidence(input.crmLeads).filter((lead) => Boolean(lead.source_file_id || lead.import_id));
+  const crmLeads = filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.crmLeads), parentEligibility)
+    .filter((lead) => Boolean(lead.source_file_id || lead.import_id));
   const imports = [] as FileImportRow[];
   const sops = filterOriginalBusinessEvidence(input.sops);
   const forms = filterOriginalBusinessEvidence(input.forms);
-  const submissions = filterOriginalBusinessEvidence(input.submissions);
+  const activeFormIds = new Set(forms.map((form) => form.id));
+  const submissions = filterOriginalBusinessEvidence(input.submissions).filter((submission) => activeFormIds.has(submission.form_id));
   const people = filterOriginalBusinessEvidence(input.people);
   const decisions: DecisionRow[] = [];
   const recommendationOutcomes: RecommendationOutcomeRow[] = [];

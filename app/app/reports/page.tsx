@@ -6,6 +6,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { ReportLifecycleMenu } from "@/components/reports/ReportLifecycleMenu";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import {
   REPORT_FILTERS,
   isPrimaryReportType,
@@ -167,9 +168,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     supabase.from("issues").select("id,title,description,root_cause,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(100)
   ]);
 
-  const evidenceErrors = [filesResult.error, kpisResult.error, signalsResult.error, issuesResult.error].filter(Boolean);
+  const parentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: kpisResult.data || [] });
+  const evidenceErrors = [filesResult.error, kpisResult.error, signalsResult.error, issuesResult.error, parentResult.error].filter(Boolean);
   const files = filterOriginalBusinessEvidence(filesResult.data || []);
-  const kpis = filterOriginalBusinessEvidence(kpisResult.data || []);
+  const parentEligibility = parentResult.eligibility;
+  const kpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpisResult.data || []), parentEligibility);
   const signals = filterOriginalBusinessEvidence(signalsResult.data || []);
   const issues = filterOriginalBusinessEvidence(issuesResult.data || []);
   const originalEvidenceCount = independentOriginalEvidenceKeys([

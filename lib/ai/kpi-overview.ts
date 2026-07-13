@@ -5,6 +5,7 @@ import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { fetchWithOpenAIResilience, getOpenAIRetrySettings, type OpenAIRetrySettings } from "@/lib/ai/openai-resilience";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
@@ -317,8 +318,6 @@ export async function loadKpiOverviewData({
       .order("sort_order", { ascending: true })
       .order("weight", { ascending: false })
   ]);
-  const queryMs = Date.now() - queryStartedAt;
-
   if (kpiResult.error) {
     throw new Error(kpiResult.error.message || "Vaeroex could not load KPI records.");
   }
@@ -327,8 +326,11 @@ export async function loadKpiOverviewData({
     throw new Error(settingsResult.error.message || "Vaeroex could not load KPI settings.");
   }
 
-  const rows = (kpiResult.data || []) as KpiRow[];
+  const rawRows = (kpiResult.data || []) as KpiRow[];
   const settings = (settingsResult.data || []) as KpiSettingRow[];
+  const parentEligibility = await loadSourceParentEligibility({ supabase, workspaceId, rows: rawRows });
+  const rows = filterBySourceParentEligibility(rawRows, parentEligibility);
+  const queryMs = Date.now() - queryStartedAt;
 
   return {
     rows,

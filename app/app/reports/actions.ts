@@ -7,6 +7,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys, sanitizeBusinessEvidenceText } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -549,6 +550,17 @@ async function fetchReportSource(
     throw new Error("Required report source data could not be loaded. No report was created.");
   }
 
+  const parentEligibility = await loadSourceParentEligibility({
+    supabase,
+    workspaceId,
+    rows: [
+      ...((kpis.data ?? []) as KpiRow[]),
+      ...((crmLeads.data ?? []) as CrmLeadRow[]),
+      ...((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]),
+      ...((operationalMetrics.data ?? []) as OperationalMetricRow[])
+    ]
+  });
+
   const taskRows = filterOriginalBusinessEvidence((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
   const issueRows = filterOriginalBusinessEvidence((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
   const eligibleChecklistIds = new Set(filterOriginalBusinessEvidence((checklistDefinitions.data ?? []) as ChecklistRow[]).map((row) => row.id));
@@ -561,7 +573,7 @@ async function fetchReportSource(
   const submissionRows = filterOriginalBusinessEvidence((submissions.data ?? []) as FormSubmissionRow[]).filter((row) => eligibleFormIds.has(row.form_id) && matchesCategory(category, {}, "Forms"));
   const assetRows = filterOriginalBusinessEvidence((assets.data ?? []) as AssetRow[]).filter(() => matchesCategory(category, {}, "Assets"));
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
-  const eligibleKpis = filterOriginalBusinessEvidence((kpis.data ?? []) as KpiRow[]);
+  const eligibleKpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence((kpis.data ?? []) as KpiRow[]), parentEligibility);
   const kpiRows = (sortKpiRowsBySettings(applyKpiSettingsToRows(eligibleKpis, kpiSettingRows), kpiSettingRows) as KpiRow[]).filter((kpi) =>
     matchesCategory(category, kpi, "KPIs")
   );
@@ -569,10 +581,17 @@ async function fetchReportSource(
   const fileRows = filterOriginalBusinessEvidence((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const activeFileIds = new Set(fileRows.map((row) => row.id));
   const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter((row) => activeFileIds.has(row.file_upload_id) && matchesCategory(category, {}, "Files"));
-  const crmLeadRows = filterOriginalBusinessEvidence((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
+  const crmLeadRows = filterBySourceParentEligibility(
+    filterOriginalBusinessEvidence((crmLeads.data ?? []) as CrmLeadRow[]),
+    parentEligibility
+  ).filter(() => matchesCategory(category, {}, "Customer Evidence"));
   const activeCustomerEvidenceIds = new Set(crmLeadRows.map((row) => row.id));
-  const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter((row) => activeCustomerEvidenceIds.has(row.lead_id) && matchesCategory(category, {}, "Customer Evidence"));
-  const operationalMetricRows = filterOriginalBusinessEvidence((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter(
+  const crmLeadHistoryRows = filterBySourceParentEligibility((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[], parentEligibility)
+    .filter((row) => activeCustomerEvidenceIds.has(row.lead_id) && matchesCategory(category, {}, "Customer Evidence"));
+  const operationalMetricRows = filterBySourceParentEligibility(
+    filterOriginalBusinessEvidence((operationalMetrics.data ?? []) as OperationalMetricRow[]),
+    parentEligibility
+  ).filter(
     (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
 

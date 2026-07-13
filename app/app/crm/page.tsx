@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -46,14 +47,16 @@ function MetricCard({ label, value, note }: { label: string; value: string | num
 export default async function CrmPage({ searchParams }: CrmPageProps) {
   const params = await searchParams;
   const { supabase, workspaceId } = await requireWorkspacePage();
-  const [entryResult, historyResult] = await Promise.all([
-    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(250),
-    supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(500)
+  const [entryResult, historyResult, archivedResult] = await Promise.all([
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(250),
+    supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(500),
+    supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("archived_at", "is", null).is("deleted_at", null)
   ]);
-  const entries = ((entryResult.data || []) as CrmLeadRow[]).filter((entry) => !entry.deleted_at);
+  const rawEntries = (entryResult.data || []) as CrmLeadRow[];
+  const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: rawEntries });
+  const entries = filterBySourceParentEligibility(rawEntries, sourceParentResult.eligibility);
   const history = (historyResult.data || []) as CrmLeadHistoryRow[];
   const importedEntries = entries.filter((entry) => entry.source_file_id || entry.import_id);
-  const archivedEntries = entries.filter((entry) => entry.archived_at);
   const latestEntryDate = entries.map((entry) => entry.last_activity_at || entry.updated_at || entry.created_at).filter(Boolean).sort().at(-1);
 
   return (
@@ -64,7 +67,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
         description="This compatibility view preserves older customer activity evidence for intelligence context. Vaeroex no longer provides customer-record management workflows."
       />
 
-      <ErrorNotice message={param(params?.error) || entryResult.error?.message || historyResult.error?.message} />
+      <ErrorNotice message={param(params?.error) || entryResult.error?.message || historyResult.error?.message || archivedResult.error?.message || sourceParentResult.error?.message} />
 
       <section className="rounded-xl border border-amber-300/25 bg-amber-950/20 p-4 text-amber-50">
         <p className="text-sm font-semibold">Read-only compatibility view</p>
@@ -84,7 +87,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Historical entries" value={entries.length} note="Stored for evidence only." />
         <MetricCard label="Uploaded or imported" value={importedEntries.length} note="Evidence from files or older imports." />
-        <MetricCard label="Archived entries" value={archivedEntries.length} note="Preserved historical context." />
+        <MetricCard label="Archived entries" value={archivedResult.count || 0} note="Excluded from active intelligence." />
         <MetricCard label="Latest evidence" value={readableDate(latestEntryDate)} note="Most recent stored activity date." />
       </section>
 

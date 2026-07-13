@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { categoryConfig, categoryLabel, type ReportSubscriptionCategory } from "@/lib/reports/subscriptions";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type AdminSupabase = SupabaseClient<Database>;
@@ -101,13 +102,22 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
     throw new Error("Required scheduled-report source data could not be loaded. No report was created.");
   }
 
+  const parentEligibility = await loadSourceParentEligibility({
+    supabase,
+    workspaceId,
+    rows: [...(kpis.data || []), ...(crm.data || [])]
+  });
+
   const taskRows = filterOriginalBusinessEvidence(tasks.data || []);
   const issueRows = filterOriginalBusinessEvidence(issues.data || []);
   const eligibleChecklistIds = new Set(filterOriginalBusinessEvidence(checklistDefinitions.data || []).map((row) => row.id));
   const checklistRows = filterOriginalBusinessEvidence(checklistRuns.data || []).filter((row) => eligibleChecklistIds.has(row.checklist_id));
   const kpiSettingRows = (kpiSettings.data || []) as KpiSettingRow[];
-  const kpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(filterOriginalBusinessEvidence(kpis.data || []), kpiSettingRows), kpiSettingRows);
-  const crmRows = filterOriginalBusinessEvidence(crm.data || []);
+  const kpiRows = sortKpiRowsBySettings(
+    applyKpiSettingsToRows(filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpis.data || []), parentEligibility), kpiSettingRows),
+    kpiSettingRows
+  );
+  const crmRows = filterBySourceParentEligibility(filterOriginalBusinessEvidence(crm.data || []), parentEligibility);
   const assignmentRows = filterOriginalBusinessEvidence(assignments.data || []);
   const fileRows = filterOriginalBusinessEvidence(files.data || []);
   const openTasks = taskRows.filter((task) => !["Done", "Complete"].includes(task.status || ""));

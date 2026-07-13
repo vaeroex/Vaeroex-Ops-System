@@ -14,6 +14,7 @@ import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import {
   applyKpiSettingsToRows,
@@ -1838,9 +1839,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const rawCustomerEvidence = crmResult.data || [];
+  const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: [...rawKpis, ...rawCustomerEvidence] });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const eligibleKpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
+  const eligibleCustomerEvidence = filterBySourceParentEligibility(rawCustomerEvidence, sourceParentEligibility);
   const sourceFiles = (fileResult.data || []) as FileUploadRow[];
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
-  const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[];
+  const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(eligibleKpis, kpiSettings), kpiSettings) as KpiRow[];
   const timeline = isKpiTimeline(params?.timeline) ? params.timeline : "90D";
   const selectedTimelineRange = timelineRange(timeline, adjustedKpis.length ? adjustedKpis : rawKpis, params?.start, params?.end);
   const activeStatusFilter = isKpiStatusFilter(params?.status) ? params.status : "all";
@@ -1865,12 +1871,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     issues: issueResult.data || [],
     assets: [],
     checklists: [],
-    checklistRuns: checklistRunResult.data || [],
+    checklistRuns: [],
     sops: [],
     files: fileResult.data || [],
     imports: [],
-    crmLeads: crmResult.data || [],
-    reports: reportResult.data || [],
+    crmLeads: eligibleCustomerEvidence,
+    reports: [],
     vaeroexRuns: [],
     operationalMetrics: [],
     notifications: notificationResult.data || [],
@@ -2035,7 +2041,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     fileResult.error?.message ||
     reportResult.error?.message ||
     notificationResult.error?.message ||
-    kpiSettingsResult.error?.message
+    kpiSettingsResult.error?.message ||
+    sourceParentResult.error?.message
         }
       />
       <SuccessNotice message={params?.message} />

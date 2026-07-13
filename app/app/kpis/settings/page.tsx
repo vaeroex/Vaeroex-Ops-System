@@ -13,6 +13,7 @@ import {
   KPI_COLOR_PALETTE,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -287,11 +288,16 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
       .from("kpis")
       .select("*")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
-  const kpis = (kpiResult.data || []) as KpiRow[];
+  const rawKpis = (kpiResult.data || []) as KpiRow[];
+  const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: rawKpis });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const kpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
   const settings = (settingsResult.data || []) as KpiSettingRow[];
   const latest = latestByMetric(kpis);
   const names = metricNames(kpis, settings);
@@ -319,7 +325,7 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
           { label: "Settings", href: "/app/kpis/settings" as Route, active: true }
         ]}
       />
-      <ErrorNotice message={params?.error || kpiResult.error?.message || settingsResult.error?.message} />
+      <ErrorNotice message={params?.error || kpiResult.error?.message || settingsResult.error?.message || sourceParentResult.error?.message} />
       <SuccessNotice message={params?.message} />
 
       {!canManage ? (

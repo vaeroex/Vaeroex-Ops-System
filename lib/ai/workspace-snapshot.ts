@@ -6,6 +6,7 @@ import {
   filterOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database } from "@/lib/supabase/types";
 
 function uniqueStrings(values: Array<string | null | undefined>) {
@@ -37,9 +38,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     reports,
     vaeroexRuns,
     fileCount,
-    kpiCount,
-    crmLeadCount,
-    operationalMetricCount,
     formCount,
     checklistCount,
     sopCount,
@@ -147,9 +145,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .order("created_at", { ascending: false })
       .limit(5),
     supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
-    supabase.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
-    supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
-    supabase.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
     supabase.from("forms").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
     supabase.from("checklists").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
     supabase.from("sops").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
@@ -223,14 +218,30 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .order("created_at", { ascending: false })
       .limit(20)
   ]);
+  const parentEligibility = await loadSourceParentEligibility({
+    supabase,
+    workspaceId,
+    rows: [
+      ...(recentKpis.data ?? []),
+      ...(recentCrmLeads.data ?? []),
+      ...(recentCrmLeadHistory.data ?? []),
+      ...(recentOperationalMetrics.data ?? [])
+    ]
+  });
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
-  const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(filterOriginalBusinessEvidence(recentKpis.data ?? []), kpiSettingRows), kpiSettingRows);
+  const recentKpiRows = sortKpiRowsBySettings(
+    applyKpiSettingsToRows(
+      filterBySourceParentEligibility(filterOriginalBusinessEvidence(recentKpis.data ?? []), parentEligibility),
+      kpiSettingRows
+    ),
+    kpiSettingRows
+  );
   const kpiForecastReadiness = buildKpiForecastEligibility(recentKpiRows as Database["public"]["Tables"]["kpis"]["Row"][]);
   const recentFileRows = filterOriginalBusinessEvidence(recentFiles.data ?? []).map((file) => ({
     ...file,
     analysis_summary: sanitizeBusinessEvidenceText(file.analysis_summary) || null
   }));
-  const recentLeadRows = filterOriginalBusinessEvidence(recentCrmLeads.data ?? []);
+  const recentLeadRows = filterBySourceParentEligibility(filterOriginalBusinessEvidence(recentCrmLeads.data ?? []), parentEligibility);
   const recentTaskRows = filterOriginalBusinessEvidence(recentTasks.data ?? []);
   const recentIssueRows = filterOriginalBusinessEvidence(recentIssues.data ?? []);
   const recentChecklistRows = filterOriginalBusinessEvidence(checklists.data ?? []);
@@ -244,10 +255,14 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
   const recentChecklistRunRows = filterOriginalBusinessEvidence(checklistRuns.data ?? []).filter((row) => eligibleChecklistIds.has(row.checklist_id));
   const recentAssetRows = filterOriginalBusinessEvidence(assets.data ?? []);
   const activeCustomerEvidenceIds = new Set(recentLeadRows.map((row) => row.id));
-  const recentCustomerHistoryRows = (recentCrmLeadHistory.data ?? []).filter((row) => activeCustomerEvidenceIds.has(row.lead_id));
+  const recentCustomerHistoryRows = filterBySourceParentEligibility(recentCrmLeadHistory.data ?? [], parentEligibility)
+    .filter((row) => activeCustomerEvidenceIds.has(row.lead_id));
   const activeFileIds = new Set(recentFileRows.map((row) => row.id));
   const recentImportRows = (recentFileImports.data ?? []).filter((row) => activeFileIds.has(row.file_upload_id));
-  const recentOperationalMetricRows = filterOriginalBusinessEvidence(recentOperationalMetrics.data ?? []);
+  const recentOperationalMetricRows = filterBySourceParentEligibility(
+    filterOriginalBusinessEvidence(recentOperationalMetrics.data ?? []),
+    parentEligibility
+  );
   const eligibleVaeroexRuns = filterBusinessEvidence(vaeroexRuns.data ?? [], { sourceKind: "platform_run" });
   const analyzedFiles = recentFileRows.filter((file) => Boolean(file.analysis_summary));
   const pendingImports = recentImportRows.filter((item) => ["extracted", "needs_review"].includes(item.status));
@@ -262,7 +277,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     },
     kpi_dashboard: {
       exists: true,
-      records: kpiCount.count ?? 0,
+      records: recentKpiRows.length,
       current_kpis: kpiForecastReadiness.currentKpiCount,
       forecast_readiness: {
         state: kpiForecastReadiness.state,
@@ -287,7 +302,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     },
     crm_pipeline: {
       exists: true,
-      records: crmLeadCount.count ?? 0,
+      records: recentLeadRows.length,
       statuses: countByStatus(recentLeadRows),
       guidance: "Customer activity records may exist as source context from external systems or imports. Use them only as evidence for revenue, retention, response quality, or customer-risk intelligence. Do not describe Vaeroex as a CRM or lead-management system."
     },
@@ -350,8 +365,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     }
   };
   const gaps = [
-    !(kpiCount.count ?? 0) ? "KPI Dashboard exists but has no KPI records yet." : "",
-    !(crmLeadCount.count ?? 0) ? "Customer activity context exists but has no customer evidence records yet." : "",
+    !recentKpiRows.length ? "KPI Dashboard exists but has no eligible KPI records yet." : "",
+    !recentLeadRows.length ? "Customer activity context exists but has no eligible customer evidence records yet." : "",
     !(sopCount.count ?? 0) ? "SOP Library exists but has no SOP records yet." : "",
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
@@ -382,12 +397,12 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       flagged_assets: flaggedAssetCount,
       form_submissions: recentSubmissionRows.length,
       uploaded_files: fileCount.count ?? 0,
-      kpi_history_records: kpiCount.count ?? 0,
+      kpi_history_records: recentKpiRows.length,
       current_kpis: kpiForecastReadiness.currentKpiCount,
       forecast_ready_kpis: kpiForecastReadiness.readyKpiCount,
       directional_forecast_kpis: kpiForecastReadiness.directionalKpiCount,
-      crm_leads: crmLeadCount.count ?? 0,
-      operational_metrics: operationalMetricCount.count ?? 0,
+      crm_leads: recentLeadRows.length,
+      operational_metrics: recentOperationalMetricRows.length,
       forms: formCount.count ?? 0,
       checklists: checklistCount.count ?? 0,
       sops: sopCount.count ?? 0,
@@ -404,7 +419,16 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     assets: recentAssetRows,
     people: recentPeopleRows,
     sops: recentSopRows,
-    reports: recentReportRows,
+    reports: recentReportRows.map((report) => ({
+      id: report.id,
+      title: report.title,
+      report_type: report.report_type,
+      date_range_start: report.date_range_start,
+      date_range_end: report.date_range_end,
+      created_at: report.created_at,
+      evidence_role: "derived_analysis",
+      evidence_limitation: "Saved report conclusions are not reused as current business evidence."
+    })),
     recent_vaeroex_results: eligibleVaeroexRuns,
     kpi_history: recentKpiRows,
     kpi_settings: kpiSettingRows,

@@ -6,6 +6,7 @@ import { ManagedRecordList, type ManagedRecordEditField } from "@/components/ope
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
@@ -50,33 +51,41 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       .eq("workspace_id", workspaceId)
       .order("full_name", { ascending: true }),
     getRecordFolders(supabase, workspaceId, "people"),
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
-    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(200),
-    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(200),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
     supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50)
   ]);
   const peopleRows = (people || []) as PersonRow[];
+  const sourceParentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [...(kpiResult.data || []), ...(crmResult.data || [])]
+  });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const eligibleKpis = filterBySourceParentEligibility(kpiResult.data || [], sourceParentEligibility);
+  const eligibleCustomerEvidence = filterBySourceParentEligibility(crmResult.data || [], sourceParentEligibility);
   const today = new Date().toISOString().slice(0, 10);
   const intelligence = buildPrestigeIntelligence({
     workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
     isDemoWorkspace: false,
     periodLabel: "People",
     range: { startDate: today, endDate: today, previousStartDate: today, previousEndDate: today },
-    kpis: kpiResult.data || [],
+    kpis: eligibleKpis,
     tasks: taskResult.data || [],
     issues: issueResult.data || [],
     assets: [],
     checklists: [],
-    checklistRuns: checklistRunResult.data || [],
+    checklistRuns: [],
     sops: [],
     files: [],
     imports: [],
-    crmLeads: crmResult.data || [],
-    reports: reportResult.data || [],
+    crmLeads: eligibleCustomerEvidence,
+    reports: [],
     vaeroexRuns: [],
     operationalMetrics: [],
     notifications: notificationResult.data || [],
@@ -142,7 +151,8 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
           checklistRunResult.error?.message ||
           crmResult.error?.message ||
           reportResult.error?.message ||
-          notificationResult.error?.message
+          notificationResult.error?.message ||
+          sourceParentResult.error?.message
         }
       />
 

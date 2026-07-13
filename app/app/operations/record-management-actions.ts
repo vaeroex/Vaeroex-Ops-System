@@ -722,28 +722,40 @@ export async function manageRecordAction(formData: FormData) {
     redirectWithError(path, error instanceof Error ? error.message : "Record action was blocked by Vaeroex security policy.");
   }
 
-  if (collection === "tasks" && (action === "archive" || action === "delete" || action === "restore")) {
+  if ((collection === "tasks" || collection === "files") && (action === "archive" || action === "delete" || action === "restore")) {
     const lifecycleClient = supabase as unknown as {
-      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id: string }> | null; error: { message: string } | null }>;
+      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id?: string; file_id?: string }> | null; error: { message: string } | null }>;
     };
-    const { data, error } = await lifecycleClient.rpc("update_business_signal_lifecycle", {
-      p_workspace_id: workspaceId,
-      p_signal_id: recordId,
-      p_action: action
-    });
+    const { data, error } = collection === "tasks"
+      ? await lifecycleClient.rpc("update_business_signal_lifecycle", {
+          p_workspace_id: workspaceId,
+          p_signal_id: recordId,
+          p_action: action
+        })
+      : await lifecycleClient.rpc("update_source_file_lifecycle", {
+          p_workspace_id: workspaceId,
+          p_file_id: recordId,
+          p_action: action
+        });
 
     if (error || !data?.length) {
-      redirectWithError(path, friendlyMutationError(error?.message, "Business Signal could not be changed. Refresh and try again."));
+      redirectWithError(path, friendlyMutationError(error?.message, `${collection === "tasks" ? "Business Signal" : "Source"} could not be changed. Refresh and try again.`));
     }
 
     revalidateRelatedPaths(collection, path);
     redirectWithMessage(
       path,
-      action === "delete"
-        ? "Business Signal deleted and removed from active intelligence."
-        : action === "archive"
-          ? "Business Signal archived and excluded from active intelligence."
-          : "Business Signal restored without duplicating its learned evidence."
+      collection === "files"
+        ? action === "delete"
+          ? "Source deleted from active views and removed from active intelligence."
+          : action === "archive"
+            ? "Source archived and excluded from active intelligence."
+            : "Source restored without duplicating its learned evidence."
+        : action === "delete"
+          ? "Business Signal deleted and removed from active intelligence."
+          : action === "archive"
+            ? "Business Signal archived and excluded from active intelligence."
+            : "Business Signal restored without duplicating its learned evidence."
     );
   }
 
@@ -824,6 +836,32 @@ export async function bulkManageRecordsAction(formData: FormData) {
     );
   } catch (error) {
     redirectWithError(path, error instanceof Error ? error.message : "Bulk action was blocked by Vaeroex security policy.");
+  }
+
+  if ((collection === "tasks" || collection === "files") && (action === "archive" || action === "delete" || action === "restore")) {
+    const lifecycleClient = supabase as unknown as {
+      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id?: string; file_id?: string }> | null; error: { message: string } | null }>;
+    };
+    const results = await Promise.all(ids.map((recordId) => collection === "tasks"
+      ? lifecycleClient.rpc("update_business_signal_lifecycle", {
+          p_workspace_id: workspaceId,
+          p_signal_id: recordId,
+          p_action: action
+        })
+      : lifecycleClient.rpc("update_source_file_lifecycle", {
+          p_workspace_id: workspaceId,
+          p_file_id: recordId,
+          p_action: action
+        })));
+    const failed = results.find((result) => result.error || !result.data?.length);
+
+    if (failed) {
+      redirectWithError(path, friendlyMutationError(failed.error?.message, `Selected ${collection === "tasks" ? "Business Signals" : "Sources"} could not all be changed. Refresh and try again.`));
+    }
+
+    revalidateRelatedPaths(collection, path);
+    const actionLabel = action === "delete" ? "deleted and removed from active intelligence" : action === "archive" ? "archived and excluded from active intelligence" : "restored";
+    redirectWithMessage(path, `${ids.length} ${collection === "tasks" ? "Business Signal" : "Source"}${ids.length === 1 ? "" : "s"} ${actionLabel}.`);
   }
 
   const query = dbClient(supabase).from(config.table).update(update) as {

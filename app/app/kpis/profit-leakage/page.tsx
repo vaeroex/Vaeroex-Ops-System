@@ -5,6 +5,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { calculateProfitLeakage } from "@/lib/intelligence/profit-leakage";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
 export const dynamic = "force-dynamic";
@@ -13,15 +14,21 @@ export default async function ProfitLeakagePage() {
   const { supabase, workspaceId } = await requireWorkspacePage();
   const [filesResult, kpisResult, metricsResult] = await Promise.all([
     supabase.from("file_uploads").select("id,display_name,analysis_summary,metadata_json,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(200),
-    supabase.from("kpis").select("id,name,source,notes,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(300),
-    supabase.from("operational_metrics").select("id,metric_name,category,notes,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(300)
+    supabase.from("kpis").select("id,name,source,notes,source_file_id,import_id,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(300),
+    supabase.from("operational_metrics").select("id,metric_name,category,notes,source_file_id,import_id,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(300)
   ]);
+  const parentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [...(kpisResult.data || []), ...(metricsResult.data || [])]
+  });
+  const parentEligibility = parentResult.eligibility;
   const files = filterOriginalBusinessEvidence(filesResult.data || []);
-  const kpis = filterOriginalBusinessEvidence(kpisResult.data || []);
-  const metrics = filterOriginalBusinessEvidence(metricsResult.data || []);
+  const kpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpisResult.data || []), parentEligibility);
+  const metrics = filterBySourceParentEligibility(filterOriginalBusinessEvidence(metricsResult.data || []), parentEligibility);
   const sources = [...files.map((row) => `file:${row.id}`), ...kpis.map((row) => `kpi:${row.id}`), ...metrics.map((row) => `metric:${row.id}`)];
   const result = calculateProfitLeakage([], new Set(sources));
-  const error = filesResult.error || kpisResult.error || metricsResult.error;
+  const error = filesResult.error || kpisResult.error || metricsResult.error || parentResult.error;
 
   return (
     <div className="space-y-6 text-slate-100">

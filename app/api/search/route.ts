@@ -15,6 +15,7 @@ import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -146,7 +147,7 @@ function addGroup(groups: Map<GlobalSearchGroupLabel, GlobalSearchResult[]>, lab
   groups.set(label, [...(groups.get(label) || []), ...results].slice(0, 6));
 }
 
-async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   const { data, error } = await request;
   if (error) {
     console.warn("[global-search] skipped source:", error.message);
@@ -156,7 +157,7 @@ async function safeResults<T>(request: PromiseLike<{ data: T[] | null; error: { 
   return data || [];
 }
 
-async function scopedResults<T>(enabled: boolean, request: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>) {
+async function scopedResults<T>(enabled: boolean, request: () => PromiseLike<{ data: T[] | null; error: { message: string } | null }>): Promise<T[]> {
   return enabled ? safeResults(request()) : [];
 }
 
@@ -449,13 +450,13 @@ export async function GET(request: Request) {
     /\b(weakest|worst|biggest risk|biggest opportunity|current priorities|what changed|changed this week|take me to)\b/i.test(query);
 
   const [
-    kpis,
+    rawKpis,
     reports,
     files,
     issues,
     tasks,
     assignments,
-    crmLeads,
+    rawCrmLeads,
     sops,
     checklists,
     people,
@@ -631,6 +632,14 @@ export async function GET(request: Request) {
         )
       : Promise.resolve([])
   ]);
+  const sourceParentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [...rawKpis, ...rawCrmLeads]
+  });
+  const sourceParentEligibility = sourceParentResult.eligibility;
+  const kpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
+  const crmLeads = filterBySourceParentEligibility(rawCrmLeads, sourceParentEligibility);
   let learnedKnowledgePage = learnedKnowledgeCandidates;
   let learnedKnowledge = await filterEligibleMemoryRowsByLifecycle({
     supabase,
@@ -662,7 +671,7 @@ export async function GET(request: Request) {
   learnedKnowledge = learnedKnowledge.slice(0, 6);
 
   let answerKpis = kpis;
-  let answerReports = reports;
+  let answerReports: ReportRow[] = [];
   let answerFiles = files;
   let answerIssues = issues;
   let answerTasks = tasks;
@@ -674,7 +683,7 @@ export async function GET(request: Request) {
     answerKpis = overviewData.rows;
     answerKpiSummary = overviewData.summary;
   } else if (shouldBuildAnswer) {
-    const [recentKpis, recentReports, recentFiles, recentIssues, recentTasks, recentRecommendations] = await Promise.all([
+    const [recentKpis, recentFiles, recentIssues, recentTasks, recentRecommendations] = await Promise.all([
       scopedResults<KpiRow>(
         includesDomain("kpis", "financials", "business_health"),
         () => supabase
@@ -685,17 +694,6 @@ export async function GET(request: Request) {
           .is("archived_at", null)
           .order("metric_date", { ascending: false })
           .limit(120)
-      ),
-      scopedResults<ReportRow>(
-        includesDomain("reports", "decisions"),
-        () => supabase
-          .from("reports")
-          .select("*")
-          .eq("workspace_id", workspaceId)
-          .is("deleted_at", null)
-          .is("archived_at", null)
-          .order("created_at", { ascending: false })
-          .limit(12)
       ),
       scopedResults<FileUploadRow>(
         includesDomain("files", "data_quality"),
@@ -744,7 +742,9 @@ export async function GET(request: Request) {
     ]);
 
     answerKpis = recentKpis.length ? recentKpis : kpis;
-    answerReports = recentReports.length ? recentReports : reports;
+    // Reports remain navigation results, but derived report activity is not
+    // treated as a new business condition in Search or Ask answers.
+    answerReports = [];
     answerFiles = recentFiles.length ? recentFiles : files;
     answerIssues = recentIssues.length ? recentIssues : issues;
     answerTasks = recentTasks.length ? recentTasks : tasks;
@@ -771,7 +771,7 @@ export async function GET(request: Request) {
       id: report.id,
       title: report.title,
       sourceType: `Derived report · ${report.report_type}`,
-      preview: truncate(report.body_markdown),
+      preview: "Saved derived analysis. Review its original evidence before using its conclusions.",
       href: hrefWithQuery("/app/reports", report.title),
       meta: report.created_at
     }))
