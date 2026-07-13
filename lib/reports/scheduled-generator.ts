@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { categoryConfig, categoryLabel, type ReportSubscriptionCategory } from "@/lib/reports/subscriptions";
-import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
 type AdminSupabase = SupabaseClient<Database>;
@@ -73,21 +73,23 @@ function list(values: string[], fallback: string) {
 }
 
 async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: string, start: Date, end: Date) {
-  const [tasks, issues, checklists, kpis, kpiSettings, crm, assignments, files] = await Promise.all([
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(300),
+  const [tasks, issues, checklistRuns, checklistDefinitions, kpis, kpiSettings, crm, assignments, files] = await Promise.all([
+    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("checklists").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(300),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
-    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true }).limit(100),
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("due_date", { ascending: true }).limit(100),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100)
   ]);
 
   const sourceErrors = [
     tasks.error,
     issues.error,
-    checklists.error,
+    checklistRuns.error,
+    checklistDefinitions.error,
     kpis.error,
     kpiSettings.error,
     crm.error,
@@ -101,11 +103,12 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
 
   const taskRows = filterOriginalBusinessEvidence(tasks.data || []);
   const issueRows = filterOriginalBusinessEvidence(issues.data || []);
-  const checklistRows = checklists.data || [];
+  const eligibleChecklistIds = new Set(filterOriginalBusinessEvidence(checklistDefinitions.data || []).map((row) => row.id));
+  const checklistRows = filterOriginalBusinessEvidence(checklistRuns.data || []).filter((row) => eligibleChecklistIds.has(row.checklist_id));
   const kpiSettingRows = (kpiSettings.data || []) as KpiSettingRow[];
   const kpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(filterOriginalBusinessEvidence(kpis.data || []), kpiSettingRows), kpiSettingRows);
   const crmRows = filterOriginalBusinessEvidence(crm.data || []);
-  const assignmentRows = assignments.data || [];
+  const assignmentRows = filterOriginalBusinessEvidence(assignments.data || []);
   const fileRows = filterOriginalBusinessEvidence(files.data || []);
   const openTasks = taskRows.filter((task) => !["Done", "Complete"].includes(task.status || ""));
   const businessSignalsInPeriod = taskRows.filter((task) => inRange(task.due_date || task.created_at, start, end) || inRange(task.created_at, start, end));
@@ -121,12 +124,12 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const newLeads = crmRows.filter((lead) => inRange(lead.created_at, start, end));
   const openAssignments = assignmentRows.filter((assignment) => !["Done", "Dismissed"].includes(assignment.status || ""));
   const uploadedFiles = fileRows.filter((file) => inRange(file.created_at, start, end));
-  const originalSourceIds = new Set([
-    ...taskRows.map((row) => `signal:${row.id}`),
-    ...issueRows.map((row) => `issue:${row.id}`),
-    ...kpiRows.map((row) => `kpi:${row.name.trim().toLowerCase()}`),
-    ...crmRows.map((row) => `customer:${row.id}`),
-    ...fileRows.map((row) => `file:${row.id}`)
+  const originalSourceIds = independentOriginalEvidenceKeys([
+    { kind: "business_signal", values: taskRows },
+    { kind: "issue", values: issueRows },
+    { kind: "kpi", values: kpiRows },
+    { kind: "customer_evidence", values: crmRows },
+    { kind: "file", values: fileRows }
   ]);
 
   return {

@@ -37,6 +37,7 @@ type EvidenceRecord = {
   error_message?: string | null;
   title?: string | null;
   name?: string | null;
+  asset_name?: string | null;
   category?: string | null;
   description?: string | null;
   root_cause?: string | null;
@@ -209,6 +210,15 @@ export function filterBusinessEvidence<T extends object>(
   return (values || []).filter((value) => isBusinessEvidenceEligible(value, options));
 }
 
+export function isActiveLifecycleRecord<T extends object>(value: T) {
+  const recordValue = value as T & Pick<EvidenceRecord, "archived_at" | "deleted_at">;
+  return !recordValue.archived_at && !recordValue.deleted_at;
+}
+
+export function filterActiveLifecycleRecords<T extends object>(values: T[] | null | undefined) {
+  return (values || []).filter(isActiveLifecycleRecord);
+}
+
 /**
  * Original evidence is a workspace input, not a product-generated interpretation
  * of that input. Keeping this boundary here prevents reports, runs, and setup
@@ -228,6 +238,7 @@ export function isOriginalBusinessEvidence<T extends object>(
   const context = [
     recordValue.title,
     recordValue.name,
+    recordValue.asset_name,
     recordValue.category,
     recordValue.description,
     recordValue.root_cause,
@@ -256,6 +267,49 @@ export function filterOriginalBusinessEvidence<T extends object>(
   options?: { sourceKind?: EvidenceSourceKind }
 ) {
   return (values || []).filter((value) => isOriginalBusinessEvidence(value, options));
+}
+
+type OriginalEvidenceIdentityRecord = EvidenceRecord & {
+  id?: string | null;
+  name?: string | null;
+  source_file_id?: string | null;
+  import_id?: string | null;
+};
+
+export type OriginalEvidenceCollection = {
+  kind: string;
+  values: object[] | null | undefined;
+};
+
+/**
+ * Return stable identities for independently supported original sources. Rows
+ * derived from the same upload or import collapse to one source so repeated KPI
+ * history cannot satisfy a multi-source evidence threshold by itself.
+ */
+export function independentOriginalEvidenceKeys(collections: OriginalEvidenceCollection[]) {
+  const keys = new Set<string>();
+
+  collections.forEach(({ kind, values }) => {
+    filterOriginalBusinessEvidence(values).forEach((value) => {
+      const recordValue = value as OriginalEvidenceIdentityRecord;
+      const namedIdentity = kind === "kpi" ? normalized(recordValue.name) : "";
+      const sourceIdentity = recordValue.source_file_id
+        ? `source_file:${recordValue.source_file_id}`
+        : recordValue.import_id
+          ? `import:${recordValue.import_id}`
+          : kind === "file" && recordValue.id
+            ? `source_file:${recordValue.id}`
+          : namedIdentity
+            ? `${kind}:${namedIdentity}`
+            : recordValue.id
+              ? `${kind}:${recordValue.id}`
+              : null;
+
+      if (sourceIdentity) keys.add(sourceIdentity);
+    });
+  });
+
+  return keys;
 }
 
 export function isPlatformFailureText(value: string | null | undefined) {

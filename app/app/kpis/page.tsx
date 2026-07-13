@@ -1817,20 +1817,22 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       .from("kpis")
       .select("*")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).eq("status", "Done"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Done"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).eq("status", "Done"),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).neq("status", "Done"),
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("kpi_alert_rules").select("*").eq("workspace_id", workspaceId).eq("is_active", true).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(100),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(20),
+    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
+    supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
     supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);

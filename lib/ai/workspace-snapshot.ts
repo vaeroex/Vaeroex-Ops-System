@@ -3,6 +3,7 @@ import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import {
   filterBusinessEvidence,
+  filterOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
 import type { Database } from "@/lib/supabase/types";
@@ -24,11 +25,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
 
   const [
     workspace,
-    openTasks,
-    overdueTasks,
-    openIssues,
-    flaggedAssets,
-    submissions,
     recentTasks,
     recentIssues,
     recentForms,
@@ -61,11 +57,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     recentRecommendationOutcomes
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).neq("status", "Done"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).lt("due_date", today).neq("status", "Done"),
-    supabase.from("issues").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Closed"),
-    supabase.from("assets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).neq("status", "Ready"),
-    supabase.from("form_submissions").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase
       .from("tasks")
       .select("id,title,description,status,priority,category,due_date,ai_generated,created_at")
@@ -78,76 +69,99 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .from("issues")
       .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,due_date,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),
     supabase
       .from("forms")
       .select("id,name,description,form_type,schema_json,is_public,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("form_submissions")
       .select("id,form_id,submitter_name,data_json,ai_summary,ai_detected_priority,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("checklists")
       .select("id,name,description,category,frequency,items_json,assigned_role,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("checklist_runs")
       .select("id,checklist_id,status,responses_json,notes,completed_at,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("assets")
       .select("id,asset_name,asset_type,location,status,last_checked_at,notes,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(12),
     supabase
       .from("people")
       .select("id,full_name,role_title,department,status,start_date,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("full_name", { ascending: true })
       .limit(20),
     supabase
       .from("sops")
       .select("id,title,department,category,status,version,ai_generated,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("reports")
       .select("id,title,report_type,date_range_start,date_range_end,source_data_json,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(8),
     supabase
       .from("ai_agent_runs")
       .select("id,agent_type,status,output_json,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
+      .eq("status", "completed")
       .order("created_at", { ascending: false })
       .limit(5),
-    supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("forms").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("checklists").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("sops").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("assets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("people").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("forms").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("checklists").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("sops").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("assets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
+    supabase.from("people").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null),
     supabase
       .from("kpis")
       .select("id,name,category,target,actual_value,metric_date,owner,source,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("metric_date", { ascending: false })
       .limit(120),
     supabase
@@ -166,12 +180,16 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .from("file_uploads")
       .select("id,display_name,file_extension,import_type,import_status,imported_rows,analysis_summary,processing_status,metadata_json,created_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
       .from("crm_leads")
       .select("id,lead_name,company,status,estimated_value,owner,source_file_id,import_id,last_activity_at,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(10),
     supabase
@@ -184,6 +202,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .from("operational_metrics")
       .select("id,metric_name,category,value,metric_date,owner,source_file_id,import_id,created_at")
       .eq("workspace_id", workspaceId)
+      .is("deleted_at", null)
+      .is("archived_at", null)
       .order("metric_date", { ascending: false })
       .limit(80),
     supabase
@@ -191,6 +211,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .select("id,title,reason,expected_outcome,actual_outcome,owner,status,related_kpi,review_date,created_at")
       .eq("workspace_id", workspaceId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(20),
     supabase
@@ -198,27 +219,42 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       .select("id,title,source_type,source_id,decision,status,owner,outcome_summary,review_date,created_at")
       .eq("workspace_id", workspaceId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
       .limit(20)
   ]);
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
-  const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(recentKpis.data ?? [], kpiSettingRows), kpiSettingRows);
+  const recentKpiRows = sortKpiRowsBySettings(applyKpiSettingsToRows(filterOriginalBusinessEvidence(recentKpis.data ?? []), kpiSettingRows), kpiSettingRows);
   const kpiForecastReadiness = buildKpiForecastEligibility(recentKpiRows as Database["public"]["Tables"]["kpis"]["Row"][]);
-  const recentFileRows = filterBusinessEvidence(recentFiles.data ?? []).map((file) => ({
+  const recentFileRows = filterOriginalBusinessEvidence(recentFiles.data ?? []).map((file) => ({
     ...file,
     analysis_summary: sanitizeBusinessEvidenceText(file.analysis_summary) || null
   }));
-  const recentLeadRows = recentCrmLeads.data ?? [];
-  const recentTaskRows = recentTasks.data ?? [];
-  const recentIssueRows = recentIssues.data ?? [];
-  const recentChecklistRows = checklists.data ?? [];
-  const recentSopRows = sops.data ?? [];
+  const recentLeadRows = filterOriginalBusinessEvidence(recentCrmLeads.data ?? []);
+  const recentTaskRows = filterOriginalBusinessEvidence(recentTasks.data ?? []);
+  const recentIssueRows = filterOriginalBusinessEvidence(recentIssues.data ?? []);
+  const recentChecklistRows = filterOriginalBusinessEvidence(checklists.data ?? []);
+  const recentSopRows = filterOriginalBusinessEvidence(sops.data ?? []);
   const recentReportRows = filterBusinessEvidence(reports.data ?? []);
-  const recentFormRows = recentForms.data ?? [];
-  const recentPeopleRows = people.data ?? [];
+  const recentFormRows = filterOriginalBusinessEvidence(recentForms.data ?? []);
+  const recentPeopleRows = filterOriginalBusinessEvidence(people.data ?? []);
+  const eligibleFormIds = new Set(recentFormRows.map((row) => row.id));
+  const recentSubmissionRows = filterOriginalBusinessEvidence(recentSubmissions.data ?? []).filter((row) => eligibleFormIds.has(row.form_id));
+  const eligibleChecklistIds = new Set(recentChecklistRows.map((row) => row.id));
+  const recentChecklistRunRows = filterOriginalBusinessEvidence(checklistRuns.data ?? []).filter((row) => eligibleChecklistIds.has(row.checklist_id));
+  const recentAssetRows = filterOriginalBusinessEvidence(assets.data ?? []);
+  const activeCustomerEvidenceIds = new Set(recentLeadRows.map((row) => row.id));
+  const recentCustomerHistoryRows = (recentCrmLeadHistory.data ?? []).filter((row) => activeCustomerEvidenceIds.has(row.lead_id));
+  const activeFileIds = new Set(recentFileRows.map((row) => row.id));
+  const recentImportRows = (recentFileImports.data ?? []).filter((row) => activeFileIds.has(row.file_upload_id));
+  const recentOperationalMetricRows = filterOriginalBusinessEvidence(recentOperationalMetrics.data ?? []);
   const eligibleVaeroexRuns = filterBusinessEvidence(vaeroexRuns.data ?? [], { sourceKind: "platform_run" });
   const analyzedFiles = recentFileRows.filter((file) => Boolean(file.analysis_summary));
-  const pendingImports = (recentFileImports.data ?? []).filter((item) => ["extracted", "needs_review"].includes(item.status));
+  const pendingImports = recentImportRows.filter((item) => ["extracted", "needs_review"].includes(item.status));
+  const activeBusinessSignalCount = recentTaskRows.filter((row) => row.status !== "Done").length;
+  const businessSignalsNeedingReview = recentTaskRows.filter((row) => row.status !== "Done" && Boolean(row.due_date && row.due_date < today)).length;
+  const activeIssueCount = recentIssueRows.filter((row) => row.status !== "Closed").length;
+  const flaggedAssetCount = recentAssetRows.filter((row) => row.status !== "Ready").length;
   const moduleState = {
     executive_dashboard: {
       exists: true,
@@ -257,14 +293,14 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     },
     business_signals: {
       exists: true,
-      open_records: openTasks.count ?? 0,
-      observations_needing_review: overdueTasks.count ?? 0,
+      open_records: activeBusinessSignalCount,
+      observations_needing_review: businessSignalsNeedingReview,
       statuses: countByStatus(recentTaskRows),
       guidance: "Business Signals already exist as evidence and strategic context. Recommend reviewing observation patterns, source quality, category coverage, and whether leadership needs an executive report or improvement plan. Do not treat them as Vaeroex-owned tasks."
     },
     issue_tracking: {
       exists: true,
-      open_records: openIssues.count ?? 0,
+      open_records: activeIssueCount,
       statuses: countByStatus(recentIssueRows),
       guidance: "Issue records already exist as source context. Recommend categorizing, reviewing, and escalating issues in leadership discussion instead of creating a new issue log."
     },
@@ -303,7 +339,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     assets: {
       exists: true,
       records: assetCount.count ?? 0,
-      flagged_records: flaggedAssets.count ?? 0,
+      flagged_records: flaggedAssetCount,
       guidance: "Assets already exist as source context. Recommend checks, maintenance review, location context, or readiness review."
     },
     people: {
@@ -320,8 +356,8 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
     pendingImports.length ? `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"} are waiting for review or approval.` : "",
-    (overdueTasks.count ?? 0) ? `${overdueTasks.count} Business Signal${overdueTasks.count === 1 ? "" : "s"} may need leadership interpretation.` : "",
-    (openIssues.count ?? 0) ? `${openIssues.count} issue${openIssues.count === 1 ? "" : "s"} are open.` : ""
+    businessSignalsNeedingReview ? `${businessSignalsNeedingReview} Business Signal${businessSignalsNeedingReview === 1 ? "" : "s"} may need leadership interpretation.` : "",
+    activeIssueCount ? `${activeIssueCount} issue${activeIssueCount === 1 ? "" : "s"} are open.` : ""
   ].filter(Boolean);
 
   return {
@@ -339,12 +375,12 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     module_state: moduleState,
     workspace_gaps: gaps,
     metrics: {
-      open_tasks: openTasks.count ?? 0,
-      business_signals: openTasks.count ?? 0,
-      source_observations_needing_review: overdueTasks.count ?? 0,
-      open_issues: openIssues.count ?? 0,
-      flagged_assets: flaggedAssets.count ?? 0,
-      form_submissions: submissions.count ?? 0,
+      open_tasks: activeBusinessSignalCount,
+      business_signals: activeBusinessSignalCount,
+      source_observations_needing_review: businessSignalsNeedingReview,
+      open_issues: activeIssueCount,
+      flagged_assets: flaggedAssetCount,
+      form_submissions: recentSubmissionRows.length,
       uploaded_files: fileCount.count ?? 0,
       kpi_history_records: kpiCount.count ?? 0,
       current_kpis: kpiForecastReadiness.currentKpiCount,
@@ -362,22 +398,22 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     recent_tasks: recentTaskRows,
     recent_issues: recentIssueRows,
     forms: recentFormRows,
-    recent_form_submissions: recentSubmissions.data ?? [],
+    recent_form_submissions: recentSubmissionRows,
     checklists: recentChecklistRows,
-    checklist_runs: checklistRuns.data ?? [],
-    assets: assets.data ?? [],
+    checklist_runs: recentChecklistRunRows,
+    assets: recentAssetRows,
     people: recentPeopleRows,
     sops: recentSopRows,
     reports: recentReportRows,
     recent_vaeroex_results: eligibleVaeroexRuns,
     kpi_history: recentKpiRows,
     kpi_settings: kpiSettingRows,
-    file_import_history: recentFileImports.data ?? [],
+    file_import_history: recentImportRows,
     files: recentFileRows,
     file_analyses: analyzedFiles,
     crm_leads: recentLeadRows,
-    crm_lead_history: recentCrmLeadHistory.data ?? [],
-    operational_metrics: recentOperationalMetrics.data ?? [],
+    crm_lead_history: recentCustomerHistoryRows,
+    operational_metrics: recentOperationalMetricRows,
     business_decisions: recentDecisions.data ?? [],
     recommendation_outcomes: recentRecommendationOutcomes.data ?? []
   };

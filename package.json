@@ -15,6 +15,7 @@
     "test:evidence-boundary": "node scripts/platform-failure-evidence-regression-tests.js",
     "test:evidence-lineage": "node scripts/evidence-lineage-regression-tests.js",
     "test:deletion-integrity": "node scripts/deletion-integrity-regression-tests.js",
+    "test:lifecycle-consistency": "node scripts/lifecycle-consistency-regression-tests.js",
     "test:homepage": "node scripts/executive-homepage-regression-tests.js",
     "test:reports": "node scripts/report-consolidation-regression-tests.js",
     "test:profit-leakage": "node scripts/profit-leakage-regression-tests.js",

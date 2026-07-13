@@ -14,6 +14,7 @@ import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
+import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -470,6 +471,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["name", "category", "notes", "source"], words))
         .order("metric_date", { ascending: false })
         .limit(6)
@@ -480,6 +482,8 @@ export async function GET(request: Request) {
         .from("reports")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "report_type", "body_markdown"], words))
         .order("created_at", { ascending: false })
         .limit(6)
@@ -502,10 +506,12 @@ export async function GET(request: Request) {
         .from("issues")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "description", "issue_type", "severity", "status", "root_cause", "recommended_fix"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<IssueRow>(rows as IssueRow[]).slice(0, 6)),
     scopedResults<TaskRow>(
       includesDomain("business_signals", "operations", "priorities"),
       () => supabase
@@ -516,8 +522,8 @@ export async function GET(request: Request) {
         .is("archived_at", null)
         .or(orFilter(["title", "description", "status", "priority", "category", "assigned_role", "assigned_department"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<TaskRow>(rows as TaskRow[]).slice(0, 6)),
     scopedResults<AssignmentRow>(
       includesDomain("operations", "priorities"),
       () => supabase
@@ -525,6 +531,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "description", "status", "priority", "source_type", "source_title"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -536,6 +543,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["lead_name", "company", "email", "status", "owner", "notes"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -546,20 +554,24 @@ export async function GET(request: Request) {
         .from("sops")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "department", "category", "body_markdown", "status"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<SopRow>(rows as SopRow[]).slice(0, 6)),
     scopedResults<ChecklistRow>(
       includesDomain("compliance", "operations"),
       () => supabase
         .from("checklists")
         .select("*")
         .eq("workspace_id", workspaceId)
+        .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["name", "description", "category", "frequency", "assigned_role"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => filterOriginalBusinessEvidence<ChecklistRow>(rows as ChecklistRow[]).slice(0, 6)),
     scopedResults<PersonRow>(
       includesDomain("people", "operations"),
       () => supabase
@@ -567,6 +579,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["full_name", "email", "phone", "role_title", "department", "status", "notes"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -578,6 +591,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "reason", "expected_outcome", "related_kpi", "owner", "status", "outcome_summary"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -589,6 +603,7 @@ export async function GET(request: Request) {
         .select("*")
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
+        .is("archived_at", null)
         .or(orFilter(["title", "source_type", "source_title", "evidence", "related_module", "related_kpi", "expected_outcome", "owner", "priority", "status", "outcome_summary"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
@@ -667,6 +682,7 @@ export async function GET(request: Request) {
           .select("*")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
+          .is("archived_at", null)
           .order("metric_date", { ascending: false })
           .limit(120)
       ),
@@ -676,6 +692,8 @@ export async function GET(request: Request) {
           .from("reports")
           .select("*")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(12)
       ),
@@ -696,9 +714,11 @@ export async function GET(request: Request) {
           .from("issues")
           .select("*")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
-          .limit(12)
-      ),
+          .limit(36)
+      ).then((rows) => filterOriginalBusinessEvidence<IssueRow>(rows as IssueRow[]).slice(0, 12)),
       scopedResults<TaskRow>(
         includesDomain("business_signals", "operations", "priorities"),
         () => supabase
@@ -708,8 +728,8 @@ export async function GET(request: Request) {
           .is("deleted_at", null)
           .is("archived_at", null)
           .order("updated_at", { ascending: false })
-          .limit(12)
-      ),
+          .limit(36)
+      ).then((rows) => filterOriginalBusinessEvidence<TaskRow>(rows as TaskRow[]).slice(0, 12)),
       scopedResults<RecommendationRow>(
         includesDomain("decisions", "priorities", "risks"),
         () => supabase
@@ -717,6 +737,7 @@ export async function GET(request: Request) {
           .select("*")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
           .limit(12)
       )
@@ -749,7 +770,7 @@ export async function GET(request: Request) {
     reports.map((report) => ({
       id: report.id,
       title: report.title,
-      sourceType: report.report_type,
+      sourceType: `Derived report · ${report.report_type}`,
       preview: truncate(report.body_markdown),
       href: hrefWithQuery("/app/reports", report.title),
       meta: report.created_at

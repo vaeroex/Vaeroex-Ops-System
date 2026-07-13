@@ -1173,8 +1173,8 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }).limit(500),
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(500),
     supabase
       .from("ai_agent_runs")
       .select("*")

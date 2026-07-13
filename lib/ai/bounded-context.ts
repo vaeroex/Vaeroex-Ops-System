@@ -6,7 +6,9 @@ import type { VaeroexEvidenceDomain, VaeroexQueryPlan } from "@/lib/ai/query-dep
 import { estimateTokenCount } from "@/lib/ai/usage";
 import {
   filterBusinessEvidence,
+  filterOriginalBusinessEvidence,
   isBusinessEvidenceEligible,
+  isOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -152,6 +154,7 @@ export async function buildFocusedExplanationContext({
       .eq("workspace_id", workspaceId)
       .eq("id", contextId)
       .is("deleted_at", null)
+      .is("archived_at", null)
       .maybeSingle();
 
     if (error) limitations.push("The selected KPI record could not be verified.");
@@ -163,6 +166,7 @@ export async function buildFocusedExplanationContext({
           .eq("workspace_id", workspaceId)
           .eq("name", data.name)
           .is("deleted_at", null)
+          .is("archived_at", null)
           .order("metric_date", { ascending: false })
           .limit(6),
         supabase
@@ -253,7 +257,7 @@ export async function buildFocusedExplanationContext({
         .maybeSingle()
     ]);
 
-    if (issue) verifiedRecords.push(issue);
+    if (issue && isOriginalBusinessEvidence(issue)) verifiedRecords.push(issue);
     if (recommendation) verifiedRecords.push(recommendation);
   }
 
@@ -345,10 +349,12 @@ export async function buildBoundedWorkspaceContext({
           "Risk records",
           supabase
             .from("issues")
-            .select("id,title,description,issue_type,severity,status,root_cause,created_at,updated_at")
+            .select("id,title,description,issue_type,severity,status,root_cause,created_at,updated_at,archived_at,deleted_at")
             .eq("workspace_id", workspaceId)
+            .is("deleted_at", null)
+            .is("archived_at", null)
             .order("updated_at", { ascending: false })
-            .limit(8),
+            .limit(24),
           limitations
         ),
         safeRows(
@@ -364,8 +370,10 @@ export async function buildBoundedWorkspaceContext({
           limitations
         )
       ]).then(([issues, recommendations]) => {
-        context.risk_and_priority_evidence = { issues, recommendations };
-        structuredEvidenceCount += issues.length + recommendations.length;
+        const eligibleIssues = filterOriginalBusinessEvidence(issues).slice(0, 8);
+        const eligibleRecommendations = filterBusinessEvidence(recommendations);
+        context.risk_and_priority_evidence = { issues: eligibleIssues, recommendations: eligibleRecommendations };
+        structuredEvidenceCount += eligibleIssues.length + eligibleRecommendations.length;
         if (domainSet.has("risks")) loadedDomains.push("risks");
         if (domainSet.has("priorities")) loadedDomains.push("priorities");
         if (domainSet.has("decisions")) loadedDomains.push("decisions");
@@ -377,16 +385,22 @@ export async function buildBoundedWorkspaceContext({
     loaders.push(
       safeRows(
         "Briefings and reports",
-        supabase
-          .from("reports")
-          .select("id,title,report_type,date_range_start,date_range_end,body_markdown,source_data_json,created_at")
+          supabase
+            .from("reports")
+          .select("id,title,report_type,date_range_start,date_range_end,body_markdown,source_data_json,created_at,archived_at,deleted_at")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("created_at", { ascending: false })
           .limit(6),
         limitations
       ).then((rows) => {
         const eligibleRows = filterBusinessEvidence(rows);
-        context.reports = eligibleRows.map((row) => ({ ...row, body_markdown: compactText(row.body_markdown, 1_000) }));
+        context.reports = eligibleRows.map((row) => ({
+          ...row,
+          evidence_role: "derived_analysis",
+          body_markdown: compactText(row.body_markdown, 1_000)
+        }));
         structuredEvidenceCount += eligibleRows.length;
         loadedDomains.push("reports");
       })
@@ -423,18 +437,19 @@ export async function buildBoundedWorkspaceContext({
     loaders.push(
       safeRows(
         "Business Signals",
-        supabase
-          .from("tasks")
-          .select("id,title,description,category,created_at,updated_at")
+          supabase
+            .from("tasks")
+          .select("id,title,description,category,related_type,ai_generated,created_at,updated_at,archived_at,deleted_at")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
           .is("archived_at", null)
           .order("updated_at", { ascending: false })
-          .limit(8),
+          .limit(24),
         limitations
       ).then((rows) => {
-        context.business_signals = rows;
-        structuredEvidenceCount += rows.length;
+        const eligibleRows = filterOriginalBusinessEvidence(rows).slice(0, 8);
+        context.business_signals = eligibleRows;
+        structuredEvidenceCount += eligibleRows.length;
         if (domainSet.has("business_signals")) loadedDomains.push("business_signals");
         if (domainSet.has("operations")) loadedDomains.push("operations");
       })
@@ -509,16 +524,19 @@ export async function buildBoundedWorkspaceContext({
     loaders.push(
       safeRows(
         "Process and policy context",
-        supabase
-          .from("sops")
-          .select("id,title,department,category,status,version,updated_at")
+          supabase
+            .from("sops")
+          .select("id,title,department,category,status,version,ai_generated,updated_at,archived_at,deleted_at")
           .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
           .order("updated_at", { ascending: false })
-          .limit(8),
+          .limit(24),
         limitations
       ).then((rows) => {
-        context.process_and_policy_context = rows;
-        structuredEvidenceCount += rows.length;
+        const eligibleRows = filterOriginalBusinessEvidence(rows).slice(0, 8);
+        context.process_and_policy_context = eligibleRows;
+        structuredEvidenceCount += eligibleRows.length;
         loadedDomains.push("compliance");
       })
     );
