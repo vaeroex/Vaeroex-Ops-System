@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useState } from "react";
-import { generatedOutputHref } from "@/lib/intelligence/generated-output";
+import { generatedOutputHref, outputTypeForInsight } from "@/lib/intelligence/generated-output";
 import type { IntelligenceConfidence, IntelligenceInsight, IntelligenceInsightType } from "@/lib/intelligence/layer";
 
 const signalTypes: IntelligenceInsightType[] = ["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"];
@@ -175,10 +175,10 @@ function ExecutiveBriefPanel({ insight }: { insight: IntelligenceInsight }) {
         <p className="mt-2 text-slate-300">{limitationFor(insight)}</p>
       </section>
       <Link
-        href={generatedOutputHref({ type: "executive_briefing", source: insight.id })}
+        href={generatedOutputHref({ type: outputTypeForInsight(insight), source: insight.id })}
         className="inline-flex min-h-10 items-center rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
       >
-        Open printable brief
+        Generate report
       </Link>
     </div>
   );

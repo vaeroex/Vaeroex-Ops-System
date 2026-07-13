@@ -198,8 +198,8 @@ function ActionButtons({
         Generate Improvement Plan
       </Link>
       {showReport ? (
-        <Link href={generatedOutputHref({ type: "executive_briefing", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-          Generate Executive Briefing
+        <Link href={generatedOutputHref({ type: "risk_brief", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
+          Generate Investigation Summary
         </Link>
       ) : null}
       {showAlert ? (

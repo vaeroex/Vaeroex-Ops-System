@@ -37,7 +37,7 @@ const saveLabels: Record<VaeroexSaveTarget, string> = {
 
 const saveDestinations: Record<string, { label: string; href: Route }> = {
   sop: { label: "SOPs", href: "/app/sops" },
-  report: { label: "Briefings", href: "/app/briefings" as Route }
+  report: { label: "Reports", href: "/app/reports" as Route }
 };
 const vaeroexRunEditFields: ManagedRecordEditField[] = [
   { name: "status", label: "Status", type: "select", options: ["queued", "running", "completed", "failed"] },
@@ -49,7 +49,7 @@ const WORKFLOW_GROUPS: Array<{
   keys: VaeroexWorkflowKey[];
 }> = [
   {
-    title: "Leadership Briefings",
+    title: "Leadership Reports",
     description: "Condensed intelligence for owners and managers deciding what deserves attention.",
     keys: ["ceo_mode", "focus_priorities", "risk_simulation", "weekly_management_meeting", "business_review_package"]
   },
@@ -160,7 +160,7 @@ function dataUsedSummary(input: JsonRecord) {
 
   return [
     { label: "KPIs", value: numberValue(metrics.kpi_history_records) || asArray(snapshot.kpi_history).length },
-    { label: "Briefings", value: numberValue(metrics.reports) || asArray(snapshot.reports).length },
+    { label: "Reports", value: numberValue(metrics.reports) || asArray(snapshot.reports).length },
     { label: "Sources", value: numberValue(metrics.uploaded_files) || asArray(snapshot.files).length },
     { label: "Issues", value: numberValue(metrics.open_issues) || asArray(snapshot.recent_issues).length },
     { label: "Business Memory", value: asArray(snapshot.recent_vaeroex_results).length + asArray(snapshot.reports).length },
@@ -546,7 +546,7 @@ function inferRelatedModule(text: string) {
   if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "Customer Evidence";
   if (normalized.includes("sop") || normalized.includes("procedure")) return "SOPs";
   if (normalized.includes("checklist")) return "Checklists";
-  if (normalized.includes("report") || normalized.includes("briefing")) return "Briefings";
+  if (normalized.includes("report") || normalized.includes("briefing")) return "Reports";
   if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Sources";
   if (normalized.includes("issue") || normalized.includes("risk")) return "Issues";
   return "Executive Review";
@@ -560,11 +560,11 @@ function moduleHref(moduleName: string): Route {
   if (normalized.includes("customer")) return "/app/sources";
   if (normalized.includes("sop")) return "/app/sops";
   if (normalized.includes("checklist")) return "/app/checklists";
-  if (normalized.includes("report") || normalized.includes("briefing")) return "/app/briefings" as Route;
+  if (normalized.includes("report") || normalized.includes("briefing")) return "/app/reports" as Route;
   if (normalized.includes("file") || normalized.includes("source")) return "/app/sources";
   if (normalized.includes("issue")) return "/app/issues";
   if (normalized.includes("form")) return "/app/forms";
-  return "/app/actions";
+  return "/app/reports";
 }
 
 function getActionableRecommendations(output: JsonRecord) {

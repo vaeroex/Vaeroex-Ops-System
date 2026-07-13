@@ -1,12 +1,11 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { saveGeneratedOutputToBriefingsAction } from "@/app/app/generated/actions";
+import { saveGeneratedOutputToReportsAction } from "@/app/app/generated/actions";
 import { GeneratedOutputControls } from "@/components/generated/GeneratedOutputControls";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
-import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import {
   buildGeneratedOutput,
   parseGeneratedOutputType,
@@ -51,6 +50,7 @@ function compactText(value: string, maxLength = 420) {
 function outputSourceData(output: ReturnType<typeof buildGeneratedOutput>) {
   return JSON.stringify({
     generated_from: "generated_output",
+    derived_analysis: true,
     output_type: output.type,
     source_title: output.title,
     evidence_count: output.evidenceCount,
@@ -78,13 +78,11 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
   }
 
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult] = await Promise.all([
+  const [tasksResult, issuesResult, kpisResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-    supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
@@ -99,8 +97,6 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     issuesResult.error,
     kpisResult.error,
     filesResult.error,
-    reportsResult.error,
-    runsResult.error,
     crmResult.error,
     importsResult.error,
     sopsResult.error,
@@ -110,15 +106,14 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
     decisionsResult.error,
     outcomesResult.error
   ].filter(Boolean);
-  const eligibleRuns = filterBusinessEvidence(runsResult.data || [], { sourceKind: "platform_run" });
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],
     issues: issuesResult.data || [],
     kpis: kpisResult.data || [],
     files: filesResult.data || [],
-    reports: reportsResult.data || [],
-    vaeroexRuns: eligibleRuns,
+    reports: [],
+    vaeroexRuns: [],
     crmLeads: crmResult.data || [],
     imports: importsResult.data || [],
     sops: sopsResult.data || [],
@@ -140,7 +135,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
   return (
     <div className="space-y-6 print:bg-white print:text-black">
       <PageHeader
-        eyebrow="Intelligence → Executive Brief"
+        eyebrow={`Intelligence → ${output.label}`}
         title={output.label}
         description="Draft · Not saved. Review the brief, then save or export it when it is ready for leadership use."
         actions={
@@ -162,7 +157,7 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
       <section className="rounded-lg border border-cyan-300/20 bg-[#08111f] p-5 text-slate-100 shadow-panel print:border-slate-300 print:bg-white print:text-black">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent print:text-slate-600">Executive Brief</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent print:text-slate-600">{output.label}</p>
             <h1 className="mt-3 text-2xl font-semibold text-white print:text-black">{output.title}</h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-300 print:text-slate-700">{compactText(output.summary)}</p>
           </div>
@@ -209,13 +204,13 @@ export default async function NewGeneratedOutputPage({ searchParams }: OutputsPa
           </div>
         </details>
         <div className="mt-5 flex flex-wrap gap-2 print:hidden">
-          <form action={saveGeneratedOutputToBriefingsAction}>
+          <form action={saveGeneratedOutputToReportsAction}>
             <input type="hidden" name="title" value={output.title} />
             <input type="hidden" name="output_type" value={output.label} />
             <input type="hidden" name="source_data_json" value={sourceDataJson} />
             <textarea className="hidden" name="body_markdown" defaultValue={output.markdown} />
-            <ConfirmSubmitButton message="Save this executive brief to Briefings?">
-              Save to Briefings
+            <ConfirmSubmitButton message="Save this output to Reports?">
+              Save to Reports
             </ConfirmSubmitButton>
           </form>
           <Link href={output.sourceHref as Route} className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">

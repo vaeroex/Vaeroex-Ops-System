@@ -2008,6 +2008,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         tabs={[
           { label: "Overview", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter }), active: activeSection === "overview" || activeSection === "detail" },
           { label: "Compare", href: "/app/kpis?section=compare" as Route, active: activeSection === "compare" },
+          { label: "Business Health", href: "/app#business-health-heading" as Route },
+          { label: "Profit Leakage", href: "/app/kpis/profit-leakage" as Route },
           { label: "Records", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, section: "records" }), active: activeSection === "records" },
           { label: "Imports", href: "/app/files?status=Imported" as Route },
           { label: "Settings", href: "/app/kpis/settings" as Route }

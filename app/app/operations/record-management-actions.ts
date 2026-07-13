@@ -427,15 +427,14 @@ function parsedFieldValue(field: EditableField, formData: FormData, path: Route 
 function revalidateRelatedPaths(collection: ManagedCollection, path: Route | string) {
   revalidatePath(path);
 
-  // These collections can be used as active business evidence. Keep every
-  // intelligence surface in sync after a lifecycle change.
+  // These collections can affect intelligence presentation or saved-output
+  // availability. Revalidation does not make derived records original evidence.
   if (["tasks", "kpis", "files", "reports", "issues", "checklists", "ai_agent_runs", "crm_leads"].includes(collection)) {
     revalidatePath("/app");
     revalidatePath("/app/intelligence");
     revalidatePath("/app/sources");
     revalidatePath("/app/files");
     revalidatePath("/app/reports");
-    revalidatePath("/app/briefings");
   }
 }
 

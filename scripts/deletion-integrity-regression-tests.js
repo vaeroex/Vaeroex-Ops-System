@@ -90,7 +90,7 @@ assert.doesNotMatch(operationsActions, /\.from\("tasks"\)[\s\S]{0,220}\.delete\(
 assert.match(recordActions, /\.maybeSingle\(\)/, "single-record mutations must allow a zero-row result without a single JSON coercion error");
 assert.doesNotMatch(recordActions, /select\("id"\)\.single\(\)/, "managed lifecycle mutations must not coerce a mutation result to one JSON object");
 assert.match(recordActions, /revalidatePath\("\/app\/intelligence"\)/, "evidence mutations must invalidate Intelligence");
-assert.match(recordActions, /revalidatePath\("\/app\/briefings"\)/, "evidence mutations must invalidate briefings");
+assert.match(recordActions, /revalidatePath\("\/app\/reports"\)/, "evidence mutations must invalidate reports");
 assert.match(fileActions, /update_source_file_lifecycle/, "file lifecycle changes must atomically include learned evidence");
 assert.match(boundedContext, /\.from\("tasks"\)[\s\S]{0,420}\.is\("deleted_at", null\)[\s\S]{0,120}\.is\("archived_at", null\)/, "Ask Vaeroex bounded context must exclude inactive signals before limiting");
 assert.match(searchRoute, /\.from\("tasks"\)[\s\S]{0,420}\.is\("deleted_at", null\)[\s\S]{0,120}\.is\("archived_at", null\)/, "search must exclude inactive signals before limiting");
