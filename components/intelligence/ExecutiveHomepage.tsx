@@ -1,6 +1,9 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { ArrowRight, Database, ShieldCheck, TrendingDown, TrendingUp } from "lucide-react";
+import { generateReportAction } from "@/app/app/reports/actions";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
+import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import type { ExecutiveHomepageModel, ExecutivePriorityCard } from "@/lib/intelligence/executive-homepage";
 
 type ExecutiveHomepageProps = {
@@ -10,6 +13,11 @@ type ExecutiveHomepageProps = {
   healthHistory: BusinessHealthTrendPoint[];
   healthHistoryError?: string | null;
   isDemoWorkspace: boolean;
+  reportReadiness: {
+    canGenerate: boolean;
+    reason: string;
+    latestReportHref?: Route | null;
+  };
 };
 
 function priorityTone(tone: ExecutivePriorityCard["tone"]) {
@@ -62,7 +70,8 @@ export function ExecutiveHomepage({
   model,
   healthHistory,
   healthHistoryError,
-  isDemoWorkspace
+  isDemoWorkspace,
+  reportReadiness
 }: ExecutiveHomepageProps) {
   const heading = firstName ? `Good morning, ${firstName}` : "Executive overview";
   const trendDelta = model.health.trendDelta;
@@ -208,6 +217,30 @@ export function ExecutiveHomepage({
               <Link href="/app/sources" className="inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60">Add information</Link>
             ) : null}
           </div>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4 rounded-lg border border-line/80 bg-white p-5 shadow-panel lg:flex-row lg:items-center lg:justify-between" aria-labelledby="executive-brief-heading">
+        <div className="max-w-2xl">
+          <h2 id="executive-brief-heading" className="text-base font-semibold text-ink">Executive Brief</h2>
+          <p className="mt-1 text-sm leading-6 text-muted">Package the current evidence into a concise leadership review. The report remains derived analysis and does not increase Business Health or evidence coverage.</p>
+          {!reportReadiness.canGenerate ? <p className="mt-2 text-xs font-semibold text-amber-700">{reportReadiness.reason}</p> : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {reportReadiness.latestReportHref ? <Link href={reportReadiness.latestReportHref} className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink hover:bg-blue-950/10">View latest</Link> : null}
+          <Link href="/app/reports" className="inline-flex min-h-11 items-center rounded-lg border border-line px-3 py-2 text-sm font-semibold text-ink hover:bg-blue-950/10">All reports</Link>
+          <form action={generateReportAction} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="return_path" value="/app" />
+            <input type="hidden" name="report_type" value="Executive Brief" />
+            <input type="hidden" name="category" value="All" />
+            <input type="hidden" name="anchor_date" value={new Date().toISOString().slice(0, 10)} />
+            <select name="report_period" defaultValue="Last 7 days" aria-label="Executive Brief period" className="min-h-11 rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink">
+              <option>Today</option>
+              <option>Last 7 days</option>
+              <option>Last 30 days</option>
+            </select>
+            <PendingSubmitButton disabled={!reportReadiness.canGenerate} pendingLabel="Generating brief..." className="min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">Generate brief</PendingSubmitButton>
+          </form>
         </div>
       </section>
     </div>

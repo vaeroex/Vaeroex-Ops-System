@@ -825,7 +825,7 @@ function SourceFileDetails({
                 <p key={run.id} className="line-clamp-2 text-sm text-slate-300">{runSummary(run)}</p>
               ))}
               {linkedReports.slice(0, 4).map((report) => (
-                <Link key={report.id} href="/app/briefings" className="block text-sm font-semibold text-cyan-100 hover:text-white">
+                <Link key={report.id} href={`/app/reports/${report.id}` as Route} className="block text-sm font-semibold text-cyan-100 hover:text-white">
                   {report.title}
                 </Link>
               ))}

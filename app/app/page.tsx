@@ -22,6 +22,7 @@ import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
+import { normalizedReportType } from "@/lib/reports/presentation";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import {
@@ -1020,7 +1021,7 @@ function IntelligenceLayerSummary({
       label: "Executive recommendation",
       title: intelligence.topRecommendation?.recommendedAction || "Add source data",
       body: intelligence.topRecommendation?.why || "Vaeroex recommends adding business context before making stronger executive recommendations.",
-      href: intelligence.topRecommendation ? generatedOutputHref({ type: "action_plan", source: intelligence.topRecommendation.id }) : ("/app/actions" as Route),
+      href: intelligence.topRecommendation ? generatedOutputHref({ type: "action_plan", source: intelligence.topRecommendation.id }) : ("/app/reports" as Route),
       tone: "border-cyan-400/30 bg-cyan-950/25"
     }
   ];
@@ -1478,7 +1479,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("assets").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),
     supabase
@@ -2025,6 +2026,18 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiTrends: comparisonTrends,
     sourceDataAvailable: businessHealthSourceErrors.length === 0
   });
+  const latestExecutiveBrief = reports.find((report) => normalizedReportType(report) === "executive_brief") || null;
+  const originalEvidenceCount = businessIntelligenceCoverage.evidenceSummary.originalEvidenceCount;
+  const canManageReports = ["owner", "admin", "manager"].includes(context.membership?.role || "");
+  const reportReadiness = {
+    canGenerate: canManageReports && businessHealthSourceErrors.length === 0 && originalEvidenceCount > 0,
+    reason: !canManageReports
+      ? "Workspace manager access is required to save reports."
+      : businessHealthSourceErrors.length
+        ? "Required evidence could not be loaded, so no report will be created."
+        : "Add eligible original evidence before generating a brief.",
+    latestReportHref: latestExecutiveBrief ? (`/app/reports/${latestExecutiveBrief.id}` as Route) : null
+  };
   const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
@@ -2071,6 +2084,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           healthHistory={businessHealthHistory}
           healthHistoryError={businessHealthSnapshotResult.errorMessage}
           isDemoWorkspace={isViewingDemoWorkspace}
+          reportReadiness={reportReadiness}
         />
       ) : null}
 
@@ -2163,8 +2177,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/tasks" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               Review Business Signals
             </Link>
-            <Link href="/app/briefings" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Shared briefings
+            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              Reports
             </Link>
           </div>
           <div className="mt-5">
@@ -2329,8 +2343,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {files.length ? "Review files" : "Upload files"}
             </Link>
-            <Link href={reports.length ? "/app/briefings" : generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {reports.length ? "Review briefings" : "Generate Executive Briefing"}
+            <Link href={reports.length ? "/app/reports" : generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              {reports.length ? "Review reports" : "Generate Executive Brief"}
             </Link>
           </div>
         </article>

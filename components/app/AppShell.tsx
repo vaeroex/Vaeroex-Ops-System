@@ -21,7 +21,7 @@ const baseNavSections = [
       { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Evidence" },
-      { href: "/app/briefings", label: "Briefings" },
+      { href: "/app/reports", label: "Reports" },
       { href: "/app/settings", label: "Settings" }
     ]
   },
@@ -29,8 +29,7 @@ const baseNavSections = [
     label: "Organizational Context",
     defaultOpen: false,
     items: [
-      { href: "/app/tasks", label: "Business Signals" },
-      { href: "/app/actions", label: "Generated Outputs" }
+      { href: "/app/tasks", label: "Business Signals" }
     ]
   }
 ] satisfies Array<{ label: string; defaultOpen?: boolean; items: Array<{ href: string; label: string }> }>;

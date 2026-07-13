@@ -6,16 +6,13 @@ import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
-import {
-  filterBusinessEvidence,
-  sanitizeBusinessEvidenceText
-} from "@/lib/intelligence/evidence-eligibility";
+import { filterOriginalBusinessEvidence, sanitizeBusinessEvidenceText } from "@/lib/intelligence/evidence-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
-type ReportPeriod = "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly" | "Year to Date";
+type ReportPeriod = "Today" | "Last 7 days" | "Last 30 days" | "Monthly" | "Quarterly" | "Yearly" | "Year to Date";
 type DateRange = {
   start: Date;
   end: Date;
@@ -31,15 +28,13 @@ type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FormSubmissionRow = Database["public"]["Tables"]["form_submissions"]["Row"];
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
-type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
-type JsonRecord = Record<string, unknown>;
 
-const REPORT_PERIODS: ReportPeriod[] = ["Daily", "Weekly", "Monthly", "Quarterly", "Yearly", "Year to Date"];
+const REPORT_PERIODS: ReportPeriod[] = ["Today", "Last 7 days", "Last 30 days", "Monthly", "Quarterly", "Yearly", "Year to Date"];
 const reportNumberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 });
 
 function text(formData: FormData, key: string) {
@@ -48,7 +43,7 @@ function text(formData: FormData, key: string) {
 }
 
 function safeReportsReturnPath(value: string) {
-  return value === "/app/briefings" ? "/app/briefings" : "/app/reports";
+  return value === "/app" ? "/app" : "/app/reports";
 }
 
 function redirectWithError(message: string, returnPath = "/app/reports"): never {
@@ -97,6 +92,18 @@ async function requireWorkspace() {
 
 function isReportPeriod(value: string): value is ReportPeriod {
   return REPORT_PERIODS.includes(value as ReportPeriod);
+}
+
+function normalizeLegacyPeriod(value: string): ReportPeriod {
+  if (isReportPeriod(value)) return value;
+  if (value === "Daily") return "Today";
+  if (value === "Weekly") return "Last 7 days";
+  return "Last 7 days";
+}
+
+function normalizeReportType(value: string) {
+  if (/board|quarterly business review/i.test(value)) return "Board Report";
+  return "Executive Brief";
 }
 
 function dateOnly(date: Date) {
@@ -176,13 +183,16 @@ function getPeriodRange(period: ReportPeriod, anchorDate: string) {
   const anchor = parseDate(anchorDate);
   const today = parseDate("");
 
-  if (period === "Daily") {
+  if (period === "Today") {
     return makeRange(anchor, anchor);
   }
 
-  if (period === "Weekly") {
-    const start = startOfWeek(anchor);
-    return makeRange(start, addDays(start, 6));
+  if (period === "Last 7 days") {
+    return makeRange(addDays(anchor, -6), anchor);
+  }
+
+  if (period === "Last 30 days") {
+    return makeRange(addDays(anchor, -29), anchor);
   }
 
   if (period === "Monthly") {
@@ -201,12 +211,16 @@ function getPeriodRange(period: ReportPeriod, anchorDate: string) {
 }
 
 function getComparisonRange(period: ReportPeriod, range: DateRange) {
-  if (period === "Daily") {
+  if (period === "Today") {
     return makeRange(addDays(range.start, -1), addDays(range.end, -1));
   }
 
-  if (period === "Weekly") {
+  if (period === "Last 7 days") {
     return makeRange(addDays(range.start, -7), addDays(range.end, -7));
+  }
+
+  if (period === "Last 30 days") {
+    return makeRange(addDays(range.start, -30), addDays(range.end, -30));
   }
 
   if (period === "Monthly") {
@@ -227,14 +241,6 @@ function getComparisonRange(period: ReportPeriod, range: DateRange) {
   const previousStart = new Date(Date.UTC(range.start.getUTCFullYear() - 1, 0, 1));
   const previousEnd = new Date(Date.UTC(range.end.getUTCFullYear() - 1, range.end.getUTCMonth(), range.end.getUTCDate()));
   return makeRange(previousStart, previousEnd);
-}
-
-function isRecord(value: unknown): value is JsonRecord {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function str(value: unknown, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
 }
 
 function inIsoRange(value: string | null, range: DateRange) {
@@ -378,23 +384,13 @@ function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
 }
 
 function comparisonLabel(period: ReportPeriod) {
-  if (period === "Daily") return "yesterday";
-  if (period === "Weekly") return "last week";
+  if (period === "Today") return "yesterday";
+  if (period === "Last 7 days") return "the previous seven days";
+  if (period === "Last 30 days") return "the previous thirty days";
   if (period === "Monthly") return "last month";
   if (period === "Quarterly") return "last quarter";
   if (period === "Yearly") return "last year";
   return "previous year-to-date";
-}
-
-function insightText(run: VaeroexRunRow) {
-  const output = isRecord(run.output_json) ? run.output_json : {};
-  const summary = str(output.executive_summary) || str(output.summary) || str(output.response_markdown);
-
-  if (summary) {
-    return summary.replace(/^#+\s*/gm, "").split("\n").map((line) => line.trim()).filter(Boolean)[0] || "";
-  }
-
-  return run.status === "failed" ? "A Vaeroex run failed during this period." : "";
 }
 
 async function fetchReportSource(
@@ -412,7 +408,6 @@ async function fetchReportSource(
     assets,
     kpis,
     kpiSettings,
-    vaeroexRuns,
     files,
     fileImports,
     crmLeads,
@@ -421,7 +416,7 @@ async function fetchReportSource(
   ] = await Promise.all([
     supabase
       .from("tasks")
-      .select("id,title,description,status,priority,category,due_date,created_at,updated_at")
+      .select("id,title,description,status,priority,category,related_type,ai_generated,due_date,created_at,updated_at")
       .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(500),
@@ -457,21 +452,19 @@ async function fetchReportSource(
       .limit(300),
     supabase
       .from("kpis")
-      .select("id,name,category,target,actual_value,metric_date,owner,source,notes,source_file_id,import_id,created_at,updated_at")
+      .select("id,name,category,target,actual_value,metric_date,owner,source,notes,source_file_id,import_id,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("metric_date", { ascending: false })
       .limit(300),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase
-      .from("ai_agent_runs")
-      .select("id,agent_type,input_json,output_json,status,error_message,created_at,archived_at,deleted_at")
-      .eq("workspace_id", workspaceId)
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
       .from("file_uploads")
       .select("id,display_name,original_name,file_extension,import_type,import_status,imported_rows,analysis_summary,metadata_json,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .limit(300),
     supabase
@@ -494,8 +487,10 @@ async function fetchReportSource(
       .limit(300),
     supabase
       .from("operational_metrics")
-      .select("id,metric_name,category,value,metric_date,owner,notes,source_file_id,import_id,created_at,updated_at")
+      .select("id,metric_name,category,value,metric_date,owner,notes,source_file_id,import_id,created_at,updated_at,archived_at,deleted_at")
       .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
       .order("metric_date", { ascending: false })
       .limit(300)
   ]);
@@ -509,7 +504,6 @@ async function fetchReportSource(
     assets.error,
     kpis.error,
     kpiSettings.error,
-    vaeroexRuns.error,
     files.error,
     fileImports.error,
     crmLeads.error,
@@ -521,8 +515,8 @@ async function fetchReportSource(
     throw new Error("Required report source data could not be loaded. No report was created.");
   }
 
-  const taskRows = ((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
-  const issueRows = ((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
+  const taskRows = filterOriginalBusinessEvidence((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
+  const issueRows = filterOriginalBusinessEvidence((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
   const checklistRunRows = ((checklistRuns.data ?? []) as ChecklistRunRow[]).filter(() =>
     matchesCategory(category, {}, "Checklists")
   );
@@ -530,15 +524,16 @@ async function fetchReportSource(
   const submissionRows = ((submissions.data ?? []) as FormSubmissionRow[]).filter(() => matchesCategory(category, {}, "Forms"));
   const assetRows = ((assets.data ?? []) as AssetRow[]).filter(() => matchesCategory(category, {}, "Assets"));
   const kpiSettingRows = (kpiSettings.data ?? []) as KpiSettingRow[];
-  const kpiRows = (sortKpiRowsBySettings(applyKpiSettingsToRows((kpis.data ?? []) as KpiRow[], kpiSettingRows), kpiSettingRows) as KpiRow[]).filter((kpi) =>
+  const eligibleKpis = filterOriginalBusinessEvidence((kpis.data ?? []) as KpiRow[]);
+  const kpiRows = (sortKpiRowsBySettings(applyKpiSettingsToRows(eligibleKpis, kpiSettingRows), kpiSettingRows) as KpiRow[]).filter((kpi) =>
     matchesCategory(category, kpi, "KPIs")
   );
-  const runRows = filterBusinessEvidence((vaeroexRuns.data ?? []) as VaeroexRunRow[], { sourceKind: "platform_run" }).filter(() => matchesCategory(category, {}, "Vaeroex insights"));
-  const fileRows = filterBusinessEvidence((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
+  // Execution history is platform telemetry, never original business evidence.
+  const fileRows = filterOriginalBusinessEvidence((files.data ?? []) as FileUploadRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const fileImportRows = ((fileImports.data ?? []) as FileImportRow[]).filter(() => matchesCategory(category, {}, "Files"));
   const crmLeadRows = ((crmLeads.data ?? []) as CrmLeadRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
   const crmLeadHistoryRows = ((crmLeadHistory.data ?? []) as CrmLeadHistoryRow[]).filter(() => matchesCategory(category, {}, "Customer Evidence"));
-  const operationalMetricRows = ((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter(
+  const operationalMetricRows = filterOriginalBusinessEvidence((operationalMetrics.data ?? []) as OperationalMetricRow[]).filter(
     (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
 
@@ -563,7 +558,6 @@ async function fetchReportSource(
   const flaggedAssets = assetRows.filter((asset) => asset.status !== "Ready");
   const recordedKpis = kpiRows.filter((kpi) => kpi.metric_date >= range.startDate && kpi.metric_date <= range.endDate);
   const kpiTrendObservations = buildKpiTrendObservations(kpiRows, range);
-  const vaeroexInsights = runRows.filter((run) => inIsoRange(run.created_at, range));
   const uploadedFiles = fileRows.filter((file) => inIsoRange(file.created_at, range));
   const importedFiles = fileRows.filter((file) => file.import_status === "imported" && inIsoRange(file.updated_at || file.created_at, range));
   const completedImports = fileImportRows.filter((item) => item.status === "completed" && inIsoRange(item.imported_at || item.created_at, range));
@@ -575,8 +569,25 @@ async function fetchReportSource(
     (metric) => metric.metric_date >= range.startDate && metric.metric_date <= range.endDate
   );
   const sourceLinkedKpis = recordedKpis.filter((kpi) => Boolean(kpi.source_file_id || kpi.import_id));
+  const originalSourceIds = new Set([
+    ...taskRows.map((row) => `signal:${row.id}`),
+    ...issueRows.map((row) => `issue:${row.id}`),
+    ...fileRows.map((row) => `file:${row.id}`),
+    ...kpiRows.map((row) => `kpi:${row.name.trim().toLowerCase()}`),
+    ...operationalMetricRows.map((row) => `metric:${row.id}`)
+  ]);
 
   return {
+    evidence: {
+      original_source_count: originalSourceIds.size,
+      source_types: [
+        taskRows.length ? "Business Signals" : "",
+        issueRows.length ? "Issues" : "",
+        fileRows.length ? "Files" : "",
+        kpiRows.length ? "KPIs" : "",
+        operationalMetricRows.length ? "Operational Metrics" : ""
+      ].filter(Boolean)
+    },
     counts: {
       completed_tasks: completedTasks.length,
       created_tasks: createdTasks.length,
@@ -590,7 +601,6 @@ async function fetchReportSource(
       sops_created: newSops.length,
       flagged_assets: flaggedAssets.length,
       kpis_recorded: recordedKpis.length,
-      vaeroex_insights: vaeroexInsights.length,
       uploaded_files: uploadedFiles.length,
       imported_files: importedFiles.length,
       completed_imports: completedImports.length,
@@ -615,7 +625,6 @@ async function fetchReportSource(
         .slice(0, 8)
         .map((kpi) => `${kpi.name}: ${kpi.actual_value ?? "not set"}${kpi.target !== null ? ` vs target ${kpi.target}` : ""}`),
       kpi_trend_observations: kpiTrendObservations,
-      vaeroex_insights: vaeroexInsights.map(insightText).filter(Boolean).slice(0, 5),
       uploaded_files: uploadedFiles
         .slice(0, 8)
         .map((file) => `${file.display_name} (${file.file_extension.toUpperCase()}, ${file.import_status.replace(/_/g, " ")})`),
@@ -642,33 +651,26 @@ async function fetchReportSource(
 
 function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} Business Signal${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, customer, market, or operational context worth leadership review.` : "",
+    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} Business Signal${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate a pattern worth leadership review.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} remain unresolved.` : "",
-    source.counts.checklist_exceptions
-      ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.`
-      : "",
     source.counts.flagged_assets ? `${source.counts.flagged_assets} asset${source.counts.flagged_assets === 1 ? "" : "s"} are not marked ready.` : "",
-    source.counts.pending_imports ? `${source.counts.pending_imports} data extraction${source.counts.pending_imports === 1 ? "" : "s"} are waiting for mapping review.` : "",
     source.counts.imported_files && source.counts.kpis_recorded === 0 && source.counts.operational_metrics === 0
       ? "Files were imported, but no KPI or business metric records were found in the selected period."
       : ""
   ].filter(Boolean);
 
-  return risks.length ? risks : ["No major business risks were found in the selected period."];
+  return risks.length ? risks : ["No supported risk signal was identified from the eligible evidence in this period."];
 }
 
 function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const actions = [
-    source.counts.overdue_tasks ? "Review the Business Signal pattern before the next management review." : "",
-    source.counts.open_issues ? "Review open issues by severity and decide whether an investigation summary is needed." : "",
-    source.counts.checklist_exceptions ? "Review incomplete checklist runs and update the checklist or accountability process where needed." : "",
-    source.counts.flagged_assets ? "Confirm asset readiness and document any maintenance or replacement decisions." : "",
-    source.counts.pending_imports ? "Review pending file mappings and save approved data so dashboards and reports use the latest numbers." : "",
-    source.counts.uploaded_files ? "Review newly uploaded files and decide which spreadsheets should become KPIs, customer activity evidence, or business metrics. Manual records can be added any time without imports." : "",
-    source.counts.sops_created === 0 ? "Pick one repeated workflow from this period and turn it into an SOP draft." : ""
+    source.counts.open_issues ? "Review the most severe open issue and determine whether a focused investigation is warranted." : "",
+    source.counts.overdue_tasks ? "Review the Business Signal pattern with leadership before drawing a broader conclusion." : "",
+    source.counts.kpis_recorded ? "Review the strongest and weakest KPI movements against current targets." : "",
+    source.counts.uploaded_files ? "Confirm that newly uploaded evidence is current and relevant to the decisions under review." : ""
   ].filter(Boolean);
 
-  return actions.length ? actions : ["Keep the current operating cadence and review trends again in the next report."];
+  return actions.length ? actions : ["Continue collecting current evidence and review again when a supported change appears."];
 }
 
 function buildReportBody({
@@ -693,14 +695,7 @@ function buildReportBody({
   const previousLabel = comparisonLabel(period);
   const risks = riskItems(current);
   const nextActions = recommendedActions(current);
-  const summary =
-    `${workspaceName} captured ${current.counts.completed_tasks} Business Signal${current.counts.completed_tasks === 1 ? "" : "s"}, ` +
-    `${current.counts.checklist_completions} checklist run${current.counts.checklist_completions === 1 ? "" : "s"}, and ` +
-    `${current.counts.sops_created} SOP update${current.counts.sops_created === 1 ? "" : "s"} during this period. ` +
-    `${current.counts.uploaded_files} file${current.counts.uploaded_files === 1 ? "" : "s"} were uploaded and ` +
-    `${current.counts.imported_file_rows} spreadsheet row${current.counts.imported_file_rows === 1 ? "" : "s"} were imported where useful. ` +
-    `${current.counts.open_issues} open issue${current.counts.open_issues === 1 ? "" : "s"} and ` +
-    `${current.counts.overdue_tasks} Business Signal${current.counts.overdue_tasks === 1 ? "" : "s"} provide context for leadership review.`;
+  const summary = `${workspaceName} has ${current.evidence.original_source_count} eligible original evidence source${current.evidence.original_source_count === 1 ? "" : "s"} supporting this review. The report found ${current.counts.open_issues} open issue${current.counts.open_issues === 1 ? "" : "s"}, ${current.counts.kpis_recorded} current KPI record${current.counts.kpis_recorded === 1 ? "" : "s"}, and ${current.counts.uploaded_files} newly uploaded file${current.counts.uploaded_files === 1 ? "" : "s"} in the selected period.`;
 
   return `# ${period} ${reportType} - Generated by Vaeroex
 
@@ -711,79 +706,28 @@ Category: ${category || "All"}
 ## Executive Summary
 ${summary}
 
-## Trend Comparison
-- Business Signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
-- Checklist completions: ${trendPhrase(current.counts.checklist_completions, previous.counts.checklist_completions)} vs ${previousLabel}
+## What Changed
+- KPI records: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)} vs ${previousLabel}
 - New issues: ${trendPhrase(current.counts.new_issues, previous.counts.new_issues)} vs ${previousLabel}
-- Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)} vs ${previousLabel}
-- SOP updates: ${trendPhrase(current.counts.sops_created, previous.counts.sops_created)} vs ${previousLabel}
-- KPIs recorded: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)} vs ${previousLabel}
-- Uploaded files: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)} vs ${previousLabel}
-- Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)} vs ${previousLabel}
-- Customer activity records: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)} vs ${previousLabel}
-
-## Business Signals and Source Context
-${readableList(
-  [
-    ...current.items.completed_tasks.map((item) => `Business Signal: ${item}`),
-    ...current.items.checklist_completions.map((item) => `Checklist completed: ${item}`),
-    ...current.items.sops_created.map((item) => `SOP updated: ${item}`)
-  ],
-  "No Business Signals, checklist completions, or SOP updates were found in this period."
-)}
-
-## Open Issues
-${readableList(current.items.open_issues, "No open issues are currently listed for this filter.")}
-
-## Business Signal Evidence
-${readableList(current.items.overdue_tasks, "No Business Signal evidence was found for this period.")}
-
-## KPI Trends
-- KPI records added: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)}
-- KPI records from imported files: ${trendPhrase(current.counts.source_linked_kpis, previous.counts.source_linked_kpis)}
-${readableList(current.items.kpis_recorded, "No KPI records were found for this period.")}
-- KPI comparison observations:
-${readableList(current.items.kpi_trend_observations, "No KPI trend observations were available yet. Add at least two dated values for a KPI to unlock comparisons.")}
-- Business Signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)}
-- Business Signals in memory now: ${current.counts.open_tasks}
-- Open issues now: ${current.counts.open_issues}
-- Checklist exceptions: ${trendPhrase(current.counts.checklist_exceptions, previous.counts.checklist_exceptions)}
-- Form submissions: ${trendPhrase(current.counts.form_submissions, previous.counts.form_submissions)}
-- Business metrics recorded: ${trendPhrase(current.counts.operational_metrics, previous.counts.operational_metrics)}
-
-## Uploaded Files and Imported Data
-- Files uploaded: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)}
-- Files marked imported: ${trendPhrase(current.counts.imported_files, previous.counts.imported_files)}
-- Completed data imports: ${trendPhrase(current.counts.completed_imports, previous.counts.completed_imports)}
-- Data extractions waiting for review: ${current.counts.pending_imports}
-- Imported spreadsheet rows: ${trendPhrase(current.counts.imported_file_rows, previous.counts.imported_file_rows)}
-- Customer activity records added: ${trendPhrase(current.counts.crm_leads, previous.counts.crm_leads)}
-- Customer activity history changes: ${trendPhrase(current.counts.crm_lead_changes, previous.counts.crm_lead_changes)}
-- File analyses completed: ${trendPhrase(current.counts.file_analyses, previous.counts.file_analyses)}
-${readableList(
-  [
-    ...current.items.uploaded_files.map((item) => `File uploaded: ${item}`),
-    ...current.items.completed_imports.map((item) => `Completed import: ${item}`),
-    ...current.items.pending_imports.map((item) => `Pending review: ${item}`),
-    ...current.items.imported_files.map((item) => `Import completed: ${item}`),
-    ...current.items.crm_leads.map((item) => `Customer activity evidence: ${item}`),
-    ...current.items.crm_lead_changes.map((item) => `Customer activity history: ${item}`),
-    ...current.items.operational_metrics.map((item) => `Business metric: ${item}`)
-  ],
-  "No uploaded files, spreadsheet imports, customer activity evidence, or business metrics were found in this period."
-)}
-
-## File Insights
-${readableList(current.items.file_insights, "No Vaeroex file reviews were saved during this period.")}
+- Business Signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
+- New source files: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)} vs ${previousLabel}
+${readableList(current.items.kpi_trend_observations, "Historical depth is not yet sufficient for a supported KPI comparison.")}
 
 ## Risks
 ${readableList(risks, "No major business risks were found in the selected period.")}
 
-## Recommended Next Actions
+## Leadership Review
 ${readableList(nextActions, "Keep the current operating cadence and review trends again in the next report.")}
 
-## Vaeroex Insights
-${readableList(current.items.vaeroex_insights, "No Vaeroex insights were saved during this period.")}
+## Supporting Evidence
+- Eligible original sources: ${current.evidence.original_source_count}
+- Source types: ${current.evidence.source_types.join(", ") || "None available"}
+${readableList(current.items.open_issues, "No active issue evidence was found for this period.")}
+${readableList(current.items.kpis_recorded, "No KPI evidence was found for this period.")}
+${readableList(current.items.uploaded_files, "No new file evidence was found for this period.")}
+
+## Limitations
+This report is derived analysis. It does not create original evidence, change Business Health, or confirm causes that are not directly supported by the listed sources.
 
 Comparison period: ${previousRange.startDate} to ${previousRange.endDate}`;
 }
@@ -792,8 +736,8 @@ export async function generateReportAction(formData: FormData) {
   const { supabase, user, workspace, workspaceId } = await requireWorkspace();
   const returnPath = safeReportsReturnPath(text(formData, "return_path"));
   const periodValue = text(formData, "report_period");
-  const period = isReportPeriod(periodValue) ? periodValue : "Weekly";
-  const reportType = text(formData, "report_type") || "Intelligence Summary";
+  const period = normalizeLegacyPeriod(periodValue);
+  const reportType = normalizeReportType(text(formData, "report_type") || "Executive Brief");
   const category = text(formData, "category") || "All";
   const anchorDate = text(formData, "anchor_date");
   const currentRange = getPeriodRange(period, anchorDate);
@@ -812,10 +756,26 @@ export async function generateReportAction(formData: FormData) {
     redirectWithError(rateLimitMessage(rateLimit), returnPath);
   }
 
-  const [current, previous] = await Promise.all([
-    fetchReportSource(supabase, workspaceId, currentRange, category),
-    fetchReportSource(supabase, workspaceId, previousRange, category)
-  ]);
+  let current: Awaited<ReturnType<typeof fetchReportSource>>;
+  let previous: Awaited<ReturnType<typeof fetchReportSource>>;
+  try {
+    [current, previous] = await Promise.all([
+      fetchReportSource(supabase, workspaceId, currentRange, category),
+      fetchReportSource(supabase, workspaceId, previousRange, category)
+    ]);
+  } catch {
+    redirectWithError("Required evidence could not be loaded, so no report was created.", returnPath);
+  }
+
+  const minimumSources = reportType === "Board Report" ? 3 : 1;
+  if (current.evidence.original_source_count < minimumSources) {
+    redirectWithError(
+      reportType === "Board Report"
+        ? "Board Reports require at least three eligible original evidence sources."
+        : "Add eligible original evidence before generating an Executive Brief.",
+      returnPath
+    );
+  }
 
   const bodyMarkdown = buildReportBody({
     period,
@@ -830,6 +790,8 @@ export async function generateReportAction(formData: FormData) {
 
   const sourceData = {
     generated_from: "period_report",
+    derived_analysis: true,
+    evidence_count: current.evidence.original_source_count,
     report_period: period,
     report_type: reportType,
     category,
@@ -848,8 +810,8 @@ export async function generateReportAction(formData: FormData) {
 
   const { error } = await supabase.from("reports").insert({
     workspace_id: workspaceId,
-    report_type: `${period} ${reportType}`,
-    title: `${period} ${reportType} - Generated by Vaeroex`,
+    report_type: reportType,
+    title: reportType,
     date_range_start: currentRange.startDate,
     date_range_end: currentRange.endDate,
     body_markdown: bodyMarkdown,
@@ -862,6 +824,6 @@ export async function generateReportAction(formData: FormData) {
   }
 
   revalidatePath("/app/reports");
-  revalidatePath("/app/briefings");
-  redirectWithMessage(`${period} briefing generated.`, returnPath);
+  revalidatePath("/app");
+  redirectWithMessage(`${reportType} generated.`, returnPath);
 }

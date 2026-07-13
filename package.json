@@ -16,6 +16,7 @@
     "test:evidence-lineage": "node scripts/evidence-lineage-regression-tests.js",
     "test:deletion-integrity": "node scripts/deletion-integrity-regression-tests.js",
     "test:homepage": "node scripts/executive-homepage-regression-tests.js",
+    "test:reports": "node scripts/report-consolidation-regression-tests.js",
     "test:intelligence": "node scripts/intelligence-experience-regression-tests.js",
     "test:public": "node scripts/public-experience-regression-tests.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"

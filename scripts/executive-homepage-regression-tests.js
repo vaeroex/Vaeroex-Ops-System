@@ -198,7 +198,7 @@ assert.match(homepageSource, /md:grid-cols-2 xl:grid-cols-3/, "priority cards mu
 assert.match(homepageSource, /grid items-start gap-4 md:grid-cols-2 xl:grid-cols-3/, "priority cards must not stretch to the tallest sibling");
 assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
-for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Briefings", "Settings"]) {
+for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Reports", "Settings"]) {
   assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
 }
 assert.doesNotMatch(appShellSource, /href: "\/app", label: "Home"/, "authenticated navigation must use Overview instead of Home");

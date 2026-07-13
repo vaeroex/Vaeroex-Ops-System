@@ -2177,7 +2177,7 @@ export async function manageSourceFileAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/briefings");
+  revalidatePath("/app/reports");
   redirectWithPathMessage(
     returnPath,
     action === "archive"
@@ -2253,7 +2253,7 @@ export async function manageLearnedKnowledgeAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/briefings");
+  revalidatePath("/app/reports");
   redirectWithPathMessage(
     returnPath,
     action === "delete"

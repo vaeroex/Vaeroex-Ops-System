@@ -29,7 +29,7 @@ function parseJson(value: string): Json {
   }
 }
 
-export async function saveGeneratedOutputToBriefingsAction(formData: FormData) {
+export async function saveGeneratedOutputToReportsAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
   const title = text(formData, "title") || "Generated Vaeroex output";
   const outputType = text(formData, "output_type") || "Generated Output";
@@ -80,7 +80,6 @@ export async function saveGeneratedOutputToBriefingsAction(formData: FormData) {
     redirect(`/app/generated/new?error=${encodeURIComponent(error.message || "Generated output could not be saved.")}` as Route);
   }
 
-  revalidatePath("/app/briefings");
   revalidatePath("/app/reports");
-  redirect("/app/briefings?message=Generated output saved to Briefings." as Route);
+  redirect("/app/reports?message=Report saved." as Route);
 }

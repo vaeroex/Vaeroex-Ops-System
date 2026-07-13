@@ -46,7 +46,7 @@ export type GeneratedOutputCoverageSummary = {
 
 const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
   action_plan: "Improvement Plan",
-  risk_brief: "Executive Brief",
+  risk_brief: "Investigation Summary",
   checklist: "Checklist Draft",
   sop: "SOP Draft",
   executive_briefing: "Executive Brief",
@@ -55,7 +55,7 @@ const OUTPUT_LABELS: Record<GeneratedOutputType, string> = {
 
 const OUTPUT_NAMES: Record<GeneratedOutputType, string> = {
   action_plan: "Improvement Plan",
-  risk_brief: "Executive Brief",
+  risk_brief: "Investigation Summary",
   checklist: "Checklist Draft",
   sop: "SOP Draft",
   executive_briefing: "Executive Briefing",
@@ -332,7 +332,7 @@ function outputBody(type: GeneratedOutputType, source: GeneratedOutputSource, in
       "Review the evidence behind this Vaeroex recommendation.",
       "Decide whether the recommendation should become an executive report, meeting agenda, SOP, checklist, or improvement plan.",
       source.recommendedAction,
-      "Save the final output to Briefings if leadership needs a record.",
+      "Save the final output to Reports if leadership needs a record.",
       "Review the outcome during the next leadership check-in."
     ]),
     "",
