@@ -46,7 +46,7 @@ metadata transaction cannot be committed.
 - Restore is available to an owner/admin after password reauthentication.
 - Restore is refused if any new business content exists, preventing an old
   snapshot from being merged into a newer workspace state.
-- At expiry, the hourly scheduled purge removes exact-manifest objects through the
+- After expiry, the daily scheduled purge removes exact-manifest objects through the
   Storage API, verifies absence, removes recovery rows and exact paths, and
   scrubs recovery-only workspace context before retaining only the operation/audit summary.
 
@@ -76,7 +76,7 @@ retains the exact retry manifest.
 
 Interactive manifests are capped at 10,000 objects. Each purge invocation
 processes at most 2,000 manifest rows in Storage API batches of 500; remaining
-rows keep the operation in a visible, retryable `partial` state and the hourly
+rows keep the operation in a visible, retryable `partial` state and the daily
 worker continues deterministically. Larger workspaces require a controlled
 support runbook rather than a long interactive request.
 
@@ -130,7 +130,7 @@ silently deleted by a business-data reset.
 `update_source_file_lifecycle` now sets `purge_after` to 30 days for a soft
 delete and immediately excludes the file and linked memory chunks. Restore
 clears the deletion and purge deadline unless the object was already purged.
-The hourly purge skips legal holds, validates the exact workspace prefix, uses
+The daily purge skips legal holds, validates the exact workspace prefix, uses
 Storage API removal, verifies object absence, records `purged_at`, and emits a
 security audit event. Before Storage deletion, a service-role-only RPC acquires
 the same workspace advisory lock used by reset preparation and claims the file.
@@ -196,7 +196,7 @@ Do not run this command with production credentials.
 5. Apply the migration to production during a controlled maintenance window.
 6. Verify tables, RLS, grants, functions, indexes, and the private bucket without
    running a reset.
-7. Deploy application code and the authenticated hourly purge route.
+7. Deploy application code and the authenticated daily purge route.
 8. Confirm Settings shows the control only to owners/admins and that regular
    file lifecycle operations still work.
 9. Perform the first real reset only with a separately approved runbook,

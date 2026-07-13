@@ -78,6 +78,7 @@ const storage = read("lib/workspaces/reset-storage.ts");
 const resetGuard = read("lib/workspaces/reset-guard.ts");
 const fileActions = read("app/app/files/actions.ts");
 const cron = read("app/api/cron/workspace-reset-purge/route.ts");
+const vercelConfig = JSON.parse(read("vercel.json"));
 
 for (const table of ["workspace_reset_operations", "workspace_reset_record_backups", "workspace_reset_storage_objects"]) {
   assert.match(migration, new RegExp(`create table if not exists public\\.${table}`), `${table} must be purpose-built`);
@@ -219,4 +220,6 @@ assert.match(storage, /updateManifestRows\(\s*admin: AdminClient,\s*workspaceId:
 assert.match(migration, /starter_records_created', false/, "guided reset setup must not create sample business evidence");
 assert.match(cron, /CRON_SECRET/, "the purge route must authenticate scheduled requests");
 assert.match(cron, /processDueWorkspaceResetPurges/, "the purge route must process due reset manifests");
+const purgeCron = vercelConfig.crons.find((entry) => entry.path === "/api/cron/workspace-reset-purge");
+assert.equal(purgeCron?.schedule, "0 9 * * *", "workspace reset purge must run once daily at 09:00 UTC");
 process.stdout.write("Workspace reset foundation regression tests passed.\n");
