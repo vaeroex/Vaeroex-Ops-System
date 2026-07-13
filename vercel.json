@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/workspace-reset-purge",
-      "schedule": "0 9 * * *"
+      "schedule": "30 * * * *"
     }
   ]
 }
