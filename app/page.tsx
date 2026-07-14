@@ -57,9 +57,6 @@ function NvidiaInceptionSection() {
             <h2 id="nvidia-inception-heading" className="mt-2 text-xl font-semibold leading-tight tracking-normal text-white sm:text-2xl">
               Vaeroex is a member of the NVIDIA Inception program.
             </h2>
-            <p className="mt-3 text-sm leading-6 text-slate-400">
-              Program membership only; no investment, certification, endorsement, or partnership is implied.
-            </p>
           </div>
           <div className="flex justify-start lg:justify-end">
             <img
