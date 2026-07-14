@@ -47,6 +47,36 @@ const trustPoints = [
   ["Derived intelligence", "Briefings and recommendations remain clearly separate from the evidence used to create them."]
 ] as const;
 
+function NvidiaInceptionSection() {
+  return (
+    <section className="border-b border-white/10 bg-[#030712] px-5 py-8 sm:px-6 sm:py-10" aria-labelledby="nvidia-inception-heading">
+      <div className="mx-auto max-w-7xl">
+        <div className="grid gap-6 border-y border-white/10 py-6 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+          <div className="max-w-3xl">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">NVIDIA Inception Program</p>
+            <h2 id="nvidia-inception-heading" className="mt-2 text-xl font-semibold leading-tight tracking-normal text-white sm:text-2xl">
+              Vaeroex is a member of the NVIDIA Inception program.
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-400">
+              Program membership only; no investment, certification, endorsement, or partnership is implied.
+            </p>
+          </div>
+          <div className="flex justify-start lg:justify-end">
+            <img
+              src="/brand/nvidia-inception-program-badge.svg"
+              alt="NVIDIA Inception Program badge"
+              className="h-auto w-44 sm:w-52"
+            />
+          </div>
+        </div>
+        <p className="mt-3 max-w-4xl text-xs leading-5 text-slate-500">
+          © 2025 NVIDIA, the NVIDIA logo, and NVIDIA Inception are trademarks and/or registered trademarks of NVIDIA Corporation in the U.S. and other countries.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 export default function HomePage() {
   return (
     <main className="min-h-screen bg-[#030712] text-white">
@@ -174,6 +204,8 @@ export default function HomePage() {
         secondaryHref="/operations-intelligence"
         secondaryLabel="Explore the product"
       />
+
+      <NvidiaInceptionSection />
 
       <PublicFooter />
     </main>
