@@ -98,38 +98,6 @@ function pointsWithCurrentScore(points: BusinessHealthTrendPoint[], currentScore
   ].sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
 }
 
-function buildDemoTrendPoints(currentScore?: number, currentStatus?: string, currentTrend?: string) {
-  const today = new Date();
-  const year = today.getUTCFullYear();
-  const currentMonth = today.getUTCMonth();
-  const monthScores = [76, 79, 63, 72, 81, 77, 80, 83, 78, 82, 85, 84];
-  const latestScore = clampScore(typeof currentScore === "number" && Number.isFinite(currentScore) ? currentScore : monthScores[currentMonth] || 80);
-  const points: BusinessHealthTrendPoint[] = [];
-
-  for (let month = 0; month <= currentMonth; month += 1) {
-    const score = month === currentMonth ? latestScore : monthScores[month] || latestScore;
-    points.push({
-      snapshotDate: dateOnly(new Date(Date.UTC(year, month, 1))),
-      score,
-      status: month === currentMonth ? currentStatus || "Current" : score >= 80 ? "Strong" : score >= 70 ? "Stable" : "Watch",
-      trend: month === currentMonth ? currentTrend || "Mixed" : month === 2 ? "Declining" : month === 4 ? "Improving" : "Stable"
-    });
-  }
-
-  const dailyOffsets = [-4, -2, 1, -1, 2, 1, 0];
-  for (let index = 6; index >= 0; index -= 1) {
-    const day = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - index));
-    points.push({
-      snapshotDate: dateOnly(day),
-      score: clampScore(latestScore + dailyOffsets[6 - index]),
-      status: currentStatus || "Current",
-      trend: currentTrend || "Mixed"
-    });
-  }
-
-  return normalizePoints(points);
-}
-
 function buildDailyPoints(points: BusinessHealthTrendPoint[]) {
   const today = new Date();
   const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 6));
@@ -217,17 +185,12 @@ export function BusinessHealthTrendChart({
   currentScore,
   currentStatus,
   currentTrend,
-  isDemoWorkspace = false,
   errorMessage,
   loading = false
 }: BusinessHealthTrendChartProps) {
   const [range, setRange] = useState<RangeKey>("7D");
   const realPoints = useMemo(() => pointsWithCurrentScore(points, currentScore, currentStatus, currentTrend), [points, currentScore, currentStatus, currentTrend]);
-  const usingSampleData = realPoints.length < 2 && isDemoWorkspace;
-  const trendPoints = useMemo(
-    () => (usingSampleData ? buildDemoTrendPoints(currentScore, currentStatus, currentTrend) : realPoints),
-    [currentScore, currentStatus, currentTrend, realPoints, usingSampleData]
-  );
+  const trendPoints = realPoints;
   const selectedPoints = useMemo(() => chartData(trendPoints, range), [trendPoints, range]);
   const coordinates = useMemo(() => pointCoordinates(selectedPoints), [selectedPoints]);
   const linePath = useMemo(() => pathFor(selectedPoints), [selectedPoints]);
@@ -236,7 +199,7 @@ export function BusinessHealthTrendChart({
   const change = typeof first === "number" && typeof last === "number" ? last - first : 0;
   const rangeLabel = range === "7D" ? "Last 7 days" : range === "6M" ? "Last 6 months" : "Year to date";
   const isLimited = selectedPoints.length > 0 && (range === "7D" ? selectedPoints.length < 4 : selectedPoints.length < 2);
-  const showError = Boolean(errorMessage && !usingSampleData && !trendPoints.length);
+  const showError = Boolean(errorMessage && !trendPoints.length);
 
   return (
     <div className="mt-4 rounded-lg border border-cyan-300/15 bg-slate-950/40 p-3">
@@ -248,11 +211,7 @@ export function BusinessHealthTrendChart({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {usingSampleData ? (
-            <span className="rounded-full border border-amber-300/35 bg-amber-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-amber-100">
-              Sample demo trend
-            </span>
-          ) : realPoints.length ? (
+          {realPoints.length ? (
             <span className="rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-100">
               Stored snapshots
             </span>
@@ -323,11 +282,6 @@ export function BusinessHealthTrendChart({
           {isLimited ? (
             <p className="mt-2 text-xs leading-5 text-slate-400">
               Limited history available. Vaeroex is showing the Business Health points collected so far.
-            </p>
-          ) : null}
-          {usingSampleData ? (
-            <p className="mt-2 text-xs leading-5 text-amber-100/80">
-              Demo workspace sample data. This is not customer history.
             </p>
           ) : null}
         </div>

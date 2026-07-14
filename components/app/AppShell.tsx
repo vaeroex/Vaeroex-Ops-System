@@ -14,8 +14,8 @@ import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
   {
-    label: "Workspace",
-    defaultOpen: true,
+    label: "Primary",
+    collapsible: false,
     items: [
       { href: "/app", label: "Overview" },
       { href: "/app/intelligence", label: "Intelligence" },
@@ -26,13 +26,13 @@ const baseNavSections = [
     ]
   },
   {
-    label: "Organizational Context",
+    label: "Business Memory",
     defaultOpen: false,
     items: [
       { href: "/app/tasks", label: "Business Signals" }
     ]
   }
-] satisfies Array<{ label: string; defaultOpen?: boolean; items: Array<{ href: string; label: string }> }>;
+] satisfies Array<{ label: string; defaultOpen?: boolean; collapsible?: boolean; items: Array<{ href: string; label: string }> }>;
 
 const adminNavSection = {
   label: "Admin",
@@ -92,19 +92,16 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
 
   return (
     <div className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
-      <aside className="fixed inset-y-0 left-0 hidden w-72 border-r border-slate-800 bg-vaeroex-navy p-5 text-white shadow-command lg:flex lg:flex-col">
-        <Link href="/app" className="group flex flex-col gap-2 rounded-lg border border-white/10 bg-white/[0.04] p-3 shadow-sm shadow-black/10">
-          <VaeroexLogo variant="full" size="lg" priority className="transition group-hover:scale-[1.01]" />
-          <span className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">Operations Intelligence Platform</span>
+      <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-vaeroex-navy p-3 text-white shadow-command lg:flex lg:flex-col">
+        <Link href="/app" aria-label="Vaeroex Overview" className="group flex h-12 items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 shadow-sm shadow-black/10">
+          <VaeroexLogo variant="symbol" size="sm" priority className="transition group-hover:scale-[1.01]" />
+          <span className="ml-3 text-sm font-semibold tracking-wide text-white">Vaeroex</span>
         </Link>
 
-        <form action={selectWorkspaceAction} className="mt-5 rounded-lg border border-white/10 bg-white/[0.055] p-3 shadow-sm shadow-black/10">
+        <form action={selectWorkspaceAction} className="mt-3 rounded-lg border border-white/10 bg-white/[0.055] p-2.5 shadow-sm shadow-black/10">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="truncate text-sm font-semibold text-white">{workspaceDisplayName}</p>
-              {isDemoWorkspace && activeWorkspace?.name ? (
-                <p className="mt-0.5 truncate text-xs text-vaeroex-silver">{activeWorkspace.name}</p>
-              ) : null}
             </div>
             <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${workspaceStatusTone(accessLabel)}`}>
               {isDemoWorkspace ? "Sample Business Environment" : accessLabel}
@@ -113,7 +110,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
           <select
             name="workspace_id"
             aria-label="Workspace switcher"
-            className="mt-3 w-full rounded-md border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs font-semibold text-white outline-none focus:border-vaeroex-blue"
+            className="mt-2 w-full rounded-md border border-white/10 bg-slate-950/80 px-2 py-1.5 text-xs font-semibold text-white outline-none focus:border-vaeroex-blue"
             defaultValue={activeWorkspace?.id || ""}
           >
             {workspaces.length ? (
@@ -135,14 +132,14 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
 
         <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} />
 
-        <form action={signOutAction} className="mt-5">
+        <form action={signOutAction} className="mt-3">
           <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
             Sign out
           </button>
         </form>
       </aside>
 
-      <div className="lg:pl-72">
+      <div className="lg:pl-64">
         <header className="sticky top-0 z-10 border-b border-slate-800 bg-vaeroex-navy px-3 py-3 text-white shadow-command sm:px-4 lg:px-8">
           <div className="flex min-w-0 items-center justify-between gap-3">
             <div className="flex min-w-0 flex-1 items-center gap-3 pr-2">

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { Archive, FileText, Plus, ShieldCheck } from "lucide-react";
+import { Archive, FileText, Plus } from "lucide-react";
 import { generateReportAction } from "@/app/app/reports/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
@@ -76,7 +76,6 @@ function ReportCard({ report, archived }: { report: ReportRow; archived: boolean
         </div>
         <ReportLifecycleMenu reportId={report.id} reportTitle={title} archived={archived} />
       </div>
-      <p className="mt-3 text-sm leading-6 text-slate-300">{reportSummary(report.body_markdown)}</p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4">
         <p className={`text-xs font-semibold ${readinessTone(readiness)}`}>Evidence readiness: {readiness}</p>
         <Link href={`/app/reports/${report.id}` as Route} className="inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60">
@@ -158,9 +157,8 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     .limit(100);
   reportQuery = archived ? reportQuery.not("archived_at", "is", null) : reportQuery.is("archived_at", null);
 
-  const [reportResult, activeCountResult, archivedCountResult, filesResult, kpisResult, signalsResult, issuesResult] = await Promise.all([
+  const [reportResult, archivedCountResult, filesResult, kpisResult, signalsResult, issuesResult] = await Promise.all([
     reportQuery,
-    supabase.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null),
     supabase.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("archived_at", "is", null).is("deleted_at", null),
     supabase.from("file_uploads").select("id,display_name,metadata_json,analysis_summary,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(100),
     supabase.from("kpis").select("id,name,source,notes,source_file_id,import_id,created_at,archived_at,deleted_at").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).limit(300),
@@ -207,10 +205,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           <h1 className="mt-2 text-2xl font-semibold tracking-normal text-white sm:text-3xl">Reports</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">Generate, review, download, and manage leadership-ready outputs created from eligible business evidence.</p>
         </div>
-        <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-300">
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">{activeCountResult.count || 0} active</span>
-          <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-2">{archivedCountResult.count || 0} archived</span>
-        </div>
       </header>
 
       <ErrorNotice message={params?.error || reportResult.error?.message || evidenceErrors[0]?.message} />
@@ -238,9 +232,9 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               {item.label}
             </Link>
           ))}
-          <Link href={archived ? "/app/reports" : "/app/reports?view=archived"} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${archived ? "border-slate-400/35 bg-slate-900 text-white" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-slate-900"}`}>
+          {archived || (archivedCountResult.count || 0) > 0 ? <Link href={archived ? "/app/reports" : "/app/reports?view=archived"} className={`inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-sm font-semibold ${archived ? "border-slate-400/35 bg-slate-900 text-white" : "border-white/10 bg-white/[0.04] text-slate-300 hover:bg-slate-900"}`}>
             <Archive className="h-4 w-4" aria-hidden="true" />{archived ? "Active" : "Archived"}
-          </Link>
+          </Link> : null}
         </nav>
 
         {reports.length ? (
@@ -256,15 +250,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         )}
       </section>
 
-      <section className="rounded-lg border border-white/10 bg-[#08111f] p-4">
-        <div className="flex items-start gap-3">
-          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-cyan-200" aria-hidden="true" />
-          <div>
-            <h2 className="text-sm font-semibold text-white">Derived analysis, not original evidence</h2>
-            <p className="mt-1 text-xs leading-5 text-slate-400">Reports package supported intelligence for review and sharing. They do not increase original-evidence coverage, create Business Health snapshots, or replace the sources used to generate them.</p>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

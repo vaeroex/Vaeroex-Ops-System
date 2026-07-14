@@ -3,7 +3,6 @@ import type { Route } from "next";
 import {
   analyzeFileAction,
   approveFileAnalysisAction,
-  createReportFromFileAction,
   discardFileAnalysisAction,
   importFileAction,
   manageLearnedKnowledgeAction,
@@ -56,7 +55,6 @@ type SourcesTab = "files" | "knowledge" | "archived";
 
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting key information", "Identifying business signals", "Checking KPI/import opportunities", "Saving analysis", "Done"];
 const IMPORT_PROGRESS_STEPS = ["Parsing file", "Detecting columns", "Preparing mapping review", "Saving staged rows", "Ready for approval"];
-const REPORT_PROGRESS_STEPS = ["Reading source evidence", "Preparing findings", "Creating report", "Saving report", "Done"];
 const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing source record", "Refreshing Sources", "Complete"];
 const sourceTabs: Array<{ key: SourcesTab; label: string; href: Route }> = [
   { key: "files", label: "Source Files", href: "/app/sources" },
@@ -235,10 +233,12 @@ function latestAnalysisAt(file: FileUploadRow) {
 
 function analysisStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   const latestRun = runs[0];
+  const runIsActive = latestRun && ["queued", "pending", "running", "processing"].includes(latestRun.status);
+  const hasCompletedAnalysis = latestRun?.status === "completed" || Boolean(file.analysis_summary || latestAnalysisAt(file));
 
-  if ((file.processing_status || "") === "processing") return "Analyzing";
+  if (runIsActive) return "Analyzing";
+  if (hasCompletedAnalysis) return "Needs Review";
   if ((file.processing_status || "") === "failed" || latestRun?.status === "failed") return "Failed";
-  if (latestRun?.status === "completed" || file.analysis_summary || latestAnalysisAt(file)) return "Needs Review";
   return "Not reviewed";
 }
 
@@ -252,16 +252,18 @@ function importStatusLabel(value: string) {
 
 function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   const reviewStatus = analysisReviewStatus(file);
+  const latestRun = runs[0];
+  const runIsActive = latestRun && ["queued", "pending", "running", "processing"].includes(latestRun.status);
 
   if (file.deleted_at) return "Deleted";
   if (file.archived_at) return "Archived";
-  if ((file.processing_status || "") === "processing") return "Analyzing";
-  if ((file.processing_status || "") === "failed" || file.import_status === "failed" || reviewStatus === "failed") return "Failed";
+  if (runIsActive) return "Analyzing";
   if (reviewStatus === "discarded" || reviewStatus === "excluded") return "Uploaded";
   if (reviewStatus === "approved" || reviewStatus === "auto_learned" || file.index_status === "ready") return "Learned";
   if (reviewStatus === "needs_review" || reviewStatus === "ready_for_review") return "Needs Review";
   if (file.import_status === "extracted" || file.import_status === "needs_review" || (isSpreadsheet(file) && file.import_status === "ready")) return "Import Review";
   if (reviewStatus === "completed" || analysisStatus(file, runs) === "Needs Review") return "Ready";
+  if ((file.processing_status || "") === "failed" || file.import_status === "failed" || reviewStatus === "failed") return "Failed";
   return "Uploaded";
 }
 
@@ -531,7 +533,7 @@ function SourceFileActions({
           </SourceActionButton>
         </form>
       ) : null}
-      {status !== "Uploaded" && status !== "Analyzing" ? (
+      {status !== "Uploaded" && status !== "Analyzing" && !isSpreadsheet(file) ? (
         <form action={analyzeFileAction}>
           <input type="hidden" name="file_id" value={file.id} />
           <input type="hidden" name="return_path" value="/app/sources" />
@@ -545,42 +547,28 @@ function SourceFileActions({
           </SourceActionButton>
         </form>
       ) : null}
-      <form action={createReportFromFileAction}>
-        <input type="hidden" name="file_id" value={file.id} />
-        <input type="hidden" name="report_title" value={`File Report - ${file.display_name}`} />
-        <SourceActionButton pendingLabel="Creating report..." steps={REPORT_PROGRESS_STEPS}>
-          Create Report
-        </SourceActionButton>
-      </form>
-      {access?.downloadUrl ? (
-        <a href={access.downloadUrl} download={file.original_name} className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">
-          Download Original
-        </a>
-      ) : null}
-      <form action={manageSourceFileAction}>
-        <input type="hidden" name="file_id" value={file.id} />
-        <input type="hidden" name="source_action" value={file.archived_at ? "restore" : "archive"} />
-        <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
-        <ConfirmSubmitButton
-          message={file.archived_at ? `Restore "${file.display_name}" to current Sources?` : `Archive "${file.display_name}"? It will leave current views but remain available as historical context.`}
-          pendingLabel={file.archived_at ? "Restoring..." : "Archiving..."}
-          className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30"
-        >
-          {file.archived_at ? "Restore" : "Archive"}
-        </ConfirmSubmitButton>
-      </form>
-      <form action={manageSourceFileAction}>
-        <input type="hidden" name="file_id" value={file.id} />
-        <input type="hidden" name="source_action" value="delete" />
-        <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
-        <ConfirmSubmitButton
-          message={`Delete this file from current Sources? This uses a workspace-safe soft delete and may remove supporting evidence from active views.${referenceWarning}`}
-          pendingLabel="Deleting file..."
-          className="rounded-md border border-red-400/35 bg-red-950/35 px-3 py-2 text-xs font-semibold text-red-100 hover:border-red-300/60 hover:bg-red-950/55"
-        >
-          Delete File
-        </ConfirmSubmitButton>
-      </form>
+      <details className="relative">
+        <summary className="inline-flex min-h-10 cursor-pointer list-none items-center rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">More</summary>
+        <div className="absolute right-0 z-20 mt-2 grid min-w-52 gap-2 rounded-lg border border-white/10 bg-[#08111f] p-3 shadow-2xl">
+          {access?.downloadUrl ? <a href={access.downloadUrl} download={file.original_name} className="rounded-md px-3 py-2 text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">Download Original</a> : null}
+          <form action={manageSourceFileAction}>
+            <input type="hidden" name="file_id" value={file.id} />
+            <input type="hidden" name="source_action" value={file.archived_at ? "restore" : "archive"} />
+            <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
+            <ConfirmSubmitButton message={file.archived_at ? `Restore "${file.display_name}" to current Sources?` : `Archive "${file.display_name}"? It will leave current views but remain available as historical context.`} pendingLabel={file.archived_at ? "Restoring..." : "Archiving..."} className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-slate-100 hover:bg-cyan-950/30">
+              {file.archived_at ? "Restore" : "Archive"}
+            </ConfirmSubmitButton>
+          </form>
+          <form action={manageSourceFileAction}>
+            <input type="hidden" name="file_id" value={file.id} />
+            <input type="hidden" name="source_action" value="delete" />
+            <input type="hidden" name="return_path" value={file.archived_at ? "/app/sources?tab=archived" : "/app/sources"} />
+            <ConfirmSubmitButton message={`Delete this file from current Sources? This uses a workspace-safe soft delete and may remove supporting evidence from active views.${referenceWarning}`} pendingLabel="Deleting file..." className="w-full rounded-md px-3 py-2 text-left text-xs font-semibold text-red-200 hover:bg-red-950/35">
+              Delete File
+            </ConfirmSubmitButton>
+          </form>
+        </div>
+      </details>
     </div>
   );
 }
@@ -643,8 +631,7 @@ function SourceFileDetailPanel({
         </div>
         <div className="flex flex-wrap gap-2">
           <StatusBadge value={status} />
-          <StatusBadge value={file.file_extension.toUpperCase()} />
-          {confidence ? <StatusBadge value={`Confidence: ${confidence}`} /> : null}
+          {confidence ? <span className="text-xs font-semibold text-slate-300">Confidence: {confidence}</span> : null}
         </div>
       </div>
 
@@ -888,7 +875,6 @@ function SourceFileRow({
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h3 className="min-w-0 break-words text-sm font-semibold text-white">{file.display_name}</h3>
             <StatusBadge value={status} />
-            <StatusBadge value={file.file_extension.toUpperCase()} />
           </div>
           <p className="mt-1 text-xs leading-5 text-slate-400">
             {file.original_name} · {fileSizeLabel(file.file_size_bytes)} · Uploaded {formatDate(file.created_at)}
@@ -1247,15 +1233,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
             <UploadSourceDrawer folders={folders} compact />
           </div>
         </div>
-        <div className="mt-3 grid gap-2 lg:grid-cols-2">
-          <details className="rounded-lg border border-white/10 bg-slate-950/35 px-3 py-2">
-            <summary className="cursor-pointer list-none text-xs font-semibold text-cyan-100">
-              What is this?
-            </summary>
-            <p className="mt-2 text-xs leading-5 text-slate-400">
-              Sources are business evidence Vaeroex can analyze, reference in briefings, or preserve as Learned Knowledge. Strong evidence is learned automatically; structured imports still require review before records change.
-            </p>
-          </details>
+        <div className="mt-3">
           <details className="rounded-lg border border-amber-300/25 bg-amber-950/15 px-3 py-2">
             <summary className="cursor-pointer list-none text-xs font-semibold text-amber-100">
               Sensitive information reminder
@@ -1276,7 +1254,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
 
       <section className="space-y-4">
         <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Sources views">
-          {sourceTabs.map((tab) => {
+          {sourceTabs.filter((tab) => tab.key !== "knowledge" || activeTab === "knowledge" || memoryChunks.some((chunk) => !chunk.archived_at && !chunk.deleted_at)).map((tab) => {
             const active = activeTab === tab.key;
             const count =
               tab.key === "files"

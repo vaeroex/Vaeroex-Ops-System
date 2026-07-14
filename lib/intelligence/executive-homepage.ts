@@ -227,7 +227,7 @@ function buildChanges({
     return {
       state: "first_review",
       items: [],
-      message: "This is the first intelligence review for this workspace. Changes will appear after additional eligible evidence is processed."
+      message: "Changes will appear after the next intelligence review."
     };
   }
 

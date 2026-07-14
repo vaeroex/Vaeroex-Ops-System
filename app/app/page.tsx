@@ -23,7 +23,6 @@ import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intellige
 import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
-import { normalizedReportType } from "@/lib/reports/presentation";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import {
@@ -2047,18 +2046,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiTrends: comparisonTrends,
     sourceDataAvailable: businessHealthSourceErrors.length === 0
   });
-  const latestExecutiveBrief = reports.find((report) => normalizedReportType(report) === "executive_brief") || null;
-  const originalEvidenceCount = businessIntelligenceCoverage.evidenceSummary.originalEvidenceCount;
-  const canManageReports = ["owner", "admin", "manager"].includes(context.membership?.role || "");
-  const reportReadiness = {
-    canGenerate: canManageReports && businessHealthSourceErrors.length === 0 && originalEvidenceCount > 0,
-    reason: !canManageReports
-      ? "Workspace manager access is required to save reports."
-      : businessHealthSourceErrors.length
-        ? "Required evidence could not be loaded, so no report will be created."
-        : "Add eligible original evidence before generating a brief.",
-    latestReportHref: latestExecutiveBrief ? (`/app/reports/${latestExecutiveBrief.id}` as Route) : null
-  };
   const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
@@ -2104,8 +2091,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           model={executiveHomepageModel}
           healthHistory={businessHealthHistory}
           healthHistoryError={businessHealthSnapshotResult.errorMessage}
-          isDemoWorkspace={isViewingDemoWorkspace}
-          reportReadiness={reportReadiness}
         />
       ) : null}
 

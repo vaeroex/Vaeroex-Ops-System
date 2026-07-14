@@ -48,17 +48,6 @@ const businessSignalCategories = [
   "Other"
 ];
 const signalSources = ["Manual", "Uploaded"];
-const examples = [
-  "Leadership change",
-  "New product launch",
-  "Pricing update",
-  "Vendor issue",
-  "New warehouse",
-  "Seasonal demand expected",
-  "Major customer lost",
-  "Regulation change"
-];
-
 function param(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
@@ -452,8 +441,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           <div className="flex flex-wrap gap-2">
             {[
               ["Signals", signals.length],
-              ["High Confidence", highConfidenceCount],
-              ["Uploaded", uploadedCount],
+              ...(highConfidenceCount ? [["High Confidence", highConfidenceCount]] : []),
+              ...(uploadedCount ? [["Uploaded", uploadedCount]] : []),
               ["Latest", latestSignal ? compactDate(latestSignal) : "None"]
             ].map(([label, value]) => (
               <span key={label} className="inline-flex min-h-8 items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1 text-xs font-semibold text-slate-200">
@@ -477,17 +466,6 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             </button>
           </form>
         </div>
-        <details className="mt-3">
-          <summary className="cursor-pointer list-none text-xs font-semibold text-cyan-200 hover:text-cyan-100">Examples and philosophy</summary>
-          <div className="mt-2 flex flex-wrap gap-2 text-xs">
-            {examples.map((example) => (
-              <span key={example} className="rounded-full border border-cyan-300/20 bg-cyan-400/10 px-2.5 py-1 font-semibold text-cyan-100">
-                {example}
-              </span>
-            ))}
-          </div>
-          <p className="mt-2 text-xs leading-5 text-slate-400">Business Signals teach Vaeroex. They do not create work.</p>
-        </details>
       </section>
 
       <section className="space-y-2">
@@ -498,8 +476,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
         {groupedSignals.length ? (
           <div className="space-y-2">
-            {groupedSignals.map((group, index) => (
-              <details key={group.category} open={index === 0} className="rounded-lg border border-white/10 bg-[#08111f] shadow-panel">
+            {groupedSignals.map((group) => (
+              <details key={group.category} className="rounded-lg border border-white/10 bg-[#08111f] shadow-panel">
                 <summary className="grid cursor-pointer list-none gap-2 px-3 py-2.5 hover:bg-cyan-950/20 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center">
                   <span className="truncate text-sm font-semibold text-white">
                     {group.category} <span className="text-slate-500">({group.items.length})</span>
