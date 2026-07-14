@@ -74,6 +74,16 @@ function limitationFor(insight: IntelligenceInsight) {
   return insight.limitation || insight.suggestedNextData || "Not enough evidence for a reliable conclusion.";
 }
 
+function lacksFindingSpecificity(insight: IntelligenceInsight) {
+  const gaps = [...insight.missingEvidence, insight.limitation || "", insight.suggestedNextData || ""]
+    .join(" ")
+    .toLowerCase();
+  const missingSpecificFields = ["owner", "outcome", "completion", "completed", "measurable", "date", "period"]
+    .filter((field) => gaps.includes(field));
+
+  return insight.confidence === "Low" && missingSpecificFields.length >= 2;
+}
+
 function evidenceDateRange(firstObserved: string, lastObserved: string) {
   if (!firstObserved && !lastObserved) return "Date unavailable";
   if (!firstObserved || firstObserved === lastObserved) return formatSignalDate(lastObserved || firstObserved);
@@ -107,6 +117,15 @@ function PanelTabs({ mode, onChange }: { mode: PanelMode; onChange: (mode: Panel
 }
 
 function SummaryPanel({ insight }: { insight: IntelligenceInsight }) {
+  if (lacksFindingSpecificity(insight)) {
+    return (
+      <div className="space-y-3 text-sm leading-6">
+        <p className="text-slate-100">Vaeroex found related records, but the available information does not identify an owner, completed outcome, or measurable business effect.</p>
+        <p className="rounded-lg border border-amber-300/20 bg-amber-950/15 p-3 text-amber-100">More information needed: owner, completion status, and outcome.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 text-sm leading-6">
       <section>
@@ -289,6 +308,7 @@ export function IntelligenceSignalInbox({ insights, initialFindingId }: { insigh
     () => signalTypes.reduce<Record<IntelligenceInsightType, number>>((acc, type) => ({ ...acc, [type]: insights.filter((insight) => insight.type === type).length }), {} as Record<IntelligenceInsightType, number>),
     [insights]
   );
+  const visibleTypes = useMemo(() => signalTypes.filter((type) => counts[type] > 0), [counts]);
   const filteredInsights = useMemo(
     () => sortInsights(insights.filter((insight) => insight.type === activeType).filter((insight) => confidence === "All" || insight.confidence === confidence).filter((insight) => !hideLowConfidence || insight.confidence !== "Low"), sortMode),
     [activeType, confidence, hideLowConfidence, insights, sortMode]
@@ -331,7 +351,7 @@ export function IntelligenceSignalInbox({ insights, initialFindingId }: { insigh
       </div>
 
       <div className="mt-4 flex gap-2 overflow-x-auto border-b border-white/10 pb-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {signalTypes.map((type) => (
+        {visibleTypes.map((type) => (
           <button key={type} type="button" onClick={() => selectType(type)} className={`inline-flex min-h-10 shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${activeType === type ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/30 hover:text-white"}`}>
             {typeTabLabel(type)} <span className="rounded-full bg-white/10 px-2 py-0.5 text-[0.7rem]">{counts[type]}</span>
           </button>

@@ -140,6 +140,9 @@ assert.doesNotMatch(inboxSource, /label: "Understand"|label: "Executive Brief"/,
 assert.match(inboxSource, /Create Investigation Summary/, "risk findings expose one normalized report action");
 assert.doesNotMatch(inboxSource, /Generate Executive Briefing|Generate Improvement Plan|Explain This/, "normal finding review must not show competing generator actions");
 assert.match(inboxSource, /buildEvidenceGroups\(insight\.supportingRecords\)/, "evidence view must group supporting records deterministically");
+assert.match(inboxSource, /signalTypes\.filter\(\(type\) => counts\[type\] > 0\)/, "zero-count finding categories must be hidden");
+assert.match(inboxSource, /Vaeroex found related records, but the available information does not identify an owner, completed outcome, or measurable business effect\./, "weak findings must use a concise specificity fallback");
+assert.match(inboxSource, /More information needed: owner, completion status, and outcome\./, "weak findings must state the missing fields directly");
 assert.match(inboxSource, /selectCollapsedRepresentatives\(groups\)/, "evidence view must use bounded representative records");
 assert.match(inboxSource, /expandedGroupKey.*showAllGroups.*expandedRecordLimit/s, "evidence groups must support one-at-a-time expansion, collapse, and explicit pagination");
 assert.match(inboxSource, /View all supporting records/, "evidence view must link to the existing filtered record surface");

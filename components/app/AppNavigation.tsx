@@ -12,6 +12,7 @@ type NavItem = {
 type NavSection = {
   label: string;
   defaultOpen?: boolean;
+  collapsible?: boolean;
   items: NavItem[];
 };
 
@@ -42,35 +43,61 @@ function isActivePath(pathname: string, href: string) {
 }
 
 function DesktopSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
+  const links = section.items.map((item) => {
+    const active = isActivePath(pathname, item.href);
+
+    return (
+      <Link
+        key={`${item.href}-${item.label}`}
+        href={item.href as Route}
+        className={`flex min-h-10 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium ${
+          active ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/20" : "text-slate-100 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
+        }`}
+      >
+        <span>{item.label}</span>
+        {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} light /> : null}
+      </Link>
+    );
+  });
+
+  if (section.collapsible === false) {
+    return <div className="grid gap-1">{links}</div>;
+  }
+
   return (
     <details open={section.defaultOpen} className="group rounded-lg border border-white/10 bg-white/[0.04] shadow-sm shadow-black/10">
       <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-silver">
         {section.label}
         <span className="text-vaeroex-accent transition group-open:rotate-90">&gt;</span>
       </summary>
-      <div className="pb-2">
-        {section.items.map((item) => {
-          const active = isActivePath(pathname, item.href);
-
-          return (
-            <Link
-              key={`${item.href}-${item.label}`}
-              href={item.href as Route}
-              className={`mx-2 flex min-h-10 items-center justify-between gap-3 rounded-md px-3 py-2 text-sm font-medium ${
-                active ? "bg-vaeroex-blue text-white shadow-sm shadow-blue-950/20" : "text-slate-100 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
-              }`}
-            >
-              <span>{item.label}</span>
-              {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} light /> : null}
-            </Link>
-          );
-        })}
-      </div>
+      <div className="grid gap-1 px-2 pb-2">{links}</div>
     </details>
   );
 }
 
 function MobileSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
+  if (section.collapsible === false) {
+    return (
+      <>
+        {section.items.map((item) => {
+          const active = isActivePath(pathname, item.href);
+          return (
+            <Link
+              key={`${section.label}-${item.label}`}
+              href={item.href as Route}
+              className={`flex min-h-11 shrink-0 items-center justify-between gap-3 whitespace-nowrap rounded-md px-3 py-2 text-sm font-semibold ${
+                active ? "bg-vaeroex-blue text-white" : "border border-line bg-white text-slate-700 hover:bg-cyan-50 hover:text-vaeroex-blue"
+              }`}
+            >
+              <span>{item.label}</span>
+              {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} /> : null}
+            </Link>
+          );
+        })}
+      </>
+    );
+  }
+
   return (
     <details className="shrink-0 rounded-md border border-line bg-white px-3 py-2 shadow-sm">
       <summary className="flex min-h-11 cursor-pointer list-none items-center whitespace-nowrap text-sm font-semibold text-slate-700">{section.label}</summary>
@@ -110,7 +137,7 @@ export function AppNavigation({ sections, notificationUnreadCount, mobile = fals
   }
 
   return (
-    <nav className="mt-5 flex flex-1 flex-col gap-2 overflow-auto pr-1">
+    <nav className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
       {sections.map((section) => (
         <DesktopSection key={section.label} section={section} notificationUnreadCount={notificationUnreadCount} pathname={pathname} />
       ))}

@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
-import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -60,6 +59,7 @@ type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type KpiAlertRuleRow = Database["public"]["Tables"]["kpi_alert_rules"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
+type KpiDirection = "higher" | "lower" | "exact" | null;
 type ComparisonMode = "actual" | "percent" | "normalized";
 type KpiStatusFilter = "all" | "on-track" | "behind-target" | "missing-data" | "updated-this-month";
 type KpiTargetRecommendation = {
@@ -113,20 +113,38 @@ function findLatestMetric(kpis: KpiRow[], keywords: string[]) {
   });
 }
 
-function metricTone(actual: number | null, target: number | null): KpiTone {
-  if (actual === null || target === null) {
+function explicitKpiDirection(name: string, rows: KpiRow[], settings: KpiSettingRow[]): KpiDirection {
+  const setting = kpiSettingForName(settings, name);
+  const text = [setting?.definition, ...rows.filter((row) => row.name === name).map((row) => row.notes)]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  const higher = /\b(higher|more) is better\b|\bincrease is (?:favorable|preferred)\b|\btarget is at least\b|\bminimum target\b/.test(text);
+  const lower = /\b(lower|less|fewer) is better\b|\bdecrease is (?:favorable|preferred)\b|\btarget is (?:under|below|at most)\b|\bmaximum target\b/.test(text);
+  const exact = /\bexact target (?:is )?preferred\b|\btarget must be exact\b/.test(text);
+
+  if ([higher, lower, exact].filter(Boolean).length !== 1) return null;
+  if (higher) return "higher";
+  if (lower) return "lower";
+  return "exact";
+}
+
+function metricTone(actual: number | null, target: number | null, direction: KpiDirection = null): KpiTone {
+  if (actual === null || target === null || !direction) {
     return "neutral";
   }
 
-  if (target === 0) {
-    return actual === 0 ? "green" : "red";
+  if (direction === "exact") {
+    if (actual === target) return "green";
+    const tolerance = Math.max(Math.abs(target) * 0.1, 1);
+    return Math.abs(actual - target) <= tolerance ? "yellow" : "red";
   }
 
-  if (actual >= target) {
-    return "green";
-  }
+  const favorable = direction === "higher" ? actual >= target : actual <= target;
+  if (favorable) return "green";
 
-  return actual >= target * 0.9 ? "yellow" : "red";
+  const tolerance = Math.max(Math.abs(target) * 0.1, 1);
+  return Math.abs(actual - target) <= tolerance ? "yellow" : "red";
 }
 
 function openTaskTone(openTasks: number): KpiTone {
@@ -141,7 +159,14 @@ function statusLabel(tone: KpiTone) {
   if (tone === "green") return "On Track";
   if (tone === "yellow") return "Near Target";
   if (tone === "red") return "Behind";
-  return "Missing Data";
+  return "Direction not set";
+}
+
+function kpiStatusText(row: KpiRow, direction: KpiDirection) {
+  if (row.actual_value === null) return "Missing Data";
+  if (row.target === null) return "Target not set";
+  if (!direction) return "Direction not set";
+  return statusLabel(metricTone(row.actual_value, row.target, direction));
 }
 
 function toneClasses(tone: KpiTone) {
@@ -283,6 +308,8 @@ function recommendedTargetForMetric(metricName: string, rows: KpiRow[]): KpiTarg
 }
 
 function KpiStatusBadge({ tone }: { tone: KpiTone }) {
+  if (tone === "neutral") return null;
+
   return (
     <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClasses(tone)}`}>
       {statusLabel(tone)}
@@ -336,7 +363,7 @@ function TimelineControls({
             </Link>
           ))}
         </div>
-        <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+        {timeline === "Custom Range" ? <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]">
           <input type="hidden" name="timeline" value="Custom Range" />
           {status !== "all" ? <input type="hidden" name="status" value={status} /> : null}
           <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -360,7 +387,7 @@ function TimelineControls({
           <button className="self-end rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
             Apply custom range
           </button>
-        </form>
+        </form> : null}
       </div>
     </details>
   );
@@ -449,8 +476,12 @@ function KpiTile({
   color: string;
   index: number;
 }) {
-  const tone = metricTone(kpi.actual_value, kpi.target);
+  const direction = explicitKpiDirection(kpi.name, rows, settings);
+  const tone = metricTone(kpi.actual_value, kpi.target, direction);
   const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
+  const difference = kpi.actual_value !== null && kpi.target !== null
+    ? formatNumericValue(kpi.actual_value - kpi.target, kpi.name)
+    : "Not available";
 
   return (
     <article className="rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-panel">
@@ -461,7 +492,7 @@ function KpiTile({
             <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
         </div>
-        <KpiStatusBadge tone={tone} />
+        {direction ? <KpiStatusBadge tone={tone} /> : null}
       </div>
       <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
@@ -470,8 +501,8 @@ function KpiTile({
           {kpi.target === null ? "Not set" : formatSettingValue(kpi.target, kpi.name, settings)}
         </p>
         <p>
-          <span className="block text-slate-500">Trend</span>
-          {trendLabelForRows(rows)}
+          <span className="block text-slate-500">{direction ? "Trend" : "Difference"}</span>
+          {direction ? trendLabelForRows(rows, direction) : difference}
         </p>
         <p>
           <span className="block text-slate-500">Last updated</span>
@@ -565,20 +596,20 @@ function isKpiStatusFilter(value: string | undefined): value is KpiStatusFilter 
 
 function statusFilterLabel(filter: KpiStatusFilter) {
   if (filter === "on-track") return "On Track";
-  if (filter === "behind-target") return "Behind Target";
-  if (filter === "missing-data") return "Missing Data";
+  if (filter === "behind-target") return "Needs Attention";
+  if (filter === "missing-data") return "Missing or Stale";
   if (filter === "updated-this-month") return "Updated This Month";
   return "Total";
 }
 
-function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter) {
+function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter, rows: KpiRow[], settings: KpiSettingRow[]) {
   if (filter === "all") return true;
   if (filter === "updated-this-month") return updatedThisMonth(row);
 
-  const tone = metricTone(row.actual_value, row.target);
+  const tone = metricTone(row.actual_value, row.target, explicitKpiDirection(row.name, rows, settings));
   if (filter === "on-track") return tone === "green";
-  if (filter === "behind-target") return tone === "red";
-  return row.actual_value === null;
+  if (filter === "behind-target") return tone === "red" || tone === "yellow";
+  return row.actual_value === null || !updatedThisMonth(row);
 }
 
 function kpiHref(params: Record<string, string | number | null | undefined>) {
@@ -742,7 +773,7 @@ function latestRowsByMetric(rows: KpiRow[], names: string[]) {
     .filter((row): row is KpiRow => Boolean(row));
 }
 
-function trendLabelForRows(rows: KpiRow[]) {
+function trendLabelForRows(rows: KpiRow[], direction: KpiDirection = null) {
   const values = rows.filter((row) => row.actual_value !== null);
   const latest = values.at(-1);
   const previous = values.at(-2);
@@ -754,9 +785,11 @@ function trendLabelForRows(rows: KpiRow[]) {
   const delta = latest.actual_value - previous.actual_value;
   const threshold = Math.max(1, Math.abs(previous.actual_value) * 0.02);
 
-  if (delta > threshold) return "Improving";
-  if (delta < -threshold) return "Declining";
-  return "Holding Steady";
+  if (Math.abs(delta) <= threshold) return "No meaningful change";
+  if (!direction || direction === "exact") return delta > 0 ? "Increased" : "Decreased";
+
+  const improving = direction === "higher" ? delta > 0 : delta < 0;
+  return improving ? "Improving" : "Declining";
 }
 
 function updatedThisMonth(row: KpiRow) {
@@ -825,14 +858,15 @@ function trendDeltaLabel(latest: KpiRow | undefined, previous: KpiRow | undefine
   return `${direction} ${absolute}${percent}`;
 }
 
-function targetHitRate(rows: KpiRow[]) {
+function targetHitRate(rows: KpiRow[], direction: KpiDirection) {
+  if (!direction) return "Direction needed";
   const rowsWithTargets = rows.filter((row) => row.actual_value !== null && row.target !== null);
 
   if (!rowsWithTargets.length) {
     return "No targets";
   }
 
-  const onTarget = rowsWithTargets.filter((row) => metricTone(row.actual_value, row.target) === "green").length;
+  const onTarget = rowsWithTargets.filter((row) => metricTone(row.actual_value, row.target, direction) === "green").length;
   return `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`;
 }
 
@@ -1052,22 +1086,6 @@ function OverlayTrendChart({ trends, mode }: { trends: KpiTrend[]; mode: Compari
   );
 }
 
-function trendDirection(trend: KpiTrend) {
-  if (trend.change === null) {
-    return "flat";
-  }
-
-  if (trend.change > 0) {
-    return "up";
-  }
-
-  if (trend.change < 0) {
-    return "down";
-  }
-
-  return "flat";
-}
-
 function trendActualValues(trend: KpiTrend) {
   return trend.rows.map((row) => row.actual_value).filter((value): value is number => value !== null);
 }
@@ -1182,132 +1200,18 @@ function percentChangeLabel(trend: KpiTrend) {
   return `${direction} ${numberFormatter.format(Math.abs(trend.changePercent))}%`;
 }
 
-function metricMatches(trend: KpiTrend | undefined, keywords: string[]) {
-  if (!trend) {
-    return false;
-  }
-
-  const name = lower(trend.name);
-  return keywords.some((keyword) => name.includes(keyword));
-}
-
 function comparisonNotes(trends: KpiTrend[]) {
   const usable = trends.filter((trend) => trend.rows.filter((row) => row.actual_value !== null).length >= 2);
 
-  if (usable.length < 2) {
-    return ["Select at least two KPIs with two or more values to unlock comparison notes."];
-  }
+  if (!usable.length) return ["Add at least two dated values for a KPI to compare movement."];
 
-  const improving = usable
+  const notes = usable
     .filter((trend) => trend.changePercent !== null)
-    .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))[0];
-  const declining = usable
-    .filter((trend) => (trend.changePercent ?? 0) < 0)
-    .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))[0];
-  const volatile = usable
-    .filter((trend) => trend.volatility !== null)
-    .sort((a, b) => (b.volatility ?? 0) - (a.volatility ?? 0))[0];
-  const revenue = usable.find((trend) => lower(trend.name).includes("revenue") || lower(trend.name).includes("sales"));
-  const customerActivity = usable.find((trend) => lower(trend.name).includes("lead") || lower(trend.name).includes("customer"));
-  const conversion = usable.find((trend) => metricMatches(trend, ["conversion", "close rate"]));
-  const responseTime = usable.find((trend) => metricMatches(trend, ["response", "reply time", "speed"]));
-  const satisfaction = usable.find((trend) => metricMatches(trend, ["satisfaction", "csat", "nps"]));
-  const issues = usable.find((trend) => metricMatches(trend, ["issue", "complaint", "risk"]));
-  const overdue = usable.find((trend) => metricMatches(trend, ["overdue", "late", "backlog"]));
-  const notes = [
-    improving && improving.changePercent !== null
-      ? `Biggest positive movement: ${improving.name} is ${percentChangeLabel(improving)}. This matters because it may be the KPI creating the most operating leverage right now.`
-      : "No KPI has enough positive movement to identify a clear fastest improver.",
-    declining && declining.changePercent !== null
-      ? `Biggest risk signal: ${declining.name} is ${percentChangeLabel(declining)}. Leadership should check whether this is an isolated dip or a downstream effect from staffing, follow-up, service quality, or demand.`
-      : "No selected KPI is currently declining across its available history.",
-    volatile && volatile.volatility !== null
-      ? `Most volatile KPI: ${volatile.name} moves by about ${formatNumericValue(volatile.volatility, volatile.name)} between entries. Volatility matters because it makes planning less reliable even when the latest value looks acceptable.`
-      : "Volatility needs more dated values before it becomes useful."
-  ];
+    .sort((a, b) => Math.abs(b.changePercent || 0) - Math.abs(a.changePercent || 0))
+    .slice(0, 3)
+    .map((trend) => `${trend.name} is ${percentChangeLabel(trend)} across the selected timeframe. Directionality is not interpreted unless that KPI explicitly defines whether higher or lower is better.`);
 
-  if (revenue && customerActivity) {
-    const revenueDirection = trendDirection(revenue);
-    const customerActivityDirection = trendDirection(customerActivity);
-
-    if (customerActivityDirection === "up" && revenueDirection === "down") {
-      notes.push("Customer activity is rising while revenue is falling, which points to a possible conversion, pricing, qualification, or response-quality bottleneck rather than a demand problem.");
-    } else if (customerActivityDirection === "down" && revenueDirection === "up") {
-      notes.push("Revenue is rising while customer activity is falling, which may mean higher-value work is offsetting weaker activity volume. That can be healthy short term, but customer activity quality should be watched.");
-    } else if (customerActivityDirection === revenueDirection && customerActivityDirection !== "flat") {
-      notes.push(`Customer activity and revenue are both moving ${customerActivityDirection}, which suggests activity volume and revenue results are currently aligned.`);
-    }
-  }
-
-  if (customerActivity && conversion && trendDirection(customerActivity) === "up" && trendDirection(conversion) === "down") {
-    notes.push("Customer activity is improving while conversion is declining. Vaeroex would treat this as a response quality, qualification, or revenue process signal.");
-  }
-
-  if (responseTime && (conversion || revenue) && trendDirection(responseTime) === "up") {
-    const paired = (conversion || revenue) as KpiTrend;
-    notes.push(
-      `${responseTime.name} is rising while ${paired.name} is ${percentChangeLabel(paired)}. If higher response time means slower service, this may be creating a customer or sales bottleneck.`
-    );
-  }
-
-  if (satisfaction && revenue && trendDirection(revenue) === "up" && trendDirection(satisfaction) === "down") {
-    notes.push("Revenue is improving while customer satisfaction is declining. Growth may be creating service strain that should be corrected before it becomes churn or complaints.");
-  }
-
-  const executionRisk = issues || overdue;
-
-  if (executionRisk && revenue && trendDirection(revenue) === "up" && trendDirection(executionRisk) === "up") {
-    notes.push("Operating demand appears to be rising while issues or Business Signals are also increasing. That pattern can indicate capacity, response, or service-quality pressure.");
-  }
-
-  return notes;
-}
-
-function ComparisonDataContext({
-  context
-}: {
-  context: ReturnType<typeof comparisonContext>;
-}) {
-  return (
-    <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-      <p className="text-sm font-semibold text-white">Data Context</p>
-      <dl className="mt-3 grid gap-3 text-xs leading-5 text-slate-300 sm:grid-cols-2 xl:grid-cols-3">
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Timeframe analyzed</dt>
-          <dd className="mt-1 text-white">{context.timeframe}</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">KPI records</dt>
-          <dd className="mt-1 text-white">{context.recordCount}</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">KPIs compared</dt>
-          <dd className="mt-1 text-white">{context.comparedKpis.join(", ") || "None selected"}</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Current KPI data</dt>
-          <dd className="mt-1 text-white">{context.currentKpiAvailability}</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Historical depth</dt>
-          <dd className="mt-1 text-white">{context.historicalDepth}</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Measurement freshness</dt>
-          <dd className="mt-1 text-white">{context.measurementFreshness}</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Forecast readiness</dt>
-          <dd className="mt-1 text-white">{context.forecastConfidence} ({context.confidenceScore}/100 comparison score)</dd>
-        </div>
-        <div className="rounded-lg border border-white/10 bg-[#08111f] p-3">
-          <dt className="font-semibold text-slate-400">Business Memory used</dt>
-          <dd className="mt-1 text-white">{context.businessMemoryCoverage}</dd>
-        </div>
-      </dl>
-      <p className="mt-3 text-xs leading-5 text-slate-400">{context.dataLimitations}</p>
-    </div>
-  );
+  return notes.length ? notes : ["The selected KPIs do not yet have enough comparable history to calculate percentage movement."];
 }
 
 function ComparisonAnalysis({
@@ -1320,53 +1224,13 @@ function ComparisonAnalysis({
   context: ReturnType<typeof comparisonContext>;
 }) {
   const notes = comparisonNotes(trends);
-  const evidence = [
-    `Timeframe: ${context.timeframe}`,
-    `KPIs compared: ${context.comparedKpis.join(", ") || "None"}`,
-    `Comparison mode: ${mode}`,
-    `KPI records: ${context.recordCount}`,
-    `Current KPI data: ${context.currentKpiAvailability}`,
-    `Historical coverage: ${context.historicalCoverage}`,
-    `Historical depth: ${context.historicalDepth}`,
-    `Measurement freshness: ${context.measurementFreshness}`,
-    `Forecast readiness: ${context.forecastConfidence}; comparison score ${context.confidenceScore}/100`,
-    `Business Memory coverage: ${context.businessMemoryCoverage}`,
-    `Data limitations: ${context.dataLimitations}`,
-    ...trends.map((trend) => `${trend.name}: ${percentChangeLabel(trend)}; latest ${formatNumericValue(trend.latest?.actual_value, trend.name)}; records ${trendActualValues(trend).length}`)
-  ];
 
   return (
     <div className="space-y-4">
-      <div className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4">
-        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Timeframe analyzed</p>
-        <p className="mt-2 text-base font-semibold text-white">{context.timeframe}</p>
-        <p className="mt-1 text-xs leading-5 text-slate-300">
-          Preset ranges update immediately. Custom ranges apply after you choose dates.
-        </p>
-      </div>
+      <p className="text-sm font-semibold text-cyan-100">Showing {context.timeframe}</p>
       <OverlayTrendChart trends={trends} mode={mode} />
-      <div className="rounded-lg border border-cyan-400/25 bg-[#08111f] p-4">
-        <div className="mb-3">
-          <p className="text-sm font-semibold text-white">Explain This Comparison</p>
-          <p className="mt-1 text-xs leading-5 text-slate-400">
-            Generate an inline leadership readout using this chart, timeframe, selected KPIs, and available Business Memory.
-          </p>
-        </div>
-        <ContextualAskVaeroex
-          label="Explain This Comparison"
-          prompt="Explain what this KPI comparison shows. Identify only the strongest supported relationship, why it matters, the evidence in the selected timeframe, and any meaningful uncertainty. Do not turn it into a general business briefing."
-          contextType="kpi_comparison"
-          contextId={`kpi-comparison-${context.comparedKpis.join("-")}-${mode}`}
-          sourceTitle="KPI comparison"
-          sourceSummary={`Comparing ${context.comparedKpis.join(", ") || "selected KPIs"} across ${context.timeframe} in ${mode} mode.`}
-          evidence={evidence}
-          compact
-          defaultCollapsed={false}
-        />
-      </div>
-      <ComparisonDataContext context={context} />
       <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-        <p className="text-sm font-semibold text-white">Comparison Insights</p>
+        <p className="text-sm font-semibold text-white">Comparison summary</p>
         <div className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
           {notes.map((note, index) => (
             <div key={`${note}-${index}`} className="flex gap-2">
@@ -1889,26 +1753,19 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const latestKpiRows = latestRowsByMetric(allVisibleKpis, metricNames);
-  const behindTargetCount = latestKpiRows.filter((kpi) => metricTone(kpi.actual_value, kpi.target) === "red").length;
-  const nearTargetCount = latestKpiRows.filter((kpi) => metricTone(kpi.actual_value, kpi.target) === "yellow").length;
-  const onTrackCount = latestKpiRows.filter((kpi) => metricTone(kpi.actual_value, kpi.target) === "green").length;
-  const missingDataCount = metricNames.length - latestKpiRows.filter((kpi) => kpi.actual_value !== null).length;
-  const updatedThisMonthCount = latestKpiRows.filter(updatedThisMonth).length;
-  const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter));
+  const kpiTone = (kpi: KpiRow) => metricTone(kpi.actual_value, kpi.target, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings));
+  const behindTargetCount = latestKpiRows.filter((kpi) => ["red", "yellow"].includes(kpiTone(kpi))).length;
+  const onTrackCount = latestKpiRows.filter((kpi) => kpiTone(kpi) === "green").length;
+  const missingOrStaleCount = metricNames.filter((name) => {
+    const row = latestKpiRows.find((kpi) => kpi.name === name);
+    return !row || row.actual_value === null || !updatedThisMonth(row);
+  }).length;
+  const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter, allVisibleKpis, kpiSettings));
   const filteredMetricNames = new Set(filteredLatestKpiRows.map((kpi) => kpi.name));
   const filteredKpis = activeStatusFilter === "all" ? kpis : kpis.filter((kpi) => filteredMetricNames.has(kpi.name));
   const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, 6);
   const hiddenTileCount = Math.max(0, filteredLatestKpiRows.length - visibleTileRows.length);
   const filterCount = activeStatusFilter === "all" ? metricNames.length : filteredLatestKpiRows.length;
-  const topAttentionKpi = latestKpiRows.find((kpi) => metricTone(kpi.actual_value, kpi.target) === "red") || latestKpiRows.find((kpi) => metricTone(kpi.actual_value, kpi.target) === "yellow") || latestKpiRows[0];
-  const kpiSummary =
-    latestKpiRows.length === 0
-      ? "Create your first KPI manually or import reviewed spreadsheet data to start the measurement layer."
-      : behindTargetCount
-        ? `${behindTargetCount} KPI${behindTargetCount === 1 ? "" : "s"} are behind target. Vaeroex recommends reviewing the evidence before changing targets.`
-        : nearTargetCount
-          ? `${nearTargetCount} KPI${nearTargetCount === 1 ? "" : "s"} are near target. Watch trend direction before taking corrective action.`
-          : "Visible KPIs are currently on track or waiting for more history. Continue adding dated values so trends become more reliable.";
   const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
   const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
@@ -1933,13 +1790,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedLatestKpi = selectedMetricRows.at(-1);
   const selectedSourceFile = selectedLatestKpi?.source_file_id ? sourceFiles.find((file) => file.id === selectedLatestKpi.source_file_id) : null;
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
+  const selectedKpiDirection = primaryMetric ? explicitKpiDirection(primaryMetric, allVisibleKpis, kpiSettings) : null;
   const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis) : null;
   const undoMetricName = params?.target_applied === "true" ? params.undo_kpi : undefined;
   const undoSetting = undoMetricName ? kpiSettingForName(kpiSettings, undoMetricName) : undefined;
   const undoLatestKpi = undoMetricName ? getMetricHistoryRows(allVisibleKpis, undoMetricName).at(-1) : undefined;
   const managedKpis = filteredKpis.map((kpi) => {
     const management = managedValues(kpi);
-    const tone = metricTone(kpi.actual_value, kpi.target);
     const kpiShares = shares.filter((share) => share.source_id === kpi.id);
     const matchingAlertRules = alertRules.filter((rule) => rule.kpi_name === kpi.name);
 
@@ -1947,7 +1804,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       id: kpi.id,
       title: kpi.name,
       type: "KPI",
-      status: statusLabel(tone),
+      status: kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings)),
       owner: kpi.owner || "Unassigned",
       category: kpi.category || "General",
       createdAt: kpi.created_at,
@@ -1976,7 +1833,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <div className="space-y-4 text-sm leading-6 text-muted">
           <p>{kpi.notes || "No notes."}</p>
           <p>
-            <span className="font-semibold text-ink">Current status:</span> {statusLabel(tone)}
+            <span className="font-semibold text-ink">Current status:</span> {kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings))}
           </p>
           <ShareRecordPanel
             sourceType="kpi"
@@ -2006,21 +1863,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <Link href="/app/files?status=Import%20Ready" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
               Import KPI Data
             </Link>
-            <GlobalSearchTrigger initialQuery="How are my KPIs doing?" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-              Search or Ask
-            </GlobalSearchTrigger>
           </div>
         }
       />
       <ModuleTabs
         tabs={[
           { label: "Overview", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter }), active: activeSection === "overview" || activeSection === "detail" },
-          { label: "Compare", href: "/app/kpis?section=compare" as Route, active: activeSection === "compare" },
-          { label: "Business Health", href: "/app#business-health-heading" as Route },
-          { label: "Profit Leakage", href: "/app/kpis/profit-leakage" as Route },
-          { label: "Records", href: kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, section: "records" }), active: activeSection === "records" },
-          { label: "Imports", href: "/app/files?status=Imported" as Route },
-          { label: "Settings", href: "/app/kpis/settings" as Route }
+          { label: "Compare", href: "/app/kpis?section=compare" as Route, active: activeSection === "compare" }
         ]}
       />
 
@@ -2057,15 +1906,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <>
           <TimelineControls timeline={timeline} range={selectedTimelineRange} status={activeStatusFilter} />
 
-          <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-            <StatusFilterCard
-              label="Total KPIs"
-              value={metricNames.length}
-              detail="Show all visible KPIs"
-              tone={metricNames.length ? "green" : "yellow"}
-              active={activeStatusFilter === "all"}
-              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "all" })}
-            />
+          <section className="grid gap-3 sm:grid-cols-3">
             <StatusFilterCard
               label="On Track"
               value={onTrackCount}
@@ -2075,28 +1916,20 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
               href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "on-track" })}
             />
             <StatusFilterCard
-              label="Behind Target"
+              label="Needs Attention"
               value={behindTargetCount}
-              detail="Needs management review"
+              detail="Explicit target direction only"
               tone={behindTargetCount ? "red" : "green"}
               active={activeStatusFilter === "behind-target"}
               href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "behind-target" })}
             />
             <StatusFilterCard
-              label="Missing Data"
-              value={missingDataCount}
-              detail="Needs a current value"
-              tone={missingDataCount ? "yellow" : "green"}
+              label="Missing or Stale"
+              value={missingOrStaleCount}
+              detail="Needs a current update"
+              tone={missingOrStaleCount ? "yellow" : "green"}
               active={activeStatusFilter === "missing-data"}
               href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "missing-data" })}
-            />
-            <StatusFilterCard
-              label="Updated This Month"
-              value={updatedThisMonthCount}
-              detail="Fresh KPI signals"
-              tone={updatedThisMonthCount ? "green" : "yellow"}
-              active={activeStatusFilter === "updated-this-month"}
-              href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: "updated-this-month" })}
             />
           </section>
 
@@ -2139,39 +1972,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             </div>
           ) : null}
 
-          <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-vaeroex-accent">Vaeroex KPI Summary</p>
-            <p className="mt-3 text-sm leading-6 text-slate-300">{kpiSummary}</p>
-            <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-300 md:grid-cols-[1fr_auto] md:items-center">
-              <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-                <p className="font-semibold text-white">Top KPI needing attention</p>
-                <p className="mt-1">{topAttentionKpi ? `${topAttentionKpi.name}: ${statusLabel(metricTone(topAttentionKpi.actual_value, topAttentionKpi.target))}` : "No KPI has enough data yet."}</p>
-              </div>
-              <Link href="/app/kpis?section=compare" className="w-fit rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-                Compare multiple KPIs
-              </Link>
-            </div>
-            <div className="mt-4">
-              <ContextualAskVaeroex
-                label="Explain These KPIs"
-                prompt="Explain what these KPI trends mean, which metric most needs attention, the supporting values, and any meaningful uncertainty."
-                contextType="kpi_summary"
-                contextId={topAttentionKpi?.id || "kpi-summary"}
-                sourceTitle="KPI summary"
-                sourceSummary={kpiSummary}
-                evidence={[
-                  `${onTrackCount} on track`,
-                  `${behindTargetCount} behind target`,
-                  `${missingDataCount} missing data`,
-                  `${updatedThisMonthCount} updated this month`,
-                  topAttentionKpi ? `Top attention KPI: ${topAttentionKpi.name}` : "No top attention KPI yet"
-                ]}
-                compact
-                defaultCollapsed={false}
-              />
-            </div>
-          </section>
-
           {activeSection === "detail" && primaryMetric ? (
             <section id="kpi-detail" className="grid gap-4 xl:grid-cols-[1.15fr_.85fr]">
               <div className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
@@ -2181,7 +1981,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <h2 className="mt-2 text-xl font-semibold text-white">{primaryMetric}</h2>
                     <p className="mt-1 text-sm leading-6 text-slate-400">{kpiDefinition(primaryMetric, kpiSettings) || "No definition set yet."}</p>
                   </div>
-                  <KpiStatusBadge tone={metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null)} />
+                  {selectedKpiDirection ? <KpiStatusBadge tone={metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null, selectedKpiDirection)} /> : null}
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <TrendSummaryCard
@@ -2196,7 +1996,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                   <TrendSummaryCard
                     label="Trend"
-                    value={trendLabelForRows(selectedMetricRows)}
+                    value={trendLabelForRows(selectedMetricRows, selectedKpiDirection)}
                     detail="Latest movement from history"
                   />
                 </div>
@@ -2208,8 +2008,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                   <TrendSummaryCard
                     label="Target Hit Rate"
-                    value={targetHitRate(selectedMetricRows)}
-                    detail="Share of history at or above target"
+                    value={targetHitRate(selectedMetricRows, selectedKpiDirection)}
+                    detail={selectedKpiDirection ? "Share of history meeting the explicit target direction" : "Set direction in the KPI definition to interpret target performance"}
                   />
                   <TrendSummaryCard
                     label="Records"
@@ -2224,7 +2024,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   <p className="text-sm font-semibold text-white">Vaeroex summary</p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     {selectedLatestKpi
-                      ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedLatestKpi.target)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful management review."}`
+                      ? selectedKpiDirection
+                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedLatestKpi.target, selectedKpiDirection)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
+                        : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)} against a target of ${formatSettingValue(selectedLatestKpi.target, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
                       : "Add a current value to unlock status, trend, and target guidance."}
                   </p>
                 </div>
@@ -2300,16 +2102,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           {metricNames.length ? (
             <>
               <div className="space-y-5 rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
                   <div>
                     <p className="text-sm font-semibold text-white">Compare KPIs</p>
                     <p className="mt-1 text-xs leading-5 text-slate-400">
                       Preset ranges update the chart immediately. Use Custom Range only when you need exact dates.
                     </p>
                   </div>
-                  <span className="w-fit rounded-full border border-cyan-400/25 bg-cyan-950/30 px-3 py-1 text-xs font-semibold text-cyan-100">
-                    Applied: {selectedComparisonContext.timeframe}
-                  </span>
                 </div>
 
                 <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
@@ -2335,43 +2134,27 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                         {item}
                       </Link>
                     ))}
-                    <span
-                      className={`min-h-10 rounded-lg border px-3 py-2 text-xs font-semibold ${
-                        timeline === "Custom Range"
-                          ? "border-vaeroex-blue bg-vaeroex-blue text-white shadow-panel ring-1 ring-vaeroex-accent/35"
-                          : "border-white/10 bg-slate-950/50 text-slate-300"
-                      }`}
-                    >
-                      Custom Range
-                    </span>
                   </div>
-                  <form method="get" className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
-                    <input type="hidden" name="section" value="compare" />
-                    <input type="hidden" name="timeline" value="Custom Range" />
-                    <input type="hidden" name="mode" value={comparisonMode} />
-                    {selectedMetrics.map((metric) => (
-                      <input key={metric} type="hidden" name="metric" value={metric} />
-                    ))}
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Custom start
-                      <input
-                        name="start"
-                        type="date"
-                        defaultValue={selectedTimelineRange.startDate}
-                        className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
-                      />
-                    </label>
-                    <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-                      Custom end
-                      <input
-                        name="end"
-                        type="date"
-                        defaultValue={selectedTimelineRange.endDate}
-                        className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
-                      />
-                    </label>
-                    <PrimaryButton>Apply custom range</PrimaryButton>
-                  </form>
+                  <details open={timeline === "Custom Range"} className="mt-3">
+                    <summary className={`inline-flex min-h-10 cursor-pointer list-none items-center rounded-lg border px-3 py-2 text-xs font-semibold ${timeline === "Custom Range" ? "border-vaeroex-blue bg-vaeroex-blue text-white" : "border-white/10 bg-slate-950/50 text-slate-300"}`}>Custom Range</summary>
+                    <form method="get" className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                      <input type="hidden" name="section" value="compare" />
+                      <input type="hidden" name="timeline" value="Custom Range" />
+                      <input type="hidden" name="mode" value={comparisonMode} />
+                      {selectedMetrics.map((metric) => (
+                        <input key={metric} type="hidden" name="metric" value={metric} />
+                      ))}
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Custom start
+                        <input name="start" type="date" defaultValue={selectedTimelineRange.startDate} className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent" />
+                      </label>
+                      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
+                        Custom end
+                        <input name="end" type="date" defaultValue={selectedTimelineRange.endDate} className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent" />
+                      </label>
+                      <PrimaryButton>Apply custom range</PrimaryButton>
+                    </form>
+                  </details>
                 </div>
 
                 <form method="get" className="space-y-5">
