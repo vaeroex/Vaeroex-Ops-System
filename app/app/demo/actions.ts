@@ -53,6 +53,12 @@ async function requireSignedInSession() {
   return { supabase, user };
 }
 
+function requireDemoWorkspaceAccess(user: SignedInUser, action = "use the sample business environment") {
+  if (!isVaeroexAdminUser(user)) {
+    redirect(appError(`Vaeroex internal access is required to ${action}.`));
+  }
+}
+
 async function setActiveWorkspace(workspaceId: string) {
   const cookieStore = await cookies();
   cookieStore.set("vaeroex_workspace_id", workspaceId, {
@@ -135,6 +141,7 @@ async function createDemoWorkspaceShell(supabase: SupabaseServerClient, user: Si
 
 export async function createDemoWorkspaceAction() {
   const { supabase, user } = await requireSignedInSession();
+  requireDemoWorkspaceAccess(user, "create a sample business environment");
   let destination: Route = appMessage("Demo workspace created with realistic January-to-current-month sample data.");
 
   try {
@@ -158,6 +165,7 @@ export async function createDemoWorkspaceAction() {
 
 export async function openDemoWorkspaceAction() {
   const { supabase, user } = await requireSignedInSession();
+  requireDemoWorkspaceAccess(user, "open a sample business environment");
   const demoWorkspace = await findDemoWorkspace(supabase, user.id);
 
   if (!demoWorkspace) {
@@ -184,10 +192,7 @@ export async function exitDemoWorkspaceAction() {
 
 export async function createFreshDemoWorkspaceAction() {
   const { supabase, user } = await requireSignedInSession();
-
-  if (!isVaeroexAdminUser(user)) {
-    redirect(appError("Vaeroex admin access is required to create a fresh demo workspace."));
-  }
+  requireDemoWorkspaceAccess(user, "create a fresh sample business environment");
 
   const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
   const workspaceId = await createDemoWorkspaceShell(supabase, user, `Vaeroex Demo Workspace ${stamp}`);
@@ -213,10 +218,7 @@ export async function createFreshDemoWorkspaceAction() {
 
 export async function resetDemoWorkspaceAction() {
   const { supabase, user } = await requireSignedInSession();
-
-  if (!isVaeroexAdminUser(user)) {
-    redirect(appError("Vaeroex admin access is required to reset demo workspace."));
-  }
+  requireDemoWorkspaceAccess(user, "reset a sample business environment");
 
   const demoWorkspace = await findDemoWorkspace(supabase, user.id);
 

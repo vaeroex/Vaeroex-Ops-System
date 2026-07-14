@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import type { Route } from "next";
 
@@ -52,7 +52,6 @@ export function OnboardingChecklist({
   const completedCount = items.filter((item) => item.completed || skipped.has(item.id)).length;
   const skippedItems = items.filter((item) => skipped.has(item.id));
   const percentComplete = Math.round((completedCount / Math.max(items.length, 1)) * 100);
-  const activeItems = useMemo(() => items.filter((item) => !item.completed && !skipped.has(item.id)), [items, skipped]);
   const shouldHideChecklist = hidden || percentComplete >= 100;
   const showChecklist = forceVisible || !shouldHideChecklist;
 
@@ -117,7 +116,7 @@ export function OnboardingChecklist({
               <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Guided onboarding</p>
               <h2 className="mt-2 text-xl font-semibold text-ink">Get Vaeroex useful in the first hour</h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-muted">
-                Complete the basics, skip what does not apply today, or explore a separate demo workspace with realistic business data.
+                Complete the basics or skip what does not apply today. Vaeroex becomes useful as you add real business evidence.
               </p>
             </div>
             <div className="min-w-52 rounded-lg border border-line bg-slate-50 p-4">
@@ -169,16 +168,6 @@ export function OnboardingChecklist({
               );
             })}
           </div>
-
-          {!adminControls && activeItems.length ? (
-            <div className="mt-5 flex flex-col gap-3 rounded-lg border border-line bg-slate-50 p-4 md:flex-row md:items-center md:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-ink">Want to see Vaeroex with data?</p>
-                <p className="mt-1 text-sm leading-6 text-muted">The demo workspace is separate from customer workspaces and can be explored safely.</p>
-              </div>
-              {demoWorkspaceForm}
-            </div>
-          ) : null}
         </div>
       ) : null}
     </section>
