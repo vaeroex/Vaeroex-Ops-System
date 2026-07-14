@@ -68,6 +68,13 @@ type FileAnalysisLearningDecision = {
   reviewReasons: string[];
   learningMode: "automatic" | "review_required";
 };
+type FileAnalysisFailureType =
+  | "blank_template"
+  | "needs_clearer_file"
+  | "unsupported_file"
+  | "incomplete_extraction"
+  | "no_usable_data"
+  | "technical_failure";
 type ImportField = {
   key: string;
   label: string;
@@ -79,13 +86,23 @@ class FileAnalysisEvidenceError extends Error {
   readonly inputJson: Json;
   readonly outputJson: Json;
   readonly extractionOutcome: FileAnalysisEvidenceAssessment["extractionOutcome"];
+  readonly failureType: FileAnalysisFailureType;
 
-  constructor(message: string, details: { inputJson: Json; outputJson: Json; extractionOutcome: FileAnalysisEvidenceAssessment["extractionOutcome"] }) {
+  constructor(
+    message: string,
+    details: {
+      inputJson: Json;
+      outputJson: Json;
+      extractionOutcome: FileAnalysisEvidenceAssessment["extractionOutcome"];
+      failureType: FileAnalysisFailureType;
+    }
+  ) {
     super(message);
     this.name = "FileAnalysisEvidenceError";
     this.inputJson = details.inputJson;
     this.outputJson = details.outputJson;
     this.extractionOutcome = details.extractionOutcome;
+    this.failureType = details.failureType;
   }
 }
 
@@ -232,7 +249,23 @@ function fileActionErrorMessage(error: unknown, fallback: string, file: Pick<Fil
     return unsupportedFileContentMessage(file);
   }
 
+  if (
+    isImageFile(file) &&
+    /could not read this image|too small|too blurry|unreadable image|no readable (?:text|content)/i.test(message)
+  ) {
+    return "The image was uploaded, but its text was too small or unclear to analyze reliably. Upload a higher-resolution image, PDF, CSV, or spreadsheet.";
+  }
+
   return message;
+}
+
+function fileAnalysisFailureTypeFromMessage(message: string): FileAnalysisFailureType {
+  if (/blank template|no populated|no data rows were found/i.test(message)) return "blank_template";
+  if (/too small|too blurry|unclear to analyze|unreadable image|could not read this image/i.test(message)) return "needs_clearer_file";
+  if (/file type cannot be reviewed|not currently available|unsupported image/i.test(message)) return "unsupported_file";
+  if (/incomplete (?:file )?extraction|schema/i.test(message)) return "incomplete_extraction";
+  if (/no usable (?:business )?(?:data|information)|no readable (?:data|content)/i.test(message)) return "no_usable_data";
+  return "technical_failure";
 }
 
 function str(value: unknown, fallback = "") {
@@ -394,10 +427,44 @@ async function downloadFileBuffer(file: FileUploadRow) {
   const { data, error } = await supabase.storage.from(file.storage_bucket).download(file.storage_path);
 
   if (error || !data) {
-    redirectWithError(error?.message || "The stored file could not be downloaded.");
+    throw new Error("Analysis could not access the saved source file. Your file remains saved. Try again.");
   }
 
   return Buffer.from(await data.arrayBuffer());
+}
+
+async function claimFileAnalysis({
+  supabase,
+  file
+}: {
+  supabase: SupabaseServerClient;
+  file: FileUploadRow;
+}) {
+  const metadata = isRecord(file.metadata_json) ? file.metadata_json : {};
+  const { data, error } = await supabase
+    .from("file_uploads")
+    .update({
+      processing_status: "processing",
+      processing_error: null,
+      processed_at: null,
+      metadata_json: {
+        ...metadata,
+        latest_analysis_status: "processing",
+        latest_analysis_error: null,
+        latest_analysis_failure: null
+      } satisfies Json
+    })
+    .eq("id", file.id)
+    .eq("workspace_id", file.workspace_id)
+    .neq("processing_status", "processing")
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return Boolean(data);
 }
 
 async function updateFileProcessingStatus({
@@ -947,6 +1014,86 @@ function hasMeaningfulModelContent(outputJson: Json) {
   ];
 
   return directLists.some((key) => asArray(output[key]).length > 0) || str(output.response_markdown).length > 120 || str(output.executive_summary).length > 80;
+}
+
+function validateFileAnalysisOutputContract(outputJson: Json) {
+  const output = isRecord(outputJson) ? outputJson : {};
+  const extractionStatus = str(output.extraction_status).toLowerCase();
+  const confidence = str(output.confidence).toLowerCase();
+  const allowedStatuses = new Set(["populated", "blank_template", "unreadable", "unsupported", "technical_failure"]);
+  const allowedConfidence = new Set(["high", "medium", "low"]);
+  const hasRequiredLists = [
+    "extracted_findings",
+    "kpis_found",
+    "risks",
+    "operational_issues",
+    "recommended_actions",
+    "opportunities",
+    "unclear_fields"
+  ].every((key) => Array.isArray(output[key]));
+  const extractedText = extractedTextFromOutput(outputJson);
+  const valid =
+    allowedStatuses.has(extractionStatus) &&
+    allowedConfidence.has(confidence) &&
+    hasRequiredLists &&
+    (extractionStatus !== "populated" || Boolean(extractedText));
+
+  return {
+    valid,
+    extractionStatus,
+    extractedText
+  };
+}
+
+function fileAnalysisEvidenceFailure({
+  file,
+  extraction,
+  outputJson,
+  evidenceAssessment
+}: {
+  file: FileUploadRow;
+  extraction: FileContentExtraction;
+  outputJson: Json;
+  evidenceAssessment: FileAnalysisEvidenceAssessment;
+}) {
+  const output = isRecord(outputJson) ? outputJson : {};
+  const extractionStatus = str(output.extraction_status).toLowerCase();
+  const outputContract = validateFileAnalysisOutputContract(outputJson);
+  let failureType: FileAnalysisFailureType;
+  let message: string;
+
+  if (extractionStatus === "blank_template") {
+    failureType = "blank_template";
+    message = "No populated inventory records were detected in this template. Add business data and upload it again.";
+  } else if (extractionStatus === "unreadable") {
+    failureType = "needs_clearer_file";
+    message = "The image was uploaded, but its text was too small or unclear to analyze reliably. Upload a higher-resolution image, PDF, CSV, or spreadsheet.";
+  } else if (extractionStatus === "unsupported") {
+    failureType = "unsupported_file";
+    message = "This file was uploaded successfully, but its format is not available for analysis. Upload a PDF, CSV, spreadsheet, DOCX, PNG, or JPG.";
+  } else if (!outputContract.valid) {
+    failureType = "incomplete_extraction";
+    message = "Analysis could not be completed because Vaeroex returned an incomplete file extraction. Your file remains saved. Try again.";
+  } else if (
+    extractionStatus === "technical_failure" ||
+    (extraction.kind === "image_vision" && !extractedTextFromOutput(outputJson) && hasMeaningfulModelContent(outputJson))
+  ) {
+    failureType = extractionStatus === "technical_failure" ? "technical_failure" : "incomplete_extraction";
+    message =
+      failureType === "incomplete_extraction"
+        ? "Analysis could not be completed because Vaeroex returned an incomplete file extraction. Your file remains saved. Try again."
+        : "Analysis could not be completed due to a processing error. Your file remains saved. Try again.";
+  } else if (evidenceAssessment.extractionOutcome === "technical_failure") {
+    failureType = "technical_failure";
+    message = "Analysis could not be completed due to a processing error. Your file remains saved. Try again.";
+  } else {
+    failureType = "no_usable_data";
+    message = isImageFile(file)
+      ? "No populated business records were detected in this image. Confirm that the image contains readable business data and try again."
+      : "No usable business records were detected in this source. Confirm that the file contains readable business data and try again.";
+  }
+
+  return { failureType, message };
 }
 
 function scoreFromUnknown(value: unknown) {
@@ -1583,7 +1730,8 @@ async function runFileVaeroexAnalysis({
   workspaceId,
   file,
   prompt,
-  rowLimit
+  rowLimit,
+  activeRunId
 }: {
   supabase: SupabaseServerClient;
   userId: string;
@@ -1592,6 +1740,7 @@ async function runFileVaeroexAnalysis({
   file: FileUploadRow;
   prompt: string;
   rowLimit: number;
+  activeRunId?: string;
 }) {
   const workflow = getVaeroexWorkflow("file_analysis");
   await updateFileProcessingStatus({ supabase, file, status: "processing" });
@@ -1711,6 +1860,7 @@ async function runFileVaeroexAnalysis({
   });
   const requestMetrics = requestMetricsFromUsage(usage.metadata);
   const outputExtractedText = extractedTextFromOutput(outputJson);
+  const outputContract = validateFileAnalysisOutputContract(outputJson);
   const finalTextContent = extraction.textContent || outputExtractedText;
   const sourceGrounding = extraction.textContent ? "local_extraction" : "model_extraction";
   const finalExtraction = {
@@ -1731,13 +1881,24 @@ async function runFileVaeroexAnalysis({
         : extraction.contentNote,
     extractionFailureReason: finalTextContent && extraction.fileAttachment ? undefined : extraction.extractionFailureReason
   } satisfies FileContentExtraction;
-  const evidenceAssessment = assessFileAnalysisEvidence({
+  const assessedEvidence = assessFileAnalysisEvidence({
     outputJson,
     extractedSourceText: finalExtraction.textContent,
     extractedRowCount: finalExtraction.rows.length,
     extractionFailureReason: finalExtraction.extractionFailureReason,
     sourceGrounding
   });
+  const evidenceAssessment: FileAnalysisEvidenceAssessment = outputContract.valid
+    ? assessedEvidence
+    : {
+        eligible: false,
+        classification: "invalid_evidence",
+        extractionOutcome: "no_readable_data",
+        reason: "The analysis returned an incomplete file extraction response.",
+        factCount: 0,
+        requiresReview: true,
+        sourceGrounding
+      };
   const evidenceLineage = {
     source_record_type: "file_upload",
     source_record_id: file.id,
@@ -1760,12 +1921,19 @@ async function runFileVaeroexAnalysis({
   } satisfies Json;
 
   if (!evidenceAssessment.eligible) {
+    const failure = fileAnalysisEvidenceFailure({
+      file,
+      extraction: finalExtraction,
+      outputJson,
+      evidenceAssessment
+    });
     throw new FileAnalysisEvidenceError(
-      "Vaeroex could not find usable business information in this file. Try a clearer source or confirm that the file contains readable business details.",
+      failure.message,
       {
         inputJson: classifiedInputJson,
         outputJson: classifiedOutputJson,
-        extractionOutcome: evidenceAssessment.extractionOutcome
+        extractionOutcome: evidenceAssessment.extractionOutcome,
+        failureType: failure.failureType
       }
     );
   }
@@ -1804,18 +1972,25 @@ async function runFileVaeroexAnalysis({
     );
   }
 
-  const { data, error } = await supabase
-    .from("ai_agent_runs")
-    .insert({
-      workspace_id: workspaceId,
-      agent_type: workflow.key,
-      input_json: classifiedInputJson,
-      output_json: classifiedOutputJson,
-      status: "completed",
-      created_by: userId
-    })
-    .select("id")
-    .single();
+  const completedRun = {
+    workspace_id: workspaceId,
+    agent_type: workflow.key,
+    input_json: classifiedInputJson,
+    output_json: classifiedOutputJson,
+    status: "completed" as const,
+    error_message: null,
+    created_by: userId
+  };
+  const runQuery = activeRunId
+    ? supabase
+        .from("ai_agent_runs")
+        .update(completedRun)
+        .eq("id", activeRunId)
+        .eq("workspace_id", workspaceId)
+        .select("id")
+        .single()
+    : supabase.from("ai_agent_runs").insert(completedRun).select("id").single();
+  const { data, error } = await runQuery;
 
   if (error || !data) {
     throw new Error(error?.message || "Vaeroex analysis could not be saved.");
@@ -3353,6 +3528,35 @@ export async function analyzeFileAction(formData: FormData) {
     },
     workspace_snapshot: {}
   } satisfies Json;
+  const claimed = await claimFileAnalysis({ supabase, file });
+
+  if (!claimed) {
+    redirectWithPathMessage(returnPath, "Analysis is already running for this source. Refresh shortly to review the result.", file.id);
+  }
+
+  const activeRunId = randomUUID();
+  const { error: runStartError } = await supabase.from("ai_agent_runs").insert({
+    id: activeRunId,
+    workspace_id: workspaceId,
+    agent_type: workflow.key,
+    input_json: inputJson,
+    output_json: {},
+    status: "running",
+    created_by: user.id
+  });
+
+  if (runStartError) {
+    await supabase
+      .from("file_uploads")
+      .update({
+        processing_status: file.processing_status || "uploaded",
+        processing_error: runStartError.message,
+        metadata_json: file.metadata_json
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+    redirectWithPathError(returnPath, "Analysis could not start. Your file remains saved. Try again.", file.id);
+  }
 
   try {
     const result = await runFileVaeroexAnalysis({
@@ -3362,7 +3566,8 @@ export async function analyzeFileAction(formData: FormData) {
       workspaceId,
       file,
       prompt,
-      rowLimit: MAX_ANALYSIS_ROWS
+      rowLimit: MAX_ANALYSIS_ROWS,
+      activeRunId
     });
     inputJson = result.inputJson;
 
@@ -3389,6 +3594,7 @@ export async function analyzeFileAction(formData: FormData) {
     const evidenceFailure = error instanceof FileAnalysisEvidenceError ? error : null;
     const failureInputJson = evidenceFailure?.inputJson || inputJson;
     const failureOutputJson = evidenceFailure?.outputJson || ({} satisfies Json);
+    const failureType = evidenceFailure?.failureType || fileAnalysisFailureTypeFromMessage(message);
     const failedAt = new Date().toISOString();
 
     await updateFileProcessingStatus({ supabase, file, status: "failed", error: message });
@@ -3401,9 +3607,16 @@ export async function analyzeFileAction(formData: FormData) {
           latest_analysis_at: failedAt,
           latest_analysis_prompt: prompt,
           latest_analysis_error: message,
+          latest_analysis_run_id: activeRunId,
           latest_analysis_failure: {
-            stage: /too large|direct visual analysis|direct document analysis/i.test(message) ? "request_size_preflight" : "analysis",
-            type: /too large|direct visual analysis|direct document analysis/i.test(message) ? "request_size" : "analysis_failed",
+            stage: /too large|direct visual analysis|direct document analysis/i.test(message)
+              ? "request_size_preflight"
+              : failureType === "incomplete_extraction" || evidenceFailure
+                ? "structured_response_validation"
+                : /access the saved source file/i.test(message)
+                  ? "storage_retrieval"
+                  : "analysis",
+            type: failureType,
             retry_eligible: true,
             user_message: message,
             evidence_classification: evidenceFailure ? "invalid_evidence" : "user_failure_state",
@@ -3416,15 +3629,16 @@ export async function analyzeFileAction(formData: FormData) {
       })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
-    await supabase.from("ai_agent_runs").insert({
-      workspace_id: workspaceId,
-      agent_type: workflow.key,
-      input_json: failureInputJson,
-      output_json: failureOutputJson,
-      status: "failed",
-      error_message: message,
-      created_by: user.id
-    });
+    await supabase
+      .from("ai_agent_runs")
+      .update({
+        input_json: failureInputJson,
+        output_json: failureOutputJson,
+        status: "failed",
+        error_message: message
+      })
+      .eq("id", activeRunId)
+      .eq("workspace_id", workspaceId);
 
     revalidatePath(FILES_PATH);
     redirectWithPathError(returnPath, message, file.id);

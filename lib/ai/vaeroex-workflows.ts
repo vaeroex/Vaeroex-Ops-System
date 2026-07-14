@@ -70,6 +70,32 @@ Every output that could become a record must be a draft for leadership review. D
 Every recommendation must explain what happened, why, evidence, business impact, recommendation confidence, what could happen next, and what leadership should review. Do not imply Vaeroex owns execution.
 `;
 
+const fileAnalysisJsonInstructions = `
+Return JSON only. Do not wrap the JSON in markdown.
+Use this exact root shape for file analysis:
+{
+  "title": "Short source title",
+  "executive_summary": "Concise summary grounded only in the source",
+  "extraction_status": "populated | blank_template | unreadable | unsupported | technical_failure",
+  "extracted_text": "Faithful, compact transcription of readable source text and values",
+  "extracted_findings": ["Source-grounded observation"],
+  "kpis_found": ["Source-grounded KPI or metric"],
+  "risks": ["Source-grounded risk"],
+  "operational_issues": ["Source-grounded issue"],
+  "recommended_actions": ["What leadership should review"],
+  "opportunities": ["Source-grounded opportunity"],
+  "unclear_fields": ["Field or value that could not be read confidently"],
+  "confidence": "High | Medium | Low",
+  "response_markdown": "Concise, readable source analysis"
+}
+For image attachments, extracted_text is required whenever any readable business labels, rows, or values are visible. Preserve visible numbers exactly and never infer missing values.
+Use extraction_status "blank_template" only when the source is readable but contains no populated business records.
+Use extraction_status "unreadable" when the source cannot be read reliably. Describe uncertain fields in unclear_fields instead of guessing.
+Use extraction_status "technical_failure" only for an actual processing failure, never as a business conclusion.
+Do not substitute the generic Ask Vaeroex response shape for this file-analysis shape.
+Every output is a draft for leadership review and must preserve the uploaded file as its source.
+`;
+
 const workspaceAwareInstructions = `
 Workspace-aware recommendation rules:
 - First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
@@ -250,7 +276,7 @@ For report-style answers, use these visible sections: Analysis Summary, Findings
 If the file suggests action, phrase it as what leadership should review. Do not create tasks, ownership, CRM records, workflows, or generic management recommendations.
 If evidence is unclear, say what needs confirmation instead of guessing.
 ${workspaceAwareInstructions}
-${sharedJsonInstructions}
+${fileAnalysisJsonInstructions}
 `
   },
   {
