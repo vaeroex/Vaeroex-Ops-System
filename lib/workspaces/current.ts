@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
+import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
@@ -51,14 +53,19 @@ export async function getWorkspaceContext(preferredWorkspaceId?: string | null):
   ]);
 
   const rows = (memberships ?? []) as MembershipWithWorkspace[];
-  const workspaces = rows
+  const canAccessDemoWorkspace = isVaeroexAdminUser(user);
+  const visibleRows = rows.filter((row) => {
+    const workspace = Array.isArray(row.workspaces) ? row.workspaces[0] : row.workspaces;
+    return Boolean(workspace && (canAccessDemoWorkspace || !isDemoWorkspaceRecord(workspace)));
+  });
+  const workspaces = visibleRows
     .map((row) => (Array.isArray(row.workspaces) ? row.workspaces[0] : row.workspaces))
     .filter((workspace): workspace is Workspace => Boolean(workspace));
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === effectivePreferredWorkspaceId) ?? workspaces[0] ?? null;
   const membership =
-    rows.find((row) => row.workspace_id === activeWorkspace?.id) ??
-    rows.find((row) => row.workspace_id === effectivePreferredWorkspaceId) ??
+    visibleRows.find((row) => row.workspace_id === activeWorkspace?.id) ??
+    visibleRows.find((row) => row.workspace_id === effectivePreferredWorkspaceId) ??
     null;
 
   return {
