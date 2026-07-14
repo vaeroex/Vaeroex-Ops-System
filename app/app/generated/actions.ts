@@ -13,7 +13,7 @@ function text(formData: FormData, key: string) {
 }
 
 function redirectWithError(message: string): never {
-  redirect(`/app/generated/new?error=${encodeURIComponent(message)}` as Route);
+  redirect(`/app/reports/new?error=${encodeURIComponent(message)}` as Route);
 }
 
 function parseJson(value: string): Json {
@@ -35,9 +35,16 @@ export async function saveGeneratedOutputToReportsAction(formData: FormData) {
   const outputType = text(formData, "output_type") || "Generated Output";
   const bodyMarkdown = text(formData, "body_markdown");
   const sourceData = parseJson(text(formData, "source_data_json"));
+  const sourceMetadata = sourceData && typeof sourceData === "object" && !Array.isArray(sourceData) ? sourceData as Record<string, Json | undefined> : {};
+  const evidenceCount = Number(sourceMetadata.evidence_count || 0);
+  const sourceRecordIds = Array.isArray(sourceMetadata.source_record_ids) ? sourceMetadata.source_record_ids.filter((value) => typeof value === "string") : [];
 
   if (!bodyMarkdown) {
     redirectWithError("Vaeroex could not save an empty generated output.");
+  }
+
+  if (!sourceMetadata.derived_analysis || evidenceCount < 1 || sourceRecordIds.length < 1) {
+    redirectWithError("Eligible supporting evidence is required before this report can be saved.");
   }
 
   try {
@@ -67,19 +74,23 @@ export async function saveGeneratedOutputToReportsAction(formData: FormData) {
     redirectWithError(error instanceof Error ? error.message : "Generated output was blocked by Vaeroex security policy.");
   }
 
-  const { error } = await supabase.from("reports").insert({
-    workspace_id: workspaceId,
-    report_type: outputType,
-    title,
-    body_markdown: bodyMarkdown,
-    source_data_json: sourceData,
-    created_by: user.id
-  });
+  const { data: report, error } = await supabase
+    .from("reports")
+    .insert({
+      workspace_id: workspaceId,
+      report_type: outputType,
+      title,
+      body_markdown: bodyMarkdown,
+      source_data_json: sourceData,
+      created_by: user.id
+    })
+    .select("id")
+    .single();
 
-  if (error) {
-    redirect(`/app/generated/new?error=${encodeURIComponent(error.message || "Generated output could not be saved.")}` as Route);
+  if (error || !report) {
+    redirect(`/app/reports/new?error=${encodeURIComponent(error?.message || "Generated output could not be saved.")}` as Route);
   }
 
   revalidatePath("/app/reports");
-  redirect("/app/reports?message=Report saved." as Route);
+  redirect(`/app/reports/${report.id}?message=${encodeURIComponent("Report saved.")}` as Route);
 }

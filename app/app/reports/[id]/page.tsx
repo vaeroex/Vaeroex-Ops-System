@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -27,6 +28,10 @@ function cleanLine(value: string) {
   return value.replace(/^[-*]\s*/, "").replace(/\*\*/g, "").trim();
 }
 
+function asRecord(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 export default async function ReportDetailPage({ params, searchParams }: ReportDetailPageProps) {
   const { id } = await params;
   const query = await searchParams;
@@ -47,6 +52,10 @@ export default async function ReportDetailPage({ params, searchParams }: ReportD
   const readiness = reportEvidenceReadiness(report);
   const sourceCount = reportSourceCount(report);
   const sections = parseReportSections(report.body_markdown);
+  const sourceData = asRecord(report.source_data_json);
+  const sourceFindingId = typeof sourceData.source_finding_id === "string" ? sourceData.source_finding_id : "";
+  const sourceHref = sourceFindingId ? `/app/intelligence?finding=${encodeURIComponent(sourceFindingId)}` : "";
+  const sourceTitle = typeof sourceData.source_title === "string" ? sourceData.source_title : "Intelligence finding";
 
   return (
     <div className="space-y-6 text-slate-100 print:bg-white print:text-black">
@@ -61,9 +70,13 @@ export default async function ReportDetailPage({ params, searchParams }: ReportD
         </Link>
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{reportTypeLabel(type)} · Derived analysis</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{reportTypeLabel(type)} · Derived analysis</p>
+              <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-0.5 text-[0.68rem] font-semibold text-emerald-100">Saved</span>
+            </div>
             <h1 className="mt-2 text-2xl font-semibold leading-tight text-white sm:text-3xl print:text-black">{title}</h1>
             <p className="mt-2 text-sm text-slate-400 print:text-slate-600">{reportPeriodLabel(report)} · Generated {new Date(report.created_at).toLocaleString()}</p>
+            {sourceHref ? <p className="mt-2 text-sm text-slate-400 print:hidden">Generated from Intelligence finding: <Link href={sourceHref as Route} className="font-semibold text-cyan-100 hover:text-white">{sourceTitle}</Link></p> : null}
           </div>
           <div className="flex items-center gap-2 print:hidden">
             <ReportExportActions title={title} reportType={reportTypeLabel(type)} dateRange={reportPeriodLabel(report)} body={report.body_markdown || ""} />

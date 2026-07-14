@@ -10,8 +10,9 @@ export type GeneratedOutputType = "action_plan" | "risk_brief" | "checklist" | "
 
 export type GeneratedOutputSource = Pick<
   IntelligenceInsight,
-  "title" | "summary" | "why" | "impact" | "recommendedAction" | "confidence" | "evidence" | "evidenceCount" | "sourceTypes" | "sourceHref" | "suggestedNextData" | "priority"
+  "title" | "summary" | "why" | "impact" | "recommendedAction" | "confidence" | "evidence" | "evidenceCount" | "supportingRecords" | "independentSourceCount" | "sourceTypes" | "sourceHref" | "limitation" | "suggestedNextData" | "priority"
 > & {
+  id?: string;
   type?: IntelligenceInsightType;
 };
 
@@ -25,6 +26,8 @@ export type GeneratedOutput = {
   recommendedRemedy: string;
   evidence: string[];
   evidenceCount: number;
+  supportingRecordIds: string[];
+  independentSourceCount: number;
   confidence: IntelligenceConfidence;
   priority: "High" | "Medium" | "Low";
   sourceTypes: string[];
@@ -106,7 +109,7 @@ export function generatedOutputHref({
   if (remedy) params.set("remedy", remedy);
   if (run) params.set("run", run);
 
-  return `/app/generated/new?${params.toString()}` as Route;
+  return `/app/reports/new?${params.toString()}` as Route;
 }
 
 export function outputTypeForInsight(insight: Pick<IntelligenceInsight, "type">): GeneratedOutputType {
@@ -158,8 +161,11 @@ export function fallbackGeneratedOutputSource(type: GeneratedOutputType, intelli
     priority: "Low",
     evidence: [`Business memory score: ${intelligence.dataQuality.score}/100`, intelligence.dataQuality.reason],
     evidenceCount: Math.max(1, intelligence.memorySummary.sourceRecords),
+    supportingRecords: [],
+    independentSourceCount: intelligence.memorySummary.sourceRecords,
     sourceTypes: ["Business Memory"],
     sourceHref: "/app/sources",
+    limitation: "Not enough eligible original evidence exists for a reliable conclusion.",
     suggestedNextData: intelligence.dataQuality.suggestedNextData[0]
   };
 }
@@ -174,6 +180,8 @@ export function sourceFromSearchParams({
   const type = parseGeneratedOutputType(params.get("type"));
   const sourceId = params.get("source");
   const matched = sourceId ? intelligence.insights.find((insight) => insight.id === sourceId) : null;
+  if (matched) return matched;
+
   const fallback = matched || fallbackGeneratedOutputSource(type, intelligence);
   const title = clean(params.get("title"), fallback.title);
   const summary = clean(params.get("summary"), fallback.summary);
@@ -365,11 +373,11 @@ export function buildGeneratedOutput({
   ].filter((item): item is string => Boolean(item));
   const sourceTypes = source.sourceTypes.length ? source.sourceTypes : ["Business Memory"];
   const limitations =
-    source.confidence === "High"
+    source.limitation || (source.confidence === "High"
       ? "Confidence is high for a draft recommendation, but leadership should still review before using it operationally."
       : source.confidence === "Medium"
         ? "Confidence is medium because Vaeroex has useful evidence but would benefit from more historical context."
-        : "Confidence is limited. Treat this as a starting point and add more source data before making major decisions.";
+        : "Confidence is limited. Treat this as a starting point and add more source data before making major decisions.");
   const markdown = [
     `# ${name}: ${source.title}`,
     "",
@@ -407,6 +415,8 @@ export function buildGeneratedOutput({
     recommendedRemedy: source.recommendedAction,
     evidence: source.evidence,
     evidenceCount: source.evidenceCount,
+    supportingRecordIds: source.supportingRecords.map((record) => record.id),
+    independentSourceCount: source.independentSourceCount,
     confidence: source.confidence,
     priority: source.priority || "Medium",
     sourceTypes,
