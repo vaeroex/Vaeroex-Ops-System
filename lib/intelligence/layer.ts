@@ -600,7 +600,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         date: lead.last_activity_at || lead.updated_at || lead.created_at,
         value: lead.status ? `Status: ${lead.status}` : "Status not recorded",
         support: lead.last_activity_at ? "The last recorded activity is overdue." : "No recent activity date is recorded.",
-        href: lead.source_file_id ? `/app/sources?file=${lead.source_file_id}` : "/app/sources",
+        href: lead.source_file_id ? `/app/sources/${lead.source_file_id}` : "/app/sources",
         classification: recordClassification(lead),
         sourceKey: lead.source_file_id ? `source-file:${lead.source_file_id}` : `import:${lead.import_id}`
       })];
@@ -699,7 +699,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         date: item.imported_at || item.reviewed_at || item.created_at,
         value: `${item.rows_imported} of ${item.rows_total} rows imported`,
         support: "The import remains in its required review state and is not yet eligible for intelligence.",
-        href: `/app/sources?file=${item.file_upload_id}&panel=import`,
+        href: `/app/sources/${item.file_upload_id}?section=imported`,
         classification: "Derived",
         sourceKey: `source-file:${item.file_upload_id}`,
         groupHint: item.import_type.replace(/_/g, " ")

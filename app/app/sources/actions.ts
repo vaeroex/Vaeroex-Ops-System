@@ -205,7 +205,6 @@ async function deleteGeneratedInsights(runIds: string[], typedConfirmation?: str
   }
 
   revalidatePath("/app/sources");
-  revalidatePath("/app/files");
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
 

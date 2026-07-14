@@ -152,7 +152,7 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
   },
   files: {
     table: "file_uploads",
-    path: "/app/files",
+    path: "/app/sources",
     titleField: "display_name",
     fields: [
       { name: "display_name", kind: "requiredText", maxLength: 180 },
@@ -433,7 +433,6 @@ function revalidateRelatedPaths(collection: ManagedCollection, path: Route | str
     revalidatePath("/app");
     revalidatePath("/app/intelligence");
     revalidatePath("/app/sources");
-    revalidatePath("/app/files");
     revalidatePath("/app/reports");
   }
 }

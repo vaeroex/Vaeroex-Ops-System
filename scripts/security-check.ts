@@ -175,7 +175,6 @@ for (const file of adminActions) {
 
 const customerPages = [
   "app/app/page.tsx",
-  "app/app/files/page.tsx",
   "app/app/reports/page.tsx",
   "app/app/sops/page.tsx",
   "app/app/kpis/page.tsx",
@@ -194,6 +193,9 @@ const customerPages = [
 for (const file of customerPages) {
   check(read(file).includes("requireWorkspacePage"), `${file} must call requireWorkspacePage for authenticated workspace access.`);
 }
+
+const legacyFilesPage = read("app/app/files/page.tsx");
+check(legacyFilesPage.includes("permanentRedirect") && legacyFilesPage.includes("/app/sources"), "Legacy Files must redirect into the authenticated Evidence workspace without querying data.");
 
 const pendingSubmitButton = read("components/operations/PendingSubmitButton.tsx");
 check(pendingSubmitButton.includes("useFormStatus"), "PendingSubmitButton must keep React form-status awareness for server action submissions.");

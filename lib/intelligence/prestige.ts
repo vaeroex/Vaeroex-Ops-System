@@ -426,7 +426,7 @@ function buildDataQuality(input: PrestigeInput) {
         id: `file-${file.id}`,
         title: `${file.display_name} has not been analyzed`,
         why: "Uploaded files should either feed business memory or explain a business trend.",
-        href: "/app/files" as Route,
+        href: "/app/sources" as Route,
         severity: "Medium" as const
       })),
     ...input.assets
@@ -809,7 +809,7 @@ function buildMemoryTimeline(input: PrestigeInput, focus: PrestigeAction[]) {
       cause: "Uploaded file added historical context.",
       actionTaken: "Use extracted findings in reports and KPI review.",
       outcome: `${file.imported_rows} imported row${file.imported_rows === 1 ? "" : "s"} recorded.`,
-      href: "/app/files"
+      href: "/app/sources"
     });
   }
 

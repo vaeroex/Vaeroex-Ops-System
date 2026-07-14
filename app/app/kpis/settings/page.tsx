@@ -321,7 +321,7 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
           { label: "Business Health", href: "/app#business-health-heading" as Route },
           { label: "Profit Leakage", href: "/app/kpis/profit-leakage" as Route },
           { label: "Records", href: "/app/kpis?section=records" as Route },
-          { label: "Imports", href: "/app/files?status=Imported" as Route },
+          { label: "Imports", href: "/app/sources?status=Imported" as Route },
           { label: "Settings", href: "/app/kpis/settings" as Route, active: true }
         ]}
       />

@@ -671,7 +671,7 @@ function buildSmartAlerts({
           title: `${unanalyzedFiles.length} uploaded file${unanalyzedFiles.length === 1 ? "" : "s"} not reviewed`,
           why: "Uploaded files should either feed historical memory or produce clear findings for reports.",
           action: "Review files",
-          href: "/app/files"
+          href: "/app/sources"
         }
       : null,
     !hasCurrentReport
@@ -1755,7 +1755,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       source: "Files",
       status: item.status,
       context: `${item.rows_imported} of ${item.rows_total} rows saved. Review mappings before using this data in reports.`,
-      href: "/app/files" as Route
+      href: "/app/sources" as Route
     })),
     ...negativeTrends.slice(0, 3).map((trend) => ({
       id: `trend-risk-${trend.name}`,
@@ -1789,7 +1789,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       source: "Files",
       status: item.status === "completed" ? "Saved" : item.status,
       context: `${item.rows_imported} of ${item.rows_total} rows available for historical reporting.`,
-      href: "/app/files" as Route
+      href: "/app/sources" as Route
     })),
     ...fileAnalyses.slice(0, 3).map((file) => ({
       id: `file-analysis-${file.id}`,
@@ -1797,7 +1797,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       source: "File analysis",
       status: file.import_status,
       context: file.analysis_summary ? file.analysis_summary.slice(0, 140) : "Analysis saved to workspace memory.",
-      href: "/app/files" as Route
+      href: "/app/sources" as Route
     }))
   ].slice(0, 3);
   const recommendedActionSignals: DashboardSignal[] = [
@@ -1842,7 +1842,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           source: `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"}`,
           status: "Needs review",
           context: "Save approved mappings so reports and dashboards use the latest uploaded data.",
-          href: "/app/files" as Route
+          href: "/app/sources" as Route
         }
       : null,
     negativeTrends[0]
@@ -2124,7 +2124,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   tone="action"
                 />
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
+                  <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
                     Review files
                   </Link>
                   <Link href="/app/sources" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
@@ -2346,7 +2346,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
               : "Upload CSV or XLSX files when you already have data to bring in. Vaeroex stages mappings for review before saving anything to history."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/files" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
+            <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {files.length ? "Review files" : "Upload files"}
             </Link>
             <Link href={reports.length ? "/app/reports" : generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
