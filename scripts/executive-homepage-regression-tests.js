@@ -223,6 +223,9 @@ assert.match(sourcesPageSource, /tab\.key !== "knowledge"[\s\S]*memoryChunks\.so
 assert.match(kpiPageSource, /function explicitKpiDirection/, "KPI directionality must come from explicit existing metadata");
 assert.match(kpiPageSource, /actual === null \|\| target === null \|\| !direction/, "KPI status must remain neutral without explicit direction");
 assert.match(kpiPageSource, /if \(tone === "neutral"\) return null/, "neutral KPIs must not show favorable or unfavorable status badges");
+assert.match(kpiPageSource, /!\(key === "status" && value === "all"\)/, "the KPI URL builder must preserve show=all while omitting the default status");
+assert.match(kpiPageSource, /showAllTiles \? filteredLatestKpiRows : filteredLatestKpiRows\.slice\(0, INITIAL_KPI_CARD_COUNT\)/, "expanded KPI rendering must use the full filtered result set");
+assert.match(kpiPageSource, /showAllTiles \? "Show fewer KPIs" : `Show all \$\{filteredLatestKpiRows\.length\} KPIs`/, "the KPI expansion control must expose both expanded and collapsed labels");
 assert.doesNotMatch(kpiPageSource, /Loading Compare/, "Compare must not retain a stale loading label");
 assert.doesNotMatch(kpiPageSource, /Biggest positive movement|Biggest risk signal/, "comparison summaries must not assign business meaning without directionality");
 

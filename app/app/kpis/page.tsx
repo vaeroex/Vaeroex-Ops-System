@@ -71,6 +71,8 @@ type KpiTargetRecommendation = {
   limitation: string;
   outliers: string;
 };
+
+const INITIAL_KPI_CARD_COUNT = 6;
 type KpiTrend = {
   name: string;
   rows: KpiRow[];
@@ -616,7 +618,7 @@ function kpiHref(params: Record<string, string | number | null | undefined>) {
   const search = new URLSearchParams();
 
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== null && value !== undefined && value !== "" && value !== "all") {
+    if (value !== null && value !== undefined && value !== "" && !(key === "status" && value === "all")) {
       search.set(key, String(value));
     }
   });
@@ -1763,8 +1765,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter, allVisibleKpis, kpiSettings));
   const filteredMetricNames = new Set(filteredLatestKpiRows.map((kpi) => kpi.name));
   const filteredKpis = activeStatusFilter === "all" ? kpis : kpis.filter((kpi) => filteredMetricNames.has(kpi.name));
-  const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, 6);
-  const hiddenTileCount = Math.max(0, filteredLatestKpiRows.length - visibleTileRows.length);
+  const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, INITIAL_KPI_CARD_COUNT);
+  const canToggleTileExpansion = filteredLatestKpiRows.length > INITIAL_KPI_CARD_COUNT;
   const filterCount = activeStatusFilter === "all" ? metricNames.length : filteredLatestKpiRows.length;
   const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
@@ -1961,13 +1963,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <EmptyState title="No KPIs match this filter" description="Clear the filter, create a KPI manually, or import reviewed CSV/XLSX data to continue building the measurement layer." />
           )}
 
-          {hiddenTileCount ? (
+          {canToggleTileExpansion ? (
             <div className="flex justify-center">
               <Link
-                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: "all" })}
+                href={kpiHref({ ...timelineQueryParams(timeline, selectedTimelineRange), status: activeStatusFilter, show: showAllTiles ? null : "all" })}
                 className="rounded-lg border border-white/10 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent"
               >
-                Show all {filteredLatestKpiRows.length} KPIs
+                {showAllTiles ? "Show fewer KPIs" : `Show all ${filteredLatestKpiRows.length} KPIs`}
               </Link>
             </div>
           ) : null}
