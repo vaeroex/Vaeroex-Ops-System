@@ -2,6 +2,7 @@ import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { businessSignalMatchesEvidenceScope, isOpenBusinessSignal } from "@/lib/intelligence/business-signal-evidence";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -16,6 +17,7 @@ export type IntelligenceEvidenceRecord = {
   href: string;
   classification: "Original" | "Manual" | "Derived";
   sourceKey: string;
+  groupHint?: string;
 };
 
 export type IntelligenceInsight = {
@@ -201,9 +203,10 @@ function evidenceRecord({
   support,
   href,
   sourceKey,
+  groupHint,
   classification = "Original"
 }: IntelligenceEvidenceRecord) {
-  return { id, title, recordType, date, value, support, href, sourceKey, classification };
+  return { id, title, recordType, date, value, support, href, sourceKey, classification, groupHint };
 }
 
 function kpiEvidenceRecord(kpi: KpiRow, support: string): IntelligenceEvidenceRecord {
@@ -222,7 +225,8 @@ function kpiEvidenceRecord(kpi: KpiRow, support: string): IntelligenceEvidenceRe
     support,
     href: `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail`,
     classification: recordClassification(kpi),
-    sourceKey
+    sourceKey,
+    groupHint: kpi.category || kpi.name
   });
 }
 
@@ -352,9 +356,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const people = filterOriginalBusinessEvidence(input.people);
   const decisions: DecisionRow[] = [];
   const recommendationOutcomes: RecommendationOutcomeRow[] = [];
-  const openTasks = tasks.filter((task) => !isClosed(task.status));
-  const businessSignalsForReview = openTasks.filter((task) => Boolean(task.description || task.category || task.related_type || task.due_date));
-  const signalsWithLimitedContext = openTasks.filter((task) => !task.description || !task.category);
+  const openTasks = tasks.filter(isOpenBusinessSignal);
+  const businessSignalsForReview = openTasks.filter((task) => businessSignalMatchesEvidenceScope(task, "related-signal-pattern"));
+  const signalsWithLimitedContext = openTasks.filter((task) => businessSignalMatchesEvidenceScope(task, "limited-signal-context"));
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const latestKpis = latestKpisByName(kpis);
   const historyCounts = kpiHistoryCounts(kpis);
@@ -417,7 +421,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         support: issue.root_cause ? `The record documents this root cause: ${issue.root_cause}` : "The issue remains open, but its root cause is not documented.",
         href: `/app/issues?q=${encodeURIComponent(issue.title)}`,
         classification: "Manual",
-        sourceKey: `issue:${issue.id}`
+        sourceKey: `issue:${issue.id}`,
+        groupHint: issue.issue_type || "Issues"
       })];
       const limitation = issue.root_cause
         ? "The issue record does not establish whether the documented cause is the only contributing factor."
@@ -462,10 +467,13 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
             recordType: "Business Signal",
             date: task.due_date || task.updated_at || task.created_at,
             value: task.description || "No description recorded.",
-            support: `This signal contributes ${task.category ? `${task.category.toLowerCase()} context` : "operating context"} to the repeated pattern.`,
+            support: task.description
+              ? `The "${task.title}" record provides direct ${task.category ? task.category.toLowerCase() : "operating"} context for this finding.`
+              : "The title is the only recorded context available for this signal.",
             href: `/app/tasks?q=${encodeURIComponent(task.title)}#signal-${task.id}`,
             classification: recordClassification(task),
-            sourceKey: task.related_id ? `${task.related_type || "record"}:${task.related_id}` : `signal:${task.id}`
+            sourceKey: task.related_id ? `${task.related_type || "record"}:${task.related_id}` : `signal:${task.id}`,
+            groupHint: task.category || task.related_type || "Business Signals"
           }));
           const missingEvidence = [
             !businessSignalsForReview.some((task) => Boolean(task.assigned_to || task.assigned_person_id)) ? "A responsible party or accountable business role" : "",
@@ -511,7 +519,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
             support: "The missing description or category prevents reliable interpretation.",
             href: `/app/tasks?q=${encodeURIComponent(task.title)}#signal-${task.id}`,
             classification: recordClassification(task),
-            sourceKey: task.related_id ? `${task.related_type || "record"}:${task.related_id}` : `signal:${task.id}`
+            sourceKey: task.related_id ? `${task.related_type || "record"}:${task.related_id}` : `signal:${task.id}`,
+            groupHint: task.category || task.related_type || "Business Signals"
           }));
 
           return {
@@ -692,7 +701,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         support: "The import remains in its required review state and is not yet eligible for intelligence.",
         href: `/app/sources?file=${item.file_upload_id}&panel=import`,
         classification: "Derived",
-        sourceKey: `source-file:${item.file_upload_id}`
+        sourceKey: `source-file:${item.file_upload_id}`,
+        groupHint: item.import_type.replace(/_/g, " ")
       })];
 
       return {
@@ -731,7 +741,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
             support: "The document has not been updated in more than 90 days.",
             href: `/app/sops?q=${encodeURIComponent(sop.title)}`,
             classification: "Manual",
-            sourceKey: `sop:${sop.id}`
+            sourceKey: `sop:${sop.id}`,
+            groupHint: sop.category || sop.department || "Process knowledge"
           }));
 
           return {
