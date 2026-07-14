@@ -5,6 +5,8 @@ import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { businessSignalMatchesEvidenceScope, type BusinessSignalEvidenceScope } from "@/lib/intelligence/business-signal-evidence";
+import { isOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { RecordDetailDrawer } from "@/components/operations/RecordDetailDrawer";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -357,7 +359,20 @@ function BusinessSignalRowCard({ signal, archived = false }: { signal: BusinessS
 export default async function TasksPage({ searchParams }: TasksPageProps) {
   const params = await searchParams;
   const query = param(params?.q).toLowerCase().trim();
-  const showArchived = param(params?.view) === "archived";
+  const evidenceFilterValue = param(params?.evidence_ids);
+  const evidenceScopeValue = param(params?.evidence_scope);
+  const evidenceScope = (["related-signal-pattern", "limited-signal-context"] as const).includes(evidenceScopeValue as BusinessSignalEvidenceScope)
+    ? evidenceScopeValue as BusinessSignalEvidenceScope
+    : null;
+  const evidenceFilterRequested = Boolean(evidenceFilterValue || evidenceScope);
+  const showArchived = param(params?.view) === "archived" && !evidenceFilterRequested;
+  const evidenceIds = new Set(
+    evidenceFilterValue
+      .split(",")
+      .map((value) => value.trim())
+      .filter((value) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value))
+  );
+  const findingId = param(params?.finding);
   const { supabase, workspaceId } = await requireWorkspacePage();
   const { data: tasks, error } = await supabase
     .from("tasks")
@@ -367,6 +382,8 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   const signals = ((tasks || []) as BusinessSignalRow[]).filter((signal) => {
     if (showArchived ? !(signal.archived_at && !signal.deleted_at) : Boolean(signal.archived_at || signal.deleted_at)) return false;
+    if (evidenceFilterValue && !evidenceIds.has(signal.id)) return false;
+    if (evidenceScope && (!isOriginalBusinessEvidence(signal) || !businessSignalMatchesEvidenceScope(signal, evidenceScope))) return false;
     if (!query) return true;
     return [signal.title, signal.description, signal.category, sourceLabel(signal)]
       .join(" ")
@@ -415,6 +432,12 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
       </div>
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message} />
+      {evidenceFilterRequested ? (
+        <div className="flex flex-col gap-2 rounded-lg border border-cyan-300/20 bg-cyan-950/20 px-3 py-2 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
+          <p>Showing {signals.length} active supporting Business Signal{signals.length === 1 ? "" : "s"} for the selected Intelligence finding.</p>
+          <a href={findingId ? `/app/intelligence?finding=${encodeURIComponent(findingId)}` : "/app/intelligence"} className="shrink-0 font-semibold text-cyan-200 hover:text-white">Back to Intelligence</a>
+        </div>
+      ) : null}
       {params?.message ? (
         <div className="rounded-lg border border-emerald-400/30 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-100">{params.message as string}</div>
       ) : null}
@@ -440,6 +463,9 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
             ))}
           </div>
           <form className="flex min-w-0 gap-2" method="get">
+            {evidenceFilterValue ? <input type="hidden" name="evidence_ids" value={evidenceFilterValue} /> : null}
+            {evidenceScope ? <input type="hidden" name="evidence_scope" value={evidenceScope} /> : null}
+            {findingId ? <input type="hidden" name="finding" value={findingId} /> : null}
             <input
               name="q"
               defaultValue={param(params?.q)}

@@ -23,6 +23,14 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
 const { buildGeneratedOutput, fallbackGeneratedOutputSource } = require("../lib/intelligence/generated-output.ts");
+const {
+  buildEvidenceGroups,
+  collapsedEvidenceGroupLimit,
+  collapsedEvidenceRepresentativeLimit,
+  representativesPerEvidenceGroup,
+  selectCollapsedRepresentatives,
+  supportingEvidenceHref
+} = require("../lib/intelligence/evidence-groups.ts");
 
 function kpi(overrides = {}) {
   return {
@@ -54,6 +62,44 @@ const setupOnly = buildIntelligenceLayer({ tasks: [signal({ id: "setup-signal", 
 assert.equal(setupOnly.topRisk, undefined, "setup/bootstrap records must not become finding evidence");
 const archivedOnly = buildIntelligenceLayer({ tasks: [signal({ id: "archived-signal", archived_at: "2026-07-11T00:00:00Z" })] });
 assert.equal(archivedOnly.topRisk, undefined, "archived records must not become finding evidence");
+
+const evidenceFixture = Array.from({ length: 120 }, (_, index) => ({
+  id: `signal:00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
+  title: `Evidence record ${index % 17}`,
+  recordType: "Business Signal",
+  date: `2026-${String((index % 6) + 1).padStart(2, "0")}-${String((index % 27) + 1).padStart(2, "0")}`,
+  value: `Observed condition ${index % 17}`,
+  support: `The saved description documents the ${["Operations", "Customer", "Finance", "Sales", "Strategy", "Vendor"][index % 6].toLowerCase()} condition summarized by this finding.`,
+  href: `/app/tasks#signal-${index}`,
+  classification: "Manual",
+  sourceKey: `signal-source:${index}`,
+  groupHint: ["Operations", "Customer", "Finance", "Sales", "Strategy", "Vendor"][index % 6]
+}));
+const evidenceGroups = buildEvidenceGroups(evidenceFixture);
+assert.equal(evidenceGroups.length, 6, "six related evidence areas must produce six deterministic groups");
+assert.equal(evidenceGroups.reduce((count, group) => count + group.records.length, 0), 120, "grouping must retain every eligible supporting record");
+assert.equal(evidenceGroups.slice(0, collapsedEvidenceGroupLimit).length, 5, "large evidence sets expose at most five groups before disclosure");
+const collapsedRepresentatives = selectCollapsedRepresentatives(evidenceGroups);
+const selectedRepresentatives = Object.values(collapsedRepresentatives).flat();
+assert.ok(selectedRepresentatives.length <= collapsedEvidenceRepresentativeLimit, "collapsed evidence must render no more than five representative records overall");
+assert.ok(Object.values(collapsedRepresentatives).every((records) => records.length <= representativesPerEvidenceGroup), "collapsed evidence must render no more than two representatives per group");
+assert.equal(new Set(selectedRepresentatives.map((record) => record.id)).size, selectedRepresentatives.length, "representative records must not repeat");
+const filteredEvidenceHref = supportingEvidenceHref({
+  ...sparse.topRisk,
+  id: "finding-123",
+  supportingRecords: evidenceFixture.slice(0, 6)
+});
+assert.match(filteredEvidenceHref, /^\/app\/tasks\?/, "Business Signal findings must open the existing Business Signals view");
+assert.match(filteredEvidenceHref, /finding=finding-123/, "view-all links retain the finding fingerprint");
+assert.match(filteredEvidenceHref, /evidence_ids=/, "view-all links retain the exact supporting record IDs");
+const scalableEvidenceHref = supportingEvidenceHref({
+  ...sparse.topRisk,
+  id: "source-signal-review-pattern",
+  supportingRecords: evidenceFixture
+});
+assert.match(scalableEvidenceHref, /evidence_scope=related-signal-pattern/, "large evidence sets use a bounded deterministic filter instead of an oversized ID list");
+assert.doesNotMatch(scalableEvidenceHref, /evidence_ids=/, "large evidence destinations must not create unbounded URLs");
+assert.match(supportingEvidenceHref(supported.topRisk), /\/app\/kpis\?metric=Revenue/, "single-metric evidence destinations preserve the KPI filter");
 
 const duplicate = {
   ...supported.topRisk,
@@ -88,15 +134,25 @@ const savedReportSource = fs.readFileSync(path.join(root, "app/app/reports/[id]/
 const saveActionSource = fs.readFileSync(path.join(root, "app/app/generated/actions.ts"), "utf8");
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const appNavigationSource = fs.readFileSync(path.join(root, "components/app/AppNavigation.tsx"), "utf8");
+const businessSignalsSource = fs.readFileSync(path.join(root, "app/app/tasks/page.tsx"), "utf8");
 assert.match(inboxSource, /label: "Summary".*label: "Evidence"/s, "selected finding must expose Summary and Evidence only");
 assert.doesNotMatch(inboxSource, /label: "Understand"|label: "Executive Brief"/, "overlapping finding tabs must be removed");
 assert.match(inboxSource, /Create Investigation Summary/, "risk findings expose one normalized report action");
 assert.doesNotMatch(inboxSource, /Generate Executive Briefing|Generate Improvement Plan|Explain This/, "normal finding review must not show competing generator actions");
-assert.match(inboxSource, /record\.title.*record\.recordType.*record\.date.*record\.classification/s, "evidence view must render concrete linked records and classifications");
+assert.match(inboxSource, /buildEvidenceGroups\(insight\.supportingRecords\)/, "evidence view must group supporting records deterministically");
+assert.match(inboxSource, /selectCollapsedRepresentatives\(groups\)/, "evidence view must use bounded representative records");
+assert.match(inboxSource, /expandedGroupKey.*showAllGroups.*expandedRecordLimit/s, "evidence groups must support one-at-a-time expansion, collapse, and explicit pagination");
+assert.match(inboxSource, /View all supporting records/, "evidence view must link to the existing filtered record surface");
 assert.match(inboxSource, /Independent sources/, "evidence view must disclose independent-source count");
 assert.match(inboxSource, /insight\.contradictoryEvidence\.length \? \(/, "contradictory evidence must render only when it exists");
 assert.match(inboxSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(23rem,.82fr\)\]/, "desktop uses a master-detail layout while mobile stays single-column");
 assert.match(inboxSource, /grid gap-4 xl:grid-cols/, "finding layout remains single-column before the desktop breakpoint");
+assert.match(inboxSource, /xl:max-h-\[calc\(100dvh-8rem\)\].*xl:overflow-y-auto/, "desktop detail panel scrolls independently");
+assert.doesNotMatch(inboxSource, /(?<!xl:)max-h-\[calc\(100dvh|(?<!xl:)overflow-y-auto/, "mobile evidence flow must not create a nested viewport scroller");
+assert.match(businessSignalsSource, /\.eq\("workspace_id", workspaceId\)/, "supporting-record destinations remain workspace scoped");
+assert.match(businessSignalsSource, /showArchived = param\(params\?\.view\) === "archived" && !evidenceFilterRequested/, "supporting-record destinations must remain active-only even if the view parameter is altered");
+assert.match(businessSignalsSource, /archived_at \|\| signal\.deleted_at.*evidenceFilterRequested/s, "lifecycle eligibility must be applied before evidence-ID filtering");
+assert.match(businessSignalsSource, /evidence_ids/, "Business Signals must honor exact supporting-record filters");
 assert.doesNotMatch(outputPageSource, /<pre/, "report draft must not render raw markdown syntax");
 assert.match(outputPageSource, /Draft · Not saved/, "new briefs must disclose their unsaved state");
 assert.match(outputPageSource, /Back to finding/, "brief route must return to the Intelligence context");
