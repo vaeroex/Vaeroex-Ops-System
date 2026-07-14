@@ -22,6 +22,8 @@ for (const label of ["Summary", "Findings", "Imported Data", "History"]) assert.
 assert.match(sourcesPage, /Original file preview is unavailable\./, "unavailable secure preview must use honest copy");
 assert.match(sourcesPage, /Preview original/, "source detail must label preview accurately");
 assert.match(sourcesPage, /Download original/, "source detail must label download accurately");
+assert.equal((sourcesPage.match(/>Preview original<\/a>/g) || []).length, 1, "source detail must show Preview original only once");
+assert.equal((sourcesPage.match(/>Download original<\/a>/g) || []).length, 1, "source detail must show Download original only once");
 assert.match(sourcesPage, /View source details/, "source detail must expose metadata progressively");
 assert.match(sourceImportReview, /Nothing is added to active KPI or metric history until you approve/, "structured imports must retain explicit review");
 assert.match(sourcesPage, /file_import_rows[\s\S]{0,220}\.eq\("workspace_id", workspaceId\)[\s\S]{0,120}\.eq\("file_upload_id", params\.file\)/, "source detail import rows must be scoped to both workspace and selected source before limiting");

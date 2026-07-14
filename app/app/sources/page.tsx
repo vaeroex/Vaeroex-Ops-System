@@ -247,14 +247,33 @@ function latestAnalysisAt(file: FileUploadRow) {
   return stringValue(file.metadata_json.latest_analysis_at) || (file.analysis_summary ? file.processed_at || file.updated_at : null);
 }
 
+function latestAnalysisFailure(file: FileUploadRow) {
+  const metadata = fileMetadata(file);
+  return isRecord(metadata.latest_analysis_failure) ? metadata.latest_analysis_failure : {};
+}
+
+function latestAnalysisFailureMessage(file: FileUploadRow) {
+  const metadata = fileMetadata(file);
+  const failure = latestAnalysisFailure(file);
+  return stringValue(failure.user_message) || stringValue(metadata.latest_analysis_error) || file.processing_error || "";
+}
+
+function failedAnalysisStatus(file: FileUploadRow) {
+  const failureType = stringValue(latestAnalysisFailure(file).type);
+
+  if (failureType === "blank_template" || failureType === "no_usable_data") return "No usable data found";
+  if (failureType === "needs_clearer_file") return "Needs clearer file";
+  return "Analysis failed";
+}
+
 function analysisStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   const latestRun = runs[0];
   const runIsActive = latestRun && ["queued", "pending", "running", "processing"].includes(latestRun.status);
   const hasCompletedAnalysis = latestRun?.status === "completed" || Boolean(file.analysis_summary || latestAnalysisAt(file));
 
   if (runIsActive) return "Analyzing";
+  if ((file.processing_status || "") === "failed" || latestRun?.status === "failed") return failedAnalysisStatus(file);
   if (hasCompletedAnalysis) return "Needs Review";
-  if ((file.processing_status || "") === "failed" || latestRun?.status === "failed") return "Failed";
   return "Not reviewed";
 }
 
@@ -274,12 +293,13 @@ function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   if (file.deleted_at) return "Deleted";
   if (file.archived_at) return "Archived";
   if (runIsActive) return "Analyzing";
+  if ((file.processing_status || "") === "failed" || latestRun?.status === "failed" || reviewStatus === "failed") return failedAnalysisStatus(file);
   if (reviewStatus === "discarded" || reviewStatus === "excluded") return "Uploaded";
   if (reviewStatus === "approved" || reviewStatus === "auto_learned" || file.index_status === "ready") return "Learned";
   if (reviewStatus === "needs_review" || reviewStatus === "ready_for_review") return "Needs Review";
   if (file.import_status === "extracted" || file.import_status === "needs_review" || (isSpreadsheet(file) && file.import_status === "ready")) return "Import Review";
   if (reviewStatus === "completed" || analysisStatus(file, runs) === "Needs Review") return "Ready";
-  if ((file.processing_status || "") === "failed" || file.import_status === "failed" || reviewStatus === "failed") return "Failed";
+  if (file.import_status === "failed") return "Analysis failed";
   return "Uploaded";
 }
 
@@ -471,7 +491,11 @@ function SourceFileActions({
             value="Analyze only this source file. Extract source-specific facts, readable text, quantities, status signals, risks, opportunities, possible KPIs, unclear fields, and a concise leadership summary. For inventory images, identify item names, readable quantities, possible shortages, possible overstock, and fields that need confirmation. Do not add generic business advice that is not supported by the file."
           />
           <SourceActionButton pendingLabel="Analyzing source..." steps={ANALYSIS_PROGRESS_STEPS}>
-            {status === "Uploaded" ? "Analyze source" : status === "Failed" ? "Retry analysis" : "Analyze again"}
+            {status === "Uploaded"
+              ? "Analyze source"
+              : ["Analysis failed", "No usable data found", "Needs clearer file"].includes(status)
+                ? "Retry analysis"
+                : "Analyze again"}
           </SourceActionButton>
         </form>
       ) : null}
@@ -525,7 +549,11 @@ function SourceFileDetailPanel({
 }) {
   const status = fileStatus(file, linkedRuns);
   const output = fileAnalysisOutput(file);
-  const summary = stringValue(output.executive_summary) || stringValue(output.summary) || file.analysis_summary || "No analysis result is available yet.";
+  const failureMessage = latestAnalysisFailureMessage(file);
+  const summary =
+    ["Analysis failed", "No usable data found", "Needs clearer file"].includes(status) && failureMessage
+      ? failureMessage
+      : stringValue(output.executive_summary) || stringValue(output.summary) || file.analysis_summary || "No analysis result is available yet.";
   const findings = [
     ...outputList(output, "extracted_findings"),
     ...outputList(output, "findings")
@@ -548,9 +576,14 @@ function SourceFileDetailPanel({
         : "Available to Intelligence and Learned Knowledge."
       : status === "Needs Review"
         ? "Not yet available. Review is needed before Vaeroex uses it."
-        : status === "Failed"
+        : status === "No usable data found"
+          ? "Not available because no supported business records were found."
+          : status === "Needs clearer file"
+            ? "Not available because the source could not be read reliably."
+            : status === "Analysis failed"
           ? "Not available because analysis failed."
           : "Not yet available in Learned Knowledge.";
+  const visibleActionError = actionError && actionError !== failureMessage ? actionError : null;
 
   const sections: Array<{ key: SourceDetailSection; label: string }> = [
     { key: "summary", label: "Summary" },
@@ -590,17 +623,19 @@ function SourceFileDetailPanel({
         ))}
       </nav>
 
-      {actionError ? (
+      {visibleActionError ? (
         <div className="mt-4 rounded-lg border border-red-400/35 bg-red-950/30 p-3 text-sm leading-6 text-red-100">
-          {actionError}
+          {visibleActionError}
         </div>
       ) : null}
 
       {visibleSection === "summary" ? (
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
           <div className="space-y-4">
-            <section className="rounded-lg border border-white/10 bg-slate-950/40 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Analysis summary</p>
+            <section className={`rounded-lg border p-4 ${status === "Analysis failed" ? "border-red-400/30 bg-red-950/20" : status === "No usable data found" || status === "Needs clearer file" ? "border-amber-300/25 bg-amber-950/15" : "border-white/10 bg-slate-950/40"}`}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                {["Analysis failed", "No usable data found", "Needs clearer file"].includes(status) ? "Analysis result" : "Analysis summary"}
+              </p>
               <p className="mt-2 text-sm leading-6 text-slate-300">{summary}</p>
               <p className="mt-3 text-xs text-slate-500">Last analyzed: {formatDateTime(latestAnalysisAt(file))}</p>
             </section>
@@ -622,21 +657,14 @@ function SourceFileDetailPanel({
               ) : null}
             </section>
           </div>
-          <div className="space-y-4">
-            <section className="rounded-lg border border-white/10 bg-slate-950/40 p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">File access</p>
-              <p className="mt-2 text-sm font-semibold text-white">{fileCategory(file, folders)}</p>
-              <div className="mt-3 flex flex-wrap gap-2">
-                {access?.viewUrl ? <a href={access.viewUrl} target="_blank" rel="noreferrer" className="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40">Preview original</a> : null}
-                {access?.downloadUrl ? <a href={access.downloadUrl} download={file.original_name} className="rounded-md border border-white/10 px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40">Download original</a> : null}
-              </div>
-              {!access?.viewUrl ? <p className="mt-3 text-xs leading-5 text-slate-400">Original file preview is unavailable.{access?.downloadUrl ? " Download the file to review it." : " View source details below or retry later."}</p> : null}
-              <details className="mt-3 border-t border-white/10 pt-3"><summary className="cursor-pointer text-xs font-semibold text-cyan-100">View source details</summary><div className="mt-3 grid gap-2 text-xs text-slate-400"><p>Processing: {(file.processing_status || "uploaded").replace(/_/g, " ")}</p><p>Import: {importStatusLabel(file.import_status)}</p><p>Rows imported: {file.imported_rows}</p><p>Updated: {formatDateTime(file.updated_at)}</p></div></details>
-            </section>
+          <div>
             <section className="rounded-lg border border-white/10 bg-slate-950/40 p-4">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Source actions</p>
+              <p className="mt-2 text-sm font-semibold text-white">{fileCategory(file, folders)}</p>
               {status === "Analyzing" ? <p className="mt-2 text-sm leading-6 text-cyan-100">Vaeroex is analyzing this source.</p> : null}
               <div className="mt-3"><SourceFileActions file={file} access={access} linkedKpis={linkedKpis} linkedRuns={linkedRuns} status={status} /></div>
+              {!access?.viewUrl ? <p className="mt-3 text-xs leading-5 text-slate-400">Original file preview is unavailable.{access?.downloadUrl ? " Download the file to review it." : " View source details below or retry later."}</p> : null}
+              <details className="mt-3 border-t border-white/10 pt-3"><summary className="cursor-pointer text-xs font-semibold text-cyan-100">View source details</summary><div className="mt-3 grid gap-2 text-xs text-slate-400"><p>Processing: {(file.processing_status || "uploaded").replace(/_/g, " ")}</p><p>Import: {importStatusLabel(file.import_status)}</p><p>Rows imported: {file.imported_rows}</p><p>Updated: {formatDateTime(file.updated_at)}</p></div></details>
             </section>
           </div>
         </div>
