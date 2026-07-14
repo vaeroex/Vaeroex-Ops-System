@@ -22,7 +22,12 @@ function compactText(value: string | null | undefined, fallback: string, maxLeng
   return `${shortened}...`;
 }
 
-export default async function IntelligencePage() {
+type IntelligencePageProps = {
+  searchParams?: Promise<{ finding?: string }>;
+};
+
+export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
+  const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
   const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, crmHistoryResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, checklistsResult, checklistRunsResult, metricsResult, assetsResult, memoryChunksResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
@@ -183,7 +188,7 @@ export default async function IntelligencePage() {
         </div>
       </section>
 
-      <IntelligenceSignalInbox insights={intelligence.insights} />
+      <IntelligenceSignalInbox insights={intelligence.insights} initialFindingId={params?.finding} />
 
       <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100">
         <summary className="cursor-pointer list-none text-sm font-semibold text-cyan-100">

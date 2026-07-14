@@ -11,7 +11,7 @@ const confidenceOptions: Array<"All" | IntelligenceConfidence> = ["All", "High",
 const pageSize = 10;
 
 type SortMode = "Priority" | "Newest" | "Confidence";
-type PanelMode = "understand" | "evidence" | "brief";
+type PanelMode = "summary" | "evidence";
 
 function confidenceClass(confidence: IntelligenceConfidence) {
   if (confidence === "High") return "border-cyan-300/40 bg-cyan-400/15 text-cyan-100";
@@ -64,20 +64,17 @@ function sortInsights(insights: IntelligenceInsight[], sortMode: SortMode) {
 }
 
 function limitationFor(insight: IntelligenceInsight) {
-  if (insight.suggestedNextData) return insight.suggestedNextData;
-  if (insight.confidence === "Low") return "The available evidence is limited, so this conclusion is preliminary.";
-  return "The available evidence supports this finding, but does not establish a root cause by itself.";
+  return insight.limitation || insight.suggestedNextData || "Not enough evidence for a reliable conclusion.";
 }
 
 function PanelTabs({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) {
   const tabs: Array<{ id: PanelMode; label: string }> = [
-    { id: "understand", label: "Understand" },
-    { id: "evidence", label: "Evidence" },
-    { id: "brief", label: "Executive Brief" }
+    { id: "summary", label: "Summary" },
+    { id: "evidence", label: "Evidence" }
   ];
 
   return (
-    <div className="grid grid-cols-3 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Selected finding view">
+    <div className="grid grid-cols-2 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Selected finding view">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -96,29 +93,31 @@ function PanelTabs({ mode, onChange }: { mode: PanelMode; onChange: (mode: Panel
   );
 }
 
-function UnderstandPanel({ insight }: { insight: IntelligenceInsight }) {
+function SummaryPanel({ insight }: { insight: IntelligenceInsight }) {
   return (
     <div className="space-y-4 text-sm leading-6">
       <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Conclusion</p>
-        <p className="mt-2 text-base font-semibold text-white">{insight.summary}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What happened</p>
+        <p className="mt-2 text-slate-100">{compactText(insight.summary, 320)}</p>
       </section>
       <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What Vaeroex found</p>
-        <p className="mt-2 text-slate-200">{insight.why}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Why it matters</p>
+        <p className="mt-2 text-slate-200">{compactText(insight.impact, 260)}</p>
+      </section>
+      <section className="border-l-2 border-cyan-300/50 pl-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">Leadership decision</p>
+        <p className="mt-2 text-slate-100">{compactText(insight.recommendedAction, 260)}</p>
       </section>
       <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What it may affect</p>
-        <p className="mt-2 text-slate-200">{insight.impact}</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Limitation</p>
+        <p className="mt-2 text-slate-300">{compactText(limitationFor(insight), 280)}</p>
       </section>
-      <section className="rounded-lg border border-cyan-300/20 bg-cyan-950/20 p-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">Recommended response</p>
-        <p className="mt-2 text-slate-100">{insight.recommendedAction}</p>
-      </section>
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What remains uncertain</p>
-        <p className="mt-2 text-slate-300">{limitationFor(insight)}</p>
-      </section>
+      <Link
+        href={generatedOutputHref({ type: outputTypeForInsight(insight), source: insight.id })}
+        className="inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+      >
+        {insight.type === "Risk" || insight.type === "Anomaly" || insight.type === "Bottleneck" ? "Create Investigation Summary" : "Create report"}
+      </Link>
     </div>
   );
 }
@@ -126,73 +125,54 @@ function UnderstandPanel({ insight }: { insight: IntelligenceInsight }) {
 function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
   return (
     <div className="space-y-4 text-sm leading-6">
-      <div className="grid gap-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs text-slate-300 sm:grid-cols-2">
-        <p><span className="font-semibold text-slate-100">Evidence:</span> {insight.evidenceCount} supporting item{insight.evidenceCount === 1 ? "" : "s"}</p>
+      <div className="grid gap-3 border-b border-white/10 pb-4 text-xs text-slate-300 sm:grid-cols-2">
+        <p><span className="font-semibold text-slate-100">Supporting records:</span> {insight.evidenceCount}</p>
+        <p><span className="font-semibold text-slate-100">Independent sources:</span> {insight.independentSourceCount}</p>
         <p><span className="font-semibold text-slate-100">Last updated:</span> {formatSignalDate(insight.lastUpdated)}</p>
-        <p className="sm:col-span-2"><span className="font-semibold text-slate-100">Source types:</span> {insight.sourceTypes.join(", ")}</p>
+        <p><span className="font-semibold text-slate-100">Period:</span> {insight.timePeriod}</p>
       </div>
-      <ul className="space-y-3">
-        {insight.evidence.map((item, index) => (
-          <li key={`${item}-${index}`} className="rounded-lg border border-white/10 bg-slate-950/45 p-3">
-            <p className="text-slate-100">{item}</p>
-            <p className="mt-1 text-xs text-slate-400">Supports the current finding.</p>
+      <ul className="divide-y divide-white/10 border-y border-white/10">
+        {insight.supportingRecords.length ? insight.supportingRecords.map((record) => (
+          <li key={record.id} className="py-4 first:pt-3 last:pb-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <Link href={record.href as Route} className="font-semibold text-cyan-100 underline-offset-4 hover:text-white hover:underline">
+                  {record.title}
+                </Link>
+                <p className="mt-1 text-xs text-slate-400">{record.recordType} · {formatSignalDate(record.date)} · {record.classification}</p>
+              </div>
+              <span className="max-w-full break-words text-xs font-semibold text-slate-200 sm:max-w-52 sm:text-right">{compactText(record.value, 120)}</span>
+            </div>
+            <p className="mt-2 break-words text-xs leading-5 text-slate-300">{compactText(record.support, 220)}</p>
           </li>
-        ))}
+        )) : <li className="py-4 text-slate-400">No eligible supporting records are available for this finding.</li>}
       </ul>
-      <p className="text-xs leading-5 text-slate-400">Contradictory evidence has not been recorded in this finding. {limitationFor(insight)}</p>
-      <Link href={insight.sourceHref as Route} className="inline-flex min-h-10 items-center text-sm font-semibold text-cyan-100 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60">
-        View related source records
-      </Link>
-    </div>
-  );
-}
-
-function ExecutiveBriefPanel({ insight }: { insight: IntelligenceInsight }) {
-  return (
-    <div className="space-y-4 text-sm leading-6">
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Issue</p>
-        <p className="mt-1 text-base font-semibold text-white">{insight.title}</p>
-      </section>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-slate-200"><span className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Priority</span>{insight.priority}</p>
-        <p className="rounded-lg border border-white/10 bg-white/[0.04] p-3 text-slate-200"><span className="block text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Confidence</span>{insight.confidence}</p>
+      <div className={`grid gap-3 text-xs leading-5 ${insight.contradictoryEvidence.length ? "sm:grid-cols-2" : ""}`}>
+        {insight.contradictoryEvidence.length ? (
+          <div>
+            <p className="font-semibold text-slate-100">Contradictory evidence</p>
+            <p className="mt-1 text-slate-400">{insight.contradictoryEvidence.join("; ")}</p>
+          </div>
+        ) : null}
+        <div>
+          <p className="font-semibold text-slate-100">Missing evidence</p>
+          <p className="mt-1 text-slate-400">{insight.missingEvidence.length ? insight.missingEvidence.join("; ") : "No material gap recorded."}</p>
+        </div>
       </div>
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What Vaeroex found</p>
-        <p className="mt-2 text-slate-200">{insight.summary} {insight.why}</p>
-      </section>
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Business impact</p>
-        <p className="mt-2 text-slate-200">{insight.impact}</p>
-      </section>
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Recommended leadership response</p>
-        <p className="mt-2 text-slate-200">{insight.recommendedAction}</p>
-      </section>
-      <section>
-        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">What to verify</p>
-        <p className="mt-2 text-slate-300">{limitationFor(insight)}</p>
-      </section>
-      <Link
-        href={generatedOutputHref({ type: outputTypeForInsight(insight), source: insight.id })}
-        className="inline-flex min-h-10 items-center rounded-lg border border-cyan-300/30 bg-cyan-400/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
-      >
-        Generate report
-      </Link>
     </div>
   );
 }
 
-export function IntelligenceSignalInbox({ insights }: { insights: IntelligenceInsight[] }) {
-  const initialType = signalTypes.find((type) => insights.some((insight) => insight.type === type)) || "Risk";
+export function IntelligenceSignalInbox({ insights, initialFindingId }: { insights: IntelligenceInsight[]; initialFindingId?: string }) {
+  const requestedFinding = initialFindingId ? insights.find((insight) => insight.id === initialFindingId) : null;
+  const initialType = requestedFinding?.type || signalTypes.find((type) => insights.some((insight) => insight.type === type)) || "Risk";
   const [activeType, setActiveType] = useState<IntelligenceInsightType>(initialType);
-  const [selectedId, setSelectedId] = useState<string>(insights.find((insight) => insight.type === initialType)?.id || insights[0]?.id || "");
+  const [selectedId, setSelectedId] = useState<string>(requestedFinding?.id || insights.find((insight) => insight.type === initialType)?.id || insights[0]?.id || "");
   const [confidence, setConfidence] = useState<"All" | IntelligenceConfidence>("All");
   const [sortMode, setSortMode] = useState<SortMode>("Priority");
   const [hideLowConfidence, setHideLowConfidence] = useState(false);
   const [visibleCount, setVisibleCount] = useState(pageSize);
-  const [panelMode, setPanelMode] = useState<PanelMode>("understand");
+  const [panelMode, setPanelMode] = useState<PanelMode>("summary");
 
   const counts = useMemo(
     () => signalTypes.reduce<Record<IntelligenceInsightType, number>>((acc, type) => ({ ...acc, [type]: insights.filter((insight) => insight.type === type).length }), {} as Record<IntelligenceInsightType, number>),
@@ -210,12 +190,12 @@ export function IntelligenceSignalInbox({ insights }: { insights: IntelligenceIn
     setActiveType(type);
     setSelectedId(firstInsight?.id || "");
     setVisibleCount(pageSize);
-    setPanelMode("understand");
+    setPanelMode("summary");
   }
 
   function selectInsight(id: string) {
     setSelectedId(id);
-    setPanelMode("understand");
+    setPanelMode("summary");
   }
 
   return (
@@ -274,16 +254,15 @@ export function IntelligenceSignalInbox({ insights }: { insights: IntelligenceIn
                     <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${priorityClass(selectedInsight.priority)}`}>Priority: {selectedInsight.priority}</span>
                     <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(selectedInsight.confidence)}`}>Confidence: {selectedInsight.confidence}</span>
                   </div>
-                  <h3 className="mt-3 text-lg font-semibold leading-7 text-white">{selectedInsight.title}</h3>
+                  <h3 className="mt-3 break-words text-lg font-semibold leading-7 text-white">{compactText(selectedInsight.title, 140)}</h3>
                 </div>
                 <button type="button" onClick={() => setSelectedId("")} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">Back to list</button>
               </div>
               <PanelTabs mode={panelMode} onChange={setPanelMode} />
-              {panelMode === "understand" ? <UnderstandPanel insight={selectedInsight} /> : null}
+              {panelMode === "summary" ? <SummaryPanel insight={selectedInsight} /> : null}
               {panelMode === "evidence" ? <EvidencePanel insight={selectedInsight} /> : null}
-              {panelMode === "brief" ? <ExecutiveBriefPanel insight={selectedInsight} /> : null}
             </div>
-          ) : <div className="py-8 text-sm leading-6 text-slate-300">Select a finding to understand it, inspect its evidence, or prepare an executive brief.</div>}
+          ) : <div className="py-8 text-sm leading-6 text-slate-300">Select a finding to review its summary and supporting evidence.</div>}
         </aside>
       </div>
     </section>

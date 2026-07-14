@@ -312,7 +312,7 @@ function BusinessSignalRowCard({ signal, archived = false }: { signal: BusinessS
   const source = sourceLabel(signal);
 
   return (
-    <article className="border-t border-white/10 first:border-t-0">
+    <article id={`signal-${signal.id}`} className="scroll-mt-28 border-t border-white/10 first:border-t-0">
       <div className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-start">
         <details className="group min-w-0">
           <summary className="cursor-pointer list-none rounded-md px-1 py-1 hover:bg-cyan-950/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45">
