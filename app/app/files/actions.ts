@@ -135,15 +135,15 @@ function cleanNoticeMessage(message: string, fallback: string) {
 }
 
 function redirectWithError(message: string): never {
-  redirect(`${FILES_PATH}?error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."))}` as Route);
+  redirect(`${SOURCES_PATH}?error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."))}` as Route);
 }
 
 function safeFileReturnPath(value: string) {
-  if (value === SOURCES_PATH || value.startsWith(`${SOURCES_PATH}?`)) {
+  if (value === SOURCES_PATH || value.startsWith(`${SOURCES_PATH}?`) || value.startsWith(`${SOURCES_PATH}/`)) {
     return value;
   }
 
-  return FILES_PATH;
+  return SOURCES_PATH;
 }
 
 function redirectWithPathError(path: string, message: string, fileId?: string): never {
@@ -172,14 +172,21 @@ function redirectWithPathMessage(path: string, message: string, fileId?: string)
   redirect(`${pathname}?${query.toString()}` as Route);
 }
 
-function redirectWithFileError(message: string, fileId?: string): never {
-  redirect(
-    `${FILES_PATH}?${fileId ? `file=${encodeURIComponent(fileId)}&` : ""}error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not process this file. Please try again."))}` as Route
-  );
+function sourceDetailPath(fileId: string, section?: "summary" | "findings" | "imported" | "history") {
+  const query = section && section !== "summary" ? `?section=${section}` : "";
+  return `${SOURCES_PATH}/${encodeURIComponent(fileId)}${query}`;
 }
 
-function redirectWithMessage(message: string, fileId?: string): never {
-  redirect(`${FILES_PATH}?${fileId ? `file=${encodeURIComponent(fileId)}&` : ""}message=${encodeURIComponent(cleanNoticeMessage(message, "Done."))}` as Route);
+function redirectWithFileError(message: string, fileId?: string, section?: "summary" | "findings" | "imported" | "history"): never {
+  const path = fileId ? sourceDetailPath(fileId, section) : SOURCES_PATH;
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${separator}error=${encodeURIComponent(cleanNoticeMessage(message, "Vaeroex could not process this file. Please try again."))}` as Route);
+}
+
+function redirectWithMessage(message: string, fileId?: string, section?: "summary" | "findings" | "imported" | "history"): never {
+  const path = fileId ? sourceDetailPath(fileId, section) : SOURCES_PATH;
+  const separator = path.includes("?") ? "&" : "?";
+  redirect(`${path}${separator}message=${encodeURIComponent(cleanNoticeMessage(message, "Done."))}` as Route);
 }
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -2657,11 +2664,11 @@ export async function importFileAction(formData: FormData) {
   });
 
   if (!rateLimit.allowed) {
-    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+    redirectWithFileError(rateLimitMessage(rateLimit), file.id, "imported");
   }
 
   if (!isSpreadsheet(file)) {
-    redirectWithFileError("Only CSV and XLSX files can be imported into KPI or business metric history.", file.id);
+    redirectWithFileError("Only CSV and XLSX files can be imported into KPI or business metric history.", file.id, "imported");
   }
 
   await updateFileProcessingStatus({ supabase, file, status: "processing" });
@@ -2678,7 +2685,7 @@ export async function importFileAction(formData: FormData) {
       .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
-    redirectWithFileError(message, file.id);
+    redirectWithFileError(message, file.id, "imported");
   }
 
   if (!rows.length) {
@@ -2692,7 +2699,7 @@ export async function importFileAction(formData: FormData) {
       })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
-    redirectWithFileError("No data rows were found. Make sure the first row contains column names.", file.id);
+    redirectWithFileError("No data rows were found. Make sure the first row contains column names.", file.id, "imported");
   }
 
   try {
@@ -2720,7 +2727,7 @@ export async function importFileAction(formData: FormData) {
       }
     );
   } catch (error) {
-    redirectWithFileError(error instanceof Error ? error.message : "File import was blocked by Vaeroex security policy.", file.id);
+    redirectWithFileError(error instanceof Error ? error.message : "File import was blocked by Vaeroex security policy.", file.id, "imported");
   }
 
   const mapping = inferMapping(importType, rows);
@@ -2748,7 +2755,7 @@ export async function importFileAction(formData: FormData) {
       status: "failed",
       error: importError?.message || "Import record could not be created."
     });
-    redirectWithFileError(importError?.message || "Import record could not be created.", file.id);
+    redirectWithFileError(importError?.message || "Import record could not be created.", file.id, "imported");
   }
 
   const importRows = rows.slice(0, 1000).map((row, index) => ({
@@ -2765,7 +2772,7 @@ export async function importFileAction(formData: FormData) {
 
   if (importRowsResult.error) {
     await updateFileProcessingStatus({ supabase, file, status: "failed", error: importRowsResult.error.message });
-    redirectWithFileError(importRowsResult.error.message, file.id);
+    redirectWithFileError(importRowsResult.error.message, file.id, "imported");
   }
 
   await supabase
@@ -2795,7 +2802,7 @@ export async function importFileAction(formData: FormData) {
   revalidatePath(FILES_PATH);
   revalidatePath("/app/kpis");
   revalidatePath("/app/reports");
-  redirectWithMessage(`Data extracted from ${rows.length} row${rows.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id);
+  redirectWithMessage(`Data extracted from ${rows.length} row${rows.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id, "imported");
 }
 
 function appendImportHistory(metadataJson: Json, entry: JsonObject) {
@@ -2817,7 +2824,7 @@ export async function saveExtractedImportAction(formData: FormData) {
   const importId = text(formData, "import_id");
 
   if (!importId) {
-    redirectWithFileError("Choose an extracted import to save.", file.id);
+    redirectWithFileError("Choose an extracted import to save.", file.id, "imported");
   }
 
   const { data: importRecord, error: importError } = await supabase
@@ -2829,7 +2836,7 @@ export async function saveExtractedImportAction(formData: FormData) {
     .maybeSingle();
 
   if (importError || !importRecord) {
-    redirectWithFileError(importError?.message || "Extraction not found for this workspace.", file.id);
+    redirectWithFileError(importError?.message || "Extraction not found for this workspace.", file.id, "imported");
   }
 
   const importType = validImportType(text(formData, "import_type") || importRecord.import_type);
@@ -2844,7 +2851,7 @@ export async function saveExtractedImportAction(formData: FormData) {
   });
 
   if (!rateLimit.allowed) {
-    redirectWithFileError(rateLimitMessage(rateLimit), file.id);
+    redirectWithFileError(rateLimitMessage(rateLimit), file.id, "imported");
   }
 
   const mapping = mappingFromForm(formData, importType, importRecord.mapping_json);
@@ -2867,11 +2874,11 @@ export async function saveExtractedImportAction(formData: FormData) {
     .limit(1000);
 
   if (rowsError) {
-    redirectWithFileError(rowsError.message, file.id);
+    redirectWithFileError(rowsError.message, file.id, "imported");
   }
 
   if (!stagedRows?.length) {
-    redirectWithFileError("No extracted rows were found to save.", file.id);
+    redirectWithFileError("No extracted rows were found to save.", file.id, "imported");
   }
 
   const importToolByType: Record<ImportType, RegisteredToolName> = {
@@ -2905,7 +2912,7 @@ export async function saveExtractedImportAction(formData: FormData) {
       }
     );
   } catch (error) {
-    redirectWithFileError(error instanceof Error ? error.message : "Import approval was blocked by Vaeroex security policy.", file.id);
+    redirectWithFileError(error instanceof Error ? error.message : "Import approval was blocked by Vaeroex security policy.", file.id, "imported");
   }
 
   let importedRowCount = 0;
@@ -3047,7 +3054,7 @@ export async function saveExtractedImportAction(formData: FormData) {
       .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
-    redirectWithFileError(message, file.id);
+    redirectWithFileError(message, file.id, "imported");
   }
 
   revalidatePath(FILES_PATH);
@@ -3066,11 +3073,12 @@ export async function saveExtractedImportAction(formData: FormData) {
       importedRowCount
         ? `KPI history updated. Dashboard and reports now include this data. ${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved.${duplicateNote}${settingsNote}`
         : `KPI history already included this data. No duplicate KPI rows were saved.${duplicateNote}${settingsNote}`,
-      file.id
+      file.id,
+      "imported"
     );
   }
 
-  redirectWithMessage(`${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved to history.`, file.id);
+  redirectWithMessage(`${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved to history.`, file.id, "imported");
 }
 
 export async function createReportFromFileAction(formData: FormData) {

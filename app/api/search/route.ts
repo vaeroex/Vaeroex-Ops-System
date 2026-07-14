@@ -301,7 +301,7 @@ function buildChangeAnswer({
   const recent = [
     ...kpis.map((item) => ({ ...recentRecordLabel(item), href: `/app/kpis?q=${encodeURIComponent(item.name)}`, type: "KPI" })),
     ...reports.map((item) => ({ ...recentRecordLabel(item), href: `/app/reports?q=${encodeURIComponent(item.title)}`, type: "Briefing" })),
-    ...files.map((item) => ({ ...recentRecordLabel(item), href: `/app/files?file=${encodeURIComponent(item.id)}`, type: "Source" })),
+    ...files.map((item) => ({ ...recentRecordLabel(item), href: `/app/sources/${encodeURIComponent(item.id)}`, type: "Source" })),
     ...tasks.map((item) => ({ ...recentRecordLabel(item), href: `/app/tasks?q=${encodeURIComponent(item.title)}`, type: "Business Signal" }))
   ]
     .filter((item) => daysAgo(item.date) <= 14)
@@ -785,7 +785,7 @@ export async function GET(request: Request) {
       title: file.display_name || file.original_name,
       sourceType: "File",
       preview: truncate(file.analysis_summary || compact([file.file_extension, file.import_status, file.processing_status])),
-      href: `/app/sources?file=${encodeURIComponent(file.id)}`,
+      href: `/app/sources/${encodeURIComponent(file.id)}`,
       meta: compact([file.file_extension?.toUpperCase(), file.processing_status])
     }))
   );
@@ -904,7 +904,7 @@ export async function GET(request: Request) {
         title: chunk.source_title || "Learned knowledge",
         sourceType: "Learned Knowledge",
         preview: truncate(chunk.summary || chunk.source_excerpt),
-        href: chunk.source_file_id ? `/app/sources?file=${encodeURIComponent(chunk.source_file_id)}` : "/app/sources?tab=knowledge",
+        href: chunk.source_file_id ? `/app/sources/${encodeURIComponent(chunk.source_file_id)}` : "/app/sources?tab=knowledge",
         meta: compact([chunk.source_type.replace(/_/g, " "), chunk.confidence_score ? `Confidence ${Math.round(chunk.confidence_score)}%` : null])
       })),
       ...decisions.map((decision) => ({

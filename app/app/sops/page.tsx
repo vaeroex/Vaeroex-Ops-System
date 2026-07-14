@@ -72,8 +72,8 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
               No source file is linked to this SOP record. If this procedure came from a file review, open the related file or Vaeroex result to view the original source.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-              <Link href="/app/files" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
-                View Files
+              <Link href="/app/sources" className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
+                View Evidence
               </Link>
               <GlobalSearchTrigger initialQuery={sop.title} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
                 View Vaeroex Results

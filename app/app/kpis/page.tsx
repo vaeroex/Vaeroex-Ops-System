@@ -1862,7 +1862,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             <Link href="/app/kpis?section=records#add-kpi" className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
               Add KPI
             </Link>
-            <Link href="/app/files?status=Import%20Ready" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
+            <Link href="/app/sources?status=Import%20Review" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-sm font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
               Import KPI Data
             </Link>
           </div>
@@ -2080,7 +2080,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <div>
                       Source file:{" "}
                       {selectedSourceFile ? (
-                        <Link href={`/app/sources?file=${selectedSourceFile.id}#file-${selectedSourceFile.id}` as Route} className="font-semibold text-cyan-100 underline underline-offset-4 hover:text-white">
+                        <Link href={`/app/sources/${selectedSourceFile.id}` as Route} className="font-semibold text-cyan-100 underline underline-offset-4 hover:text-white">
                           {selectedSourceFile.display_name}
                         </Link>
                       ) : selectedLatestKpi?.source_file_id ? (

@@ -684,6 +684,38 @@ button.bg-vaeroex-blue:hover {
   stroke: #253041;
 }
 
+[data-theme="light"] .evidence-workspace .bg-\[\#08111f\] {
+  background-color: #ffffff !important;
+}
+
+[data-theme="light"] .evidence-workspace .bg-slate-950\/40,
+[data-theme="light"] .evidence-workspace .bg-slate-950\/45,
+[data-theme="light"] .evidence-workspace .bg-slate-950\/70,
+[data-theme="light"] .evidence-workspace .bg-slate-950\/80 {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .evidence-workspace .border-white\/10,
+[data-theme="light"] .evidence-workspace .border-white\/15 {
+  border-color: #dbe3ef !important;
+}
+
+[data-theme="light"] .evidence-workspace .text-white,
+[data-theme="light"] .evidence-workspace .text-slate-100,
+[data-theme="light"] .evidence-workspace .text-slate-200 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .evidence-workspace .text-slate-300,
+[data-theme="light"] .evidence-workspace .text-slate-400,
+[data-theme="light"] .evidence-workspace .text-slate-500 {
+  color: #526176 !important;
+}
+
+[data-theme="light"] .evidence-workspace .bg-vaeroex-blue.text-white {
+  color: #ffffff !important;
+}
+
 .pulsar {
   color-scheme: dark;
   --pulsar-bg: #030712;

@@ -518,11 +518,12 @@ function runFileAnalysisRequestSizingTests() {
     sourcesPage.indexOf("const sourceTabs"),
     sourcesPage.indexOf("];", sourcesPage.indexOf("const sourceTabs"))
   );
-  assert.match(sourcesPage, /SourceFileDetailPanel/, "Sources should render selected-file detail in a separate panel");
-  assert.match(sourcesPage, /Select a source to inspect details, analysis status, and available actions\./, "Sources rows should stay compact and point users to the detail panel");
+  assert.match(sourcesPage, /SourceFileDetailPanel/, "Evidence should render source detail through one focused component");
+  assert.match(sourcesPage, /Open a source to review its analysis, imported data, history, and lifecycle\./, "Evidence rows should stay compact and point users to source detail");
+  assert.match(sourcesPage, /Open source/, "Evidence rows should expose one clear source action");
   assert.match(sourcesPage, /Needs Review/, "Sources should expose review only when confidence or risk requires it");
   assert.match(sourcesPage, /Learned/, "Sources should expose automatically learned file evidence");
-  assert.match(sourceTabs, /Files/);
+  assert.match(sourceTabs, /Active Sources/);
   assert.match(sourceTabs, /Learned Knowledge/);
   assert.match(sourceTabs, /Archived/);
   assert.doesNotMatch(sourceTabs, /All Files|Needs Review|Recent Uploads|Imported Data/, "Sources should keep secondary status views out of the primary tab set");
@@ -839,8 +840,10 @@ function runCrmRetirementTests() {
   assert.match(recordManagementActions, /collection === "crm_leads"/, "managed record mutations must explicitly block crm_leads");
 
   const filesPage = read("app/app/files/page.tsx");
-  assert.doesNotMatch(filesPage, /importType="crm"|value: "crm"|Customer Activity Data|Review customer data import/, "Sources UI must not expose customer-record import actions");
-  assert.match(filesPage, /Customer record imports are retired/, "old staged customer imports should render as retired/read-only");
+  const sourceImportReview = read("components/evidence/SourceImportReview.tsx");
+  assert.match(filesPage, /permanentRedirect/, "legacy Files URLs must redirect into Evidence");
+  assert.doesNotMatch(sourceImportReview, /importType="crm"|value: "crm"|Customer Activity Data|Review customer data import/, "Evidence must not expose customer-record import actions");
+  assert.match(sourceImportReview, /Customer record imports are retired/, "old staged customer imports should render as retired/read-only");
 
   const fileActions = read("app/app/files/actions.ts");
   assert.match(fileActions, /Customer record imports have been retired/, "customer-record import actions must fail closed");

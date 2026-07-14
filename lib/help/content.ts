@@ -147,7 +147,7 @@ export const helpArticles: HelpArticle[] = [
     ["reports", "Reports", "Customer-ready summaries by day, week, month, quarter, year, or year-to-date.", "/app/reports"],
     ["kpis", "KPIs", "Time-series metrics with targets, trend context, and evidence.", "/app/kpis"],
     ["crm", "Customer Activity Evidence", "Customer activity used as evidence for risk, opportunity, and revenue trends.", "/app/sources"],
-    ["files-imports", "Files & Imports", "Upload files, extract content, review mappings, and save approved data historically.", "/app/files"],
+    ["files-imports", "Evidence", "Upload files, review source findings, and approve structured imports.", "/app/sources"],
     ["sop-library", "SOP Library", "A place to store, review, and improve working procedures.", "/app/sops"],
     ["tasks", "Business Signals", "Business observations and events that help Vaeroex build memory and context.", "/app/tasks"],
     ["issues", "Issues", "A place to log risks, problems, root causes, and recommended fixes.", "/app/issues"],
@@ -334,7 +334,7 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
     what: "Files store business documents and imports by workspace so Vaeroex can build historical memory from approved data.",
     workflow: ["Select a file", "Analyze or import", "Review mappings", "Approve saved data", "Use results in reports"],
     mistakes: ["Uploading sensitive data", "Creating reports from empty files", "Skipping import review"],
-    related: ["Files & Imports", "Sensitive Data Policy", "Reports"]
+    related: ["Evidence", "Sensitive Data Policy", "Reports"]
   },
   reports: {
     what: "Reports turn workspace records into period summaries, trend comparisons, risks, and recommendations.",
