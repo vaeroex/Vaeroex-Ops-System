@@ -48,7 +48,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
           <TextInput label="Name" name="name" required />
           <TextInput label="Email" name="email" type="email" required />
           <TextInput label="Workspace" name="workspace" placeholder="Workspace name or ID" />
-          <TextInput label="Page/module" name="page_module" placeholder="Dashboard, Files, Reports, Billing..." />
+          <TextInput label="Page/module" name="page_module" placeholder="Overview, Evidence, Reports, Billing..." />
           <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Vaeroex result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
           <div className="md:col-span-2">

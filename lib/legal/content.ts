@@ -46,7 +46,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   terms: {
     id: "terms",
     title: "Terms of Service",
-    summary: "Plain-English terms for using Vaeroex as an Operations Intelligence Platform.",
+    summary: "Plain-English terms for using Operations Intelligence by Vaeroex.",
     href: "/terms",
     updated: LEGAL_DOCUMENT_VERSIONS.terms,
     sections: [
@@ -60,8 +60,8 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Description of Service",
         body: [
-          "Vaeroex is an Operations Intelligence Platform designed to help organizations turn information into visibility, awareness, prediction, and action.",
-          "Vaeroex may include dashboards, KPI records, files, reports, business memory, evidence retrieval, predictive insights, and Vaeroex-generated recommendations."
+          "Vaeroex LLC provides Operations Intelligence, software designed to help organizations turn business information into evidence-backed understanding for leadership.",
+          "Operations Intelligence may include an Executive Overview, Business Health, KPI records, Evidence, Reports, Business Signals, Business Memory, evidence retrieval, and Vaeroex-generated recommendations."
         ]
       },
       {
@@ -285,9 +285,9 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     href: "/ai-disclaimer",
     updated: LEGAL_DOCUMENT_VERSIONS.aiDisclaimer,
     sections: [
-      { title: "Operations Intelligence Support", body: ["Vaeroex uses AI-assisted systems to assist with operational analysis, predictive insights, decision support, recommendations, summaries, file reviews, and reports."] },
+      { title: "Operations Intelligence Support", body: ["Operations Intelligence uses AI-assisted systems to support analysis, decision support, recommendations, summaries, file reviews, and reports."] },
       { title: "Possible Errors", body: ["Outputs may be incomplete, inaccurate, outdated, or unsuitable for a specific business situation."] },
-      { title: "Human Review Required", body: ["Users must review and approve Vaeroex-generated outputs before relying on them or saving them into reports, KPIs, SOP drafts, checklists, or other supporting materials."] },
+      { title: "Human Review Required", body: ["Users must review Vaeroex-generated analysis before relying on it for important decisions or saving it into business records."] },
       { title: "No Professional Advice", body: ["Vaeroex does not provide legal, medical, financial, tax, insurance, employment, compliance, safety, or regulated professional advice."] },
       { title: "No Guarantee", body: ["Vaeroex recommendations are not guarantees of business performance, revenue, compliance, or operational improvement."] },
       { title: "Customer Responsibility", body: ["Customers remain responsible for decisions, implementation, review, and follow-through."] },
@@ -351,13 +351,14 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
 export const trustSections = [
   ["Workspace Isolation", "Vaeroex uses workspace-scoped records, private workspace file paths, role-aware access checks, and Supabase Row Level Security policies to keep customer workspaces separated."],
   ["Private File Storage", "Uploaded files are stored in a private workspace file bucket. File metadata and storage paths are scoped to the active workspace, and supported upload types are allowlisted."],
-  ["Business Memory", "Business Memory stores extracted evidence by workspace and retrieves relevant evidence for Vaeroex answers. Archived or deleted evidence is excluded from future retrieval."],
-  ["Evidence Retrieval", "Vaeroex is designed to retrieve a limited set of relevant evidence instead of sending every uploaded file into a single long conversation."],
-  ["Prompt Injection Safeguards", "Uploaded files, OCR text, spreadsheet rows, and Business Memory are treated as untrusted evidence, not instructions. Vaeroex is instructed not to follow commands embedded inside source material."],
-  ["Tool Execution Gateway", "Model-influenced create, update, delete, import, and generated-output actions must pass through a server-side allowlist, schema validation, role checks, and confirmation rules before records can change."],
-  ["Destructive Action Confirmation", "Destructive actions are user-driven and require confirmation. Bulk destructive actions are designed to require stronger confirmation before execution."],
-  ["Audit Logging", "Security-sensitive actions, blocked model-influenced actions, Stripe webhook processing, admin operations, and selected support events are designed to create audit records for review."],
-  ["Server-Side OpenAI Usage", "OpenAI API calls run server-side using Vaeroex production configuration. Customer browsers do not receive the OpenAI API key."],
+  ["Evidence Lineage", "Eligible evidence retains its workspace, source, file, worksheet, row, and parent relationships where applicable so supporting records remain inspectable."],
+  ["Original Evidence and Derived Analysis", "Original source evidence remains distinct from generated findings and Reports. Derived analysis cannot increase original-evidence coverage or become a new fact about the business."],
+  ["Business Memory Retrieval", "Business Memory stores eligible extracted context by workspace and retrieves a bounded set relevant to the current question instead of sending every uploaded file into one long conversation."],
+  ["Prompt and Content Safeguards", "Uploaded files, OCR text, spreadsheet rows, and Business Memory are treated as untrusted evidence, not instructions. Commands embedded inside source material are not treated as user authority."],
+  ["Actions and Confirmation", "Model-influenced mutations must pass through server-side authorization, validation, workspace checks, and confirmation rules. Vaeroex does not present generated recommendations as autonomous authority."],
+  ["Archive, Restore, and Soft-Delete", "Archived or soft-deleted records are excluded from current Business Memory, Search, Ask, Business Health, Coverage, Intelligence, Reports, and Profit Leakage. Restore can return eligible records to active use."],
+  ["Audit Logging", "Security-sensitive actions, blocked model-influenced actions, billing webhook processing, admin operations, and selected support events are designed to create audit records for review."],
+  ["Server-Side Processing and AI Limits", "Model requests run server-side using Vaeroex production configuration. Customer browsers do not receive provider API keys, and generated outputs may still be incomplete or inaccurate."],
   ["Sensitive Data Boundaries", "Vaeroex is not intended for unrestricted regulated sensitive data such as PHI/ePHI, Social Security numbers, payment card numbers, government IDs, or highly sensitive personal records unless appropriate controls exist."],
   ["Current Compliance Status", "Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR certification, government certification, malware scanning certification, or absolute security."],
   ["Customer Responsibility", "Customers remain responsible for the information they upload, workspace roles they assign, legal obligations that apply to their data, and final decisions they make."],

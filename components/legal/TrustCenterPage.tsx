@@ -11,25 +11,25 @@ const trustGroups = [
     title: "Workspace and file protection",
     summary: "How customer workspaces, records, and private source files are separated.",
     icon: FileLock2,
-    items: [trustSections[0], trustSections[1]]
+    items: [trustSections[0], trustSections[1], trustSections[7]]
   },
   {
     title: "Evidence and Vaeroex outputs",
     summary: "How relevant evidence is retrieved and kept distinct from generated analysis.",
     icon: Database,
-    items: [trustSections[2], trustSections[3], trustSections[4], trustSections[8]]
+    items: [trustSections[2], trustSections[3], trustSections[4]]
   },
   {
     title: "Actions, permissions, and audit records",
     summary: "How model-influenced actions are validated, confirmed, and recorded.",
     icon: ShieldCheck,
-    items: [trustSections[5], trustSections[6], trustSections[7]]
+    items: [trustSections[5], trustSections[6], trustSections[8]]
   },
   {
     title: "Current boundaries and customer responsibility",
     summary: "What Vaeroex does not claim and where customer judgment remains required.",
     icon: UserRoundCheck,
-    items: [trustSections[9], trustSections[10], trustSections[11], trustSections[12]]
+    items: [trustSections[9], trustSections[10], trustSections[11], trustSections[12], trustSections[13]]
   }
 ] as const;
 
@@ -103,9 +103,9 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
     <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Trust Center"
+        eyebrow="Trust at Vaeroex Intelligence Systems"
         title="Trustworthy intelligence starts with clear boundaries."
-        description="See how Vaeroex separates workspaces, handles private source information, distinguishes original evidence from generated analysis, and keeps leadership in control."
+        description="See how Operations Intelligence separates workspaces, preserves evidence lineage, distinguishes original evidence from derived analysis, and excludes archived or deleted records from current intelligence."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">

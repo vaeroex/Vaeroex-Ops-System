@@ -6,10 +6,11 @@ import {
   ChartNoAxesCombined,
   CircleGauge,
   FileSearch2,
+  FileText,
   Gauge,
-  Lightbulb,
   ScanSearch,
-  ShieldCheck
+  ShieldCheck,
+  TrendingDown
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
@@ -21,7 +22,7 @@ import { operationsIntelligenceJsonLd, publicPageMetadata } from "@/lib/seo/publ
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Operations Intelligence by Vaeroex",
-  description: "Vaeroex Operations Intelligence turns fragmented business activity into evidence-backed visibility, risk, performance context, and leadership recommendations.",
+  description: "Operations Intelligence by Vaeroex turns business evidence into executive understanding, prioritized findings, KPI context, Business Memory, and Reports.",
   path: "/operations-intelligence"
 });
 
@@ -33,12 +34,19 @@ const processSteps = [
 ] as const;
 
 const capabilities = [
-  { title: "Executive Overview", body: "The current business state, meaningful change, and priority decision in one view.", icon: CircleGauge },
-  { title: "Business Health", body: "A conservative health signal grounded in eligible original evidence.", icon: Gauge },
-  { title: "KPI Intelligence", body: "Actuals, targets, trends, freshness, and business meaning without report clutter.", icon: ChartNoAxesCombined },
-  { title: "Risk & Opportunity", body: "Conditions that deserve leadership attention, ranked with source support.", icon: ScanSearch },
-  { title: "Business Memory", body: "Relevant organizational context that retains provenance and lifecycle status.", icon: Brain },
-  { title: "Executive Briefings", body: "Review-ready summaries with changes, evidence limits, and recommended decisions.", icon: Lightbulb }
+  { title: "Executive Overview", body: "Business Health, Needs Attention, Positive Signal, Intelligence Readiness, and What Changed in one calm review.", icon: CircleGauge },
+  { title: "Business Health", body: "A conservative current-state signal grounded in eligible original evidence and valid history.", icon: Gauge },
+  { title: "Prioritized findings", body: "Supported risks and positive signals ranked for leadership attention with confidence and evidence.", icon: ScanSearch },
+  { title: "KPI trends", body: "Actuals, targets, freshness, and direction shown without inventing favorable or unfavorable meaning.", icon: ChartNoAxesCombined },
+  { title: "Evidence & Business Memory", body: "Source-backed organizational context that retains provenance, eligibility, and lifecycle status.", icon: Brain },
+  { title: "Reports", body: "Executive Brief, Board Report, Improvement Plan, and Investigation Summary built from eligible evidence.", icon: FileText },
+  { title: "Profit Leakage foundation", body: "Supported amounts are totaled only when independent structured evidence establishes them; otherwise the result is Not established.", icon: TrendingDown }
+] as const;
+
+const evidenceInputs = [
+  ["Multi-worksheet workbooks", "Supported worksheets are detected and prepared independently while preserving workbook, worksheet, row, and source lineage."],
+  ["Documents and images", "Supported PDFs, documents, and images use grounded extraction before any content can enter Business Memory."],
+  ["Lifecycle-aware evidence", "Archive, restore, and soft-delete remove inactive records from current intelligence without presenting deletion as immediate database erasure."]
 ] as const;
 
 const audience = ["Owners reviewing a growing business", "CEOs and COOs connecting performance across systems", "Operations leaders preparing an evidence-backed review", "Department leaders who need context beyond one report"] as const;
@@ -53,9 +61,9 @@ export default function OperationsIntelligencePage() {
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Vaeroex Operations Intelligence"
-        title="Turn operational activity into a clearer leadership decision."
-        description="Vaeroex connects fragmented business information into evidence-backed performance context, risks, opportunities, and recommendations without replacing the systems your organization already uses."
+        eyebrow="Operations Intelligence by Vaeroex"
+        title="Turn business evidence into executive understanding."
+        description="Operations Intelligence connects fragmented business information into Business Health, meaningful change, prioritized findings, KPI context, and evidence-backed Reports without replacing the systems your organization already uses."
         actions={
           <>
             <StartWithVaeroexMenu />
@@ -93,14 +101,14 @@ export default function OperationsIntelligencePage() {
           <details className="group mt-10 border-t border-white/10 pt-8">
             <summary className="flex min-h-11 cursor-pointer list-none flex-col gap-3 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60 sm:flex-row sm:items-end sm:justify-between">
               <span>
-                <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">What it creates</span>
-                <span className="mt-2 block text-2xl font-semibold text-white">Six leadership outcomes, available when you want the detail.</span>
-                <span className="mt-2 block text-sm leading-6 text-slate-400">Executive Overview · Business Health · KPI Intelligence · Risk &amp; Opportunity · Business Memory · Executive Briefings</span>
+                <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Current product</span>
+                <span className="mt-2 block text-2xl font-semibold text-white">The intelligence leadership can review today.</span>
+                <span className="mt-2 block text-sm leading-6 text-slate-400">Executive Overview · Business Health · Prioritized findings · KPI trends · Evidence · Business Memory · Reports</span>
               </span>
               <span className="shrink-0 text-sm font-semibold text-cyan-200 group-open:hidden">Explore capabilities</span>
               <span className="hidden shrink-0 text-sm font-semibold text-cyan-200 group-open:block">Hide capabilities</span>
             </summary>
-            <div className="mt-6 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-6 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2 xl:grid-cols-4">
               {capabilities.map((capability, index) => {
                 const Icon = capability.icon;
                 return (
@@ -117,6 +125,24 @@ export default function OperationsIntelligencePage() {
       </section>
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-14 sm:px-6 sm:py-16">
+        <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,.72fr)_minmax(0,1.28fr)]">
+          <div>
+            <FileSearch2 className="h-6 w-6 text-cyan-200" aria-hidden="true" />
+            <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-normal">Business information enters as evidence, not as unsupported conclusions.</h2>
+            <p className="mt-4 text-base leading-7 text-slate-300">Operations Intelligence supports structured workbooks, documents, images, KPIs, and Business Signals while retaining the lineage leadership needs to inspect why a conclusion exists.</p>
+          </div>
+          <div className="divide-y divide-white/10 border-y border-white/10">
+            {evidenceInputs.map(([title, body]) => (
+              <div key={title} className="grid gap-2 py-5 sm:grid-cols-[minmax(0,.34fr)_minmax(0,.66fr)]">
+                <h3 className="font-semibold text-white">{title}</h3>
+                <p className="text-sm leading-6 text-slate-400">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="border-b border-white/10 px-5 py-14 sm:px-6 sm:py-16">
         <div className="mx-auto grid max-w-7xl gap-10 lg:grid-cols-2">
           <div>
             <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-950/25 text-cyan-100">
@@ -141,9 +167,9 @@ export default function OperationsIntelligencePage() {
               <p className="mt-2 text-sm leading-6 text-slate-400">Confidence grows with relevant source depth, recency, agreement, and history. Limited evidence produces limited conclusions, not invented certainty.</p>
             </div>
             <div className="py-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Executive briefings</p>
-              <p className="mt-2 text-lg font-semibold text-white">The answer first. Evidence and limitations when leadership needs them.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Briefings focus on meaningful change, primary risks, opportunities, and decisions requiring review instead of reproducing every record.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Evidence-backed Reports</p>
+              <p className="mt-2 text-lg font-semibold text-white">The right report for the leadership review at hand.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Executive Briefs, Board Reports, Improvement Plans, and Investigation Summaries remain derived analysis and cannot increase original-evidence coverage.</p>
             </div>
             <div className="py-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Human review</p>
@@ -174,8 +200,9 @@ export default function OperationsIntelligencePage() {
       </section>
 
       <PublicCtaBand
+        eyebrow="Operations Intelligence by Vaeroex"
         title="Give leadership a clearer basis for the next decision."
-        description="Start with one private workspace for Operations Intelligence, Business Memory, KPI context, evidence-backed recommendations, and executive briefings."
+        description="Start with one private workspace for Business Health, prioritized findings, KPI context, Evidence, Business Memory, and evidence-backed Reports."
         primaryHref="/pricing"
         primaryLabel="View pricing"
         secondaryHref="/contact"

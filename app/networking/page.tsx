@@ -8,12 +8,12 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Vaeroex Network",
-  description: "The Vaeroex Network is a curated professional relationship network for operators, advisors, integration partners, and organizations aligned with Operations Intelligence.",
+  description: "The Vaeroex Network is a curated professional relationship network for operators, domain experts, technology partners, and organizations aligned with evidence-backed intelligence systems.",
   path: "/networking"
 });
 
 const relationshipTypes = [
-  ["Operators and advisors", "Experienced leaders who understand evidence, operating performance, and executive decision rhythms."],
+  ["Operators and domain experts", "Experienced leaders who understand evidence, operating performance, and executive decision rhythms."],
   ["Technology and integration partners", "Organizations that can help connect Vaeroex with the external systems customers already use."],
   ["Implementation relationships", "Qualified professionals who help organizations improve how they review and respond to intelligence."],
   ["Strategic relationships", "Industry experts and aligned organizations interested in the long-term Vaeroex direction."]
@@ -30,9 +30,9 @@ export default function NetworkingPage() {
     <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Vaeroex Network"
-        title="A curated network for relationships that strengthen Operations Intelligence."
-        description="The Vaeroex Network connects credible operators, advisors, technology partners, and strategic organizations around one goal: helping leadership understand business conditions with greater clarity."
+        eyebrow="Vaeroex Intelligence Systems"
+        title="A curated network for relationships that strengthen evidence-backed intelligence."
+        description="The Vaeroex Network connects credible operators, domain experts, technology partners, and strategic organizations around one goal: helping leadership understand complex information with greater clarity."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.partners} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
             Start a partner conversation
@@ -46,7 +46,7 @@ export default function NetworkingPage() {
           <PublicSectionHeading
             eyebrow="Who should reach out"
             title="Focused relationships, not an open directory."
-            description="The Network is for people and organizations with a credible way to improve product context, integrations, implementation quality, or customer understanding."
+            description="The Network is for people and organizations with a credible way to improve intelligence context, product quality, integrations, or customer understanding."
           />
           <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-2">
             {relationshipTypes.map(([title, body]) => (

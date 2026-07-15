@@ -3,8 +3,8 @@ import { TrustCenterPage } from "@/components/legal/TrustCenterPage";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Trust Center",
-  description: "Review Vaeroex trust, safety, privacy, legal, and responsible-use resources.",
+  title: "Trust | Vaeroex Intelligence Systems",
+  description: "Review current Vaeroex workspace isolation, evidence lineage, lifecycle exclusion, AI limitations, and responsible-use boundaries.",
   path: "/trust"
 });
 

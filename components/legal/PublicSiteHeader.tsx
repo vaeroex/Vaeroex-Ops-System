@@ -6,7 +6,7 @@ import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const primaryNavLinks: Array<{ href: Route; label: string }> = [
-  { href: "/", label: "Platform" },
+  { href: "/", label: "Home" },
   { href: "/operations-intelligence", label: "Operations Intelligence" },
   { href: "/pricing", label: "Pricing" },
   { href: "/trust", label: "Trust" }
@@ -45,7 +45,7 @@ export async function PublicSiteHeader() {
           </span>
           <span className="min-w-0">
             <span className="block text-base font-semibold leading-none">Vaeroex</span>
-            <span className="mt-1 hidden text-xs font-medium text-slate-400 sm:block">Operations Intelligence</span>
+            <span className="mt-1 hidden text-xs font-medium text-slate-400 sm:block">Intelligence Systems</span>
           </span>
         </Link>
 
