@@ -29,7 +29,7 @@ const parser = loadTypeScriptModule("lib/imports/spreadsheets.ts");
 const worksheetTypes = loadTypeScriptModule("lib/imports/worksheet-types.ts");
 const workbook = parser.parseXlsxWorkbookEntries(new Map([
   entry("xl/workbook.xml", `
-    <workbook xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+    <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
       <sheets>
         <sheet name="Company Profile" sheetId="1" r:id="rId1"/>
         <sheet name="Monthly Sales" sheetId="2" r:id="rId2"/>
@@ -69,6 +69,136 @@ assert.strictEqual(workbook.issues[0].worksheet, "Chart Summary");
 assert.strictEqual(workbook.worksheets[3].status, "failed", "malformed worksheets must report a sheet-specific failure");
 assert.strictEqual(workbook.issues[1].worksheet, "Broken Data");
 assert.strictEqual(workbook.worksheets[4].status, "empty", "formatting-only worksheets must be ignored safely");
+
+const arbitraryPrefixWorkbook = parser.parseXlsxWorkbookEntries(new Map([
+  entry("xl/workbook.xml", `
+    <ss:workbook xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:rel="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+      <ss:sheets><ss:sheet name="Hidden Metrics" sheetId="9" state="hidden" rel:id="customRelationship42"/></ss:sheets>
+    </ss:workbook>`),
+  entry("xl/_rels/workbook.xml.rels", `
+    <pkg:Relationships xmlns:pkg="http://schemas.openxmlformats.org/package/2006/relationships">
+      <pkg:Relationship Id="customRelationship42" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="./worksheets/custom.xml"/>
+    </pkg:Relationships>`),
+  entry("xl/worksheets/custom.xml", `
+    <ss:worksheet xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><ss:sheetData>
+      <ss:row r="1"><ss:c r="A1" t="s"><ss:v>0</ss:v></ss:c><ss:c r="B1" t="s"><ss:v>1</ss:v></ss:c></ss:row>
+      <ss:row r="2"><ss:c r="A2" t="s"><ss:v>2</ss:v></ss:c><ss:c r="B2"><ss:v>42</ss:v></ss:c></ss:row>
+    </ss:sheetData></ss:worksheet>`),
+  entry("xl/sharedStrings.xml", `<ss:sst xmlns:ss="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><ss:si><ss:t>Metric</ss:t></ss:si><ss:si><ss:t>Value</ss:t></ss:si><ss:si><ss:t>Orders</ss:t></ss:si></ss:sst>`)
+]));
+assert.strictEqual(arbitraryPrefixWorkbook.worksheets.length, 1, "arbitrary SpreadsheetML prefixes must be accepted");
+assert.strictEqual(arbitraryPrefixWorkbook.worksheets[0].name, "Hidden Metrics");
+assert.strictEqual(arbitraryPrefixWorkbook.worksheets[0].state, "hidden", "hidden worksheet state must be preserved");
+assert.strictEqual(arbitraryPrefixWorkbook.worksheets[0].relationshipId, "customRelationship42", "arbitrary relationship IDs must be preserved");
+assert.strictEqual(arbitraryPrefixWorkbook.worksheets[0].relationshipTarget, "xl/worksheets/custom.xml", "relative worksheet targets must resolve under xl/");
+assert.strictEqual(arbitraryPrefixWorkbook.rows.length, 1, "namespace-prefixed worksheet rows must be parsed");
+
+const exactFixture = fs.readFileSync(path.join(root, "scripts/fixtures/Vaeroex_Retail_Full_Demo_Dataset_Dated.xlsx"));
+const exactWorkbook = parser.parseSpreadsheetWorkbook({ fileName: "Vaeroex_Retail_Full_Demo_Dataset_Dated.xlsx", buffer: exactFixture });
+const exactSheetNames = ["Company Profile", "Monthly Sales", "Store Performance", "Inventory", "Orders", "Customer Feedback", "Employees", "Supplier Invoices"];
+assert.strictEqual(exactWorkbook.worksheets.length, 8, "the namespace-prefixed export must expose all eight worksheets");
+assert.deepStrictEqual(exactWorkbook.worksheets.map((worksheet) => worksheet.name), exactSheetNames, "worksheet order and names must match the workbook declarations");
+assert.strictEqual(exactWorkbook.rows.length, 303, "all 303 source rows must remain available for downstream processing");
+assert(exactWorkbook.worksheets.every((worksheet) => worksheet.relationshipId && worksheet.relationshipTarget), "every worksheet must preserve relationship lineage");
+assert(!exactWorkbook.issues.some((issue) => issue.message.includes("No worksheets were declared")), "namespace-prefixed workbooks must not be treated as empty");
+assert.deepStrictEqual(
+  exactWorkbook.worksheets.map((worksheet) => worksheetTypes.detectWorksheetType(worksheet)),
+  ["company_profile", "wide_time_series", "customers", "inventory", "orders", "customers", "employees", "financials"],
+  "the exact workbook must proceed through independent worksheet classification"
+);
+
+const missingRelationship = parser.parseXlsxWorkbookEntries(new Map([
+  entry("xl/workbook.xml", `<x:workbook><x:sheets><x:sheet name="Missing Relationship" r:id="unknown"/></x:sheets></x:workbook>`),
+  entry("xl/_rels/workbook.xml.rels", `<Relationships></Relationships>`)
+]));
+assert.strictEqual(missingRelationship.worksheets[0].status, "failed");
+assert.match(missingRelationship.worksheets[0].error, /relationship is missing/, "declared sheets with missing relationships need a distinct error");
+
+const missingTarget = parser.parseXlsxWorkbookEntries(new Map([
+  entry("xl/workbook.xml", `<workbook><sheets><sheet name="Missing Target" r:id="rId1"/></sheets></workbook>`),
+  entry("xl/_rels/workbook.xml.rels", `<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/missing.xml"/></Relationships>`)
+]));
+assert.match(missingTarget.worksheets[0].error, /data file .* is missing/, "missing worksheet targets need a distinct error");
+
+const unsafeTarget = parser.parseXlsxWorkbookEntries(new Map([
+  entry("xl/workbook.xml", `<workbook><sheets><sheet name="Unsafe" r:id="rId1"/></sheets></workbook>`),
+  entry("xl/_rels/workbook.xml.rels", `<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="../outside.xml"/></Relationships>`)
+]));
+assert.match(unsafeTarget.worksheets[0].error, /unsafe or outside/, "worksheet path traversal must be rejected");
+
+const externalTarget = parser.parseXlsxWorkbookEntries(new Map([
+  entry("xl/workbook.xml", `<workbook><sheets><sheet name="External" r:id="rId1"/></sheets></workbook>`),
+  entry("xl/_rels/workbook.xml.rels", `<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="https://example.com/sheet.xml" TargetMode="External"/></Relationships>`)
+]));
+assert.match(externalTarget.worksheets[0].error, /External worksheet relationships are not supported/, "external worksheet relationships must be rejected");
+
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([
+    entry("xl/workbook.xml", `<workbook><sheets/></workbook>`),
+    entry("xl/_rels/workbook.xml.rels", `<Relationships></Relationships>`)
+  ])),
+  /No worksheets were declared/,
+  "the empty-workbook error must be reserved for a genuine empty sheets declaration"
+);
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([
+    entry("xl/workbook.xml", `<workbook><sheets>`),
+    entry("xl/_rels/workbook.xml.rels", `<Relationships></Relationships>`)
+  ])),
+  /workbook XML is malformed/,
+  "malformed workbook XML must not be labeled as an empty workbook"
+);
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([entry("xl/_rels/workbook.xml.rels", `<Relationships></Relationships>`)])),
+  /workbook XML is missing/,
+  "a missing workbook XML part needs a distinct error"
+);
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([entry("xl/workbook.xml", `<workbook><sheets/></workbook>`)])),
+  /relationships file is missing/,
+  "a missing workbook relationships part needs a distinct error"
+);
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([
+    entry("xl/workbook.xml", `<workbook><sheets><sheet name="One" r:id="rId1"/></sheets></workbook>`),
+    entry("xl/_rels/workbook.xml.rels", `<Relationships><Relationship`)
+  ])),
+  /relationships XML is malformed/,
+  "malformed relationships XML needs a distinct error"
+);
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([
+    entry("xl/workbook.xml", `<workbook><sheets><sheet name="One" r:id="rId1"/></sheets></workbook>`),
+    entry("xl/_rels/workbook.xml.rels", `<Relationships><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>`),
+    entry("xl/worksheets/sheet1.xml", `<worksheet><sheetData/></worksheet>`),
+    entry("xl/vbaProject.bin", "macro")
+  ])),
+  /macros or embedded objects are not supported/,
+  "macro-enabled packages must be rejected"
+);
+const excessiveSheets = Array.from({ length: 201 }, (_, index) => `<sheet name="Sheet ${index + 1}" r:id="relationship${index + 1}"/>`).join("");
+assert.throws(
+  () => parser.parseXlsxWorkbookEntries(new Map([
+    entry("xl/workbook.xml", `<workbook><sheets>${excessiveSheets}</sheets></workbook>`),
+    entry("xl/_rels/workbook.xml.rels", `<Relationships/>`)
+  ])),
+  /more than 200 worksheets/,
+  "excessive worksheet counts must be rejected"
+);
+assert.throws(
+  () => parser.parseSpreadsheetWorkbook({ fileName: "encrypted.xlsx", buffer: Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]) }),
+  /Encrypted XLSX workbooks are not supported/,
+  "encrypted Office packages need a distinct error"
+);
+const traversalFixture = Buffer.from(exactFixture);
+for (let offset = traversalFixture.indexOf("xl/workbook.xml"); offset >= 0; offset = traversalFixture.indexOf("xl/workbook.xml", offset + 1)) {
+  traversalFixture.write("../workbook.xml", offset, "utf8");
+}
+assert.throws(
+  () => parser.parseSpreadsheetWorkbook({ fileName: "unsafe.xlsx", buffer: traversalFixture }),
+  /unsafe file path/,
+  "ZIP package path traversal must be rejected before XML parsing"
+);
 
 const detectedTypes = [
   ["Company Profile", ["Company", "Industry"], "company_profile"],
@@ -227,6 +357,7 @@ assert.doesNotMatch(actions, /rows\.slice\(0,\s*1000\)/, "structured imports mus
 assert.match(actions, /validateImportRow[\s\S]*Required mapping/, "every staged row must receive explicit import validation");
 assert.match(actions, /business_memory_indexing[\s\S]*No rows are indexed or activated before import approval/, "the trace must state the Business Memory boundary");
 assert.match(actions, /mode: "workbook"[\s\S]*worksheetPlans/, "workbook staging must preserve an independent plan for every worksheet");
+assert.match(actions, /relationship_id: worksheet\.relationshipId \|\| null[\s\S]*relationship_target: worksheet\.relationshipTarget \|\| null/, "workbook staging must preserve resolved worksheet relationship lineage");
 assert.match(actions, /detection_version: WORKBOOK_DETECTION_VERSION/, "new workbook plans must persist a deterministic detection version");
 assert.match(actions, /reprepareImportId[\s\S]*\.eq\("workspace_id", workspaceId\)[\s\S]*\.eq\("file_upload_id", file\.id\)/, "workbook re-preparation must resolve its target inside the active workspace and source");
 assert.match(actions, /if \(reprepareImport\)[\s\S]*importRecord = \{ id: reprepareImport\.id \}/, "re-preparation must reuse the existing import record rather than creating a duplicate import");
