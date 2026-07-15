@@ -2,6 +2,7 @@ import type { SpreadsheetWorksheet } from "@/lib/imports/spreadsheets";
 
 export type WorksheetType =
   | "company_profile"
+  | "wide_time_series"
   | "kpis"
   | "sales"
   | "financials"
@@ -25,6 +26,7 @@ export type WorksheetImportField = {
 
 export const WORKSHEET_TYPE_OPTIONS: Array<{ value: WorksheetType; label: string }> = [
   { value: "company_profile", label: "Company Profile" },
+  { value: "wide_time_series", label: "Time Series" },
   { value: "kpis", label: "KPIs" },
   { value: "sales", label: "Sales" },
   { value: "financials", label: "Financials" },
@@ -39,6 +41,7 @@ export const WORKSHEET_TYPE_OPTIONS: Array<{ value: WorksheetType; label: string
 
 const WORKSHEET_CONTEXT_LABELS: Record<WorksheetType, string> = {
   company_profile: "Company Context",
+  wide_time_series: "Time Series",
   kpis: "KPIs",
   sales: "Sales",
   financials: "Financial",
@@ -64,6 +67,9 @@ export const WORKSHEET_IMPORT_FIELDS: Record<WorksheetType, WorksheetImportField
   company_profile: [
     { key: "label", label: "Context field", required: true, candidates: ["field", "attribute", "company", "item", "name"] },
     { key: "value", label: "Context value", required: true, candidates: ["value", "detail", "description", "information"] }
+  ],
+  wide_time_series: [
+    { key: "period", label: "Date or period", required: true, valueType: "date", candidates: ["date", "period", "month", "week", "quarter", "year"] }
   ],
   kpis: [
     { key: "name", label: "KPI name", required: true, candidates: ["kpi", "kpi name", "metric", "metric name", "month", "store", "name"] },
@@ -129,6 +135,132 @@ function includesAny(value: string, candidates: string[]) {
   return candidates.some((candidate) => value.includes(candidate));
 }
 
+const PERIOD_COLUMNS = ["date", "period", "month", "week", "quarter", "year"];
+const ENTITY_IDENTITY_COLUMNS = [
+  "sku",
+  "item",
+  "item id",
+  "item name",
+  "inventory item",
+  "product",
+  "product id",
+  "product name",
+  "customer",
+  "order id",
+  "order number",
+  "employee",
+  "customer id",
+  "customer name",
+  "employee id",
+  "employee name",
+  "vendor",
+  "vendor id",
+  "vendor name",
+  "supplier",
+  "supplier id",
+  "supplier name"
+];
+
+export function parseWorksheetNumber(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  const candidate = String(value ?? "").trim();
+  if (!candidate) return null;
+  const negative = /^\(.*\)$/.test(candidate);
+  const parsed = Number(candidate.replace(/[()$,%\s,]/g, ""));
+  if (!Number.isFinite(parsed)) return null;
+  return negative ? -parsed : parsed;
+}
+
+export function parseWorksheetPeriod(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+    excelEpoch.setUTCDate(excelEpoch.getUTCDate() + value);
+    return excelEpoch.toISOString().slice(0, 10);
+  }
+
+  const candidate = String(value ?? "").trim();
+  if (!candidate) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return candidate;
+  if (/^\d{4}-\d{2}$/.test(candidate)) return `${candidate}-01`;
+  if (/^\d{4}$/.test(candidate)) return `${candidate}-01-01`;
+  const quarter = candidate.match(/^Q([1-4])\s*[-/]?\s*(\d{4})$/i) || candidate.match(/^(\d{4})\s*[-/]?\s*Q([1-4])$/i);
+  if (quarter) {
+    const startsWithQuarter = /^Q/i.test(candidate);
+    const quarterNumber = Number(startsWithQuarter ? quarter[1] : quarter[2]);
+    const year = startsWithQuarter ? quarter[2] : quarter[1];
+    return `${year}-${String((quarterNumber - 1) * 3 + 1).padStart(2, "0")}-01`;
+  }
+  const parsed = Date.parse(candidate);
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : null;
+}
+
+function exactColumn(columns: string[], candidates: string[]) {
+  return columns.find((column) => candidates.includes(normalized(column)))
+    || columns.find((column) => {
+      const words = normalized(column).split(" ");
+      return candidates.some((candidate) => words.includes(candidate));
+    });
+}
+
+export function inferWideTimeSeriesMetricColumns(
+  worksheet: Pick<SpreadsheetWorksheet, "columns"> & Partial<Pick<SpreadsheetWorksheet, "rows">>,
+  periodColumn = exactColumn(worksheet.columns, PERIOD_COLUMNS)
+) {
+  if (!periodColumn) return [];
+  const candidates = worksheet.columns.filter((column) => column !== periodColumn);
+  const rows = worksheet.rows || [];
+
+  if (!rows.length) {
+    return candidates.filter((column) => !ENTITY_IDENTITY_COLUMNS.includes(normalized(column)));
+  }
+
+  return candidates.filter((column) => {
+    const populated = rows.map((row) => row.values[column]).filter((value) => value !== null && value !== undefined && String(value).trim() !== "");
+    if (!populated.length) return false;
+    return populated.filter((value) => parseWorksheetNumber(value) !== null).length / populated.length >= 0.5;
+  });
+}
+
+export function wideTimeSeriesTargetColumn(metricColumn: string, columns: string[]) {
+  const metric = normalized(metricColumn);
+  if (metric.startsWith("target ") || metric.endsWith(" target")) return null;
+  return columns.find((column) => {
+    const candidate = normalized(column);
+    return candidate === `target ${metric}` || candidate === `${metric} target`;
+  }) || null;
+}
+
+export function evaluateWideTimeSeriesCells(values: Record<string, unknown>, metricColumns: string[]) {
+  const metrics: Array<{ column: string; value: number }> = [];
+  const invalidColumns: string[] = [];
+  for (const column of metricColumns) {
+    const rawValue = values[column];
+    if (rawValue === null || rawValue === undefined || String(rawValue).trim() === "") continue;
+    const value = parseWorksheetNumber(rawValue);
+    if (value === null) invalidColumns.push(column);
+    else metrics.push({ column, value });
+  }
+  return { metrics, invalidColumns };
+}
+
+export function isWideTimeSeriesWorksheet(
+  worksheet: Pick<SpreadsheetWorksheet, "columns"> & Partial<Pick<SpreadsheetWorksheet, "rows">>
+) {
+  const periodColumn = exactColumn(worksheet.columns, PERIOD_COLUMNS);
+  if (!periodColumn) return false;
+  if (worksheet.columns.some((column) => ENTITY_IDENTITY_COLUMNS.includes(normalized(column)))) return false;
+  const rows = worksheet.rows || [];
+  if (rows.length) {
+    const populatedPeriods = rows
+      .map((row) => row.values[periodColumn])
+      .filter((value) => value !== null && value !== undefined && String(value).trim() !== "");
+    if (!populatedPeriods.length || populatedPeriods.filter((value) => parseWorksheetPeriod(value)).length / populatedPeriods.length < 0.5) {
+      return false;
+    }
+  }
+  return inferWideTimeSeriesMetricColumns(worksheet, periodColumn).length >= 2;
+}
+
 export function worksheetTypeLabel(type: WorksheetType) {
   return WORKSHEET_CONTEXT_LABELS[type] || "Unknown / Context Only";
 }
@@ -137,12 +269,15 @@ export function isWorksheetType(value: string): value is WorksheetType {
   return WORKSHEET_TYPE_OPTIONS.some((option) => option.value === value);
 }
 
-export function detectWorksheetType(worksheet: Pick<SpreadsheetWorksheet, "name" | "columns">): WorksheetType {
+export function detectWorksheetType(
+  worksheet: Pick<SpreadsheetWorksheet, "name" | "columns"> & Partial<Pick<SpreadsheetWorksheet, "rows">>
+): WorksheetType {
   const name = normalized(worksheet.name);
   const columns = normalized(worksheet.columns.join(" "));
   const combined = `${name} ${columns}`;
 
   if (includesAny(combined, ["company profile", "company context", "business profile"])) return "company_profile";
+  if (isWideTimeSeriesWorksheet(worksheet)) return "wide_time_series";
   if (includesAny(combined, ["inventory", "on hand", "reorder point", "stock level", "sku"])) return "inventory";
   if (includesAny(combined, ["customer feedback", "customer rating", "customer satisfaction", "support feedback"])) return "customers";
   if (includesAny(combined, ["employee", "employees", "overtime hours", "training hours", "headcount"])) return "employees";

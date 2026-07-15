@@ -120,6 +120,12 @@ function ImportDiagnostics({ file, latestImport }: { file: FileUploadRow; latest
   const issues = importIssues(latestImport.errors_json);
   const trace = pipelineTrace(file);
   const worksheets = worksheetTrace(file);
+  const parserIssueCount = issues.filter((issue) => issue.stage === "workbook parsing").length;
+  const detectionIssueCount = issues.filter((issue) => issue.stage === "worksheet detection").length;
+  const extractionIssueCount = issues.filter((issue) => issue.stage === "record extraction").length;
+  const validationIssueCount = issues.filter((issue) => issue.stage === "import validation").length;
+  const importFailureCount = issues.filter((issue) => issue.stage === "import").length;
+  const indexingIssueCount = issues.filter((issue) => issue.stage === "business memory indexing").length;
 
   if (!issues.length && !trace.length && !worksheets.length) return null;
 
@@ -146,6 +152,9 @@ function ImportDiagnostics({ file, latestImport }: { file: FileUploadRow; latest
           <summary className="cursor-pointer text-sm font-semibold text-red-100">
             {issues.length} ingestion issue{issues.length === 1 ? "" : "s"}
           </summary>
+          <p className="mt-2 text-xs leading-5 text-slate-400">
+            Workbook parsing: {parserIssueCount} · Worksheet detection: {detectionIssueCount} · Record extraction: {extractionIssueCount} · Row or cell validation: {validationIssueCount} · Import failures: {importFailureCount} · Indexing: {indexingIssueCount}
+          </p>
           <ol className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-2 text-xs leading-5 text-slate-300">
             {issues.map((issue, index) => (
               <li key={`${issue.worksheet}-${issue.rowNumber ?? "sheet"}-${issue.stage}-${index}`} className="rounded-md border border-white/10 bg-slate-950/55 p-3">
@@ -218,6 +227,7 @@ export function SourceImportReview({
   const importType = asImportType(latestImport.import_type);
   const importRows = rows.filter((row) => row.import_id === latestImport.id).sort((a, b) => a.row_number - b.row_number);
   const needsReview = latestImport.status === "needs_review" || latestImport.status === "extracted";
+  const isWorkbookImport = isRecord(latestImport.mapping_json) && latestImport.mapping_json.mode === "workbook";
 
   if (!needsReview) {
     return (
@@ -228,12 +238,12 @@ export function SourceImportReview({
             {latestImport.rows_imported} of {latestImport.rows_total} rows were saved from this source.
           </p>
           {latestImport.extraction_summary ? <p className="mt-2 text-xs leading-5 text-slate-500">{latestImport.extraction_summary}</p> : null}
-          {latestImport.status === "failed" ? (
+          {latestImport.status === "failed" || (latestImport.status === "completed" && isWorkbookImport) ? (
             <form action={importFileAction} className="mt-4">
               <input type="hidden" name="file_id" value={file.id} />
               <input type="hidden" name="import_type" value={importType === "metrics" ? "metrics" : "kpi"} />
               <PendingSubmitButton pendingLabel="Re-reading every worksheet..." className="min-h-10 rounded-md bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">
-                Re-prepare import
+                {isWorkbookImport ? "Re-prepare workbook" : "Re-prepare import"}
               </PendingSubmitButton>
             </form>
           ) : null}

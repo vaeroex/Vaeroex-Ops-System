@@ -72,7 +72,7 @@ assert.strictEqual(workbook.worksheets[4].status, "empty", "formatting-only work
 
 const detectedTypes = [
   ["Company Profile", ["Company", "Industry"], "company_profile"],
-  ["Monthly Sales", ["Month", "Revenue", "Target Revenue"], "kpis"],
+  ["Monthly Sales", ["Month", "Revenue", "Target Revenue"], "wide_time_series"],
   ["Inventory", ["SKU", "On Hand", "Reorder Point"], "inventory"],
   ["Orders", ["Order ID", "Status", "Days to Deliver"], "orders"],
   ["Employees", ["Employee", "Department", "Overtime Hours"], "employees"],
@@ -91,6 +91,89 @@ assert.notStrictEqual(
 assert(worksheetTypes.WORKSHEET_IMPORT_FIELDS.kpis.some((field) => field.key === "actual_value"), "KPI worksheets must receive KPI mapping fields");
 assert(!worksheetTypes.WORKSHEET_IMPORT_FIELDS.inventory.some((field) => field.key === "actual_value"), "inventory worksheets must not receive KPI mapping fields");
 
+const monthlySales = {
+  name: "Monthly Sales",
+  columns: ["Month", "Revenue", "Target Revenue", "Transactions", "Average Basket", "Gross Margin %", "Returns %", "Inventory Value", "Online Sales", "Open Projects"],
+  rows: [
+    {
+      values: {
+        Month: "2026-01",
+        Revenue: 125000,
+        "Target Revenue": 130000,
+        Transactions: 420,
+        "Average Basket": 297.62,
+        "Gross Margin %": 41,
+        "Returns %": 2.4,
+        "Inventory Value": 88000,
+        "Online Sales": 34000,
+        "Open Projects": 7
+      }
+    },
+    {
+      values: {
+        Month: "2026-02",
+        Revenue: 128000,
+        "Target Revenue": 132000,
+        Transactions: "invalid",
+        "Average Basket": 301.2,
+        "Gross Margin %": 42,
+        "Returns %": 2.1,
+        "Inventory Value": 91000,
+        "Online Sales": 35000,
+        "Open Projects": 8
+      }
+    }
+  ]
+};
+assert.strictEqual(worksheetTypes.detectWorksheetType(monthlySales), "wide_time_series", "worksheet structure must take priority over an Inventory Value metric column");
+assert.notStrictEqual(
+  worksheetTypes.detectWorksheetType({
+    name: "Customer Activity",
+    columns: ["Date", "Customer", "Revenue", "Orders"],
+    rows: [{ values: { Date: "2026-01-01", Customer: "Acme", Revenue: 1000, Orders: 4 } }]
+  }),
+  "wide_time_series",
+  "an entity-identity column must keep customer records out of the time-series path"
+);
+assert.notStrictEqual(
+  worksheetTypes.detectWorksheetType({
+    name: "Metrics",
+    columns: ["Month", "Revenue", "Transactions"],
+    rows: [{ values: { Month: "not a period", Revenue: 1000, Transactions: 4 } }]
+  }),
+  "wide_time_series",
+  "wide time-series detection must require usable period values when sample rows are available"
+);
+assert.notStrictEqual(
+  worksheetTypes.detectWorksheetType({
+    name: "Monthly Revenue",
+    columns: ["Month", "Revenue"],
+    rows: [{ values: { Month: "2026-01", Revenue: 1000 } }]
+  }),
+  "wide_time_series",
+  "wide time-series detection must require multiple numeric measure columns"
+);
+const wideMapping = worksheetTypes.inferWorksheetMapping("wide_time_series", monthlySales.columns);
+assert.deepStrictEqual(wideMapping, { period: "Month" }, "wide time series must require only its period mapping");
+const metricColumns = worksheetTypes.inferWideTimeSeriesMetricColumns(monthlySales, wideMapping.period);
+assert.strictEqual(metricColumns.length, 9, "every numeric metric series must be retained");
+assert(metricColumns.includes("Inventory Value"), "Inventory Value must remain a metric rather than changing the worksheet parser");
+assert.strictEqual(worksheetTypes.wideTimeSeriesTargetColumn("Revenue", metricColumns), "Target Revenue", "Revenue must retain its explicit target relationship");
+assert.strictEqual(worksheetTypes.wideTimeSeriesTargetColumn("Transactions", metricColumns), null, "targets must never be invented");
+const evaluatedCells = worksheetTypes.evaluateWideTimeSeriesCells(monthlySales.rows[1].values, metricColumns);
+assert(evaluatedCells.invalidColumns.includes("Transactions"), "the invalid metric cell must be identified precisely");
+assert(evaluatedCells.metrics.some((metric) => metric.column === "Revenue"), "an invalid cell must not reject unrelated valid metrics from the row");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("2026-02"), "2026-02-01", "monthly periods must normalize deterministically");
+const sixValidMonths = Array.from({ length: 6 }, (_, index) => ({
+  ...monthlySales.rows[0].values,
+  Month: `2026-${String(index + 1).padStart(2, "0")}`
+}));
+assert.strictEqual(
+  sixValidMonths.reduce((total, row) => total + worksheetTypes.evaluateWideTimeSeriesCells(row, metricColumns).metrics.length, 0),
+  54,
+  "six valid monthly rows must expand into all nine metric series without row-level rejection"
+);
+
 const actions = fs.readFileSync(path.join(root, "app/app/files/actions.ts"), "utf8");
 const review = fs.readFileSync(path.join(root, "components/evidence/SourceImportReview.tsx"), "utf8");
 const workbookReview = fs.readFileSync(path.join(root, "components/evidence/WorkbookImportReview.tsx"), "utf8");
@@ -105,6 +188,13 @@ assert.match(actions, /business_memory_indexing[\s\S]*No rows are indexed or act
 assert.match(actions, /mode: "workbook"[\s\S]*worksheetPlans/, "workbook staging must preserve an independent plan for every worksheet");
 assert.match(actions, /approve_workbook_import/, "approved workbook imports must pass through the Tool Execution Gateway");
 assert.match(actions, /indexWorksheetImportEvidence/, "approved workbook rows must preserve source lineage in Business Memory");
+assert.match(actions, /plan\.selected_type === "wide_time_series"[\s\S]*buildWideTimeSeriesKpiRecords/, "wide time series must use its dedicated multi-metric record path");
+assert.doesNotMatch(actions, /wide_time_series[\s\S]{0,500}Item or SKU/, "wide time series must not inherit inventory identity requirements");
+assert.match(actions, /useImportRowIdentity: false/, "multiple metric series from one worksheet row must not be suppressed as duplicate import rows");
+assert.match(actions, /removeDuplicateOperationalMetricRows/, "re-preparing the same source must not duplicate previously accepted operational metrics");
+assert.match(actions, /imported_rows: Math\.max\(file\.imported_rows, acceptedRowCount\)/, "retry counts must remain idempotent");
+assert.match(actions, /business_memory_indexing", status: indexingSucceeded \? "complete" : "failed"/, "the final trace must reflect actual Business Memory indexing");
+assert.match(actions, /validationIssueCount[\s\S]*importFailureCount/, "pipeline reporting must distinguish validation issues from import failures");
 assert.match(actions, /skipped_worksheet/, "unapproved worksheets must be skipped without receiving irrelevant validation errors");
 assert.match(actions, /if \(!plan \|\| !plan\.enabled\) return \{ row, issues: \[\]/, "skipped worksheets must bypass row validation");
 assert.match(actions, /plan\.selected_type === "company_profile" \|\| plan\.selected_type === "unknown"/, "context-only worksheets must not create structured records");
