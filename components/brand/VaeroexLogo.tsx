@@ -17,12 +17,13 @@ const logoSizes = {
 
 export function VaeroexLogo({ variant = "full", size = "md", priority = false, className = "" }: VaeroexLogoProps) {
   const logo = logoSizes[size];
+  const src = variant === "symbol" ? "/icon-192.png" : "/brand/vaeroex-logo-white-wordmark.png";
 
   return (
     <span data-logo-variant={variant} className={`relative inline-flex shrink-0 items-center justify-center overflow-hidden ${logo.className} ${className}`}>
       <Image
-        src="/brand/vaeroex-logo.png"
-        alt="Vaeroex logo"
+        src={src}
+        alt="Vaeroex"
         width={logo.width}
         height={logo.height}
         priority={priority}

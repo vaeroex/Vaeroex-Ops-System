@@ -20,7 +20,7 @@ function safeFileName(value: string) {
 
 export function ReportExportActions({ title, reportType, body, dateRange }: ReportExportActionsProps) {
   const [message, setMessage] = useState("");
-  const reportText = `![Vaeroex logo](/brand/vaeroex-logo.png)\n\n# ${title}\n\nVaeroex Executive Report\n${reportType}\n${dateRange}\n\n${body || "No report body yet."}`;
+  const reportText = `![Vaeroex](/icon-192.png)\n\n# ${title}\n\nVaeroex Executive Report\n${reportType}\n${dateRange}\n\n${body || "No report body yet."}`;
 
   async function copyReport() {
     await navigator.clipboard.writeText(reportText);
