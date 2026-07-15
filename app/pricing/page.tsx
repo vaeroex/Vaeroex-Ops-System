@@ -10,8 +10,8 @@ import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emai
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Pricing",
-  description: "Vaeroex Operations Intelligence is $500 per month for a private business workspace, Business Memory, KPI intelligence, and evidence-backed leadership support.",
+  title: "Operations Intelligence Pricing | Vaeroex",
+  description: "Operations Intelligence by Vaeroex Intelligence Systems is $500 per month for a private workspace, Business Memory, KPI context, prioritized findings, and evidence-backed Reports.",
   path: "/pricing"
 });
 
@@ -19,12 +19,13 @@ const planInclusions = [
   "Private business workspace",
   "Business Memory",
   "Executive Overview and Business Health",
-  "KPI and performance intelligence",
-  "Risk and opportunity detection",
+  "KPI trends and performance context",
+  "Prioritized risks and positive signals",
   "Evidence-backed recommendations",
-  "Executive briefings",
-  "File analysis and structured import review",
-  "Search or Ask Vaeroex",
+  "Executive Brief and Board Report",
+  "Improvement Plan and Investigation Summary",
+  "Document, image, and multi-worksheet workbook analysis",
+  "Search or ask across eligible workspace evidence",
   "Continuous platform improvements"
 ] as const;
 
@@ -47,6 +48,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
     <article className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#07111f] shadow-command">
       <div className="border-b border-white/10 p-5 sm:p-6">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Operations Intelligence</p>
+        <p className="mt-2 text-xs font-medium text-slate-500">by Vaeroex Intelligence Systems</p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <h2 className="text-2xl font-semibold text-white">One complete workspace</h2>
           <div className="text-right">
@@ -90,9 +92,9 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Simple pricing"
+        eyebrow="Operations Intelligence by Vaeroex Intelligence Systems"
         title="Pay for operational clarity—not another place to manage work."
-        description="One monthly subscription gives leadership a private Operations Intelligence workspace with Business Memory, performance context, evidence-backed recommendations, and executive briefings."
+        description="One monthly subscription gives leadership a private Operations Intelligence workspace with Business Memory, performance context, prioritized findings, and evidence-backed Reports."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.billing} className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">Billing questions</a>
         }
@@ -153,6 +155,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       </section>
 
       <PublicCtaBand
+        eyebrow="Operations Intelligence by Vaeroex"
         title="Start with one private Operations Intelligence workspace."
         description="Bring together the evidence leadership already relies on and review what changed, what matters, and what needs attention next."
         primaryHref="/api/stripe/checkout"

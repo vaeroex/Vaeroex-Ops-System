@@ -5,7 +5,7 @@ import { VAEROEX_COMPANY_ADDRESS_LINES, VAEROEX_CONTACT_EMAILS, VAEROEX_FOOTER_L
 import { legalLinks } from "@/lib/legal/content";
 
 const platformLinks: Array<[string, Route]> = [
-  ["Platform", "/"],
+  ["Home", "/"],
   ["Operations Intelligence", "/operations-intelligence"],
   ["Pricing", "/pricing"],
   ["Trust", "/trust"]
@@ -39,7 +39,7 @@ export function PublicFooter() {
             <VaeroexLogo variant="symbol" size="xs" />
             <span className="font-semibold">Vaeroex</span>
           </Link>
-          <p className="mt-3 max-w-sm leading-6 text-slate-300">Operations Intelligence for leaders who need a clearer view of performance, risk, and what deserves review next.</p>
+          <p className="mt-3 max-w-sm leading-6 text-slate-300">Vaeroex Intelligence Systems builds evidence-backed software that turns fragmented information into clearer leadership understanding.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-4 text-xs leading-5">
             <p className="font-semibold text-slate-200">Business Address</p>
@@ -54,7 +54,7 @@ export function PublicFooter() {
         </div>
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           <div>
-            <p className="font-semibold text-slate-200">Platform</p>
+            <p className="font-semibold text-slate-200">Product</p>
             <div className="mt-2 grid gap-1.5">
               {platformLinks.map(([label, href]) => (
                 <Link key={href} href={href} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">

@@ -22,7 +22,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       title,
       description,
       url: canonical,
-      siteName: "Vaeroex",
+      siteName: "Vaeroex Intelligence Systems",
       type: "website",
       images: [
         {
@@ -45,11 +45,11 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
 export const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "Vaeroex",
+  name: "Vaeroex Intelligence Systems",
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
   logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`,
-  description: "Vaeroex is an Operations Intelligence Platform that turns fragmented business information into evidence-backed visibility, risks, priorities, and leadership recommendations.",
+  description: "Vaeroex Intelligence Systems develops evidence-backed intelligence software that turns fragmented information into decision-ready understanding for leadership.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",
@@ -77,8 +77,8 @@ export const operationsIntelligenceJsonLd = {
   url: `${PUBLIC_SITE_URL}/operations-intelligence`,
   publisher: {
     "@type": "Organization",
-    name: "Vaeroex",
+    name: "Vaeroex Intelligence Systems",
     url: PUBLIC_SITE_URL
   },
-  description: "Operations Intelligence by Vaeroex turns fragmented business activity into evidence-backed performance context, risk, opportunity, and leadership recommendations."
+  description: "Operations Intelligence by Vaeroex turns business evidence into executive understanding, prioritized findings, KPI context, Business Memory, and Reports."
 };

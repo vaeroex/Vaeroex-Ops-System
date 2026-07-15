@@ -7,7 +7,7 @@ export function MarketingDashboardPreview() {
     <aside className="vaeroex-dashboard-preview overflow-hidden rounded-lg border border-white/15 bg-[#07111f]/95 text-white shadow-command" aria-label="Illustrative Vaeroex Operations Intelligence preview">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
-          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-200">Leadership Brief</p>
+          <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-200">Executive Overview</p>
           <h2 className="mt-1 text-lg font-semibold">What needs attention now</h2>
         </div>
         <span className="w-fit rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-semibold text-slate-300">Illustrative</span>

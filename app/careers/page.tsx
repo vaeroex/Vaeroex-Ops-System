@@ -8,7 +8,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Careers at Vaeroex",
-  description: "Vaeroex is not currently listing open roles. Qualified builders, operators, and intelligence specialists may share future interest.",
+  description: "Vaeroex Intelligence Systems is not currently listing open roles. Qualified builders, operators, and intelligence specialists may share future interest.",
   path: "/careers"
 });
 
@@ -23,9 +23,9 @@ export default function CareersPage() {
     <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Careers at Vaeroex"
+        eyebrow="Vaeroex Intelligence Systems"
         title="We are not currently listing open positions."
-        description="Vaeroex is building Operations Intelligence carefully. As the company grows, future work may require engineers, product thinkers, operators, and domain specialists who value clarity, evidence, and responsible execution."
+        description="Vaeroex is building evidence-backed intelligence systems carefully. As the company grows, future work may require engineers, product thinkers, operators, and domain specialists who value clarity, evidence, and responsible execution."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.careers} className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
             Share future interest
