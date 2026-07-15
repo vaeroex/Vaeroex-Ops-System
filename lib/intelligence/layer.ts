@@ -3,6 +3,7 @@ import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from 
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { businessSignalMatchesEvidenceScope, isOpenBusinessSignal } from "@/lib/intelligence/business-signal-evidence";
+import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -126,6 +127,7 @@ export type IntelligenceLayerInput = {
   people?: PersonRow[];
   decisions?: DecisionRow[];
   recommendationOutcomes?: RecommendationOutcomeRow[];
+  operationalInsights?: IntelligenceInsight[];
 };
 
 const currencyFormatter = new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 0, style: "currency" });
@@ -157,22 +159,15 @@ function formatMetric(value: number | null, name: string) {
 }
 
 function latestKpisByName(kpis: KpiRow[]) {
-  const map = new Map<string, KpiRow>();
-
-  for (const kpi of [...kpis].sort((a, b) => b.metric_date.localeCompare(a.metric_date))) {
-    if (!map.has(kpi.name)) {
-      map.set(kpi.name, kpi);
-    }
-  }
-
-  return Array.from(map.values());
+  return Array.from(groupKpisByNormalizedName(kpis).values()).map((rows) => rows[0]);
 }
 
 function kpiHistoryCounts(kpis: KpiRow[]) {
   const map = new Map<string, number>();
 
   for (const kpi of kpis) {
-    map.set(kpi.name, (map.get(kpi.name) || 0) + 1);
+    const key = normalizeKpiName(kpi.name);
+    map.set(key, (map.get(key) || 0) + 1);
   }
 
   return map;
@@ -181,8 +176,9 @@ function kpiHistoryCounts(kpis: KpiRow[]) {
 function kpiHistoryByName(kpis: KpiRow[]) {
   const map = new Map<string, KpiRow[]>();
 
-  for (const kpi of [...kpis].sort((a, b) => b.metric_date.localeCompare(a.metric_date))) {
-    map.set(kpi.name, [...(map.get(kpi.name) || []), kpi]);
+  for (const kpi of [...kpis].sort(compareKpiRowsNewest)) {
+    const key = normalizeKpiName(kpi.name);
+    map.set(key, [...(map.get(key) || []), kpi]);
   }
 
   return map;
@@ -214,7 +210,7 @@ function kpiEvidenceRecord(kpi: KpiRow, support: string): IntelligenceEvidenceRe
     ? `source-file:${kpi.source_file_id}`
     : kpi.import_id
       ? `import:${kpi.import_id}`
-      : `kpi:${kpi.id}`;
+      : `manual-kpi:${normalizeKpiName(kpi.name)}`;
 
   return evidenceRecord({
     id: `kpi:${kpi.id}`,
@@ -281,13 +277,14 @@ export function consolidateDuplicateInsights(insights: IntelligenceInsight[]) {
     }
 
     const supportingRecords = uniqueBy([...current.supportingRecords, ...insight.supportingRecords], (record) => record.id);
-    const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
+    const independentSourceCount = new Set(supportingRecords.filter((record) => record.classification !== "Derived").map((record) => record.sourceKey)).size;
     grouped.set(fingerprint, {
       ...current,
       evidence: uniqueBy([...current.evidence, ...insight.evidence], (item) => item),
       supportingRecords,
       evidenceCount: supportingRecords.length,
       independentSourceCount,
+      confidence: current.confidence === "High" || insight.confidence === "High" || independentSourceCount >= 2 ? "High" : current.confidence,
       contradictoryEvidence: uniqueBy([...current.contradictoryEvidence, ...insight.contradictoryEvidence], (item) => item),
       missingEvidence: uniqueBy([...current.missingEvidence, ...insight.missingEvidence], (item) => item),
       sourceTypes: uniqueBy([...current.sourceTypes, ...insight.sourceTypes], (item) => item),
@@ -356,6 +353,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const people = filterOriginalBusinessEvidence(input.people);
   const decisions: DecisionRow[] = [];
   const recommendationOutcomes: RecommendationOutcomeRow[] = [];
+  const operationalInsights = input.operationalInsights || [];
   const openTasks = tasks.filter(isOpenBusinessSignal);
   const businessSignalsForReview = openTasks.filter((task) => businessSignalMatchesEvidenceScope(task, "related-signal-pattern"));
   const signalsWithLimitedContext = openTasks.filter((task) => businessSignalMatchesEvidenceScope(task, "limited-signal-context"));
@@ -367,8 +365,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const belowTargetKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
   const improvingKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value >= kpi.target);
   const pendingImports = imports.filter((item) => ["extracted", "needs_review"].includes(lower(item.status)));
-  const forecastReadyMetricNames = new Set(forecastEligibility.metrics.filter((metric) => metric.state === "ready").map((metric) => metric.name.toLowerCase()));
-  const forecastReadyKpis = latestKpis.filter((kpi) => forecastReadyMetricNames.has(kpi.name.toLowerCase()));
   const staleSops = sops.filter((sop) => {
     const date = new Date(sop.updated_at || sop.created_at);
     const ageDays = (Date.now() - date.getTime()) / 86400000;
@@ -409,6 +405,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const dataQualityLabel = dataQualityScore >= 70 ? "Strong" : dataQualityScore >= 40 ? "Developing" : "Limited";
   const dataConfidence = dataQualityScore >= 70 ? "High" : dataQualityScore >= 40 ? "Medium" : "Low";
   const insights: IntelligenceInsight[] = [
+    ...operationalInsights,
     ...openIssues.slice(0, 4).map((issue) => {
       const priority = priorityFrom(issue.severity);
       const evidence = [`Issue status: ${issue.status}`, `Severity: ${issue.severity}`, issue.root_cause ? `Root cause: ${issue.root_cause}` : "Root cause not documented"];
@@ -550,14 +547,16 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       })()
       : null,
     ...belowTargetKpis.slice(0, 4).map((kpi) => {
-      const history = historyCounts.get(kpi.name) || 1;
-      const belowTargetPeriods = (historyByName.get(kpi.name) || [kpi]).filter(
+      const key = normalizeKpiName(kpi.name);
+      const history = historyCounts.get(key) || 1;
+      const belowTargetPeriods = (historyByName.get(key) || [kpi]).filter(
         (row) => row.target !== null && row.actual_value !== null && row.actual_value < row.target * 0.9
       ).length;
       const evidence = [`Actual: ${formatMetric(kpi.actual_value, kpi.name)}`, `Target: ${formatMetric(kpi.target, kpi.name)}`, `Historical records: ${history}`];
-      const supportingRecords = (historyByName.get(kpi.name) || [kpi]).slice(0, 4).map((row, index) =>
+      const supportingRecords = (historyByName.get(key) || [kpi]).slice(0, 4).map((row, index) =>
         kpiEvidenceRecord(row, index === 0 ? "The latest recorded value is below the current target." : "This prior value establishes the recent KPI history.")
       );
+      const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
       const limitation = history < 3
         ? `Only ${history} historical record${history === 1 ? " is" : "s are"} available. Vaeroex cannot determine whether the gap is persistent.`
         : "The KPI history confirms the performance gap, but it does not establish the cause.";
@@ -570,11 +569,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         why: "The latest recorded value is below the current target.",
         impact: "The gap needs context before it can be tied to a cause or business impact.",
         recommendedAction: "Decide whether leadership should investigate the cause now or continue monitoring the next reporting period.",
-        confidence: history >= 3 ? "High" : "Medium",
+        confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
         evidence,
         evidenceCount: supportingRecords.length,
         supportingRecords,
-        independentSourceCount: new Set(supportingRecords.map((record) => record.sourceKey)).size,
+        independentSourceCount,
         contradictoryEvidence: [],
         missingEvidence: history < 3 ? ["At least three comparable historical periods", "Evidence explaining the change"] : ["Evidence explaining the change"],
         sourceTypes: ["KPIs"],
@@ -631,10 +630,12 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       };
     }),
     ...improvingKpis.slice(0, 3).map((kpi) => {
-      const history = historyCounts.get(kpi.name) || 1;
-      const supportingRecords = (historyByName.get(kpi.name) || [kpi]).slice(0, 4).map((row, index) =>
+      const key = normalizeKpiName(kpi.name);
+      const history = historyCounts.get(key) || 1;
+      const supportingRecords = (historyByName.get(key) || [kpi]).slice(0, 4).map((row, index) =>
         kpiEvidenceRecord(row, index === 0 ? "The latest value meets or exceeds the current target." : "This prior value establishes the recent KPI history.")
       );
+      const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
 
       return {
         id: `kpi-opportunity-${kpi.id}`,
@@ -644,11 +645,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         why: "The latest recorded value meets or exceeds the current target.",
         impact: "The result may be worth preserving, but the current records do not establish its cause.",
         recommendedAction: "Decide whether the practice behind this result is clear enough to preserve or requires a focused review.",
-        confidence: history >= 3 ? "High" : "Medium",
+        confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
         evidence: [`Metric date: ${kpi.metric_date}`, `Historical records: ${history}`, kpi.source ? `Source: ${kpi.source}` : "Source not recorded"],
         evidenceCount: supportingRecords.length,
         supportingRecords,
-        independentSourceCount: new Set(supportingRecords.map((record) => record.sourceKey)).size,
+        independentSourceCount,
         contradictoryEvidence: [],
         missingEvidence: ["Evidence explaining what caused the result"],
         sourceTypes: ["KPIs"],
@@ -658,36 +659,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         affectedArea: kpi.category || kpi.name,
         timePeriod: kpi.metric_date,
         limitation: history < 3 ? `Only ${history} historical record${history === 1 ? " is" : "s are"} available, so the result may not represent a durable trend.` : "The KPI history confirms the result, but not what caused it.",
-        fingerprint: ""
-      };
-    }),
-    ...forecastReadyKpis.slice(0, 3).map((kpi) => {
-      const supportingRecords = (historyByName.get(kpi.name) || [kpi]).slice(0, 6).map((row, index) =>
-        kpiEvidenceRecord(row, index === 0 ? "This is the latest point in the directional trend." : "This historical point contributes to the trend direction.")
-      );
-
-      return {
-        id: `forecast-${kpi.id}`,
-        type: "Forecast" as const,
-        title: `${kpi.name} has enough history for trend review`,
-        summary: `${historyCounts.get(kpi.name)} historical records are available for directional forecasting.`,
-        why: "The metric has enough dated history for directional trend review.",
-        impact: "The trend can inform a discussion, but it does not establish a forecasted outcome on its own.",
-        recommendedAction: "Decide whether the directional trend is sufficient for planning or whether causal evidence is needed first.",
-        confidence: "Medium" as const,
-        evidence: [`Latest value: ${formatMetric(kpi.actual_value, kpi.name)}`, `Target: ${formatMetric(kpi.target, kpi.name)}`, `History count: ${historyCounts.get(kpi.name)}`],
-        evidenceCount: supportingRecords.length,
-        supportingRecords,
-        independentSourceCount: new Set(supportingRecords.map((record) => record.sourceKey)).size,
-        contradictoryEvidence: [],
-        missingEvidence: ["Causal evidence supporting the forecast direction"],
-        sourceTypes: ["KPI history"],
-        sourceHref: "/app/kpis",
-        priority: "Medium" as const,
-        lastUpdated: kpi.updated_at || kpi.created_at,
-        affectedArea: kpi.category || kpi.name,
-        timePeriod: "Historical",
-        limitation: "Historical direction is available, but the records do not support a precise predicted outcome.",
         fingerprint: ""
       };
     }),

@@ -22,6 +22,7 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 };
 
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
+const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operational-evidence.ts");
 const { buildGeneratedOutput, fallbackGeneratedOutputSource } = require("../lib/intelligence/generated-output.ts");
 const {
   buildEvidenceGroups,
@@ -48,7 +49,7 @@ function signal(overrides = {}) {
 
 const supported = buildIntelligenceLayer({ kpis: [kpi(), kpi({ id: "kpi-2", metric_date: "2026-06-10", actual_value: 85 }), kpi({ id: "kpi-3", metric_date: "2026-05-10", actual_value: 90 })] });
 assert.equal(supported.topRisk?.title, "Revenue remained below target for 2 periods", "supported KPI findings state the observed duration directly");
-assert.equal(supported.topRisk?.confidence, "High", "historical KPI evidence supports high confidence");
+assert.equal(supported.topRisk?.confidence, "Medium", "one manual KPI series cannot claim multiple independent sources");
 assert.equal(supported.topRisk?.supportingRecords.length, 3, "KPI findings retain concrete supporting records");
 assert.match(supported.topRisk?.supportingRecords[0]?.href || "", /\/app\/kpis\?metric=Revenue/, "KPI evidence links to the original KPI detail");
 
@@ -62,6 +63,146 @@ const setupOnly = buildIntelligenceLayer({ tasks: [signal({ id: "setup-signal", 
 assert.equal(setupOnly.topRisk, undefined, "setup/bootstrap records must not become finding evidence");
 const archivedOnly = buildIntelligenceLayer({ tasks: [signal({ id: "archived-signal", archived_at: "2026-07-11T00:00:00Z" })] });
 assert.equal(archivedOnly.topRisk, undefined, "archived records must not become finding evidence");
+
+const retailFile = {
+  id: "retail-file", display_name: "Retail workbook.xlsx", original_name: "Retail workbook.xlsx", created_at: "2026-07-14T00:00:00Z", updated_at: "2026-07-14T00:00:00Z", archived_at: null, deleted_at: null, metadata_json: {}
+};
+const retailImport = { id: "retail-import", file_upload_id: retailFile.id, created_at: "2026-07-14T00:00:00Z", archived_at: null, deleted_at: null };
+const months = ["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"];
+function importedKpi(name, values, options = {}) {
+  return values.map((actual_value, index) => ({
+    id: `${name}-${index}`,
+    name,
+    actual_value,
+    target: options.target ?? null,
+    metric_date: months[index],
+    source: "Uploaded workbook",
+    source_file_id: retailFile.id,
+    import_id: retailImport.id,
+    import_row_id: `${name}-row-${index}`,
+    raw_data_json: {
+      "Vaeroex worksheet": "Monthly Sales",
+      "Vaeroex source row": index + 2,
+      "Vaeroex source file ID": retailFile.id
+    },
+    created_at: `2026-07-14T00:00:0${index}Z`,
+    updated_at: `2026-07-14T00:00:0${index}Z`,
+    archived_at: null,
+    deleted_at: null
+  }));
+}
+let operationalIndex = 0;
+function operationalRow(worksheet, rowNumber, raw, overrides = {}) {
+  operationalIndex += 1;
+  return {
+    id: `operational-${operationalIndex}`,
+    source_file_id: retailFile.id,
+    import_id: retailImport.id,
+    import_row_id: `import-row-${operationalIndex}`,
+    metric_name: overrides.metric_name || String(raw.SKU || raw.Order || raw.Customer || raw.Invoice || raw.Store || `Metric ${operationalIndex}`),
+    category: overrides.category || worksheet,
+    value: overrides.value ?? null,
+    metric_date: overrides.metric_date || "2026-06-01",
+    owner: null,
+    notes: null,
+    raw_data_json: { ...raw, "Vaeroex worksheet": worksheet, "Vaeroex source row": rowNumber, "Vaeroex source file ID": retailFile.id },
+    created_at: `2026-07-14T00:${String(operationalIndex).padStart(2, "0")}:00Z`,
+    updated_at: `2026-07-14T00:${String(operationalIndex).padStart(2, "0")}:00Z`,
+    archived_at: null,
+    deleted_at: null,
+    ...overrides
+  };
+}
+function memoryChunk(worksheet, index) {
+  return {
+    id: `chunk-${index}`,
+    source_type: "file",
+    source_id: retailFile.id,
+    source_file_id: retailFile.id,
+    source_title: `Retail workbook · ${worksheet}`,
+    source_excerpt: `${worksheet} indexed evidence excerpt`,
+    summary: `${worksheet} summary`,
+    chunk_index: index,
+    content_hash: `hash-${index}`,
+    source_metadata: { worksheet_name: worksheet, evidence_classification: "business_evidence", evidence_lifecycle: "active" },
+    source_quality: "high",
+    confidence_score: 90,
+    token_estimate: 20,
+    indexed_at: "2026-07-14T01:00:00Z",
+    created_at: "2026-07-14T01:00:00Z",
+    updated_at: "2026-07-14T01:00:00Z",
+    archived_at: null,
+    deleted_at: null
+  };
+}
+const retailKpis = [
+  ...importedKpi("Revenue", [1185000, 1170000, 1150000, 1130000, 1110000, 1095000], { target: 1200000 }),
+  ...importedKpi("Transactions", [18420, 18100, 17800, 17500, 17200, 16920]),
+  ...importedKpi("Gross Margin %", [48.2, 47.4, 46.5, 45.6, 44.7, 43.7]),
+  ...importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]),
+  ...importedKpi("Inventory Value", [2100000, 2200000, 2300000, 2400000, 2500000, 2700000]),
+  ...importedKpi("Online Sales", [42000, 44000, 46500, 49000, 52000, 54500])
+];
+const retailMetrics = [
+  ...Array.from({ length: 6 }, (_, index) => operationalRow("Inventory", index + 2, { SKU: `SKU-${index + 1}`, Status: "Critical", "On Hand": 10 + index, "Reorder Point": 30 + index })),
+  ...Array.from({ length: 12 }, (_, index) => operationalRow("Orders", index + 2, { Order: `ORD-${index + 1}`, Status: "Delayed", "Customer Complaint": index < 6 ? "Yes" : "No" })),
+  ...Array.from({ length: 16 }, (_, index) => operationalRow("Customer Feedback", index + 2, { Customer: `CUST-${index + 1}`, Rating: 2, Resolved: index < 13 ? "No" : "Yes" })),
+  ...Array.from({ length: 10 }, (_, index) => operationalRow("Supplier Invoices", index + 2, { Invoice: `INV-${index + 1}`, Amount: 1000 + index * 100, Status: "Overdue" })),
+  ...[28.8, 31.2, 34.5, 37.1, 39.4, 42.0, 44.3, 46.2].map((margin, index) => operationalRow("Store Performance", index + 2, { Store: `Store ${index + 1}`, "Gross Margin %": margin, "Overtime Hours": 20 + index * 10 }))
+];
+const retailChunks = ["Monthly Sales", "Inventory", "Orders", "Customer Feedback", "Supplier Invoices", "Store Performance"].map(memoryChunk);
+const retailInsights = buildOperationalEvidenceInsights({ kpis: retailKpis, operationalMetrics: retailMetrics, memoryChunks: retailChunks, files: [retailFile], imports: [retailImport] });
+assert.equal(retailInsights.length, 6, "retail evidence is capped at six prioritized findings");
+for (const title of [
+  "Margin and returns are moving in the wrong direction",
+  "Inventory increased while sales activity declined",
+  "Customer and order exceptions require attention",
+  "Store performance varies materially",
+  "Supplier invoices include overdue obligations",
+  "Online sales are increasing"
+]) assert.ok(retailInsights.some((insight) => insight.title === title), `${title} must be generated deterministically`);
+const customerExceptions = retailInsights.find((insight) => insight.title === "Customer and order exceptions require attention");
+assert.match(customerExceptions.summary, /12 delayed orders/);
+assert.match(customerExceptions.summary, /6 orders with customer complaints/);
+assert.match(customerExceptions.summary, /16 feedback ratings of two or lower/);
+assert.match(customerExceptions.summary, /13 unresolved feedback records/);
+const inventoryFinding = retailInsights.find((insight) => insight.title === "Inventory increased while sales activity declined");
+assert.match(inventoryFinding.summary, /6 inventory items .*below reorder level/);
+assert.match(inventoryFinding.limitation, /do not prove|does not prove/i, "cross-metric language must reject causation");
+const onlineFinding = retailInsights.find((insight) => insight.title === "Online sales are increasing");
+assert.equal(onlineFinding.confidence, "Medium", "one workbook caps finding confidence at Medium");
+assert.equal(onlineFinding.independentSourceCount, 1, "chunks and KPI points from one workbook remain one independent source");
+assert.ok(onlineFinding.supportingRecords.some((record) => record.recordType === "Business Memory citation"), "eligible memory supports an existing finding");
+assert.equal(buildOperationalEvidenceInsights({ memoryChunks: retailChunks, files: [retailFile], imports: [retailImport] }).length, 0, "memory chunks cannot independently create findings");
+const withInactiveMetric = buildOperationalEvidenceInsights({
+  kpis: retailKpis,
+  operationalMetrics: [
+    ...retailMetrics,
+    operationalRow("Orders", 99, { Order: "ARCHIVED", Status: "Delayed" }, { archived_at: "2026-07-14T02:00:00Z" }),
+    operationalRow("Orders", 100, { Order: "SETUP", Status: "Delayed", setup_bootstrap: true })
+  ],
+  memoryChunks: retailChunks,
+  files: [retailFile],
+  imports: [retailImport]
+});
+assert.match(withInactiveMetric.find((insight) => insight.title === "Customer and order exceptions require attention").summary, /12 delayed orders/, "inactive operational rows are excluded before counting");
+assert.equal(buildOperationalEvidenceInsights({ kpis: retailKpis, operationalMetrics: retailMetrics, files: [{ ...retailFile, archived_at: "2026-07-14T02:00:00Z" }], imports: [retailImport] }).length, 0, "parent-ineligible operational evidence is excluded");
+const returnsOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]), files: [retailFile], imports: [retailImport] });
+assert.equal(returnsOnly[0]?.title, "Returns increased across the available periods", "an approved returns direction creates a bounded adverse trend without another metric");
+const marginOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Gross Margin %", [48.2, 47.4, 46.5, 45.6, 44.7, 43.7]), files: [retailFile], imports: [retailImport] });
+assert.equal(marginOnly[0]?.title, "Gross margin declined across the available periods", "an approved margin direction creates a bounded adverse trend without another metric");
+const unfamiliarOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Mystery Index", [10, 20, 30, 40, 50, 60]), files: [retailFile], imports: [retailImport] });
+assert.equal(unfamiliarOnly.length, 0, "unfamiliar metrics do not receive invented direction or targets");
+const belowTargetOnly = buildIntelligenceLayer({ kpis: importedKpi("Revenue", [1185000, 1170000, 1150000, 1130000, 1110000, 1095000], { target: 1200000 }), files: [retailFile], imports: [retailImport] });
+assert.equal(belowTargetOnly.topRisk, undefined, "8.75% below target does not cross the existing 10% risk threshold");
+assert.equal(belowTargetOnly.insights.some((insight) => insight.type === "Forecast"), false, "forecast readiness does not create generic finding cards");
+const deterministicLatest = buildIntelligenceLayer({
+  kpis: [
+    kpi({ id: "older", name: "Revenue", actual_value: 80, target: 100, metric_date: "2026-07-10", updated_at: "2026-07-10T01:00:00Z" }),
+    kpi({ id: "newer", name: "revenue", actual_value: 120, target: 100, metric_date: "2026-07-10", updated_at: "2026-07-10T02:00:00Z" })
+  ]
+});
+assert.equal(deterministicLatest.topOpportunity?.supportingRecords[0]?.id, "kpi:newer", "normalized KPI identity uses the deterministic latest-row tie-breaker");
 
 const evidenceFixture = Array.from({ length: 120 }, (_, index) => ({
   id: `signal:00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
@@ -141,6 +282,8 @@ assert.match(inboxSource, /Create Investigation Summary/, "risk findings expose 
 assert.doesNotMatch(inboxSource, /Generate Executive Briefing|Generate Improvement Plan|Explain This/, "normal finding review must not show competing generator actions");
 assert.match(inboxSource, /buildEvidenceGroups\(insight\.supportingRecords\)/, "evidence view must group supporting records deterministically");
 assert.match(inboxSource, /signalTypes\.filter\(\(type\) => counts\[type\] > 0\)/, "zero-count finding categories must be hidden");
+assert.match(inboxSource, /useState<SignalView>\("All"\)/, "All findings is the default executive view");
+assert.match(inboxSource, /Positive signals/, "opportunities use plain executive language");
 assert.match(inboxSource, /Vaeroex found related records, but the available information does not identify an owner, completed outcome, or measurable business effect\./, "weak findings must use a concise specificity fallback");
 assert.match(inboxSource, /More information needed: owner, completion status, and outcome\./, "weak findings must state the missing fields directly");
 assert.match(inboxSource, /selectCollapsedRepresentatives\(groups\)/, "evidence view must use bounded representative records");
@@ -170,5 +313,7 @@ assert.match(saveActionSource, /redirect\(`\/app\/reports\/\$\{report\.id\}/, "s
 assert.match(savedReportSource, /Generated from Intelligence finding/, "saved reports preserve a route to the origin finding");
 assert.match(appNavigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested Intelligence and Reports routes must keep their sidebar section active");
 assert.doesNotMatch(intelligencePageSource, /Forecast Summary/, "weak forecast readiness is not promoted into the executive summary");
+assert.match(intelligencePageSource, /from\("operational_metrics"\)/, "Intelligence loads bounded operational evidence");
+assert.match(intelligencePageSource, /filterEligibleMemoryRowsByLifecycle/, "Intelligence validates memory parent lifecycle before citation use");
 
 process.stdout.write("Intelligence experience regressions passed.\n");

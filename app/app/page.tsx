@@ -15,6 +15,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
+import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
@@ -24,6 +25,7 @@ import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepa
 import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
+import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import {
   applyKpiSettingsToRows,
@@ -1545,7 +1547,17 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
   const decisions = filterBusinessEvidence((decisionResult.data || []) as BusinessDecisionRow[]);
   const recommendationOutcomes = filterBusinessEvidence((recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[]);
-  const memoryChunks = (memoryChunksResult.data || []) as BusinessMemoryChunkRow[];
+  let memoryChunks = [] as BusinessMemoryChunkRow[];
+  let memoryEligibilityError: Error | null = null;
+  try {
+    memoryChunks = await filterEligibleMemoryRowsByLifecycle({
+      supabase,
+      workspaceId,
+      rows: (memoryChunksResult.data || []) as BusinessMemoryChunkRow[]
+    }) as BusinessMemoryChunkRow[];
+  } catch (error) {
+    memoryEligibilityError = error instanceof Error ? error : new Error("Business Memory eligibility could not be verified.");
+  }
   const errors = [
     kpiResult.error,
     kpiSettingsResult.error,
@@ -1569,7 +1581,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisionResult.error,
     recommendationOutcomeResult.error,
     memoryChunksResult.error,
-    sourceParentResult.error
+    sourceParentResult.error,
+    memoryEligibilityError
   ].filter(Boolean);
   const businessHealthSourceErrors = [
     kpiResult.error,
@@ -1591,7 +1604,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisionResult.error,
     recommendationOutcomeResult.error,
     memoryChunksResult.error,
-    sourceParentResult.error
+    sourceParentResult.error,
+    memoryEligibilityError
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
@@ -1965,6 +1979,13 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     decisions,
     recommendationOutcomes
   });
+  const operationalInsights = buildOperationalEvidenceInsights({
+    kpis,
+    operationalMetrics,
+    memoryChunks,
+    files,
+    imports
+  });
   const intelligenceLayer = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     kpis,
@@ -1978,7 +1999,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sops,
     people,
     decisions,
-    recommendationOutcomes
+    recommendationOutcomes,
+    operationalInsights
   });
   const businessHealthMemorySignals = intelligenceLayer.memorySummary.sourceRecords + intelligenceLayer.memorySummary.kpiHistoryRecords;
   if (!businessHealthSourceErrors.length && intelligenceLayer.businessHealth.available) {

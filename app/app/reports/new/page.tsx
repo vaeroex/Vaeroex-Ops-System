@@ -4,8 +4,11 @@ import { saveGeneratedOutputToReportsAction } from "@/app/app/generated/actions"
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
+import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { buildGeneratedOutput, parseGeneratedOutputType, sourceFromSearchParams } from "@/lib/intelligence/generated-output";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
+import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -83,7 +86,7 @@ export default async function NewReportPage({ searchParams }: NewReportPageProps
   }
 
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult] = await Promise.all([
+  const [tasksResult, issuesResult, kpisResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
@@ -95,25 +98,50 @@ export default async function NewReportPage({ searchParams }: NewReportPageProps
     supabase.from("form_submissions").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false })
+    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
+    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500)
   ]);
-  const errors = [tasksResult.error, issuesResult.error, kpisResult.error, filesResult.error, crmResult.error, importsResult.error, sopsResult.error, formsResult.error, submissionsResult.error, peopleResult.error, decisionsResult.error, outcomesResult.error].filter(Boolean);
+  const sourceParentResult = await loadSourceParentEligibilityResult({
+    supabase,
+    workspaceId,
+    rows: [...(kpisResult.data || []), ...(crmResult.data || []), ...(metricsResult.data || [])]
+  });
+  const eligibleKpis = filterBySourceParentEligibility(kpisResult.data || [], sourceParentResult.eligibility);
+  const eligibleMetrics = filterBySourceParentEligibility(metricsResult.data || [], sourceParentResult.eligibility);
+  const eligibleCustomerEvidence = filterBySourceParentEligibility(crmResult.data || [], sourceParentResult.eligibility);
+  let eligibleMemoryChunks = [] as NonNullable<typeof memoryResult.data>;
+  let memoryEligibilityError: Error | null = null;
+  try {
+    eligibleMemoryChunks = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: memoryResult.data || [] });
+  } catch (error) {
+    memoryEligibilityError = error instanceof Error ? error : new Error("Business Memory eligibility could not be verified.");
+  }
+  const operationalInsights = buildOperationalEvidenceInsights({
+    kpis: eligibleKpis,
+    operationalMetrics: eligibleMetrics,
+    memoryChunks: eligibleMemoryChunks,
+    files: filesResult.data || [],
+    imports: importsResult.data || []
+  });
+  const errors = [tasksResult.error, issuesResult.error, kpisResult.error, filesResult.error, crmResult.error, importsResult.error, sopsResult.error, formsResult.error, submissionsResult.error, peopleResult.error, decisionsResult.error, outcomesResult.error, metricsResult.error, memoryResult.error, sourceParentResult.error, memoryEligibilityError].filter(Boolean);
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],
     issues: issuesResult.data || [],
-    kpis: kpisResult.data || [],
+    kpis: eligibleKpis,
     files: filesResult.data || [],
     reports: [],
     vaeroexRuns: [],
-    crmLeads: crmResult.data || [],
+    crmLeads: eligibleCustomerEvidence,
     imports: importsResult.data || [],
     sops: sopsResult.data || [],
     forms: formsResult.data || [],
     submissions: submissionsResult.data || [],
     people: peopleResult.data || [],
     decisions: decisionsResult.data || [],
-    recommendationOutcomes: outcomesResult.data || []
+    recommendationOutcomes: outcomesResult.data || [],
+    operationalInsights
   });
   const source = sourceFromSearchParams({ params, intelligence });
   const output = buildGeneratedOutput({ type: outputType, source, intelligence, workspaceName: context.activeWorkspace?.name });
