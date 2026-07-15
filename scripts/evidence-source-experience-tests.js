@@ -27,6 +27,7 @@ assert.equal((sourcesPage.match(/>Download original<\/a>/g) || []).length, 1, "s
 assert.match(sourcesPage, /View source details/, "source detail must expose metadata progressively");
 assert.match(sourceImportReview, /Nothing is added to active KPI or metric history until you approve/, "structured imports must retain explicit review");
 assert.match(sourcesPage, /file_import_rows[\s\S]{0,220}\.eq\("workspace_id", workspaceId\)[\s\S]{0,120}\.eq\("file_upload_id", params\.file\)/, "source detail import rows must be scoped to both workspace and selected source before limiting");
+assert.match(sourcesPage, /file_import_rows[\s\S]{0,300}\.eq\("status", "staged"\)[\s\S]{0,120}\.limit\(2000\)/, "source detail must load only the current staged workbook generation before limiting");
 assert.match(fileActions, /requireToolExecution[\s\S]*approve_kpi_import/, "import approval must retain the Tool Execution Gateway");
 assert.match(fileActions, /safeFileReturnPath[\s\S]*startsWith\(`\$\{SOURCES_PATH\}\//, "server actions must safely return to nested source routes");
 assert.match(sourcesPage, /manageSourceFileAction/, "source detail must retain transactional lifecycle controls");

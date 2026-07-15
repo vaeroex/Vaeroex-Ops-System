@@ -1097,6 +1097,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         .select("*")
         .eq("workspace_id", workspaceId)
         .eq("file_upload_id", params.file)
+        .eq("status", "staged")
         .order("row_number", { ascending: true })
         .limit(2000)
     : Promise.resolve({ data: [], error: null });

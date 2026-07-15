@@ -164,6 +164,47 @@ const evaluatedCells = worksheetTypes.evaluateWideTimeSeriesCells(monthlySales.r
 assert(evaluatedCells.invalidColumns.includes("Transactions"), "the invalid metric cell must be identified precisely");
 assert(evaluatedCells.metrics.some((metric) => metric.column === "Revenue"), "an invalid cell must not reject unrelated valid metrics from the row");
 assert.strictEqual(worksheetTypes.parseWorksheetPeriod("2026-02"), "2026-02-01", "monthly periods must normalize deterministically");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("01/2026"), "2026-01-01", "numeric month/year periods must normalize deterministically");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("Jan 2026"), "2026-01-01", "abbreviated month/year periods must normalize deterministically");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("January 2026"), "2026-01-01", "full month/year periods must normalize deterministically");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("Q1 2026"), "2026-01-01", "quarter/year periods must normalize deterministically");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("2026 Q2"), "2026-04-01", "year/quarter periods must normalize deterministically");
+assert.strictEqual(worksheetTypes.parseWorksheetPeriod("Sept"), "month:09", "month-only labels must normalize without inventing a year");
+assert.strictEqual(worksheetTypes.worksheetPeriodDate("September"), null, "month-only labels must never become fabricated database dates");
+for (const [index, labels] of [
+  [1, ["Jan", "January"]], [2, ["Feb", "February"]], [3, ["Mar", "March"]],
+  [4, ["Apr", "April"]], [5, ["May"]], [6, ["Jun", "June"]],
+  [7, ["Jul", "July"]], [8, ["Aug", "August"]], [9, ["Sep", "Sept", "September"]],
+  [10, ["Oct", "October"]], [11, ["Nov", "November"]], [12, ["Dec", "December"]]
+]) {
+  for (const label of labels) assert.strictEqual(worksheetTypes.parseWorksheetPeriod(label), `month:${String(index).padStart(2, "0")}`, `${label} must be recognized without inventing a year`);
+}
+
+const monthOnlySeries = (months) => ({
+  name: "Monthly Sales",
+  columns: monthlySales.columns,
+  rows: months.map((month, index) => ({
+    values: { ...monthlySales.rows[0].values, Month: month, Revenue: 125000 + index, Transactions: 420 + index }
+  }))
+});
+assert.strictEqual(worksheetTypes.detectWorksheetType(monthOnlySeries(["Jan", "Feb", "Mar", "Apr", "May", "Jun"])), "wide_time_series", "ordered abbreviated month labels must qualify as a time series");
+assert.strictEqual(worksheetTypes.detectWorksheetType(monthOnlySeries(["January", "February", "March", "April", "May", "June"])), "wide_time_series", "ordered full month labels must qualify as a time series");
+assert.notStrictEqual(worksheetTypes.detectWorksheetType(monthOnlySeries(["Jan", "Mar", "Feb"])), "wide_time_series", "unordered month-only labels must not qualify as a time series");
+assert.strictEqual(worksheetTypes.detectWorksheetType(monthOnlySeries(["Jan 2026", "Feb 2026", "Mar 2026"])), "wide_time_series", "month/year labels must qualify as a time series");
+assert.strictEqual(worksheetTypes.detectWorksheetType(monthOnlySeries(["Q1 2026", "Q2 2026", "Q3 2026"])), "wide_time_series", "quarter labels must qualify as a time series");
+assert.notStrictEqual(worksheetTypes.detectWorksheetType({ name: "Inventory Summary", columns: ["Month", "Inventory Value", "Carrying Cost"], rows: monthOnlySeries(["Jan", "Feb"]).rows }), "inventory", "Inventory Value without entity-level inventory structure must not trigger inventory classification");
+assert.strictEqual(worksheetTypes.detectWorksheetType({ name: "Inventory", columns: ["SKU", "Item", "On Hand", "Reorder Point"], rows: [] }), "inventory", "entity-level inventory worksheets must remain inventory");
+for (const worksheet of [
+  { name: "Orders", columns: ["Date", "Order ID", "Amount", "Quantity"] },
+  { name: "Customers", columns: ["Date", "Customer ID", "Revenue", "Orders"] },
+  { name: "Employees", columns: ["Date", "Employee ID", "Hours", "Cost"] },
+  { name: "Vendors", columns: ["Date", "Vendor ID", "Spend", "Orders"] },
+  { name: "Suppliers", columns: ["Date", "Supplier ID", "Spend", "Lead Time"] }
+]) {
+  assert.notStrictEqual(worksheetTypes.detectWorksheetType({ ...worksheet, rows: [{ values: Object.fromEntries(worksheet.columns.map((column, index) => [column, index === 0 ? "2026-01-01" : index + 1])) }] }), "wide_time_series", `${worksheet.name} entity rows must not enter the time-series path`);
+}
+assert.strictEqual(worksheetTypes.workbookDetectionPlanIsStale({ mode: "workbook", worksheets: [] }), true, "unversioned workbook plans must be eligible for re-preparation");
+assert.strictEqual(worksheetTypes.workbookDetectionPlanIsStale({ mode: "workbook", detection_version: worksheetTypes.WORKBOOK_DETECTION_VERSION, worksheets: [] }), false, "current workbook plans must not be marked stale");
 const sixValidMonths = Array.from({ length: 6 }, (_, index) => ({
   ...monthlySales.rows[0].values,
   Month: `2026-${String(index + 1).padStart(2, "0")}`
@@ -186,6 +227,11 @@ assert.doesNotMatch(actions, /rows\.slice\(0,\s*1000\)/, "structured imports mus
 assert.match(actions, /validateImportRow[\s\S]*Required mapping/, "every staged row must receive explicit import validation");
 assert.match(actions, /business_memory_indexing[\s\S]*No rows are indexed or activated before import approval/, "the trace must state the Business Memory boundary");
 assert.match(actions, /mode: "workbook"[\s\S]*worksheetPlans/, "workbook staging must preserve an independent plan for every worksheet");
+assert.match(actions, /detection_version: WORKBOOK_DETECTION_VERSION/, "new workbook plans must persist a deterministic detection version");
+assert.match(actions, /reprepareImportId[\s\S]*\.eq\("workspace_id", workspaceId\)[\s\S]*\.eq\("file_upload_id", file\.id\)/, "workbook re-preparation must resolve its target inside the active workspace and source");
+assert.match(actions, /if \(reprepareImport\)[\s\S]*importRecord = \{ id: reprepareImport\.id \}/, "re-preparation must reuse the existing import record rather than creating a duplicate import");
+assert.match(actions, /status: "superseded"/, "previous unapproved staging rows must be retired before the refreshed plan is reviewed");
+assert.match(actions, /\.eq\("status", "staged"\)[\s\S]*\.order\("row_number"/, "approval must load only the current staged workbook generation");
 assert.match(actions, /approve_workbook_import/, "approved workbook imports must pass through the Tool Execution Gateway");
 assert.match(actions, /indexWorksheetImportEvidence/, "approved workbook rows must preserve source lineage in Business Memory");
 assert.match(actions, /plan\.selected_type === "wide_time_series"[\s\S]*buildWideTimeSeriesKpiRecords/, "wide time series must use its dedicated multi-metric record path");
@@ -202,12 +248,22 @@ assert.match(actions, /metricRows = planRows\.filter\(\(row\) => hasMappedNumeri
 assert.match(actions, /structuredFailureIds[\s\S]*runtimeIssues[\s\S]*for \(const plan of enabledPlans\)/, "worksheet write failures must be tracked without collapsing all sheets into one operation");
 assert.match(actions, /"Vaeroex workbook"[\s\S]*"Vaeroex worksheet"[\s\S]*"Vaeroex source row"/, "structured records must retain workbook, worksheet, and original-row lineage");
 assert.match(evidenceIndex, /source_type: "file"[\s\S]*source_file_id: file\.id[\s\S]*worksheet_name[\s\S]*row_numbers/, "Business Memory chunks must retain source-parent and worksheet lineage");
+const worksheetIndexing = evidenceIndex.slice(evidenceIndex.indexOf("export async function indexWorksheetImportEvidence"));
+assert(
+  worksheetIndexing.indexOf("previousWorksheetRows") < worksheetIndexing.indexOf('.upsert(rows, {'),
+  "superseded worksheet evidence must be identified and retired before replacement chunks are upserted"
+);
+assert.match(worksheetIndexing, /restoreSupersededWorksheetRows[\s\S]*if \(error\)[\s\S]*restoreSupersededWorksheetRows/, "failed replacement indexing must restore previously active worksheet evidence");
 assert.match(toolGateway, /approve_workbook_import:[\s\S]*allowedRoles: OPERATOR_ROLES/, "workbook approval must retain the existing operator-role boundary");
 assert.match(workbookReview, /Dataset type/, "users must be able to review and change worksheet detection");
 assert.match(workbookReview, /WORKSHEET_IMPORT_FIELDS\[plan\.selected_type\]/, "the review must show only the mapping for the selected worksheet type");
 assert.match(workbookReview, /worksheet_\$\{plan\.index\}_map_\$\{field\.key\}/, "worksheet mappings must be submitted independently");
 assert.match(review, /Ingestion pipeline trace/, "source review must expose the complete stage trace");
 assert.match(review, /issue\.worksheet[\s\S]*issue\.rowNumber/, "source review must identify worksheet and row failures");
+assert.match(review, /Re-prepare workbook/, "workbook review must expose re-preparation for stale and needs-review plans");
+assert.match(review, /Re-run worksheet detection using the latest import rules\. Existing approved records will not be duplicated\./, "re-preparation must explain its safe effect");
+assert.match(review, /workbookDetectionPlanIsStale/, "older workbook plans must be detected without silently rewriting them during render");
+assert.match(review, /row\.status === "staged"/, "the review UI must render only the latest staged rows");
 assert.match(sources, /Import failed/, "structured import failures must not be mislabeled as AI analysis failures");
 
 console.log("Spreadsheet ingestion regression tests passed.");

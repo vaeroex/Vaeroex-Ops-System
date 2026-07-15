@@ -1081,23 +1081,22 @@ export async function indexWorksheetImportEvidence({
       deleted_at: null
     };
   });
-  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
-    onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
-  });
-
-  if (error) {
-    await supabase
-      .from("file_uploads")
-      .update({ index_status: "failed", index_error: error.message, indexed_at: indexedAt })
-      .eq("workspace_id", workspaceId)
-      .eq("id", file.id);
-    return { indexedChunks: 0, error: error.message };
-  }
-
   const currentChunkKeys = new Set(rows.map((row) => `${row.content_hash}:${row.chunk_index}`));
   const previousWorksheetRows = (existingRows || []).filter((row) =>
     metadataRecord(row.source_metadata).indexing_method === "worksheet_import" && !currentChunkKeys.has(`${row.content_hash}:${row.chunk_index}`)
   );
+  const restoreSupersededWorksheetRows = async () => {
+    const results = await Promise.all(previousWorksheetRows.map((row) => supabase
+      .from("business_memory_chunks")
+      .update({
+        archived_at: null,
+        deleted_at: null,
+        source_metadata: row.source_metadata
+      })
+      .eq("workspace_id", workspaceId)
+      .eq("id", row.id)));
+    return results.find((result) => result.error)?.error || null;
+  };
   for (let index = 0; index < previousWorksheetRows.length; index += 20) {
     const batch = previousWorksheetRows.slice(index, index + 20);
     const updates = await Promise.all(batch.map((row) => {
@@ -1117,7 +1116,32 @@ export async function indexWorksheetImportEvidence({
         .eq("id", row.id);
     }));
     const updateError = updates.find((result) => result.error)?.error;
-    if (updateError) return { indexedChunks: rows.length, error: updateError.message };
+    if (updateError) {
+      const rollbackError = await restoreSupersededWorksheetRows();
+      return {
+        indexedChunks: 0,
+        error: rollbackError
+          ? `${updateError.message} Superseded evidence restoration also failed: ${rollbackError.message}`
+          : updateError.message
+      };
+    }
+  }
+
+  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
+    onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
+  });
+
+  if (error) {
+    const rollbackError = await restoreSupersededWorksheetRows();
+    const errorMessage = rollbackError
+      ? `${error.message} Superseded evidence restoration also failed: ${rollbackError.message}`
+      : error.message;
+    await supabase
+      .from("file_uploads")
+      .update({ index_status: "failed", index_error: errorMessage, indexed_at: indexedAt })
+      .eq("workspace_id", workspaceId)
+      .eq("id", file.id);
+    return { indexedChunks: 0, error: errorMessage };
   }
 
   const { count, error: countError } = await supabase
