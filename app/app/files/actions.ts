@@ -12,7 +12,14 @@ import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { cleanExtractedText, extractDocxText, extractPdfText } from "@/lib/imports/document-text";
-import { parseSpreadsheetRows, previewRows, type ImportCellValue, type ImportRow } from "@/lib/imports/spreadsheets";
+import {
+  parseSpreadsheetWorkbook,
+  previewRows,
+  type ImportCellValue,
+  type ImportRow,
+  type SpreadsheetRow,
+  type SpreadsheetWorkbook
+} from "@/lib/imports/spreadsheets";
 import { approvedKpiColor } from "@/lib/kpis/settings";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
@@ -52,6 +59,7 @@ type FileContentExtraction = {
   contentNote: string;
   extractionFailureReason?: string;
   fileAttachment?: VaeroexFileAttachment;
+  spreadsheet?: SpreadsheetWorkbook;
 };
 type FileAnalysisConfidenceLabel = "High" | "Medium" | "Low";
 type FileAnalysisEvidenceQuality = "strong" | "moderate" | "weak";
@@ -113,6 +121,7 @@ const SOURCES_PATH = "/app/sources";
 const STORAGE_BUCKET = "workspace-files";
 const MAX_ANALYSIS_ROWS = 60;
 const MAX_REPORT_ROWS = 100;
+const MAX_IMPORT_ROWS = 1000;
 const MAX_EXTRACTED_TEXT_CHARS = 18_000;
 const MAX_TEXT_PREVIEW_CHARS = 4_000;
 const KPI_IMPORT_CHART_TYPES = ["line", "bar", "mixed"] as const;
@@ -528,7 +537,7 @@ function cell(row: ImportRow, candidates: string[]) {
 }
 
 function importHeaders(rows: ImportRow[]) {
-  return Object.keys(rows[0] || {}).filter(Boolean);
+  return Array.from(new Set(rows.flatMap((row) => Object.keys(row)))).filter(Boolean);
 }
 
 function inferMapping(importType: ImportType, rows: ImportRow[]) {
@@ -651,25 +660,42 @@ function jsonToImportRow(value: Json): ImportRow {
   }, {});
 }
 
-function mappedRowJson(row: ImportRow, mapping: ImportMapping, importType: ImportType) {
-  return IMPORT_FIELDS[importType].reduce<JsonRecord>((mapped, field) => {
+function mappedRowJson(row: ImportRow, mapping: ImportMapping, importType: ImportType, source?: SpreadsheetRow) {
+  const mapped = IMPORT_FIELDS[importType].reduce<JsonRecord>((result, field) => {
     const value = mappedCell(row, mapping, field);
 
     if (value !== null && value !== undefined && String(value).trim() !== "") {
-      mapped[field.key] = value;
+      result[field.key] = value;
     }
 
-    return mapped;
-  }, {}) as Json;
+    return result;
+  }, {});
+
+  if (source) {
+    mapped.__source = {
+      worksheet: source.worksheetName,
+      worksheet_index: source.worksheetIndex,
+      row_number: source.worksheetRowNumber
+    };
+  }
+
+  return mapped as Json;
 }
 
-function extractionSummary(importType: ImportType, rows: ImportRow[], mapping: ImportMapping) {
+function extractionSummary(importType: ImportType, rows: ImportRow[], mapping: ImportMapping, spreadsheet?: SpreadsheetWorkbook) {
   const mappedRequired = IMPORT_FIELDS[importType].filter((field) => field.required && mapping[field.key]).length;
   const requiredCount = IMPORT_FIELDS[importType].filter((field) => field.required).length;
   const mappedCount = Object.keys(mapping).length;
   const importLabel = importType === "kpi" ? "KPI history" : "business metrics";
 
-  return `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} for ${importLabel}. ${mappedCount} column${mappedCount === 1 ? "" : "s"} were mapped, including ${mappedRequired} of ${requiredCount} required field${requiredCount === 1 ? "" : "s"}. Review the mappings before saving.`;
+  const worksheetSummary = spreadsheet
+    ? ` across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}`
+    : "";
+  const issueSummary = spreadsheet?.issues.length
+    ? ` ${spreadsheet.issues.length} worksheet issue${spreadsheet.issues.length === 1 ? " was" : "s were"} recorded and no worksheet was silently skipped.`
+    : "";
+
+  return `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"}${worksheetSummary} for ${importLabel}. ${mappedCount} column${mappedCount === 1 ? "" : "s"} were mapped, including ${mappedRequired} of ${requiredCount} required field${requiredCount === 1 ? "" : "s"}. Review the mappings before saving.${issueSummary}`;
 }
 
 function field(importType: ImportType, key: string) {
@@ -682,6 +708,123 @@ function field(importType: ImportType, key: string) {
   return match;
 }
 
+type ImportPipelineStage =
+  | "workbook_parsing"
+  | "worksheet_detection"
+  | "record_extraction"
+  | "ai_analysis"
+  | "response_validation"
+  | "import_validation"
+  | "import"
+  | "business_memory_indexing";
+
+type ImportPipelineIssue = {
+  stage: ImportPipelineStage;
+  worksheet: string;
+  row_number: number | null;
+  field: string;
+  message: string;
+};
+
+type StagedImportRow = Pick<FileImportRow, "id" | "data_json" | "mapped_data_json" | "row_number">;
+
+function importRowSource(importRow: Pick<FileImportRow, "mapped_data_json" | "row_number">) {
+  const mapped = isRecord(importRow.mapped_data_json) ? importRow.mapped_data_json : {};
+  const source = isRecord(mapped.__source) ? mapped.__source : {};
+  const sourceRowNumber = Number(source.row_number);
+
+  return {
+    worksheet: typeof source.worksheet === "string" && source.worksheet.trim() ? source.worksheet.trim() : "Unknown worksheet",
+    rowNumber: Number.isInteger(sourceRowNumber) && sourceRowNumber > 0 ? sourceRowNumber : importRow.row_number
+  };
+}
+
+function issueForImportRow(importRow: StagedImportRow, stage: ImportPipelineStage, message: string, fieldName?: string): ImportPipelineIssue {
+  const source = importRowSource(importRow);
+  return {
+    stage,
+    worksheet: source.worksheet,
+    row_number: source.rowNumber,
+    field: fieldName || "row",
+    message
+  };
+}
+
+function validateImportRow(importType: ImportType, importRow: StagedImportRow, mapping: ImportMapping) {
+  const row = jsonToImportRow(importRow.data_json);
+  const issues: ImportPipelineIssue[] = [];
+
+  for (const importField of IMPORT_FIELDS[importType]) {
+    const mappedHeader = mapping[importField.key];
+    const value = mappedHeader && Object.prototype.hasOwnProperty.call(row, mappedHeader) ? row[mappedHeader] : null;
+
+    if (importField.required && !mappedHeader) {
+      issues.push(issueForImportRow(importRow, "import_validation", `Required mapping "${importField.label}" is not selected.`, importField.key));
+      continue;
+    }
+
+    if (importField.required && (!Object.prototype.hasOwnProperty.call(row, mappedHeader) || value === null || String(value).trim() === "")) {
+      issues.push(
+        issueForImportRow(
+          importRow,
+          "import_validation",
+          Object.prototype.hasOwnProperty.call(row, mappedHeader)
+            ? `Column "${mappedHeader}" is blank for this row.`
+            : `Column "${mappedHeader}" is not present on this worksheet.`,
+          importField.key
+        )
+      );
+      continue;
+    }
+
+    if (mappedHeader && value !== null && String(value).trim() !== "") {
+      const numericField = importType === "kpi"
+        ? importField.key === "actual_value"
+        : importField.key === "value";
+      if (numericField && mappedNumber(row, mapping, importField) === null) {
+        issues.push(issueForImportRow(importRow, "import_validation", `Column "${mappedHeader}" must contain a valid number.`, importField.key));
+      }
+
+    }
+  }
+
+  return issues;
+}
+
+async function updateImportRowDiagnostics({
+  supabase,
+  workspaceId,
+  importId,
+  results
+}: {
+  supabase: SupabaseServerClient;
+  workspaceId: string;
+  importId: string;
+  results: Array<{ row: StagedImportRow; issues: ImportPipelineIssue[]; mappedData: Json }>;
+}) {
+  for (let index = 0; index < results.length; index += 20) {
+    const batch = results.slice(index, index + 20);
+    const updates = await Promise.all(
+      batch.map(({ row, issues, mappedData }) =>
+        supabase
+          .from("file_import_rows")
+          .update({
+            mapped_data_json: mappedData,
+            validation_errors_json: issues as unknown as Json,
+            status: issues.length ? "rejected_validation" : "staged"
+          })
+          .eq("workspace_id", workspaceId)
+          .eq("import_id", importId)
+          .eq("id", row.id)
+      )
+    );
+    const updateError = updates.find((result) => result.error)?.error;
+    if (updateError) {
+      throw new Error(`Import diagnostics could not be saved: ${updateError.message}`);
+    }
+  }
+}
+
 function buildKpiRecords(
   importRows: Pick<FileImportRow, "id" | "data_json">[],
   workspaceId: string,
@@ -690,13 +833,12 @@ function buildKpiRecords(
   importId: string,
   mapping: ImportMapping
 ) {
-  return importRows
-    .map((importRow) => {
-      const row = jsonToImportRow(importRow.data_json);
+  return importRows.map((importRow) => {
+    const row = jsonToImportRow(importRow.data_json);
 
-      return {
-        importRowId: importRow.id,
-        record: {
+    return {
+      importRowId: importRow.id,
+      record: {
           workspace_id: workspaceId,
           source_file_id: sourceFile.id,
           import_id: importId,
@@ -711,10 +853,9 @@ function buildKpiRecords(
           source: mappedText(row, mapping, field("kpi", "source"), `Uploaded file: ${sourceFile.display_name}`),
           raw_data_json: rowJson(row),
           created_by: userId
-        }
-      };
-    })
-    .filter(({ record }) => record.name && record.actual_value !== null);
+      }
+    };
+  });
 }
 
 function kpiDedupeKey(name: string, metricDate: string) {
@@ -858,13 +999,12 @@ function buildOperationalMetricRecords(
   importId: string,
   mapping: ImportMapping
 ) {
-  return importRows
-    .map((importRow) => {
-      const row = jsonToImportRow(importRow.data_json);
+  return importRows.map((importRow) => {
+    const row = jsonToImportRow(importRow.data_json);
 
-      return {
-        importRowId: importRow.id,
-        record: {
+    return {
+      importRowId: importRow.id,
+      record: {
           workspace_id: workspaceId,
           source_file_id: sourceFile.id,
           import_id: importId,
@@ -877,10 +1017,9 @@ function buildOperationalMetricRecords(
           notes: mappedText(row, mapping, field("metrics", "notes")),
           raw_data_json: rowJson(row),
           created_by: userId
-        }
-      };
-    })
-    .filter(({ record }) => record.metric_name && record.value !== null);
+      }
+    };
+  });
 }
 
 function summarizeVaeroexOutput(outputJson: Json) {
@@ -1288,16 +1427,16 @@ function classifyFileAnalysisLearning({
   };
 }
 
-function spreadsheetRowsAsText(rows: ImportRow[], limit: number) {
+function spreadsheetRowsAsText(rows: SpreadsheetRow[], limit: number) {
   return rows
     .slice(0, limit)
-    .map((row, index) => {
-      const values = Object.entries(row)
+    .map((row) => {
+      const values = Object.entries(row.values)
         .filter(([, value]) => value !== null && String(value).trim() !== "")
         .map(([key, value]) => `${key}: ${String(value).slice(0, 180)}`)
         .join("; ");
 
-      return `Row ${index + 1}: ${values || "No values"}`;
+      return `Worksheet "${row.worksheetName}", row ${row.worksheetRowNumber}: ${values || "No values"}`;
     })
     .join("\n");
 }
@@ -1429,19 +1568,33 @@ function requestMetricsFromUsage(metadata: Json | undefined): VaeroexRequestSize
   return isRecord(requestSize) ? (requestSize as VaeroexRequestSizeMetrics) : null;
 }
 
-function spreadsheetExtraction(rows: ImportRow[], rowLimit: number): FileContentExtraction {
-  const rowText = spreadsheetRowsAsText(rows, rowLimit);
+function spreadsheetExtraction(spreadsheet: SpreadsheetWorkbook, rowLimit: number): FileContentExtraction {
+  const rowText = spreadsheetRowsAsText(spreadsheet.rows, rowLimit);
+  const rows = spreadsheet.rows.map((row) => row.values);
+  const parsedWorksheetCount = spreadsheet.worksheets.filter((worksheet) => worksheet.status === "parsed").length;
+  const omittedRowCount = Math.max(0, rows.length - rowLimit);
+  const issueNote = spreadsheet.issues.length
+    ? ` ${spreadsheet.issues.length} worksheet issue${spreadsheet.issues.length === 1 ? " was" : "s were"} recorded.`
+    : "";
+  const analysisLimitNote = omittedRowCount
+    ? ` ${rowLimit} representative rows were included in the bounded AI review; ${omittedRowCount} additional parsed rows remain available for import review.`
+    : " All parsed rows were included in the AI review.";
 
   return {
     supported: true,
     kind: "spreadsheet",
     rows,
-    preview: previewRows(rows, rowLimit) as Json,
+    preview: spreadsheet.rows.slice(0, rowLimit).map((row) => ({
+      worksheet: row.worksheetName,
+      row_number: row.worksheetRowNumber,
+      values: row.values
+    })) as Json,
     rowText,
     columns: importHeaders(rows),
     textContent: rowText,
     textPreview: textPreview(rowText),
-    contentNote: `Vaeroex parsed ${rows.length} spreadsheet row${rows.length === 1 ? "" : "s"} from the file.`
+    contentNote: `Vaeroex parsed ${rows.length} data row${rows.length === 1 ? "" : "s"} from ${parsedWorksheetCount} of ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}.${issueNote}${analysisLimitNote}`,
+    spreadsheet
   };
 }
 
@@ -1532,13 +1685,14 @@ async function extractFileContent(file: FileUploadRow, rowLimit: number): Promis
     return emptyUnsupportedExtraction(file);
   }
 
-  const rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
+  const spreadsheet = parseSpreadsheetWorkbook({ fileName: file.original_name, buffer });
 
-  if (!rows.length) {
-    throw new Error("No data rows were found in the spreadsheet. Make sure the first row contains column names.");
+  if (!spreadsheet.rows.length) {
+    const worksheetFailures = spreadsheet.issues.map((issue) => `${issue.worksheet}: ${issue.message}`).join(" ");
+    throw new Error(worksheetFailures || "No data rows were found in any worksheet. Make sure each worksheet's first populated row contains column names.");
   }
 
-  return spreadsheetExtraction(rows, rowLimit);
+  return spreadsheetExtraction(spreadsheet, rowLimit);
 }
 
 function readableList(value: unknown) {
@@ -2848,10 +3002,10 @@ export async function importFileAction(formData: FormData) {
 
   await updateFileProcessingStatus({ supabase, file, status: "processing" });
   const buffer = await downloadFileBuffer(file);
-  let rows: ImportRow[] = [];
+  let spreadsheet: SpreadsheetWorkbook;
 
   try {
-    rows = parseSpreadsheetRows({ fileName: file.original_name, buffer });
+    spreadsheet = parseSpreadsheetWorkbook({ fileName: file.original_name, buffer });
   } catch (error) {
     const message = actionErrorMessage(error, "The spreadsheet could not be read.");
 
@@ -2863,18 +3017,32 @@ export async function importFileAction(formData: FormData) {
     redirectWithFileError(message, file.id, "imported");
   }
 
+  const rows = spreadsheet.rows.map((row) => row.values);
+
   if (!rows.length) {
+    const worksheetFailures = spreadsheet.issues.map((issue) => `${issue.worksheet}: ${issue.message}`).join(" ");
+    const message = worksheetFailures || "No data rows were found in any worksheet. Make sure each worksheet's first populated row contains column names.";
     await supabase
       .from("file_uploads")
       .update({
         import_status: "failed",
         processing_status: "failed",
-        processing_error: "No data rows were found. Make sure the first row contains column names.",
+        processing_error: message,
         processed_at: new Date().toISOString()
       })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
-    redirectWithFileError("No data rows were found. Make sure the first row contains column names.", file.id, "imported");
+    redirectWithFileError(message, file.id, "imported");
+  }
+
+  if (rows.length > MAX_IMPORT_ROWS) {
+    const message = `This workbook contains ${rows.length} data rows across ${spreadsheet.worksheets.length} worksheets. The current reviewed-import limit is ${MAX_IMPORT_ROWS} rows, so no rows were staged and none were silently discarded. Split the workbook into smaller files and try again.`;
+    await supabase
+      .from("file_uploads")
+      .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+    redirectWithFileError(message, file.id, "imported");
   }
 
   try {
@@ -2906,7 +3074,14 @@ export async function importFileAction(formData: FormData) {
   }
 
   const mapping = inferMapping(importType, rows);
-  const summary = extractionSummary(importType, rows, mapping);
+  const summary = extractionSummary(importType, rows, mapping, spreadsheet);
+  const parserIssues = spreadsheet.issues.map((issue) => ({
+    stage: issue.stage,
+    worksheet: issue.worksheet,
+    row_number: null,
+    field: "worksheet",
+    message: issue.message
+  })) satisfies ImportPipelineIssue[];
   const { data: importRecord, error: importError } = await supabase
     .from("file_imports")
     .insert({
@@ -2918,6 +3093,7 @@ export async function importFileAction(formData: FormData) {
       rows_imported: 0,
       mapping_json: mapping,
       extraction_summary: summary,
+      errors_json: parserIssues as unknown as Json,
       created_by: user.id
     })
     .select("id")
@@ -2933,21 +3109,24 @@ export async function importFileAction(formData: FormData) {
     redirectWithFileError(importError?.message || "Import record could not be created.", file.id, "imported");
   }
 
-  const importRows = rows.slice(0, 1000).map((row, index) => ({
+  const importRows = spreadsheet.rows.map((row, index) => ({
     workspace_id: workspaceId,
     file_upload_id: file.id,
     import_id: importRecord.id,
     import_type: importType,
     row_number: index + 1,
-    data_json: rowJson(row),
-    mapped_data_json: mappedRowJson(row, mapping, importType),
+    data_json: rowJson(row.values),
+    mapped_data_json: mappedRowJson(row.values, mapping, importType, row),
+    validation_errors_json: [] as Json,
     status: "staged"
   }));
-  const importRowsResult = await supabase.from("file_import_rows").insert(importRows);
+  for (let index = 0; index < importRows.length; index += 500) {
+    const importRowsResult = await supabase.from("file_import_rows").insert(importRows.slice(index, index + 500));
 
-  if (importRowsResult.error) {
-    await updateFileProcessingStatus({ supabase, file, status: "failed", error: importRowsResult.error.message });
-    redirectWithFileError(importRowsResult.error.message, file.id, "imported");
+    if (importRowsResult.error) {
+      await updateFileProcessingStatus({ supabase, file, status: "failed", error: importRowsResult.error.message });
+      redirectWithFileError(importRowsResult.error.message, file.id, "imported");
+    }
   }
 
   await supabase
@@ -2964,11 +3143,35 @@ export async function importFileAction(formData: FormData) {
           import_id: importRecord.id,
           import_type: importType,
           rows_total: rows.length,
+          worksheets: spreadsheet.worksheets.map((worksheet) => ({
+            name: worksheet.name,
+            index: worksheet.index,
+            state: worksheet.state,
+            status: worksheet.status,
+            rows: worksheet.rows.length,
+            columns: worksheet.columns,
+            error: worksheet.error || null
+          })),
+          parser_issues: parserIssues,
           mapping,
           extracted_at: new Date().toISOString(),
-          summary
+          summary,
+          pipeline_trace: [
+            { stage: "storage", status: "complete", detail: "The stored workbook was downloaded successfully." },
+            { stage: "workbook_parsing", status: "complete", detail: `Parsed ${spreadsheet.worksheets.length} declared worksheet(s).` },
+            { stage: "worksheet_detection", status: spreadsheet.issues.length ? "completed_with_issues" : "complete", detail: `${spreadsheet.worksheets.length} worksheet(s) inspected; ${spreadsheet.issues.length} issue(s) recorded.` },
+            { stage: "record_extraction", status: "complete", detail: `Extracted ${rows.length} data row(s) without silently truncating the import.` },
+            { stage: "ai_analysis", status: "not_run", detail: "Structured import preparation does not invoke AI analysis." },
+            { stage: "response_validation", status: "not_run", detail: "No AI response was produced for this import path." },
+            { stage: "import_validation", status: "pending_review", detail: "Rows will be validated against the approved mappings before records are saved." },
+            { stage: "business_memory_indexing", status: "not_run", detail: "No rows are indexed or activated before import approval." }
+          ]
         },
-        preview_rows: previewRows(rows, 5)
+        preview_rows: spreadsheet.rows.slice(0, 5).map((row) => ({
+          worksheet: row.worksheetName,
+          row_number: row.worksheetRowNumber,
+          values: row.values
+        }))
       } satisfies Json
     })
     .eq("id", file.id)
@@ -2977,7 +3180,7 @@ export async function importFileAction(formData: FormData) {
   revalidatePath(FILES_PATH);
   revalidatePath("/app/kpis");
   revalidatePath("/app/reports");
-  redirectWithMessage(`Data extracted from ${rows.length} row${rows.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id, "imported");
+  redirectWithMessage(`Data extracted from ${rows.length} row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id, "imported");
 }
 
 function appendImportHistory(metadataJson: Json, entry: JsonObject) {
@@ -2990,6 +3193,30 @@ function appendImportHistory(metadataJson: Json, entry: JsonObject) {
     ...metadata,
     last_import: entry,
     import_history: [entry, ...history].slice(0, 20)
+  } satisfies JsonObject;
+}
+
+function updateImportPipelineTrace(metadataJson: Json, status: "complete" | "failed", detail: string) {
+  const metadata = (isRecord(metadataJson) ? metadataJson : {}) as JsonObject;
+  const extraction = isRecord(metadata.latest_extraction) ? metadata.latest_extraction : {};
+  const existingTrace = Array.isArray(extraction.pipeline_trace)
+    ? extraction.pipeline_trace.flatMap((item) => isRecord(item) ? [item] : [])
+    : [];
+  const nextTrace = existingTrace.map((item) => {
+    if (item.stage !== "import_validation") return item;
+    return { ...item, status, detail };
+  });
+
+  if (!nextTrace.some((item) => item.stage === "import_validation")) {
+    nextTrace.push({ stage: "import_validation", status, detail });
+  }
+
+  return {
+    ...metadata,
+    latest_extraction: {
+      ...extraction,
+      pipeline_trace: nextTrace
+    }
   } satisfies JsonObject;
 }
 
@@ -3041,7 +3268,7 @@ export async function saveExtractedImportAction(formData: FormData) {
   ) as Json;
   const { data: stagedRows, error: rowsError } = await supabase
     .from("file_import_rows")
-    .select("id,data_json,row_number")
+    .select("id,data_json,mapped_data_json,row_number")
     .eq("workspace_id", workspaceId)
     .eq("file_upload_id", file.id)
     .eq("import_id", importId)
@@ -3090,17 +3317,69 @@ export async function saveExtractedImportAction(formData: FormData) {
     redirectWithFileError(error instanceof Error ? error.message : "Import approval was blocked by Vaeroex security policy.", file.id, "imported");
   }
 
+  const diagnostics = (stagedRows as StagedImportRow[]).map((row) => {
+    const existingMapped = isRecord(row.mapped_data_json) ? row.mapped_data_json : {};
+    const mappedData = mappedRowJson(jsonToImportRow(row.data_json), mapping, importType) as JsonRecord;
+    if (isRecord(existingMapped.__source)) {
+      mappedData.__source = existingMapped.__source;
+    }
+    return {
+      row,
+      issues: validateImportRow(importType, row, mapping),
+      mappedData: mappedData as Json
+    };
+  });
+  const validRows = diagnostics.filter((result) => !result.issues.length).map((result) => result.row);
+  const rejectedIssues = diagnostics.flatMap((result) => result.issues);
+  const parserIssues = Array.isArray(importRecord.errors_json)
+    ? importRecord.errors_json.filter(isRecord).map((issue) => issue as JsonRecord)
+    : [];
+
+  try {
+    await updateImportRowDiagnostics({ supabase, workspaceId, importId, results: diagnostics });
+  } catch (error) {
+    redirectWithFileError(error instanceof Error ? error.message : "Import diagnostics could not be saved.", file.id, "imported");
+  }
+
+  if (!validRows.length) {
+    const firstIssue = rejectedIssues[0];
+    const message = `No ${importType === "kpi" ? "KPI" : "metric"} rows were imported. All ${stagedRows.length} extracted rows failed validation. First failure: ${firstIssue.worksheet}, row ${firstIssue.row_number}: ${firstIssue.message}`;
+    await supabase
+      .from("file_imports")
+      .update({
+        status: "failed",
+        rows_imported: 0,
+        mapping_json: savedMappingJson,
+        errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json
+      })
+      .eq("id", importId)
+      .eq("workspace_id", workspaceId);
+    await supabase
+      .from("file_uploads")
+      .update({
+        import_status: "failed",
+        processing_status: "failed",
+        processing_error: message,
+        processed_at: new Date().toISOString(),
+        metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", `${stagedRows.length} row(s) were rejected. No business records or Business Memory evidence were created.`)
+      })
+      .eq("id", file.id)
+      .eq("workspace_id", workspaceId);
+    redirectWithFileError(message, file.id, "imported");
+  }
+
   let importedRowCount = 0;
   let duplicateKpiRowCount = 0;
   let importedKpiImportRowIds: string[] = [];
   let duplicateKpiImportRowIds: string[] = [];
   let kpiSettingsSkippedForPermission = false;
+  const rejectedRowCount = diagnostics.filter((result) => result.issues.length).length;
 
   try {
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
 
     if (importType === "kpi") {
-      const targetRows = buildKpiRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
+      const targetRows = buildKpiRecords(validRows, workspaceId, user.id, file, importId, mapping);
       const deduped = await removeDuplicateKpiRows({
         supabase,
         rows: targetRows,
@@ -3131,7 +3410,7 @@ export async function saveExtractedImportAction(formData: FormData) {
         kpiSettingsSkippedForPermission = !kpiSettingsSaved;
       }
     } else {
-      const targetRows = buildOperationalMetricRecords(stagedRows, workspaceId, user.id, file, importId, mapping);
+      const targetRows = buildOperationalMetricRecords(validRows, workspaceId, user.id, file, importId, mapping);
       importedRowCount = targetRows.length;
 
       if (targetRows.length) {
@@ -3141,10 +3420,6 @@ export async function saveExtractedImportAction(formData: FormData) {
           throw new Error(error.message);
         }
       }
-    }
-
-    if (!importedRowCount && !duplicateKpiRowCount) {
-      throw new Error("No rows matched the selected mappings. Check the required fields and try again.");
     }
 
     const importedAt = new Date().toISOString();
@@ -3180,13 +3455,17 @@ export async function saveExtractedImportAction(formData: FormData) {
           .in("id", duplicateKpiImportRowIds);
       }
     } else {
-      await supabase
-        .from("file_import_rows")
-        .update({
-          status: "imported"
-        })
-        .eq("workspace_id", workspaceId)
-        .eq("import_id", importId);
+      const importedMetricRowIds = validRows.map((row) => row.id);
+      if (importedMetricRowIds.length) {
+        await supabase
+          .from("file_import_rows")
+          .update({
+            status: "imported"
+          })
+          .eq("workspace_id", workspaceId)
+          .eq("import_id", importId)
+          .in("id", importedMetricRowIds);
+      }
     }
 
     await supabase
@@ -3197,7 +3476,8 @@ export async function saveExtractedImportAction(formData: FormData) {
         mapping_json: savedMappingJson,
         reviewed_at: importedAt,
         imported_at: importedAt,
-        extraction_summary: extractionSummary(importType, stagedRows.map((row) => jsonToImportRow(row.data_json)), mapping)
+        extraction_summary: `${extractionSummary(importType, stagedRows.map((row) => jsonToImportRow(row.data_json)), mapping)} ${rejectedRowCount} row${rejectedRowCount === 1 ? " was" : "s were"} rejected with worksheet-level diagnostics.`,
+        errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json
       })
       .eq("id", importId)
       .eq("workspace_id", workspaceId);
@@ -3211,22 +3491,54 @@ export async function saveExtractedImportAction(formData: FormData) {
         processing_status: "ready",
         processing_error: null,
         processed_at: new Date().toISOString(),
-        metadata_json: appendImportHistory(file.metadata_json, importEntry)
+        metadata_json: appendImportHistory(
+          updateImportPipelineTrace(
+            file.metadata_json,
+            "complete",
+            `${importedRowCount} row(s) imported, ${rejectedRowCount} row(s) rejected, and ${duplicateKpiRowCount} duplicate row(s) skipped.`
+          ) as Json,
+          importEntry
+        )
       })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
   } catch (error) {
     const message = actionErrorMessage(error, "Imported data could not be saved.");
+    const importIssues = validRows.map((row) => issueForImportRow(row, "import", message));
+
+    try {
+      await updateImportRowDiagnostics({
+        supabase,
+        workspaceId,
+        importId,
+        results: diagnostics.map((result) => {
+          if (result.issues.length) return result;
+          const rowIssue = importIssues.find((issue) => {
+            const source = importRowSource(result.row);
+            return issue.worksheet === source.worksheet && issue.row_number === source.rowNumber;
+          });
+          return { ...result, issues: rowIssue ? [rowIssue] : [] };
+        })
+      });
+    } catch {
+      // The import-level error remains persisted even if row diagnostics cannot be updated.
+    }
 
     await supabase
       .from("file_imports")
-      .update({ status: "failed", errors_json: [{ message }] })
+      .update({ status: "failed", errors_json: [...parserIssues, ...rejectedIssues, ...importIssues] as unknown as Json })
       .eq("id", importId)
       .eq("workspace_id", workspaceId);
 
     await supabase
       .from("file_uploads")
-      .update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString() })
+      .update({
+        import_status: "failed",
+        processing_status: "failed",
+        processing_error: message,
+        processed_at: new Date().toISOString(),
+        metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", `Import failed after row validation: ${message}`)
+      })
       .eq("id", file.id)
       .eq("workspace_id", workspaceId);
     redirectWithFileError(message, file.id, "imported");

@@ -63,6 +63,119 @@ function rowValues(row: FileImportDataRow) {
   return isRecord(row.data_json) ? row.data_json : {};
 }
 
+function rowSource(row: FileImportDataRow) {
+  const mapped = isRecord(row.mapped_data_json) ? row.mapped_data_json : {};
+  const source = isRecord(mapped.__source) ? mapped.__source : {};
+  return {
+    worksheet: typeof source.worksheet === "string" && source.worksheet.trim() ? source.worksheet : "Unknown worksheet",
+    rowNumber: typeof source.row_number === "number" ? source.row_number : row.row_number
+  };
+}
+
+function importIssues(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).map((issue) => ({
+    stage: typeof issue.stage === "string" ? issue.stage.replace(/_/g, " ") : "import",
+    worksheet: typeof issue.worksheet === "string" ? issue.worksheet : "Workbook",
+    rowNumber: typeof issue.row_number === "number" ? issue.row_number : null,
+    field: typeof issue.field === "string" ? issue.field : "",
+    message: typeof issue.message === "string" ? issue.message : "The row could not be processed."
+  }));
+}
+
+function latestExtraction(file: FileUploadRow) {
+  if (!isRecord(file.metadata_json) || !isRecord(file.metadata_json.latest_extraction)) return {};
+  return file.metadata_json.latest_extraction;
+}
+
+function pipelineTrace(file: FileUploadRow) {
+  const extraction = latestExtraction(file);
+  if (!Array.isArray(extraction.pipeline_trace)) return [];
+  return extraction.pipeline_trace.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    return [{
+      stage: typeof item.stage === "string" ? item.stage.replace(/_/g, " ") : "stage",
+      status: typeof item.status === "string" ? item.status.replace(/_/g, " ") : "unknown",
+      detail: typeof item.detail === "string" ? item.detail : ""
+    }];
+  });
+}
+
+function worksheetTrace(file: FileUploadRow) {
+  const extraction = latestExtraction(file);
+  if (!Array.isArray(extraction.worksheets)) return [];
+  return extraction.worksheets.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    return [{
+      name: typeof item.name === "string" ? item.name : "Worksheet",
+      status: typeof item.status === "string" ? item.status : "unknown",
+      rows: typeof item.rows === "number" ? item.rows : 0,
+      error: typeof item.error === "string" ? item.error : ""
+    }];
+  });
+}
+
+function ImportDiagnostics({ file, latestImport }: { file: FileUploadRow; latestImport: FileImportRow }) {
+  const issues = importIssues(latestImport.errors_json);
+  const trace = pipelineTrace(file);
+  const worksheets = worksheetTrace(file);
+
+  if (!issues.length && !trace.length && !worksheets.length) return null;
+
+  return (
+    <div className="space-y-3">
+      {worksheets.length ? (
+        <details className="rounded-lg border border-white/10 bg-slate-950/45 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-cyan-100">
+            Worksheets inspected ({worksheets.length})
+          </summary>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {worksheets.map((worksheet, index) => (
+              <div key={`${worksheet.name}-${index}`} className="rounded-md border border-white/10 bg-white/[0.03] p-3 text-xs leading-5">
+                <p className="font-semibold text-white">{worksheet.name}</p>
+                <p className="capitalize text-slate-400">{worksheet.status.replace(/_/g, " ")} · {worksheet.rows} data row{worksheet.rows === 1 ? "" : "s"}</p>
+                {worksheet.error ? <p className="mt-1 text-red-100">{worksheet.error}</p> : null}
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+      {issues.length ? (
+        <details open={latestImport.status === "failed"} className="rounded-lg border border-red-400/25 bg-red-950/15 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-red-100">
+            {issues.length} ingestion issue{issues.length === 1 ? "" : "s"}
+          </summary>
+          <ol className="mt-3 max-h-96 space-y-2 overflow-y-auto pr-2 text-xs leading-5 text-slate-300">
+            {issues.map((issue, index) => (
+              <li key={`${issue.worksheet}-${issue.rowNumber ?? "sheet"}-${issue.stage}-${index}`} className="rounded-md border border-white/10 bg-slate-950/55 p-3">
+                <p className="font-semibold text-white">
+                  {issue.worksheet}{issue.rowNumber ? ` · row ${issue.rowNumber}` : ""}
+                </p>
+                <p className="mt-1 text-slate-400">Stage: {issue.stage}{issue.field ? ` · Field: ${issue.field}` : ""}</p>
+                <p className="mt-1 text-slate-200">{issue.message}</p>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+      {trace.length ? (
+        <details className="rounded-lg border border-white/10 bg-slate-950/45 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-cyan-100">Ingestion pipeline trace</summary>
+          <div className="mt-3 space-y-2 text-xs leading-5 text-slate-300">
+            {trace.map((item, index) => (
+              <div key={`${item.stage}-${index}`} className="grid gap-1 border-t border-white/10 pt-2 sm:grid-cols-[10rem_8rem_minmax(0,1fr)]">
+                <span className="font-semibold capitalize text-white">{item.stage}</span>
+                <span className="capitalize text-cyan-100">{item.status}</span>
+                <span className="text-slate-400">{item.detail}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 function asImportType(value: string): ImportType {
   if (value === "crm" || value === "metrics") return value;
   return "kpi";
@@ -112,11 +225,24 @@ export function SourceImportReview({
 
   if (!needsReview) {
     return (
-      <div className="rounded-lg border border-white/10 bg-slate-950/45 p-4">
-        <p className="text-sm font-semibold text-white">{statusLabel(latestImport.status)}</p>
-        <p className="mt-2 text-sm leading-6 text-slate-400">
-          {latestImport.rows_imported} of {latestImport.rows_total} rows were saved from this source.
-        </p>
+      <div className="space-y-3">
+        <div className="rounded-lg border border-white/10 bg-slate-950/45 p-4">
+          <p className="text-sm font-semibold text-white">{statusLabel(latestImport.status)}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-400">
+            {latestImport.rows_imported} of {latestImport.rows_total} rows were saved from this source.
+          </p>
+          {latestImport.extraction_summary ? <p className="mt-2 text-xs leading-5 text-slate-500">{latestImport.extraction_summary}</p> : null}
+          {latestImport.status === "failed" ? (
+            <form action={importFileAction} className="mt-4">
+              <input type="hidden" name="file_id" value={file.id} />
+              <input type="hidden" name="import_type" value={importType === "metrics" ? "metrics" : "kpi"} />
+              <PendingSubmitButton pendingLabel="Re-reading every worksheet..." className="min-h-10 rounded-md bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white disabled:opacity-60">
+                Re-prepare import
+              </PendingSubmitButton>
+            </form>
+          ) : null}
+        </div>
+        <ImportDiagnostics file={file} latestImport={latestImport} />
       </div>
     );
   }
@@ -157,6 +283,8 @@ export function SourceImportReview({
         </p>
       </div>
 
+      <ImportDiagnostics file={file} latestImport={latestImport} />
+
       {importType === "kpi" ? (
         <details className="rounded-lg border border-white/10 bg-slate-950/45 p-4">
           <summary className="cursor-pointer text-sm font-semibold text-cyan-100">KPI display settings</summary>
@@ -192,8 +320,8 @@ export function SourceImportReview({
         <div className="border-b border-white/10 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-400">Sample rows</div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-xs text-slate-300">
-            <thead className="bg-white/[0.04] text-slate-400"><tr><th className="px-3 py-2">Row</th>{columns.slice(0, 6).map((column) => <th key={column} className="px-3 py-2">{column}</th>)}</tr></thead>
-            <tbody>{previewRows.map((row) => { const values = rowValues(row); return <tr key={row.id} className="border-t border-white/10"><td className="px-3 py-2 font-medium">{row.row_number}</td>{columns.slice(0, 6).map((column) => <td key={column} className="max-w-48 truncate px-3 py-2">{String(values[column] ?? "")}</td>)}</tr>; })}</tbody>
+            <thead className="bg-white/[0.04] text-slate-400"><tr><th className="px-3 py-2">Worksheet</th><th className="px-3 py-2">Row</th>{columns.slice(0, 6).map((column) => <th key={column} className="px-3 py-2">{column}</th>)}</tr></thead>
+            <tbody>{previewRows.map((row) => { const values = rowValues(row); const source = rowSource(row); return <tr key={row.id} className="border-t border-white/10"><td className="whitespace-nowrap px-3 py-2 font-medium text-white">{source.worksheet}</td><td className="px-3 py-2 font-medium">{source.rowNumber}</td>{columns.slice(0, 6).map((column) => <td key={column} className="max-w-48 truncate px-3 py-2">{String(values[column] ?? "")}</td>)}</tr>; })}</tbody>
           </table>
         </div>
       </section>

@@ -23,6 +23,7 @@
     "test:intelligence": "node scripts/intelligence-experience-regression-tests.js",
     "test:evidence-ui": "node scripts/evidence-source-experience-tests.js",
     "test:file-analysis": "node scripts/file-analysis-regression-tests.js",
+    "test:spreadsheet-ingestion": "node scripts/spreadsheet-ingestion-regression-tests.js",
     "test:public": "node scripts/public-experience-regression-tests.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
