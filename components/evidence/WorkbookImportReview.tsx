@@ -7,6 +7,7 @@ import {
   WORKSHEET_IMPORT_FIELDS,
   WORKSHEET_TYPE_OPTIONS,
   inferWorksheetMapping,
+  inferWideTimeSeriesMetricColumns,
   isWorksheetType,
   worksheetTypeLabel,
   type WorksheetMapping,
@@ -29,6 +30,7 @@ type WorksheetPlan = {
   selected_type: WorksheetType;
   enabled: boolean;
   mapping: WorksheetMapping;
+  metric_columns: string[];
 };
 
 function isRecord(value: unknown): value is JsonRecord {
@@ -50,6 +52,11 @@ function parsePlans(value: unknown): WorksheetPlan[] {
     const mapping = isRecord(item.mapping)
       ? Object.fromEntries(Object.entries(item.mapping).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
       : inferWorksheetMapping(type, columns);
+    const metricColumns = Array.isArray(item.metric_columns)
+      ? item.metric_columns.filter((column): column is string => typeof column === "string" && columns.includes(column))
+      : type === "wide_time_series"
+        ? inferWideTimeSeriesMetricColumns({ columns }, mapping.period)
+        : [];
 
     if (!Number.isInteger(index) || typeof item.name !== "string") return [];
     return [{
@@ -61,7 +68,8 @@ function parsePlans(value: unknown): WorksheetPlan[] {
       detected_type: typeof item.detected_type === "string" && isWorksheetType(item.detected_type) ? item.detected_type : type,
       selected_type: type,
       enabled: item.enabled === true,
-      mapping
+      mapping,
+      metric_columns: metricColumns
     }];
   });
 }
@@ -106,9 +114,13 @@ export function WorkbookImportReview({
 
   function changeType(plan: WorksheetPlan, value: string) {
     if (!isWorksheetType(value)) return;
+    const mapping = inferWorksheetMapping(value, plan.columns);
     updatePlan(plan.index, {
       selected_type: value,
-      mapping: inferWorksheetMapping(value, plan.columns),
+      mapping,
+      metric_columns: value === "wide_time_series"
+        ? inferWideTimeSeriesMetricColumns({ columns: plan.columns }, mapping.period)
+        : [],
       enabled: value !== "unknown" || plan.enabled
     });
   }
@@ -189,7 +201,15 @@ export function WorkbookImportReview({
                             name={`worksheet_${plan.index}_map_${field.key}`}
                             value={plan.mapping[field.key] || ""}
                             disabled={!plan.enabled || !canImport}
-                            onChange={(event) => updatePlan(plan.index, { mapping: { ...plan.mapping, [field.key]: event.target.value } })}
+                            onChange={(event) => {
+                              const mapping = { ...plan.mapping, [field.key]: event.target.value };
+                              updatePlan(plan.index, {
+                                mapping,
+                                metric_columns: plan.selected_type === "wide_time_series" && field.key === "period"
+                                  ? inferWideTimeSeriesMetricColumns({ columns: plan.columns }, mapping.period)
+                                  : plan.metric_columns
+                              });
+                            }}
                             className={inputClass}
                           >
                             <option value="">Do not import</option>
@@ -204,6 +224,20 @@ export function WorkbookImportReview({
                     This worksheet will be preserved as source evidence and organizational context. It will not create structured KPI or metric records.
                   </p>
                 )}
+
+                {plan.selected_type === "wide_time_series" ? (
+                  <div className="rounded-md border border-cyan-300/15 bg-cyan-950/15 p-3">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Metric series</p>
+                    <p className="mt-1 text-xs leading-5 text-slate-400">
+                      Each valid numeric cell becomes a dated metric. Invalid cells are reported individually without rejecting other metrics in that row.
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {plan.metric_columns.map((column) => (
+                        <span key={column} className="rounded border border-white/10 bg-white/[0.04] px-2 py-1 text-xs text-slate-200">{column}</span>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 {samples.length ? (
                   <div className="overflow-x-auto rounded-md border border-white/10">
