@@ -17,7 +17,7 @@ export const metadata: Metadata = {
     type: "website",
     images: [
       {
-        url: "/brand/vaeroex-logo.png",
+        url: "/brand/vaeroex-logo-white-wordmark.png",
         width: 1536,
         height: 1024,
         alt: "Vaeroex"

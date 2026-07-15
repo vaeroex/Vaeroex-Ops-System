@@ -26,7 +26,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       type: "website",
       images: [
         {
-          url: `${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`,
+          url: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
           width: 1200,
           height: 630,
           alt: "Vaeroex"
@@ -37,7 +37,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       card: "summary_large_image",
       title,
       description,
-      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`]
+      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`]
     }
   };
 }
@@ -48,7 +48,7 @@ export const organizationJsonLd = {
   name: "Vaeroex Intelligence Systems",
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
-  logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`,
+  logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
   description: "Vaeroex Intelligence Systems develops evidence-backed intelligence software that turns fragmented information into decision-ready understanding for leadership.",
   address: {
     "@type": "PostalAddress",
