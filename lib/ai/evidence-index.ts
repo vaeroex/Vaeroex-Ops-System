@@ -956,3 +956,192 @@ export async function indexFileAnalysisEvidence({
 
   return { indexedChunks: rows.length, error: embedding.error };
 }
+
+export type WorksheetImportEvidence = {
+  name: string;
+  index: number;
+  type: string;
+  rows: Array<{ rowNumber: number; values: Record<string, string | number | null> }>;
+};
+
+export async function indexWorksheetImportEvidence({
+  supabase,
+  workspaceId,
+  userId,
+  file,
+  importId,
+  worksheets
+}: {
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+  userId?: string | null;
+  file: FileUploadRow;
+  importId: string;
+  worksheets: WorksheetImportEvidence[];
+}) {
+  if (file.deleted_at || file.archived_at) {
+    return { indexedChunks: 0, error: "Inactive source files cannot be added to Business Memory." };
+  }
+
+  const chunks = worksheets.flatMap((worksheet) => {
+    const groups: typeof worksheet.rows[] = [];
+    for (let index = 0; index < worksheet.rows.length; index += 20) {
+      groups.push(worksheet.rows.slice(index, index + 20));
+    }
+
+    return groups.map((group) => ({
+      worksheet,
+      rows: group,
+      text: [
+        `Workbook: ${file.display_name}`,
+        `Original source: ${file.original_name}`,
+        `Worksheet: ${worksheet.name}`,
+        `Detected context: ${worksheet.type}`,
+        ...group.map((row) => {
+          const values = Object.entries(row.values)
+            .filter(([, value]) => value !== null && String(value).trim())
+            .map(([key, value]) => `${key}: ${String(value).slice(0, 240)}`)
+            .join("; ");
+          return `Row ${row.rowNumber}: ${values || "No populated values"}`;
+        })
+      ].join("\n")
+    }));
+  });
+
+  if (!chunks.length) {
+    return { indexedChunks: 0, error: "No approved worksheet rows were available for Business Memory." };
+  }
+
+  if (chunks.length > MAX_INDEXED_CHUNKS_PER_FILE) {
+    return {
+      indexedChunks: 0,
+      error: `The approved workbook requires ${chunks.length} evidence chunks, above the ${MAX_INDEXED_CHUNKS_PER_FILE}-chunk indexing limit. No worksheet evidence was silently discarded.`
+    };
+  }
+
+  const indexedAt = new Date().toISOString();
+  const { data: existingRows, error: existingError } = await supabase
+    .from("business_memory_chunks")
+    .select("id,content_hash,chunk_index,source_metadata")
+    .eq("workspace_id", workspaceId)
+    .eq("source_type", "file")
+    .eq("source_file_id", file.id)
+    .is("deleted_at", null)
+    .is("archived_at", null)
+    .limit(MAX_INDEXED_CHUNKS_PER_FILE * 4);
+
+  if (existingError) {
+    return { indexedChunks: 0, error: existingError.message };
+  }
+
+  const embedding = await createEmbeddings(chunks.map((chunk) => chunk.text));
+  const rows = chunks.map<MemoryChunkInsert>((chunk, index) => {
+    const rowNumbers = chunk.rows.map((row) => row.rowNumber);
+    return {
+      workspace_id: workspaceId,
+      source_type: "file",
+      source_id: file.id,
+      source_file_id: file.id,
+      source_title: `${file.display_name} · ${chunk.worksheet.name}`,
+      source_excerpt: chunk.text,
+      summary: `${chunk.worksheet.name} from ${file.display_name}`,
+      chunk_index: index,
+      content_hash: hashContent(`${file.id}:${chunk.worksheet.index}:${chunk.text}`),
+      embedding: embedding.embeddings[index] || null,
+      embedding_model: embedding.embeddings[index] ? embedding.model : null,
+      source_metadata: {
+        workbook_name: file.display_name,
+        original_file_name: file.original_name,
+        source_file_id: file.id,
+        source_record_type: "file_upload",
+        source_record_id: file.id,
+        import_id: importId,
+        worksheet_name: chunk.worksheet.name,
+        worksheet_index: chunk.worksheet.index,
+        worksheet_type: chunk.worksheet.type,
+        row_start: Math.min(...rowNumbers),
+        row_end: Math.max(...rowNumbers),
+        row_numbers: rowNumbers,
+        evidence_classification: "business_evidence",
+        evidence_lifecycle: "active",
+        extraction_outcome: "completed",
+        review_status: "approved",
+        trust_level: "trusted",
+        indexing_method: "worksheet_import",
+        embedding_error: embedding.error || null,
+        invalidated_at: null,
+        invalidation_reason: null,
+        indexed_by: userId || null
+      },
+      source_quality: "high",
+      confidence_score: 90,
+      token_estimate: estimateTokenCount(chunk.text),
+      indexed_at: indexedAt,
+      archived_at: null,
+      deleted_at: null
+    };
+  });
+  const { error } = await supabase.from("business_memory_chunks").upsert(rows, {
+    onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"
+  });
+
+  if (error) {
+    await supabase
+      .from("file_uploads")
+      .update({ index_status: "failed", index_error: error.message, indexed_at: indexedAt })
+      .eq("workspace_id", workspaceId)
+      .eq("id", file.id);
+    return { indexedChunks: 0, error: error.message };
+  }
+
+  const currentChunkKeys = new Set(rows.map((row) => `${row.content_hash}:${row.chunk_index}`));
+  const previousWorksheetRows = (existingRows || []).filter((row) =>
+    metadataRecord(row.source_metadata).indexing_method === "worksheet_import" && !currentChunkKeys.has(`${row.content_hash}:${row.chunk_index}`)
+  );
+  for (let index = 0; index < previousWorksheetRows.length; index += 20) {
+    const batch = previousWorksheetRows.slice(index, index + 20);
+    const updates = await Promise.all(batch.map((row) => {
+      const metadata = metadataRecord(row.source_metadata);
+      return supabase
+        .from("business_memory_chunks")
+        .update({
+          archived_at: indexedAt,
+          deleted_at: indexedAt,
+          source_metadata: {
+            ...metadata,
+            invalidated_at: indexedAt,
+            invalidation_reason: "Superseded by a newly approved worksheet import."
+          }
+        })
+        .eq("workspace_id", workspaceId)
+        .eq("id", row.id);
+    }));
+    const updateError = updates.find((result) => result.error)?.error;
+    if (updateError) return { indexedChunks: rows.length, error: updateError.message };
+  }
+
+  const { count, error: countError } = await supabase
+    .from("business_memory_chunks")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .eq("source_type", "file")
+    .eq("source_file_id", file.id)
+    .is("deleted_at", null)
+    .is("archived_at", null);
+
+  await supabase
+    .from("file_uploads")
+    .update({
+      index_status: "ready",
+      index_error: embedding.error || countError?.message || null,
+      indexed_at: indexedAt,
+      indexed_chunk_count: count ?? rows.length
+    })
+    .eq("workspace_id", workspaceId)
+    .eq("id", file.id);
+
+  return {
+    indexedChunks: rows.length,
+    error: embedding.error || countError?.message || null
+  };
+}
