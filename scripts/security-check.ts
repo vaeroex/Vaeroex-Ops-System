@@ -340,6 +340,7 @@ for (const toolName of [
   "stage_file_import",
   "approve_kpi_import",
   "approve_operational_metrics_import",
+  "approve_workbook_import",
   "create_report_from_file",
   "attach_file_to_report",
   "save_file_analysis_business_memory",
@@ -374,6 +375,7 @@ check(archivedBulkActions.includes("Type DELETE") && archivedBulkActions.include
 check(fileActions.includes("stage_file_import"), "File import staging must pass through the gateway.");
 check(fileActions.includes("approve_kpi_import"), "KPI import approval must pass through the gateway.");
 check(fileActions.includes("approve_operational_metrics_import"), "Operational metrics import approval must pass through the gateway.");
+check(fileActions.includes("approve_workbook_import"), "Multi-dataset workbook approval must pass through the gateway.");
 check(!fileActions.includes("\"approve_crm_import\""), "Retired customer-record imports must not call the CRM import approval tool.");
 check(fileActions.includes("Customer record imports have been retired"), "Customer-record imports must fail closed with a clear retired-workflow message.");
 check(fileActions.includes("create_report_from_file"), "Report-from-file generation must pass through the gateway.");

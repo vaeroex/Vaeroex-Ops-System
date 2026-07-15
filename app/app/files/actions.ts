@@ -4,7 +4,7 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { assessFileAnalysisEvidence, buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence } from "@/lib/ai/evidence-index";
+import { assessFileAnalysisEvidence, buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence, indexWorksheetImportEvidence } from "@/lib/ai/evidence-index";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment, type VaeroexRequestSizeMetrics } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -20,6 +20,15 @@ import {
   type SpreadsheetRow,
   type SpreadsheetWorkbook
 } from "@/lib/imports/spreadsheets";
+import {
+  WORKSHEET_IMPORT_FIELDS,
+  detectWorksheetType,
+  inferWorksheetMapping,
+  isWorksheetType,
+  worksheetTypeLabel,
+  type WorksheetMapping,
+  type WorksheetType
+} from "@/lib/imports/worksheet-types";
 import { approvedKpiColor } from "@/lib/kpis/settings";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
@@ -36,6 +45,17 @@ type JsonRecord = Record<string, unknown>;
 type JsonObject = { [key: string]: Json | undefined };
 type SupabaseServerClient = NonNullable<Awaited<ReturnType<typeof createSupabaseServerClient>>>;
 type ImportMapping = Record<string, string>;
+type WorkbookWorksheetPlan = {
+  index: number;
+  name: string;
+  status: string;
+  row_count: number;
+  columns: string[];
+  detected_type: WorksheetType;
+  selected_type: WorksheetType;
+  enabled: boolean;
+  mapping: WorksheetMapping;
+};
 type KpiImportChartType = "line" | "bar" | "mixed";
 type KpiImportInterpretation = {
   unit_type: string | null;
@@ -593,23 +613,23 @@ function kpiImportInterpretationFromForm(formData: FormData): KpiImportInterpret
   };
 }
 
-function mappedCell(row: ImportRow, mapping: ImportMapping, field: ImportField) {
+function mappedCell(row: ImportRow, mapping: ImportMapping, field: ImportField, strictMapping = false) {
   const mappedHeader = mapping[field.key];
 
   if (mappedHeader && Object.prototype.hasOwnProperty.call(row, mappedHeader)) {
     return row[mappedHeader];
   }
 
-  return cell(row, field.candidates);
+  return strictMapping ? null : cell(row, field.candidates);
 }
 
-function mappedText(row: ImportRow, mapping: ImportMapping, field: ImportField, fallback = "") {
-  const value = mappedCell(row, mapping, field);
+function mappedText(row: ImportRow, mapping: ImportMapping, field: ImportField, fallback = "", strictMapping = false) {
+  const value = mappedCell(row, mapping, field, strictMapping);
   return value === null || value === undefined ? fallback : String(value).trim();
 }
 
-function mappedNumber(row: ImportRow, mapping: ImportMapping, field: ImportField) {
-  const value = mappedCell(row, mapping, field);
+function mappedNumber(row: ImportRow, mapping: ImportMapping, field: ImportField, strictMapping = false) {
+  const value = mappedCell(row, mapping, field, strictMapping);
 
   if (typeof value === "number") {
     return Number.isFinite(value) ? value : null;
@@ -619,8 +639,8 @@ function mappedNumber(row: ImportRow, mapping: ImportMapping, field: ImportField
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function mappedDate(row: ImportRow, mapping: ImportMapping, field: ImportField) {
-  const value = mappedCell(row, mapping, field);
+function mappedDate(row: ImportRow, mapping: ImportMapping, field: ImportField, strictMapping = false) {
+  const value = mappedCell(row, mapping, field, strictMapping);
 
   if (typeof value === "number") {
     const excelEpoch = new Date(Date.UTC(1899, 11, 30));
@@ -831,7 +851,8 @@ function buildKpiRecords(
   userId: string,
   sourceFile: FileUploadRow,
   importId: string,
-  mapping: ImportMapping
+  mapping: ImportMapping,
+  strictMapping = false
 ) {
   return importRows.map((importRow) => {
     const row = jsonToImportRow(importRow.data_json);
@@ -843,14 +864,14 @@ function buildKpiRecords(
           source_file_id: sourceFile.id,
           import_id: importId,
           import_row_id: importRow.id,
-          name: mappedText(row, mapping, field("kpi", "name")),
-          category: mappedText(row, mapping, field("kpi", "category"), "Imported"),
-          target: mappedNumber(row, mapping, field("kpi", "target")),
-          actual_value: mappedNumber(row, mapping, field("kpi", "actual_value")),
-          metric_date: mappedDate(row, mapping, field("kpi", "metric_date")),
-          owner: mappedText(row, mapping, field("kpi", "owner")),
-          notes: mappedText(row, mapping, field("kpi", "notes")),
-          source: mappedText(row, mapping, field("kpi", "source"), `Uploaded file: ${sourceFile.display_name}`),
+          name: mappedText(row, mapping, field("kpi", "name"), "", strictMapping),
+          category: mappedText(row, mapping, field("kpi", "category"), "Imported", strictMapping),
+          target: mappedNumber(row, mapping, field("kpi", "target"), strictMapping),
+          actual_value: mappedNumber(row, mapping, field("kpi", "actual_value"), strictMapping),
+          metric_date: mappedDate(row, mapping, field("kpi", "metric_date"), strictMapping),
+          owner: mappedText(row, mapping, field("kpi", "owner"), "", strictMapping),
+          notes: mappedText(row, mapping, field("kpi", "notes"), "", strictMapping),
+          source: mappedText(row, mapping, field("kpi", "source"), `Uploaded file: ${sourceFile.display_name}`, strictMapping),
           raw_data_json: rowJson(row),
           created_by: userId
       }
@@ -997,7 +1018,8 @@ function buildOperationalMetricRecords(
   userId: string,
   sourceFile: FileUploadRow,
   importId: string,
-  mapping: ImportMapping
+  mapping: ImportMapping,
+  strictMapping = false
 ) {
   return importRows.map((importRow) => {
     const row = jsonToImportRow(importRow.data_json);
@@ -1009,12 +1031,12 @@ function buildOperationalMetricRecords(
           source_file_id: sourceFile.id,
           import_id: importId,
           import_row_id: importRow.id,
-          metric_name: mappedText(row, mapping, field("metrics", "metric_name")),
-          category: mappedText(row, mapping, field("metrics", "category"), "Business"),
-          value: mappedNumber(row, mapping, field("metrics", "value")),
-          metric_date: mappedDate(row, mapping, field("metrics", "metric_date")),
-          owner: mappedText(row, mapping, field("metrics", "owner")),
-          notes: mappedText(row, mapping, field("metrics", "notes")),
+          metric_name: mappedText(row, mapping, field("metrics", "metric_name"), "", strictMapping),
+          category: mappedText(row, mapping, field("metrics", "category"), "Business", strictMapping),
+          value: mappedNumber(row, mapping, field("metrics", "value"), strictMapping),
+          metric_date: mappedDate(row, mapping, field("metrics", "metric_date"), strictMapping),
+          owner: mappedText(row, mapping, field("metrics", "owner"), "", strictMapping),
+          notes: mappedText(row, mapping, field("metrics", "notes"), "", strictMapping),
           raw_data_json: rowJson(row),
           created_by: userId
       }
@@ -2980,7 +3002,7 @@ export async function discardFileAnalysisAction(formData: FormData) {
 
 export async function importFileAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
-  const importType = validImportType(text(formData, "import_type"));
+  const importType: ImportType = "metrics";
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const rateLimit = await enforceRateLimit({
     action: "file.import_stage",
@@ -3073,8 +3095,26 @@ export async function importFileAction(formData: FormData) {
     redirectWithFileError(error instanceof Error ? error.message : "File import was blocked by Vaeroex security policy.", file.id, "imported");
   }
 
-  const mapping = inferMapping(importType, rows);
-  const summary = extractionSummary(importType, rows, mapping, spreadsheet);
+  const worksheetPlans = spreadsheet.worksheets.map<WorkbookWorksheetPlan>((worksheet) => {
+    const detectedType = detectWorksheetType(worksheet);
+    return {
+      index: worksheet.index,
+      name: worksheet.name,
+      status: worksheet.status,
+      row_count: worksheet.rows.length,
+      columns: worksheet.columns,
+      detected_type: detectedType,
+      selected_type: detectedType,
+      enabled: worksheet.status === "parsed" && worksheet.rows.length > 0 && detectedType !== "unknown",
+      mapping: inferWorksheetMapping(detectedType, worksheet.columns)
+    };
+  });
+  const mappingJson = {
+    mode: "workbook",
+    worksheets: worksheetPlans
+  } satisfies JsonObject;
+  const detectedCount = worksheetPlans.filter((worksheet) => worksheet.detected_type !== "unknown").length;
+  const summary = `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. ${detectedCount} worksheet${detectedCount === 1 ? "" : "s"} received a suggested dataset type. Review each worksheet independently before importing.`;
   const parserIssues = spreadsheet.issues.map((issue) => ({
     stage: issue.stage,
     worksheet: issue.worksheet,
@@ -3091,7 +3131,7 @@ export async function importFileAction(formData: FormData) {
       status: "needs_review",
       rows_total: rows.length,
       rows_imported: 0,
-      mapping_json: mapping,
+      mapping_json: mappingJson,
       extraction_summary: summary,
       errors_json: parserIssues as unknown as Json,
       created_by: user.id
@@ -3109,17 +3149,30 @@ export async function importFileAction(formData: FormData) {
     redirectWithFileError(importError?.message || "Import record could not be created.", file.id, "imported");
   }
 
-  const importRows = spreadsheet.rows.map((row, index) => ({
-    workspace_id: workspaceId,
-    file_upload_id: file.id,
-    import_id: importRecord.id,
-    import_type: importType,
-    row_number: index + 1,
-    data_json: rowJson(row.values),
-    mapped_data_json: mappedRowJson(row.values, mapping, importType, row),
-    validation_errors_json: [] as Json,
-    status: "staged"
-  }));
+  const planByIndex = new Map(worksheetPlans.map((worksheet) => [worksheet.index, worksheet]));
+  const importRows = spreadsheet.rows.map((row, index) => {
+    const plan = planByIndex.get(row.worksheetIndex);
+    return {
+      workspace_id: workspaceId,
+      file_upload_id: file.id,
+      import_id: importRecord.id,
+      import_type: plan?.detected_type === "kpis" ? "kpi" : "metrics",
+      row_number: index + 1,
+      data_json: rowJson(row.values),
+      mapped_data_json: {
+        __source: {
+          workbook: file.display_name,
+          original_source: file.original_name,
+          worksheet: row.worksheetName,
+          worksheet_index: row.worksheetIndex,
+          row_number: row.worksheetRowNumber,
+          detected_type: plan?.detected_type || "unknown"
+        }
+      } satisfies Json,
+      validation_errors_json: [] as Json,
+      status: "staged"
+    };
+  });
   for (let index = 0; index < importRows.length; index += 500) {
     const importRowsResult = await supabase.from("file_import_rows").insert(importRows.slice(index, index + 500));
 
@@ -3153,7 +3206,7 @@ export async function importFileAction(formData: FormData) {
             error: worksheet.error || null
           })),
           parser_issues: parserIssues,
-          mapping,
+          mapping: mappingJson,
           extracted_at: new Date().toISOString(),
           summary,
           pipeline_trace: [
@@ -3220,6 +3273,311 @@ function updateImportPipelineTrace(metadataJson: Json, status: "complete" | "fai
   } satisfies JsonObject;
 }
 
+function workbookPlans(value: Json): WorkbookWorksheetPlan[] {
+  if (!isRecord(value) || value.mode !== "workbook" || !Array.isArray(value.worksheets)) return [];
+
+  return value.worksheets.flatMap((item) => {
+    if (!isRecord(item)) return [];
+    const index = Number(item.index);
+    const detectedType = typeof item.detected_type === "string" && isWorksheetType(item.detected_type) ? item.detected_type : "unknown";
+    const selectedType = typeof item.selected_type === "string" && isWorksheetType(item.selected_type) ? item.selected_type : detectedType;
+    const columns = Array.isArray(item.columns) ? item.columns.filter((column): column is string => typeof column === "string") : [];
+    const mapping = isRecord(item.mapping)
+      ? Object.fromEntries(Object.entries(item.mapping).filter((entry): entry is [string, string] => typeof entry[1] === "string"))
+      : inferWorksheetMapping(selectedType, columns);
+
+    if (!Number.isInteger(index) || typeof item.name !== "string") return [];
+    return [{
+      index,
+      name: item.name,
+      status: typeof item.status === "string" ? item.status : "parsed",
+      row_count: typeof item.row_count === "number" ? item.row_count : 0,
+      columns,
+      detected_type: detectedType,
+      selected_type: selectedType,
+      enabled: item.enabled === true,
+      mapping
+    }];
+  });
+}
+
+function workbookPlansFromForm(formData: FormData, storedPlans: WorkbookWorksheetPlan[]) {
+  return storedPlans.map((plan) => {
+    const selectedValue = text(formData, `worksheet_${plan.index}_type`);
+    const selectedType = isWorksheetType(selectedValue) ? selectedValue : plan.selected_type;
+    const fallback = selectedType === plan.selected_type ? plan.mapping : inferWorksheetMapping(selectedType, plan.columns);
+    const mapping = WORKSHEET_IMPORT_FIELDS[selectedType].reduce<WorksheetMapping>((result, field) => {
+      const selected = text(formData, `worksheet_${plan.index}_map_${field.key}`) || fallback[field.key];
+      if (selected && plan.columns.includes(selected)) result[field.key] = selected;
+      return result;
+    }, {});
+
+    return {
+      ...plan,
+      selected_type: selectedType,
+      enabled: formData.get(`worksheet_${plan.index}_enabled`) === "on" && plan.status === "parsed" && plan.row_count > 0,
+      mapping
+    };
+  });
+}
+
+function worksheetIndexForRow(row: StagedImportRow) {
+  const mapped = isRecord(row.mapped_data_json) ? row.mapped_data_json : {};
+  const source = isRecord(mapped.__source) ? mapped.__source : {};
+  const worksheetIndex = Number(source.worksheet_index);
+  return Number.isInteger(worksheetIndex) ? worksheetIndex : -1;
+}
+
+function worksheetMappedData(row: StagedImportRow, plan: WorkbookWorksheetPlan) {
+  const sourceMapped = isRecord(row.mapped_data_json) ? row.mapped_data_json : {};
+  const result = WORKSHEET_IMPORT_FIELDS[plan.selected_type].reduce<JsonRecord>((mapped, field) => {
+    const column = plan.mapping[field.key];
+    const values = jsonToImportRow(row.data_json);
+    if (column && Object.prototype.hasOwnProperty.call(values, column)) mapped[field.key] = values[column];
+    return mapped;
+  }, {});
+  result.__source = {
+    ...(isRecord(sourceMapped.__source) ? sourceMapped.__source : {}),
+    selected_type: plan.selected_type
+  };
+  return result as Json;
+}
+
+function validateWorksheetImportRow(row: StagedImportRow, plan: WorkbookWorksheetPlan) {
+  const values = jsonToImportRow(row.data_json);
+  const issues: ImportPipelineIssue[] = [];
+
+  for (const importField of WORKSHEET_IMPORT_FIELDS[plan.selected_type]) {
+    const column = plan.mapping[importField.key];
+    const value = column && Object.prototype.hasOwnProperty.call(values, column) ? values[column] : null;
+    if (importField.required && !column) {
+      issues.push(issueForImportRow(row, "import_validation", `Required mapping "${importField.label}" is not selected for ${plan.name}.`, importField.key));
+      continue;
+    }
+    if (importField.required && (!column || value === null || String(value).trim() === "")) {
+      issues.push(issueForImportRow(row, "import_validation", `Column "${column || importField.label}" is blank for this row.`, importField.key));
+      continue;
+    }
+    if (importField.valueType === "number" && column && value !== null && String(value).trim() !== "") {
+      const parsed = typeof value === "number" ? value : Number(String(value).replace(/[$,%\s,]/g, ""));
+      if (!Number.isFinite(parsed)) {
+        issues.push(issueForImportRow(row, "import_validation", `Column "${column}" must contain a valid number.`, importField.key));
+      }
+    }
+  }
+
+  return issues;
+}
+
+function hasMappedNumericValue(row: StagedImportRow, mapping: WorksheetMapping) {
+  const column = mapping.value;
+  if (!column) return false;
+  const values = jsonToImportRow(row.data_json);
+  const value = values[column];
+  if (value === null || value === undefined || String(value).trim() === "") return false;
+  const parsed = typeof value === "number" ? value : Number(String(value).replace(/[$,%\s,]/g, ""));
+  return Number.isFinite(parsed);
+}
+
+function rowWithWorkbookLineage(row: StagedImportRow, file: FileUploadRow, plan: WorkbookWorksheetPlan) {
+  const values = jsonToImportRow(row.data_json);
+  const source = importRowSource(row);
+  return {
+    ...values,
+    "Vaeroex workbook": file.display_name,
+    "Vaeroex original source": file.original_name,
+    "Vaeroex source file ID": file.id,
+    "Vaeroex worksheet": plan.name,
+    "Vaeroex worksheet index": plan.index,
+    "Vaeroex source row": source.rowNumber,
+    "Vaeroex dataset type": plan.selected_type
+  } satisfies ImportRow;
+}
+
+async function saveWorkbookImport({
+  supabase,
+  user,
+  workspaceId,
+  membership,
+  file,
+  importRecord,
+  stagedRows,
+  formData
+}: {
+  supabase: SupabaseServerClient;
+  user: { id: string };
+  workspaceId: string;
+  membership: Awaited<ReturnType<typeof requireWorkspace>>["membership"];
+  file: FileUploadRow;
+  importRecord: Database["public"]["Tables"]["file_imports"]["Row"];
+  stagedRows: StagedImportRow[];
+  formData: FormData;
+}): Promise<never> {
+  const storedPlans = workbookPlans(importRecord.mapping_json);
+  const plans = workbookPlansFromForm(formData, storedPlans);
+  const enabledPlans = plans.filter((plan) => plan.enabled);
+  if (!enabledPlans.length) redirectWithFileError("Select at least one worksheet to import.", file.id, "imported");
+
+  const planByIndex = new Map(plans.map((plan) => [plan.index, plan]));
+  const enabledRows = stagedRows.filter((row) => planByIndex.get(worksheetIndexForRow(row))?.enabled);
+  if (!enabledRows.length) redirectWithFileError("The approved worksheets contain no importable rows.", file.id, "imported");
+
+  await requireToolExecution(
+    { supabase, workspaceId, userId: user.id, userRole: membership.role },
+    {
+      toolName: "approve_workbook_import",
+      args: { fileId: file.id, importId: importRecord.id, importType: "metrics", rowsApproved: enabledRows.length },
+      initiatedBy: "user",
+      confirmationReceived: true,
+      targetRecordId: importRecord.id,
+      metadata: { source: "workbook_import_approval", file_id: file.id, worksheet_count: enabledPlans.length } satisfies Json
+    }
+  );
+
+  const diagnostics = stagedRows.map((row) => {
+    const plan = planByIndex.get(worksheetIndexForRow(row));
+    if (!plan || !plan.enabled) return { row, issues: [] as ImportPipelineIssue[], mappedData: row.mapped_data_json };
+    return { row, issues: validateWorksheetImportRow(row, plan), mappedData: worksheetMappedData(row, plan) };
+  });
+  await updateImportRowDiagnostics({ supabase, workspaceId, importId: importRecord.id, results: diagnostics });
+
+  const kpiRowIds = diagnostics.filter((result) => planByIndex.get(worksheetIndexForRow(result.row))?.selected_type === "kpis").map((result) => result.row.id);
+  const metricRowIds = diagnostics.filter((result) => planByIndex.get(worksheetIndexForRow(result.row))?.selected_type !== "kpis").map((result) => result.row.id);
+  if (kpiRowIds.length) await supabase.from("file_import_rows").update({ import_type: "kpi" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", kpiRowIds);
+  if (metricRowIds.length) await supabase.from("file_import_rows").update({ import_type: "metrics" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", metricRowIds);
+
+  const skippedRows = diagnostics.filter((result) => !planByIndex.get(worksheetIndexForRow(result.row))?.enabled).map((result) => result.row.id);
+  if (skippedRows.length) {
+    await supabase.from("file_import_rows").update({ status: "skipped_worksheet" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", skippedRows);
+  }
+
+  const validRows = diagnostics.filter((result) => planByIndex.get(worksheetIndexForRow(result.row))?.enabled && !result.issues.length).map((result) => result.row);
+  const rejectedIssues = diagnostics.flatMap((result) => result.issues);
+  const parserIssues = Array.isArray(importRecord.errors_json) ? importRecord.errors_json.filter(isRecord) : [];
+  if (!validRows.length) {
+    const first = rejectedIssues[0];
+    const message = first
+      ? `No approved rows were imported. First failure: ${first.worksheet}, row ${first.row_number}: ${first.message}`
+      : "No approved rows were available to import.";
+    await supabase.from("file_imports").update({ status: "failed", rows_imported: 0, mapping_json: { mode: "workbook", worksheets: plans }, errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    redirectWithFileError(message, file.id, "imported");
+  }
+
+  let insertedStructuredRows = 0;
+  const duplicateIds: string[] = [];
+  const structuredIds: string[] = [];
+  const structuredFailureIds: string[] = [];
+  const runtimeIssues: ImportPipelineIssue[] = [];
+  try {
+    await updateFileProcessingStatus({ supabase, file, status: "processing" });
+    for (const plan of enabledPlans) {
+      const planRows = validRows.filter((row) => worksheetIndexForRow(row) === plan.index);
+      if (!planRows.length || plan.selected_type === "company_profile" || plan.selected_type === "unknown") continue;
+
+      try {
+        if (plan.selected_type === "kpis") {
+          const targetRows = buildKpiRecords(planRows, workspaceId, user.id, file, importRecord.id, plan.mapping, true).map((target) => ({
+            ...target,
+            record: { ...target.record, raw_data_json: rowJson(rowWithWorkbookLineage(planRows.find((row) => row.id === target.importRowId)!, file, plan)) }
+          }));
+          const deduped = await removeDuplicateKpiRows({ supabase, rows: targetRows, workspaceId, sourceFileId: file.id });
+          if (deduped.rows.length) {
+            const { error } = await supabase.from("kpis").insert(deduped.rows.map((row) => row.record));
+            if (error) throw new Error(error.message);
+          }
+          insertedStructuredRows += deduped.rows.length;
+          structuredIds.push(...deduped.rows.map((row) => row.importRowId));
+          duplicateIds.push(...deduped.duplicateRows.map((row) => row.importRowId));
+        } else {
+          const metricRows = planRows.filter((row) => hasMappedNumericValue(row, plan.mapping));
+          const targetRows = buildOperationalMetricRecords(metricRows, workspaceId, user.id, file, importRecord.id, plan.mapping, true).map((target) => ({
+            ...target,
+            record: {
+              ...target.record,
+              category: target.record.category === "Business" ? worksheetTypeLabel(plan.selected_type) : target.record.category,
+              raw_data_json: rowJson(rowWithWorkbookLineage(planRows.find((row) => row.id === target.importRowId)!, file, plan))
+            }
+          }));
+          if (targetRows.length) {
+            const { error } = await supabase.from("operational_metrics").insert(targetRows.map((row) => row.record));
+            if (error) throw new Error(error.message);
+          }
+          insertedStructuredRows += targetRows.length;
+          structuredIds.push(...targetRows.map((row) => row.importRowId));
+        }
+      } catch (error) {
+        const message = actionErrorMessage(error, `${plan.name} could not be saved to structured history.`);
+        structuredFailureIds.push(...planRows.map((row) => row.id));
+        runtimeIssues.push(...planRows.map((row) => issueForImportRow(row, "import", message, "worksheet")));
+      }
+    }
+
+    const evidenceWorksheets = enabledPlans.flatMap((plan) => {
+      const rows = validRows.filter((row) => worksheetIndexForRow(row) === plan.index).map((row) => ({
+        rowNumber: importRowSource(row).rowNumber,
+        values: jsonToImportRow(row.data_json)
+      }));
+      return rows.length ? [{ name: plan.name, index: plan.index, type: worksheetTypeLabel(plan.selected_type), rows }] : [];
+    });
+    const indexing = await indexWorksheetImportEvidence({ supabase, workspaceId, userId: user.id, file, importId: importRecord.id, worksheets: evidenceWorksheets });
+    const indexingSucceeded = indexing.indexedChunks > 0;
+    if (!indexingSucceeded) {
+      runtimeIssues.push({
+        stage: "business_memory_indexing",
+        worksheet: "Workbook",
+        row_number: null,
+        field: "evidence",
+        message: indexing.error || "Approved worksheet evidence could not be added to Business Memory."
+      });
+    }
+
+    const contextIds = validRows.filter((row) => !structuredIds.includes(row.id) && !duplicateIds.includes(row.id) && !structuredFailureIds.includes(row.id)).map((row) => row.id);
+    if (structuredIds.length) await supabase.from("file_import_rows").update({ status: "imported" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredIds);
+    if (contextIds.length) await supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed" : "index_failed" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", contextIds);
+    if (structuredFailureIds.length) await supabase.from("file_import_rows").update({ status: indexingSucceeded ? "indexed_with_import_error" : "rejected_import" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", structuredFailureIds);
+    if (duplicateIds.length) await supabase.from("file_import_rows").update({ status: "skipped_duplicate" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", duplicateIds);
+
+    const importedAt = new Date().toISOString();
+    const acceptedRowCount = indexingSucceeded ? validRows.length - duplicateIds.length : insertedStructuredRows;
+    const mappingJson = { mode: "workbook", worksheets: plans } satisfies JsonObject;
+    await supabase.from("file_imports").update({
+      status: "completed",
+      rows_imported: acceptedRowCount,
+      mapping_json: mappingJson,
+      reviewed_at: importedAt,
+      imported_at: importedAt,
+      extraction_summary: `${enabledPlans.length} worksheet${enabledPlans.length === 1 ? "" : "s"} processed independently. ${acceptedRowCount} row${acceptedRowCount === 1 ? "" : "s"} accepted, ${rejectedIssues.length + runtimeIssues.length} issue${rejectedIssues.length + runtimeIssues.length === 1 ? "" : "s"} recorded, and ${indexing.indexedChunks} evidence chunk${indexing.indexedChunks === 1 ? "" : "s"} added to Business Memory.`,
+      errors_json: [...parserIssues, ...rejectedIssues, ...runtimeIssues] as unknown as Json
+    }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+
+    await supabase.from("file_uploads").update({
+      import_type: "metrics",
+      import_status: "imported",
+      imported_rows: file.imported_rows + acceptedRowCount,
+      processing_status: "ready",
+      processing_error: null,
+      processed_at: importedAt,
+      metadata_json: appendImportHistory(
+        updateImportPipelineTrace(file.metadata_json, "complete", `${enabledPlans.length} worksheet(s) processed independently; ${acceptedRowCount} row(s) accepted, ${runtimeIssues.length} processing issue(s) recorded, and ${indexing.indexedChunks} Business Memory chunk(s) indexed.`) as Json,
+        { import_id: importRecord.id, import_type: "workbook", rows_total: importRecord.rows_total, rows_imported: acceptedRowCount, structured_rows: insertedStructuredRows, worksheet_count: enabledPlans.length, imported_at: importedAt, source_file_id: file.id }
+      )
+    }).eq("workspace_id", workspaceId).eq("id", file.id);
+  } catch (error) {
+    const message = actionErrorMessage(error, "The approved workbook could not be imported.");
+    const issue = { stage: "import" as const, worksheet: "Workbook", row_number: null, field: "workbook", message };
+    await supabase.from("file_imports").update({ status: "failed", mapping_json: { mode: "workbook", worksheets: plans }, errors_json: [...parserIssues, ...rejectedIssues, issue] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    await supabase.from("file_uploads").update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString(), metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", message) }).eq("workspace_id", workspaceId).eq("id", file.id);
+    redirectWithFileError(message, file.id, "imported");
+  }
+
+  revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/reports");
+  redirectWithMessage(`${enabledPlans.length} worksheet${enabledPlans.length === 1 ? "" : "s"} imported independently. Business Memory now preserves workbook, worksheet, and original-row lineage.`, file.id, "imported");
+}
+
 export async function saveExtractedImportAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
@@ -3281,6 +3639,19 @@ export async function saveExtractedImportAction(formData: FormData) {
 
   if (!stagedRows?.length) {
     redirectWithFileError("No extracted rows were found to save.", file.id, "imported");
+  }
+
+  if (isRecord(importRecord.mapping_json) && importRecord.mapping_json.mode === "workbook") {
+    return saveWorkbookImport({
+      supabase,
+      user,
+      workspaceId,
+      membership,
+      file,
+      importRecord,
+      stagedRows: stagedRows as StagedImportRow[],
+      formData
+    });
   }
 
   const importToolByType: Record<ImportType, RegisteredToolName> = {

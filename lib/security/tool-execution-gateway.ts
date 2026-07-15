@@ -219,6 +219,15 @@ export const TOOL_EXECUTION_REGISTRY = {
     destructive: false,
     allowedRoles: OPERATOR_ROLES
   },
+  approve_workbook_import: {
+    name: "approve_workbook_import",
+    operationType: "CREATE_RECORD",
+    targetTable: "business_memory_chunks",
+    schema: fileImportApprovalSchema,
+    requiresConfirmation: true,
+    destructive: false,
+    allowedRoles: OPERATOR_ROLES
+  },
   create_report_from_file: {
     name: "create_report_from_file",
     operationType: "CREATE_RECORD",

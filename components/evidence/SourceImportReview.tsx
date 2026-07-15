@@ -1,5 +1,6 @@
 import { importFileAction, saveExtractedImportAction } from "@/app/app/files/actions";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
+import { WorkbookImportReview } from "@/components/evidence/WorkbookImportReview";
 import { KPI_COLOR_PALETTE, kpiColorMayBeLowContrast } from "@/lib/kpis/settings";
 import type { Database } from "@/lib/supabase/types";
 
@@ -206,13 +207,8 @@ export function SourceImportReview({
         <div className="mt-4 flex flex-wrap gap-2">
           <form action={importFileAction}>
             <input type="hidden" name="file_id" value={file.id} />
-            <input type="hidden" name="import_type" value="kpi" />
-            <PendingSubmitButton pendingLabel="Preparing KPI import..." className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Prepare KPI import</PendingSubmitButton>
-          </form>
-          <form action={importFileAction}>
-            <input type="hidden" name="file_id" value={file.id} />
             <input type="hidden" name="import_type" value="metrics" />
-            <PendingSubmitButton pendingLabel="Preparing metric import..." className="min-h-11 rounded-md border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 disabled:opacity-60">Prepare metric import</PendingSubmitButton>
+            <PendingSubmitButton pendingLabel="Inspecting worksheets..." className="min-h-11 rounded-md bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">Prepare workbook import</PendingSubmitButton>
           </form>
         </div>
       </div>
@@ -260,6 +256,15 @@ export function SourceImportReview({
     return (
       <div className="rounded-lg border border-amber-300/30 bg-amber-950/20 p-4 text-sm leading-6 text-amber-50">
         No extracted rows are available. Prepare the import again before approving data.
+      </div>
+    );
+  }
+
+  if (isRecord(latestImport.mapping_json) && latestImport.mapping_json.mode === "workbook") {
+    return (
+      <div className="space-y-4">
+        <ImportDiagnostics file={file} latestImport={latestImport} />
+        <WorkbookImportReview file={file} importRecord={latestImport} rows={importRows} />
       </div>
     );
   }
