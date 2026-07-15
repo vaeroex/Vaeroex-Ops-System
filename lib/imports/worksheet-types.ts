@@ -1,5 +1,17 @@
 import type { SpreadsheetWorksheet } from "@/lib/imports/spreadsheets";
 
+export const WORKBOOK_DETECTION_VERSION = 2;
+
+export function workbookDetectionVersion(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return 0;
+  const version = Number((value as Record<string, unknown>).detection_version);
+  return Number.isInteger(version) && version > 0 ? version : 0;
+}
+
+export function workbookDetectionPlanIsStale(value: unknown) {
+  return workbookDetectionVersion(value) < WORKBOOK_DETECTION_VERSION;
+}
+
 export type WorksheetType =
   | "company_profile"
   | "wide_time_series"
@@ -136,12 +148,39 @@ function includesAny(value: string, candidates: string[]) {
 }
 
 const PERIOD_COLUMNS = ["date", "period", "month", "week", "quarter", "year"];
+const MONTH_NUMBERS: Record<string, number> = {
+  jan: 1,
+  january: 1,
+  feb: 2,
+  february: 2,
+  mar: 3,
+  march: 3,
+  apr: 4,
+  april: 4,
+  may: 5,
+  jun: 6,
+  june: 6,
+  jul: 7,
+  july: 7,
+  aug: 8,
+  august: 8,
+  sep: 9,
+  sept: 9,
+  september: 9,
+  oct: 10,
+  october: 10,
+  nov: 11,
+  november: 11,
+  dec: 12,
+  december: 12
+};
 const ENTITY_IDENTITY_COLUMNS = [
   "sku",
   "item",
   "item id",
   "item name",
   "inventory item",
+  "inventory id",
   "product",
   "product id",
   "product name",
@@ -181,7 +220,10 @@ export function parseWorksheetPeriod(value: unknown) {
   const candidate = String(value ?? "").trim();
   if (!candidate) return null;
   if (/^\d{4}-\d{2}-\d{2}$/.test(candidate)) return candidate;
-  if (/^\d{4}-\d{2}$/.test(candidate)) return `${candidate}-01`;
+  const yearMonth = candidate.match(/^(\d{4})-(0[1-9]|1[0-2])$/);
+  if (yearMonth) return `${yearMonth[1]}-${yearMonth[2]}-01`;
+  const monthYearNumeric = candidate.match(/^(0?[1-9]|1[0-2])[/-](\d{4})$/);
+  if (monthYearNumeric) return `${monthYearNumeric[2]}-${String(Number(monthYearNumeric[1])).padStart(2, "0")}-01`;
   if (/^\d{4}$/.test(candidate)) return `${candidate}-01-01`;
   const quarter = candidate.match(/^Q([1-4])\s*[-/]?\s*(\d{4})$/i) || candidate.match(/^(\d{4})\s*[-/]?\s*Q([1-4])$/i);
   if (quarter) {
@@ -190,8 +232,39 @@ export function parseWorksheetPeriod(value: unknown) {
     const year = startsWithQuarter ? quarter[2] : quarter[1];
     return `${year}-${String((quarterNumber - 1) * 3 + 1).padStart(2, "0")}-01`;
   }
+
+  const namedMonth = candidate.match(/^([A-Za-z]+)(?:[\s,/-]+(\d{4}))?$/);
+  if (namedMonth) {
+    const month = MONTH_NUMBERS[namedMonth[1].toLowerCase()];
+    if (month) {
+      return namedMonth[2]
+        ? `${namedMonth[2]}-${String(month).padStart(2, "0")}-01`
+        : `month:${String(month).padStart(2, "0")}`;
+    }
+  }
+
+  // Date.parse may infer the current year for vague month labels, so only use it
+  // after an explicit year has been established by the source value.
+  if (!/\b\d{4}\b/.test(candidate)) return null;
   const parsed = Date.parse(candidate);
   return Number.isFinite(parsed) ? new Date(parsed).toISOString().slice(0, 10) : null;
+}
+
+export function worksheetPeriodDate(value: unknown) {
+  const period = parseWorksheetPeriod(value);
+  return period && /^\d{4}-\d{2}-\d{2}$/.test(period) ? period : null;
+}
+
+function monthOnlyNumber(value: unknown) {
+  const period = parseWorksheetPeriod(value);
+  const match = period?.match(/^month:(\d{2})$/);
+  return match ? Number(match[1]) : null;
+}
+
+function isRecognizableMonthSequence(values: unknown[]) {
+  const months = values.map(monthOnlyNumber);
+  if (months.length < 2 || months.some((month) => month === null)) return false;
+  return months.every((month, index) => index === 0 || month === ((months[index - 1]! % 12) + 1));
 }
 
 function exactColumn(columns: string[], candidates: string[]) {
@@ -254,11 +327,44 @@ export function isWideTimeSeriesWorksheet(
     const populatedPeriods = rows
       .map((row) => row.values[periodColumn])
       .filter((value) => value !== null && value !== undefined && String(value).trim() !== "");
-    if (!populatedPeriods.length || populatedPeriods.filter((value) => parseWorksheetPeriod(value)).length / populatedPeriods.length < 0.5) {
+    const parsedPeriods = populatedPeriods.map(parseWorksheetPeriod).filter(Boolean);
+    if (!populatedPeriods.length || parsedPeriods.length / populatedPeriods.length < 0.5) {
       return false;
+    }
+    if (parsedPeriods.every((period) => period?.startsWith("month:"))) {
+      const monthOnlyValues = populatedPeriods.filter((value) => monthOnlyNumber(value) !== null);
+      if (!isRecognizableMonthSequence(monthOnlyValues)) return false;
     }
   }
   return inferWideTimeSeriesMetricColumns(worksheet, periodColumn).length >= 2;
+}
+
+function isInventoryWorksheet(name: string, columns: string[]) {
+  const normalizedColumns = columns.map(normalized);
+  const hasIdentity = normalizedColumns.some((column) => [
+    "sku",
+    "item",
+    "item id",
+    "item name",
+    "inventory item",
+    "inventory id",
+    "product",
+    "product id",
+    "product name"
+  ].includes(column));
+  if (!hasIdentity) return false;
+
+  const hasInventoryStructure = normalizedColumns.some((column) => [
+    "on hand",
+    "reorder point",
+    "stock",
+    "stock level",
+    "quantity",
+    "qty",
+    "supplier",
+    "supplier id"
+  ].includes(column));
+  return name.includes("inventory") || hasInventoryStructure;
 }
 
 export function worksheetTypeLabel(type: WorksheetType) {
@@ -278,7 +384,7 @@ export function detectWorksheetType(
 
   if (includesAny(combined, ["company profile", "company context", "business profile"])) return "company_profile";
   if (isWideTimeSeriesWorksheet(worksheet)) return "wide_time_series";
-  if (includesAny(combined, ["inventory", "on hand", "reorder point", "stock level", "sku"])) return "inventory";
+  if (isInventoryWorksheet(name, worksheet.columns)) return "inventory";
   if (includesAny(combined, ["customer feedback", "customer rating", "customer satisfaction", "support feedback"])) return "customers";
   if (includesAny(combined, ["employee", "employees", "overtime hours", "training hours", "headcount"])) return "employees";
   if (includesAny(combined, ["supplier invoice", "vendor invoice", "invoices", "accounts payable", "financial", "profit and loss", "expenses"])) return "financials";

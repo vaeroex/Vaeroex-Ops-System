@@ -21,6 +21,7 @@ import {
   type SpreadsheetWorkbook
 } from "@/lib/imports/spreadsheets";
 import {
+  WORKBOOK_DETECTION_VERSION,
   WORKSHEET_IMPORT_FIELDS,
   detectWorksheetType,
   evaluateWideTimeSeriesCells,
@@ -29,6 +30,7 @@ import {
   isWorksheetType,
   parseWorksheetNumber,
   parseWorksheetPeriod,
+  worksheetPeriodDate,
   wideTimeSeriesTargetColumn,
   worksheetTypeLabel,
   type WorksheetMapping,
@@ -3058,10 +3060,37 @@ export async function discardFileAnalysisAction(formData: FormData) {
   redirectWithPathMessage(returnPath, "Analysis discarded. It will not be used in future Vaeroex answers.", file.id);
 }
 
+function workbookMappingWithPlans(value: unknown, plans: WorkbookWorksheetPlan[]) {
+  const existing = (isRecord(value) && value.mode === "workbook" ? value : {}) as JsonObject;
+  return {
+    ...existing,
+    mode: "workbook",
+    detection_version: WORKBOOK_DETECTION_VERSION,
+    worksheets: plans
+  } satisfies JsonObject;
+}
+
 export async function importFileAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const importType: ImportType = "metrics";
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
+  const reprepareImportId = text(formData, "import_id");
+  let reprepareImport: Database["public"]["Tables"]["file_imports"]["Row"] | null = null;
+
+  if (reprepareImportId) {
+    const { data, error } = await supabase
+      .from("file_imports")
+      .select("*")
+      .eq("id", reprepareImportId)
+      .eq("workspace_id", workspaceId)
+      .eq("file_upload_id", file.id)
+      .maybeSingle();
+    if (error || !data) redirectWithFileError(error?.message || "Workbook import not found for this workspace.", file.id, "imported");
+    if (!isRecord(data.mapping_json) || data.mapping_json.mode !== "workbook") {
+      redirectWithFileError("Only an existing workbook import can be re-prepared.", file.id, "imported");
+    }
+    reprepareImport = data;
+  }
   const rateLimit = await enforceRateLimit({
     action: "file.import_stage",
     limit: 15,
@@ -3171,12 +3200,18 @@ export async function importFileAction(formData: FormData) {
         : []
     };
   });
+  const preparedAt = new Date().toISOString();
+  const preparationId = randomUUID();
   const mappingJson = {
     mode: "workbook",
+    detection_version: WORKBOOK_DETECTION_VERSION,
+    preparation_id: preparationId,
+    detected_at: preparedAt,
+    ...(reprepareImport ? { reprepared_at: preparedAt } : {}),
     worksheets: worksheetPlans
   } satisfies JsonObject;
   const detectedCount = worksheetPlans.filter((worksheet) => worksheet.detected_type !== "unknown").length;
-  const summary = `Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. ${detectedCount} worksheet${detectedCount === 1 ? "" : "s"} received a suggested dataset type. Review each worksheet independently before importing.`;
+  const summary = `${reprepareImport ? "Workbook detection was updated using the latest import rules. " : ""}Vaeroex found ${rows.length} data row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. ${detectedCount} worksheet${detectedCount === 1 ? "" : "s"} received a suggested dataset type. Review each worksheet independently before importing.`;
   const parserIssues = spreadsheet.issues.map((issue) => ({
     stage: issue.stage,
     worksheet: issue.worksheet,
@@ -3184,37 +3219,56 @@ export async function importFileAction(formData: FormData) {
     field: "worksheet",
     message: issue.message
   })) satisfies ImportPipelineIssue[];
-  const { data: importRecord, error: importError } = await supabase
-    .from("file_imports")
-    .insert({
-      workspace_id: workspaceId,
-      file_upload_id: file.id,
-      import_type: importType,
-      status: "needs_review",
-      rows_total: rows.length,
-      rows_imported: 0,
-      mapping_json: mappingJson,
-      extraction_summary: summary,
-      errors_json: parserIssues as unknown as Json,
-      created_by: user.id
-    })
-    .select("id")
-    .single();
+  let importRecord: { id: string };
+  if (reprepareImport) {
+    importRecord = { id: reprepareImport.id };
+  } else {
+    const { data, error } = await supabase
+      .from("file_imports")
+      .insert({
+        workspace_id: workspaceId,
+        file_upload_id: file.id,
+        import_type: importType,
+        status: "needs_review",
+        rows_total: rows.length,
+        rows_imported: 0,
+        mapping_json: mappingJson,
+        extraction_summary: summary,
+        errors_json: parserIssues as unknown as Json,
+        created_by: user.id
+      })
+      .select("id")
+      .single();
 
-  if (importError || !importRecord) {
-    await updateFileProcessingStatus({
-      supabase,
-      file,
-      status: "failed",
-      error: importError?.message || "Import record could not be created."
-    });
-    redirectWithFileError(importError?.message || "Import record could not be created.", file.id, "imported");
+    if (error || !data) {
+      await updateFileProcessingStatus({
+        supabase,
+        file,
+        status: "failed",
+        error: error?.message || "Import record could not be created."
+      });
+      redirectWithFileError(error?.message || "Import record could not be created.", file.id, "imported");
+    }
+    importRecord = data;
   }
+
+  const previousStagedRows = reprepareImport
+    ? await supabase
+        .from("file_import_rows")
+        .select("id")
+        .eq("workspace_id", workspaceId)
+        .eq("file_upload_id", file.id)
+        .eq("import_id", reprepareImport.id)
+        .eq("status", "staged")
+        .limit(MAX_IMPORT_ROWS)
+    : { data: [] as Array<{ id: string }>, error: null };
+  if (previousStagedRows.error) redirectWithFileError(previousStagedRows.error.message, file.id, "imported");
 
   const planByIndex = new Map(worksheetPlans.map((worksheet) => [worksheet.index, worksheet]));
   const importRows = spreadsheet.rows.map((row, index) => {
     const plan = planByIndex.get(row.worksheetIndex);
     return {
+      id: randomUUID(),
       workspace_id: workspaceId,
       file_upload_id: file.id,
       import_id: importRecord.id,
@@ -3228,6 +3282,8 @@ export async function importFileAction(formData: FormData) {
           worksheet: row.worksheetName,
           worksheet_index: row.worksheetIndex,
           row_number: row.worksheetRowNumber,
+          preparation_id: preparationId,
+          detection_version: WORKBOOK_DETECTION_VERSION,
           detected_type: plan?.detected_type || "unknown"
         }
       } satisfies Json,
@@ -3239,8 +3295,48 @@ export async function importFileAction(formData: FormData) {
     const importRowsResult = await supabase.from("file_import_rows").insert(importRows.slice(index, index + 500));
 
     if (importRowsResult.error) {
+      await supabase.from("file_import_rows").delete().eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", importRows.map((row) => row.id));
       await updateFileProcessingStatus({ supabase, file, status: "failed", error: importRowsResult.error.message });
       redirectWithFileError(importRowsResult.error.message, file.id, "imported");
+    }
+  }
+
+  if (reprepareImport) {
+    const previousIds = (previousStagedRows.data || []).map((row) => row.id);
+    if (previousIds.length) {
+      const supersedeResult = await supabase
+        .from("file_import_rows")
+        .update({ status: "superseded" })
+        .eq("workspace_id", workspaceId)
+        .eq("file_upload_id", file.id)
+        .eq("import_id", importRecord.id)
+        .in("id", previousIds);
+      if (supersedeResult.error) {
+        await supabase.from("file_import_rows").delete().eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", importRows.map((row) => row.id));
+        redirectWithFileError(supersedeResult.error.message, file.id, "imported");
+      }
+    }
+
+    const refreshResult = await supabase
+      .from("file_imports")
+      .update({
+        status: "needs_review",
+        rows_total: rows.length,
+        mapping_json: mappingJson,
+        extraction_summary: summary,
+        errors_json: parserIssues as unknown as Json,
+        reviewed_at: null
+      })
+      .eq("workspace_id", workspaceId)
+      .eq("file_upload_id", file.id)
+      .eq("id", importRecord.id);
+    if (refreshResult.error) {
+      const previousIds = (previousStagedRows.data || []).map((row) => row.id);
+      if (previousIds.length) {
+        await supabase.from("file_import_rows").update({ status: "staged" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", previousIds);
+      }
+      await supabase.from("file_import_rows").delete().eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", importRows.map((row) => row.id));
+      redirectWithFileError(refreshResult.error.message, file.id, "imported");
     }
   }
 
@@ -3293,9 +3389,11 @@ export async function importFileAction(formData: FormData) {
     .eq("workspace_id", workspaceId);
 
   revalidatePath(FILES_PATH);
+  revalidatePath(SOURCES_PATH);
+  revalidatePath(`${SOURCES_PATH}/${file.id}`);
   revalidatePath("/app/kpis");
   revalidatePath("/app/reports");
-  redirectWithMessage(`Data extracted from ${rows.length} row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id, "imported");
+  redirectWithMessage(`${reprepareImport ? "Workbook detection updated" : "Data extracted"} from ${rows.length} row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id, "imported");
 }
 
 function appendImportHistory(metadataJson: Json, entry: JsonObject) {
@@ -3512,8 +3610,19 @@ function buildWideTimeSeriesKpiRecords({
 
   for (const row of rows) {
     const values = jsonToImportRow(row.data_json);
-    const period = parseWorksheetPeriod(periodColumn ? values[periodColumn] : null);
-    if (!period) continue;
+    const originalPeriod = periodColumn ? values[periodColumn] : null;
+    const parsedPeriod = parseWorksheetPeriod(originalPeriod);
+    if (!parsedPeriod) continue;
+    const period = worksheetPeriodDate(originalPeriod);
+    if (!period) {
+      issues.push(issueForImportRow(
+        row,
+        "import_validation",
+        `Period "${String(originalPeriod)}" identifies a month but has no year. The row remains available as source evidence, but a dated KPI point was not created. Add a year and re-prepare the workbook to create KPI history.`,
+        periodColumn || "period"
+      ));
+      continue;
+    }
 
     const evaluated = evaluateWideTimeSeriesCells(values, plan.metric_columns);
     for (const invalidColumn of evaluated.invalidColumns) {
@@ -3545,6 +3654,7 @@ function buildWideTimeSeriesKpiRecords({
           raw_data_json: rowJson({
             ...lineage,
             "Vaeroex period column": periodColumn || "",
+            "Vaeroex original period": String(originalPeriod ?? ""),
             "Vaeroex metric column": metricColumn,
             "Vaeroex target column": targetColumn || ""
           }),
@@ -3627,7 +3737,7 @@ async function saveWorkbookImport({
     const message = first
       ? `No approved rows were imported. First failure: ${first.worksheet}, row ${first.row_number}: ${first.message}`
       : "No approved rows were available to import.";
-    await supabase.from("file_imports").update({ status: "failed", rows_imported: 0, mapping_json: { mode: "workbook", worksheets: plans }, errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    await supabase.from("file_imports").update({ status: "failed", rows_imported: 0, mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans), errors_json: [...parserIssues, ...rejectedIssues] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
     redirectWithFileError(message, file.id, "imported");
   }
 
@@ -3737,7 +3847,7 @@ async function saveWorkbookImport({
 
     const importedAt = new Date().toISOString();
     const acceptedRowCount = indexingSucceeded ? validRows.length : new Set([...structuredRowIds, ...duplicateRowIds]).size;
-    const mappingJson = { mode: "workbook", worksheets: plans } satisfies JsonObject;
+    const mappingJson = workbookMappingWithPlans(importRecord.mapping_json, plans);
     await supabase.from("file_imports").update({
       status: "completed",
       rows_imported: acceptedRowCount,
@@ -3775,7 +3885,7 @@ async function saveWorkbookImport({
   } catch (error) {
     const message = actionErrorMessage(error, "The approved workbook could not be imported.");
     const issue = { stage: "import" as const, worksheet: "Workbook", row_number: null, field: "workbook", message };
-    await supabase.from("file_imports").update({ status: "failed", mapping_json: { mode: "workbook", worksheets: plans }, errors_json: [...parserIssues, ...rejectedIssues, issue] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    await supabase.from("file_imports").update({ status: "failed", mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans), errors_json: [...parserIssues, ...rejectedIssues, issue] as unknown as Json }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
     await supabase.from("file_uploads").update({ import_status: "failed", processing_status: "failed", processing_error: message, processed_at: new Date().toISOString(), metadata_json: updateImportPipelineTrace(file.metadata_json, "failed", message) }).eq("workspace_id", workspaceId).eq("id", file.id);
     redirectWithFileError(message, file.id, "imported");
   }
@@ -3840,6 +3950,7 @@ export async function saveExtractedImportAction(formData: FormData) {
     .eq("workspace_id", workspaceId)
     .eq("file_upload_id", file.id)
     .eq("import_id", importId)
+    .eq("status", "staged")
     .order("row_number", { ascending: true })
     .limit(1000);
 
