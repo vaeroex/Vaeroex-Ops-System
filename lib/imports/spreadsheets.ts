@@ -3,6 +3,36 @@ import { inflateRawSync } from "zlib";
 export type ImportCellValue = string | number | null;
 export type ImportRow = Record<string, ImportCellValue>;
 
+export type SpreadsheetRow = {
+  worksheetName: string;
+  worksheetIndex: number;
+  worksheetRowNumber: number;
+  values: ImportRow;
+};
+
+export type SpreadsheetWorksheet = {
+  name: string;
+  index: number;
+  state: string;
+  columns: string[];
+  rows: SpreadsheetRow[];
+  status: "parsed" | "empty" | "unsupported" | "failed";
+  error?: string;
+};
+
+export type SpreadsheetParseIssue = {
+  stage: "workbook_parsing" | "worksheet_detection" | "record_extraction";
+  worksheet: string;
+  worksheetIndex: number;
+  message: string;
+};
+
+export type SpreadsheetWorkbook = {
+  rows: SpreadsheetRow[];
+  worksheets: SpreadsheetWorksheet[];
+  issues: SpreadsheetParseIssue[];
+};
+
 type ZipEntry = {
   name: string;
   data: Buffer;
@@ -14,19 +44,43 @@ function cleanHeader(value: ImportCellValue, index: number) {
   return header.length > 80 ? header.slice(0, 80) : header;
 }
 
-function rowsFromGrid(grid: ImportCellValue[][]) {
-  const nonEmptyRows = grid.filter((row) => row.some((cell) => cell !== null && String(cell).trim() !== ""));
-  const headerRow = nonEmptyRows[0] || [];
-  const headers = headerRow.map(cleanHeader);
+type NumberedGridRow = {
+  rowNumber: number;
+  cells: ImportCellValue[];
+};
+
+function uniqueHeaders(headerRow: ImportCellValue[]) {
+  const counts = new Map<string, number>();
+
+  return headerRow.map((value, index) => {
+    const header = cleanHeader(value, index);
+    const count = (counts.get(header) || 0) + 1;
+    counts.set(header, count);
+    return count === 1 ? header : `${header} (${count})`;
+  });
+}
+
+function recordsFromNumberedGrid(grid: NumberedGridRow[]) {
+  const nonEmptyRows = grid.filter(({ cells }) => cells.some((cell) => cell !== null && String(cell).trim() !== ""));
+  const headerRow = nonEmptyRows[0]?.cells || [];
+  const headers = uniqueHeaders(headerRow);
   const dataRows = nonEmptyRows.slice(1);
 
-  return dataRows.map((row) => {
-    const record: ImportRow = {};
-    headers.forEach((header, index) => {
-      record[header] = row[index] ?? null;
-    });
-    return record;
-  });
+  return {
+    headers,
+    rows: dataRows.map(({ rowNumber, cells }) => {
+      const record: ImportRow = {};
+      headers.forEach((header, index) => {
+        record[header] = cells[index] ?? null;
+      });
+
+      return { rowNumber, values: record };
+    })
+  };
+}
+
+function rowsFromGrid(grid: ImportCellValue[][]) {
+  return recordsFromNumberedGrid(grid.map((cells, index) => ({ rowNumber: index + 1, cells }))).rows.map((row) => row.values);
 }
 
 function parseCsvGrid(content: string) {
@@ -87,8 +141,9 @@ function textBetween(value: string, tag: string) {
 }
 
 function attr(value: string, name: string) {
-  const match = value.match(new RegExp(`${name}="([^"]*)"`));
-  return match ? match[1] : "";
+  const escapedName = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = value.match(new RegExp(`(?:^|\\s)${escapedName}="([^"]*)"`));
+  return match ? decodeXml(match[1]) : "";
 }
 
 function columnIndex(cellReference: string, fallback: number) {
@@ -180,11 +235,21 @@ function parseCellValue(cellAttributes: string, cellXml: string, sharedStrings: 
 }
 
 function parseSheetRows(xml: string, sharedStrings: string[]) {
-  return Array.from(xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)).map((rowMatch) => {
+  if (!/<worksheet\b/.test(xml) || !/<\/worksheet>/.test(xml) || !/<sheetData\b/.test(xml)) {
+    throw new Error("The worksheet XML is malformed or missing its sheet data section.");
+  }
+
+  const openingRowCount = Array.from(xml.matchAll(/<row\b/g)).length;
+  const closingRowCount = Array.from(xml.matchAll(/<\/row>/g)).length;
+  if (openingRowCount !== closingRowCount) {
+    throw new Error("The worksheet XML contains an incomplete row and could not be parsed safely.");
+  }
+
+  return Array.from(xml.matchAll(/<row\b([^>]*)>([\s\S]*?)<\/row>/g)).map((rowMatch, rowIndex) => {
     const rowCells: ImportCellValue[] = [];
     let fallbackIndex = 0;
 
-    for (const cellMatch of rowMatch[1].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
+    for (const cellMatch of rowMatch[2].matchAll(/<c\b([^>]*)>([\s\S]*?)<\/c>/g)) {
       const cellAttributes = cellMatch[1];
       const cellXml = cellMatch[2];
       const index = columnIndex(attr(cellAttributes, "r"), fallbackIndex);
@@ -192,8 +257,123 @@ function parseSheetRows(xml: string, sharedStrings: string[]) {
       fallbackIndex = index + 1;
     }
 
-    return rowCells;
+    const parsedRowNumber = Number(attr(rowMatch[1], "r"));
+    return {
+      rowNumber: Number.isInteger(parsedRowNumber) && parsedRowNumber > 0 ? parsedRowNumber : rowIndex + 1,
+      cells: rowCells
+    };
   });
+}
+
+function normalizedWorksheetTarget(target: string) {
+  const withoutLeadingSlash = target.replace(/^\//, "");
+  const withWorkbookDirectory = withoutLeadingSlash.startsWith("xl/") ? withoutLeadingSlash : `xl/${withoutLeadingSlash}`;
+  const segments: string[] = [];
+
+  for (const segment of withWorkbookDirectory.split("/")) {
+    if (!segment || segment === ".") continue;
+    if (segment === "..") {
+      segments.pop();
+    } else {
+      segments.push(segment);
+    }
+  }
+
+  return segments.join("/");
+}
+
+function workbookRelationships(xml: string) {
+  const relationships = new Map<string, { target: string; type: string }>();
+
+  for (const match of xml.matchAll(/<Relationship\b([^>]*)\/?\s*>/g)) {
+    const id = attr(match[1], "Id");
+    const target = attr(match[1], "Target");
+    if (id && target) {
+      relationships.set(id, { target: normalizedWorksheetTarget(target), type: attr(match[1], "Type") });
+    }
+  }
+
+  return relationships;
+}
+
+export function parseXlsxWorkbookEntries(entries: Map<string, ZipEntry>): SpreadsheetWorkbook {
+  const workbookEntry = entries.get("xl/workbook.xml");
+  const relationshipEntry = entries.get("xl/_rels/workbook.xml.rels");
+
+  if (!workbookEntry || !relationshipEntry) {
+    throw new Error("The XLSX workbook index is missing. Please export the workbook again as XLSX.");
+  }
+
+  const workbookXml = workbookEntry.data.toString("utf8");
+  const relationships = workbookRelationships(relationshipEntry.data.toString("utf8"));
+  const sharedStringsXml = entries.get("xl/sharedStrings.xml")?.data.toString("utf8") || "";
+  const sharedStrings = sharedStringsXml ? parseSharedStrings(sharedStringsXml) : [];
+  const worksheets: SpreadsheetWorksheet[] = [];
+  const issues: SpreadsheetParseIssue[] = [];
+  const sheetMatches = Array.from(workbookXml.matchAll(/<sheet\b([^>]*)\/?\s*>/g));
+
+  if (!sheetMatches.length) {
+    throw new Error("No worksheets were declared in this XLSX workbook.");
+  }
+
+  sheetMatches.forEach((sheetMatch, index) => {
+    const attributes = sheetMatch[1];
+    const name = attr(attributes, "name") || `Worksheet ${index + 1}`;
+    const state = attr(attributes, "state") || "visible";
+    const relationshipId = attr(attributes, "r:id");
+    const relationship = relationships.get(relationshipId);
+    const issueBase = { worksheet: name, worksheetIndex: index + 1 };
+
+    if (!relationship) {
+      const message = "The worksheet relationship is missing from the workbook index.";
+      worksheets.push({ name, index: index + 1, state, columns: [], rows: [], status: "failed", error: message });
+      issues.push({ stage: "worksheet_detection", ...issueBase, message });
+      return;
+    }
+
+    if (!relationship.type.endsWith("/worksheet")) {
+      const message = "This workbook tab is not a standard worksheet and cannot be imported.";
+      worksheets.push({ name, index: index + 1, state, columns: [], rows: [], status: "unsupported", error: message });
+      issues.push({ stage: "worksheet_detection", ...issueBase, message });
+      return;
+    }
+
+    const worksheetEntry = entries.get(relationship.target);
+    if (!worksheetEntry) {
+      const message = `The worksheet data file (${relationship.target}) is missing.`;
+      worksheets.push({ name, index: index + 1, state, columns: [], rows: [], status: "failed", error: message });
+      issues.push({ stage: "worksheet_detection", ...issueBase, message });
+      return;
+    }
+
+    try {
+      const parsed = recordsFromNumberedGrid(parseSheetRows(worksheetEntry.data.toString("utf8"), sharedStrings));
+      const rows = parsed.rows.map((row) => ({
+        worksheetName: name,
+        worksheetIndex: index + 1,
+        worksheetRowNumber: row.rowNumber,
+        values: row.values
+      }));
+      worksheets.push({
+        name,
+        index: index + 1,
+        state,
+        columns: parsed.headers,
+        rows,
+        status: rows.length ? "parsed" : "empty"
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Worksheet rows could not be parsed.";
+      worksheets.push({ name, index: index + 1, state, columns: [], rows: [], status: "failed", error: message });
+      issues.push({ stage: "record_extraction", ...issueBase, message });
+    }
+  });
+
+  return {
+    worksheets,
+    rows: worksheets.flatMap((worksheet) => worksheet.rows),
+    issues
+  };
 }
 
 export function parseCsvRows(content: string) {
@@ -201,18 +381,45 @@ export function parseCsvRows(content: string) {
 }
 
 export function parseXlsxRows(buffer: Buffer) {
-  const entries = readZipEntries(buffer);
-  const sharedStringsXml = entries.get("xl/sharedStrings.xml")?.data.toString("utf8") || "";
-  const worksheetEntry =
-    entries.get("xl/worksheets/sheet1.xml") ||
-    Array.from(entries.values()).find((entry) => /^xl\/worksheets\/sheet\d+\.xml$/.test(entry.name));
+  return parseXlsxWorkbookEntries(readZipEntries(buffer)).rows.map((row) => row.values);
+}
 
-  if (!worksheetEntry) {
-    throw new Error("No worksheet was found in this XLSX file.");
+export function parseSpreadsheetWorkbook({
+  fileName,
+  buffer
+}: {
+  fileName: string;
+  buffer: Buffer;
+}): SpreadsheetWorkbook {
+  const lowerName = fileName.toLowerCase();
+
+  if (lowerName.endsWith(".csv")) {
+    const parsedRows = parseCsvRows(buffer.toString("utf8"));
+    const rows = parsedRows.map((values, index) => ({
+      worksheetName: "CSV",
+      worksheetIndex: 1,
+      worksheetRowNumber: index + 2,
+      values
+    }));
+    return {
+      rows,
+      worksheets: [{
+        name: "CSV",
+        index: 1,
+        state: "visible",
+        columns: Object.keys(parsedRows[0] || {}),
+        rows,
+        status: rows.length ? "parsed" : "empty"
+      }],
+      issues: []
+    };
   }
 
-  const sharedStrings = sharedStringsXml ? parseSharedStrings(sharedStringsXml) : [];
-  return rowsFromGrid(parseSheetRows(worksheetEntry.data.toString("utf8"), sharedStrings));
+  if (lowerName.endsWith(".xlsx")) {
+    return parseXlsxWorkbookEntries(readZipEntries(buffer));
+  }
+
+  throw new Error("Only CSV and XLSX files can be imported or analyzed right now.");
 }
 
 export function parseSpreadsheetRows({
@@ -222,17 +429,7 @@ export function parseSpreadsheetRows({
   fileName: string;
   buffer: Buffer;
 }) {
-  const lowerName = fileName.toLowerCase();
-
-  if (lowerName.endsWith(".csv")) {
-    return parseCsvRows(buffer.toString("utf8"));
-  }
-
-  if (lowerName.endsWith(".xlsx")) {
-    return parseXlsxRows(buffer);
-  }
-
-  throw new Error("Only CSV and XLSX files can be imported or analyzed right now.");
+  return parseSpreadsheetWorkbook({ fileName, buffer }).rows.map((row) => row.values);
 }
 
 export function previewRows(rows: ImportRow[], limit = 20) {

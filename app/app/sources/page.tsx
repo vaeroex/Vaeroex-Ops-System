@@ -289,17 +289,19 @@ function fileStatus(file: FileUploadRow, runs: VaeroexRunRow[]) {
   const reviewStatus = analysisReviewStatus(file);
   const latestRun = runs[0];
   const runIsActive = latestRun && ["queued", "pending", "running", "processing"].includes(latestRun.status);
+  const hasUsableAnalysis = Boolean(file.analysis_summary) || ["approved", "auto_learned", "needs_review", "ready_for_review", "completed"].includes(reviewStatus);
 
   if (file.deleted_at) return "Deleted";
   if (file.archived_at) return "Archived";
   if (runIsActive) return "Analyzing";
-  if ((file.processing_status || "") === "failed" || latestRun?.status === "failed" || reviewStatus === "failed") return failedAnalysisStatus(file);
+  if (file.import_status === "failed" && latestRun?.status !== "failed" && reviewStatus !== "failed" && !hasUsableAnalysis) return "Import failed";
+  if ((file.import_status !== "failed" && (file.processing_status || "") === "failed") || latestRun?.status === "failed" || reviewStatus === "failed") return failedAnalysisStatus(file);
   if (reviewStatus === "discarded" || reviewStatus === "excluded") return "Uploaded";
   if (reviewStatus === "approved" || reviewStatus === "auto_learned" || file.index_status === "ready") return "Learned";
   if (reviewStatus === "needs_review" || reviewStatus === "ready_for_review") return "Needs Review";
   if (file.import_status === "extracted" || file.import_status === "needs_review" || (isSpreadsheet(file) && file.import_status === "ready")) return "Import Review";
   if (reviewStatus === "completed" || analysisStatus(file, runs) === "Needs Review") return "Ready";
-  if (file.import_status === "failed") return "Analysis failed";
+  if (file.import_status === "failed") return "Import failed";
   return "Uploaded";
 }
 
@@ -493,7 +495,7 @@ function SourceFileActions({
           <SourceActionButton pendingLabel="Analyzing source..." steps={ANALYSIS_PROGRESS_STEPS}>
             {status === "Uploaded"
               ? "Analyze source"
-              : ["Analysis failed", "No usable data found", "Needs clearer file"].includes(status)
+              : ["Analysis failed", "Import failed", "No usable data found", "Needs clearer file"].includes(status)
                 ? "Retry analysis"
                 : "Analyze again"}
           </SourceActionButton>
@@ -551,7 +553,7 @@ function SourceFileDetailPanel({
   const output = fileAnalysisOutput(file);
   const failureMessage = latestAnalysisFailureMessage(file);
   const summary =
-    ["Analysis failed", "No usable data found", "Needs clearer file"].includes(status) && failureMessage
+    ["Analysis failed", "Import failed", "No usable data found", "Needs clearer file"].includes(status) && failureMessage
       ? failureMessage
       : stringValue(output.executive_summary) || stringValue(output.summary) || file.analysis_summary || "No analysis result is available yet.";
   const findings = [
@@ -580,8 +582,10 @@ function SourceFileDetailPanel({
           ? "Not available because no supported business records were found."
           : status === "Needs clearer file"
             ? "Not available because the source could not be read reliably."
-            : status === "Analysis failed"
-          ? "Not available because analysis failed."
+            : status === "Analysis failed" || status === "Import failed"
+          ? status === "Import failed"
+            ? "Not available because no structured rows were approved."
+            : "Not available because analysis failed."
           : "Not yet available in Learned Knowledge.";
   const visibleActionError = actionError && actionError !== failureMessage ? actionError : null;
 
@@ -632,9 +636,9 @@ function SourceFileDetailPanel({
       {visibleSection === "summary" ? (
         <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
           <div className="space-y-4">
-            <section className={`rounded-lg border p-4 ${status === "Analysis failed" ? "border-red-400/30 bg-red-950/20" : status === "No usable data found" || status === "Needs clearer file" ? "border-amber-300/25 bg-amber-950/15" : "border-white/10 bg-slate-950/40"}`}>
+            <section className={`rounded-lg border p-4 ${status === "Analysis failed" || status === "Import failed" ? "border-red-400/30 bg-red-950/20" : status === "No usable data found" || status === "Needs clearer file" ? "border-amber-300/25 bg-amber-950/15" : "border-white/10 bg-slate-950/40"}`}>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-                {["Analysis failed", "No usable data found", "Needs clearer file"].includes(status) ? "Analysis result" : "Analysis summary"}
+                {["Analysis failed", "Import failed", "No usable data found", "Needs clearer file"].includes(status) ? (status === "Import failed" ? "Import result" : "Analysis result") : "Analysis summary"}
               </p>
               <p className="mt-2 text-sm leading-6 text-slate-300">{summary}</p>
               <p className="mt-3 text-xs text-slate-500">Last analyzed: {formatDateTime(latestAnalysisAt(file))}</p>
