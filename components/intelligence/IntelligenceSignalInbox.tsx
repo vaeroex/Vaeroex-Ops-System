@@ -14,6 +14,7 @@ import { generatedOutputHref, outputTypeForInsight } from "@/lib/intelligence/ge
 import type { IntelligenceConfidence, IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceInsightType } from "@/lib/intelligence/layer";
 
 const signalTypes: IntelligenceInsightType[] = ["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"];
+type SignalView = "All" | IntelligenceInsightType;
 const confidenceOptions: Array<"All" | IntelligenceConfidence> = ["All", "High", "Medium", "Low"];
 const pageSize = 10;
 
@@ -32,14 +33,16 @@ function priorityClass(priority: "High" | "Medium" | "Low") {
   return "border-slate-400/30 bg-slate-500/15 text-slate-100";
 }
 
-function typeEmptyMessage(type: IntelligenceInsightType) {
+function typeEmptyMessage(type: SignalView) {
+  if (type === "All") return "No evidence-backed findings currently require leadership review.";
   if (type === "Forecast") return "No forecast signals have enough historical evidence yet.";
   if (type === "Opportunity") return "No evidence-backed opportunity is ready for review.";
   return `No ${type.toLowerCase()} signals currently require attention.`;
 }
 
-function typeTabLabel(type: IntelligenceInsightType) {
-  if (type === "Opportunity") return "Opportunities";
+function typeTabLabel(type: SignalView) {
+  if (type === "All") return "All findings";
+  if (type === "Opportunity") return "Positive signals";
   if (type === "Anomaly") return "Anomalies";
   return `${type}s`;
 }
@@ -295,9 +298,8 @@ function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
 
 export function IntelligenceSignalInbox({ insights, initialFindingId }: { insights: IntelligenceInsight[]; initialFindingId?: string }) {
   const requestedFinding = initialFindingId ? insights.find((insight) => insight.id === initialFindingId) : null;
-  const initialType = requestedFinding?.type || signalTypes.find((type) => insights.some((insight) => insight.type === type)) || "Risk";
-  const [activeType, setActiveType] = useState<IntelligenceInsightType>(initialType);
-  const [selectedId, setSelectedId] = useState<string>(requestedFinding?.id || insights.find((insight) => insight.type === initialType)?.id || insights[0]?.id || "");
+  const [activeType, setActiveType] = useState<SignalView>("All");
+  const [selectedId, setSelectedId] = useState<string>(requestedFinding?.id || insights[0]?.id || "");
   const [confidence, setConfidence] = useState<"All" | IntelligenceConfidence>("All");
   const [sortMode, setSortMode] = useState<SortMode>("Priority");
   const [hideLowConfidence, setHideLowConfidence] = useState(false);
@@ -305,19 +307,19 @@ export function IntelligenceSignalInbox({ insights, initialFindingId }: { insigh
   const [panelMode, setPanelMode] = useState<PanelMode>("summary");
 
   const counts = useMemo(
-    () => signalTypes.reduce<Record<IntelligenceInsightType, number>>((acc, type) => ({ ...acc, [type]: insights.filter((insight) => insight.type === type).length }), {} as Record<IntelligenceInsightType, number>),
+    () => signalTypes.reduce<Record<SignalView, number>>((acc, type) => ({ ...acc, [type]: insights.filter((insight) => insight.type === type).length }), { All: insights.length } as Record<SignalView, number>),
     [insights]
   );
-  const visibleTypes = useMemo(() => signalTypes.filter((type) => counts[type] > 0), [counts]);
+  const visibleTypes = useMemo<SignalView[]>(() => ["All", ...signalTypes.filter((type) => counts[type] > 0)], [counts]);
   const filteredInsights = useMemo(
-    () => sortInsights(insights.filter((insight) => insight.type === activeType).filter((insight) => confidence === "All" || insight.confidence === confidence).filter((insight) => !hideLowConfidence || insight.confidence !== "Low"), sortMode),
+    () => sortInsights(insights.filter((insight) => activeType === "All" || insight.type === activeType).filter((insight) => confidence === "All" || insight.confidence === confidence).filter((insight) => !hideLowConfidence || insight.confidence !== "Low"), sortMode),
     [activeType, confidence, hideLowConfidence, insights, sortMode]
   );
   const visibleInsights = filteredInsights.slice(0, visibleCount);
   const selectedInsight = selectedId ? filteredInsights.find((insight) => insight.id === selectedId) || visibleInsights[0] || null : null;
 
-  function selectType(type: IntelligenceInsightType) {
-    const firstInsight = insights.find((insight) => insight.type === type);
+  function selectType(type: SignalView) {
+    const firstInsight = type === "All" ? insights[0] : insights.find((insight) => insight.type === type);
     setActiveType(type);
     setSelectedId(firstInsight?.id || "");
     setVisibleCount(pageSize);

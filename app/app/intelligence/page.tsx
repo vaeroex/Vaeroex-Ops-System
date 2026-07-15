@@ -1,8 +1,10 @@
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
+import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
+import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -16,7 +18,7 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult] = await Promise.all([
+  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
     supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
@@ -30,7 +32,9 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     supabase.from("form_submissions").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false })
+    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
+    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500)
   ]);
 
   const errors = [
@@ -47,7 +51,9 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     submissionsResult.error,
     peopleResult.error,
     decisionsResult.error,
-    outcomesResult.error
+    outcomesResult.error,
+    metricsResult.error,
+    memoryResult.error
   ].filter(Boolean);
 
   if (errors.some((error) => isSecurityResponseMessage(error?.message))) {
@@ -63,14 +69,34 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     workspaceId,
     rows: [
       ...(kpisResult.data || []),
-      ...(crmResult.data || [])
+      ...(crmResult.data || []),
+      ...(metricsResult.data || [])
     ]
   });
   const sourceParentEligibility = sourceParentResult.eligibility;
-  const displayErrors = [...errors, sourceParentResult.error].filter(Boolean) as Array<{ message: string }>;
   const eligibleKpis = filterBySourceParentEligibility(kpisResult.data || [], sourceParentEligibility);
   const eligibleCustomerEvidence = filterBySourceParentEligibility(crmResult.data || [], sourceParentEligibility);
+  const eligibleOperationalMetrics = filterBySourceParentEligibility(metricsResult.data || [], sourceParentEligibility);
   const eligibleRuns = filterBusinessEvidence(runsResult.data || [], { sourceKind: "platform_run" });
+  let eligibleMemoryChunks = [] as NonNullable<typeof memoryResult.data>;
+  let memoryEligibilityError: Error | null = null;
+  try {
+    eligibleMemoryChunks = await filterEligibleMemoryRowsByLifecycle({
+      supabase,
+      workspaceId,
+      rows: memoryResult.data || []
+    });
+  } catch (error) {
+    memoryEligibilityError = error instanceof Error ? error : new Error("Business Memory eligibility could not be verified.");
+  }
+  const operationalInsights = buildOperationalEvidenceInsights({
+    kpis: eligibleKpis,
+    operationalMetrics: eligibleOperationalMetrics,
+    memoryChunks: eligibleMemoryChunks,
+    files: filesResult.data || [],
+    imports: importsResult.data || []
+  });
+  const displayErrors = [...errors, sourceParentResult.error, memoryEligibilityError].filter(Boolean) as Array<{ message: string }>;
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     tasks: tasksResult.data || [],
@@ -86,7 +112,8 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     submissions: submissionsResult.data || [],
     people: peopleResult.data || [],
     decisions: decisionsResult.data || [],
-    recommendationOutcomes: outcomesResult.data || []
+    recommendationOutcomes: outcomesResult.data || [],
+    operationalInsights
   });
   return (
     <div className="space-y-4">
