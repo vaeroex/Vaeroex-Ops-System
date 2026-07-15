@@ -55,6 +55,9 @@ type ImportMapping = Record<string, string>;
 type WorkbookWorksheetPlan = {
   index: number;
   name: string;
+  state: string;
+  relationship_id: string | null;
+  relationship_target: string | null;
   status: string;
   row_count: number;
   columns: string[];
@@ -3191,6 +3194,9 @@ export async function importFileAction(formData: FormData) {
     return {
       index: worksheet.index,
       name: worksheet.name,
+      state: worksheet.state,
+      relationship_id: worksheet.relationshipId || null,
+      relationship_target: worksheet.relationshipTarget || null,
       status: worksheet.status,
       row_count: worksheet.rows.length,
       columns: worksheet.columns,
@@ -3465,6 +3471,9 @@ function workbookPlans(value: Json): WorkbookWorksheetPlan[] {
     return [{
       index,
       name: item.name,
+      state: typeof item.state === "string" ? item.state : "visible",
+      relationship_id: typeof item.relationship_id === "string" ? item.relationship_id : null,
+      relationship_target: typeof item.relationship_target === "string" ? item.relationship_target : null,
       status: typeof item.status === "string" ? item.status : "parsed",
       row_count: typeof item.row_count === "number" ? item.row_count : 0,
       columns,
