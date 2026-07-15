@@ -209,6 +209,8 @@ function redirectWithPathError(path: string, message: string, fileId?: string): 
     query.set("file", fileId);
   }
 
+  query.delete("message");
+  query.delete("saved");
   query.set("error", cleanNoticeMessage(message, "Vaeroex could not complete that action. Please try again."));
   redirect(`${pathname}?${query.toString()}` as Route);
 }
@@ -222,6 +224,7 @@ function redirectWithPathMessage(path: string, message: string, fileId?: string)
     query.set("file", fileId);
   }
 
+  query.delete("error");
   query.set("message", cleanNoticeMessage(message, "Done."));
   redirect(`${pathname}?${query.toString()}` as Route);
 }

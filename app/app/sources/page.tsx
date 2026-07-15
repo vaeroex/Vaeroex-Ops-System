@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
-import { permanentRedirect } from "next/navigation";
+import { permanentRedirect, redirect } from "next/navigation";
 import {
   analyzeFileAction,
   approveFileAnalysisAction,
@@ -21,6 +21,7 @@ import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview } from "@/components/evidence/SourceImportReview";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
+import { shouldClearSourceImportError } from "@/lib/imports/source-import-notices";
 import { getRecordFolders } from "@/lib/records/management";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -100,6 +101,13 @@ function normalizeSourceDetailSection(value?: string | null): SourceDetailSectio
 function sourceDetailHref(fileId: string, section: SourceDetailSection = "summary") {
   const suffix = section === "summary" ? "" : `?section=${section}`;
   return `/app/sources/${encodeURIComponent(fileId)}${suffix}` as Route;
+}
+
+function sourceDetailNoticeHref(fileId: string, section: SourceDetailSection, message?: string | null) {
+  const query = new URLSearchParams();
+  if (section !== "summary") query.set("section", section);
+  if (message) query.set("message", message);
+  return `/app/sources/${encodeURIComponent(fileId)}${query.size ? `?${query.toString()}` : ""}` as Route;
 }
 
 function formatDate(value?: string | null) {
@@ -1159,20 +1167,33 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     runsByFile
   });
   const linkedFile = params.file ? files.find((file) => file.id === params.file && !file.deleted_at) : null;
+  const linkedFileImports = linkedFile ? imports.filter((item) => item.file_upload_id === linkedFile.id) : [];
   const activeFilterLabel = params.status || (activeTab === "archived" ? "Archived" : "") || params.q || params.trust || params.source_type || "";
   const isArchivedView = activeTab === "archived";
   const successMessage = cleanNoticeMessage(params.message, "File action completed.");
   const loadErrorMessage = cleanNoticeMessage(errors[0]?.message, "Source data could not be loaded.");
   const actionErrorMessage = cleanNoticeMessage(params.error, "Source data could not be loaded.");
   const errorMessage = loadErrorMessage || (linkedFile ? null : actionErrorMessage);
-  const selectedFileActionError = linkedFile ? actionErrorMessage : null;
+  const clearSourceImportError = linkedFile
+    ? shouldClearSourceImportError({
+        error: actionErrorMessage,
+        successMessage,
+        fileImportStatus: linkedFile.import_status,
+        latestImportStatus: linkedFileImports[0]?.status
+      })
+    : false;
+  const selectedFileActionError = linkedFile && !clearSourceImportError ? actionErrorMessage : null;
 
   if (options.sourceDetail) {
     const activeSection = normalizeSourceDetailSection(params.section);
+
+    if (linkedFile && params.error && clearSourceImportError) {
+      redirect(sourceDetailNoticeHref(linkedFile.id, activeSection, successMessage));
+    }
+
     const linkedKpis = linkedFile ? kpis.filter((kpi) => kpi.source_file_id === linkedFile.id) : [];
     const linkedRuns = linkedFile ? runs.filter((run) => runFileId(run) === linkedFile.id) : [];
     const linkedReports = linkedFile ? reportsForFile(reports, linkedFile.id) : [];
-    const fileImports = linkedFile ? imports.filter((item) => item.file_upload_id === linkedFile.id) : [];
     const fileImportRows = linkedFile ? importRows.filter((item) => item.file_upload_id === linkedFile.id) : [];
 
     return (
@@ -1193,7 +1214,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
           <SourceFileDetailPanel
             file={linkedFile}
             folders={folders}
-            fileImports={fileImports}
+            fileImports={linkedFileImports}
             fileImportRows={fileImportRows}
             linkedKpis={linkedKpis}
             linkedRuns={linkedRuns}
@@ -1374,7 +1395,7 @@ export default async function SourcesPage({ searchParams }: SourcesPageProps) {
     const section = normalizeSourceDetailSection(params.section || (params.panel === "import" ? "imported" : params.panel));
     const query = new URLSearchParams();
     if (section !== "summary") query.set("section", section);
-    if (params.error) query.set("error", params.error);
+    if (params.error && !params.message) query.set("error", params.error);
     if (params.message) query.set("message", params.message);
     permanentRedirect(`/app/sources/${encodeURIComponent(params.file)}${query.size ? `?${query.toString()}` : ""}` as Route);
   }
