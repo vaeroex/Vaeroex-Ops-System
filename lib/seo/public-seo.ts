@@ -26,7 +26,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       type: "website",
       images: [
         {
-          url: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-full.png`,
+          url: `${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`,
           width: 1200,
           height: 630,
           alt: "Vaeroex"
@@ -37,7 +37,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       card: "summary_large_image",
       title,
       description,
-      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-logo-full.png`]
+      images: [`${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`]
     }
   };
 }
@@ -48,7 +48,7 @@ export const organizationJsonLd = {
   name: "Vaeroex",
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
-  logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-symbol.png`,
+  logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo.png`,
   description: "Vaeroex is an Operations Intelligence Platform that turns fragmented business information into evidence-backed visibility, risks, priorities, and leadership recommendations.",
   address: {
     "@type": "PostalAddress",
