@@ -7,7 +7,7 @@ import { redirect } from "next/navigation";
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { classifyKpiOverviewIntent, runLightweightKpiOverview } from "@/lib/ai/kpi-overview";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { planVaeroexQuery, type VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
@@ -226,8 +226,8 @@ function structuredEvidenceContext(recordCount: number): EvidenceContext {
   };
 }
 
-function askVaeroexOpenAISettings() {
-  const base = getOpenAIRetrySettings();
+function askVaeroexProviderSettings() {
+  const base = getAIProviderRetrySettings();
 
   return {
     ...base,
@@ -236,8 +236,8 @@ function askVaeroexOpenAISettings() {
   };
 }
 
-function askKpiOverviewOpenAISettings() {
-  const base = getOpenAIRetrySettings();
+function askKpiOverviewProviderSettings() {
+  const base = getAIProviderRetrySettings();
 
   return {
     ...base,
@@ -677,9 +677,10 @@ export async function runVaeroexAction(formData: FormData) {
         const kpiOverview = await runLightweightKpiOverview({
           supabase,
           workspaceId,
+          userId: user.id,
           userPrompt,
           intentClassificationMs,
-          openAISettings: askKpiOverviewOpenAISettings(),
+          providerSettings: askKpiOverviewProviderSettings(),
           stageLogger: (event, details = {}) => logVaeroexRunEvent(event, logDetails(details))
         });
         workspaceSnapshot = kpiOverview.workspaceSnapshot;
@@ -857,7 +858,7 @@ export async function runVaeroexAction(formData: FormData) {
             modelRoute: modelRouteForPlan(queryPlan),
             executionPath: queryPlan.classification
           }));
-          const baseSettings = askVaeroexOpenAISettings();
+          const baseSettings = askVaeroexProviderSettings();
           const modelRoute = modelRouteForPlan(queryPlan);
           const generationStartedAt = Date.now();
 
@@ -869,10 +870,11 @@ export async function runVaeroexAction(formData: FormData) {
               extraInputs: evidenceAwareInputs,
               supabase,
               workspaceId,
+              userId: user.id,
               modelRoute,
               executionPath: queryPlan.classification,
               maxOutputTokens: queryPlan.tier === 3 ? 1_200 : 700,
-              openAISettings: {
+              providerSettings: {
                 ...baseSettings,
                 timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
                 maxRetries: queryPlan.tier === 3 ? Math.min(baseSettings.maxRetries, 1) : 0

@@ -1,5 +1,8 @@
 import "server-only";
 
+import { NVIDIA_NEMOTRON_MODEL } from "@/lib/ai/providers/provider-manager";
+import type { AIProviderName } from "@/lib/ai/providers/types";
+
 export type VaeroexModelRoute = "default" | "kpi_overview" | "focused_explanation" | "cross_business_reasoning" | "file_analysis";
 
 const DEFAULT_OPENAI_MODEL = "gpt-4o-mini";
@@ -8,7 +11,12 @@ function configured(name: string) {
   return process.env[name]?.trim() || null;
 }
 
-export function resolveVaeroexModel(route: VaeroexModelRoute = "default") {
+export function resolveConfiguredAIProvider(): AIProviderName {
+  return process.env.AI_PROVIDER?.trim().toLowerCase() === "nvidia" ? "nvidia" : "openai";
+}
+
+export function resolveVaeroexModel(route: VaeroexModelRoute = "default", provider = resolveConfiguredAIProvider()) {
+  if (provider === "nvidia") return NVIDIA_NEMOTRON_MODEL;
   const current = configured("OPENAI_MODEL") || DEFAULT_OPENAI_MODEL;
 
   if (route === "focused_explanation") {
@@ -28,6 +36,7 @@ export function resolveVaeroexModel(route: VaeroexModelRoute = "default") {
 
 export function getVaeroexModelRoutingStatus() {
   return {
+    provider: resolveConfiguredAIProvider(),
     default: resolveVaeroexModel("default"),
     kpiOverview: resolveVaeroexModel("kpi_overview"),
     focusedExplanation: resolveVaeroexModel("focused_explanation"),

@@ -25,6 +25,7 @@
     "test:file-analysis": "node scripts/file-analysis-regression-tests.js",
     "test:spreadsheet-ingestion": "node scripts/spreadsheet-ingestion-regression-tests.js",
     "test:public": "node scripts/public-experience-regression-tests.js",
+    "test:ai-provider": "node scripts/ai-provider-regression-tests.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
   "dependencies": {

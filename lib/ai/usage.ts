@@ -31,9 +31,10 @@ function numberEnv(name: string) {
 }
 
 export function modelCost(model: string) {
-  const inputOverride = numberEnv("OPENAI_INPUT_COST_CENTS_PER_1M");
-  const outputOverride = numberEnv("OPENAI_OUTPUT_COST_CENTS_PER_1M");
   const normalized = model.trim().toLowerCase();
+  const isNvidia = normalized.startsWith("nvidia/");
+  const inputOverride = numberEnv(isNvidia ? "NVIDIA_INPUT_COST_CENTS_PER_1M" : "OPENAI_INPUT_COST_CENTS_PER_1M");
+  const outputOverride = numberEnv(isNvidia ? "NVIDIA_OUTPUT_COST_CENTS_PER_1M" : "OPENAI_OUTPUT_COST_CENTS_PER_1M");
   const exact = DEFAULT_MODEL_COST_CENTS_PER_1M[normalized];
   const matchedPrefix = Object.entries(DEFAULT_MODEL_COST_CENTS_PER_1M).find(([name]) => normalized.startsWith(`${name}-`))?.[1];
   const defaults = exact || matchedPrefix || CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M;
@@ -79,6 +80,32 @@ export function estimatedCostCents(usage: Pick<VaeroexTokenUsage, "inputTokens" 
   const outputCost = (usage.outputTokens / 1_000_000) * cost.output;
 
   return Math.max(0, Math.ceil(inputCost + outputCost));
+}
+
+function providerAttempts(metadata: Json | undefined) {
+  if (!metadata || Array.isArray(metadata) || typeof metadata !== "object") return [];
+  const attempts = (metadata as Record<string, Json | undefined>).provider_attempts;
+  if (!Array.isArray(attempts)) return [];
+
+  return attempts.flatMap((attempt) => {
+    if (!attempt || Array.isArray(attempt) || typeof attempt !== "object") return [];
+    const value = attempt as Record<string, Json | undefined>;
+    const model = typeof value.model === "string" ? value.model : "";
+    const inputTokens = typeof value.inputTokens === "number" ? value.inputTokens : 0;
+    const outputTokens = typeof value.outputTokens === "number" ? value.outputTokens : 0;
+    return model ? [{ model, inputTokens, outputTokens }] : [];
+  });
+}
+
+export function estimatedProviderCostCents(usage: VaeroexTokenUsage) {
+  const attempts = providerAttempts(usage.metadata);
+  if (!attempts.length) return estimatedCostCents(usage);
+
+  const total = attempts.reduce((sum, attempt) => {
+    const cost = modelCost(attempt.model);
+    return sum + (attempt.inputTokens / 1_000_000) * cost.input + (attempt.outputTokens / 1_000_000) * cost.output;
+  }, 0);
+  return Math.max(0, Math.ceil(total));
 }
 
 export async function assertWorkspaceTokenBudget({
@@ -166,7 +193,7 @@ export async function recordVaeroexAiUsage({
     tokens_used: usage.totalTokens,
     input_tokens: usage.inputTokens,
     output_tokens: usage.outputTokens,
-    estimated_cost_cents: estimatedCostCents(usage),
+    estimated_cost_cents: estimatedProviderCostCents(usage),
     model: usage.model,
     request_id: usage.requestId || null,
     latency_ms: usage.latencyMs ?? null,

@@ -17,7 +17,7 @@ The in-app intelligence partner is named **Vaeroex**. User-facing UI should say 
 - Supabase Postgres
 - Supabase Storage-ready schema
 - Supabase Row Level Security
-- OpenAI API for Vaeroex features
+- Provider-neutral Vaeroex generation with OpenAI active by default and optional NVIDIA Nemotron routing
 - Vercel-ready deployment
 
 ## Current Phase
@@ -125,7 +125,7 @@ pnpm install
 cp .env.example .env.local
 ```
 
-3. Fill in Supabase and OpenAI values in `.env.local`.
+3. Fill in Supabase and AI provider values in `.env.local`.
 
 4. Start the dev server:
 
@@ -155,9 +155,18 @@ SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=
 OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+AI_PROVIDER=openai
+NVIDIA_API_KEY=
 VAEROEX_MAX_EVIDENCE_CHUNKS=8
 OPENAI_INPUT_COST_CENTS_PER_1M=
 OPENAI_OUTPUT_COST_CENTS_PER_1M=
+NVIDIA_INPUT_COST_CENTS_PER_1M=
+NVIDIA_OUTPUT_COST_CENTS_PER_1M=
+VAEROEX_AI_RATE_LIMIT_WINDOW_SECONDS=600
+VAEROEX_AI_USER_RATE_LIMIT=60
+VAEROEX_AI_WORKSPACE_RATE_LIMIT=240
+VAEROEX_WORKSPACE_MONTHLY_TOKEN_BUDGET=2000000
+VAEROEX_SINGLE_REQUEST_TOKEN_BUDGET=120000
 CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=
@@ -292,9 +301,13 @@ VAEROEX_SYSTEM_PROMPT
 
 Every Vaeroex interaction must use that prompt. The app must not run a Vaeroex review without a non-empty system prompt.
 
-Vaeroex runs use the OpenAI API through server-side `OPENAI_API_KEY`; customer usage is not powered by a personal ChatGPT subscription. If `OPENAI_MODEL` is blank, the app uses the default configured in `lib/ai/vaeroex-client.ts`.
+Vaeroex generation uses a server-only provider layer. `AI_PROVIDER=openai` is the default. Setting `AI_PROVIDER=nvidia` routes text generation to `nvidia/llama-3.3-nemotron-super-49b-v1.5`, retries NVIDIA once when needed, and falls back to OpenAI when NVIDIA remains unavailable or returns invalid structured output. `NVIDIA_API_KEY` and `OPENAI_API_KEY` must remain server-side.
 
-Uploaded source evidence can be indexed with `OPENAI_EMBEDDING_MODEL` for workspace-private Business Memory retrieval. `VAEROEX_MAX_EVIDENCE_CHUNKS` controls how many evidence chunks Vaeroex may use per answer. Optional OpenAI cost-rate variables let the admin usage dashboard estimate cost from recorded input/output tokens.
+The selected NVIDIA model is text-only in this integration. Image and direct-file analysis automatically use the OpenAI fallback so existing source analysis behavior remains intact.
+
+Uploaded source evidence continues to use `OPENAI_EMBEDDING_MODEL` so existing workspace-private pgvector indexes retain their dimensions. `VAEROEX_MAX_EVIDENCE_CHUNKS` controls how many evidence chunks Vaeroex may use per answer. Optional provider cost-rate variables let the admin usage dashboard estimate cost from recorded input/output tokens, retries, and fallback attempts.
+
+Provider calls enforce user and workspace limits through the existing server-side rate-limit store. Monthly usage continues to be recorded in `ai_usage`. The admin-only `POST /api/health/openai` smoke path remains disabled unless `VAEROEX_AI_SMOKE_TEST_ENABLED=true`; it accepts a demo workspace ID, verifies the signed-in admin can read that demo workspace, exercises bounded Business Memory retrieval and generation, and records usage without returning or logging evidence content.
 
 ## Seed Data
 
@@ -435,6 +448,8 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 OPENAI_API_KEY=
 OPENAI_MODEL=
+AI_PROVIDER=openai
+NVIDIA_API_KEY=
 CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=https://vaeroex.com

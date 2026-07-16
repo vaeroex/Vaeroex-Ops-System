@@ -1409,7 +1409,7 @@ function failureReasons(input: JsonRecord, message?: string | null) {
   const hasAnyData = dataUsedSummary(input).some((item) => item.value > 0);
 
   if (/temporarily unavailable|api key|openai|authentication|authorization/.test(lowerMessage)) {
-    reasons.push("Vaeroex intelligence is temporarily unavailable or the OpenAI runtime rejected the request.");
+    reasons.push("Vaeroex intelligence is temporarily unavailable or the configured provider rejected the request.");
   }
 
   if (!hasAnyData) {

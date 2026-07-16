@@ -42,7 +42,7 @@ Use this when full Supabase-auth integration tests are not available locally.
 ## Secrets
 
 1. Open browser devtools.
-2. Search page source and network responses for `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, and `CRON_SECRET`.
+2. Search page source and network responses for `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, and `CRON_SECRET`.
 3. Expected: no matches.
 
 ## Regression Command
