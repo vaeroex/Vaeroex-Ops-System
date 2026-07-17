@@ -1,5 +1,6 @@
 export type VaeroexWorkflowKey =
   | "ask_vaeroex"
+  | "executive_intelligence"
   | "operations_audit"
   | "sop_generator"
   | "weekly_report"
@@ -96,6 +97,95 @@ Do not substitute the generic Ask Vaeroex response shape for this file-analysis 
 Every output is a draft for leadership review and must preserve the uploaded file as its source.
 `;
 
+const executiveIntelligenceJsonInstructions = `
+Return JSON only. Do not wrap the JSON in markdown.
+For this executive workflow, the required executive structure supersedes the default short-answer preference.
+Use this exact root shape and keep reasoning_stage before executive_summary:
+{
+  "title": "Short executive title",
+  "reasoning_stage": {
+    "what_is_happening": [
+      { "finding_id": "F1", "conclusion": "Evidence-backed conclusion", "evidence_references": [{ "citation_id": 1, "support": "How this source supports the conclusion" }] }
+    ],
+    "why_it_is_happening": [
+      { "cause_id": "C1", "conclusion": "Supported cause, possible relationship, or not established", "status": "Supported | Possible | Not established", "evidence_references": [{ "citation_id": 1, "support": "How this source bears on the cause" }] }
+    ],
+    "why_leadership_should_care": {
+      "conclusion": "Decision relevance across financial, operational, customer, or strategic impact",
+      "evidence_references": [{ "citation_id": 1, "support": "How this source supports the relevance" }]
+    },
+    "what_should_happen_next": [
+      { "action_id": "A1", "action": "Evidence-backed leadership action", "evidence_references": [{ "citation_id": 1, "support": "Why the evidence supports this action" }] }
+    ],
+    "priority_logic": {
+      "ordered_action_ids": ["A1"],
+      "explanation": "Why this order addresses the greatest verified impact or urgency first"
+    }
+  },
+  "executive_summary": "What is happening, why it matters, and what leadership should understand immediately",
+  "key_findings": [
+    { "reasoning_finding_id": "F1", "finding": "Finding", "business_impact": "Impact", "confidence": "High | Medium | Low | Insufficient", "evidence_references": [{ "citation_id": 1, "support": "Support" }] }
+  ],
+  "root_cause_analysis": [
+    { "reasoning_cause_id": "C1", "finding": "Finding", "analysis": "Concise causal assessment", "status": "Supported | Possible | Not established", "evidence_references": [{ "citation_id": 1, "support": "Support" }] }
+  ],
+  "business_impact": {
+    "financial": "Supported impact or Not established from current evidence",
+    "operational": "Supported impact or Not established from current evidence",
+    "customer": "Supported impact or Not established from current evidence",
+    "strategic": "Supported impact or Not established from current evidence",
+    "if_ignored": "Supported consequence or Not established from current evidence",
+    "evidence_references": [{ "citation_id": 1, "support": "Support" }]
+  },
+  "recommended_actions": [
+    {
+      "reasoning_action_id": "A1",
+      "action": "Leadership action",
+      "priority": "Critical | High | Medium | Low",
+      "expected_business_impact": "Expected impact",
+      "urgency": "Why timing matters",
+      "expected_outcome": "Expected outcome",
+      "time_horizon": "Immediate | 30 Days | 90 Days | Long-Term",
+      "confidence": "High | Medium | Low | Insufficient",
+      "why_prioritized": "Why this comes before lower-impact work",
+      "evidence_references": [{ "citation_id": 1, "support": "Support" }]
+    }
+  ],
+  "supporting_evidence": {
+    "kpis": [{ "citation_id": 1, "support": "Support" }],
+    "business_memory": [],
+    "reports": [],
+    "documents": [],
+    "historical_trends": []
+  },
+  "confidence_assessment": {
+    "level": "High | Medium | Low | Insufficient",
+    "explanation": "Why this confidence level is warranted",
+    "supporting_source_count": 1,
+    "evidence_agreement": "Aligned | Mixed | Conflicting | Insufficient",
+    "conflicts": [],
+    "uncertainty": []
+  },
+  "missing_information": ["Information that would materially improve the decision"],
+  "leadership_brief": {
+    "priorities": ["Priority one", "Priority two", "Priority three"],
+    "first_leadership_meeting": "The first leadership meeting should focus on...",
+    "biggest_decision": "The biggest decision that cannot wait is...",
+    "biggest_opportunity": "The biggest opportunity this week is...",
+    "biggest_unknown": "The biggest unknown preventing a better decision is..."
+  }
+}
+reasoning_stage is a concise decision analysis, not private chain-of-thought. Complete all five reasoning stages before writing executive_summary.
+Every visible finding, root cause, and recommendation must reference its reasoning-stage ID and retain at least one of the same evidence citations.
+Use only citation IDs supplied in evidence_context. Never invent a citation, source, fact, number, trend, relationship, or financial impact.
+A root cause may be Supported only when at least two independent original sources support it. Otherwise use Possible or Not established.
+Business Memory and derived reports may support interpretation but do not increase the independent-source count.
+Correlation is not causation. Describe co-movement as a relationship unless independent evidence establishes a cause.
+If evidence conflicts, identify the conflict and reduce confidence. If confidence is not High, missing_information must explain exactly what would improve the decision.
+Use one to three ranked findings and one to three ranked actions. leadership_brief.priorities must contain exactly three concise priorities; an evidence gap may be a priority when it blocks a reliable decision.
+Do not mention searches, retrieval, chunks, databases, prompts, or internal implementation in user-facing fields.
+`;
+
 const workspaceAwareInstructions = `
 Workspace-aware recommendation rules:
 - First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
@@ -110,6 +200,24 @@ Workspace-aware recommendation rules:
 `;
 
 export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
+  {
+    key: "executive_intelligence",
+    title: "Executive Intelligence",
+    description: "Correlate bounded workspace evidence into decision-ready executive intelligence.",
+    actionLabel: "Ask Vaeroex",
+    promptPlaceholder: "What should leadership understand and do next?",
+    saveTargets: [],
+    instructions: `
+Answer the user's exact executive question as a seasoned Chief Operating Officer advising leadership.
+Do not summarize evidence source-by-source. Rank the evidence, identify relationships, distinguish supported causes from possible relationships, assess business impact, and prioritize leadership action.
+The Executive Summary must be derived from the completed reasoning_stage. Its first sentence must directly answer the user's exact question, then explain what is happening, why it matters, and what leadership should understand immediately.
+Rank findings and actions by verified business impact, urgency, and confidence. Explain why the first action comes before lower-impact work.
+Keep the response concise enough for an executive to scan, while completing every required section.
+Do not expose reasoning_stage to the user. The application uses it only to verify that analysis preceded writing.
+${workspaceAwareInstructions}
+${executiveIntelligenceJsonInstructions}
+`
+  },
   {
     key: "ask_vaeroex",
     title: "Ask Vaeroex",
@@ -355,5 +463,5 @@ ${sharedJsonInstructions}
 ];
 
 export function getVaeroexWorkflow(key: string | null | undefined) {
-  return VAEROEX_WORKFLOWS.find((workflow) => workflow.key === key) ?? VAEROEX_WORKFLOWS[0];
+  return VAEROEX_WORKFLOWS.find((workflow) => workflow.key === key) ?? VAEROEX_WORKFLOWS.find((workflow) => workflow.key === "ask_vaeroex")!;
 }

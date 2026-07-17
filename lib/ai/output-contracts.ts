@@ -1,6 +1,7 @@
 import "server-only";
 
 import { z } from "zod";
+import { validateExecutiveIntelligenceContract } from "@/lib/ai/executive-output";
 import type { VaeroexWorkflowKey } from "@/lib/ai/vaeroex-workflows";
 import type { Json } from "@/lib/supabase/types";
 
@@ -39,6 +40,8 @@ const kpiOverviewOutputSchema = z.object({
 }).passthrough();
 
 export function validateVaeroexWorkflowContract(workflow: VaeroexWorkflowKey, value: unknown) {
+  if (workflow === "executive_intelligence") return validateExecutiveIntelligenceContract(value);
+
   const parsed = workflow === "file_analysis" ? fileAnalysisOutputSchema.safeParse(value) : genericOutputSchema.safeParse(value);
   return parsed.success
     ? { ok: true as const, value: parsed.data as Json }

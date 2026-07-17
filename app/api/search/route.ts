@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
-import { buildWorkspaceEvidenceContext, evidenceContextAsJson, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
+import { buildWorkspaceEvidenceContext, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
+import { buildExecutiveReasoningContext } from "@/lib/ai/executive-intelligence";
+import { executiveAnswerFromOutput, validateExecutiveEvidenceReferences } from "@/lib/ai/executive-output";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
@@ -1107,6 +1109,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ query, groups: [], answer: fallbackAnswer });
   }
 
+  const executiveReasoning = buildExecutiveReasoningContext({
+    query,
+    plan: queryPlan,
+    boundedContext,
+    evidenceContext
+  });
+
+  if (!executiveReasoning.rankedEvidenceCount) {
+    return NextResponse.json({ query, groups: [], answer: fallbackAnswer });
+  }
+
   const limit = await isUsageLimitReached({
     supabase,
     userId: user.id,
@@ -1119,7 +1132,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This workspace has reached its monthly Vaeroex usage limit." }, { status: 429 });
   }
 
-  const workflow = getVaeroexWorkflow("ask_vaeroex");
+  const workflow = getVaeroexWorkflow("executive_intelligence");
   const baseSettings = getAIProviderRetrySettings();
   const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
   const generationStartedAt = Date.now();
@@ -1127,7 +1140,7 @@ export async function POST(request: Request) {
   try {
     const generation = await runVaeroexCompletionWithUsage({
       workflow,
-      userPrompt: `Answer this exact question directly: ${query}\n\nUse only the bounded workspace context and retrieved evidence. Do not add generic management advice, unrelated recommendations, fabricated facts, or report sections. Return JSON with direct_answer, evidence_note, recommendation_confidence, limitations, and response_markdown.`,
+      userPrompt: `Prepare an executive intelligence response to this exact question: ${query}\n\nComplete the required reasoning_stage first. Only after all five decision-analysis steps are complete may you write the visible executive response. Use only the ranked citations and bounded workspace context.`,
       workspaceSnapshot: boundedContext.workspaceSnapshot,
       extraInputs: {
         query_plan: {
@@ -1137,19 +1150,21 @@ export async function POST(request: Request) {
           retrieval_depth: queryPlan.retrievalDepth,
           context_token_budget: queryPlan.contextTokenBudget
         },
-        evidence_context: evidenceContextAsJson(evidenceContext)
+        evidence_context: executiveReasoning.evidenceContextJson,
+        executive_reasoning_manifest: executiveReasoning.reasoningManifest
       } satisfies Json,
       supabase,
       workspaceId,
       userId: user.id,
       modelRoute,
       executionPath: queryPlan.classification,
-      maxOutputTokens: queryPlan.tier === 3 ? 1_000 : 650,
+      maxOutputTokens: queryPlan.tier === 3 ? 1_300 : 1_100,
       providerSettings: {
         ...baseSettings,
         timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs, SEARCH_ASK_PROVIDER_TIMEOUT_MS),
         maxRetries: SEARCH_ASK_PROVIDER_MAX_RETRIES
-      }
+      },
+      outputValidator: (value) => validateExecutiveEvidenceReferences(value, executiveReasoning.catalog)
     });
 
     await recordVaeroexAiUsage({
@@ -1167,7 +1182,10 @@ export async function POST(request: Request) {
           loaded_domains: boundedContext.loadedDomains,
           bounded_context_ms: boundedContext.loadMs,
           estimated_context_tokens: boundedContext.estimatedContextTokens,
-          evidence_count: evidenceCount
+          evidence_count: evidenceCount,
+          ranked_evidence_count: executiveReasoning.rankedEvidenceCount,
+          independent_original_source_count: executiveReasoning.independentSourceCount,
+          explicit_reasoning_stage: true
         }
       }
     });
@@ -1175,7 +1193,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       query,
       groups: [],
-      answer: answerFromOutput(generation.outputJson, evidenceCount, fallbackAnswer)
+      answer: executiveAnswerFromOutput({
+        output: generation.outputJson,
+        catalog: executiveReasoning.catalog,
+        fallback: fallbackAnswer
+      })
     });
   } catch (error) {
     if (isSecurityResponseMessage(error instanceof Error ? error.message : "")) {
@@ -1209,6 +1231,9 @@ export async function POST(request: Request) {
           execution_path: queryPlan.classification,
           data_domains: queryPlan.domains,
           evidence_count: evidenceCount,
+          ranked_evidence_count: executiveReasoning.rankedEvidenceCount,
+          independent_original_source_count: executiveReasoning.independentSourceCount,
+          explicit_reasoning_stage: true,
           timeout: /timed out|timeout|abort/i.test(error instanceof Error ? error.message : ""),
           provider: lastAttempt?.provider || null,
           primary_provider: error instanceof AIProviderExecutionError ? error.primaryProvider : null,

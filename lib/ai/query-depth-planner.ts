@@ -64,6 +64,24 @@ const DOMAIN_PATTERNS: Array<[VaeroexEvidenceDomain, RegExp]> = [
   ["decisions", /\b(decision|decisions|recommendation|recommendations|outcome|outcomes)\b/i]
 ];
 
+const EXECUTIVE_LEADERSHIP_DOMAINS: VaeroexEvidenceDomain[] = [
+  "kpis",
+  "business_health",
+  "financials",
+  "operations",
+  "customers",
+  "people",
+  "risks",
+  "priorities",
+  "reports",
+  "files",
+  "business_memory",
+  "business_signals",
+  "compliance",
+  "data_quality",
+  "decisions"
+];
+
 function unique<T>(values: T[]) {
   return Array.from(new Set(values));
 }
@@ -199,7 +217,11 @@ export function planVaeroexQuery({
   const withinDomainComparison =
     (/\brevenue\b/i.test(normalized) && /\b(profit|profitability|margin|cost|costs|expense|expenses)\b/i.test(normalized)) ||
     (/\b(retention|satisfaction|conversion)\b/i.test(normalized) && /\b(response|complaint|engagement)\b/i.test(normalized));
-  const broadLeadershipQuestion = /\b(across the business|this week|overall|company-wide|organization-wide)\b/i.test(normalized) && /\b(focus|priority|risk|changed|summary|briefing)\b/i.test(normalized);
+  const explicitExecutiveQuestion =
+    /\b(what should (i|we|leadership) (focus on|know|do)|what needs leadership attention|executive (summary|briefing)|leadership (summary|briefing)|how (is|are) (my |our |the )?(business|company|organization|we) (doing|performing)|biggest (risk|opportunity|decision))\b/i.test(normalized);
+  const broadLeadershipQuestion =
+    explicitExecutiveQuestion ||
+    (/\b(across the business|this week|overall|company-wide|organization-wide)\b/i.test(normalized) && /\b(focus|priority|risk|changed|summary|briefing)\b/i.test(normalized));
   const structured =
     (/\b(overview|status|current|latest|newest|components?|how many|count|counts|freshness|last updated|which .* need attention|alerts?|priorities|summary|summarize)\b/i.test(normalized) ||
       /\bhow (are|is) .*(kpi|kpis|metric|metrics|performance).*\b(doing|looking|performing)\b/i.test(normalized)) &&
@@ -209,8 +231,16 @@ export function planVaeroexQuery({
     return planFor("search_navigation", domains, "The request asks to locate or open a workspace record.");
   }
 
-  if ((explanatory && crossDomainConnector && (domains.length >= 2 || withinDomainComparison)) || broadLeadershipQuestion) {
-    return planFor("cross_business_reasoning", domains.length ? domains : ["risks", "priorities", "business_memory"], "The question connects multiple business domains.");
+  if (broadLeadershipQuestion) {
+    return planFor(
+      "cross_business_reasoning",
+      unique([...domains, ...EXECUTIVE_LEADERSHIP_DOMAINS]),
+      "The question requires a bounded executive view across core business domains."
+    );
+  }
+
+  if (explanatory && crossDomainConnector && (domains.length >= 2 || withinDomainComparison)) {
+    return planFor("cross_business_reasoning", domains, "The question connects multiple business domains.");
   }
 
   if (structured && domains.length) {
