@@ -2981,7 +2981,7 @@ export async function approveFileAnalysisAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
   revalidatePath("/app/agents");
-  redirectWithPathMessage(returnPath, "Findings approved. This source is now available to Business Memory and Search or Ask.", file.id);
+  redirectWithPathMessage(returnPath, "Findings approved. This source is now available to Business Memory, Search, and Ask Vaeroex.", file.id);
 }
 
 export async function discardFileAnalysisAction(formData: FormData) {

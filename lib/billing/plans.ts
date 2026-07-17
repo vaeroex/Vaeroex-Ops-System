@@ -20,7 +20,7 @@ export const VAEROEX_PLAN_FEATURES = [
   "KPI Intelligence",
   "Evidence-backed recommendations",
   "Executive brief generation",
-  "Search or Ask Vaeroex",
+  "Search and Ask Vaeroex",
   "File analysis & imports",
   "Continuous platform improvements",
   "Leadership decision support",

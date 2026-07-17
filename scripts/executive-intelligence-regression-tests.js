@@ -43,6 +43,8 @@ const fallbackSource = read("lib/ai/executive-fallback.ts");
 const boundedContextSource = read("lib/ai/bounded-context.ts");
 const renderer = read("components/app/ExecutiveIntelligenceAnswer.tsx");
 const globalSearch = read("components/app/GlobalSearch.tsx");
+const askResponse = read("components/app/AskVaeroexResponse.tsx");
+const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
 const queryPlanner = read("lib/ai/query-depth-planner.ts");
 const client = read("lib/ai/vaeroex-client.ts");
 
@@ -65,8 +67,10 @@ assert.match(boundedContextSource, /business_health_score_context/, "Business He
 assert.match(boundedContextSource, /filterOriginalOrSourceBackedRows\(kpiData\.rows\)/, "bounded KPI evidence must exclude setup-only rows while preserving active source-backed observations");
 assert.match(fallbackSource, /variant:\s*"limited"/, "sparse and failed generations must use the limited-evidence UI variant");
 assert.match(queryPlanner, /EXECUTIVE_LEADERSHIP_DOMAINS/, "broad executive questions must load bounded cross-business domains");
-assert.match(globalSearch, /answer\.executiveBriefing/, "the Search or Ask UI must recognize structured executive answers");
-assert.match(globalSearch, /<ExecutiveIntelligenceAnswer/, "the Search or Ask UI must render the executive briefing component");
+assert.doesNotMatch(globalSearch, /ExecutiveIntelligenceAnswer|answer\.executiveBriefing/, "Global Search must not render Executive Intelligence answers");
+assert.match(askResponse, /answer\.executiveBriefing/, "dedicated Ask must recognize structured executive answers");
+assert.match(askResponse, /<ExecutiveIntelligenceAnswer/, "dedicated Ask must render the executive briefing component");
+assert.match(askWorkspace, /<AskVaeroexResponse answer=\{answer\}/, "persistent Ask exchanges must use the validated answer renderer");
 assert.doesNotMatch(renderer, /reasoning_stage|what_is_happening|priority_logic/, "the internal reasoning stage must never be exposed in the UI");
 
 for (const heading of [

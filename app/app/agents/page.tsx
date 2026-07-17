@@ -1477,8 +1477,8 @@ function FailurePanel({
         <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying..." activityDisabled={run.agent_type === "ask_vaeroex"}>
           Retry
         </PendingSubmitButton>
-        <Link href="/app?search=1" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
-          Open Search or Ask
+        <Link href="/app/ask" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
+          Start New Analysis
         </Link>
       </form>
       {canViewDebug ? (
@@ -1678,7 +1678,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   const params = await searchParams;
 
   if (!params?.run && !params?.error && !params?.saved && !params?.debug) {
-    redirect("/app?search=1");
+    redirect("/app/ask");
   }
 
   const { supabase, workspaceId } = await requireWorkspacePage();
@@ -1759,7 +1759,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <PageHeader
         eyebrow="Vaeroex Results"
         title="Saved Vaeroex Result"
-        description={canViewDebug ? "Review a saved Vaeroex answer or admin diagnostic record. New questions now start from global Search or Ask." : "Review this saved Vaeroex answer. New questions now start from global Search or Ask."}
+        description={canViewDebug ? "Review a saved Vaeroex answer or admin diagnostic record. New questions now start in Ask Vaeroex." : "Review this saved Vaeroex answer. New questions now start in Ask Vaeroex."}
       />
 
       <ErrorNotice message={pageErrorMessage} />
@@ -1840,7 +1840,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
                   title="Vaeroex result records"
                   description="Admin-only execution history and diagnostics. Customer-facing business knowledge is managed in Sources → Learned Knowledge."
                   emptyTitle="No Vaeroex results yet"
-                  emptyDescription="Use global Search or Ask, contextual explanations, or generated outputs to create saved Vaeroex results."
+                  emptyDescription="Use Ask Vaeroex, contextual explanations, or generated outputs to create saved Vaeroex results."
                   returnPath="/app/agents"
                   searchParams={params}
                 />

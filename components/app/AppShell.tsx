@@ -18,6 +18,7 @@ const baseNavSections = [
     collapsible: false,
     items: [
       { href: "/app", label: "Overview" },
+      { href: "/app/ask", label: "Ask Vaeroex" },
       { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Evidence" },
