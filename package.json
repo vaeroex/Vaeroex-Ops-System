@@ -26,6 +26,7 @@
     "test:spreadsheet-ingestion": "node scripts/spreadsheet-ingestion-regression-tests.js",
     "test:public": "node scripts/public-experience-regression-tests.js",
     "test:ai-provider": "node scripts/ai-provider-regression-tests.js",
+    "test:executive-reasoning": "node scripts/executive-intelligence-regression-tests.js",
     "test:search-ask": "node scripts/search-ask-generation-regression-tests.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },

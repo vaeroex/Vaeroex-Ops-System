@@ -27,6 +27,9 @@ type RunVaeroexRequest = {
   modelRoute?: VaeroexModelRoute;
   executionPath?: string;
   maxOutputTokens?: number;
+  outputValidator?: (value: Json) =>
+    | { ok: true; value: Json }
+    | { ok: false; reason: string };
 };
 
 export type VaeroexRequestSizeMetrics = {
@@ -390,7 +393,8 @@ export async function runVaeroexCompletionWithUsage({
   providerSettings,
   modelRoute = "default",
   executionPath = "default",
-  maxOutputTokens
+  maxOutputTokens,
+  outputValidator
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     throw new Error("Vaeroex prompt is not configured.");
@@ -474,7 +478,12 @@ export async function runVaeroexCompletionWithUsage({
     validate(value) {
       const contract = validateVaeroexWorkflowContract(workflow.key, value);
       if (!contract.ok) return contract;
-      const normalized = normalizeVaeroexOutput(contract.value);
+      let normalized = normalizeVaeroexOutput(contract.value);
+      if (outputValidator) {
+        const contextualValidation = outputValidator(normalized);
+        if (!contextualValidation.ok) return contextualValidation;
+        normalized = contextualValidation.value;
+      }
       const safety = validateAiGeneratedOutput(normalized, { allowedSourceIds });
       if (!safety.ok) throw new AIProviderPolicyError(securityResponseMessage());
       return { ok: true as const, value: normalized };

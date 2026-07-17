@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Command, Loader2, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useActivitySignal } from "@/components/app/ActivityProvider";
+import { ExecutiveIntelligenceAnswer } from "@/components/app/ExecutiveIntelligenceAnswer";
 import { globalSearchApiErrorMessage } from "@/lib/search/api-errors";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import type { GlobalSearchAnswer, GlobalSearchGroup, GlobalSearchResponse } from "@/lib/search/types";
@@ -389,29 +390,35 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                     <SecurityResponseNotice compact />
                   ) : answer ? (
                     <section className="rounded-xl border border-vaeroex-accent/25 bg-cyan-950/20 p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Direct Answer</p>
-                      <p className="mt-2 text-sm leading-6 text-white">{answer.directAnswer}</p>
-                      {answer.recommendationConfidence ? (
-                        <div className="mt-3 inline-flex rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-semibold text-slate-100">
-                          Recommendation Confidence: {answer.recommendationConfidence}
-                        </div>
-                      ) : null}
-                      {answer.evidenceNote ? <p className="mt-3 text-xs leading-5 text-slate-300">{answer.evidenceNote}</p> : null}
-                      {answer.relevantDestinations?.length ? (
-                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                          {answer.relevantDestinations.map((destination) => (
-                            <Link
-                              key={`${destination.href}-${destination.label}`}
-                              href={destination.href as Route}
-                              className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm font-semibold text-white transition hover:border-vaeroex-accent/50 hover:bg-cyan-950/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
-                              onClick={closeSearch}
-                            >
-                              <span>{destination.label}</span>
-                              {destination.context ? <span className="mt-1 block text-xs font-normal leading-5 text-slate-400">{destination.context}</span> : null}
-                            </Link>
-                          ))}
-                        </div>
-                      ) : null}
+                      {answer.executiveBriefing ? (
+                        <ExecutiveIntelligenceAnswer briefing={answer.executiveBriefing} />
+                      ) : (
+                        <>
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Direct Answer</p>
+                          <p className="mt-2 text-sm leading-6 text-white">{answer.directAnswer}</p>
+                          {answer.recommendationConfidence ? (
+                            <div className="mt-3 inline-flex rounded-full border border-white/10 bg-slate-950/45 px-3 py-1 text-xs font-semibold text-slate-100">
+                              Recommendation Confidence: {answer.recommendationConfidence}
+                            </div>
+                          ) : null}
+                          {answer.evidenceNote ? <p className="mt-3 text-xs leading-5 text-slate-300">{answer.evidenceNote}</p> : null}
+                          {answer.relevantDestinations?.length ? (
+                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              {answer.relevantDestinations.map((destination) => (
+                                <Link
+                                  key={`${destination.href}-${destination.label}`}
+                                  href={destination.href as Route}
+                                  className="rounded-lg border border-white/10 bg-slate-950/40 p-3 text-sm font-semibold text-white transition hover:border-vaeroex-accent/50 hover:bg-cyan-950/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
+                                  onClick={closeSearch}
+                                >
+                                  <span>{destination.label}</span>
+                                  {destination.context ? <span className="mt-1 block text-xs font-normal leading-5 text-slate-400">{destination.context}</span> : null}
+                                </Link>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      )}
                     </section>
                   ) : null}
                   {groups.map((group) => (

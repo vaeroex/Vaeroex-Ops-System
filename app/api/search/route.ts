@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
-import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
-import { buildWorkspaceEvidenceContext, evidenceContextAsJson, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
+import { buildBoundedWorkspaceContext } from "@/lib/ai/bounded-context";
+import { buildWorkspaceEvidenceContext, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
+import { buildLimitedEvidenceExecutiveAnswer } from "@/lib/ai/executive-fallback";
+import { buildExecutiveReasoningContext } from "@/lib/ai/executive-intelligence";
+import { executiveAnswerFromOutput, validateExecutiveEvidenceReferences } from "@/lib/ai/executive-output";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
@@ -68,39 +71,6 @@ function normalizeQuestion(value: unknown) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function stringValue(value: unknown) {
-  return typeof value === "string" && value.trim() ? value.trim() : "";
-}
-
-function normalizedRecommendationConfidence(value: unknown, evidenceCount: number): GlobalSearchAnswer["recommendationConfidence"] {
-  const candidate = stringValue(value);
-  return ["High", "Medium", "Low", "Insufficient"].includes(candidate)
-    ? candidate as GlobalSearchAnswer["recommendationConfidence"]
-    : confidenceFromEvidence(evidenceCount);
-}
-
-function answerFromOutput(output: Json, evidenceCount: number, fallback: GlobalSearchAnswer): GlobalSearchAnswer {
-  const record = isRecord(output) ? output : {};
-  const directAnswer =
-    stringValue(record.direct_answer) ||
-    stringValue(record.direct_explanation) ||
-    stringValue(record.response_markdown) ||
-    stringValue(record.summary) ||
-    fallback.directAnswer;
-  const limitations = Array.isArray(record.limitations)
-    ? record.limitations.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).join(" ")
-    : stringValue(record.limitations);
-  const evidenceNote = stringValue(record.evidence_note) || fallback.evidenceNote || (limitations || undefined);
-
-  return {
-    kind: "business_answer",
-    directAnswer,
-    recommendationConfidence: normalizedRecommendationConfidence(record.recommendation_confidence || record.confidence, evidenceCount),
-    evidenceNote,
-    relevantDestinations: fallback.relevantDestinations
-  };
 }
 
 function queryWords(query: string) {
@@ -273,14 +243,14 @@ function buildKpiGlobalAnswer(query: string, summary: KpiOverviewSummary, groups
 function buildRiskAnswer(issues: IssueRow[], recommendations: RecommendationRow[], groups: GlobalSearchGroup[]): GlobalSearchAnswer {
   const issue = issues.find((item) => /urgent|high|critical/i.test(`${item.severity} ${item.status}`)) || issues[0];
   const recommendation = recommendations.find((item) => /urgent|high/i.test(`${item.priority} ${item.status}`)) || recommendations[0];
-  const top = issue?.title || recommendation?.title || "No high-priority risk is obvious from the bounded records this panel loaded.";
+  const top = issue?.title || recommendation?.title || "No high-priority risk is supported by the current workspace information.";
   const evidenceCount = [issue, recommendation, ...issues.slice(1, 3), ...recommendations.slice(1, 3)].filter(Boolean).length;
 
   return {
     kind: "business_answer",
     directAnswer: issue || recommendation ? `${top} is the clearest risk signal available in this quick workspace scan.` : top,
     recommendationConfidence: confidenceFromEvidence(evidenceCount),
-    evidenceNote: issue || recommendation ? `This used bounded workspace records: issues, recommendations, and matching Learned Knowledge entries.` : "I did not find enough current risk evidence in the bounded search results.",
+    evidenceNote: issue || recommendation ? "This reflects current issues, recommendations, and related learned context." : "Current workspace information does not support a reliable risk ranking.",
     relevantDestinations: [
       issue ? destination("Open risks and issues", `/app/issues?q=${encodeURIComponent(issue.title)}`, compact([issue.severity, issue.status])) : null,
       recommendation ? destination("Open supporting recommendation", sourceHref(recommendation.source_type, recommendation.source_title || recommendation.title), compact([recommendation.priority, recommendation.status])) : null,
@@ -335,7 +305,7 @@ function buildGeneralBusinessAnswer(groups: GlobalSearchGroup[]): GlobalSearchAn
       kind: "business_answer",
       directAnswer: "I do not see enough matching workspace evidence in this quick panel to answer that reliably.",
       recommendationConfidence: "Insufficient",
-      evidenceNote: "This panel uses bounded workspace search first. Add more specific terms or open the relevant module for contextual analysis.",
+      evidenceNote: "Add more specific terms or open the relevant business area for a focused answer.",
       relevantDestinations: [
         destination("Open Intelligence", "/app/intelligence", "Review current risks, opportunities, and forecasts"),
         destination("Open Sources", "/app/sources", "Upload or review business evidence")
@@ -347,7 +317,7 @@ function buildGeneralBusinessAnswer(groups: GlobalSearchGroup[]): GlobalSearchAn
     kind: "navigation_answer",
     directAnswer: `I found matching workspace evidence. The best place to start is ${destinations[0].label}.`,
     recommendationConfidence: confidenceFromEvidence(destinations.length),
-    evidenceNote: "This used bounded workspace search results rather than broad Learned Knowledge retrieval.",
+    evidenceNote: "This answer points to the most relevant current workspace records.",
     relevantDestinations: destinations
   };
 }
@@ -1063,7 +1033,7 @@ export async function POST(request: Request) {
       answer: {
         kind: "navigation_answer",
         directAnswer: "Matching workspace records are shown in the search results.",
-        evidenceNote: "Navigation requests use workspace search and do not call OpenAI."
+        evidenceNote: "Navigation requests use workspace search and do not generate an analysis."
       } satisfies GlobalSearchAnswer
     });
   }
@@ -1092,18 +1062,24 @@ export async function POST(request: Request) {
     });
   }
 
-  const fallbackOutput = buildDeterministicBoundedAnswer({ query, context: boundedContext });
   const evidenceCount = boundedContext.structuredEvidenceCount + evidenceContext.chunks.length;
-  const fallbackAnswer = answerFromOutput(fallbackOutput, evidenceCount, {
-    kind: "business_answer",
-    directAnswer: "Vaeroex did not find enough relevant workspace evidence to answer without guessing.",
-    recommendationConfidence: confidenceFromEvidence(evidenceCount),
-    evidenceNote: evidenceCount
-      ? `This used ${evidenceCount} bounded evidence item${evidenceCount === 1 ? "" : "s"}.`
-      : "No relevant structured or Learned Knowledge evidence was available."
+  const executiveReasoning = buildExecutiveReasoningContext({
+    query,
+    plan: queryPlan,
+    boundedContext,
+    evidenceContext
+  });
+  const fallbackAnswer = buildLimitedEvidenceExecutiveAnswer({
+    query,
+    boundedContext,
+    reasoningContext: executiveReasoning
   });
 
   if (!queryPlan.requiresOpenAI) {
+    return NextResponse.json({ query, groups: [], answer: fallbackAnswer });
+  }
+
+  if (!executiveReasoning.rankedEvidenceCount) {
     return NextResponse.json({ query, groups: [], answer: fallbackAnswer });
   }
 
@@ -1119,7 +1095,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "This workspace has reached its monthly Vaeroex usage limit." }, { status: 429 });
   }
 
-  const workflow = getVaeroexWorkflow("ask_vaeroex");
+  const workflow = getVaeroexWorkflow("executive_intelligence");
   const baseSettings = getAIProviderRetrySettings();
   const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
   const generationStartedAt = Date.now();
@@ -1127,7 +1103,7 @@ export async function POST(request: Request) {
   try {
     const generation = await runVaeroexCompletionWithUsage({
       workflow,
-      userPrompt: `Answer this exact question directly: ${query}\n\nUse only the bounded workspace context and retrieved evidence. Do not add generic management advice, unrelated recommendations, fabricated facts, or report sections. Return JSON with direct_answer, evidence_note, recommendation_confidence, limitations, and response_markdown.`,
+      userPrompt: `Prepare an executive intelligence response to this exact question: ${query}\n\nComplete the required reasoning_stage first. Only after all five decision-analysis steps are complete may you write the visible executive response. Use only the ranked citations and bounded workspace context.`,
       workspaceSnapshot: boundedContext.workspaceSnapshot,
       extraInputs: {
         query_plan: {
@@ -1137,19 +1113,21 @@ export async function POST(request: Request) {
           retrieval_depth: queryPlan.retrievalDepth,
           context_token_budget: queryPlan.contextTokenBudget
         },
-        evidence_context: evidenceContextAsJson(evidenceContext)
+        evidence_context: executiveReasoning.evidenceContextJson,
+        executive_reasoning_manifest: executiveReasoning.reasoningManifest
       } satisfies Json,
       supabase,
       workspaceId,
       userId: user.id,
       modelRoute,
       executionPath: queryPlan.classification,
-      maxOutputTokens: queryPlan.tier === 3 ? 1_000 : 650,
+      maxOutputTokens: queryPlan.tier === 3 ? 1_300 : 1_100,
       providerSettings: {
         ...baseSettings,
         timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs, SEARCH_ASK_PROVIDER_TIMEOUT_MS),
         maxRetries: SEARCH_ASK_PROVIDER_MAX_RETRIES
-      }
+      },
+      outputValidator: (value) => validateExecutiveEvidenceReferences(value, executiveReasoning.catalog)
     });
 
     await recordVaeroexAiUsage({
@@ -1167,7 +1145,13 @@ export async function POST(request: Request) {
           loaded_domains: boundedContext.loadedDomains,
           bounded_context_ms: boundedContext.loadMs,
           estimated_context_tokens: boundedContext.estimatedContextTokens,
-          evidence_count: evidenceCount
+          evidence_count: evidenceCount,
+          ranked_evidence_count: executiveReasoning.rankedEvidenceCount,
+          independent_original_source_count: executiveReasoning.independentSourceCount,
+          current_independent_original_source_count: executiveReasoning.currentIndependentSourceCount,
+          original_source_type_count: executiveReasoning.originalSourceTypeCount,
+          evidence_sufficiency_ceiling: executiveReasoning.maximumEvidenceSufficiency,
+          explicit_reasoning_stage: true
         }
       }
     });
@@ -1175,7 +1159,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       query,
       groups: [],
-      answer: answerFromOutput(generation.outputJson, evidenceCount, fallbackAnswer)
+      answer: executiveAnswerFromOutput({
+        output: generation.outputJson,
+        catalog: executiveReasoning.catalog,
+        fallback: fallbackAnswer
+      })
     });
   } catch (error) {
     if (isSecurityResponseMessage(error instanceof Error ? error.message : "")) {
@@ -1209,6 +1197,12 @@ export async function POST(request: Request) {
           execution_path: queryPlan.classification,
           data_domains: queryPlan.domains,
           evidence_count: evidenceCount,
+          ranked_evidence_count: executiveReasoning.rankedEvidenceCount,
+          independent_original_source_count: executiveReasoning.independentSourceCount,
+          current_independent_original_source_count: executiveReasoning.currentIndependentSourceCount,
+          original_source_type_count: executiveReasoning.originalSourceTypeCount,
+          evidence_sufficiency_ceiling: executiveReasoning.maximumEvidenceSufficiency,
+          explicit_reasoning_stage: true,
           timeout: /timed out|timeout|abort/i.test(error instanceof Error ? error.message : ""),
           provider: lastAttempt?.provider || null,
           primary_provider: error instanceof AIProviderExecutionError ? error.primaryProvider : null,
@@ -1218,16 +1212,17 @@ export async function POST(request: Request) {
       }
     });
 
-    const fallbackWithReason = buildDeterministicBoundedAnswer({
+    const fallbackWithReason = buildLimitedEvidenceExecutiveAnswer({
       query,
-      context: boundedContext,
-      failureReason: "The deeper analysis was unavailable, so Vaeroex returned the bounded workspace evidence it could verify."
+      boundedContext,
+      reasoningContext: executiveReasoning,
+      failureReason: "The deeper analysis did not complete, so this briefing is limited to safe conclusions and next steps."
     });
 
     return NextResponse.json({
       query,
       groups: [],
-      answer: answerFromOutput(fallbackWithReason, evidenceCount, fallbackAnswer)
+      answer: fallbackWithReason
     });
   }
 }
