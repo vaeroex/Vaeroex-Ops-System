@@ -4,7 +4,7 @@ import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/
 import { resolveAIProviderAttemptWindow, type AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
 import { OpenAIProvider } from "@/lib/ai/providers/openai-provider";
 import { NvidiaProvider } from "@/lib/ai/providers/nvidia-provider";
-import { AIProviderError, AIProviderPolicyError, type AIProvider, type AIProviderInputPart, type AIProviderName } from "@/lib/ai/providers/types";
+import { AIProviderError, AIProviderPolicyError, type AIGenerationMode, type AIProvider, type AIProviderInputPart, type AIProviderName } from "@/lib/ai/providers/types";
 
 export const NVIDIA_NEMOTRON_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1.5";
 
@@ -46,6 +46,7 @@ type RunStructuredAIRequest<T> = {
   systemPrompt: string;
   userContent: AIProviderInputPart[];
   temperature?: number;
+  generationMode?: AIGenerationMode;
   maxOutputTokens?: number;
   settings?: AIProviderRetrySettings;
   validate: (value: unknown) => StructuredOutputValidation<T>;
@@ -184,6 +185,7 @@ async function runProvider<T>({
         systemPrompt: request.systemPrompt,
         userContent: validationReason ? repairContent(request.userContent, validationReason) : request.userContent,
         temperature: request.temperature ?? 0.2,
+        generationMode: request.generationMode,
         maxOutputTokens: request.maxOutputTokens,
         settings: providerSettings
       });

@@ -3,6 +3,7 @@ import "server-only";
 import type { AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 
 export type AIProviderName = "openai" | "nvidia";
+export type AIGenerationMode = "default" | "interactive_executive";
 
 export type AIProviderInputPart =
   | { type: "text"; text: string }
@@ -14,6 +15,7 @@ export type AIProviderRequest = {
   systemPrompt: string;
   userContent: AIProviderInputPart[];
   temperature: number;
+  generationMode?: AIGenerationMode;
   maxOutputTokens?: number;
   settings: AIProviderRetrySettings;
 };

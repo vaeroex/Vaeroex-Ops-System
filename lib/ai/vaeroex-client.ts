@@ -7,7 +7,7 @@ import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { getAIProviderCircuitSnapshot, getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { getAIProviderRuntimeStatus, runStructuredAI } from "@/lib/ai/providers/provider-manager";
 import type { AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
-import { AIProviderPolicyError, type AIProviderInputPart } from "@/lib/ai/providers/types";
+import { AIProviderPolicyError, type AIGenerationMode, type AIProviderInputPart } from "@/lib/ai/providers/types";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { assertWorkspaceTokenBudget, estimateTokenCount, getWorkspaceTokenBudget, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
@@ -32,6 +32,7 @@ type RunVaeroexRequest = {
   executionPath?: string;
   maxInputTokens?: number;
   maxOutputTokens?: number;
+  generationMode?: AIGenerationMode;
   outputValidator?: (value: Json) =>
     | { ok: true; value: Json }
     | { ok: false; reason: string };
@@ -423,6 +424,7 @@ export async function runVaeroexCompletionWithUsage({
   executionPath = "default",
   maxInputTokens,
   maxOutputTokens,
+  generationMode,
   outputValidator
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
@@ -528,6 +530,7 @@ export async function runVaeroexCompletionWithUsage({
       systemPrompt,
       userContent,
       temperature: 0.2,
+      generationMode,
       maxOutputTokens,
       settings: providerSettings,
       executionBudget: providerExecutionBudget,
@@ -535,7 +538,9 @@ export async function runVaeroexCompletionWithUsage({
       validate(value) {
         const contract = validateVaeroexWorkflowContract(workflow.key, value);
         if (!contract.ok) return contract;
-        let normalized = normalizeVaeroexOutput(contract.value);
+        let normalized = workflow.key === "executive_intelligence"
+          ? contract.value
+          : normalizeVaeroexOutput(contract.value);
         if (outputValidator) {
           const contextualValidation = outputValidator(normalized);
           if (!contextualValidation.ok) return contextualValidation;
@@ -577,6 +582,7 @@ export async function runVaeroexCompletionWithUsage({
       model_route: modelRoute,
       execution_path: executionPath,
       max_output_tokens: maxOutputTokens || null,
+      generation_mode: generationMode || "default",
       provider: generation.provider,
       primary_provider: primaryProvider,
       fallback_used: generation.fallbackUsed,

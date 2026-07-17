@@ -110,42 +110,33 @@ Security and evidence boundary:
 - Respect the manifest's evidence-sufficiency and confidence ceilings. Stale, narrow, or conflicting evidence lowers confidence.
 - Do not request PHI, Social Security numbers, medical record numbers, insurance IDs, or other regulated identifiers. Regulated, legal, tax, medical, financial, and compliance matters require qualified professional review.
 
-Visible output must be concise, plain-language, evidence-backed, and suitable for a CEO. Do not expose retrieval, ranking, prompt, database, provider, manifest, contract, or reasoning-stage terminology. The reasoning_stage field is internal verification data and must never be quoted or described in visible fields.
+Visible output must be concise, plain-language, evidence-backed, and suitable for a CEO. Do not expose retrieval, ranking, prompt, database, provider, manifest, contract, or reasoning-stage terminology. The canonical analysis object contains conclusions for validation, not private chain-of-thought, and must never be quoted or described as an internal process.
 `;
 
 const executiveIntelligenceJsonInstructions = `
-Return JSON only. Use every required key below. Enum notation A|B means choose one literal. Ref={"citation_id":positive integer,"support":nonempty string}. Arrays may be empty and contain at most 3 items unless the contract states otherwise.
+Return one compact JSON object only, in the exact key order shown. Enum notation A|B means choose one literal. Citation arrays contain only supplied positive integer IDs. Keep the complete transport object near 250-400 tokens by stating each conclusion once and using terse executive language.
 
 {
- "title":string,
- "reasoning_stage":{
-  "evidence_sufficiency":{"state":"Sufficient|Partial|Conflicting|Insufficient","explanation":string},
-  "what_is_happening":[{"finding_id":"F1|F2|F3","conclusion":string,"evidence_references":[Ref]}],
-  "why_it_is_happening":[{"cause_id":"C1|C2|C3","conclusion":string,"status":"Supported|Possible|Not established","evidence_references":[Ref]}],
-  "why_leadership_should_care":{"conclusion":string,"evidence_references":[Ref]},
-  "what_should_happen_next":[{"action_id":"A1|A2|A3","action":string,"evidence_references":[Ref]}],
-  "priority_logic":{"ordered_action_ids":["A1"],"explanation":string}
+ "analysis":{
+  "evidence_sufficiency":"Sufficient|Partial|Conflicting|Insufficient",
+  "evidence_agreement":"Aligned|Mixed|Conflicting|Insufficient",
+  "findings":[{"id":"F1|F2|F3","signal_id":"S1","finding":string,"impact":string,"confidence":"High|Medium|Low|Insufficient","citations":[1]}],
+  "relationships":[{"finding_ids":["F1","F2"],"status":"Supported|Possible|Not established","assessment":string,"citations":[1,2]}],
+  "actions":[{"id":"A1|A2|A3","action":string,"priority":"Critical|High|Medium|Low","why":string,"outcome":string,"horizon":"Immediate|30 Days|90 Days|Long-Term","citations":[1]}],
+  "uncertainty":[string]
  },
  "executive_summary":string,
- "executive_summary_signal_ids":["S1"],
- "key_findings":[{"reasoning_finding_id":"F1","finding":string,"business_impact":string,"confidence":"High|Medium|Low|Insufficient","evidence_references":[Ref]}],
- "root_cause_analysis":[{"reasoning_cause_id":"C1","finding":string,"analysis":string,"status":"Supported|Possible|Not established","evidence_references":[Ref]}],
- "business_impact":{"financial":string,"operational":string,"customer":string,"strategic":string,"if_ignored":string,"evidence_references":[Ref]},
- "recommended_actions":[{"reasoning_action_id":"A1","action":string,"priority":"Critical|High|Medium|Low","expected_business_impact":string,"urgency":string,"expected_outcome":string,"time_horizon":"Immediate|30 Days|90 Days|Long-Term","confidence":"High|Medium|Low|Insufficient","why_prioritized":string,"would_change_if":string,"evidence_references":[Ref]}],
- "supporting_evidence":{"kpis":[Ref],"business_memory":[Ref],"reports":[Ref],"documents":[Ref],"historical_trends":[Ref]},
- "confidence_assessment":{"level":"High|Medium|Low|Insufficient","explanation":string,"supporting_source_count":nonnegative integer,"evidence_agreement":"Aligned|Mixed|Conflicting|Insufficient","conflicts":[string],"uncertainty":[string]},
- "missing_information":[string],
- "limited_evidence":null|{"evidence_readiness_summary":string,"provisional_interpretations":[{"statement":string,"evidence_references":[Ref]}],"alternative_explanations":[{"statement":string,"evidence_references":[Ref]}],"conflict_resolution":null|{"conflict_summary":string,"fresher_source":string,"more_direct_source":string,"derived_source_limitations":string,"resolution_action":string},"leadership_risk":string,"decisions_to_defer":[string]},
- "leadership_brief":{"priorities":[string,string,string],"first_leadership_meeting":string,"biggest_decision":string,"biggest_opportunity":string,"biggest_unknown":string}
+ "overall_confidence":"High|Medium|Low|Insufficient",
+ "summary_signal_ids":["S1"]
 }
 
 Decision contract:
-1. Complete reasoning_stage in key order before executive_summary: sufficiency, distinct findings, causes/relationships, leadership relevance, actions, priority order.
-2. The signal manifest is authoritative. Evaluate every candidate; return its minimum distinct findings (maximum 3), preserve required signal order, and include every required_signal_id substantively in executive_summary and executive_summary_signal_ids.
-3. If cross-signal assessment is required, evaluate a listed relationship with citations from both signals; never assume causation.
-4. Never exceed maximum_evidence_sufficiency or maximum_recommendation_confidence. Use only supplied citation IDs. Visible findings, causes, and actions must retain citations from their matching reasoning IDs.
-5. Sufficient requires key_findings and root_cause_analysis and sets limited_evidence=null. Otherwise populate limited_evidence, use reversible actions, identify missing information and decisions to defer; Conflicting also requires conflict_resolution. With zero original evidence, invent no business finding or cause.
-6. Use 1-3 actions and exactly 3 leadership priorities. Unsupported impacts must say "Not established." Business Health answers must distinguish assessment readiness from operating performance and use only the supplied score context.
+1. Complete analysis before executive_summary: establish sufficiency, identify what is happening and why it matters, assess listed relationships, prioritize actions and why they come first, then state uncertainty. Return conclusions only, never hidden reasoning.
+2. The signal manifest is authoritative. Return its minimum distinct findings (maximum 3) in required_signal_ids order. Each finding uses that signal_id and its eligible citations. Include every required signal in executive_summary and summary_signal_ids.
+3. Evaluate only listed relationship candidates. If cross-signal assessment is required, return at least one relationship with citations from both findings. Never imply causation unless Supported by two independent current original sources; otherwise use Possible or Not established.
+4. Never exceed the manifest's sufficiency or confidence ceilings. Business Memory is supporting context only. Use only supplied citation IDs; every finding and action needs eligible original evidence.
+5. Use 1-3 distinct prioritized actions. State the action, why it ranks there, its evidence-supported outcome, horizon, and citations once. Put missing facts, conflicts, or decision-changing inputs in uncertainty.
+6. The executive summary answers the exact question in its first sentence and synthesizes every required finding plus why the first action is the priority. Unsupported impacts say "Not established." Business Health answers separate assessment readiness from operating performance.
 `;
 
 const workspaceAwareInstructions = `
@@ -173,7 +164,7 @@ export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
     instructions: `
 Answer the user's exact executive question as a seasoned Chief Operating Officer advising leadership.
 When analysis_session_context exists, use it only to resolve conversational references; re-establish every current claim from current citations.
-Synthesize distinct signals rather than summarizing sources. Rank findings and actions by verified impact, urgency, confidence, and freshness. The executive summary's first sentence must answer the exact question, cover every required signal, and explain why the top action comes first.
+Synthesize distinct signals rather than summarizing sources. Rank findings and actions by verified impact, urgency, confidence, and freshness. Reason before writing, but return only concise decision conclusions, never private chain-of-thought. The executive summary's first sentence must answer the exact question, cover every required signal, and explain why the top action comes first.
 ${executiveIntelligenceJsonInstructions}
 `
   },

@@ -1,6 +1,6 @@
 import "server-only";
 
-import { fetchWithAIProviderResilience, isRetryableAIProviderStatus } from "@/lib/ai/provider-resilience";
+import { consumeAIProviderResponse, isRetryableAIProviderStatus } from "@/lib/ai/provider-resilience";
 import { AIProviderError, type AIEmbeddingResult, type AIProvider, type AIProviderRequest } from "@/lib/ai/providers/types";
 
 const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
@@ -50,7 +50,7 @@ export class OpenAIProvider implements AIProvider {
           return { type: "input_file", filename: part.fileName, file_data: dataUrl(part.mimeType, part.base64Data) };
         });
     const startedAt = Date.now();
-    const response = await fetchWithAIProviderResilience("openai", OPENAI_RESPONSES_ENDPOINT, {
+    const { response, value: payload } = await consumeAIProviderResponse("openai", OPENAI_RESPONSES_ENDPOINT, {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -63,8 +63,14 @@ export class OpenAIProvider implements AIProvider {
           { role: "user", content: userContent }
         ]
       })
+    }, async (providerResponse) => {
+      const body = await providerResponse.text();
+      try {
+        return JSON.parse(body) as ResponsesPayload;
+      } catch {
+        return {} as ResponsesPayload;
+      }
     }, { ...request.settings, maxRetries: 0 });
-    const payload = (await response.json().catch(() => ({}))) as ResponsesPayload;
 
     if (!response.ok) {
       throw new AIProviderError(
@@ -99,15 +105,21 @@ export class OpenAIProvider implements AIProvider {
     }
 
     try {
-      const response = await fetchWithAIProviderResilience("openai", OPENAI_EMBEDDINGS_ENDPOINT, {
+      const { response, value: payload } = await consumeAIProviderResponse("openai", OPENAI_EMBEDDINGS_ENDPOINT, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model, input: inputs })
+      }, async (providerResponse) => {
+        const body = await providerResponse.text();
+        try {
+          return JSON.parse(body) as {
+            data?: Array<{ embedding?: number[] }>;
+            usage?: { total_tokens?: number; prompt_tokens?: number };
+          };
+        } catch {
+          return {};
+        }
       }, settings);
-      const payload = (await response.json().catch(() => ({}))) as {
-        data?: Array<{ embedding?: number[] }>;
-        usage?: { total_tokens?: number; prompt_tokens?: number };
-      };
       if (!response.ok) {
         return { model, embeddings: inputs.map(() => null), tokens: 0, error: `Embedding request failed with status ${response.status}.` };
       }

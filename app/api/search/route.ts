@@ -8,7 +8,11 @@ import {
   buildExecutiveReasoningContext,
   EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS
 } from "@/lib/ai/executive-intelligence";
-import { executiveAnswerFromOutput, validateExecutiveEvidenceReferences } from "@/lib/ai/executive-output";
+import {
+  executiveAnswerFromOutput,
+  EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS,
+  validateExecutiveEvidenceReferences
+} from "@/lib/ai/executive-output";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
@@ -1013,7 +1017,8 @@ export async function POST(request: Request) {
       userId: user.id,
       modelRoute,
       executionPath: queryPlan.classification,
-      maxOutputTokens: queryPlan.tier === 3 ? 1_800 : 1_100,
+      maxOutputTokens: EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS,
+      generationMode: "interactive_executive",
       maxInputTokens: EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS,
       providerSettings: {
         ...baseSettings,

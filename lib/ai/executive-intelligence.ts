@@ -800,6 +800,7 @@ export function buildExecutiveReasoningContext({
     citationId: index + 1,
     title: item.title,
     sourceType: item.sourceType,
+    support: item.excerpt,
     independentSourceKey: item.independentSourceKey,
     evidenceRole: item.evidenceRole,
     freshnessScore: item.rankingFactors.freshness,
@@ -834,17 +835,16 @@ export function buildExecutiveReasoningContext({
     evidenceContextJson: compactPrompt.evidenceContextJson,
     modelWorkspaceSnapshot: compactPrompt.modelWorkspaceSnapshot,
     reasoningManifest: {
-      contract_version: 2,
+      contract_version: 3,
       execution_tier: plan.tier,
       loaded_domains: boundedContext.loadedDomains,
       reasoning_must_precede_writing: true,
       reasoning_stage_order: [
         "evidence_sufficiency",
-        "what_is_happening",
-        "why_it_is_happening",
-        "why_leadership_should_care",
-        "what_should_happen_next",
-        "priority_logic",
+        "findings",
+        "relationships",
+        "actions",
+        "uncertainty",
         "executive_summary"
       ],
       signal_synthesis: {

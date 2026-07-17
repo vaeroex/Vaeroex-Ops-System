@@ -1,6 +1,8 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const Module = require("node:module");
 const path = require("node:path");
+const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
@@ -16,14 +18,50 @@ const guardrails = read("lib/ai/provider-guardrails.ts");
 const usage = read("lib/ai/usage.ts");
 const resilience = read("lib/ai/provider-resilience.ts");
 const env = read(".env.example");
+const searchRoute = read("app/api/search/route.ts");
+
+require.extensions[".ts"] = function compileTypeScript(module, filename) {
+  const source = fs.readFileSync(filename, "utf8");
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      esModuleInterop: true,
+      module: ts.ModuleKind.CommonJS,
+      moduleResolution: ts.ModuleResolutionKind.NodeJs,
+      target: ts.ScriptTarget.ES2022
+    },
+    fileName: filename
+  });
+  module._compile(output.outputText, filename);
+};
+
+const originalResolveFilename = Module._resolveFilename;
+Module._resolveFilename = function resolveAlias(request, parent, isMain, options) {
+  if (request.startsWith("@/")) {
+    return originalResolveFilename.call(this, path.join(root, request.slice(2)), parent, isMain, options);
+  }
+  return originalResolveFilename.call(this, request, parent, isMain, options);
+};
+
+const originalLoad = Module._load;
+Module._load = function loadPatched(request, parent, isMain) {
+  if (request === "server-only") return {};
+  return originalLoad.call(this, request, parent, isMain);
+};
 
 assert.match(manager, /nvidia\/llama-3\.3-nemotron-super-49b-v1\.5/, "NVIDIA must use the approved Nemotron model");
 assert.match(nvidia, /https:\/\/integrate\.api\.nvidia\.com\/v1\/chat\/completions/, "NVIDIA must use its server API endpoint");
 assert.match(nvidia, /process\.env\.NVIDIA_API_KEY/, "NVIDIA credentials must remain server-side");
+assert.match(searchRoute, /generationMode:\s*"interactive_executive"/, "interactive Executive Analysis must opt into its provider-neutral fast mode");
+assert.match(manager, /generationMode:\s*request\.generationMode/, "the provider manager must pass the workflow generation mode without selecting a vendor");
+assert.match(nvidia, /interactiveExecutive \? `\/no_think/, "NVIDIA interactive Executive Analysis must disable hidden reasoning with the documented system directive");
+assert.match(nvidia, /temperature:\s*interactiveExecutive \? 0 : request\.temperature/, "NVIDIA reasoning-off mode must use greedy decoding");
+assert.match(nvidia, /!interactiveExecutive \? \{ top_p: 0\.95 \} : \{\}/, "greedy mode must not also override top-p");
+assert.doesNotMatch(openai, /no_think|interactiveExecutive/, "the NVIDIA reasoning mode must not alter OpenAI behavior");
 assert.match(openai, /process\.env\.OPENAI_API_KEY/, "OpenAI fallback credentials must remain server-side");
 assert.match(manager, /primaryProvider !== "nvidia"/, "only NVIDIA primary calls should automatically enter the OpenAI fallback path");
 assert.match(manager, /primaryMaxAttempts = Math\.max\(1, Math\.min\(settings\.maxRetries \+ 1, 2\)\)/, "provider retries must honor workflow-specific settings");
 assert.match(resilience, /maxRetries:\s*1/, "the default provider policy must retain one retry outside bounded workflows");
+assert.match(resilience, /const value = await consume\(response\)[\s\S]*recordAIProviderSuccess/, "provider success must be recorded only after the complete response body is consumed");
 assert.match(manager, /waitBeforeRetry/, "provider retries must use bounded backoff");
 assert.match(manager, /repairContent/, "invalid structured responses must receive one repair attempt");
 assert.match(manager, /validate: \(value: unknown\)/, "provider outputs must be validated by the caller contract");
@@ -48,4 +86,87 @@ assert.match(env, /AI_PROVIDER=openai/, "OpenAI must remain the default provider
 assert.match(env, /NVIDIA_API_KEY=/, "the server-side NVIDIA key must be documented");
 assert.doesNotMatch(env, /NEXT_PUBLIC_NVIDIA/, "NVIDIA credentials must never be public");
 
-console.log("AI provider regression tests passed.");
+async function runDynamicProviderTests() {
+  const { consumeAIProviderResponse, resetAIProviderCircuitForTests } = require("../lib/ai/provider-resilience.ts");
+  const { NvidiaProvider } = require("../lib/ai/providers/nvidia-provider.ts");
+  const originalFetch = global.fetch;
+  const originalKey = process.env.NVIDIA_API_KEY;
+  const settings = {
+    timeoutMs: 25,
+    maxRetries: 0,
+    retryBaseDelayMs: 1,
+    circuitFailureThreshold: 50,
+    circuitOpenMs: 10_000
+  };
+
+  try {
+    global.fetch = async (_input, init) => ({
+      ok: true,
+      status: 200,
+      headers: new Headers(),
+      text: () => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => resolve("{\"ok\":true}"), 150);
+        init.signal.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(init.signal.reason || new Error("aborted"));
+        }, { once: true });
+      })
+    });
+    await assert.rejects(
+      consumeAIProviderResponse("nvidia", "https://provider.test", {}, (response) => response.text(), settings),
+      /timed out|abort/i,
+      "the provider timeout must remain active while the response body is being read"
+    );
+
+    resetAIProviderCircuitForTests();
+    const requestBodies = [];
+    process.env.NVIDIA_API_KEY = "test-key-not-a-secret";
+    global.fetch = async (_input, init) => {
+      requestBodies.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: "{\"ok\":true}" } }],
+        usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 }
+      }), { status: 200, headers: { "content-type": "application/json" } });
+    };
+    const provider = new NvidiaProvider();
+    const baseRequest = {
+      model: "nvidia/llama-3.3-nemotron-super-49b-v1.5",
+      systemPrompt: "System contract",
+      userContent: [{ type: "text", text: "Request" }],
+      temperature: 0.2,
+      maxOutputTokens: 400,
+      settings: { ...settings, timeoutMs: 500 }
+    };
+    await provider.generate({ ...baseRequest, generationMode: "interactive_executive" });
+    await provider.generate({ ...baseRequest, generationMode: "default" });
+
+    assert.match(requestBodies[0].messages[0].content, /^\/no_think\n/, "interactive Executive Analysis must put /no_think in NVIDIA's system prompt");
+    assert.equal(requestBodies[0].temperature, 0, "interactive Executive Analysis must use greedy decoding");
+    assert.equal("top_p" in requestBodies[0], false, "greedy NVIDIA requests must not also change top-p");
+    assert.doesNotMatch(requestBodies[1].messages[0].content, /^\/no_think/, "other NVIDIA workflows must preserve reasoning mode");
+    assert.equal(requestBodies[1].temperature, 0.2, "other NVIDIA workflows must preserve their requested temperature");
+    assert.equal(requestBodies[1].top_p, 0.95, "other NVIDIA workflows must preserve current provider defaults");
+
+    global.fetch = async () => new Response(JSON.stringify({
+      choices: [{ finish_reason: "length", message: { content: "{\"ok\":true}" } }],
+      usage: { prompt_tokens: 10, completion_tokens: 400, total_tokens: 410 }
+    }), { status: 200, headers: { "content-type": "application/json" } });
+    await assert.rejects(
+      provider.generate({ ...baseRequest, generationMode: "interactive_executive" }),
+      /incomplete response/i,
+      "a provider response stopped by the output limit must never be accepted as complete"
+    );
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) delete process.env.NVIDIA_API_KEY;
+    else process.env.NVIDIA_API_KEY = originalKey;
+    resetAIProviderCircuitForTests();
+  }
+}
+
+runDynamicProviderTests()
+  .then(() => console.log("AI provider regression tests passed."))
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });

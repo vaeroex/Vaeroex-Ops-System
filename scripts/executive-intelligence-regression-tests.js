@@ -55,17 +55,18 @@ assert.doesNotMatch(route, /buildDeterministicBoundedAnswer/, "executive generat
 assert.match(route, /outputValidator:\s*\(value\) => validateExecutiveEvidenceReferences/, "executive citations and source independence must be validated inside the provider contract");
 assert.match(route, /explicit_reasoning_stage:\s*true/, "usage telemetry must record the executive reasoning path without recording its content");
 assert.match(route, /signal_candidate_count:\s*executiveReasoning\.signalSynthesis\.candidates\.length/, "usage telemetry must record bounded signal counts without logging signal content");
-assert.match(route, /maxOutputTokens:\s*queryPlan\.tier === 3 \? 1_800 : 1_100/, "Tier 3 must reserve enough bounded output space for multi-signal synthesis");
+assert.match(route, /maxOutputTokens:\s*EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS/, "interactive Executive Analysis must use the compact canonical output budget");
+assert.match(route, /generationMode:\s*"interactive_executive"/, "interactive Executive Analysis must request its workflow-specific fast structured mode");
 assert.match(route, /workspaceSnapshot:\s*executiveReasoning\.modelWorkspaceSnapshot/, "executive generation must receive the compact model snapshot instead of the full bounded workspace object");
 assert.match(route, /maxInputTokens:\s*EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS/, "interactive executive generation must enforce a hard input-token ceiling");
 assert.doesNotMatch(route, /workspaceSnapshot:\s*boundedContext\.workspaceSnapshot/, "the full bounded retrieval result must never be serialized into the interactive model request");
 assert.match(route, /runVaeroexCompletionWithUsage/, "executive reasoning must remain behind the provider-neutral Vaeroex client");
 assert.match(client, /runStructuredAI/, "the Vaeroex client must continue to use the provider manager");
-assert.match(workflow, /Complete reasoning_stage in key order before executive_summary/i, "the workflow must reason before it writes");
-assert.match(workflow, /what_is_happening[\s\S]*why_it_is_happening[\s\S]*why_leadership_should_care[\s\S]*what_should_happen_next[\s\S]*priority_logic/, "the five executive reasoning decisions must be explicit and ordered");
+assert.match(workflow, /Complete analysis before executive_summary/i, "the workflow must reason before it writes");
+assert.match(workflow, /evidence_sufficiency[\s\S]*findings[\s\S]*relationships[\s\S]*actions[\s\S]*uncertainty/, "the canonical executive reasoning decisions must be explicit and ordered");
 assert.match(outputContracts, /workflow === "executive_intelligence"/, "executive responses must use a dedicated structured contract");
 assert.match(workflow, /minimum distinct findings/, "the executive prompt must honor the deterministic multi-signal plan");
-assert.match(workflow, /include every required_signal_id substantively/, "the executive prompt must prevent dominant-signal collapse");
+assert.match(workflow, /Include every required signal in executive_summary and summary_signal_ids/i, "the executive prompt must prevent dominant-signal collapse");
 assert.match(reasoning, /businessImpact \* 0\.3[\s\S]*confidence \* 0\.25[\s\S]*freshness \* 0\.15[\s\S]*directRelevance \* 0\.25[\s\S]*historicalImportance \* 0\.05/, "evidence ranking must use all required factors");
 assert.match(workflow, /Business Memory may support original evidence but is not an independent source/, "Business Memory must not inflate independent-source confidence");
 assert.match(workflow, /Derived analysis cannot establish a new fact without eligible original lineage/, "derived reports must not establish new business facts");
@@ -84,7 +85,7 @@ assert.doesNotMatch(globalSearch, /ExecutiveIntelligenceAnswer|answer\.executive
 assert.match(askResponse, /answer\.executiveBriefing/, "dedicated Ask must recognize structured executive answers");
 assert.match(askResponse, /<ExecutiveIntelligenceAnswer/, "dedicated Ask must render the executive briefing component");
 assert.match(askWorkspace, /<AskVaeroexResponse answer=\{answer\}/, "persistent Ask exchanges must use the validated answer renderer");
-assert.doesNotMatch(renderer, /reasoning_stage|what_is_happening|priority_logic/, "the internal reasoning stage must never be exposed in the UI");
+assert.doesNotMatch(renderer, /summary_signal_ids|signal_id|relationship_candidates/, "the canonical transport and manifest must never be exposed in the UI");
 
 for (const heading of [
   "Executive Summary",
@@ -103,6 +104,7 @@ for (const heading of ["Evidence Readiness", "What Can Be Said", "Safe Next Acti
 }
 
 const {
+  EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS,
   executiveAnswerFromOutput,
   validateExecutiveEvidenceReferences,
   validateExecutiveIntelligenceContract
@@ -120,120 +122,58 @@ const { buildBusinessHealthDecisionContext } = require("../lib/ai/business-healt
 const { planVaeroexQuery } = require("../lib/ai/query-depth-planner.ts");
 const { estimateVaeroexCompletionRequest } = require("../lib/ai/vaeroex-client.ts");
 const { getVaeroexWorkflow } = require("../lib/ai/vaeroex-workflows.ts");
-
-const ref = (citationId, support = `Citation ${citationId} supports this conclusion.`) => ({
-  citation_id: citationId,
-  support
-});
+const { estimateTokenCount } = require("../lib/ai/usage.ts");
 
 const validOutput = {
-  title: "Executive performance brief",
-  reasoning_stage: {
-    evidence_sufficiency: { state: "Sufficient", explanation: "Three current independent sources support a complete briefing." },
-    what_is_happening: [
-      { finding_id: "F1", conclusion: "Revenue and inventory are moving in opposite directions.", evidence_references: [ref(1), ref(2)] }
-    ],
-    why_it_is_happening: [
-      { cause_id: "C1", conclusion: "Demand and inventory movement are no longer aligned.", status: "Supported", evidence_references: [ref(1), ref(2)] }
-    ],
-    why_leadership_should_care: {
-      conclusion: "The relationship may constrain cash and operating flexibility.",
-      evidence_references: [ref(1), ref(2)]
-    },
-    what_should_happen_next: [
-      { action_id: "A1", action: "Review inventory commitments against current demand.", evidence_references: [ref(2)] },
-      { action_id: "A2", action: "Confirm the revenue trend with the latest transaction period.", evidence_references: [ref(1)] },
-      { action_id: "A3", action: "Resolve the conflicting customer signal before changing the plan.", evidence_references: [ref(3)] }
-    ],
-    priority_logic: {
-      ordered_action_ids: ["A1", "A2", "A3"],
-      explanation: "Inventory exposure comes first because it is the most immediate verified operating constraint."
-    }
-  },
-  executive_summary: "Inventory growth is outpacing current revenue movement, making inventory exposure the first leadership concern.",
-  key_findings: [
-    { reasoning_finding_id: "F1", finding: "Inventory and revenue are moving out of alignment.", business_impact: "Working capital flexibility may narrow.", confidence: "High", evidence_references: [ref(1), ref(2)] }
-  ],
-  root_cause_analysis: [
-    { reasoning_cause_id: "C1", finding: "Demand and inventory movement are misaligned.", analysis: "Two independent sources support the relationship, but no unsupported financial amount is inferred.", status: "Supported", evidence_references: [ref(1), ref(2)] }
-  ],
-  business_impact: {
-    financial: "The amount is not established, but more cash may remain committed to inventory.",
-    operational: "Inventory decisions may lag demand changes.",
-    customer: "Customer impact is not established from current evidence.",
-    strategic: "Leadership has less flexibility if the pattern persists.",
-    if_ignored: "The verified inventory exposure may continue while the revenue trend remains unresolved.",
-    evidence_references: [ref(1), ref(2)]
-  },
-  recommended_actions: [
-    { reasoning_action_id: "A1", action: "Review inventory commitments against current demand.", priority: "Critical", expected_business_impact: "Reduce avoidable inventory exposure.", urgency: "The inventory signal is current.", expected_outcome: "A demand-aligned inventory decision.", time_horizon: "Immediate", confidence: "High", why_prioritized: "This addresses the most immediate verified exposure.", would_change_if: "Current orders show demand has recovered.", evidence_references: [ref(2)] },
-    { reasoning_action_id: "A2", action: "Confirm the revenue trend with the latest transaction period.", priority: "High", expected_business_impact: "Improve confidence in the demand decision.", urgency: "The decision depends on current demand.", expected_outcome: "A current revenue baseline.", time_horizon: "30 Days", confidence: "Medium", why_prioritized: "This verifies whether the pattern is persisting.", would_change_if: "The next transaction period reverses the trend.", evidence_references: [ref(1)] },
-    { reasoning_action_id: "A3", action: "Resolve the conflicting customer signal before changing the plan.", priority: "Medium", expected_business_impact: "Avoid acting on incomplete customer context.", urgency: "The conflict limits certainty.", expected_outcome: "A clearer customer-demand interpretation.", time_horizon: "30 Days", confidence: "Medium", why_prioritized: "It improves the next decision without displacing the immediate inventory review.", would_change_if: "A direct customer source resolves the conflict.", evidence_references: [ref(3)] }
-  ],
-  supporting_evidence: {
-    kpis: [ref(1)],
-    business_memory: [ref(4)],
-    reports: [ref(5)],
-    documents: [ref(2)],
-    historical_trends: [ref(3)]
-  },
-  confidence_assessment: {
-    level: "High",
-    explanation: "Three independent original sources align on the operating pattern.",
-    supporting_source_count: 3,
+  analysis: {
+    evidence_sufficiency: "Sufficient",
     evidence_agreement: "Aligned",
-    conflicts: [],
+    findings: [
+      { id: "F1", signal_id: "S1", finding: "Revenue movement needs review.", impact: "Demand confidence may narrow.", confidence: "Low", citations: [1] },
+      { id: "F2", signal_id: "S2", finding: "Inventory movement is a separate concern.", impact: "Operating flexibility may narrow.", confidence: "Low", citations: [2] },
+      { id: "F3", signal_id: "S3", finding: "Customer activity adds a distinct signal.", impact: "The demand picture remains mixed.", confidence: "Low", citations: [3] }
+    ],
+    relationships: [
+      { finding_ids: ["F1", "F2"], status: "Supported", assessment: "Revenue and inventory movement are not aligned.", citations: [1, 2] }
+    ],
+    actions: [
+      { id: "A1", action: "Review inventory commitments.", priority: "Critical", why: "It addresses the clearest current exposure.", outcome: "A demand-aligned inventory decision.", horizon: "Immediate", citations: [2] },
+      { id: "A2", action: "Confirm the revenue trend.", priority: "High", why: "It tests whether demand movement persists.", outcome: "A current revenue baseline.", horizon: "30 Days", citations: [1] },
+      { id: "A3", action: "Resolve the customer signal.", priority: "Medium", why: "It improves the next demand decision.", outcome: "Clearer customer context.", horizon: "30 Days", citations: [3] }
+    ],
     uncertainty: []
   },
-  missing_information: [],
-  limited_evidence: null,
-  leadership_brief: {
-    priorities: ["Review inventory exposure.", "Confirm current revenue movement.", "Resolve the customer evidence conflict."],
-    first_leadership_meeting: "The first leadership meeting should focus on inventory commitments and current demand.",
-    biggest_decision: "The biggest decision that cannot wait is whether inventory commitments should change.",
-    biggest_opportunity: "The biggest opportunity this week is restoring alignment between demand and inventory.",
-    biggest_unknown: "The biggest unknown preventing a better decision is the unresolved customer-demand signal."
-  }
+  executive_summary: "Revenue movement, inventory exposure, and customer activity require a coordinated review, led by inventory commitments.",
+  overall_confidence: "High",
+  summary_signal_ids: ["S1", "S2", "S3"]
 };
 
 const catalog = [
-  { citationId: 1, title: "Revenue KPI", sourceType: "KPI", independentSourceKey: "kpi:1", evidenceRole: "original", freshnessScore: 100, directRelevanceScore: 90 },
-  { citationId: 2, title: "Inventory workbook", sourceType: "Document", independentSourceKey: "file:2", evidenceRole: "original", freshnessScore: 100, directRelevanceScore: 90 },
-  { citationId: 3, title: "Customer history", sourceType: "Historical trend", independentSourceKey: "customer:3", evidenceRole: "original", freshnessScore: 80, directRelevanceScore: 75 },
-  { citationId: 4, title: "Learned context", sourceType: "Business Memory", independentSourceKey: null, evidenceRole: "supporting", freshnessScore: 100, directRelevanceScore: 80 },
-  { citationId: 5, title: "Prior briefing", sourceType: "Report", independentSourceKey: null, evidenceRole: "derived", freshnessScore: 100, directRelevanceScore: 70 }
+  { citationId: 1, title: "Revenue KPI", sourceType: "KPI", support: "Revenue movement in the current period.", independentSourceKey: "kpi:1", evidenceRole: "original", freshnessScore: 100, directRelevanceScore: 90, signalId: "S1", domain: "financials", findingEligible: true, executiveRank: 1 },
+  { citationId: 2, title: "Inventory workbook", sourceType: "Document", support: "Inventory movement in the current period.", independentSourceKey: "file:2", evidenceRole: "original", freshnessScore: 100, directRelevanceScore: 90, signalId: "S2", domain: "operations", findingEligible: true, executiveRank: 2 },
+  { citationId: 3, title: "Customer history", sourceType: "Historical trend", support: "Customer activity changed in the current period.", independentSourceKey: "customer:3", evidenceRole: "original", freshnessScore: 80, directRelevanceScore: 75, signalId: "S3", domain: "customers", findingEligible: true, executiveRank: 3 },
+  { citationId: 4, title: "Learned context", sourceType: "Business Memory", support: "Supporting learned context.", independentSourceKey: null, evidenceRole: "supporting", freshnessScore: 100, directRelevanceScore: 80, signalId: "S1", domain: "supporting", findingEligible: false, executiveRank: null },
+  { citationId: 5, title: "Prior briefing", sourceType: "Report", support: "Prior derived analysis.", independentSourceKey: null, evidenceRole: "derived", freshnessScore: 100, directRelevanceScore: 70, signalId: null, domain: "reports", findingEligible: false, executiveRank: null }
 ];
 
 assert.equal(validateExecutiveIntelligenceContract(validOutput).ok, true, "a complete reason-first executive response must satisfy the contract");
 assert.equal(validateExecutiveEvidenceReferences(validOutput, catalog).ok, true, "bounded citations and independent sources must validate");
+assert.deepEqual(Object.keys(validOutput), ["analysis", "executive_summary", "overall_confidence", "summary_signal_ids"], "the provider transport must contain only the compact canonical sections");
+assert.ok(estimateTokenCount(JSON.stringify(validOutput)) <= EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS, "a valid three-signal canonical response must fit its complete output budget without truncation");
 
-const signalAwareCatalog = catalog.map((item, index) => index < 3
-  ? {
-      ...item,
-      signalId: `S${index + 1}`,
-      domain: ["financials", "operations", "customers"][index],
-      findingEligible: true,
-      executiveRank: index + 1
-    }
-  : { ...item, signalId: null, domain: "supporting", findingEligible: false, executiveRank: null });
+const truncatedOutput = structuredClone(validOutput);
+delete truncatedOutput.summary_signal_ids;
+assert.equal(validateExecutiveIntelligenceContract(truncatedOutput).ok, false, "truncated canonical JSON must never be accepted");
+const extraTransportField = { ...validOutput, leadership_brief: { priorities: [] } };
+assert.equal(validateExecutiveIntelligenceContract(extraTransportField).ok, false, "duplicated presentation fields must not re-enter the provider transport contract");
+
+const signalAwareCatalog = catalog;
 const multiSignalOutput = structuredClone(validOutput);
-multiSignalOutput.executive_summary = "Revenue movement, inventory exposure, and customer activity are the three distinct conditions leadership should review together.";
-multiSignalOutput.executive_summary_signal_ids = ["S1", "S2", "S3"];
-multiSignalOutput.reasoning_stage.what_is_happening = [
-  { finding_id: "F1", conclusion: "Revenue movement requires leadership attention.", evidence_references: [ref(1)] },
-  { finding_id: "F2", conclusion: "Inventory movement is a distinct operating concern.", evidence_references: [ref(2)] },
-  { finding_id: "F3", conclusion: "Customer activity adds a separate demand signal.", evidence_references: [ref(3)] }
-];
-multiSignalOutput.reasoning_stage.why_leadership_should_care.evidence_references = [ref(1), ref(2), ref(3)];
-multiSignalOutput.key_findings = [
-  { reasoning_finding_id: "F1", finding: "Revenue movement requires attention.", business_impact: "Demand confidence may narrow.", confidence: "Low", evidence_references: [ref(1)] },
-  { reasoning_finding_id: "F2", finding: "Inventory movement is a separate concern.", business_impact: "Operating flexibility may narrow.", confidence: "Low", evidence_references: [ref(2)] },
-  { reasoning_finding_id: "F3", finding: "Customer activity adds a third signal.", business_impact: "The demand picture remains mixed.", confidence: "Low", evidence_references: [ref(3)] }
-];
 const threeSignalPolicy = {
   minimumDistinctFindings: 3,
   requiredSignalIds: ["S1", "S2", "S3"],
-  requireCrossSignalAssessment: true
+  requireCrossSignalAssessment: true,
+  relationships: [{ leftSignalId: "S1", rightSignalId: "S2" }]
 };
 assert.equal(
   validateExecutiveEvidenceReferences(multiSignalOutput, signalAwareCatalog, threeSignalPolicy).ok,
@@ -242,7 +182,7 @@ assert.equal(
 );
 
 const incompleteExecutiveSummary = structuredClone(multiSignalOutput);
-incompleteExecutiveSummary.executive_summary_signal_ids = ["S1", "S2"];
+incompleteExecutiveSummary.summary_signal_ids = ["S1", "S2"];
 assert.equal(
   validateExecutiveEvidenceReferences(incompleteExecutiveSummary, signalAwareCatalog, threeSignalPolicy).ok,
   false,
@@ -250,6 +190,9 @@ assert.equal(
 );
 
 const dominantSignalOnly = structuredClone(validOutput);
+dominantSignalOnly.analysis.findings = dominantSignalOnly.analysis.findings.slice(0, 1);
+dominantSignalOnly.analysis.relationships = [];
+dominantSignalOnly.summary_signal_ids = ["S1"];
 assert.equal(
   validateExecutiveEvidenceReferences(dominantSignalOnly, signalAwareCatalog, threeSignalPolicy).ok,
   false,
@@ -257,10 +200,8 @@ assert.equal(
 );
 
 const repeatedSignal = structuredClone(multiSignalOutput);
-repeatedSignal.reasoning_stage.what_is_happening[1].evidence_references = [ref(1)];
-repeatedSignal.reasoning_stage.what_is_happening[2].evidence_references = [ref(1)];
-repeatedSignal.key_findings[1].evidence_references = [ref(1)];
-repeatedSignal.key_findings[2].evidence_references = [ref(1)];
+repeatedSignal.analysis.findings[1].signal_id = "S1";
+repeatedSignal.analysis.findings[1].citations = [1];
 assert.equal(
   validateExecutiveEvidenceReferences(repeatedSignal, signalAwareCatalog, threeSignalPolicy).ok,
   false,
@@ -268,7 +209,7 @@ assert.equal(
 );
 
 const outOfPriorityOrder = structuredClone(multiSignalOutput);
-[outOfPriorityOrder.key_findings[0], outOfPriorityOrder.key_findings[1]] = [outOfPriorityOrder.key_findings[1], outOfPriorityOrder.key_findings[0]];
+[outOfPriorityOrder.analysis.findings[0], outOfPriorityOrder.analysis.findings[1]] = [outOfPriorityOrder.analysis.findings[1], outOfPriorityOrder.analysis.findings[0]];
 assert.equal(
   validateExecutiveEvidenceReferences(outOfPriorityOrder, signalAwareCatalog, threeSignalPolicy).ok,
   false,
@@ -280,69 +221,63 @@ const lowerPrioritySubstitutionCatalog = [
   { ...signalAwareCatalog[2], citationId: 6, title: "Lower-priority signal", signalId: "S4", executiveRank: 4 }
 ];
 const lowerPrioritySubstitution = structuredClone(multiSignalOutput);
-lowerPrioritySubstitution.reasoning_stage.what_is_happening[2].evidence_references = [ref(6)];
-lowerPrioritySubstitution.reasoning_stage.why_leadership_should_care.evidence_references = [ref(1), ref(2), ref(6)];
-lowerPrioritySubstitution.reasoning_stage.why_it_is_happening[0].evidence_references = [ref(1), ref(2)];
-lowerPrioritySubstitution.key_findings[2].evidence_references = [ref(6)];
+lowerPrioritySubstitution.analysis.findings[2].signal_id = "S4";
+lowerPrioritySubstitution.analysis.findings[2].citations = [6];
 assert.equal(
   validateExecutiveEvidenceReferences(lowerPrioritySubstitution, lowerPrioritySubstitutionCatalog, threeSignalPolicy).ok,
   false,
   "lower-priority signals must not displace a required higher-priority finding"
 );
 
-const appendixInflation = structuredClone(validOutput);
-appendixInflation.supporting_evidence.documents.push(ref(6));
-appendixInflation.confidence_assessment.supporting_source_count = 4;
-const appendixCatalog = [
-  ...catalog,
-  { citationId: 6, title: "Unused source", sourceType: "Document", independentSourceKey: "file:6", evidenceRole: "original", freshnessScore: 100, directRelevanceScore: 90 }
-];
+const unplannedRelationship = structuredClone(multiSignalOutput);
+unplannedRelationship.analysis.relationships[0] = {
+  finding_ids: ["F1", "F3"],
+  status: "Possible",
+  assessment: "Revenue and customer activity may move together.",
+  citations: [1, 3]
+};
 assert.equal(
-  validateExecutiveEvidenceReferences(appendixInflation, appendixCatalog).ok,
+  validateExecutiveEvidenceReferences(unplannedRelationship, signalAwareCatalog, threeSignalPolicy).ok,
   false,
-  "an unused source listed only in the evidence appendix must not inflate briefing confidence"
+  "the model must not invent a relationship outside the deterministic signal plan"
+);
+
+const appendixInflation = structuredClone(validOutput);
+appendixInflation.analysis.findings = appendixInflation.analysis.findings.slice(0, 1);
+appendixInflation.analysis.relationships = [];
+appendixInflation.analysis.actions = appendixInflation.analysis.actions.slice(0, 1);
+appendixInflation.summary_signal_ids = ["S1"];
+assert.equal(
+  validateExecutiveEvidenceReferences(appendixInflation, catalog).ok,
+  false,
+  "unused catalog sources must not inflate briefing confidence"
 );
 
 const summaryBeforeReasoning = {
-  title: validOutput.title,
   executive_summary: validOutput.executive_summary,
-  reasoning_stage: validOutput.reasoning_stage,
-  ...Object.fromEntries(Object.entries(validOutput).filter(([key]) => !["title", "executive_summary", "reasoning_stage"].includes(key)))
+  analysis: validOutput.analysis,
+  overall_confidence: validOutput.overall_confidence,
+  summary_signal_ids: validOutput.summary_signal_ids
 };
 assert.equal(validateExecutiveIntelligenceContract(summaryBeforeReasoning).ok, false, "the response must not be written before the reasoning stage");
 
 const unreasonedFinding = structuredClone(validOutput);
-unreasonedFinding.key_findings[0].reasoning_finding_id = "F2";
+unreasonedFinding.analysis.relationships[0].finding_ids = ["F1", "F9"];
 assert.equal(validateExecutiveIntelligenceContract(unreasonedFinding).ok, false, "visible findings must be produced by the reasoning stage");
 
 const missingConfidenceInput = structuredClone(validOutput);
-missingConfidenceInput.confidence_assessment.level = "Low";
-missingConfidenceInput.missing_information = [];
+missingConfidenceInput.overall_confidence = "Low";
+missingConfidenceInput.analysis.uncertainty = [];
 assert.equal(validateExecutiveIntelligenceContract(missingConfidenceInput).ok, false, "low confidence must identify missing information");
 
 const sameSourceCatalog = catalog.map((item) => item.citationId <= 3 ? { ...item, independentSourceKey: "file:one" } : item);
 assert.equal(validateExecutiveEvidenceReferences(validOutput, sameSourceCatalog).ok, false, "multiple records from one source must not establish a root cause");
 
 const conflicting = structuredClone(validOutput);
-conflicting.reasoning_stage.evidence_sufficiency = { state: "Conflicting", explanation: "Current sources disagree on the operating pattern." };
-conflicting.confidence_assessment.level = "Medium";
-conflicting.confidence_assessment.evidence_agreement = "Conflicting";
-conflicting.confidence_assessment.conflicts = ["Revenue and customer evidence point in different directions."];
-conflicting.missing_information = ["A current direct customer source that resolves the disagreement."];
-conflicting.limited_evidence = {
-  evidence_readiness_summary: "Three sources are available, but two disagree on the direction of demand.",
-  provisional_interpretations: [{ statement: "Inventory exposure may be outpacing demand.", evidence_references: [ref(1), ref(2)] }],
-  alternative_explanations: [{ statement: "The customer signal may reflect a timing difference.", evidence_references: [ref(3)] }],
-  conflict_resolution: {
-    conflict_summary: "Revenue and customer evidence disagree on current demand.",
-    fresher_source: "Revenue KPI is the fresher source.",
-    more_direct_source: "Customer history is more direct for customer behavior.",
-    derived_source_limitations: "The saved report is derived and does not resolve the conflict.",
-    resolution_action: "Confirm current customer orders against the latest revenue period."
-  },
-  leadership_risk: "Choosing one source without resolving the disagreement could misdirect inventory decisions.",
-  decisions_to_defer: ["A broad inventory commitment change"]
-};
+conflicting.analysis.evidence_sufficiency = "Conflicting";
+conflicting.analysis.evidence_agreement = "Conflicting";
+conflicting.analysis.uncertainty = ["Revenue and customer evidence point in different directions."];
+conflicting.overall_confidence = "Medium";
 const conflictingAnswer = executiveAnswerFromOutput({
   output: conflicting,
   catalog,
@@ -350,14 +285,16 @@ const conflictingAnswer = executiveAnswerFromOutput({
 });
 assert.equal(conflictingAnswer.recommendationConfidence, "Medium", "conflicting evidence must cap recommendation confidence below High");
 assert.equal(conflictingAnswer.executiveBriefing.variant, "limited", "conflicting evidence must use the limited-evidence briefing");
-assert.deepEqual(conflictingAnswer.executiveBriefing.confidenceAssessment.conflicts, conflicting.confidence_assessment.conflicts, "evidence conflicts must remain visible");
-assert.equal(conflictingAnswer.executiveBriefing.keyFindings[0].confidence, "Medium", "finding confidence must reflect only the independent sources cited by that finding");
+assert.deepEqual(conflictingAnswer.executiveBriefing.confidenceAssessment.conflicts, conflicting.analysis.uncertainty, "evidence conflicts must remain visible");
+assert.equal(conflictingAnswer.executiveBriefing.keyFindings[0].confidence, "Low", "finding confidence must reflect only the independent sources cited by that finding");
 assert.equal(conflictingAnswer.executiveBriefing.recommendedActions[0].confidence, "Low", "action confidence must reflect only the independent sources cited by that action");
 assert.equal("reasoningStage" in conflictingAnswer.executiveBriefing, false, "internal reasoning must not be returned to the UI");
+assert.equal("analysis" in conflictingAnswer.executiveBriefing, false, "the canonical reasoning transport must not be returned to the UI");
+assert.doesNotMatch(JSON.stringify(conflictingAnswer), /summary_signal_ids|signal_id|relationship_candidates/, "manifest and transport internals must not leak into the client answer");
+assert.equal(conflictingAnswer.executiveBriefing.supportingEvidence.find((group) => group.category === "KPIs").items[0].support, catalog[0].support, "citation presentation must be derived from the eligible catalog rather than model-written support text");
 
 const derivedRecommendation = structuredClone(conflicting);
-derivedRecommendation.reasoning_stage.what_should_happen_next[0].evidence_references = [ref(5)];
-derivedRecommendation.recommended_actions[0].evidence_references = [ref(5)];
+derivedRecommendation.analysis.actions[0].citations = [5];
 assert.equal(
   validateExecutiveEvidenceReferences(derivedRecommendation, catalog).ok,
   false,
@@ -652,7 +589,7 @@ const healthRequest = estimateVaeroexCompletionRequest({
     evidence_context: healthReasoning.evidenceContextJson,
     executive_reasoning_manifest: healthReasoning.reasoningManifest
   },
-  maxOutputTokens: 1_800
+  maxOutputTokens: EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS
 });
 assert.match(healthAnswer.directAnswer, /22 out of 100/i, "Business Health fallback must answer with the actual score");
 assert.match(healthAnswer.executiveBriefing.limitedEvidence.evidenceReadinessSummary, /data-quality base of 35/i, "Business Health fallback must explain the actual data-quality component");
@@ -666,8 +603,8 @@ const staleCatalog = catalog.map((item) => item.evidenceRole === "original" ? { 
 assert.equal(validateExecutiveEvidenceReferences(validOutput, staleCatalog).ok, false, "stale original evidence cannot support High briefing confidence");
 
 const contradictoryConfidence = structuredClone(conflicting);
-contradictoryConfidence.reasoning_stage.evidence_sufficiency.state = "Insufficient";
-contradictoryConfidence.confidence_assessment.level = "High";
+contradictoryConfidence.analysis.evidence_sufficiency = "Insufficient";
+contradictoryConfidence.overall_confidence = "High";
 assert.equal(validateExecutiveIntelligenceContract(contradictoryConfidence).ok, false, "insufficient evidence can never be paired with High briefing confidence");
 
 const weakestEvidenceAnswer = buildLimitedEvidenceExecutiveAnswer({
@@ -812,7 +749,7 @@ const scaleBenchmarks = [
     userPrompt: scaleQuestion,
     workspaceSnapshot: reasoningContext.modelWorkspaceSnapshot,
     extraInputs,
-    maxOutputTokens: 1_800
+    maxOutputTokens: EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS
   });
   const followUpRequest = estimateVaeroexCompletionRequest({
     workflow: executiveWorkflow,
@@ -828,14 +765,14 @@ const scaleBenchmarks = [
         immediately_previous_answer_summary: "A".repeat(1_800)
       }
     },
-    maxOutputTokens: 1_800
+    maxOutputTokens: EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS
   });
   const unboundedRequest = estimateVaeroexCompletionRequest({
     workflow: executiveWorkflow,
     userPrompt: scaleQuestion,
     workspaceSnapshot: bounded.workspaceSnapshot,
     extraInputs,
-    maxOutputTokens: 1_800
+    maxOutputTokens: EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS
   });
 
   assert.ok(reasoningContext.promptCompaction.compactContextTokens <= EXECUTIVE_COMPACT_CONTEXT_TARGET_TOKENS, `${label} compact evidence context must stay within its deterministic context budget`);
