@@ -6,6 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Command, Loader2, Search, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useActivitySignal } from "@/components/app/ActivityProvider";
+import { globalSearchApiErrorMessage } from "@/lib/search/api-errors";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import type { GlobalSearchAnswer, GlobalSearchGroup, GlobalSearchResponse } from "@/lib/search/types";
 
@@ -219,15 +220,16 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
         body: JSON.stringify({ query: trimmedQuery })
       });
 
-      const payload = (await response.json().catch(() => ({}))) as GlobalSearchResponse & { error?: string };
+      const payload: unknown = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || "Vaeroex could not answer that question right now.");
+        throw new Error(globalSearchApiErrorMessage(response.status, payload));
       }
 
       if (requestVersion !== requestVersionRef.current) return;
-      setAnswer(payload.answer || null);
-      setGroups((current) => payload.groups?.length ? payload.groups : current);
+      const result = payload as GlobalSearchResponse;
+      setAnswer(result.answer || null);
+      setGroups((current) => result.groups?.length ? result.groups : current);
     } catch (answerError) {
       if (controller.signal.aborted || requestVersion !== requestVersionRef.current) return;
       setError(answerError instanceof Error ? answerError.message : "Vaeroex could not answer that question right now.");

@@ -14,6 +14,7 @@ const embeddings = read("lib/ai/evidence-index.ts");
 const smoke = read("lib/ai/provider-smoke-test.ts");
 const guardrails = read("lib/ai/provider-guardrails.ts");
 const usage = read("lib/ai/usage.ts");
+const resilience = read("lib/ai/provider-resilience.ts");
 const env = read(".env.example");
 
 assert.match(manager, /nvidia\/llama-3\.3-nemotron-super-49b-v1\.5/, "NVIDIA must use the approved Nemotron model");
@@ -21,7 +22,8 @@ assert.match(nvidia, /https:\/\/integrate\.api\.nvidia\.com\/v1\/chat\/completio
 assert.match(nvidia, /process\.env\.NVIDIA_API_KEY/, "NVIDIA credentials must remain server-side");
 assert.match(openai, /process\.env\.OPENAI_API_KEY/, "OpenAI fallback credentials must remain server-side");
 assert.match(manager, /primaryProvider !== "nvidia"/, "only NVIDIA primary calls should automatically enter the OpenAI fallback path");
-assert.match(manager, /primaryMaxAttempts = request\.primaryProvider === "nvidia" \? 2/, "NVIDIA must receive exactly one retry");
+assert.match(manager, /primaryMaxAttempts = Math\.max\(1, Math\.min\(settings\.maxRetries \+ 1, 2\)\)/, "provider retries must honor workflow-specific settings");
+assert.match(resilience, /maxRetries:\s*1/, "the default provider policy must retain one retry outside bounded workflows");
 assert.match(manager, /waitBeforeRetry/, "provider retries must use bounded backoff");
 assert.match(manager, /repairContent/, "invalid structured responses must receive one repair attempt");
 assert.match(manager, /validate: \(value: unknown\)/, "provider outputs must be validated by the caller contract");

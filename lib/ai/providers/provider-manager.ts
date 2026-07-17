@@ -13,6 +13,7 @@ export type AIProviderAttempt = {
   provider: AIProviderName;
   model: string;
   attempt: number;
+  fallback: boolean;
   success: boolean;
   latencyMs: number;
   inputTokens: number;
@@ -21,6 +22,17 @@ export type AIProviderAttempt = {
   requestId: string | null;
   failureType: "transport" | "structured_output" | "unsupported_input" | null;
 };
+
+export class AIProviderExecutionError extends Error {
+  constructor(
+    cause: unknown,
+    readonly primaryProvider: AIProviderName,
+    readonly attempts: AIProviderAttempt[]
+  ) {
+    super(cause instanceof Error ? cause.message : `${primaryProvider} provider failed.`, { cause });
+    this.name = "AIProviderExecutionError";
+  }
+}
 
 type ProviderRegistry = Record<AIProviderName, AIProvider>;
 
@@ -148,6 +160,7 @@ async function runProvider<T>({
           provider: providerName,
           model,
           attempt: attemptNumber,
+          fallback,
           success: false,
           latencyMs: result.latencyMs,
           inputTokens: result.usage.inputTokens,
@@ -170,6 +183,7 @@ async function runProvider<T>({
           provider: providerName,
           model,
           attempt: attemptNumber,
+          fallback,
           success: false,
           latencyMs: result.latencyMs,
           inputTokens: result.usage.inputTokens,
@@ -189,6 +203,7 @@ async function runProvider<T>({
         provider: providerName,
         model,
         attempt: attemptNumber,
+        fallback,
         success: true,
         latencyMs: result.latencyMs,
         inputTokens: result.usage.inputTokens,
@@ -208,6 +223,7 @@ async function runProvider<T>({
         provider: providerName,
         model,
         attempt: attemptNumber,
+        fallback,
         success: false,
         latencyMs: Date.now() - startedAt,
         inputTokens: 0,
@@ -230,7 +246,7 @@ export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
   const providers = request.providers || providerRegistry();
   const attempts: AIProviderAttempt[] = [];
   const settings = settingsForProvider(request.primaryProvider, request.settings);
-  const primaryMaxAttempts = request.primaryProvider === "nvidia" ? 2 : Math.max(1, Math.min(settings.maxRetries + 1, 2));
+  const primaryMaxAttempts = Math.max(1, Math.min(settings.maxRetries + 1, 2));
   let finalResult: Awaited<ReturnType<typeof runProvider<T>>>;
 
   try {
@@ -245,16 +261,27 @@ export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
     });
   } catch (primaryError) {
     if (primaryError instanceof AIProviderPolicyError) throw primaryError;
-    if (request.primaryProvider !== "nvidia") throw primaryError;
-    finalResult = await runProvider({
-      provider: providers.openai,
-      providerName: "openai",
-      model: request.fallbackModel,
-      request,
-      maxAttempts: 2,
-      fallback: true,
-      attempts
-    });
+    if (request.primaryProvider !== "nvidia") {
+      throw new AIProviderExecutionError(primaryError, request.primaryProvider, attempts);
+    }
+
+    const fallbackSettings = settingsForProvider("openai", request.settings);
+    const fallbackMaxAttempts = Math.max(1, Math.min(fallbackSettings.maxRetries + 1, 2));
+
+    try {
+      finalResult = await runProvider({
+        provider: providers.openai,
+        providerName: "openai",
+        model: request.fallbackModel,
+        request,
+        maxAttempts: fallbackMaxAttempts,
+        fallback: true,
+        attempts
+      });
+    } catch (fallbackError) {
+      if (fallbackError instanceof AIProviderPolicyError) throw fallbackError;
+      throw new AIProviderExecutionError(fallbackError, request.primaryProvider, attempts);
+    }
   }
 
   const aggregate = attempts.reduce(
