@@ -92,6 +92,8 @@ export type ExecutiveSignalSynthesisPlan = {
 };
 
 export const EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS = 10_000;
+export const EXECUTIVE_INITIAL_REQUEST_TARGET_TOKENS = 6_500;
+export const EXECUTIVE_FOLLOW_UP_REQUEST_TARGET_TOKENS = 8_000;
 export const EXECUTIVE_COMPACT_CONTEXT_TARGET_TOKENS = 900;
 export const EXECUTIVE_SIGNAL_CANDIDATE_LIMIT = 6;
 export const EXECUTIVE_ORIGINAL_RECORDS_PER_SIGNAL = 2;
@@ -609,16 +611,7 @@ function compactExecutivePromptContext({
     return [signal.signalId, citationIds] as const;
   }));
   const baseModelWorkspaceSnapshot = {
-    scope: "compact_executive_reasoning",
-    query: compactText(
-      isRecord(boundedContext.workspaceSnapshot) ? boundedContext.workspaceSnapshot.query : "",
-      600
-    ),
-    requested_domains: isRecord(boundedContext.workspaceSnapshot)
-      ? boundedContext.workspaceSnapshot.requested_domains ?? boundedContext.loadedDomains
-      : boundedContext.loadedDomains,
-    loaded_domains: boundedContext.loadedDomains,
-    business_health_score_context: compactBusinessHealthContext(boundedContext.workspaceSnapshot),
+    business_health_score_context: compactBusinessHealthContext(boundedContext.workspaceSnapshot)
   } satisfies Json;
 
   let retainedSignalCount = signalSynthesis.candidates.length;
@@ -683,25 +676,9 @@ function compactExecutivePromptContext({
       limitations: Array.isArray(baseEvidence.limitations)
         ? baseEvidence.limitations.slice(0, 4).map((item) => compactText(item, 180))
         : [],
-      policy: [
-        "Only these compact citations may support the answer.",
-        "Citation provenance is authoritative; omitted workspace records are not available to the model.",
-        "Supporting Business Memory cannot establish a finding or increase source independence."
-      ],
       citations
     } satisfies Json;
-    const modelWorkspaceSnapshot = {
-      ...baseModelWorkspaceSnapshot,
-      scope_policy: {
-        full_workspace_snapshot_excluded: true,
-        retrieved_records_ranked_server_side: true,
-        model_receives_compact_signal_evidence_only: true,
-        maximum_signal_candidates: EXECUTIVE_SIGNAL_CANDIDATE_LIMIT,
-        retained_signal_candidates: retainedSignals.length,
-        maximum_original_records_per_signal: EXECUTIVE_ORIGINAL_RECORDS_PER_SIGNAL,
-        maximum_supporting_memory_entries: EXECUTIVE_SUPPORTING_MEMORY_LIMIT
-      }
-    } satisfies Json;
+    const modelWorkspaceSnapshot = baseModelWorkspaceSnapshot;
     const compactContextTokens = estimateTokenCount(JSON.stringify({
       workspace_context: modelWorkspaceSnapshot,
       evidence_context: evidenceContextJson
@@ -857,30 +834,20 @@ export function buildExecutiveReasoningContext({
     evidenceContextJson: compactPrompt.evidenceContextJson,
     modelWorkspaceSnapshot: compactPrompt.modelWorkspaceSnapshot,
     reasoningManifest: {
-      mode: "executive_intelligence",
-      question: query,
+      contract_version: 2,
       execution_tier: plan.tier,
       loaded_domains: boundedContext.loadedDomains,
       reasoning_must_precede_writing: true,
       reasoning_stage_order: [
-        "Review every bounded signal candidate and determine which conditions are meaningfully supported.",
-        "Merge related evidence into one condition so repeated records do not become repeated findings.",
-        "Rank distinct findings by verified executive impact, urgency, confidence, and freshness.",
-        "Evaluate cross-signal relationships without assuming correlation or causation.",
-        "Determine what is happening from the ranked distinct findings.",
-        "Determine why it is happening; distinguish supported causes from possible relationships.",
-        "Determine why leadership should care across financial, operational, customer, and strategic impact.",
-        "Determine what should happen next.",
-        "Rank those actions and explain why they come before lower-impact work.",
-        "Only then write the executive response."
+        "evidence_sufficiency",
+        "what_is_happening",
+        "why_it_is_happening",
+        "why_leadership_should_care",
+        "what_should_happen_next",
+        "priority_logic",
+        "executive_summary"
       ],
-      evidence_ranking: {
-        factors: ["business impact", "confidence", "freshness", "direct relevance", "historical importance"],
-        representative_limit: ranked.length,
-        maximum_per_domain_before_fill: 2
-      },
       signal_synthesis: {
-        candidate_limit: 6,
         candidates: compactSignalSynthesis.candidates.map((candidate) => {
           const citationIds = candidate.citationIds.filter((citationId) => compactPrompt.selectedCitationIds.has(citationId));
           const originalCitationIds = candidate.originalCitationIds.filter((citationId) => compactPrompt.selectedCitationIds.has(citationId));
@@ -909,44 +876,17 @@ export function buildExecutiveReasoningContext({
           right_signal_id: relationship.rightSignalId,
           domains: relationship.domains,
           shared_terms: relationship.sharedTerms,
-          evaluation_priority: relationship.evaluationPriority,
-          policy: "Evaluate the relationship; do not assume correlation or causation."
+          evaluation_priority: relationship.evaluationPriority
         })),
         minimum_distinct_findings: compactSignalSynthesis.minimumDistinctFindings,
         required_signal_ids: compactSignalSynthesis.requiredSignalIds,
-        require_cross_signal_assessment: compactSignalSynthesis.requireCrossSignalAssessment,
-        policy: [
-          "Evaluate every candidate before writing.",
-          "Merge related citations inside one signal rather than repeating the same condition.",
-          "Use distinct signal candidates for distinct findings.",
-          "Rank the final findings by verified executive importance.",
-          "A relationship candidate is a question to evaluate, not evidence of causation."
-        ]
-      },
-      correlation_policy: {
-        supported_root_cause_requires_independent_sources: 2,
-        correlation_is_not_causation: true,
-        business_memory_is_supporting_context_not_an_independent_source: true,
-        derived_reports_cannot_establish_current_business_facts: true,
-        unsupported_relationships_must_be_labeled_possible_or_not_established: true
+        require_cross_signal_assessment: compactSignalSynthesis.requireCrossSignalAssessment
       },
       independent_original_source_count: independentSourceCount,
       current_independent_original_source_count: currentIndependentSourceCount,
       original_source_type_count: originalSourceTypeCount,
       maximum_evidence_sufficiency: maximumEvidenceSufficiency,
-      maximum_recommendation_confidence: confidenceCeiling(independentSourceCount, currentIndependentSourceCount),
-      response_policy: {
-        use_only_citation_ids_from_evidence_context: true,
-        never_invent_financial_impact: true,
-        use_not_established_when_impact_is_not_supported: true,
-        explain_conflicting_evidence: true,
-        classify_evidence_sufficiency_before_drawing_conclusions: true,
-        partial_evidence_requires_provisional_language: true,
-        insufficient_evidence_requires_safe_reversible_actions: true,
-        stale_evidence_cannot_support_high_confidence: true,
-        derived_context_requires_original_lineage: true,
-        do_not_expose_internal_reasoning_stage: true
-      }
+      maximum_recommendation_confidence: confidenceCeiling(independentSourceCount, currentIndependentSourceCount)
     },
     catalog,
     independentSourceCount,
