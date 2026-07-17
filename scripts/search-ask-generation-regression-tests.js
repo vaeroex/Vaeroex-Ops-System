@@ -36,6 +36,7 @@ Module._load = function loadPatched(request, parent, isMain) {
 };
 
 const globalSearch = read("components/app/GlobalSearch.tsx");
+const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
 const searchRoute = read("app/api/search/route.ts");
 const providerManager = read("lib/ai/providers/provider-manager.ts");
 const vaeroexClient = read("lib/ai/vaeroex-client.ts");
@@ -48,21 +49,17 @@ assert.match(
   /fetch\(`\/api\/search\?q=\$\{encodeURIComponent\(trimmedQuery\)\}`/,
   "typing must continue to use deterministic GET search"
 );
-assert.match(globalSearch, /onSubmit=\{submitQuestion\}/, "the Search or Ask form must own explicit question submission");
-assert.match(globalSearch, /onKeyDown=\{submitQuestionOnEnter\}/, "Enter must use an explicit question-submit handler");
-assert.match(globalSearch, /event\.currentTarget\.form\?\.requestSubmit\(\)/, "Enter must request exactly one native form submission");
-assert.match(globalSearch, /event\.preventDefault\(\);[\s\S]{0,120}requestSubmit\(\)/, "explicit Enter handling must prevent the browser's second implicit submit");
-assert.match(globalSearch, /type="submit"[\s\S]{0,700}aria-label="Ask Vaeroex"/, "the panel must expose a clear Ask submit action");
-assert.match(globalSearch, /if \(trimmedQuery\.length < 2 \|\| askingRef\.current\) return;/, "a question must not start twice while generation is active");
-assert.match(globalSearch, /searchAbortRef\.current\?\.abort\(\)/, "explicit Ask must cancel pending GET search work");
-assert.match(globalSearch, /generationAbortRef/, "generation cancellation must be scoped separately from live search");
-assert.match(globalSearch, /data-vaeroex-skip-global-activity/, "the local Search or Ask activity state must not create a duplicate global form activity");
+assert.match(globalSearch, /onSubmit=\{openSelectedResult\}/, "Search Enter must open the selected deterministic result");
+assert.doesNotMatch(globalSearch, /method:\s*"POST"|submitQuestion|generationAbortRef|aria-label="Ask Vaeroex"/, "Search must not retain Ask generation behavior");
 
-const submitStart = globalSearch.indexOf("async function submitQuestion");
-const submitEnd = globalSearch.indexOf("function submitQuestionOnEnter");
-const submitSource = globalSearch.slice(submitStart, submitEnd);
-assert.match(submitSource, /method:\s*"POST"/, "explicit Ask must call the generative POST endpoint");
-assert.equal((submitSource.match(/fetch\("\/api\/search"/g) || []).length, 1, "one explicit Ask must issue only one POST request");
+const submitStart = askWorkspace.indexOf("async function requestAnalysis");
+const submitEnd = askWorkspace.indexOf("function submitInitial", submitStart);
+const submitSource = askWorkspace.slice(submitStart, submitEnd);
+assert.match(submitSource, /method:\s*"POST"/, "dedicated Ask must call the generative POST endpoint");
+assert.equal((submitSource.match(/fetch\("\/api\/search"/g) || []).length, 1, "Ask and follow-up must share one POST call site");
+assert.match(askWorkspace, /requestInFlightRef\.current/, "Ask must reject duplicate generation while a request is active");
+assert.match(askWorkspace, /requestControllerRef/, "Ask cancellation must be scoped separately from Search");
+assert.match(askWorkspace, /data-vaeroex-skip-global-activity/, "local Ask activity must not create duplicate global form activity");
 
 assert.match(searchRoute, /export async function GET/, "deterministic workspace search must remain available");
 assert.match(searchRoute, /export async function POST/, "the bounded generation endpoint must remain available");
@@ -88,7 +85,7 @@ assert.match(searchRoute, /SEARCH_ASK_PROVIDER_TIMEOUT_MS = 8_000/, "interactive
 assert.match(searchRoute, /SEARCH_ASK_PROVIDER_MAX_RETRIES = 0/, "interactive Search or Ask must not spend its deadline on a second NVIDIA attempt");
 assert.match(searchRoute, /provider_attempts:\s*providerAttempts/, "failed Search or Ask usage must preserve completed provider attempts");
 assert.match(apiErrors, /status === 408 \|\| status === 504/, "structured timeout responses must map to a safe user message");
-assert.doesNotMatch(globalSearch, /new Error\(payload\.error/, "structured API errors must never be coerced into [object Object]");
+assert.doesNotMatch(askWorkspace, /new Error\(payload\.error/, "structured API errors must never be coerced into [object Object]");
 assert.match(providerResilience, /controller\.abort\(timeoutError\(provider, settings\.timeoutMs\)\)/, "provider timeouts must abort the active request");
 assert.match(providerResilience, /finally \{[\s\S]*clearTimeout\(timeout\)/, "provider timeout cleanup must always run");
 

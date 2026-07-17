@@ -859,16 +859,22 @@ function runCrmRetirementTests() {
 
 function runGlobalSearchAskMergeTests() {
   const appShell = read("components/app/AppShell.tsx");
-  assert.doesNotMatch(appShell, /href:\s*"\/app\/ask"|href="\/app\/ask"|>Ask Vaeroex</, "Ask Vaeroex must not remain a primary nav or top-bar destination");
-  assert.match(appShell, /GlobalSearch/, "app shell should expose the merged global Search or Ask entry point");
+  assert.match(appShell, /href:\s*"\/app\/ask",\s*label:\s*"Ask Vaeroex"/, "Ask Vaeroex must have a dedicated authenticated destination");
+  assert.match(appShell, /GlobalSearch/, "app shell must preserve the separate global Search entry point");
 
   const globalSearch = read("components/app/GlobalSearch.tsx");
-  assert.match(globalSearch, /Ask a business question or search your workspace/, "global panel placeholder should support questions and search");
+  assert.match(globalSearch, /Search workspace records/, "global panel must identify itself as record Search");
   assert.match(globalSearch, /vaeroex:open-global-search/, "page-level triggers should open the global panel in place");
-  assert.match(globalSearch, /SecurityResponseNotice/, "blocked global prompts must render the dedicated Security Response UI");
-  assert.match(globalSearch, /Direct Answer/, "business questions in global search should render a compact direct answer");
-  assert.match(globalSearch, /submitQuestion/, "global Search or Ask should require an explicit Enter submission before deeper reasoning");
-  assert.match(globalSearch, /method:\s*"POST"/, "explicit global questions should use the bounded answer endpoint instead of live-search generation");
+  assert.match(globalSearch, /openSelectedResult/, "Search Enter must open the selected record");
+  assert.doesNotMatch(globalSearch, /method:\s*"POST"|submitQuestion|ExecutiveIntelligenceAnswer/, "global Search must not generate or render Executive Analysis");
+  assert.match(globalSearch, /SecurityResponseNotice/, "blocked deterministic searches must retain the minimal Security Response");
+
+  const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
+  const askResponse = read("components/app/AskVaeroexResponse.tsx");
+  assert.match(askWorkspace, /fetch\("\/api\/search"[\s\S]*method:\s*"POST"/, "dedicated Ask must use the bounded answer endpoint");
+  assert.match(askWorkspace, /requestInFlightRef\.current/, "dedicated Ask must prevent duplicate POSTs");
+  assert.match(askResponse, /SecurityResponseNotice/, "blocked Ask prompts must render only the dedicated Security Response UI");
+  assert.match(askResponse, /ExecutiveIntelligenceAnswer/, "dedicated Ask must render validated Executive Intelligence answers");
 
   const globalSearchTrigger = read("components/app/GlobalSearchTrigger.tsx");
   assert.match(globalSearchTrigger, /CustomEvent\("vaeroex:open-global-search"/, "Search or Ask triggers must use the shared global panel event");
@@ -880,19 +886,19 @@ function runGlobalSearchAskMergeTests() {
   assert.match(searchRoute, /loadKpiOverviewData/, "global Search or Ask KPI overview must load KPI rows with workspace settings through the shared helper");
   assert.match(searchRoute, /shouldUseKpiOverviewAnswer/, "global Search or Ask must gate KPI overview routing separately from generic weak/weakest questions");
   assert.doesNotMatch(searchRoute, /kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/, "weakest must not route to KPI overview unless the query clearly references KPIs or metrics");
-  assert.match(searchRoute, /buildGeneralBusinessAnswer/, "global Search or Ask should provide compact routing answers for broad business questions");
+  assert.doesNotMatch(searchRoute, /shouldBuildAnswer|buildGeneralBusinessAnswer/, "GET Search must not run the retired merged-panel answer path");
   assert.doesNotMatch(searchRoute, /buildWorkspaceSnapshot/, "global Search or Ask must never load the full workspace snapshot");
   assert.match(searchRoute, /scopedResults/, "live global search should remain deterministic and domain-scoped");
   assert.match(searchRoute, /export async function POST/, "global Search or Ask should expose an explicit bounded answer path");
   assert.match(searchRoute, /buildBoundedWorkspaceContext/, "explicit global questions should load only planner-selected domains");
 
   const legacyAskPage = read("app/app/ask/page.tsx");
-  assert.match(legacyAskPage, /params\.run/, "legacy /app/ask must preserve saved result links");
-  assert.match(legacyAskPage, /redirect\("\/app\?search=1"\)/, "blank /app/ask visits must redirect into the global panel");
+  assert.match(legacyAskPage, /params\.run/, "dedicated /app/ask must preserve saved legacy result links");
+  assert.match(legacyAskPage, /AskVaeroexWorkspace/, "blank /app/ask visits must render persistent Executive Analysis");
 
   const agentsPage = read("app/app/agents/page.tsx");
   assert.match(agentsPage, /Saved Vaeroex Result/, "legacy agents route should read as saved results, not a primary Ask destination");
-  assert.match(agentsPage, /redirect\("\/app\?search=1"\)/, "blank /app/agents visits must redirect into global Search or Ask");
+  assert.match(agentsPage, /redirect\("\/app\/ask"\)/, "blank /app/agents visits must redirect into dedicated Ask");
 }
 
 function runQueryDepthPlannerTests() {

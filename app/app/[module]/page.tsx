@@ -113,7 +113,7 @@ export default async function ModuleComingSoonPage({ params }: ModulePageProps) 
             Back to dashboard
           </Link>
           <GlobalSearchTrigger className="rounded-lg border border-line bg-white px-4 py-2 text-sm font-semibold">
-            Search or Ask
+            Search
           </GlobalSearchTrigger>
         </div>
       </section>

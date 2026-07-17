@@ -94,8 +94,8 @@ export const helpArticles: HelpArticle[] = [
     when: "Use this mindset when reviewing KPIs, Business Signals, files, reports, and briefings.",
     workflow: ["Choose one visibility gap", "Add evidence", "Review the pattern", "Generate a brief if needed", "Revisit the result"],
     mistakes: ["Trying to perfect every workflow before starting", "Treating one signal as the whole picture", "Using reports without review"],
-    nextLabel: "Search or Ask",
-    nextHref: "/app?search=1",
+    nextLabel: "Ask Vaeroex",
+    nextHref: "/app/ask",
     related: ["Operations Intelligence", "Visibility", "Action"]
   }),
   article({
@@ -158,7 +158,7 @@ export const helpArticles: HelpArticle[] = [
     ["report-sharing", "Report Sharing", "Share report context through in-app notifications and workspace history.", "/app/reports"],
     ["report-scheduling", "Report Scheduling", "Configure weekly, monthly, quarterly, and alert-driven report preferences.", "/app/reports"],
     ["kpi-alerts", "KPI Alerts", "Create attention signals when important metrics drift from target.", "/app/kpis"],
-    ["vaeroex-ai", "Search or Ask", "Search your workspace or ask broad business questions using workspace context.", "/app?search=1"]
+    ["vaeroex-ai", "Ask Vaeroex", "Ask focused business questions using current workspace context.", "/app/ask"]
   ].map(([id, title, summary, href]) =>
     article({
       id,
@@ -172,7 +172,7 @@ export const helpArticles: HelpArticle[] = [
       mistakes: ["Creating duplicate records", "Treating incomplete data as complete", "Using stale data without review"],
       nextLabel: "Open feature",
       nextHref: href as Route,
-      related: ["Reports", "Search or Ask", "Notifications"]
+      related: ["Reports", "Search", "Ask Vaeroex"]
     })
   ),
   ...[
@@ -202,8 +202,8 @@ export const helpArticles: HelpArticle[] = [
       when: "Use Vaeroex when you want a structured second look at workspace activity.",
       workflow: ["Ask a specific question", "Review the evidence", "Edit the recommendation if needed", "Save only useful outputs", "Compare results over time"],
       mistakes: ["Treating output as guaranteed", "Skipping human review", "Uploading sensitive data"],
-      nextLabel: "Search or Ask",
-      nextHref: "/app?search=1",
+      nextLabel: "Ask Vaeroex",
+      nextHref: "/app/ask",
       related: ["AI Disclaimer", "Human Review Notice", "Sensitive Data Policy"]
     })
   ),
@@ -328,7 +328,7 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
     what: "The dashboard summarizes business health, KPI signals, risks, opportunities, and recommended leadership reviews.",
     workflow: ["Review Business Health", "Check alerts", "Open supporting evidence", "Generate a report if leadership needs a summary"],
     mistakes: ["Ignoring stale data", "Treating a score as a guarantee", "Skipping evidence review"],
-    related: ["Business Health Score", "Reports", "Search or Ask"]
+    related: ["Business Health Score", "Reports", "Ask Vaeroex"]
   },
   files: {
     what: "Files store business documents and imports by workspace so Vaeroex can build historical memory from approved data.",
@@ -355,7 +355,7 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
     related: ["Profit Leak Detector", "KPIs", "Reports"]
   },
   "ask vaeroex": {
-    what: "Use Search or Ask for workspace search and broad business questions using workspace context.",
+    what: "Use Ask Vaeroex for focused executive questions. Use Search when you need to locate a workspace record.",
     workflow: ["Ask a specific question", "Review evidence", "Edit if needed", "Save only useful outputs", "Compare results over time"],
     mistakes: ["Treating output as professional advice", "Skipping review", "Uploading sensitive data"],
     related: ["AI Disclaimer", "Human Review Notice", "Sensitive Data Policy"]

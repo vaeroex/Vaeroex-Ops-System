@@ -155,7 +155,7 @@ export function ThemeControls({ variant = "panel" }: ThemeControlsProps) {
         <div className="mt-4 grid gap-3 lg:grid-cols-3">
           {[
             ["Business Health", "Executive scorecard surfaces stay high contrast."],
-            ["Search or Ask", "Questions and workspace lookup share one calm entry point."],
+            ["Search and Ask", "Search locates records; Ask Vaeroex provides focused Executive Analysis."],
             ["Pulsar", "Signal accents create the official Vaeroex visual experience without sacrificing readability."]
           ].map(([title, description]) => (
             <div key={title} className="rounded-lg border border-line bg-slate-50 p-4 dark:border-vaeroex-dark-border dark:bg-vaeroex-dark-secondary">

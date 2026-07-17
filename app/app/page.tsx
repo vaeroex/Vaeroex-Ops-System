@@ -2089,7 +2089,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           actions={
             <div className="flex flex-wrap gap-2">
               <GlobalSearchTrigger className="rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
-                Search or Ask
+                Search
               </GlobalSearchTrigger>
               <Link href="/app/intelligence" className="rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:bg-cyan-950/30">
                 View Intelligence

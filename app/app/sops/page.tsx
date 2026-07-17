@@ -76,7 +76,7 @@ export default async function SopsPage({ searchParams }: SopsPageProps) {
                 View Evidence
               </Link>
               <GlobalSearchTrigger initialQuery={sop.title} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold text-slate-700 hover:border-vaeroex-accent">
-                View Vaeroex Results
+                Search Related Records
               </GlobalSearchTrigger>
             </div>
           </div>

@@ -135,4 +135,10 @@ export type GlobalSearchResponse = {
   query: string;
   groups: GlobalSearchGroup[];
   answer?: GlobalSearchAnswer | null;
+  analysisSession?: {
+    sessionId: string;
+    sessionToken: string;
+    followUpNumber: number;
+    followUpsRemaining: number;
+  };
 };
