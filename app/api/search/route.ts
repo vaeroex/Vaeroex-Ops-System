@@ -1163,8 +1163,7 @@ export async function POST(request: Request) {
           loaded_domains: boundedContext.loadedDomains,
           bounded_context_ms: boundedContext.loadMs,
           estimated_context_tokens: boundedContext.estimatedContextTokens,
-          evidence_count: evidenceCount,
-          fallback_used: false
+          evidence_count: evidenceCount
         }
       }
     });
