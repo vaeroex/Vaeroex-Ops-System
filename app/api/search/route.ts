@@ -4,7 +4,10 @@ import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildBoundedWorkspaceContext } from "@/lib/ai/bounded-context";
 import { buildWorkspaceEvidenceContext, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildLimitedEvidenceExecutiveAnswer } from "@/lib/ai/executive-fallback";
-import { buildExecutiveReasoningContext } from "@/lib/ai/executive-intelligence";
+import {
+  buildExecutiveReasoningContext,
+  EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS
+} from "@/lib/ai/executive-intelligence";
 import { executiveAnswerFromOutput, validateExecutiveEvidenceReferences } from "@/lib/ai/executive-output";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
@@ -932,7 +935,7 @@ export async function POST(request: Request) {
     const generation = await runVaeroexCompletionWithUsage({
       workflow,
       userPrompt: `Prepare an executive intelligence response to this exact current question: ${query}\n\nComplete the required reasoning_stage first. Only after all five decision-analysis steps are complete may you write the visible executive response. Use prior analysis only for conversational continuity. Re-establish every business claim from the newly supplied ranked citations and bounded workspace context.`,
-      workspaceSnapshot: boundedContext.workspaceSnapshot,
+      workspaceSnapshot: executiveReasoning.modelWorkspaceSnapshot,
       extraInputs: {
         query_plan: {
           classification: queryPlan.classification,
@@ -960,6 +963,7 @@ export async function POST(request: Request) {
       modelRoute,
       executionPath: queryPlan.classification,
       maxOutputTokens: queryPlan.tier === 3 ? 1_800 : 1_100,
+      maxInputTokens: EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS,
       providerSettings: {
         ...baseSettings,
         timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs, SEARCH_ASK_PROVIDER_TIMEOUT_MS),
@@ -997,6 +1001,13 @@ export async function POST(request: Request) {
           signal_candidate_count: executiveReasoning.signalSynthesis.candidates.length,
           minimum_distinct_findings: executiveReasoning.signalSynthesis.minimumDistinctFindings,
           relationship_candidate_count: executiveReasoning.signalSynthesis.relationships.length,
+          compact_evidence_count: executiveReasoning.promptCompaction.retainedEvidenceCount,
+          compact_original_evidence_count: executiveReasoning.promptCompaction.retainedOriginalEvidenceCount,
+          compact_supporting_memory_count: executiveReasoning.promptCompaction.retainedSupportingMemoryCount,
+          compact_signal_count: executiveReasoning.promptCompaction.retainedSignalCount,
+          compact_context_tokens: executiveReasoning.promptCompaction.compactContextTokens,
+          compact_context_target_tokens: executiveReasoning.promptCompaction.targetContextTokens,
+          compact_trimming_steps: executiveReasoning.promptCompaction.trimmingSteps,
           analysis_session_id: analysisRequest.sessionId,
           analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
           follow_up_number: analysisRequest.followUpNumber,
@@ -1047,6 +1058,13 @@ export async function POST(request: Request) {
           signal_candidate_count: executiveReasoning.signalSynthesis.candidates.length,
           minimum_distinct_findings: executiveReasoning.signalSynthesis.minimumDistinctFindings,
           relationship_candidate_count: executiveReasoning.signalSynthesis.relationships.length,
+          compact_evidence_count: executiveReasoning.promptCompaction.retainedEvidenceCount,
+          compact_original_evidence_count: executiveReasoning.promptCompaction.retainedOriginalEvidenceCount,
+          compact_supporting_memory_count: executiveReasoning.promptCompaction.retainedSupportingMemoryCount,
+          compact_signal_count: executiveReasoning.promptCompaction.retainedSignalCount,
+          compact_context_tokens: executiveReasoning.promptCompaction.compactContextTokens,
+          compact_context_target_tokens: executiveReasoning.promptCompaction.targetContextTokens,
+          compact_trimming_steps: executiveReasoning.promptCompaction.trimmingSteps,
           analysis_session_id: analysisRequest.sessionId,
           analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
           follow_up_number: analysisRequest.followUpNumber,

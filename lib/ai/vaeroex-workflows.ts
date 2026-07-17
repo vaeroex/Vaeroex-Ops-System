@@ -128,6 +128,7 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
     }
   },
   "executive_summary": "What is happening, why it matters, and what leadership should understand immediately",
+  "executive_summary_signal_ids": ["S1", "S2"],
   "key_findings": [
     { "reasoning_finding_id": "F1", "finding": "Highest-priority finding", "business_impact": "Impact", "confidence": "High | Medium | Low | Insufficient", "evidence_references": [{ "citation_id": 1, "support": "Support" }] },
     { "reasoning_finding_id": "F2", "finding": "Distinct second finding when required", "business_impact": "Impact", "confidence": "High | Medium | Low | Insufficient", "evidence_references": [{ "citation_id": 2, "support": "Support" }] }
@@ -199,7 +200,7 @@ Treat executive_reasoning_manifest.signal_synthesis as the required pre-writing 
 Return at least signal_synthesis.minimum_distinct_findings distinct reasoning findings and visible key findings, up to three. Each finding must introduce eligible original evidence from a different signal candidate. When the minimum is zero, do not invent a finding. When it is one, one finding is correct.
 The first finding must retain the highest-priority required signal. Order later findings by verified signal priority, not by source order or narrative convenience.
 When signal_synthesis.require_cross_signal_assessment is true, evaluate at least one listed relationship using citations from both signals. The result may be Supported, Possible, or Not established. A relationship candidate is never proof of correlation or causation.
-Synthesize the findings in executive_summary and why_leadership_should_care. Do not let the highest-ranked finding erase other distinct decision-relevant signals.
+Synthesize every required_signal_id in executive_summary and list those IDs in executive_summary_signal_ids. Do not list a signal ID unless its finding is substantively represented in the summary. Do not let the highest-ranked finding erase other distinct decision-relevant signals.
 Never classify evidence above executive_reasoning_manifest.maximum_evidence_sufficiency. Use Conflicting only when independent original sources disagree and identify the conflict.
 For Sufficient evidence, produce the complete executive briefing and set limited_evidence to null.
 For Partial, Conflicting, or Insufficient evidence, populate limited_evidence and make the visible response a useful limited-evidence briefing. State supported conclusions, label hypotheses, identify alternatives, explain leadership risk, recommend reversible actions, identify decisions to defer, and list the exact missing information.

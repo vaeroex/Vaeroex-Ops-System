@@ -57,6 +57,7 @@ const executiveIntelligenceOutputSchema = z.object({
   title: z.string().trim().min(1).max(160),
   reasoning_stage: executiveReasoningStageSchema,
   executive_summary: z.string().trim().min(1).max(1_500),
+  executive_summary_signal_ids: z.array(z.string().regex(/^S[1-9]\d*$/)).max(3).default([]),
   key_findings: z.array(z.object({
     reasoning_finding_id: findingIdSchema,
     finding: z.string().trim().min(1).max(500),
@@ -503,6 +504,14 @@ export function validateExecutiveEvidenceReferences(
       return {
         ok: false as const,
         reason: `The executive briefing must retain the ${minimum} highest-priority distinct evidence-backed findings.`
+      };
+    }
+
+    const summarySignalIds = new Set(parsed.executive_summary_signal_ids);
+    if (Array.from(requiredSignalIds).some((signalId) => !summarySignalIds.has(signalId))) {
+      return {
+        ok: false as const,
+        reason: "The executive summary must synthesize every required highest-priority finding."
       };
     }
 

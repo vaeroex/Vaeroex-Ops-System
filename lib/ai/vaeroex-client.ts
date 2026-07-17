@@ -26,6 +26,7 @@ type RunVaeroexRequest = {
   providerSettings?: AIProviderRetrySettings;
   modelRoute?: VaeroexModelRoute;
   executionPath?: string;
+  maxInputTokens?: number;
   maxOutputTokens?: number;
   outputValidator?: (value: Json) =>
     | { ok: true; value: Json }
@@ -280,8 +281,7 @@ function buildUserContent({
   extraInputs,
   fileAttachment
 }: RunVaeroexRequest) {
-  const textInput = JSON.stringify(
-    {
+  const textInput = JSON.stringify({
       workflow: workflow.key,
       user_request: userPrompt || workflow.promptPlaceholder,
       extra_inputs: extraInputs,
@@ -315,10 +315,7 @@ function buildUserContent({
             mime_type: fileAttachment.mimeType
           }
         : null
-    },
-    null,
-    2
-  );
+    });
 
   const content: AIProviderInputPart[] = [{ type: "text", text: textInput }];
   if (!fileAttachment) return content;
@@ -340,6 +337,23 @@ function buildUserContent({
   }
 
   return content;
+}
+
+export function estimateVaeroexCompletionRequest({
+  workflow,
+  userPrompt,
+  workspaceSnapshot,
+  extraInputs = {},
+  fileAttachment,
+  maxOutputTokens,
+  model = "provider-model"
+}: Pick<RunVaeroexRequest, "workflow" | "userPrompt" | "workspaceSnapshot" | "extraInputs" | "fileAttachment" | "maxOutputTokens"> & {
+  model?: string;
+}) {
+  const systemPrompt = `${VAEROEX_SYSTEM_PROMPT}\n\nWorkflow instructions:\n${workflow.instructions}`;
+  const userContent = buildUserContent({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment });
+  const requestBodyJson = JSON.stringify({ model, systemPrompt, userContent, maxOutputTokens: maxOutputTokens || null });
+  return estimateVaeroexRequestSize(requestBodyJson, fileAttachment);
 }
 
 export function getVaeroexAIRuntimeStatus() {
@@ -393,6 +407,7 @@ export async function runVaeroexCompletionWithUsage({
   providerSettings,
   modelRoute = "default",
   executionPath = "default",
+  maxInputTokens,
   maxOutputTokens,
   outputValidator
 }: RunVaeroexRequest) {
@@ -411,6 +426,11 @@ export async function runVaeroexCompletionWithUsage({
   const requestBodyJson = JSON.stringify({ model, systemPrompt, userContent, maxOutputTokens: maxOutputTokens || null });
   const requestSize = estimateVaeroexRequestSize(requestBodyJson, fileAttachment);
   const estimatedRequestTokens = requestSize.estimatedRequestTokens;
+  if (maxInputTokens && estimatedRequestTokens > maxInputTokens) {
+    throw new AIProviderPolicyError(
+      `The bounded model request exceeded its ${maxInputTokens}-token interactive input budget.`
+    );
+  }
   await enforceAIProviderRateLimits({ userId, workspaceId, operation: executionPath });
   logVaeroexAIEvent("token_budget_check_started", {
     requestId,

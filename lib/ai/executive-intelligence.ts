@@ -4,6 +4,7 @@ import type { BoundedWorkspaceContext } from "@/lib/ai/bounded-context";
 import { evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-index";
 import type { ExecutiveCitationCatalogEntry } from "@/lib/ai/executive-output";
 import type { VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
+import { estimateTokenCount } from "@/lib/ai/usage";
 import type { Json } from "@/lib/supabase/types";
 
 type JsonRecord = Record<string, Json | undefined>;
@@ -37,6 +38,7 @@ export type RankedExecutiveEvidence = ExecutiveEvidenceCandidate & {
 
 export type ExecutiveReasoningContext = {
   evidenceContextJson: Json;
+  modelWorkspaceSnapshot: Json;
   reasoningManifest: Json;
   catalog: ExecutiveCitationCatalogEntry[];
   independentSourceCount: number;
@@ -45,7 +47,19 @@ export type ExecutiveReasoningContext = {
   rankedEvidenceCount: number;
   rankedEvidence: RankedExecutiveEvidence[];
   signalSynthesis: ExecutiveSignalSynthesisPlan;
+  promptCompaction: ExecutivePromptCompactionMetrics;
   maximumEvidenceSufficiency: "Sufficient" | "Partial" | "Insufficient";
+};
+
+export type ExecutivePromptCompactionMetrics = {
+  retrievedEvidenceCount: number;
+  retainedEvidenceCount: number;
+  retainedOriginalEvidenceCount: number;
+  retainedSupportingMemoryCount: number;
+  retainedSignalCount: number;
+  compactContextTokens: number;
+  targetContextTokens: number;
+  trimmingSteps: string[];
 };
 
 export type ExecutiveSignalCandidate = {
@@ -76,6 +90,14 @@ export type ExecutiveSignalSynthesisPlan = {
   requireCrossSignalAssessment: boolean;
 };
 
+export const EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS = 10_000;
+export const EXECUTIVE_COMPACT_CONTEXT_TARGET_TOKENS = 900;
+export const EXECUTIVE_SIGNAL_CANDIDATE_LIMIT = 6;
+export const EXECUTIVE_ORIGINAL_RECORDS_PER_SIGNAL = 2;
+export const EXECUTIVE_ORIGINAL_EXCERPT_LIMIT = 320;
+export const EXECUTIVE_SUPPORTING_MEMORY_LIMIT = 4;
+export const EXECUTIVE_SUPPORTING_MEMORY_EXCERPT_LIMIT = 240;
+
 const IMPACT_PATTERN = /\b(revenue|profit|margin|cash|cost|expense|customer|retention|complaint|inventory|deadline|delay|risk|compliance|staff|capacity|quality|churn|conversion|loss|growth)\b/i;
 const HISTORICAL_PATTERN = /\b(trend|history|historical|previous|prior|month|quarter|year|week|period|change|growth|declin|increase|decrease|forecast)\b/i;
 const STOP_WORDS = new Set(["the", "and", "for", "with", "that", "this", "from", "what", "why", "how", "should", "would", "could", "about"]);
@@ -103,6 +125,15 @@ function compactText(value: unknown, max = 900) {
   const text = typeof value === "string" ? value : JSON.stringify(value);
   const normalized = (text || "").replace(/\s+/g, " ").trim();
   return normalized.length > max ? `${normalized.slice(0, max - 3).trim()}...` : normalized;
+}
+
+function compactExcerpt(value: string, max: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= max) return normalized;
+  const candidate = normalized.slice(0, max - 3);
+  const boundary = Math.max(candidate.lastIndexOf(". "), candidate.lastIndexOf("; "), candidate.lastIndexOf(", "));
+  const text = boundary >= Math.floor(max * 0.55) ? candidate.slice(0, boundary + 1) : candidate;
+  return `${text.trim()}...`;
 }
 
 function stringValue(value: unknown) {
@@ -379,7 +410,7 @@ function groupPriority(members: MutableSignalGroup["originalMembers"]) {
 
 export function buildExecutiveSignalSynthesisPlan(
   ranked: RankedExecutiveEvidence[],
-  limit = 6
+  limit = EXECUTIVE_SIGNAL_CANDIDATE_LIMIT
 ): ExecutiveSignalSynthesisPlan {
   const groups: MutableSignalGroup[] = [];
   const structuredLineageKeys = new Set(
@@ -508,6 +539,217 @@ export function buildExecutiveSignalSynthesisPlan(
   };
 }
 
+function compactBusinessHealthContext(workspaceSnapshot: Json) {
+  const snapshot = isRecord(workspaceSnapshot) ? workspaceSnapshot : {};
+  const structured = isRecord(snapshot.structured_context) ? snapshot.structured_context : {};
+  const health = isRecord(structured.business_health_score_context) ? structured.business_health_score_context : null;
+  if (!health) return null;
+  const readiness = isRecord(health.kpi_readiness) ? health.kpi_readiness : null;
+
+  return {
+    available: health.available ?? false,
+    current_assessment: health.current_assessment ?? null,
+    score_components: health.score_components ?? null,
+    coverage_indicators: health.coverage_indicators ?? null,
+    kpi_readiness: readiness
+      ? {
+          visible_metrics: readiness.visible_metrics ?? null,
+          measurement_rows: readiness.measurement_rows ?? null,
+          missing_targets: readiness.missing_targets ?? null,
+          missing_values: readiness.missing_values ?? null,
+          stale_metrics: readiness.stale_metrics ?? null,
+          metrics_with_insufficient_history: readiness.metrics_with_insufficient_history ?? null,
+          recommendation_confidence: readiness.recommendation_confidence ?? null,
+          limitations: Array.isArray(readiness.limitations)
+            ? readiness.limitations.slice(0, 3).map((item) => compactText(item, 180))
+            : []
+        }
+      : null,
+    interpretation_policy: health.interpretation_policy ?? null
+  } satisfies Json;
+}
+
+function compactExecutivePromptContext({
+  boundedContext,
+  ranked,
+  signalSynthesis,
+  baseEvidence
+}: {
+  boundedContext: BoundedWorkspaceContext;
+  ranked: RankedExecutiveEvidence[];
+  signalSynthesis: ExecutiveSignalSynthesisPlan;
+  baseEvidence: JsonRecord;
+}) {
+  const rankedByCitationId = new Map(ranked.map((item, index) => [index + 1, item]));
+  const requiredSignalIds = new Set(signalSynthesis.requiredSignalIds);
+  const minimumSignalCount = signalSynthesis.requiredSignalIds.length;
+  const memoryCandidates = ranked
+    .map((item, index) => ({ item, citationId: index + 1 }))
+    .filter(({ item }) => item.evidenceRole === "supporting" && item.sourceType === "Business Memory");
+  const requiredContextCandidates = ranked
+    .map((item, index) => ({ item, citationId: index + 1 }))
+    .filter(({ item }) => item.domain === "business_health" && item.evidenceRole === "historical")
+    .slice(0, 1);
+  const distinctOriginalCitationIds = new Map(signalSynthesis.candidates.map((signal) => {
+    const seen = new Set<string>();
+    const citationIds = signal.originalCitationIds.filter((citationId) => {
+      const item = rankedByCitationId.get(citationId);
+      if (!item) return false;
+      const provenanceKey = item.independentSourceKey || [
+        item.sourceFileId,
+        item.sourceId,
+        item.title.toLowerCase(),
+        compactExcerpt(item.excerpt, 120).toLowerCase()
+      ].filter(Boolean).join(":");
+      if (seen.has(provenanceKey)) return false;
+      seen.add(provenanceKey);
+      return true;
+    });
+    return [signal.signalId, citationIds] as const;
+  }));
+  const baseModelWorkspaceSnapshot = {
+    scope: "compact_executive_reasoning",
+    query: compactText(
+      isRecord(boundedContext.workspaceSnapshot) ? boundedContext.workspaceSnapshot.query : "",
+      600
+    ),
+    requested_domains: isRecord(boundedContext.workspaceSnapshot)
+      ? boundedContext.workspaceSnapshot.requested_domains ?? boundedContext.loadedDomains
+      : boundedContext.loadedDomains,
+    loaded_domains: boundedContext.loadedDomains,
+    business_health_score_context: compactBusinessHealthContext(boundedContext.workspaceSnapshot),
+  } satisfies Json;
+
+  let retainedSignalCount = signalSynthesis.candidates.length;
+  let memoryLimit = EXECUTIVE_SUPPORTING_MEMORY_LIMIT;
+  let includeOptionalSecondRecords = true;
+  let includeRequiredSecondRecords = true;
+  let originalExcerptLimit = EXECUTIVE_ORIGINAL_EXCERPT_LIMIT;
+  let memoryExcerptLimit = EXECUTIVE_SUPPORTING_MEMORY_EXCERPT_LIMIT;
+  const trimmingSteps: string[] = [];
+
+  const buildCompactContext = () => {
+    const retainedSignals = signalSynthesis.candidates.slice(0, retainedSignalCount);
+    const signalByCitationId = new Map<number, ExecutiveSignalCandidate>();
+    retainedSignals.forEach((signal) => signal.citationIds.forEach((citationId) => signalByCitationId.set(citationId, signal)));
+    const selectedCitationIds = new Set<number>();
+
+    retainedSignals.forEach((signal) => distinctOriginalCitationIds.get(signal.signalId)?.slice(0, 1).forEach((citationId) => selectedCitationIds.add(citationId)));
+    retainedSignals
+      .filter((signal) => requiredSignalIds.has(signal.signalId) && includeRequiredSecondRecords)
+      .forEach((signal) => distinctOriginalCitationIds.get(signal.signalId)?.slice(1, EXECUTIVE_ORIGINAL_RECORDS_PER_SIGNAL).forEach((citationId) => selectedCitationIds.add(citationId)));
+    retainedSignals
+      .filter((signal) => !requiredSignalIds.has(signal.signalId) && includeOptionalSecondRecords)
+      .forEach((signal) => distinctOriginalCitationIds.get(signal.signalId)?.slice(1, EXECUTIVE_ORIGINAL_RECORDS_PER_SIGNAL).forEach((citationId) => selectedCitationIds.add(citationId)));
+    requiredContextCandidates.forEach(({ citationId }) => selectedCitationIds.add(citationId));
+    memoryCandidates.slice(0, memoryLimit).forEach(({ citationId }) => selectedCitationIds.add(citationId));
+
+    const retained = Array.from(selectedCitationIds)
+      .sort((left, right) => left - right)
+      .map((citationId) => ({ citationId, item: rankedByCitationId.get(citationId) }))
+      .filter((entry): entry is { citationId: number; item: RankedExecutiveEvidence } => Boolean(entry.item));
+    const citations = retained.map(({ citationId, item }) => {
+      const signal = signalByCitationId.get(citationId);
+      return {
+        citation_id: citationId,
+        signal_id: signal?.signalId || null,
+        executive_rank: signal?.executiveRank || null,
+        domain: item.domain,
+        title: compactText(item.title, 160),
+        source_type: item.sourceType,
+        source_id: item.sourceId,
+        source_file_id: item.sourceFileId,
+        independent_source_key: item.independentSourceKey,
+        evidence_role: item.evidenceRole,
+        recorded_at: item.recordedAt,
+        confidence_score: item.confidenceScore,
+        freshness_score: item.rankingFactors.freshness,
+        direct_relevance_score: item.rankingFactors.directRelevance,
+        excerpt: compactExcerpt(
+          item.excerpt,
+          item.sourceType === "Business Memory" ? memoryExcerptLimit : originalExcerptLimit
+        )
+      };
+    });
+    const evidenceContextJson = {
+      available: baseEvidence.available ?? citations.length > 0,
+      retrieval_mode: baseEvidence.retrieval_mode ?? "none",
+      confidence_score: baseEvidence.confidence_score ?? null,
+      confidence_label: baseEvidence.confidence_label ?? null,
+      data_gaps: Array.isArray(baseEvidence.data_gaps)
+        ? baseEvidence.data_gaps.slice(0, 4).map((item) => compactText(item, 180))
+        : [],
+      limitations: Array.isArray(baseEvidence.limitations)
+        ? baseEvidence.limitations.slice(0, 4).map((item) => compactText(item, 180))
+        : [],
+      policy: [
+        "Only these compact citations may support the answer.",
+        "Citation provenance is authoritative; omitted workspace records are not available to the model.",
+        "Supporting Business Memory cannot establish a finding or increase source independence."
+      ],
+      citations
+    } satisfies Json;
+    const modelWorkspaceSnapshot = {
+      ...baseModelWorkspaceSnapshot,
+      scope_policy: {
+        full_workspace_snapshot_excluded: true,
+        retrieved_records_ranked_server_side: true,
+        model_receives_compact_signal_evidence_only: true,
+        maximum_signal_candidates: EXECUTIVE_SIGNAL_CANDIDATE_LIMIT,
+        retained_signal_candidates: retainedSignals.length,
+        maximum_original_records_per_signal: EXECUTIVE_ORIGINAL_RECORDS_PER_SIGNAL,
+        maximum_supporting_memory_entries: EXECUTIVE_SUPPORTING_MEMORY_LIMIT
+      }
+    } satisfies Json;
+    const compactContextTokens = estimateTokenCount(JSON.stringify({
+      workspace_context: modelWorkspaceSnapshot,
+      evidence_context: evidenceContextJson
+    }));
+
+    return { evidenceContextJson, modelWorkspaceSnapshot, selectedCitationIds, retained, compactContextTokens };
+  };
+
+  let compact = buildCompactContext();
+  while (compact.compactContextTokens > EXECUTIVE_COMPACT_CONTEXT_TARGET_TOKENS) {
+    if (memoryLimit > 0) {
+      memoryLimit -= 1;
+      trimmingSteps.push("supporting_memory");
+    } else if (includeOptionalSecondRecords) {
+      includeOptionalSecondRecords = false;
+      trimmingSteps.push("optional_secondary_evidence");
+    } else if (includeRequiredSecondRecords) {
+      includeRequiredSecondRecords = false;
+      trimmingSteps.push("required_secondary_evidence");
+    } else if (retainedSignalCount > minimumSignalCount) {
+      retainedSignalCount -= 1;
+      trimmingSteps.push("lowest_ranked_optional_signal");
+    } else if (originalExcerptLimit > 160) {
+      originalExcerptLimit = Math.max(160, originalExcerptLimit - 40);
+      memoryExcerptLimit = Math.max(120, memoryExcerptLimit - 40);
+      trimmingSteps.push("excerpt_length");
+    } else {
+      break;
+    }
+    compact = buildCompactContext();
+  }
+
+  return {
+    evidenceContextJson: compact.evidenceContextJson,
+    modelWorkspaceSnapshot: compact.modelWorkspaceSnapshot,
+    selectedCitationIds: compact.selectedCitationIds,
+    metrics: {
+      retrievedEvidenceCount: ranked.length,
+      retainedEvidenceCount: compact.retained.length,
+      retainedOriginalEvidenceCount: compact.retained.filter(({ item }) => item.evidenceRole === "original").length,
+      retainedSupportingMemoryCount: compact.retained.filter(({ item }) => item.sourceType === "Business Memory").length,
+      retainedSignalCount,
+      compactContextTokens: compact.compactContextTokens,
+      targetContextTokens: EXECUTIVE_COMPACT_CONTEXT_TARGET_TOKENS,
+      trimmingSteps
+    } satisfies ExecutivePromptCompactionMetrics
+  };
+}
+
 function confidenceCeiling(independentSourceCount: number, currentIndependentSourceCount: number) {
   if (currentIndependentSourceCount >= 3) return "High";
   if (currentIndependentSourceCount >= 2) return "Medium";
@@ -541,6 +783,25 @@ export function buildExecutiveReasoningContext({
     chunks: evidenceContext.chunks.filter((chunk) => selectedMemoryKeys.has(chunk.id))
   };
   const baseEvidence = evidenceContextAsJson(rankedMemoryContext) as JsonRecord;
+  const compactPrompt = compactExecutivePromptContext({
+    boundedContext,
+    ranked,
+    signalSynthesis,
+    baseEvidence
+  });
+  const retainedSignalIds = new Set(signalSynthesis.candidates
+    .filter((candidate) => candidate.citationIds.some((citationId) => compactPrompt.selectedCitationIds.has(citationId)))
+    .map((candidate) => candidate.signalId));
+  const retainedRelationships = signalSynthesis.relationships.filter((relationship) =>
+    retainedSignalIds.has(relationship.leftSignalId) && retainedSignalIds.has(relationship.rightSignalId)
+  );
+  const compactSignalSynthesis: ExecutiveSignalSynthesisPlan = {
+    candidates: signalSynthesis.candidates.filter((candidate) => retainedSignalIds.has(candidate.signalId)),
+    relationships: retainedRelationships,
+    minimumDistinctFindings: Math.min(signalSynthesis.minimumDistinctFindings, retainedSignalIds.size),
+    requiredSignalIds: signalSynthesis.requiredSignalIds.filter((signalId) => retainedSignalIds.has(signalId)),
+    requireCrossSignalAssessment: signalSynthesis.requireCrossSignalAssessment && retainedRelationships.length > 0
+  };
   const catalog: ExecutiveCitationCatalogEntry[] = ranked.map((item, index) => ({
     citationId: index + 1,
     title: item.title,
@@ -553,7 +814,8 @@ export function buildExecutiveReasoningContext({
     signalId: signalByCitationId.get(index + 1)?.signalId || null,
     findingEligible: item.findingEligible,
     executiveRank: signalByCitationId.get(index + 1)?.executiveRank || null
-  }));
+  })).filter((item) => compactPrompt.selectedCitationIds.has(item.citationId));
+  const catalogByCitationId = new Map(catalog.map((item) => [item.citationId, item]));
   const independentSourceCount = new Set(
     catalog
       .filter((item) => item.evidenceRole === "original")
@@ -574,25 +836,9 @@ export function buildExecutiveReasoningContext({
     : independentSourceCount === 1 || currentIndependentSourceCount < 2 || originalSourceTypeCount < 2
       ? "Partial" as const
       : "Sufficient" as const;
-  const citations = ranked.map((item, index) => ({
-    citation_id: index + 1,
-    title: item.title,
-    source_type: item.sourceType,
-    source_id: item.sourceId,
-    source_file_id: item.sourceFileId,
-    evidence_role: item.evidenceRole,
-    independent_source_key: item.independentSourceKey,
-    excerpt: item.excerpt,
-    executive_rank: index + 1,
-    rank_score: item.rankScore,
-    ranking_factors: item.rankingFactors
-  }));
-
   return {
-    evidenceContextJson: {
-      ...baseEvidence,
-      citations
-    },
+    evidenceContextJson: compactPrompt.evidenceContextJson,
+    modelWorkspaceSnapshot: compactPrompt.modelWorkspaceSnapshot,
     reasoningManifest: {
       mode: "executive_intelligence",
       question: query,
@@ -618,18 +864,30 @@ export function buildExecutiveReasoningContext({
       },
       signal_synthesis: {
         candidate_limit: 6,
-        candidates: signalSynthesis.candidates.map((candidate) => ({
-          signal_id: candidate.signalId,
-          title: candidate.title,
-          domains: candidate.domains,
-          citation_ids: candidate.citationIds,
-          original_citation_ids: candidate.originalCitationIds,
-          independent_original_source_count: candidate.independentSourceCount,
-          current_independent_original_source_count: candidate.currentIndependentSourceCount,
-          priority_score: candidate.priorityScore,
-          executive_rank: candidate.executiveRank
-        })),
-        relationship_candidates: signalSynthesis.relationships.map((relationship) => ({
+        candidates: compactSignalSynthesis.candidates.map((candidate) => {
+          const citationIds = candidate.citationIds.filter((citationId) => compactPrompt.selectedCitationIds.has(citationId));
+          const originalCitationIds = candidate.originalCitationIds.filter((citationId) => compactPrompt.selectedCitationIds.has(citationId));
+          const independentSources = new Set(originalCitationIds
+            .map((citationId) => catalogByCitationId.get(citationId)?.independentSourceKey)
+            .filter((key): key is string => Boolean(key)));
+          const currentIndependentSources = new Set(originalCitationIds
+            .map((citationId) => catalogByCitationId.get(citationId))
+            .filter((entry) => entry?.freshnessScore !== undefined && entry.freshnessScore >= 60)
+            .map((entry) => entry?.independentSourceKey)
+            .filter((key): key is string => Boolean(key)));
+          return {
+            signal_id: candidate.signalId,
+            title: candidate.title,
+            domains: candidate.domains,
+            citation_ids: citationIds,
+            original_citation_ids: originalCitationIds,
+            independent_original_source_count: independentSources.size,
+            current_independent_original_source_count: currentIndependentSources.size,
+            priority_score: candidate.priorityScore,
+            executive_rank: candidate.executiveRank
+          };
+        }),
+        relationship_candidates: compactSignalSynthesis.relationships.map((relationship) => ({
           left_signal_id: relationship.leftSignalId,
           right_signal_id: relationship.rightSignalId,
           domains: relationship.domains,
@@ -637,9 +895,9 @@ export function buildExecutiveReasoningContext({
           evaluation_priority: relationship.evaluationPriority,
           policy: "Evaluate the relationship; do not assume correlation or causation."
         })),
-        minimum_distinct_findings: signalSynthesis.minimumDistinctFindings,
-        required_signal_ids: signalSynthesis.requiredSignalIds,
-        require_cross_signal_assessment: signalSynthesis.requireCrossSignalAssessment,
+        minimum_distinct_findings: compactSignalSynthesis.minimumDistinctFindings,
+        required_signal_ids: compactSignalSynthesis.requiredSignalIds,
+        require_cross_signal_assessment: compactSignalSynthesis.requireCrossSignalAssessment,
         policy: [
           "Evaluate every candidate before writing.",
           "Merge related citations inside one signal rather than repeating the same condition.",
@@ -679,7 +937,8 @@ export function buildExecutiveReasoningContext({
     originalSourceTypeCount,
     rankedEvidenceCount: ranked.length,
     rankedEvidence: ranked,
-    signalSynthesis,
+    signalSynthesis: compactSignalSynthesis,
+    promptCompaction: compactPrompt.metrics,
     maximumEvidenceSufficiency
   };
 }
