@@ -23,6 +23,7 @@ type RateLimitOptions = {
   identifiers?: Array<string | null | undefined>;
   requestHeaders?: Headers;
   metadata?: Json;
+  strict?: boolean;
 };
 
 const FALLBACK_LIMIT_MESSAGE = "Too many requests. Please try again shortly.";
@@ -85,6 +86,7 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
   const admin = createSupabaseAdminClient();
 
   if (!admin) {
+    if (options.strict) throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
     return {
       allowed: true,
       action: options.action,
@@ -105,6 +107,7 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
     .maybeSingle();
 
   if (error) {
+    if (options.strict) throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
     if (!isMissingRateLimitTable(error)) {
       console.warn("[rate-limit] check failed:", error.message);
     }
@@ -142,6 +145,9 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
     if ("error" in updateResult && updateResult.error && !isMissingRateLimitTable(updateResult.error)) {
       console.warn("[rate-limit] update failed:", updateResult.error.message);
     }
+    if ("error" in updateResult && updateResult.error && options.strict) {
+      throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
+    }
 
     return {
       allowed: true,
@@ -162,6 +168,9 @@ export async function enforceRateLimit(options: RateLimitOptions): Promise<RateL
 
   if (insertResult.error && !isMissingRateLimitTable(insertResult.error)) {
     console.warn("[rate-limit] insert failed:", insertResult.error.message);
+  }
+  if (insertResult.error && options.strict) {
+    throw new Error("Vaeroex could not verify request limits. Please try again shortly.");
   }
 
   return {

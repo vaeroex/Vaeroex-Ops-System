@@ -2096,6 +2096,7 @@ async function runFileVaeroexAnalysis({
     fileAttachment: extraction.fileAttachment,
     supabase,
     workspaceId,
+    userId,
     modelRoute: "file_analysis",
     executionPath: "focused_file_analysis",
     maxOutputTokens: 1_200

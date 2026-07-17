@@ -244,7 +244,7 @@ const agentsActionsRuntime = read("app/app/agents/actions.ts");
 check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), "Ask Vaeroex must bound Business Memory retrieval so server actions can return.");
 check(agentsActionsRuntime.includes("withStageTimeout") && agentsActionsRuntime.includes("Business Memory retrieval"), "Ask Vaeroex must apply a stage timeout to Business Memory retrieval.");
 check(agentsActionsRuntime.includes("reducedEvidenceContext") && agentsActionsRuntime.includes("continuingWithReducedContext"), "Ask Vaeroex must continue with reduced context when Business Memory retrieval fails safely.");
-check(agentsActionsRuntime.includes("askVaeroexOpenAISettings") && agentsActionsRuntime.includes("openAISettings"), "Ask Vaeroex must cap OpenAI timeout/retry settings for server-action execution.");
+check(agentsActionsRuntime.includes("askVaeroexProviderSettings") && agentsActionsRuntime.includes("providerSettings"), "Ask Vaeroex must cap provider timeout/retry settings for server-action execution.");
 check(agentsActionsRuntime.includes("createRunningRun") && agentsActionsRuntime.includes('status: "running"'), "Ask Vaeroex must create a run record before long-running analysis starts.");
 check(agentsActionsRuntime.includes("updateRunRecord") && agentsActionsRuntime.includes("failureOutput"), "Ask Vaeroex must update the same run for success, timeout, and failure outcomes.");
 check(agentsActionsRuntime.includes("vaeroex_run_diagnostics") && agentsActionsRuntime.includes("finalStage"), "Ask Vaeroex failed runs must store admin-only lifecycle diagnostics.");
@@ -257,10 +257,10 @@ const kpiOverviewRuntime = read("lib/ai/kpi-overview.ts");
 check(kpiOverviewRuntime.includes("KPI_OVERVIEW_MAX_ROWS") && kpiOverviewRuntime.includes("KPI_OVERVIEW_HISTORY_PER_METRIC"), "KPI overview must cap historical KPI context.");
 check(kpiOverviewRuntime.includes("loadKpiOverviewData") && kpiOverviewRuntime.includes("kpi_settings"), "KPI overview must load workspace KPI settings through a shared bounded helper.");
 check(kpiOverviewRuntime.includes("Business Memory or document retrieval") && kpiOverviewRuntime.includes("retrieval_ms"), "KPI overview must distinguish structured KPI evidence from broad retrieval.");
-check(kpiOverviewRuntime.includes("maxRetries: 0"), "KPI overview OpenAI retry must avoid repeating an identical expensive request.");
+check(kpiOverviewRuntime.includes("maxRetries: 0"), "KPI overview provider retry must avoid repeating an identical expensive request.");
 const vaeroexClientRuntime = read("lib/ai/vaeroex-client.ts");
-check(vaeroexClientRuntime.includes("openAISettings?: OpenAIRetrySettings"), "Vaeroex OpenAI client must accept per-call timeout/retry settings.");
-check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex OpenAI client must log token budget stages.");
+check(vaeroexClientRuntime.includes("providerSettings?: AIProviderRetrySettings"), "Vaeroex client must accept per-call provider timeout/retry settings.");
+check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex provider client must log token budget stages.");
 check(vaeroexClientRuntime.includes("modelRoute") && vaeroexClientRuntime.includes("executionPath"), "Vaeroex OpenAI usage must identify model route and execution path.");
 check(vaeroexClientRuntime.includes("collectBoundedSourceIds") && vaeroexClientRuntime.includes("allowedSourceIds"), "Vaeroex output citations must be validated against bounded request evidence.");
 const contextualAskRuntime = read("app/app/contextual-ask/actions.ts");
@@ -269,7 +269,10 @@ check(contextualAskRuntime.includes('retrievalStrategy: "keyword_only"') && cont
 const usageRuntime = read("lib/ai/usage.ts");
 check(usageRuntime.includes("CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M") && !usageRuntime.includes("{ input: 0, output: 0 }"), "Unknown OpenAI models must never record zero estimated cost.");
 const evidenceIndexRuntime = read("lib/ai/evidence-index.ts");
-check(evidenceIndexRuntime.includes("embeddingTimeoutMs") && evidenceIndexRuntime.includes("maxRetries: 0"), "Semantic retrieval must have a bounded timeout and avoid repeated embedding requests.");
+check(
+  evidenceIndexRuntime.includes("embeddingTimeoutMs") && evidenceIndexRuntime.includes("createAIEmbeddings") && read("lib/ai/providers/provider-manager.ts").includes("maxRetries: 0"),
+  "Semantic retrieval must have a bounded timeout and avoid repeated embedding requests."
+);
 
 const workspaceActionFiles = [
   "app/app/operations/actions.ts",
@@ -304,6 +307,7 @@ const clientFiles = sourceFiles.filter((file) => read(file).startsWith("\"use cl
 const serverSecrets = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "OPENAI_API_KEY",
+  "NVIDIA_API_KEY",
   "CRON_SECRET",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET"
@@ -323,10 +327,15 @@ check(adminClient.includes("server-only"), "Service-role Supabase admin client m
 check(adminClient.includes("SUPABASE_SERVICE_ROLE_KEY"), "Service-role Supabase admin client should be the only place that reads SUPABASE_SERVICE_ROLE_KEY directly.");
 
 const openAiClient = read("lib/ai/vaeroex-client.ts");
-check(openAiClient.includes("server-only"), "Vaeroex OpenAI runtime client must be marked server-only.");
-check(openAiClient.includes("process.env.OPENAI_API_KEY"), "Vaeroex OpenAI runtime client must read OPENAI_API_KEY server-side.");
-check(openAiClient.includes("validateAiGeneratedOutput"), "Vaeroex OpenAI runtime client must validate model output before saving.");
-check(openAiClient.includes("untrusted_evidence_boundary"), "Vaeroex OpenAI runtime client must label retrieved evidence as untrusted.");
+const openAiProvider = read("lib/ai/providers/openai-provider.ts");
+const nvidiaProvider = read("lib/ai/providers/nvidia-provider.ts");
+const providerManager = read("lib/ai/providers/provider-manager.ts");
+check(openAiClient.includes("server-only"), "Vaeroex runtime client must be marked server-only.");
+check(openAiProvider.includes("server-only") && openAiProvider.includes("process.env.OPENAI_API_KEY"), "OpenAI provider must read OPENAI_API_KEY server-side.");
+check(nvidiaProvider.includes("server-only") && nvidiaProvider.includes("process.env.NVIDIA_API_KEY"), "NVIDIA provider must read NVIDIA_API_KEY server-side.");
+check(providerManager.includes("OpenAIProvider") && providerManager.includes("NvidiaProvider"), "Vaeroex generation must use the provider manager abstraction.");
+check(openAiClient.includes("validateAiGeneratedOutput"), "Vaeroex runtime client must validate model output before saving.");
+check(openAiClient.includes("untrusted_evidence_boundary"), "Vaeroex runtime client must label retrieved evidence as untrusted.");
 
 const toolGateway = read("lib/security/tool-execution-gateway.ts");
 check(toolGateway.includes("server-only"), "AI tool execution gateway must be server-only.");

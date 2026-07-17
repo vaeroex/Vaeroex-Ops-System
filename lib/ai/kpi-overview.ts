@@ -1,8 +1,11 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { resolveVaeroexModel } from "@/lib/ai/model-routing";
-import { fetchWithOpenAIResilience, getOpenAIRetrySettings, type OpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { resolveConfiguredAIProvider, resolveVaeroexModel } from "@/lib/ai/model-routing";
+import { validateKpiOverviewContract } from "@/lib/ai/output-contracts";
+import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
+import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
+import { runStructuredAI } from "@/lib/ai/providers/provider-manager";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
@@ -11,7 +14,6 @@ import type { Database, Json } from "@/lib/supabase/types";
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type JsonRecord = Record<string, unknown>;
 
-const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const KPI_OVERVIEW_OPENAI_TIMEOUT_MS = 6_000;
 const KPI_OVERVIEW_MAX_ROWS = 160;
 const KPI_OVERVIEW_MAX_METRICS = 12;
@@ -438,165 +440,109 @@ function compactPromptContext(summary: KpiOverviewSummary) {
   };
 }
 
-function parseOpenAIJson(content: string) {
-  try {
-    return JSON.parse(content) as JsonRecord;
-  } catch {
-    const match = content.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-
-    try {
-      return JSON.parse(match[0]) as JsonRecord;
-    } catch {
-      return null;
-    }
-  }
-}
-
-function extractResponsesContent(payload: JsonRecord) {
-  const outputText = str(payload.output_text);
-  if (outputText) return outputText;
-
-  const output = Array.isArray(payload.output) ? payload.output : [];
-  for (const item of output) {
-    const content = isRecord(item) && Array.isArray(item.content) ? item.content : [];
-    for (const part of content) {
-      if (isRecord(part) && part.type === "output_text" && typeof part.text === "string") {
-        return part.text;
-      }
-    }
-  }
-
-  return "";
-}
-
-function normalizeModelOutput(value: JsonRecord | null, fallback: Json) {
+function normalizeModelOutput(value: Json, fallback: Json) {
+  const valueRecord = isRecord(value) ? value : null;
   const fallbackRecord = isRecord(fallback) ? fallback : {};
-  const confidence = str(value?.recommendation_confidence);
+  const confidence = str(valueRecord?.recommendation_confidence);
   const fallbackConfidence = str(fallbackRecord.recommendation_confidence, "Low");
   const confidenceRank: Record<string, number> = { Insufficient: 0, Low: 1, Medium: 2, High: 3 };
   const modelConfidence = ["High", "Medium", "Low", "Insufficient"].includes(confidence) ? confidence : fallbackConfidence;
   const normalizedConfidence =
     (confidenceRank[modelConfidence] ?? 1) > (confidenceRank[fallbackConfidence] ?? 1) ? fallbackConfidence : modelConfidence;
-  const directAnswer = str(value?.direct_answer) || str(fallbackRecord.direct_answer);
-  const responseMarkdown = str(value?.response_markdown) || str(value?.answer) || str(fallbackRecord.response_markdown) || directAnswer;
-  const evidenceNote = str(value?.evidence_note) || str(fallbackRecord.evidence_note);
+  const directAnswer = str(valueRecord?.direct_answer) || str(fallbackRecord.direct_answer);
+  const responseMarkdown = str(valueRecord?.response_markdown) || str(valueRecord?.answer) || str(fallbackRecord.response_markdown) || directAnswer;
+  const evidenceNote = str(valueRecord?.evidence_note) || str(fallbackRecord.evidence_note);
 
   return {
     ...fallbackRecord,
-    title: str(value?.title, str(fallbackRecord.title, "KPI overview")),
+    title: str(valueRecord?.title, str(fallbackRecord.title, "KPI overview")),
     direct_answer: directAnswer,
-    summary: str(value?.summary, directAnswer),
+    summary: str(valueRecord?.summary, directAnswer),
     response_markdown: responseMarkdown,
     recommendation_confidence: normalizedConfidence,
     evidence_note: evidenceNote
   } satisfies Json;
 }
 
-async function runCompactOpenAIKpiAnswer({
+async function runCompactProviderKpiAnswer({
   supabase,
   workspaceId,
+  userId,
   userPrompt,
   summary,
-  openAISettings
+  providerSettings
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
+  userId?: string | null;
   userPrompt: string;
   summary: KpiOverviewSummary;
-  openAISettings?: OpenAIRetrySettings;
+  providerSettings?: AIProviderRetrySettings;
 }) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = resolveVaeroexModel("kpi_overview");
-
-  if (!apiKey) {
-    throw new Error("OpenAI API key is not configured.");
-  }
-
-  const requestBody = {
-    model,
-    temperature: 0.15,
-    text: { format: { type: "json_object" } },
-    input: [
-      {
-        role: "system",
-        content:
-          "You are Vaeroex, an Operations Intelligence advisor. Answer KPI overview questions directly and conversationally. Use only the provided structured KPI context. Do not invent numbers. Do not recommend task management, owner assignment, CRM work, or workflow execution. Return JSON only with title, direct_answer, summary, response_markdown, recommendation_confidence, and evidence_note."
-      },
-      {
-        role: "user",
-        content: JSON.stringify(
-          {
-            user_question: userPrompt,
-            kpi_context: compactPromptContext(summary),
-            answer_rules: [
-              "First sentence directly answers the question.",
-              "Briefly mention what is going well, what needs attention, and what is uncertain only when supported by KPI context.",
-              "Do not estimate financial impact.",
-              "Keep the answer short.",
-              "Use Recommendation Confidence: High, Medium, Low, or Insufficient."
-            ]
-          },
-          null,
-          2
-        )
-      }
-    ]
-  };
-  const requestBodyJson = JSON.stringify(requestBody);
+  const primaryProvider = resolveConfiguredAIProvider();
+  const model = resolveVaeroexModel("kpi_overview", primaryProvider);
+  const fallbackModel = resolveVaeroexModel("kpi_overview", "openai");
+  const systemPrompt =
+    "You are Vaeroex, an Operations Intelligence advisor. Answer KPI overview questions directly and conversationally. Use only the provided structured KPI context. Do not invent numbers. Do not recommend task management, owner assignment, CRM work, or workflow execution. Return JSON only with title, direct_answer, summary, response_markdown, recommendation_confidence, and evidence_note.";
+  const userContent = JSON.stringify(
+    {
+      user_question: userPrompt,
+      kpi_context: compactPromptContext(summary),
+      answer_rules: [
+        "First sentence directly answers the question.",
+        "Briefly mention what is going well, what needs attention, and what is uncertain only when supported by KPI context.",
+        "Do not estimate financial impact.",
+        "Keep the answer short.",
+        "Use Recommendation Confidence: High, Medium, Low, or Insufficient."
+      ]
+    },
+    null,
+    2
+  );
+  const requestBodyJson = JSON.stringify({ model, systemPrompt, userContent });
   const estimatedRequestTokens = estimateTokenCount(requestBodyJson);
+  await enforceAIProviderRateLimits({ userId, workspaceId, operation: "lightweight_kpi_overview" });
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
+  const baseSettings = getAIProviderRetrySettings(primaryProvider);
   const settings = {
-    ...getOpenAIRetrySettings(),
-    ...openAISettings,
-    timeoutMs: Math.min(openAISettings?.timeoutMs ?? getOpenAIRetrySettings().timeoutMs, KPI_OVERVIEW_OPENAI_TIMEOUT_MS),
+    ...baseSettings,
+    ...providerSettings,
+    timeoutMs: Math.min(providerSettings?.timeoutMs ?? baseSettings.timeoutMs, KPI_OVERVIEW_OPENAI_TIMEOUT_MS),
     maxRetries: 0
   };
-  const startedAt = Date.now();
-  const response = await fetchWithOpenAIResilience(
-    OPENAI_RESPONSES_ENDPOINT,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: requestBodyJson
-    },
-    settings
-  );
-  const payload = (await response.json().catch(() => ({}))) as JsonRecord;
-  const latencyMs = Date.now() - startedAt;
-
-  if (!response.ok) {
-    throw new Error(cleanVaeroexErrorMessage(str(isRecord(payload.error) ? payload.error.message : ""), "Vaeroex KPI analysis took longer than expected."));
-  }
-
-  const content = extractResponsesContent(payload);
-  if (!content) {
-    throw new Error("Vaeroex returned an empty KPI overview.");
-  }
-
-  const inputTokens = numberValue(isRecord(payload.usage) ? payload.usage.input_tokens : null) || estimatedRequestTokens;
-  const outputTokens = numberValue(isRecord(payload.usage) ? payload.usage.output_tokens : null) || estimateTokenCount(content);
-  const totalTokens = numberValue(isRecord(payload.usage) ? payload.usage.total_tokens : null) || inputTokens + outputTokens;
+  const generation = await runStructuredAI({
+    primaryProvider,
+    primaryModel: model,
+    fallbackModel,
+    systemPrompt,
+    userContent: [{ type: "text", text: userContent }],
+    temperature: 0.15,
+    maxOutputTokens: 650,
+    settings,
+    validate: validateKpiOverviewContract,
+    logContext: { workflow: "kpi_overview", modelRoute: "kpi_overview", executionPath: "structured_answer" }
+  });
 
   return {
-    output: parseOpenAIJson(content),
+    output: generation.output,
     usage: {
-      inputTokens,
-      outputTokens,
-      totalTokens,
-      model,
-      requestId: response.headers.get("x-request-id") || response.headers.get("openai-request-id"),
-      latencyMs,
+      inputTokens: generation.inputTokens,
+      outputTokens: generation.outputTokens,
+      totalTokens: generation.totalTokens,
+      model: generation.model,
+      requestId: generation.requestId,
+      latencyMs: generation.latencyMs,
       status: "completed",
       metadata: {
         workflow_path: "lightweight_kpi_overview",
         model_route: "kpi_overview",
         execution_path: "structured_answer",
         estimated_request_tokens: estimatedRequestTokens,
-        request_body_bytes: Buffer.byteLength(requestBodyJson, "utf8")
+        request_body_bytes: Buffer.byteLength(requestBodyJson, "utf8"),
+        provider: generation.provider,
+        primary_provider: primaryProvider,
+        fallback_used: generation.fallbackUsed,
+        provider_attempts: generation.attempts
       } satisfies Json
     } satisfies VaeroexTokenUsage,
     estimatedRequestTokens
@@ -606,17 +552,19 @@ async function runCompactOpenAIKpiAnswer({
 export async function runLightweightKpiOverview({
   supabase,
   workspaceId,
+  userId,
   userPrompt,
   intentClassificationMs,
-  openAISettings,
+  providerSettings,
   stageLogger,
   useOpenAI = false
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
+  userId?: string | null;
   userPrompt: string;
   intentClassificationMs: number;
-  openAISettings?: OpenAIRetrySettings;
+  providerSettings?: AIProviderRetrySettings;
   stageLogger?: StageLogger;
   useOpenAI?: boolean;
 }) {
@@ -670,12 +618,13 @@ export async function runLightweightKpiOverview({
     const openAIStartedAt = Date.now();
 
     try {
-      const modelResult = await runCompactOpenAIKpiAnswer({
+      const modelResult = await runCompactProviderKpiAnswer({
         supabase,
         workspaceId,
+        userId,
         userPrompt,
         summary,
-        openAISettings
+        providerSettings
       });
       diagnostics.openai_ms = Date.now() - openAIStartedAt;
       outputJson = normalizeModelOutput(modelResult.output, fallbackOutput);

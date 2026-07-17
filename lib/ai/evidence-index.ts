@@ -1,7 +1,7 @@
 import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { fetchWithOpenAIResilience, getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { createAIEmbeddings } from "@/lib/ai/providers/provider-manager";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import { isBusinessEvidenceEligible, isPlatformFailureText } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -22,17 +22,6 @@ export type FileAnalysisEvidenceAssessment = {
   factCount: number;
   requiresReview: boolean;
   sourceGrounding: "local_extraction" | "model_extraction";
-};
-
-type EmbeddingResponse = {
-  data?: Array<{ embedding?: number[] }>;
-  usage?: {
-    prompt_tokens?: number;
-    total_tokens?: number;
-  };
-  error?: {
-    message?: string;
-  };
 };
 
 export type EvidenceContextChunk = {
@@ -63,7 +52,6 @@ export type EvidenceContext = {
 
 type EvidenceStageLogger = (event: string, details?: Record<string, unknown>) => void;
 
-const DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small";
 const MAX_CHUNK_CHARACTERS = 1_400;
 const CHUNK_OVERLAP_CHARACTERS = 160;
 const DEFAULT_MAX_EVIDENCE_CHUNKS = 8;
@@ -313,68 +301,7 @@ function terms(value: string) {
 }
 
 async function createEmbeddings(inputs: string[], timeoutMs?: number) {
-  const apiKey = process.env.OPENAI_API_KEY;
-  const model = process.env.OPENAI_EMBEDDING_MODEL || DEFAULT_EMBEDDING_MODEL;
-
-  if (!apiKey || !inputs.length) {
-    return {
-      model,
-      embeddings: inputs.map(() => null as number[] | null),
-      tokens: 0,
-      error: apiKey ? undefined : "OPENAI_API_KEY is not configured."
-    };
-  }
-
-  let response: Response;
-
-  try {
-    const baseSettings = getOpenAIRetrySettings();
-    response = await fetchWithOpenAIResilience(
-      "https://api.openai.com/v1/embeddings",
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          model,
-          input: inputs
-        })
-      },
-      timeoutMs
-        ? {
-            ...baseSettings,
-            timeoutMs: Math.min(baseSettings.timeoutMs, timeoutMs),
-            maxRetries: 0
-          }
-        : baseSettings
-    );
-  } catch (error) {
-    return {
-      model,
-      embeddings: inputs.map(() => null as number[] | null),
-      tokens: 0,
-      error: error instanceof Error ? error.message : "Embedding request failed."
-    };
-  }
-
-  const payload = (await response.json().catch(() => ({}))) as EmbeddingResponse;
-
-  if (!response.ok) {
-    return {
-      model,
-      embeddings: inputs.map(() => null as number[] | null),
-      tokens: 0,
-      error: payload.error?.message || `Embedding request failed with status ${response.status}.`
-    };
-  }
-
-  return {
-    model,
-    embeddings: inputs.map((_, index) => payload.data?.[index]?.embedding || null),
-    tokens: payload.usage?.total_tokens || payload.usage?.prompt_tokens || 0
-  };
+  return createAIEmbeddings(inputs, timeoutMs);
 }
 
 function evidencePolicy() {

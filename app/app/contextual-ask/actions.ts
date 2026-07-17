@@ -3,7 +3,7 @@
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, rebuildEvidenceContext } from "@/lib/ai/evidence-index";
 import { buildDeterministicFocusedExplanation, buildFocusedExplanationContext } from "@/lib/ai/bounded-context";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
-import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { planVaeroexQuery } from "@/lib/ai/query-depth-planner";
 import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
@@ -334,7 +334,7 @@ The first sentence must explain this selected item directly. Stay within this it
     const generationStartedAt = Date.now();
 
     try {
-      const baseSettings = getOpenAIRetrySettings();
+      const baseSettings = getAIProviderRetrySettings();
       generation = await runVaeroexCompletionWithUsage({
         workflow,
         userPrompt,
@@ -344,10 +344,11 @@ The first sentence must explain this selected item directly. Stay within this it
         } satisfies Json,
         supabase,
         workspaceId,
+        userId: user.id,
         modelRoute: "focused_explanation",
         executionPath: queryPlan.classification,
         maxOutputTokens: 700,
-        openAISettings: {
+        providerSettings: {
           ...baseSettings,
           timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
           maxRetries: 0

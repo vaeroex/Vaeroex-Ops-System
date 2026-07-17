@@ -9,6 +9,7 @@ const actions = read("app/app/files/actions.ts");
 const sources = read("app/app/sources/page.tsx");
 const workflows = read("lib/ai/vaeroex-workflows.ts");
 const client = read("lib/ai/vaeroex-client.ts");
+const openAiProvider = read("lib/ai/providers/openai-provider.ts");
 
 const fileWorkflow = workflows.slice(
   workflows.indexOf('key: "file_analysis"'),
@@ -40,8 +41,10 @@ assert.match(workflows, /never infer missing values/, "image analysis must not i
 assert.match(actions, /file\.file_extension === "png"[\s\S]{0,120}file\.file_extension === "jpg"/, "PNG and JPG analysis must remain supported");
 assert.match(actions, /file\.file_extension === "jpeg"/, "JPEG analysis must remain supported");
 assert.match(actions, /file\.file_extension === "pdf"[\s\S]{0,900}fileAttachment\(file, buffer, "file"\)/, "scanned PDFs must retain direct file analysis");
-assert.match(client, /type: "input_image"/, "image attachments must use the OpenAI vision input path");
-assert.match(client, /type: "input_file"/, "PDF attachments must use the OpenAI file input path");
+assert.match(client, /type: "image"/, "image attachments must use the provider-neutral image input path");
+assert.match(client, /type: "file"/, "PDF attachments must use the provider-neutral file input path");
+assert.match(openAiProvider, /type: "input_image"/, "OpenAI fallback must preserve the vision input path");
+assert.match(openAiProvider, /type: "input_file"/, "OpenAI fallback must preserve the PDF input path");
 assert.match(actions, /function validateFileAnalysisOutputContract/, "all file types must validate the dedicated extraction contract");
 assert.match(actions, /allowedStatuses\.has\(extractionStatus\)/, "file analysis must validate extraction status");
 assert.match(actions, /allowedConfidence\.has\(confidence\)/, "file analysis must validate confidence");

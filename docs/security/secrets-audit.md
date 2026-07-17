@@ -6,8 +6,10 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `lib/supabase/config.ts` | Client-safe publishable/anon key; protected by RLS | SAFE |
 | `NEXT_PUBLIC_APP_URL` | `lib/supabase/config.ts` | Client-safe app URL | SAFE |
 | `SUPABASE_SERVICE_ROLE_KEY` | `lib/supabase/admin.ts` | Server-only; file is marked `server-only` | SAFE |
-| `OPENAI_API_KEY` | `lib/ai/vaeroex-client.ts` | Server-only; file is marked `server-only` | SAFE |
-| `OPENAI_MODEL` | `lib/ai/vaeroex-client.ts` | Server-only runtime setting | SAFE |
+| `OPENAI_API_KEY` | `lib/ai/providers/openai-provider.ts` | Server-only; file is marked `server-only` | SAFE |
+| `NVIDIA_API_KEY` | `lib/ai/providers/nvidia-provider.ts` | Server-only; file is marked `server-only` | SAFE |
+| `OPENAI_MODEL` | `lib/ai/model-routing.ts` | Server-only runtime setting | SAFE |
+| `AI_PROVIDER` | `lib/ai/model-routing.ts` | Server-only provider selection; defaults to OpenAI | SAFE |
 | `CRON_SECRET` | `app/api/cron/report-subscriptions/route.ts` | Server-only route authorization secret | SAFE |
 | `STRIPE_SECRET_KEY` | `lib/stripe/billing.ts` | Server-only Stripe API credential | SAFE |
 | `STRIPE_WEBHOOK_SECRET` | `app/api/stripe/webhook/route.ts` | Server-only webhook verification secret | SAFE |
@@ -21,8 +23,8 @@ Checks performed:
 - Client components are scanned by `scripts/security-check.ts` for server secret names.
 - Client components must not import `@/lib/supabase/admin`.
 - Client components must not import `@/lib/ai/vaeroex-client`.
-- The service-role Supabase client and OpenAI runtime client are marked with `server-only`.
+- The service-role Supabase client and AI provider runtime are marked with `server-only`.
 
 Important rule:
 
-Never create `NEXT_PUBLIC_` versions of `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `STRIPE_SECRET_KEY`, `CRON_SECRET`, or webhook secrets.
+Never create `NEXT_PUBLIC_` versions of `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `STRIPE_SECRET_KEY`, `CRON_SECRET`, or webhook secrets.

@@ -41,9 +41,9 @@ Vaeroex Ops System is ready for a limited beta after manual testing passes. It i
 
 ## Vaeroex AI
 
-- Vaeroex uses the configured OpenAI API key and `VAEROEX_SYSTEM_PROMPT`.
+- Vaeroex uses the configured server-side AI provider and `VAEROEX_SYSTEM_PROMPT`; OpenAI remains the default and fallback provider.
 - The prompt is non-empty in source and guarded before key workflows.
-- Token usage and estimated cost are currently stored as zero placeholders unless enhanced with real usage data from the model provider response.
+- Token usage, latency, provider/model metadata, and estimated cost are stored when returned by the model provider; exact NVIDIA cost requires the configured cost-rate environment values.
 - Vaeroex output is stored and can be saved after confirmation, but rich edit-before-save workflows are limited.
 - Streaming responses are not implemented.
 - Model reliability, latency, and cost have not been measured under real customer usage.

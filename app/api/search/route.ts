@@ -3,7 +3,7 @@ import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@/lib/ai/bounded-context";
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
-import { getOpenAIRetrySettings } from "@/lib/ai/openai-resilience";
+import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { planVaeroexQuery, type VaeroexEvidenceDomain } from "@/lib/ai/query-depth-planner";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -1116,7 +1116,7 @@ export async function POST(request: Request) {
   }
 
   const workflow = getVaeroexWorkflow("ask_vaeroex");
-  const baseSettings = getOpenAIRetrySettings();
+  const baseSettings = getAIProviderRetrySettings();
   const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
   const generationStartedAt = Date.now();
 
@@ -1137,10 +1137,11 @@ export async function POST(request: Request) {
       } satisfies Json,
       supabase,
       workspaceId,
+      userId: user.id,
       modelRoute,
       executionPath: queryPlan.classification,
       maxOutputTokens: queryPlan.tier === 3 ? 1_000 : 650,
-      openAISettings: {
+      providerSettings: {
         ...baseSettings,
         timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
         maxRetries: queryPlan.tier === 3 ? Math.min(baseSettings.maxRetries, 1) : 0
