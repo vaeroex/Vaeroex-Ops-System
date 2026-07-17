@@ -1,7 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { normalizePlanLimits } from "@/lib/billing/plans";
-import type { UsageSnapshot } from "@/lib/billing/types";
+import type { SubscriptionAccessResult, UsageSnapshot } from "@/lib/billing/types";
 import type { Database } from "@/lib/supabase/types";
 
 function monthStart() {
@@ -110,5 +110,35 @@ export async function isUsageLimitReached({
     subscription,
     usage,
     limitValue
+  };
+}
+
+export async function isAiRunUsageLimitReached({
+  supabase,
+  workspaceId,
+  subscription
+}: {
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+  subscription: SubscriptionAccessResult;
+}) {
+  const plan = normalizePlanLimits(subscription.plan);
+  const limitValue = plan?.max_ai_runs_per_month ?? null;
+
+  if (typeof limitValue !== "number") {
+    return { reached: false, limitValue, count: 0 };
+  }
+
+  const result = await supabase
+    .from("ai_agent_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("workspace_id", workspaceId)
+    .gte("created_at", monthStart());
+  const count = result.count ?? 0;
+
+  return {
+    reached: count >= limitValue,
+    limitValue,
+    count
   };
 }

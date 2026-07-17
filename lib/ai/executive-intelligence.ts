@@ -5,6 +5,7 @@ import { evidenceContextAsJson, type EvidenceContext } from "@/lib/ai/evidence-i
 import type { ExecutiveCitationCatalogEntry } from "@/lib/ai/executive-output";
 import type { VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
 import { estimateTokenCount } from "@/lib/ai/usage";
+import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
 import type { Json } from "@/lib/supabase/types";
 
 type JsonRecord = Record<string, Json | undefined>;
@@ -761,18 +762,31 @@ export function buildExecutiveReasoningContext({
   query,
   plan,
   boundedContext,
-  evidenceContext
+  evidenceContext,
+  stageLogger
 }: {
   query: string;
   plan: VaeroexQueryPlan;
   boundedContext: BoundedWorkspaceContext;
   evidenceContext: EvidenceContext;
+  stageLogger?: WorkflowStageLogger;
 }): ExecutiveReasoningContext {
+  const candidateAssemblyStartedAt = Date.now();
+  const candidates = [...structuredEvidenceCandidates(boundedContext), ...memoryEvidenceCandidates(evidenceContext)];
+  stageLogger?.("evidence_candidate_assembly_ms", Date.now() - candidateAssemblyStartedAt);
+
+  const rankingStartedAt = Date.now();
   const ranked = rankExecutiveEvidence(
-    [...structuredEvidenceCandidates(boundedContext), ...memoryEvidenceCandidates(evidenceContext)],
+    candidates,
     query
   );
+  stageLogger?.("evidence_ranking_deduplication_ms", Date.now() - rankingStartedAt);
+
+  const signalPlanningStartedAt = Date.now();
   const signalSynthesis = buildExecutiveSignalSynthesisPlan(ranked);
+  stageLogger?.("signal_planning_ms", Date.now() - signalPlanningStartedAt);
+
+  const promptConstructionStartedAt = Date.now();
   const signalByCitationId = new Map<number, ExecutiveSignalCandidate>();
   signalSynthesis.candidates.forEach((signal) => {
     signal.citationIds.forEach((citationId) => signalByCitationId.set(citationId, signal));
@@ -789,6 +803,9 @@ export function buildExecutiveReasoningContext({
     signalSynthesis,
     baseEvidence
   });
+  stageLogger?.("prompt_compaction_ms", Date.now() - promptConstructionStartedAt);
+
+  const manifestConstructionStartedAt = Date.now();
   const retainedSignalIds = new Set(signalSynthesis.candidates
     .filter((candidate) => candidate.citationIds.some((citationId) => compactPrompt.selectedCitationIds.has(citationId)))
     .map((candidate) => candidate.signalId));
@@ -836,7 +853,7 @@ export function buildExecutiveReasoningContext({
     : independentSourceCount === 1 || currentIndependentSourceCount < 2 || originalSourceTypeCount < 2
       ? "Partial" as const
       : "Sufficient" as const;
-  return {
+  const result: ExecutiveReasoningContext = {
     evidenceContextJson: compactPrompt.evidenceContextJson,
     modelWorkspaceSnapshot: compactPrompt.modelWorkspaceSnapshot,
     reasoningManifest: {
@@ -941,4 +958,6 @@ export function buildExecutiveReasoningContext({
     promptCompaction: compactPrompt.metrics,
     maximumEvidenceSufficiency
   };
+  stageLogger?.("reasoning_manifest_construction_ms", Date.now() - manifestConstructionStartedAt);
+  return result;
 }

@@ -1,8 +1,10 @@
 import { cookies } from "next/headers";
+import type { User } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
+import type { Database, Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 type MembershipWithWorkspace = WorkspaceMember & {
   workspaces: Workspace | Workspace[] | null;
@@ -15,8 +17,16 @@ export type WorkspaceContext = {
   membership: WorkspaceMember | null;
 };
 
-export async function getWorkspaceContext(preferredWorkspaceId?: string | null): Promise<WorkspaceContext> {
-  const supabase = await createSupabaseServerClient();
+type AuthenticatedWorkspaceContext = {
+  supabase: SupabaseClient<Database>;
+  user: User;
+};
+
+export async function getWorkspaceContext(
+  preferredWorkspaceId?: string | null,
+  authenticated?: AuthenticatedWorkspaceContext
+): Promise<WorkspaceContext> {
+  const supabase = authenticated?.supabase || await createSupabaseServerClient();
   const effectivePreferredWorkspaceId =
     preferredWorkspaceId === undefined ? (await cookies()).get("vaeroex_workspace_id")?.value ?? null : preferredWorkspaceId;
 
@@ -29,9 +39,7 @@ export async function getWorkspaceContext(preferredWorkspaceId?: string | null):
     };
   }
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = authenticated?.user || (await supabase.auth.getUser()).data.user;
 
   if (!user) {
     return {

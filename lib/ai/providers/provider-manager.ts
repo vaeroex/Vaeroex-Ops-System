@@ -1,6 +1,7 @@
 import "server-only";
 
 import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
+import { resolveAIProviderAttemptWindow, type AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
 import { OpenAIProvider } from "@/lib/ai/providers/openai-provider";
 import { NvidiaProvider } from "@/lib/ai/providers/nvidia-provider";
 import { AIProviderError, AIProviderPolicyError, type AIProvider, type AIProviderInputPart, type AIProviderName } from "@/lib/ai/providers/types";
@@ -20,7 +21,9 @@ export type AIProviderAttempt = {
   outputTokens: number;
   totalTokens: number;
   requestId: string | null;
-  failureType: "transport" | "structured_output" | "unsupported_input" | null;
+  failureType: "transport" | "structured_output" | "unsupported_input" | "deadline" | null;
+  timeoutBudgetMs?: number;
+  deadlineRemainingMs?: number;
 };
 
 export class AIProviderExecutionError extends Error {
@@ -48,6 +51,7 @@ type RunStructuredAIRequest<T> = {
   validate: (value: unknown) => StructuredOutputValidation<T>;
   providers?: ProviderRegistry;
   logContext?: { workflow?: string; modelRoute?: string; executionPath?: string };
+  executionBudget?: AIProviderExecutionBudget;
 };
 
 function providerRegistry(): ProviderRegistry {
@@ -84,6 +88,8 @@ function logAttempt(attempt: AIProviderAttempt, context: RunStructuredAIRequest<
     attempt: attempt.attempt,
     fallback,
     failureType: attempt.failureType,
+    timeoutBudgetMs: attempt.timeoutBudgetMs ?? null,
+    deadlineRemainingMs: Number.isFinite(attempt.deadlineRemainingMs) ? attempt.deadlineRemainingMs : null,
     workflow: context?.workflow || null,
     modelRoute: context?.modelRoute || null,
     executionPath: context?.executionPath || null
@@ -138,9 +144,39 @@ async function runProvider<T>({
 }) {
   let lastError: unknown;
   let validationReason = "";
-  const providerSettings = settingsForProvider(providerName, request.settings);
+  const configuredProviderSettings = settingsForProvider(providerName, request.settings);
 
   for (let attemptNumber = 1; attemptNumber <= maxAttempts; attemptNumber += 1) {
+    const attemptWindow = resolveAIProviderAttemptWindow({
+      budget: request.executionBudget,
+      provider: providerName,
+      fallback,
+      configuredTimeoutMs: configuredProviderSettings.timeoutMs
+    });
+    if (!attemptWindow.canStart) {
+      const skippedAttempt: AIProviderAttempt = {
+        provider: providerName,
+        model,
+        attempt: attemptNumber,
+        fallback,
+        success: false,
+        latencyMs: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+        totalTokens: 0,
+        requestId: null,
+        failureType: "deadline",
+        timeoutBudgetMs: attemptWindow.timeoutMs,
+        deadlineRemainingMs: attemptWindow.remainingMs
+      };
+      attempts.push(skippedAttempt);
+      logAttempt(skippedAttempt, request.logContext, fallback);
+      throw new AIProviderError(`${providerName} was skipped because the workflow deadline had insufficient time remaining.`, providerName, true);
+    }
+    const providerSettings = {
+      ...configuredProviderSettings,
+      timeoutMs: attemptWindow.timeoutMs
+    };
     const startedAt = Date.now();
     try {
       const result = await provider.generate({
@@ -167,7 +203,9 @@ async function runProvider<T>({
           outputTokens: result.usage.outputTokens,
           totalTokens: result.usage.totalTokens,
           requestId: result.requestId,
-          failureType: "structured_output"
+          failureType: "structured_output",
+          timeoutBudgetMs: attemptWindow.timeoutMs,
+          deadlineRemainingMs: attemptWindow.remainingMs
         };
         attempts.push(failedAttempt);
         logAttempt(failedAttempt, request.logContext, fallback);
@@ -190,7 +228,9 @@ async function runProvider<T>({
           outputTokens: result.usage.outputTokens,
           totalTokens: result.usage.totalTokens,
           requestId: result.requestId,
-          failureType: "structured_output"
+          failureType: "structured_output",
+          timeoutBudgetMs: attemptWindow.timeoutMs,
+          deadlineRemainingMs: attemptWindow.remainingMs
         };
         attempts.push(failedAttempt);
         logAttempt(failedAttempt, request.logContext, fallback);
@@ -210,7 +250,9 @@ async function runProvider<T>({
         outputTokens: result.usage.outputTokens,
         totalTokens: result.usage.totalTokens,
         requestId: result.requestId,
-        failureType: null
+        failureType: null,
+        timeoutBudgetMs: attemptWindow.timeoutMs,
+        deadlineRemainingMs: attemptWindow.remainingMs
       };
       attempts.push(successfulAttempt);
       logAttempt(successfulAttempt, request.logContext, fallback);
@@ -230,7 +272,9 @@ async function runProvider<T>({
         outputTokens: 0,
         totalTokens: 0,
         requestId: null,
-        failureType: unsupported ? "unsupported_input" : "transport"
+        failureType: unsupported ? "unsupported_input" : "transport",
+        timeoutBudgetMs: attemptWindow.timeoutMs,
+        deadlineRemainingMs: attemptWindow.remainingMs
       };
       attempts.push(failedAttempt);
       logAttempt(failedAttempt, request.logContext, fallback);

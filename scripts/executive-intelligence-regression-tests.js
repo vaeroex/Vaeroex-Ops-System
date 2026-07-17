@@ -734,6 +734,56 @@ const buildScaleMemory = (recordCount) => ({
   })),
   maxChunks: Math.min(recordCount, 200)
 });
+const deterministicFallbackReasoning = buildExecutiveReasoningContext({
+  query: scaleQuestion,
+  plan: scalePlan,
+  boundedContext: buildScaleContext(120),
+  evidenceContext: buildScaleMemory(120)
+});
+const deterministicMultiSignalFallback = buildLimitedEvidenceExecutiveAnswer({
+  query: scaleQuestion,
+  boundedContext: buildScaleContext(120),
+  reasoningContext: deterministicFallbackReasoning,
+  failureReason: "Both bounded provider attempts ended before completion."
+});
+assert.equal(
+  deterministicMultiSignalFallback.executiveBriefing.keyFindings.length,
+  Math.min(3, deterministicFallbackReasoning.signalSynthesis.candidates.length),
+  "provider failure must preserve up to three conservative ranked findings"
+);
+assert.ok(
+  deterministicMultiSignalFallback.executiveBriefing.keyFindings.length >= 2,
+  "multi-signal deterministic fallback must remain useful when several distinct signals are available"
+);
+
+const preparationBenchmarks = [
+  { label: "small", storedRecords: 120 },
+  { label: "medium", storedRecords: 5_000 },
+  { label: "large", storedRecords: 25_000 }
+].map(({ label, storedRecords }) => {
+  const retrievedRecordLimit = 120;
+  const bounded = buildScaleContext(Math.min(storedRecords, retrievedRecordLimit));
+  const startedAt = process.hrtime.bigint();
+  const reasoningContext = buildExecutiveReasoningContext({
+    query: scaleQuestion,
+    plan: scalePlan,
+    boundedContext: bounded,
+    evidenceContext: buildScaleMemory(Math.min(storedRecords, retrievedRecordLimit))
+  });
+  const preparationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
+  assert.ok(preparationMs < 1_500, `${label} bounded reasoning preparation must stay below 1.5 seconds`);
+  assert.ok(reasoningContext.rankedEvidenceCount <= 18, `${label} ranked evidence must stay within its fixed candidate cap`);
+  return {
+    label,
+    stored_records: storedRecords,
+    retrieved_records: Math.min(storedRecords, retrievedRecordLimit),
+    ranked_evidence: reasoningContext.rankedEvidenceCount,
+    preparation_ms: Math.round(preparationMs * 10) / 10
+  };
+});
+assert.equal(new Set(preparationBenchmarks.map((item) => item.retrieved_records)).size, 1, "retrieved preparation input must remain fixed as stored workspace data grows");
+assert.equal(new Set(preparationBenchmarks.map((item) => item.ranked_evidence)).size, 1, "ranked preparation output must remain fixed as stored workspace data grows");
+
 const scaleBenchmarks = [
   { label: "small", records: 120 },
   { label: "medium", records: 5_000 },
@@ -816,4 +866,5 @@ assert.doesNotMatch(userFacingFallback, /bounded summary|first relevant KPI|reas
 assert.equal("reasoningStage" in healthAnswer.executiveBriefing, false, "deterministic limited briefings must not expose internal reasoning");
 
 console.log("Executive prompt scale benchmarks:", JSON.stringify(scaleBenchmarks));
+console.log("Executive preparation scale benchmarks:", JSON.stringify(preparationBenchmarks));
 console.log("Executive Intelligence regression tests passed.");

@@ -6,6 +6,7 @@ import { validateVaeroexWorkflowContract } from "@/lib/ai/output-contracts";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { getAIProviderCircuitSnapshot, getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { getAIProviderRuntimeStatus, runStructuredAI } from "@/lib/ai/providers/provider-manager";
+import type { AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
 import { AIProviderPolicyError, type AIProviderInputPart } from "@/lib/ai/providers/types";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { assertWorkspaceTokenBudget, estimateTokenCount, getWorkspaceTokenBudget, type VaeroexTokenUsage } from "@/lib/ai/usage";
@@ -13,6 +14,7 @@ import type { VaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
 import { securityResponseMessage } from "@/lib/security/security-response";
 import type { Database, Json } from "@/lib/supabase/types";
+import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
 
 type RunVaeroexRequest = {
   workflow: VaeroexWorkflow;
@@ -24,6 +26,8 @@ type RunVaeroexRequest = {
   workspaceId?: string;
   userId?: string;
   providerSettings?: AIProviderRetrySettings;
+  providerExecutionBudget?: AIProviderExecutionBudget;
+  stageLogger?: WorkflowStageLogger;
   modelRoute?: VaeroexModelRoute;
   executionPath?: string;
   maxInputTokens?: number;
@@ -405,6 +409,8 @@ export async function runVaeroexCompletionWithUsage({
   workspaceId,
   userId,
   providerSettings,
+  providerExecutionBudget,
+  stageLogger,
   modelRoute = "default",
   executionPath = "default",
   maxInputTokens,
@@ -420,18 +426,19 @@ export async function runVaeroexCompletionWithUsage({
   const model = resolveVaeroexModel(modelRoute, primaryProvider);
   const fallbackModel = resolveVaeroexModel(modelRoute, "openai");
   const startedAt = Date.now();
+  const promptConstructionStartedAt = Date.now();
   assertDirectAttachmentSize(fileAttachment);
   const systemPrompt = `${VAEROEX_SYSTEM_PROMPT}\n\nWorkflow instructions:\n${workflow.instructions}`;
   const userContent = buildUserContent({ workflow, userPrompt, workspaceSnapshot, extraInputs, fileAttachment });
   const requestBodyJson = JSON.stringify({ model, systemPrompt, userContent, maxOutputTokens: maxOutputTokens || null });
   const requestSize = estimateVaeroexRequestSize(requestBodyJson, fileAttachment);
+  stageLogger?.("provider_prompt_construction_ms", Date.now() - promptConstructionStartedAt);
   const estimatedRequestTokens = requestSize.estimatedRequestTokens;
   if (maxInputTokens && estimatedRequestTokens > maxInputTokens) {
     throw new AIProviderPolicyError(
       `The bounded model request exceeded its ${maxInputTokens}-token interactive input budget.`
     );
   }
-  await enforceAIProviderRateLimits({ userId, workspaceId, operation: executionPath });
   logVaeroexAIEvent("token_budget_check_started", {
     requestId,
     workflow: workflow.key,
@@ -446,11 +453,28 @@ export async function runVaeroexCompletionWithUsage({
     attachmentBytes: requestSize.attachmentBytes,
     attachmentBudgetMode: requestSize.attachmentBudgetMode
   });
-  const tokenBudget = await assertWorkspaceTokenBudget({
-    supabase,
-    workspaceId,
-    estimatedRequestTokens
-  });
+  const [, tokenBudget] = await Promise.all([
+    (async () => {
+      const guardrailStartedAt = Date.now();
+      try {
+        await enforceAIProviderRateLimits({ userId, workspaceId, operation: executionPath });
+      } finally {
+        stageLogger?.("provider_rate_limit_ms", Date.now() - guardrailStartedAt);
+      }
+    })(),
+    (async () => {
+      const tokenBudgetStartedAt = Date.now();
+      try {
+        return await assertWorkspaceTokenBudget({
+          supabase,
+          workspaceId,
+          estimatedRequestTokens
+        });
+      } finally {
+        stageLogger?.("workspace_token_budget_ms", Date.now() - tokenBudgetStartedAt);
+      }
+    })()
+  ]);
   logVaeroexAIEvent("token_budget_check_finished", {
     requestId,
     workflow: workflow.key,
@@ -485,30 +509,38 @@ export async function runVaeroexCompletionWithUsage({
   if (isRecord(extraInputs) && isRecord(extraInputs.evidence_context)) {
     collectBoundedSourceIds(extraInputs.evidence_context as Json, allowedSourceIds);
   }
-  const generation = await runStructuredAI({
-    primaryProvider,
-    primaryModel: model,
-    fallbackModel,
-    systemPrompt,
-    userContent,
-    temperature: 0.2,
-    maxOutputTokens,
-    settings: providerSettings,
-    logContext: { workflow: workflow.key, modelRoute, executionPath },
-    validate(value) {
-      const contract = validateVaeroexWorkflowContract(workflow.key, value);
-      if (!contract.ok) return contract;
-      let normalized = normalizeVaeroexOutput(contract.value);
-      if (outputValidator) {
-        const contextualValidation = outputValidator(normalized);
-        if (!contextualValidation.ok) return contextualValidation;
-        normalized = contextualValidation.value;
+  stageLogger?.("provider_client_preparation_ms", Date.now() - startedAt);
+  const providerExecutionStartedAt = Date.now();
+  let generation: Awaited<ReturnType<typeof runStructuredAI<Json>>>;
+  try {
+    generation = await runStructuredAI({
+      primaryProvider,
+      primaryModel: model,
+      fallbackModel,
+      systemPrompt,
+      userContent,
+      temperature: 0.2,
+      maxOutputTokens,
+      settings: providerSettings,
+      executionBudget: providerExecutionBudget,
+      logContext: { workflow: workflow.key, modelRoute, executionPath },
+      validate(value) {
+        const contract = validateVaeroexWorkflowContract(workflow.key, value);
+        if (!contract.ok) return contract;
+        let normalized = normalizeVaeroexOutput(contract.value);
+        if (outputValidator) {
+          const contextualValidation = outputValidator(normalized);
+          if (!contextualValidation.ok) return contextualValidation;
+          normalized = contextualValidation.value;
+        }
+        const safety = validateAiGeneratedOutput(normalized, { allowedSourceIds });
+        if (!safety.ok) throw new AIProviderPolicyError(securityResponseMessage());
+        return { ok: true as const, value: normalized };
       }
-      const safety = validateAiGeneratedOutput(normalized, { allowedSourceIds });
-      if (!safety.ok) throw new AIProviderPolicyError(securityResponseMessage());
-      return { ok: true as const, value: normalized };
-    }
-  });
+    });
+  } finally {
+    stageLogger?.("provider_execution_ms", Date.now() - providerExecutionStartedAt);
+  }
   const latencyMs = Date.now() - startedAt;
   logVaeroexAIEvent("request_succeeded", {
     requestId,

@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAIEmbeddings } from "@/lib/ai/providers/provider-manager";
 import { estimateTokenCount } from "@/lib/ai/usage";
+import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
 import { isBusinessEvidenceEligible, isPlatformFailureText } from "@/lib/intelligence/evidence-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -571,6 +572,7 @@ export async function buildWorkspaceEvidenceContext({
   workspaceId,
   query,
   stageLogger,
+  timingLogger,
   maxChunks,
   retrievalStrategy = "auto",
   embeddingTimeoutMs
@@ -579,6 +581,7 @@ export async function buildWorkspaceEvidenceContext({
   workspaceId: string;
   query: string;
   stageLogger?: EvidenceStageLogger;
+  timingLogger?: WorkflowStageLogger;
   maxChunks?: number;
   retrievalStrategy?: "auto" | "keyword_only";
   embeddingTimeoutMs?: number;
@@ -592,7 +595,9 @@ export async function buildWorkspaceEvidenceContext({
   if (retrievalStrategy === "auto") {
     const candidateLimit = Math.min(48, Math.max(limit, limit * 4));
     stageLogger?.("embeddings_started", { queryLength: query.length, limit });
+    const embeddingStartedAt = Date.now();
     const embedding = await createEmbeddings([query.slice(0, 4_000)], embeddingTimeoutMs);
+    timingLogger?.("embedding_retrieval_ms", Date.now() - embeddingStartedAt);
     stageLogger?.("embeddings_finished", {
       embeddingAvailable: Boolean(embedding.embeddings[0]),
       embeddingError: embedding.error || null,
@@ -601,19 +606,23 @@ export async function buildWorkspaceEvidenceContext({
 
     if (embedding.embeddings[0]) {
       stageLogger?.("vector_retrieval_started", { limit });
+      const vectorStartedAt = Date.now();
       const { data, error } = await supabase.rpc("match_business_memory_chunks", {
         target_workspace_id: workspaceId,
         query_embedding: embedding.embeddings[0],
         match_count: candidateLimit,
         min_similarity: 0.08
       });
+      timingLogger?.("vector_database_retrieval_ms", Date.now() - vectorStartedAt);
       stageLogger?.("vector_retrieval_finished", {
         matchCount: data?.length || 0,
         error: error?.message || null
       });
 
       if (!error && data?.length) {
+        const lifecycleFilterStartedAt = Date.now();
         const eligibleRows = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: data });
+        timingLogger?.("memory_lifecycle_filter_ms", Date.now() - lifecycleFilterStartedAt);
         chunks = eligibleRows
           .slice(0, limit)
           .map((row) => toEvidenceChunk(row, "similarity" in row ? row.similarity : undefined));
@@ -630,7 +639,9 @@ export async function buildWorkspaceEvidenceContext({
 
   if (!chunks.length) {
     stageLogger?.("keyword_retrieval_started", { limit });
+    const keywordStartedAt = Date.now();
     chunks = await keywordEvidence({ supabase, workspaceId, query, limit });
+    timingLogger?.("keyword_database_retrieval_ms", Date.now() - keywordStartedAt);
     stageLogger?.("keyword_retrieval_finished", { matchCount: chunks.length });
     retrievalMode = chunks.length ? "keyword" : "none";
   }

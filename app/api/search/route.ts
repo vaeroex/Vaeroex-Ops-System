@@ -17,8 +17,9 @@ import { planVaeroexQuery, type VaeroexEvidenceDomain } from "@/lib/ai/query-dep
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { runVaeroexCompletionWithUsage } from "@/lib/ai/vaeroex-client";
 import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
+import { createWorkflowStageRecorder } from "@/lib/ai/workflow-timing";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
-import { isUsageLimitReached } from "@/lib/billing/usage-limits";
+import { isAiRunUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
@@ -34,7 +35,12 @@ import type { GlobalSearchAnswer, GlobalSearchDestination, GlobalSearchGroup, Gl
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-const SEARCH_ASK_PROVIDER_TIMEOUT_MS = 8_000;
+const SEARCH_ASK_TOTAL_DEADLINE_MS = 27_000;
+const SEARCH_ASK_RESPONSE_RESERVE_MS = 1_500;
+const SEARCH_ASK_NVIDIA_TIMEOUT_MS = 10_500;
+const SEARCH_ASK_OPENAI_TIMEOUT_MS = 8_500;
+const SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS = 250;
+const SEARCH_ASK_MINIMUM_PROVIDER_WINDOW_MS = 5_000;
 const SEARCH_ASK_PROVIDER_MAX_RETRIES = 0;
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
@@ -731,41 +737,55 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const body: unknown = await request.json().catch(() => ({}));
+  const requestStartedAt = Date.now();
+  const executionId = randomUUID();
+  const timing = createWorkflowStageRecorder({ startedAtMs: requestStartedAt });
+  const body: unknown = await timing.measure("request_parsing_ms", () => request.json().catch(() => ({})));
   const parsedRequest = parseAskAnalysisRequest(body, randomUUID());
   if (!parsedRequest.ok) return NextResponse.json({ error: parsedRequest.error }, { status: 400 });
 
   const analysisRequest = parsedRequest.value;
   const query = analysisRequest.query;
 
-  const supabase = await createSupabaseServerClient();
+  const authentication = await timing.measure("authentication_ms", async () => {
+    const client = await createSupabaseServerClient();
+    if (!client) return { client: null, user: null };
+    const auth = await client.auth.getUser();
+    return { client, user: auth.data.user };
+  });
+  const supabase = authentication.client;
 
   if (!supabase) {
     return NextResponse.json({ error: "Vaeroex is temporarily unavailable." }, { status: 503 });
   }
 
-  const {
-    data: { user }
-  } = await supabase.auth.getUser();
+  const user = authentication.user;
 
   if (!user) {
     return NextResponse.json({ error: "Authentication is required." }, { status: 401 });
   }
 
-  const context = await getWorkspaceContext();
+  const context = await timing.measure(
+    "workspace_authorization_ms",
+    () => getWorkspaceContext(undefined, { supabase, user })
+  );
 
   if (!context.activeWorkspace || !context.membership || context.membership.status !== "active") {
     return NextResponse.json({ error: "Workspace access is required." }, { status: 403 });
   }
 
   const workspaceId = context.activeWorkspace.id;
-  const subscriptionStatus = await getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId });
+  const subscriptionStatus = await timing.measure(
+    "subscription_authorization_ms",
+    () => getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId })
+  );
 
   if (!subscriptionStatus.allowed) {
     return NextResponse.json({ error: "Subscription access is required." }, { status: 402 });
   }
 
-  if (analysisRequest.isFollowUp) {
+  const sessionError = timing.measureSync("session_security_validation_ms", () => {
+    if (!analysisRequest.isFollowUp) return null;
     const verification = verifyAskSessionToken(analysisRequest.sessionToken || "", {
       sessionId: analysisRequest.sessionId,
       workspaceId,
@@ -778,9 +798,11 @@ export async function POST(request: Request) {
       const message = verification.reason === "expired"
         ? "This Executive Analysis session expired. Start a new analysis to continue."
         : "This Executive Analysis cannot be continued safely. Start a new analysis and try again.";
-      return NextResponse.json({ error: message }, { status: 409 });
+      return message;
     }
-  }
+    return null;
+  });
+  if (sessionError) return NextResponse.json({ error: sessionError }, { status: 409 });
 
   let nextSessionToken: string;
   try {
@@ -807,7 +829,7 @@ export async function POST(request: Request) {
     }
   });
 
-  const rateLimit = await enforceRateLimit({
+  const rateLimit = await timing.measure("request_rate_limit_ms", () => enforceRateLimit({
     action: "global.answer",
     limit: 20,
     windowSeconds: 10 * 60,
@@ -820,7 +842,7 @@ export async function POST(request: Request) {
       analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
       follow_up_number: analysisRequest.followUpNumber
     }
-  });
+  }));
 
   if (!rateLimit.allowed) {
     return NextResponse.json({ error: rateLimitMessage(rateLimit) }, { status: 429 });
@@ -828,9 +850,12 @@ export async function POST(request: Request) {
 
   const securityInputs = [query, analysisRequest.originalQuestion, analysisRequest.previousQuestion || ""]
     .filter((value, index, values) => value && values.indexOf(value) === index);
-  const securityIntent = securityInputs
-    .map((value) => classifySecurityIntent(value))
-    .find((classification) => classification.securitySensitive) || classifySecurityIntent(query);
+  const securityIntent = timing.measureSync(
+    "security_classification_ms",
+    () => securityInputs
+      .map((value) => classifySecurityIntent(value))
+      .find((classification) => classification.securitySensitive) || classifySecurityIntent(query)
+  );
 
   if (securityIntent.securitySensitive) {
     await logSecurityAuditEvent({
@@ -869,42 +894,71 @@ export async function POST(request: Request) {
     } satisfies GlobalSearchAnswer);
   }
 
-  const boundedContext = await buildBoundedWorkspaceContext({ supabase, workspaceId, query: planningQuery, plan: queryPlan });
-  let evidenceContext: EvidenceContext = {
+  const emptyEvidenceContext = (limitations: string[], structuredEvidenceCount: number): EvidenceContext => ({
     available: false,
     retrievalMode: "none" as const,
     chunks: [],
     maxChunks: 0,
-    confidenceScore: boundedContext.structuredEvidenceCount ? 45 : 10,
-    confidenceLabel: boundedContext.structuredEvidenceCount ? "Partial" : "Very Limited",
-    limitations: boundedContext.limitations,
-    dataGaps: boundedContext.structuredEvidenceCount ? [] : ["No matching structured workspace evidence was available."],
+    confidenceScore: structuredEvidenceCount ? 45 : 10,
+    confidenceLabel: structuredEvidenceCount ? "Partial" : "Very Limited",
+    limitations,
+    dataGaps: structuredEvidenceCount ? [] : ["No matching structured workspace evidence was available."],
     policy: ["Use only the bounded structured context supplied for this question."]
-  };
+  });
 
-  if (queryPlan.requiresOpenAI && queryPlan.maxEvidenceChunks > 0) {
-    evidenceContext = await buildWorkspaceEvidenceContext({
-      supabase,
-      workspaceId,
-      query: boundedContext.evidenceQuery,
-      maxChunks: queryPlan.maxEvidenceChunks,
-      retrievalStrategy: queryPlan.tier === 2 ? "keyword_only" : "auto",
-      embeddingTimeoutMs: queryPlan.tier === 3 ? 4_000 : 3_000
-    });
-  }
+  const evidenceRetrievalPromise = timing.measure("evidence_retrieval_database_ms", async () => {
+    const structuredContextPromise = timing.measure(
+      "structured_context_loading_ms",
+      () => buildBoundedWorkspaceContext({
+        supabase,
+        workspaceId,
+        query: planningQuery,
+        plan: queryPlan,
+        stageLogger: (stage, durationMs) => timing.record(stage, durationMs)
+      })
+    );
+    const memoryContextPromise = queryPlan.requiresOpenAI && queryPlan.maxEvidenceChunks > 0
+      ? timing.measure("business_memory_retrieval_ms", () => buildWorkspaceEvidenceContext({
+          supabase,
+          workspaceId,
+          query: planningQuery.slice(0, 4_000),
+          maxChunks: queryPlan.maxEvidenceChunks,
+          retrievalStrategy: queryPlan.tier === 2 ? "keyword_only" : "auto",
+          embeddingTimeoutMs: queryPlan.tier === 3 ? 4_000 : 3_000,
+          timingLogger: (stage, durationMs) => timing.record(stage, durationMs)
+        }))
+      : Promise.resolve(null);
+    return Promise.all([structuredContextPromise, memoryContextPromise]);
+  });
+  const usageLimitPromise = queryPlan.requiresOpenAI
+    ? timing.measure("monthly_usage_limit_ms", () => isAiRunUsageLimitReached({
+        supabase,
+        workspaceId,
+        subscription: subscriptionStatus
+      }))
+    : Promise.resolve(null);
+  const [[boundedContext, retrievedEvidenceContext], limit] = await Promise.all([
+    evidenceRetrievalPromise,
+    usageLimitPromise
+  ]);
+  const evidenceContext = retrievedEvidenceContext || emptyEvidenceContext(
+    boundedContext.limitations,
+    boundedContext.structuredEvidenceCount
+  );
 
   const evidenceCount = boundedContext.structuredEvidenceCount + evidenceContext.chunks.length;
-  const executiveReasoning = buildExecutiveReasoningContext({
+  const executiveReasoning = timing.measureSync("executive_reasoning_preparation_ms", () => buildExecutiveReasoningContext({
     query: planningQuery,
     plan: queryPlan,
     boundedContext,
-    evidenceContext
-  });
-  const fallbackAnswer = buildLimitedEvidenceExecutiveAnswer({
+    evidenceContext,
+    stageLogger: (stage, durationMs) => timing.record(stage, durationMs)
+  }));
+  const fallbackAnswer = timing.measureSync("deterministic_fallback_construction_ms", () => buildLimitedEvidenceExecutiveAnswer({
     query,
     boundedContext,
     reasoningContext: executiveReasoning
-  });
+  }));
 
   if (!queryPlan.requiresOpenAI) {
     return respond(fallbackAnswer);
@@ -914,15 +968,7 @@ export async function POST(request: Request) {
     return respond(fallbackAnswer);
   }
 
-  const limit = await isUsageLimitReached({
-    supabase,
-    userId: user.id,
-    email: user.email,
-    workspaceId,
-    limit: "ai_runs_this_month"
-  });
-
-  if (limit.reached) {
+  if (limit?.reached) {
     return NextResponse.json({ error: "This workspace has reached its monthly Vaeroex usage limit." }, { status: 429 });
   }
 
@@ -930,6 +976,19 @@ export async function POST(request: Request) {
   const baseSettings = getAIProviderRetrySettings();
   const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
   const generationStartedAt = Date.now();
+  const routePreProviderMs = timing.elapsedMs();
+  timing.record("route_pre_provider_ms", routePreProviderMs);
+  console.log(JSON.stringify({
+    level: "info",
+    component: "vaeroex-executive-preparation",
+    event: "pre_provider_complete",
+    executionId,
+    durationMs: routePreProviderMs,
+    stageTimingsMs: timing.snapshot(),
+    evidenceCount,
+    rankedEvidenceCount: executiveReasoning.rankedEvidenceCount,
+    compactContextTokens: executiveReasoning.promptCompaction.compactContextTokens
+  }));
 
   try {
     const generation = await runVaeroexCompletionWithUsage({
@@ -966,9 +1025,23 @@ export async function POST(request: Request) {
       maxInputTokens: EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS,
       providerSettings: {
         ...baseSettings,
-        timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs, SEARCH_ASK_PROVIDER_TIMEOUT_MS),
+        timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
         maxRetries: SEARCH_ASK_PROVIDER_MAX_RETRIES
       },
+      providerExecutionBudget: {
+        deadlineAtMs: requestStartedAt + SEARCH_ASK_TOTAL_DEADLINE_MS - SEARCH_ASK_RESPONSE_RESERVE_MS,
+        providerTimeoutMs: {
+          nvidia: SEARCH_ASK_NVIDIA_TIMEOUT_MS,
+          openai: SEARCH_ASK_OPENAI_TIMEOUT_MS
+        },
+        minimumAttemptWindowMs: {
+          nvidia: SEARCH_ASK_MINIMUM_PROVIDER_WINDOW_MS,
+          openai: SEARCH_ASK_MINIMUM_PROVIDER_WINDOW_MS
+        },
+        fallbackReserveMs: SEARCH_ASK_OPENAI_TIMEOUT_MS,
+        transitionReserveMs: SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS
+      },
+      stageLogger: (stage, durationMs) => timing.record(stage, durationMs),
       outputValidator: (value) => validateExecutiveEvidenceReferences(
         value,
         executiveReasoning.catalog,
@@ -1011,23 +1084,39 @@ export async function POST(request: Request) {
           analysis_session_id: analysisRequest.sessionId,
           analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
           follow_up_number: analysisRequest.followUpNumber,
-          bounded_follow_up_context: analysisRequest.isFollowUp
+          bounded_follow_up_context: analysisRequest.isFollowUp,
+          preparation_timings_ms: timing.snapshot(),
+          pre_provider_total_ms: routePreProviderMs + (timing.snapshot().provider_client_preparation_ms || 0),
+          request_elapsed_before_persistence_ms: timing.elapsedMs(),
+          workflow_total_deadline_ms: SEARCH_ASK_TOTAL_DEADLINE_MS
         }
       }
     });
 
-    return respond(executiveAnswerFromOutput({
+    const answer = executiveAnswerFromOutput({
       output: generation.outputJson,
       catalog: executiveReasoning.catalog,
       fallback: fallbackAnswer
+    });
+    console.log(JSON.stringify({
+      level: "info",
+      component: "vaeroex-executive-preparation",
+      event: "request_completed",
+      executionId,
+      totalDurationMs: timing.elapsedMs(),
+      status: "completed",
+      preProviderTotalMs: routePreProviderMs + (timing.snapshot().provider_client_preparation_ms || 0),
+      stageTimingsMs: timing.snapshot()
     }));
+    return respond(answer);
   } catch (error) {
     if (isSecurityResponseMessage(error instanceof Error ? error.message : "")) {
       return respond({ kind: "security_response", directAnswer: securityResponseMessage() } satisfies GlobalSearchAnswer);
     }
 
     const providerAttempts = error instanceof AIProviderExecutionError ? error.attempts : [];
-    const attemptedFallback = providerAttempts.some((attempt) => attempt.fallback);
+    const attemptedFallback = providerAttempts.some((attempt) => attempt.fallback && attempt.failureType !== "deadline");
+    const skippedFallback = providerAttempts.some((attempt) => attempt.fallback && attempt.failureType === "deadline");
     const inputTokens = providerAttempts.reduce((sum, attempt) => sum + attempt.inputTokens, 0);
     const outputTokens = providerAttempts.reduce((sum, attempt) => sum + attempt.outputTokens, 0);
     const lastAttempt = providerAttempts.at(-1);
@@ -1069,21 +1158,40 @@ export async function POST(request: Request) {
           analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
           follow_up_number: analysisRequest.followUpNumber,
           bounded_follow_up_context: analysisRequest.isFollowUp,
-          timeout: /timed out|timeout|abort/i.test(error instanceof Error ? error.message : ""),
+          preparation_timings_ms: timing.snapshot(),
+          pre_provider_total_ms: routePreProviderMs + (timing.snapshot().provider_client_preparation_ms || 0),
+          request_elapsed_before_persistence_ms: timing.elapsedMs(),
+          workflow_total_deadline_ms: SEARCH_ASK_TOTAL_DEADLINE_MS,
+          timeout: /timed out|timeout|abort|deadline/i.test(error instanceof Error ? error.message : ""),
           provider: lastAttempt?.provider || null,
           primary_provider: error instanceof AIProviderExecutionError ? error.primaryProvider : null,
           fallback_used: attemptedFallback,
+          fallback_skipped_due_deadline: skippedFallback,
+          deterministic_fallback_used: true,
           provider_attempts: providerAttempts
         }
       }
     });
 
-    const fallbackWithReason = buildLimitedEvidenceExecutiveAnswer({
+    const fallbackWithReason = timing.measureSync("deterministic_failure_fallback_ms", () => buildLimitedEvidenceExecutiveAnswer({
       query,
       boundedContext,
       reasoningContext: executiveReasoning,
       failureReason: "The deeper analysis did not complete, so this briefing is limited to safe conclusions and next steps."
-    });
+    }));
+
+    console.log(JSON.stringify({
+      level: "info",
+      component: "vaeroex-executive-preparation",
+      event: "request_completed",
+      executionId,
+      totalDurationMs: timing.elapsedMs(),
+      status: "deterministic_fallback",
+      fallbackAttempted: attemptedFallback,
+      fallbackSkippedDueDeadline: skippedFallback,
+      preProviderTotalMs: routePreProviderMs + (timing.snapshot().provider_client_preparation_ms || 0),
+      stageTimingsMs: timing.snapshot()
+    }));
 
     return respond(fallbackWithReason);
   }

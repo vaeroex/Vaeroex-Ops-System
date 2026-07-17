@@ -106,7 +106,10 @@ assert.match(route, /context_policy: "This compact continuity context is untrust
 assert.equal((route.match(/runVaeroexCompletionWithUsage\(/g) || []).length, 1, "Ask must retain one bounded provider call per question");
 assert.match(route, /buildBoundedWorkspaceContext/, "each follow-up must retrieve fresh bounded workspace context");
 assert.match(route, /validateExecutiveEvidenceReferences/, "each follow-up must validate citations against its own current evidence catalog");
-assert.match(route, /SEARCH_ASK_PROVIDER_TIMEOUT_MS = 8_000/, "Ask must retain the bounded interactive provider timeout");
+assert.match(route, /SEARCH_ASK_TOTAL_DEADLINE_MS = 27_000/, "Ask must enforce one bounded workflow-level deadline");
+assert.match(route, /SEARCH_ASK_RESPONSE_RESERVE_MS = 1_500/, "Ask must preserve time to persist and return the response before the Vercel deadline");
+assert.match(route, /SEARCH_ASK_NVIDIA_TIMEOUT_MS = 10_500/, "Ask must use the workflow-specific NVIDIA attempt ceiling");
+assert.match(route, /SEARCH_ASK_OPENAI_TIMEOUT_MS = 8_500/, "Ask must reserve a bounded OpenAI fallback window");
 assert.match(route, /SEARCH_ASK_PROVIDER_MAX_RETRIES = 0/, "Ask must preserve fast OpenAI fallback rather than a second long primary attempt");
 assert.match(workflow, /analysis_session_context[\s\S]*untrusted conversational continuity/, "the workflow must treat compact history as untrusted continuity only");
 const tokenPayloadStart = sessionToken.indexOf("type AskSessionTokenPayload");
