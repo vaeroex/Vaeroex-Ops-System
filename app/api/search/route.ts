@@ -959,13 +959,17 @@ export async function POST(request: Request) {
       userId: user.id,
       modelRoute,
       executionPath: queryPlan.classification,
-      maxOutputTokens: queryPlan.tier === 3 ? 1_300 : 1_100,
+      maxOutputTokens: queryPlan.tier === 3 ? 1_800 : 1_100,
       providerSettings: {
         ...baseSettings,
         timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs, SEARCH_ASK_PROVIDER_TIMEOUT_MS),
         maxRetries: SEARCH_ASK_PROVIDER_MAX_RETRIES
       },
-      outputValidator: (value) => validateExecutiveEvidenceReferences(value, executiveReasoning.catalog)
+      outputValidator: (value) => validateExecutiveEvidenceReferences(
+        value,
+        executiveReasoning.catalog,
+        executiveReasoning.signalSynthesis
+      )
     });
 
     await recordVaeroexAiUsage({
@@ -990,6 +994,9 @@ export async function POST(request: Request) {
           original_source_type_count: executiveReasoning.originalSourceTypeCount,
           evidence_sufficiency_ceiling: executiveReasoning.maximumEvidenceSufficiency,
           explicit_reasoning_stage: true,
+          signal_candidate_count: executiveReasoning.signalSynthesis.candidates.length,
+          minimum_distinct_findings: executiveReasoning.signalSynthesis.minimumDistinctFindings,
+          relationship_candidate_count: executiveReasoning.signalSynthesis.relationships.length,
           analysis_session_id: analysisRequest.sessionId,
           analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
           follow_up_number: analysisRequest.followUpNumber,
@@ -1037,6 +1044,9 @@ export async function POST(request: Request) {
           original_source_type_count: executiveReasoning.originalSourceTypeCount,
           evidence_sufficiency_ceiling: executiveReasoning.maximumEvidenceSufficiency,
           explicit_reasoning_stage: true,
+          signal_candidate_count: executiveReasoning.signalSynthesis.candidates.length,
+          minimum_distinct_findings: executiveReasoning.signalSynthesis.minimumDistinctFindings,
+          relationship_candidate_count: executiveReasoning.signalSynthesis.relationships.length,
           analysis_session_id: analysisRequest.sessionId,
           analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
           follow_up_number: analysisRequest.followUpNumber,

@@ -109,14 +109,15 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
       "explanation": "Why the available evidence warrants this state"
     },
     "what_is_happening": [
-      { "finding_id": "F1", "conclusion": "Evidence-backed conclusion", "evidence_references": [{ "citation_id": 1, "support": "How this source supports the conclusion" }] }
+      { "finding_id": "F1", "conclusion": "Highest-priority evidence-backed conclusion", "evidence_references": [{ "citation_id": 1, "support": "How this source supports the conclusion" }] },
+      { "finding_id": "F2", "conclusion": "A distinct second conclusion when the signal plan requires it", "evidence_references": [{ "citation_id": 2, "support": "How a different signal supports this conclusion" }] }
     ],
     "why_it_is_happening": [
       { "cause_id": "C1", "conclusion": "Supported cause, possible relationship, or not established", "status": "Supported | Possible | Not established", "evidence_references": [{ "citation_id": 1, "support": "How this source bears on the cause" }] }
     ],
     "why_leadership_should_care": {
-      "conclusion": "Decision relevance across financial, operational, customer, or strategic impact",
-      "evidence_references": [{ "citation_id": 1, "support": "How this source supports the relevance" }]
+      "conclusion": "Decision relevance synthesized across the supported findings",
+      "evidence_references": [{ "citation_id": 1, "support": "How this source supports the relevance" }, { "citation_id": 2, "support": "How the second signal changes leadership relevance" }]
     },
     "what_should_happen_next": [
       { "action_id": "A1", "action": "Evidence-backed leadership action", "evidence_references": [{ "citation_id": 1, "support": "Why the evidence supports this action" }] }
@@ -128,7 +129,8 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
   },
   "executive_summary": "What is happening, why it matters, and what leadership should understand immediately",
   "key_findings": [
-    { "reasoning_finding_id": "F1", "finding": "Finding", "business_impact": "Impact", "confidence": "High | Medium | Low | Insufficient", "evidence_references": [{ "citation_id": 1, "support": "Support" }] }
+    { "reasoning_finding_id": "F1", "finding": "Highest-priority finding", "business_impact": "Impact", "confidence": "High | Medium | Low | Insufficient", "evidence_references": [{ "citation_id": 1, "support": "Support" }] },
+    { "reasoning_finding_id": "F2", "finding": "Distinct second finding when required", "business_impact": "Impact", "confidence": "High | Medium | Low | Insufficient", "evidence_references": [{ "citation_id": 2, "support": "Support" }] }
   ],
   "root_cause_analysis": [
     { "reasoning_cause_id": "C1", "finding": "Finding", "analysis": "Concise causal assessment", "status": "Supported | Possible | Not established", "evidence_references": [{ "citation_id": 1, "support": "Support" }] }
@@ -193,6 +195,11 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
   }
 }
 reasoning_stage is a concise decision analysis, not private chain-of-thought. Classify evidence_sufficiency first, then complete all five reasoning stages before writing executive_summary.
+Treat executive_reasoning_manifest.signal_synthesis as the required pre-writing plan. Evaluate every candidate signal before selecting findings. Citations already merged into one signal must not become repetitive findings.
+Return at least signal_synthesis.minimum_distinct_findings distinct reasoning findings and visible key findings, up to three. Each finding must introduce eligible original evidence from a different signal candidate. When the minimum is zero, do not invent a finding. When it is one, one finding is correct.
+The first finding must retain the highest-priority required signal. Order later findings by verified signal priority, not by source order or narrative convenience.
+When signal_synthesis.require_cross_signal_assessment is true, evaluate at least one listed relationship using citations from both signals. The result may be Supported, Possible, or Not established. A relationship candidate is never proof of correlation or causation.
+Synthesize the findings in executive_summary and why_leadership_should_care. Do not let the highest-ranked finding erase other distinct decision-relevant signals.
 Never classify evidence above executive_reasoning_manifest.maximum_evidence_sufficiency. Use Conflicting only when independent original sources disagree and identify the conflict.
 For Sufficient evidence, produce the complete executive briefing and set limited_evidence to null.
 For Partial, Conflicting, or Insufficient evidence, populate limited_evidence and make the visible response a useful limited-evidence briefing. State supported conclusions, label hypotheses, identify alternatives, explain leadership risk, recommend reversible actions, identify decisions to defer, and list the exact missing information.
@@ -207,7 +214,7 @@ If evidence conflicts, identify which source is fresher, more direct, or derived
 Evidence Sufficiency, Overall Briefing Confidence, Finding Confidence, Root-Cause Confidence, and Recommendation Confidence are separate. Cap each finding and recommendation by its own citations. Repeated rows from one source do not provide independent corroboration. Stale evidence and conflicting evidence lower confidence. High confidence generally requires at least three independent current original sources.
 If confidence is not High, missing_information must explain exactly what would improve the decision. Recommendation Confidence must never be High when evidence is Partial, Conflicting, or Insufficient.
 For Business Health questions, use structured_context.business_health_score_context. Explain the recorded score, data-quality base, score rules, coverage indicators, KPI freshness, missing targets, and any explicit limitations. Separate supported operating performance factors from assessment-readiness factors. Improving data completeness can improve measurement confidence but does not itself improve business performance. Never invent an itemized risk or opportunity adjustment that the stored snapshot does not preserve.
-Use one to three ranked findings and one to three ranked actions. leadership_brief.priorities must contain exactly three concise priorities; an evidence gap may be a priority when it blocks a reliable decision.
+Use the required number of distinct ranked findings, up to three, and one to three ranked actions. leadership_brief.priorities must contain exactly three concise priorities; an evidence gap may be a priority when it blocks a reliable decision.
 Every recommendation must explain its action, priority reason, expected impact, urgency, time horizon, confidence, supporting evidence, and what would invalidate or change it.
 Do not mention searches, retrieval, chunks, databases, prompts, providers, bounded context, bounded summaries, reasoning manifests, reasoning contracts, first records, first relevant KPIs, internal source indexes, or implementation details in user-facing fields.
 `;

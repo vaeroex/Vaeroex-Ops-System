@@ -54,11 +54,15 @@ assert.match(route, /buildLimitedEvidenceExecutiveAnswer/, "zero-evidence and pr
 assert.doesNotMatch(route, /buildDeterministicBoundedAnswer/, "executive generation must not return the legacy single-sentence fallback");
 assert.match(route, /outputValidator:\s*\(value\) => validateExecutiveEvidenceReferences/, "executive citations and source independence must be validated inside the provider contract");
 assert.match(route, /explicit_reasoning_stage:\s*true/, "usage telemetry must record the executive reasoning path without recording its content");
+assert.match(route, /signal_candidate_count:\s*executiveReasoning\.signalSynthesis\.candidates\.length/, "usage telemetry must record bounded signal counts without logging signal content");
+assert.match(route, /maxOutputTokens:\s*queryPlan\.tier === 3 \? 1_800 : 1_100/, "Tier 3 must reserve enough bounded output space for multi-signal synthesis");
 assert.match(route, /runVaeroexCompletionWithUsage/, "executive reasoning must remain behind the provider-neutral Vaeroex client");
 assert.match(client, /runStructuredAI/, "the Vaeroex client must continue to use the provider manager");
 assert.match(workflow, /reasoning_must_precede_writing|complete all five reasoning stages before writing executive_summary/i, "the workflow must reason before it writes");
 assert.match(workflow, /what_is_happening[\s\S]*why_it_is_happening[\s\S]*why_leadership_should_care[\s\S]*what_should_happen_next[\s\S]*priority_logic/, "the five executive reasoning decisions must be explicit and ordered");
 assert.match(outputContracts, /workflow === "executive_intelligence"/, "executive responses must use a dedicated structured contract");
+assert.match(workflow, /signal_synthesis\.minimum_distinct_findings/, "the executive prompt must honor the deterministic multi-signal plan");
+assert.match(workflow, /Do not let the highest-ranked finding erase other distinct decision-relevant signals/, "the executive prompt must prevent dominant-signal collapse");
 assert.match(reasoning, /businessImpact \* 0\.3[\s\S]*confidence \* 0\.25[\s\S]*freshness \* 0\.15[\s\S]*directRelevance \* 0\.25[\s\S]*historicalImportance \* 0\.05/, "evidence ranking must use all required factors");
 assert.match(reasoning, /business_memory_is_supporting_context_not_an_independent_source:\s*true/, "Business Memory must not inflate independent-source confidence");
 assert.match(reasoning, /derived_reports_cannot_establish_current_business_facts:\s*true/, "derived reports must not establish new business facts");
@@ -184,6 +188,79 @@ const catalog = [
 
 assert.equal(validateExecutiveIntelligenceContract(validOutput).ok, true, "a complete reason-first executive response must satisfy the contract");
 assert.equal(validateExecutiveEvidenceReferences(validOutput, catalog).ok, true, "bounded citations and independent sources must validate");
+
+const signalAwareCatalog = catalog.map((item, index) => index < 3
+  ? {
+      ...item,
+      signalId: `S${index + 1}`,
+      domain: ["financials", "operations", "customers"][index],
+      findingEligible: true,
+      executiveRank: index + 1
+    }
+  : { ...item, signalId: null, domain: "supporting", findingEligible: false, executiveRank: null });
+const multiSignalOutput = structuredClone(validOutput);
+multiSignalOutput.reasoning_stage.what_is_happening = [
+  { finding_id: "F1", conclusion: "Revenue movement requires leadership attention.", evidence_references: [ref(1)] },
+  { finding_id: "F2", conclusion: "Inventory movement is a distinct operating concern.", evidence_references: [ref(2)] },
+  { finding_id: "F3", conclusion: "Customer activity adds a separate demand signal.", evidence_references: [ref(3)] }
+];
+multiSignalOutput.reasoning_stage.why_leadership_should_care.evidence_references = [ref(1), ref(2), ref(3)];
+multiSignalOutput.key_findings = [
+  { reasoning_finding_id: "F1", finding: "Revenue movement requires attention.", business_impact: "Demand confidence may narrow.", confidence: "Low", evidence_references: [ref(1)] },
+  { reasoning_finding_id: "F2", finding: "Inventory movement is a separate concern.", business_impact: "Operating flexibility may narrow.", confidence: "Low", evidence_references: [ref(2)] },
+  { reasoning_finding_id: "F3", finding: "Customer activity adds a third signal.", business_impact: "The demand picture remains mixed.", confidence: "Low", evidence_references: [ref(3)] }
+];
+const threeSignalPolicy = {
+  minimumDistinctFindings: 3,
+  requiredSignalIds: ["S1", "S2", "S3"],
+  requireCrossSignalAssessment: true
+};
+assert.equal(
+  validateExecutiveEvidenceReferences(multiSignalOutput, signalAwareCatalog, threeSignalPolicy).ok,
+  true,
+  "three distinct supported signals must survive reasoning, synthesis, and visible output"
+);
+
+const dominantSignalOnly = structuredClone(validOutput);
+assert.equal(
+  validateExecutiveEvidenceReferences(dominantSignalOnly, signalAwareCatalog, threeSignalPolicy).ok,
+  false,
+  "one dominant finding must not pass when three distinct supported signals are available"
+);
+
+const repeatedSignal = structuredClone(multiSignalOutput);
+repeatedSignal.reasoning_stage.what_is_happening[1].evidence_references = [ref(1)];
+repeatedSignal.reasoning_stage.what_is_happening[2].evidence_references = [ref(1)];
+repeatedSignal.key_findings[1].evidence_references = [ref(1)];
+repeatedSignal.key_findings[2].evidence_references = [ref(1)];
+assert.equal(
+  validateExecutiveEvidenceReferences(repeatedSignal, signalAwareCatalog, threeSignalPolicy).ok,
+  false,
+  "rephrasing one signal as several findings must not satisfy multi-signal coverage"
+);
+
+const outOfPriorityOrder = structuredClone(multiSignalOutput);
+[outOfPriorityOrder.key_findings[0], outOfPriorityOrder.key_findings[1]] = [outOfPriorityOrder.key_findings[1], outOfPriorityOrder.key_findings[0]];
+assert.equal(
+  validateExecutiveEvidenceReferences(outOfPriorityOrder, signalAwareCatalog, threeSignalPolicy).ok,
+  false,
+  "visible findings must retain deterministic executive priority order"
+);
+
+const lowerPrioritySubstitutionCatalog = [
+  ...signalAwareCatalog,
+  { ...signalAwareCatalog[2], citationId: 6, title: "Lower-priority signal", signalId: "S4", executiveRank: 4 }
+];
+const lowerPrioritySubstitution = structuredClone(multiSignalOutput);
+lowerPrioritySubstitution.reasoning_stage.what_is_happening[2].evidence_references = [ref(6)];
+lowerPrioritySubstitution.reasoning_stage.why_leadership_should_care.evidence_references = [ref(1), ref(2), ref(6)];
+lowerPrioritySubstitution.reasoning_stage.why_it_is_happening[0].evidence_references = [ref(1), ref(2)];
+lowerPrioritySubstitution.key_findings[2].evidence_references = [ref(6)];
+assert.equal(
+  validateExecutiveEvidenceReferences(lowerPrioritySubstitution, lowerPrioritySubstitutionCatalog, threeSignalPolicy).ok,
+  false,
+  "lower-priority signals must not displace a required higher-priority finding"
+);
 
 const appendixInflation = structuredClone(validOutput);
 appendixInflation.supporting_evidence.documents.push(ref(6));
@@ -349,6 +426,33 @@ assert.ok(zeroEvidenceAnswer.executiveBriefing.recommendedActions.length >= 2, "
 assert.ok(zeroEvidenceAnswer.executiveBriefing.missingInformation.length >= 3, "zero evidence must identify the information needed next");
 assert.equal(zeroEvidenceAnswer.executiveBriefing.keyFindings.length, 0, "zero evidence must not fabricate business findings");
 
+const memoryOnlyReasoning = buildExecutiveReasoningContext({
+  query: "What should leadership focus on?",
+  plan: executivePlan,
+  boundedContext: emptyBounded,
+  evidenceContext: {
+    ...emptyEvidenceContext,
+    available: true,
+    retrievalMode: "keyword",
+    chunks: [{
+      id: sourceId(5),
+      sourceType: "Source analysis",
+      sourceId: sourceId(6),
+      sourceFileId: sourceId(7),
+      title: "Revenue context",
+      excerpt: "Revenue context from an indexed source.",
+      summary: "Revenue context",
+      quality: "high",
+      confidenceScore: 80,
+      indexedAt: now,
+      similarity: 0.9
+    }],
+    maxChunks: 1
+  }
+});
+assert.equal(memoryOnlyReasoning.signalSynthesis.candidates.length, 0, "Business Memory alone must not create an executive signal candidate");
+assert.equal(memoryOnlyReasoning.signalSynthesis.minimumDistinctFindings, 0, "supporting context must not force a business finding");
+
 const oneSourceBounded = makeBoundedContext({
   sources: [{ id: sourceId(1), display_name: "Current operating review", analysis_summary: "Current operating review available.", updated_at: now }]
 }, 1);
@@ -370,6 +474,7 @@ assert.match(oneSourceAnswer.directAnswer, /one narrow evidence base/i, "one-sou
 
 const workbookId = sourceId(20);
 const sameWorkbookBounded = makeBoundedContext({
+  sources: [{ id: workbookId, display_name: "Retail workbook", analysis_summary: "The workbook contains current revenue measurements.", updated_at: now }],
   kpi_records: [1, 2, 3, 4].map((number) => ({
     id: sourceId(20 + number),
     name: "Revenue",
@@ -387,6 +492,22 @@ const sameWorkbookReasoning = buildExecutiveReasoningContext({
 });
 assert.equal(sameWorkbookReasoning.independentSourceCount, 1, "four KPI rows from one workbook must count as one independent source");
 assert.equal(sameWorkbookReasoning.maximumEvidenceSufficiency, "Partial", "repeated rows from one workbook cannot establish sufficient corroboration");
+assert.equal(sameWorkbookReasoning.signalSynthesis.candidates.length, 1, "repeated measurements for one KPI must merge into one executive signal");
+assert.equal(sameWorkbookReasoning.signalSynthesis.minimumDistinctFindings, 1, "one merged KPI signal must not be expanded into repetitive findings");
+assert.ok(sameWorkbookReasoning.signalSynthesis.candidates[0].citationIds.length >= 5, "the parent document may support its structured signal without becoming a duplicate finding");
+
+const sameMetricAcrossDomains = makeBoundedContext({
+  kpi_records: [{ id: sourceId(31), name: "Revenue", actual_value: 120, metric_date: "2026-07-01", source_file_id: sourceId(32), updated_at: now }],
+  operational_metrics: [{ id: sourceId(33), metric_name: "Revenue", value: 120, metric_date: "2026-07-01", source_file_id: sourceId(32), updated_at: now }]
+}, 2);
+const sameMetricReasoning = buildExecutiveReasoningContext({
+  query: "What is happening with revenue?",
+  plan: planVaeroexQuery({ query: "What is happening with revenue?" }),
+  boundedContext: sameMetricAcrossDomains,
+  evidenceContext: emptyEvidenceContext
+});
+assert.equal(sameMetricReasoning.signalSynthesis.candidates.length, 1, "the same named metric represented in two domains must merge into one signal");
+assert.deepEqual(sameMetricReasoning.signalSynthesis.candidates[0].domains, ["kpis", "operations"], "a merged signal must preserve every contributing domain");
 
 const multiSourceBounded = makeBoundedContext({
   sources: [{
@@ -421,6 +542,9 @@ assert.equal(multiSourceReasoning.independentSourceCount, 3, "multiple original 
 assert.equal(multiSourceReasoning.currentIndependentSourceCount, 3, "current original sources must be identified separately");
 assert.equal(multiSourceReasoning.originalSourceTypeCount, 3, "a full briefing must reflect more than one kind of original evidence");
 assert.equal(multiSourceReasoning.maximumEvidenceSufficiency, "Sufficient", "multiple current independent sources may support a full briefing");
+assert.equal(multiSourceReasoning.signalSynthesis.candidates.length, 3, "distinct original business conditions must become distinct signal candidates");
+assert.equal(multiSourceReasoning.signalSynthesis.minimumDistinctFindings, 3, "three meaningful signals must require three distinct findings before writing");
+assert.ok(multiSourceReasoning.signalSynthesis.relationships.length >= 1, "cross-domain signal candidates must be evaluated for relationships without assuming causation");
 const multiSourceFailureAnswer = buildLimitedEvidenceExecutiveAnswer({
   query: "What should leadership focus on this week?",
   boundedContext: multiSourceBounded,

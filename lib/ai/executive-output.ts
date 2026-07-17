@@ -294,6 +294,16 @@ export type ExecutiveCitationCatalogEntry = {
   evidenceRole: "original" | "supporting" | "derived" | "historical";
   freshnessScore: number;
   directRelevanceScore: number;
+  domain?: string;
+  signalId?: string | null;
+  findingEligible?: boolean;
+  executiveRank?: number | null;
+};
+
+export type ExecutiveSignalValidationPolicy = {
+  minimumDistinctFindings: number;
+  requiredSignalIds: string[];
+  requireCrossSignalAssessment: boolean;
 };
 
 type ParsedExecutiveOutput = z.infer<typeof executiveIntelligenceOutputSchema>;
@@ -400,9 +410,55 @@ function independentSourceCountForReferences(
   ).size;
 }
 
+function signalIdsForReferences(
+  references: Array<{ citation_id: number }>,
+  catalogById: Map<number, ExecutiveCitationCatalogEntry>
+) {
+  return new Set(
+    references
+      .map((reference) => catalogById.get(reference.citation_id))
+      .filter((item): item is ExecutiveCitationCatalogEntry => Boolean(item?.signalId) && item?.findingEligible === true)
+      .map((item) => item.signalId as string)
+  );
+}
+
+function maximumDistinctFindingCoverage(signalSets: Set<string>[]) {
+  const signalAssignments = new Map<string, number>();
+
+  function assign(findingIndex: number, visited: Set<string>): boolean {
+    for (const signalId of signalSets[findingIndex]) {
+      if (visited.has(signalId)) continue;
+      visited.add(signalId);
+      const assignedFinding = signalAssignments.get(signalId);
+      if (assignedFinding === undefined || assign(assignedFinding, visited)) {
+        signalAssignments.set(signalId, findingIndex);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  let matched = 0;
+  signalSets.forEach((_, findingIndex) => {
+    if (assign(findingIndex, new Set())) matched += 1;
+  });
+  return matched;
+}
+
+function earliestExecutiveRank(
+  references: Array<{ citation_id: number }>,
+  catalogById: Map<number, ExecutiveCitationCatalogEntry>
+) {
+  const ranks = references
+    .map((reference) => catalogById.get(reference.citation_id)?.executiveRank)
+    .filter((rank): rank is number => typeof rank === "number");
+  return ranks.length ? Math.min(...ranks) : Number.POSITIVE_INFINITY;
+}
+
 export function validateExecutiveEvidenceReferences(
   value: Json,
-  catalog: ExecutiveCitationCatalogEntry[]
+  catalog: ExecutiveCitationCatalogEntry[],
+  signalPolicy?: ExecutiveSignalValidationPolicy
 ) {
   const parsed = parsedExecutiveOutput(value);
   if (!parsed) return { ok: false as const, reason: "The executive response did not match its contract." };
@@ -415,6 +471,73 @@ export function validateExecutiveEvidenceReferences(
       ok: false as const,
       reason: `Evidence reference ${unknownReference.citation_id} was not supplied to this request.`
     };
+  }
+
+  if (signalPolicy && signalPolicy.minimumDistinctFindings > 0) {
+    const minimum = Math.min(3, signalPolicy.minimumDistinctFindings);
+    const requiredSignalIds = new Set(signalPolicy.requiredSignalIds.slice(0, minimum));
+    const reasoningSignalSets = parsed.reasoning_stage.what_is_happening.map((finding) =>
+      signalIdsForReferences(finding.evidence_references, catalogById)
+    );
+    const visibleSignalSets = parsed.key_findings.map((finding) =>
+      signalIdsForReferences(finding.evidence_references, catalogById)
+    );
+    const requiredReasoningSignalSets = reasoningSignalSets.map((signals) =>
+      new Set(Array.from(signals).filter((signalId) => requiredSignalIds.has(signalId)))
+    );
+    const requiredVisibleSignalSets = visibleSignalSets.map((signals) =>
+      new Set(Array.from(signals).filter((signalId) => requiredSignalIds.has(signalId)))
+    );
+
+    if (
+      parsed.reasoning_stage.what_is_happening.length < minimum ||
+      maximumDistinctFindingCoverage(requiredReasoningSignalSets) < minimum
+    ) {
+      return {
+        ok: false as const,
+        reason: `The reasoning stage must assess the ${minimum} highest-priority distinct evidence-backed signals before writing.`
+      };
+    }
+
+    if (parsed.key_findings.length < minimum || maximumDistinctFindingCoverage(requiredVisibleSignalSets) < minimum) {
+      return {
+        ok: false as const,
+        reason: `The executive briefing must retain the ${minimum} highest-priority distinct evidence-backed findings.`
+      };
+    }
+
+    const leadingSignalId = signalPolicy.requiredSignalIds[0];
+    if (leadingSignalId && !visibleSignalSets[0]?.has(leadingSignalId)) {
+      return { ok: false as const, reason: "The first executive finding must retain the highest-priority supported signal." };
+    }
+
+    const visibleRanks = parsed.key_findings.map((finding) => earliestExecutiveRank(finding.evidence_references, catalogById));
+    if (visibleRanks.some((rank, index) => index > 0 && rank < visibleRanks[index - 1])) {
+      return { ok: false as const, reason: "Executive findings must remain ordered by verified signal priority." };
+    }
+
+    if (minimum >= 2) {
+      const leadershipSignalCount = signalIdsForReferences(
+        parsed.reasoning_stage.why_leadership_should_care.evidence_references,
+        catalogById
+      ).size;
+      if (leadershipSignalCount < 2) {
+        return { ok: false as const, reason: "Leadership relevance must synthesize more than the dominant signal." };
+      }
+    }
+
+    if (signalPolicy.requireCrossSignalAssessment) {
+      const relationshipAssessed = [
+        ...parsed.reasoning_stage.why_it_is_happening,
+        ...parsed.root_cause_analysis
+      ].some((item) => signalIdsForReferences(item.evidence_references, catalogById).size >= 2);
+      if (!relationshipAssessed) {
+        return {
+          ok: false as const,
+          reason: "The executive reasoning stage must evaluate at least one relationship between distinct supported signals."
+        };
+      }
+    }
   }
 
   const supportedCausalAssessments = [
