@@ -1,7 +1,8 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { buildBusinessHealthDecisionContext } from "@/lib/ai/business-health-context";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
-import { loadKpiOverviewData } from "@/lib/ai/kpi-overview";
+import { buildKpiOverviewSummary, loadKpiOverviewData, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import type { VaeroexEvidenceDomain, VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import {
@@ -61,6 +62,19 @@ function jsonRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
 }
 
+function hasExplicitReportLineage(value: Json, depth = 0): boolean {
+  if (depth > 4 || !value || typeof value !== "object") return false;
+  if (Array.isArray(value)) return value.some((item) => hasExplicitReportLineage(item, depth + 1));
+
+  return Object.entries(value).some(([key, item]) => {
+    if (/^(original_source_ids|source_file_ids|source_ids|evidence_lineage)$/i.test(key)) {
+      const serialized = safeJsonStringify(item as Json);
+      if (/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i.test(serialized)) return true;
+    }
+    return hasExplicitReportLineage(item as Json, depth + 1);
+  });
+}
+
 function confidenceFromEvidence(count: number) {
   if (count >= 4) return "High";
   if (count >= 2) return "Medium";
@@ -111,6 +125,10 @@ async function sourceEligibleRows<T extends { source_file_id?: string | null; im
     limitations.push(`${label} source lifecycle could not be verified, so source-linked records were excluded.`);
     return rows.filter((row) => !row.source_file_id && !row.import_id);
   }
+}
+
+function filterOriginalOrSourceBackedRows<T extends { source_file_id?: string | null; import_id?: string | null }>(rows: T[]) {
+  return rows.filter((row) => Boolean(row.source_file_id || row.import_id) || isOriginalBusinessEvidence(row));
 }
 
 export function buildDeterministicFocusedExplanation({
@@ -338,12 +356,28 @@ export async function buildBoundedWorkspaceContext({
   const context: JsonRecord = {};
   const loadedDomains: VaeroexEvidenceDomain[] = [];
   let structuredEvidenceCount = 0;
+  let kpiSummary: KpiOverviewSummary | null = null;
+  let businessHealthRows: Json[] = [];
 
   if (domainSet.has("kpis") || domainSet.has("financials") || domainSet.has("business_health")) {
     try {
       const kpiData = await loadKpiOverviewData({ supabase, workspaceId });
-      context.kpi_summary = kpiData.summary;
-      structuredEvidenceCount += kpiData.summary.metrics.length;
+      const eligibleKpiRows = filterOriginalOrSourceBackedRows(kpiData.rows);
+      kpiSummary = buildKpiOverviewSummary(eligibleKpiRows, kpiData.settings);
+      context.kpi_summary = kpiSummary;
+      context.kpi_records = eligibleKpiRows.slice(0, 16).map((row) => ({
+        id: row.id,
+        name: row.name,
+        category: row.category,
+        target: row.target,
+        actual_value: row.actual_value,
+        metric_date: row.metric_date,
+        source_file_id: row.source_file_id,
+        import_id: row.import_id,
+        updated_at: row.updated_at,
+        created_at: row.created_at
+      }));
+      structuredEvidenceCount += kpiSummary.metrics.length;
       loadedDomains.push("kpis");
     } catch {
       limitations.push("KPI context could not be loaded for this answer.");
@@ -365,6 +399,7 @@ export async function buildBoundedWorkspaceContext({
         limitations
       ).then((rows) => {
         const eligibleRows = filterBusinessEvidence(rows);
+        businessHealthRows = eligibleRows as Json[];
         context.business_health = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         loadedDomains.push("business_health");
@@ -417,7 +452,7 @@ export async function buildBoundedWorkspaceContext({
         "Briefings and reports",
           supabase
             .from("reports")
-          .select("id,title,report_type,date_range_start,date_range_end,created_at,archived_at,deleted_at")
+          .select("id,title,report_type,date_range_start,date_range_end,source_data_json,created_at,archived_at,deleted_at")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
           .is("archived_at", null)
@@ -434,6 +469,7 @@ export async function buildBoundedWorkspaceContext({
           date_range_end: row.date_range_end,
           created_at: row.created_at,
           evidence_role: "derived_analysis",
+          evidence_lineage_available: hasExplicitReportLineage(row.source_data_json),
           evidence_limitation: "Saved report conclusions are not reused as current business evidence."
         }));
         loadedDomains.push("reports");
@@ -447,7 +483,7 @@ export async function buildBoundedWorkspaceContext({
         "Source files",
         supabase
           .from("file_uploads")
-          .select("id,display_name,file_extension,analysis_summary,processing_status,index_status,indexed_chunk_count,processed_at,indexed_at,created_at,updated_at")
+          .select("id,display_name,file_extension,analysis_summary,processing_status,index_status,indexed_chunk_count,processed_at,indexed_at,created_at,updated_at,metadata_json")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
           .is("archived_at", null)
@@ -457,8 +493,17 @@ export async function buildBoundedWorkspaceContext({
       ).then((rows) => {
         const eligibleRows = filterBusinessEvidence(rows);
         context.sources = eligibleRows.map((row) => ({
-          ...row,
-          analysis_summary: sanitizeBusinessEvidenceText(row.analysis_summary) || null
+          id: row.id,
+          display_name: row.display_name,
+          file_extension: row.file_extension,
+          analysis_summary: sanitizeBusinessEvidenceText(row.analysis_summary) || null,
+          processing_status: row.processing_status,
+          index_status: row.index_status,
+          indexed_chunk_count: row.indexed_chunk_count,
+          processed_at: row.processed_at,
+          indexed_at: row.indexed_at,
+          created_at: row.created_at,
+          updated_at: row.updated_at
         }));
         structuredEvidenceCount += eligibleRows.length;
         if (domainSet.has("files")) loadedDomains.push("files");
@@ -496,7 +541,7 @@ export async function buildBoundedWorkspaceContext({
         "Operational metrics",
         supabase
           .from("operational_metrics")
-          .select("id,metric_name,category,value,metric_date,notes,source_file_id,import_id,updated_at")
+          .select("id,metric_name,category,value,metric_date,notes,source_file_id,import_id,raw_data_json,created_at,updated_at")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
           .is("archived_at", null)
@@ -504,7 +549,8 @@ export async function buildBoundedWorkspaceContext({
           .limit(12),
         limitations
       ).then(async (rows) => {
-        const eligibleRows = await sourceEligibleRows({ supabase, workspaceId, rows, label: "Operational metrics", limitations });
+        const sourceBackedRows = await sourceEligibleRows({ supabase, workspaceId, rows, label: "Operational metrics", limitations });
+        const eligibleRows = filterOriginalOrSourceBackedRows(sourceBackedRows);
         context.operational_metrics = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         if (domainSet.has("financials")) loadedDomains.push("financials");
@@ -519,7 +565,7 @@ export async function buildBoundedWorkspaceContext({
         "Historical customer activity",
         supabase
           .from("crm_leads")
-          .select("id,status,last_activity_at,source_file_id,import_id,created_at,updated_at")
+          .select("id,status,last_activity_at,source_file_id,import_id,raw_data_json,created_at,updated_at")
           .eq("workspace_id", workspaceId)
           .is("deleted_at", null)
           .is("archived_at", null)
@@ -527,7 +573,8 @@ export async function buildBoundedWorkspaceContext({
           .limit(8),
         limitations
       ).then(async (rows) => {
-        const eligibleRows = await sourceEligibleRows({ supabase, workspaceId, rows, label: "Customer activity", limitations });
+        const sourceBackedRows = await sourceEligibleRows({ supabase, workspaceId, rows, label: "Customer activity", limitations });
+        const eligibleRows = filterOriginalOrSourceBackedRows(sourceBackedRows);
         context.historical_customer_activity = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
         loadedDomains.push("customers");
@@ -579,6 +626,13 @@ export async function buildBoundedWorkspaceContext({
   }
 
   await Promise.all(loaders);
+
+  if (domainSet.has("business_health")) {
+    context.business_health_score_context = buildBusinessHealthDecisionContext({
+      snapshots: businessHealthRows,
+      kpiSummary
+    });
+  }
 
   const workspaceSnapshot = {
     scope: "bounded_cross_business_reasoning",
@@ -642,7 +696,7 @@ export function buildDeterministicBoundedAnswer({
     typeof latestHealth.score === "number" ? `Business Health is ${latestHealth.score} out of 100${typeof latestHealth.trend === "string" ? ` with a ${latestHealth.trend.toLowerCase()} trend` : ""}.` : "",
     typeof firstIssue.title === "string" ? `The clearest current risk record is ${firstIssue.title}.` : "",
     typeof firstRecommendation.title === "string" ? `The leading saved recommendation is ${firstRecommendation.title}.` : "",
-    typeof firstMetric.name === "string" ? `${firstMetric.name} is the first relevant KPI in the bounded summary.` : ""
+    typeof firstMetric.name === "string" ? `The current KPI information includes ${firstMetric.name}.` : ""
   ].filter(Boolean);
   const asksCount = /\b(how many|count|counts)\b/i.test(query);
   const countAnswer = asksCount
@@ -660,21 +714,21 @@ export function buildDeterministicBoundedAnswer({
       : /\b(file|source|document|upload)\b/i.test(query) && typeof firstSource.display_name === "string"
         ? `The latest relevant source is ${firstSource.display_name}.`
         : /\b(alert|risk|issue)\b/i.test(query) && typeof firstIssue.title === "string"
-          ? `${firstIssue.title} is the clearest current risk record in this bounded view.`
+          ? `${firstIssue.title} is the clearest current risk record available for this question.`
           : /\b(priority|recommendation)\b/i.test(query) && typeof firstRecommendation.title === "string"
-            ? `${firstRecommendation.title} is the leading current recommendation in this bounded view.`
+            ? `${firstRecommendation.title} is the leading current recommendation available for this question.`
             : /\b(signal|observation|event)\b/i.test(query) && typeof firstSignal.title === "string"
-              ? `${firstSignal.title} is the latest relevant Business Signal in this bounded view.`
+              ? `${firstSignal.title} is the latest relevant Business Signal available for this question.`
               : "";
   const directAnswer = countAnswer
-    ? `This bounded view found ${countAnswer}.`
+    ? `The current workspace information includes ${countAnswer}.`
     : targetedObservation || (observations.length
         ? observations.slice(0, 2).join(" ")
-        : "Vaeroex did not find enough bounded workspace evidence to answer this question without guessing.");
+        : "The current workspace information is not sufficient for a reliable business conclusion.");
   const limitations = [
     ...(failureReason ? [failureReason] : []),
     ...context.limitations,
-    ...(observations.length ? ["This is a shorter bounded answer; deeper causal analysis was not completed."] : ["Add or identify evidence directly related to this question."])
+    ...(observations.length ? ["A deeper causal analysis was not completed."] : ["Add or identify evidence directly related to this question."])
   ];
 
   return {
@@ -682,7 +736,7 @@ export function buildDeterministicBoundedAnswer({
     direct_answer: directAnswer,
     summary: directAnswer,
     response_markdown: directAnswer,
-    evidence_note: `${context.structuredEvidenceCount} bounded workspace record${context.structuredEvidenceCount === 1 ? "" : "s"} were considered across ${context.loadedDomains.join(", ") || "the requested scope"}.`,
+    evidence_note: `${context.structuredEvidenceCount} workspace record${context.structuredEvidenceCount === 1 ? "" : "s"} were considered across ${context.loadedDomains.join(", ") || "the requested business areas"}.`,
     recommendation_confidence: confidenceFromEvidence(context.structuredEvidenceCount),
     limitations,
     fallback_used: true,

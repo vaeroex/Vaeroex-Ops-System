@@ -104,6 +104,10 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
 {
   "title": "Short executive title",
   "reasoning_stage": {
+    "evidence_sufficiency": {
+      "state": "Sufficient | Partial | Conflicting | Insufficient",
+      "explanation": "Why the available evidence warrants this state"
+    },
     "what_is_happening": [
       { "finding_id": "F1", "conclusion": "Evidence-backed conclusion", "evidence_references": [{ "citation_id": 1, "support": "How this source supports the conclusion" }] }
     ],
@@ -148,6 +152,7 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
       "time_horizon": "Immediate | 30 Days | 90 Days | Long-Term",
       "confidence": "High | Medium | Low | Insufficient",
       "why_prioritized": "Why this comes before lower-impact work",
+      "would_change_if": "The new evidence or condition that would invalidate or change this action",
       "evidence_references": [{ "citation_id": 1, "support": "Support" }]
     }
   ],
@@ -167,6 +172,18 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
     "uncertainty": []
   },
   "missing_information": ["Information that would materially improve the decision"],
+  "limited_evidence": {
+    "evidence_readiness_summary": "Why a broader conclusion cannot yet be made",
+    "provisional_interpretations": [
+      { "statement": "A clearly labeled hypothesis", "evidence_references": [{ "citation_id": 1, "support": "Why this source makes the hypothesis plausible" }] }
+    ],
+    "alternative_explanations": [
+      { "statement": "A competing explanation", "evidence_references": [{ "citation_id": 1, "support": "Why this alternative remains plausible" }] }
+    ],
+    "conflict_resolution": null,
+    "leadership_risk": "Why acting with incomplete, stale, narrow, or conflicting evidence creates decision risk",
+    "decisions_to_defer": ["Decision that should wait for stronger evidence"]
+  },
   "leadership_brief": {
     "priorities": ["Priority one", "Priority two", "Priority three"],
     "first_leadership_meeting": "The first leadership meeting should focus on...",
@@ -175,15 +192,24 @@ Use this exact root shape and keep reasoning_stage before executive_summary:
     "biggest_unknown": "The biggest unknown preventing a better decision is..."
   }
 }
-reasoning_stage is a concise decision analysis, not private chain-of-thought. Complete all five reasoning stages before writing executive_summary.
-Every visible finding, root cause, and recommendation must reference its reasoning-stage ID and retain at least one of the same evidence citations.
+reasoning_stage is a concise decision analysis, not private chain-of-thought. Classify evidence_sufficiency first, then complete all five reasoning stages before writing executive_summary.
+Never classify evidence above executive_reasoning_manifest.maximum_evidence_sufficiency. Use Conflicting only when independent original sources disagree and identify the conflict.
+For Sufficient evidence, produce the complete executive briefing and set limited_evidence to null.
+For Partial, Conflicting, or Insufficient evidence, populate limited_evidence and make the visible response a useful limited-evidence briefing. State supported conclusions, label hypotheses, identify alternatives, explain leadership risk, recommend reversible actions, identify decisions to defer, and list the exact missing information.
+For Conflicting evidence, populate limited_evidence.conflict_resolution with the conflict, the fresher source, the more direct source, any derived-source limitation, and the smallest action that can resolve the disagreement. For other states, set conflict_resolution to null.
+For zero original evidence, do not invent a business finding or cause. Explain decision readiness, recommend safe information-gathering actions, and use Low or Insufficient recommendation confidence.
+Every visible finding, root cause, and recommendation must reference its reasoning-stage ID and retain at least one of the same evidence citations when business evidence is available. With zero original evidence, omit business findings and use uncited data-readiness actions rather than inventing support.
 Use only citation IDs supplied in evidence_context. Never invent a citation, source, fact, number, trend, relationship, or financial impact.
 A root cause may be Supported only when at least two independent original sources support it. Otherwise use Possible or Not established.
-Business Memory and derived reports may support interpretation but do not increase the independent-source count.
+Business Memory may support an original source but does not increase the independent-source count. A derived report is secondary context only when its underlying original lineage is available; otherwise do not reuse its conclusions.
 Correlation is not causation. Describe co-movement as a relationship unless independent evidence establishes a cause.
-If evidence conflicts, identify the conflict and reduce confidence. If confidence is not High, missing_information must explain exactly what would improve the decision.
+If evidence conflicts, identify which source is fresher, more direct, or derived, explain why neither should win without support, and recommend the smallest action that resolves the conflict.
+Evidence Sufficiency, Overall Briefing Confidence, Finding Confidence, Root-Cause Confidence, and Recommendation Confidence are separate. Cap each finding and recommendation by its own citations. Repeated rows from one source do not provide independent corroboration. Stale evidence and conflicting evidence lower confidence. High confidence generally requires at least three independent current original sources.
+If confidence is not High, missing_information must explain exactly what would improve the decision. Recommendation Confidence must never be High when evidence is Partial, Conflicting, or Insufficient.
+For Business Health questions, use structured_context.business_health_score_context. Explain the recorded score, data-quality base, score rules, coverage indicators, KPI freshness, missing targets, and any explicit limitations. Separate supported operating performance factors from assessment-readiness factors. Improving data completeness can improve measurement confidence but does not itself improve business performance. Never invent an itemized risk or opportunity adjustment that the stored snapshot does not preserve.
 Use one to three ranked findings and one to three ranked actions. leadership_brief.priorities must contain exactly three concise priorities; an evidence gap may be a priority when it blocks a reliable decision.
-Do not mention searches, retrieval, chunks, databases, prompts, or internal implementation in user-facing fields.
+Every recommendation must explain its action, priority reason, expected impact, urgency, time horizon, confidence, supporting evidence, and what would invalidate or change it.
+Do not mention searches, retrieval, chunks, databases, prompts, providers, bounded context, bounded summaries, reasoning manifests, reasoning contracts, first records, first relevant KPIs, internal source indexes, or implementation details in user-facing fields.
 `;
 
 const workspaceAwareInstructions = `
@@ -203,7 +229,7 @@ export const VAEROEX_WORKFLOWS: VaeroexWorkflow[] = [
   {
     key: "executive_intelligence",
     title: "Executive Intelligence",
-    description: "Correlate bounded workspace evidence into decision-ready executive intelligence.",
+    description: "Correlate relevant workspace evidence into decision-ready executive intelligence.",
     actionLabel: "Ask Vaeroex",
     promptPlaceholder: "What should leadership understand and do next?",
     saveTargets: [],

@@ -39,7 +39,11 @@ export type ExecutiveReasoningContext = {
   reasoningManifest: Json;
   catalog: ExecutiveCitationCatalogEntry[];
   independentSourceCount: number;
+  currentIndependentSourceCount: number;
+  originalSourceTypeCount: number;
   rankedEvidenceCount: number;
+  rankedEvidence: RankedExecutiveEvidence[];
+  maximumEvidenceSufficiency: "Sufficient" | "Partial" | "Insufficient";
 };
 
 const IMPACT_PATTERN = /\b(revenue|profit|margin|cash|cost|expense|customer|retention|complaint|inventory|deadline|delay|risk|compliance|staff|capacity|quality|churn|conversion|loss|growth)\b/i;
@@ -197,7 +201,9 @@ function structuredCandidate({
         ? `file:${sourceId}`
         : importId
           ? `import:${importId}`
-          : sourceId
+          : domain === "kpis"
+            ? `kpi-series:${recordTitle(record, fallbackTitle).toLowerCase()}`
+            : sourceId
             ? `${domain}:${sourceId}`
             : `${domain}:aggregate`
     : null;
@@ -233,10 +239,11 @@ function structuredEvidenceCandidates(context: BoundedWorkspaceContext): Executi
     fallbackTitle: string;
   }> = [
     { domain: "kpis", sourceType: "KPI summary", records: values(structured.kpi_summary), role: "supporting", fallbackTitle: "Structured KPI summary" },
+    { domain: "kpis", sourceType: "KPI measurement", records: values(structured.kpi_records), role: "original", fallbackTitle: "KPI measurement" },
     { domain: "business_health", sourceType: "Historical trend", records: values(structured.business_health), role: "historical", fallbackTitle: "Business Health history" },
     { domain: "risks", sourceType: "Risk", records: values(riskContext.issues), role: "original", fallbackTitle: "Business risk" },
     { domain: "decisions", sourceType: "Recommendation", records: values(riskContext.recommendations), role: "derived", fallbackTitle: "Prior recommendation" },
-    { domain: "reports", sourceType: "Report", records: values(structured.reports), role: "derived", fallbackTitle: "Saved report" },
+    { domain: "reports", sourceType: "Report", records: values(structured.reports).filter((value) => isRecord(value) && value.evidence_lineage_available === true), role: "derived", fallbackTitle: "Saved report" },
     { domain: "documents", sourceType: "Document", records: values(structured.sources), role: "original", fallbackTitle: "Source document" },
     { domain: "operations", sourceType: "Business Signal", records: values(structured.business_signals), role: "original", fallbackTitle: "Business Signal" },
     { domain: "operations", sourceType: "Operational metric", records: values(structured.operational_metrics), role: "original", fallbackTitle: "Operational metric" },
@@ -272,9 +279,9 @@ function memoryEvidenceCandidates(context: EvidenceContext): ExecutiveEvidenceCa
   }));
 }
 
-function confidenceCeiling(independentSourceCount: number) {
-  if (independentSourceCount >= 3) return "High";
-  if (independentSourceCount >= 2) return "Medium";
+function confidenceCeiling(independentSourceCount: number, currentIndependentSourceCount: number) {
+  if (currentIndependentSourceCount >= 3) return "High";
+  if (currentIndependentSourceCount >= 2) return "Medium";
   if (independentSourceCount >= 1) return "Low";
   return "Insufficient";
 }
@@ -305,7 +312,9 @@ export function buildExecutiveReasoningContext({
     title: item.title,
     sourceType: item.sourceType,
     independentSourceKey: item.independentSourceKey,
-    evidenceRole: item.evidenceRole
+    evidenceRole: item.evidenceRole,
+    freshnessScore: item.rankingFactors.freshness,
+    directRelevanceScore: item.rankingFactors.directRelevance
   }));
   const independentSourceCount = new Set(
     catalog
@@ -313,6 +322,20 @@ export function buildExecutiveReasoningContext({
       .map((item) => item.independentSourceKey)
       .filter((key): key is string => Boolean(key))
   ).size;
+  const currentIndependentSourceCount = new Set(
+    catalog
+      .filter((item) => item.evidenceRole === "original" && item.freshnessScore >= 60)
+      .map((item) => item.independentSourceKey)
+      .filter((key): key is string => Boolean(key))
+  ).size;
+  const originalSourceTypeCount = new Set(
+    catalog.filter((item) => item.evidenceRole === "original").map((item) => item.sourceType)
+  ).size;
+  const maximumEvidenceSufficiency = independentSourceCount === 0
+    ? "Insufficient" as const
+    : independentSourceCount === 1 || currentIndependentSourceCount < 2 || originalSourceTypeCount < 2
+      ? "Partial" as const
+      : "Sufficient" as const;
   const citations = ranked.map((item, index) => ({
     citation_id: index + 1,
     title: item.title,
@@ -359,17 +382,29 @@ export function buildExecutiveReasoningContext({
         unsupported_relationships_must_be_labeled_possible_or_not_established: true
       },
       independent_original_source_count: independentSourceCount,
-      maximum_recommendation_confidence: confidenceCeiling(independentSourceCount),
+      current_independent_original_source_count: currentIndependentSourceCount,
+      original_source_type_count: originalSourceTypeCount,
+      maximum_evidence_sufficiency: maximumEvidenceSufficiency,
+      maximum_recommendation_confidence: confidenceCeiling(independentSourceCount, currentIndependentSourceCount),
       response_policy: {
         use_only_citation_ids_from_evidence_context: true,
         never_invent_financial_impact: true,
         use_not_established_when_impact_is_not_supported: true,
         explain_conflicting_evidence: true,
+        classify_evidence_sufficiency_before_drawing_conclusions: true,
+        partial_evidence_requires_provisional_language: true,
+        insufficient_evidence_requires_safe_reversible_actions: true,
+        stale_evidence_cannot_support_high_confidence: true,
+        derived_context_requires_original_lineage: true,
         do_not_expose_internal_reasoning_stage: true
       }
     },
     catalog,
     independentSourceCount,
-    rankedEvidenceCount: ranked.length
+    currentIndependentSourceCount,
+    originalSourceTypeCount,
+    rankedEvidenceCount: ranked.length,
+    rankedEvidence: ranked,
+    maximumEvidenceSufficiency
   };
 }

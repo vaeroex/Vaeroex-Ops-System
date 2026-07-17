@@ -218,7 +218,7 @@ export function planVaeroexQuery({
     (/\brevenue\b/i.test(normalized) && /\b(profit|profitability|margin|cost|costs|expense|expenses)\b/i.test(normalized)) ||
     (/\b(retention|satisfaction|conversion)\b/i.test(normalized) && /\b(response|complaint|engagement)\b/i.test(normalized));
   const explicitExecutiveQuestion =
-    /\b(what should (i|we|leadership) (focus on|know|do)|what needs leadership attention|executive (summary|briefing)|leadership (summary|briefing)|how (is|are) (my |our |the )?(business|company|organization|we) (doing|performing)|biggest (risk|opportunity|decision))\b/i.test(normalized);
+    /\b(what should (i|we|leadership) (focus on|know|do)|what needs leadership attention|what can leadership (responsibly )?conclude|if you were leading|first leadership meeting|based on all available evidence|weakest evidence|executive (summary|briefing)|leadership (summary|briefing)|how (is|are) (my |our |the )?(business|company|organization|we) (doing|performing)|biggest (risk|opportunity|decision))\b/i.test(normalized);
   const broadLeadershipQuestion =
     explicitExecutiveQuestion ||
     (/\b(across the business|this week|overall|company-wide|organization-wide)\b/i.test(normalized) && /\b(focus|priority|risk|changed|summary|briefing)\b/i.test(normalized));
