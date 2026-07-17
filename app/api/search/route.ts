@@ -4,6 +4,7 @@ import { buildBoundedWorkspaceContext, buildDeterministicBoundedAnswer } from "@
 import { buildWorkspaceEvidenceContext, evidenceContextAsJson, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
+import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { planVaeroexQuery, type VaeroexEvidenceDomain } from "@/lib/ai/query-depth-planner";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -23,6 +24,9 @@ import type { GlobalSearchAnswer, GlobalSearchDestination, GlobalSearchGroup, Gl
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
+
+const SEARCH_ASK_PROVIDER_TIMEOUT_MS = 8_000;
+const SEARCH_ASK_PROVIDER_MAX_RETRIES = 0;
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -1143,8 +1147,8 @@ export async function POST(request: Request) {
       maxOutputTokens: queryPlan.tier === 3 ? 1_000 : 650,
       providerSettings: {
         ...baseSettings,
-        timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
-        maxRetries: queryPlan.tier === 3 ? Math.min(baseSettings.maxRetries, 1) : 0
+        timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs, SEARCH_ASK_PROVIDER_TIMEOUT_MS),
+        maxRetries: SEARCH_ASK_PROVIDER_MAX_RETRIES
       }
     });
 
@@ -1163,8 +1167,7 @@ export async function POST(request: Request) {
           loaded_domains: boundedContext.loadedDomains,
           bounded_context_ms: boundedContext.loadMs,
           estimated_context_tokens: boundedContext.estimatedContextTokens,
-          evidence_count: evidenceCount,
-          fallback_used: false
+          evidence_count: evidenceCount
         }
       }
     });
@@ -1183,16 +1186,22 @@ export async function POST(request: Request) {
       });
     }
 
+    const providerAttempts = error instanceof AIProviderExecutionError ? error.attempts : [];
+    const attemptedFallback = providerAttempts.some((attempt) => attempt.fallback);
+    const inputTokens = providerAttempts.reduce((sum, attempt) => sum + attempt.inputTokens, 0);
+    const outputTokens = providerAttempts.reduce((sum, attempt) => sum + attempt.outputTokens, 0);
+    const lastAttempt = providerAttempts.at(-1);
+
     await recordVaeroexAiUsage({
       supabase,
       workspaceId,
       userId: user.id,
       agentType: "global_search_or_ask",
       usage: {
-        inputTokens: 0,
-        outputTokens: 0,
-        totalTokens: 0,
-        model: resolveVaeroexModel(modelRoute),
+        inputTokens,
+        outputTokens,
+        totalTokens: inputTokens + outputTokens,
+        model: lastAttempt?.model || resolveVaeroexModel(modelRoute),
         latencyMs: Date.now() - generationStartedAt,
         status: "failed",
         metadata: {
@@ -1201,7 +1210,10 @@ export async function POST(request: Request) {
           data_domains: queryPlan.domains,
           evidence_count: evidenceCount,
           timeout: /timed out|timeout|abort/i.test(error instanceof Error ? error.message : ""),
-          fallback_used: true
+          provider: lastAttempt?.provider || null,
+          primary_provider: error instanceof AIProviderExecutionError ? error.primaryProvider : null,
+          fallback_used: attemptedFallback,
+          provider_attempts: providerAttempts
         }
       }
     });

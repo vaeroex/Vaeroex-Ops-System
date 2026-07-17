@@ -4,8 +4,9 @@ import Link from "next/link";
 import type { Route } from "next";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Command, Loader2, Search, X } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useActivitySignal } from "@/components/app/ActivityProvider";
+import { globalSearchApiErrorMessage } from "@/lib/search/api-errors";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import type { GlobalSearchAnswer, GlobalSearchGroup, GlobalSearchResponse } from "@/lib/search/types";
 
@@ -23,6 +24,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   const [groups, setGroups] = useState<GlobalSearchGroup[]>([]);
   const [answer, setAnswer] = useState<GlobalSearchAnswer | null>(null);
   const [loading, setLoading] = useState(false);
+  const [asking, setAsking] = useState(false);
   const [loadingLabel, setLoadingLabel] = useState("Searching...");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -31,6 +33,9 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   const searchParams = useSearchParams();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const requestVersionRef = useRef(0);
+  const searchAbortRef = useRef<AbortController | null>(null);
+  const generationAbortRef = useRef<AbortController | null>(null);
+  const askingRef = useRef(false);
   const inputId = useId();
   const resultsId = useId();
   const titleId = useId();
@@ -40,7 +45,13 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   useActivitySignal(loading, loadingLabel, { source: "global-search", timeoutMs: 30000 });
 
   const closeSearch = useCallback(() => {
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    generationAbortRef.current?.abort();
+    generationAbortRef.current = null;
+    askingRef.current = false;
     requestVersionRef.current += 1;
+    setAsking(false);
     setLoading(false);
     setOpen(false);
   }, []);
@@ -108,7 +119,20 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
   }, [open]);
 
   useEffect(() => {
+    return () => {
+      searchAbortRef.current?.abort();
+      generationAbortRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!open || askingRef.current) {
+      return;
+    }
+
     if (trimmedQuery.length < 2) {
+      searchAbortRef.current?.abort();
+      searchAbortRef.current = null;
       requestVersionRef.current += 1;
       setGroups([]);
       setAnswer(null);
@@ -118,6 +142,8 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
     }
 
     const controller = new AbortController();
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = controller;
     const requestVersion = ++requestVersionRef.current;
     const timeout = window.setTimeout(async () => {
       setLoading(true);
@@ -149,6 +175,9 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
         setAnswer(null);
         setError(searchError instanceof Error ? searchError.message : "Vaeroex search is temporarily unavailable.");
       } finally {
+        if (searchAbortRef.current === controller) {
+          searchAbortRef.current = null;
+        }
         if (!controller.signal.aborted && requestVersion === requestVersionRef.current) {
           setLoading(false);
         }
@@ -158,15 +187,24 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
     return () => {
       window.clearTimeout(timeout);
       controller.abort();
+      if (searchAbortRef.current === controller) {
+        searchAbortRef.current = null;
+      }
     };
-  }, [trimmedQuery]);
+  }, [open, trimmedQuery]);
 
   async function submitQuestion(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
-    if (trimmedQuery.length < 2) return;
+    if (trimmedQuery.length < 2 || askingRef.current) return;
 
+    searchAbortRef.current?.abort();
+    searchAbortRef.current = null;
+    const controller = new AbortController();
+    generationAbortRef.current = controller;
+    askingRef.current = true;
     const requestVersion = ++requestVersionRef.current;
+    setAsking(true);
     setLoading(true);
     setLoadingLabel("Analyzing...");
     setError(null);
@@ -174,6 +212,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
     try {
       const response = await fetch("/api/search", {
         method: "POST",
+        signal: controller.signal,
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json"
@@ -181,23 +220,45 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
         body: JSON.stringify({ query: trimmedQuery })
       });
 
-      const payload = (await response.json().catch(() => ({}))) as GlobalSearchResponse & { error?: string };
+      const payload: unknown = await response.json().catch(() => ({}));
 
       if (!response.ok) {
-        throw new Error(payload.error || "Vaeroex could not answer that question right now.");
+        throw new Error(globalSearchApiErrorMessage(response.status, payload));
       }
 
       if (requestVersion !== requestVersionRef.current) return;
-      setAnswer(payload.answer || null);
-      setGroups((current) => payload.groups?.length ? payload.groups : current);
+      const result = payload as GlobalSearchResponse;
+      setAnswer(result.answer || null);
+      setGroups((current) => result.groups?.length ? result.groups : current);
     } catch (answerError) {
-      if (requestVersion !== requestVersionRef.current) return;
+      if (controller.signal.aborted || requestVersion !== requestVersionRef.current) return;
       setError(answerError instanceof Error ? answerError.message : "Vaeroex could not answer that question right now.");
     } finally {
-      if (requestVersion === requestVersionRef.current) {
+      if (generationAbortRef.current === controller) {
+        generationAbortRef.current = null;
+        askingRef.current = false;
+        setAsking(false);
+      }
+      if (!controller.signal.aborted && requestVersion === requestVersionRef.current) {
         setLoading(false);
       }
     }
+  }
+
+  function submitQuestionOnEnter(event: ReactKeyboardEvent<HTMLInputElement>) {
+    if (
+      event.key !== "Enter" ||
+      event.nativeEvent.isComposing ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.currentTarget.form?.requestSubmit();
   }
 
   return (
@@ -260,7 +321,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               <label className="sr-only" htmlFor={inputId}>
                 Ask or search Vaeroex
               </label>
-              <form className="relative mt-4" onSubmit={submitQuestion}>
+              <form className="relative mt-4" onSubmit={submitQuestion} data-vaeroex-skip-global-activity>
                 <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-vaeroex-accent" aria-hidden="true" />
                 <input
                   ref={inputRef}
@@ -268,19 +329,23 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                   type="search"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={submitQuestionOnEnter}
                   placeholder="Ask a business question or search your workspace..."
                   autoComplete="off"
-                  className="min-h-12 w-full rounded-xl border border-white/15 bg-slate-950/60 py-3 pl-10 pr-16 text-base font-medium text-white outline-none placeholder:text-slate-500 shadow-sm shadow-black/10 transition focus:border-vaeroex-accent/60 focus:bg-slate-950/75 focus:ring-2 focus:ring-vaeroex-accent/25"
+                  disabled={asking}
+                  className="min-h-12 w-full rounded-xl border border-white/15 bg-slate-950/60 py-3 pl-10 pr-32 text-base font-medium text-white outline-none placeholder:text-slate-500 shadow-sm shadow-black/10 transition focus:border-vaeroex-accent/60 focus:bg-slate-950/75 focus:ring-2 focus:ring-vaeroex-accent/25 disabled:cursor-wait disabled:opacity-75"
                   aria-controls={resultsId}
                 />
                 <div className="absolute right-2 top-1/2 flex -translate-y-1/2 items-center gap-1">
                   {loading ? <Loader2 className="h-4 w-4 animate-spin text-vaeroex-accent" aria-hidden="true" /> : null}
-                  {query ? (
+                  {query && !asking ? (
                     <button
                       type="button"
                       className="grid h-8 w-8 place-items-center rounded-md text-slate-300 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
                       onClick={() => {
                         requestVersionRef.current += 1;
+                        searchAbortRef.current?.abort();
+                        searchAbortRef.current = null;
                         setLoading(false);
                         setQuery("");
                         setGroups([]);
@@ -293,6 +358,14 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                       <X className="h-4 w-4" aria-hidden="true" />
                     </button>
                   ) : null}
+                  <button
+                    type="submit"
+                    className="min-h-8 rounded-lg bg-vaeroex-blue px-3 text-xs font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55 disabled:pointer-events-none disabled:opacity-60"
+                    disabled={asking || trimmedQuery.length < 2}
+                    aria-label="Ask Vaeroex"
+                  >
+                    {asking ? "Asking..." : "Ask"}
+                  </button>
                 </div>
               </form>
             </header>
@@ -308,7 +381,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               ) : loading && !total ? (
                 <div className="flex min-h-32 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.055] text-sm text-slate-300">
                   <Loader2 className="h-4 w-4 animate-spin text-vaeroex-accent" aria-hidden="true" />
-                  Searching Vaeroex...
+                  {asking ? "Vaeroex is thinking..." : "Searching Vaeroex..."}
                 </div>
               ) : answer || total ? (
                 <div className="space-y-3">
@@ -378,7 +451,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
             </div>
 
             <footer className="border-t border-white/10 bg-slate-950/45 px-3 py-2 text-[0.68rem] font-semibold uppercase tracking-wide text-slate-500 sm:px-4">
-              Press Enter to ask · Cmd/Ctrl + K opens Search or Ask anywhere in Vaeroex.
+              Press Enter or choose Ask · Cmd/Ctrl + K opens Search or Ask anywhere in Vaeroex.
             </footer>
           </section>
         </div>
