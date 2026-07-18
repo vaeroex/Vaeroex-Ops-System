@@ -108,6 +108,7 @@ for (const heading of ["Evidence Readiness", "What Can Be Said", "Safe Next Acti
 
 const {
   EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS,
+  applyExecutiveConfidenceCeilings,
   executiveAnswerFromOutput,
   validateExecutiveEvidenceReferences,
   validateExecutiveIntelligenceContract
@@ -330,6 +331,27 @@ assertDiagnostic(validateExecutiveEvidenceReferences(unknownCitationOutput, sign
 const excessiveFindingConfidence = structuredClone(multiSignalOutput);
 excessiveFindingConfidence.analysis.findings[0].confidence = "High";
 assertDiagnostic(validateExecutiveEvidenceReferences(excessiveFindingConfidence, signalAwareCatalog, threeSignalPolicy), "confidence_ceiling_exceeded", "confidence");
+
+const mediumCeilingCatalog = signalAwareCatalog.map((entry) =>
+  entry.citationId === 3 ? { ...entry, freshnessScore: 40 } : entry
+);
+const overconfidentCanonicalOutput = structuredClone(multiSignalOutput);
+overconfidentCanonicalOutput.analysis.findings[0].confidence = "High";
+const confidenceBoundedOutput = applyExecutiveConfidenceCeilings(overconfidentCanonicalOutput, mediumCeilingCatalog);
+assert.equal(confidenceBoundedOutput.analysis.findings[0].confidence, "Low", "finding confidence must be lowered to its cited-source ceiling");
+assert.equal(confidenceBoundedOutput.overall_confidence, "Medium", "overall confidence must be lowered to the current independent-source ceiling");
+assert.deepEqual(confidenceBoundedOutput.analysis.findings[0].citations, overconfidentCanonicalOutput.analysis.findings[0].citations, "confidence normalization must preserve citations");
+assert.deepEqual(confidenceBoundedOutput.summary_signal_ids, overconfidentCanonicalOutput.summary_signal_ids, "confidence normalization must preserve required signal coverage");
+assert.deepEqual(confidenceBoundedOutput.analysis.relationships, overconfidentCanonicalOutput.analysis.relationships, "confidence normalization must preserve model-supported relationships");
+assert.deepEqual(confidenceBoundedOutput.analysis.actions, overconfidentCanonicalOutput.analysis.actions, "confidence normalization must preserve generated actions");
+assert.equal(confidenceBoundedOutput.analysis.uncertainty.length, 1, "a deterministic evidence limitation must keep lowered confidence contract-valid");
+assert.equal(validateExecutiveIntelligenceContract(confidenceBoundedOutput).ok, true, "confidence-bounded output must remain canonical-contract valid");
+assert.equal(
+  validateExecutiveEvidenceReferences(confidenceBoundedOutput, mediumCeilingCatalog, threeSignalPolicy).ok,
+  true,
+  "deterministically bounded confidence must pass the unchanged contextual validator"
+);
+assert.deepEqual(applyExecutiveConfidenceCeilings(validOutput, catalog), validOutput, "already supported confidence must remain byte-for-byte equivalent as data");
 
 const appendixInflation = structuredClone(validOutput);
 appendixInflation.analysis.findings = appendixInflation.analysis.findings.slice(0, 1);

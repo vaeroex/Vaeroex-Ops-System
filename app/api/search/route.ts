@@ -9,6 +9,7 @@ import {
   EXECUTIVE_INTERACTIVE_MAX_INPUT_TOKENS
 } from "@/lib/ai/executive-intelligence";
 import {
+  applyExecutiveConfidenceCeilings,
   executiveAnswerFromOutput,
   EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS,
   validateExecutiveEvidenceReferences
@@ -1040,7 +1041,7 @@ export async function POST(request: Request) {
       },
       stageLogger: (stage, durationMs) => timing.record(stage, durationMs),
       outputValidator: (value) => validateExecutiveEvidenceReferences(
-        value,
+        applyExecutiveConfidenceCeilings(value, executiveReasoning.catalog),
         executiveReasoning.catalog,
         executiveReasoning.signalSynthesis
       )

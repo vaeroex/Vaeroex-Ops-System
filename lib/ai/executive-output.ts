@@ -422,6 +422,61 @@ function cappedConfidence(
   return CONFIDENCE_RANK[requested] <= CONFIDENCE_RANK[maximum] ? requested : maximum;
 }
 
+const CONFIDENCE_CEILING_UNCERTAINTY = "Confidence is limited by the available independent source coverage.";
+
+export function applyExecutiveConfidenceCeilings(
+  value: Json,
+  catalog: ExecutiveCitationCatalogEntry[]
+): Json {
+  const parsed = parsedExecutiveOutput(value);
+  if (!parsed) return value;
+
+  const catalogById = new Map(catalog.map((item) => [item.citationId, item]));
+  let findingConfidenceChanged = false;
+  const findings = parsed.analysis.findings.map((finding) => {
+    const sourceCount = independentSourceKeysForCitations(finding.citations, catalogById).size;
+    const currentSourceCount = independentSourceKeysForCitations(finding.citations, catalogById, true).size;
+    const confidence = cappedConfidence(
+      finding.confidence,
+      sourceCount,
+      currentSourceCount,
+      parsed.analysis.evidence_sufficiency,
+      parsed.analysis.evidence_agreement
+    );
+    findingConfidenceChanged ||= confidence !== finding.confidence;
+    return confidence === finding.confidence ? finding : { ...finding, confidence };
+  });
+
+  const decisionCitations = decisionCitationIds(parsed);
+  const overallConfidence = cappedConfidence(
+    parsed.overall_confidence,
+    independentSourceKeysForCitations(decisionCitations, catalogById).size,
+    independentSourceKeysForCitations(decisionCitations, catalogById, true).size,
+    parsed.analysis.evidence_sufficiency,
+    parsed.analysis.evidence_agreement
+  );
+  const overallConfidenceChanged = overallConfidence !== parsed.overall_confidence;
+  if (!findingConfidenceChanged && !overallConfidenceChanged) return value;
+
+  const uncertainty = overallConfidenceChanged && overallConfidence !== "High" && parsed.analysis.uncertainty.length === 0
+    ? [CONFIDENCE_CEILING_UNCERTAINTY]
+    : parsed.analysis.uncertainty;
+
+  return {
+    analysis: {
+      evidence_sufficiency: parsed.analysis.evidence_sufficiency,
+      evidence_agreement: parsed.analysis.evidence_agreement,
+      findings,
+      relationships: parsed.analysis.relationships,
+      actions: parsed.analysis.actions,
+      uncertainty
+    },
+    executive_summary: parsed.executive_summary,
+    overall_confidence: overallConfidence,
+    summary_signal_ids: parsed.summary_signal_ids
+  } as Json;
+}
+
 function allowedRelationshipPair(
   leftSignalId: string,
   rightSignalId: string,
