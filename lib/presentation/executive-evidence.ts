@@ -14,6 +14,13 @@ export type ExecutiveEvidencePresentation = {
   provenance: ExecutiveEvidenceDetail[];
 };
 
+export type ExecutiveEvidenceSummary = {
+  citationNumbers: number[];
+  evidenceCount: number;
+  sourceCount: number;
+  text: string;
+};
+
 type UnknownRecord = Record<string, unknown>;
 
 const UUID_PATTERN = /\b[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\b/gi;
@@ -205,6 +212,39 @@ export function presentExecutiveEvidence(reference: ExecutiveEvidenceReference):
     summary,
     details: structured?.details || [],
     provenance: structured?.provenance || []
+  };
+}
+
+export function dedupeExecutiveEvidence(references: ExecutiveEvidenceReference[]) {
+  const seen = new Set<number>();
+  return references.filter((reference) => {
+    if (seen.has(reference.citationId)) return false;
+    seen.add(reference.citationId);
+    return true;
+  });
+}
+
+export function summarizeExecutiveEvidence(references: ExecutiveEvidenceReference[]): ExecutiveEvidenceSummary | null {
+  const uniqueReferences = dedupeExecutiveEvidence(references);
+  if (!uniqueReferences.length) return null;
+
+  const evidence = uniqueReferences.map(presentExecutiveEvidence);
+  const sourceNames = [...new Set(evidence.map((item) => item.sourceName))];
+  const metricsOnly = evidence.every((item) => item.sourceType === "Operational metric");
+  const evidenceLabel = metricsOnly
+    ? `supporting metric${evidence.length === 1 ? "" : "s"}`
+    : `supporting evidence record${evidence.length === 1 ? "" : "s"}`;
+  const sourceDescription = sourceNames.length === 1
+    ? sourceNames[0]
+    : sourceNames.length === 2
+      ? `${sourceNames[0]} and ${sourceNames[1]}`
+      : `${sourceNames[0]} and ${sourceNames.length - 1} other sources`;
+
+  return {
+    citationNumbers: evidence.map((item) => item.citationNumber),
+    evidenceCount: evidence.length,
+    sourceCount: sourceNames.length,
+    text: `${evidence.length} ${evidenceLabel} from ${sourceDescription}.`
   };
 }
 

@@ -1,6 +1,9 @@
-import { ExecutiveEvidenceRenderer } from "@/components/app/ExecutiveEvidenceRenderer";
-import { uniqueExecutiveLines } from "@/lib/presentation/executive-evidence";
-import type { ExecutiveIntelligenceBriefing } from "@/lib/search/types";
+import {
+  ExecutiveEvidenceRenderer,
+  ExecutiveEvidenceSummary
+} from "@/components/app/ExecutiveEvidenceRenderer";
+import { dedupeExecutiveEvidence, summarizeExecutiveEvidence, uniqueExecutiveLines } from "@/lib/presentation/executive-evidence";
+import type { ExecutiveEvidenceReference, ExecutiveIntelligenceBriefing } from "@/lib/search/types";
 
 function SectionHeading({ children }: { children: string }) {
   return <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">{children}</h3>;
@@ -83,9 +86,41 @@ function RecommendationDetails({ action }: { action: ExecutiveIntelligenceBriefi
   );
 }
 
+function collectExecutiveEvidence(briefing: ExecutiveIntelligenceBriefing) {
+  return dedupeExecutiveEvidence([
+    ...briefing.keyFindings.flatMap((finding) => finding.evidence),
+    ...briefing.rootCauseAnalysis.flatMap((cause) => cause.evidence),
+    ...briefing.recommendedActions.flatMap((action) => action.evidence),
+    ...briefing.supportingEvidence.flatMap((group) => group.items),
+    ...(briefing.limitedEvidence?.provisionalInterpretations.flatMap((item) => item.evidence) || []),
+    ...(briefing.limitedEvidence?.alternativeExplanations.flatMap((item) => item.evidence) || [])
+  ]);
+}
+
+function SupportingEvidenceSection({ references }: { references: ExecutiveEvidenceReference[] }) {
+  const summary = summarizeExecutiveEvidence(references);
+
+  return (
+    <section id="executive-supporting-evidence" className="border-t border-white/10 pt-5">
+      <SectionHeading>Supporting Evidence</SectionHeading>
+      {summary ? (
+        <details className="mt-3 rounded-md border border-white/10 bg-slate-950/25 px-3 py-2.5">
+          <summary className="cursor-pointer text-sm font-semibold text-vaeroex-accent">View Evidence</summary>
+          <p className="mt-2 break-words text-xs leading-5 text-slate-400">
+            {summary.text} Each citation is shown once, even when it supports multiple conclusions.
+          </p>
+          <ExecutiveEvidenceRenderer references={references} />
+        </details>
+      ) : (
+        <p className="mt-2 text-sm leading-6 text-slate-400">No additional supporting evidence was used.</p>
+      )}
+    </section>
+  );
+}
+
 function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
   const limited = briefing.limitedEvidence;
-  const visibleEvidenceGroups = briefing.supportingEvidence.filter((group) => group.items.length);
+  const allEvidence = collectExecutiveEvidence(briefing);
 
   return (
     <div className="space-y-6">
@@ -107,7 +142,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                   <span className="shrink-0 text-xs font-semibold text-slate-300">{finding.confidence}</span>
                 </div>
                 <p className="mt-1 text-sm leading-6 text-slate-300">{finding.businessImpact}</p>
-                <ExecutiveEvidenceRenderer references={finding.evidence} />
+                <ExecutiveEvidenceSummary references={finding.evidence} />
               </div>
             ))}
           </div>
@@ -121,7 +156,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
             {limited.provisionalInterpretations.map((item) => (
               <div key={item.statement}>
                 <p className="text-sm leading-6 text-slate-200">{item.statement}</p>
-                <ExecutiveEvidenceRenderer references={item.evidence} />
+                <ExecutiveEvidenceSummary references={item.evidence} />
               </div>
             ))}
           </div>
@@ -135,7 +170,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
             {limited.alternativeExplanations.map((item) => (
               <div key={item.statement}>
                 <p className="text-sm leading-6 text-slate-300">{item.statement}</p>
-                <ExecutiveEvidenceRenderer references={item.evidence} />
+                <ExecutiveEvidenceSummary references={item.evidence} />
               </div>
             ))}
           </div>
@@ -174,7 +209,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-white">{index + 1}. {action.action}</p>
               <RecommendationDetails action={action} />
-              <ExecutiveEvidenceRenderer references={action.evidence} />
+              <ExecutiveEvidenceSummary references={action.evidence} />
             </li>
           ))}
         </ol>
@@ -212,19 +247,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
         </section>
       ) : null}
 
-      {visibleEvidenceGroups.length ? (
-        <details className="border-t border-white/10 pt-5">
-          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Supporting Evidence</summary>
-          <div className="mt-3 space-y-4">
-            {visibleEvidenceGroups.map((group) => (
-              <div key={group.category}>
-                <p className="text-sm font-semibold text-white">{group.category}</p>
-                <ExecutiveEvidenceRenderer references={group.items} />
-              </div>
-            ))}
-          </div>
-        </details>
-      ) : null}
+      <SupportingEvidenceSection references={allEvidence} />
 
     </div>
   );
@@ -235,14 +258,14 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
     return <LimitedExecutiveIntelligenceAnswer briefing={briefing} />;
   }
 
-  const visibleEvidenceGroups = briefing.supportingEvidence.filter((group) => group.items.length);
+  const allEvidence = collectExecutiveEvidence(briefing);
 
   return (
     <div className="space-y-6">
       <LeadershipBrief briefing={briefing} />
 
       <section className="border-t border-white/10 pt-5">
-        <SectionHeading>Key Findings</SectionHeading>
+        <SectionHeading>Top Priorities</SectionHeading>
         <ol className="mt-3 space-y-4">
           {briefing.keyFindings.map((finding, index) => (
             <li key={`${index}-${finding.finding}`}>
@@ -253,7 +276,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 </span>
               </div>
               <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Business impact:</span> {finding.businessImpact}</p>
-              <ExecutiveEvidenceRenderer references={finding.evidence} />
+              <ExecutiveEvidenceSummary references={finding.evidence} />
             </li>
           ))}
         </ol>
@@ -269,7 +292,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 <span className="shrink-0 text-xs font-semibold text-slate-300">{cause.status}</span>
               </div>
               <p className="mt-1 text-sm leading-6 text-slate-300">{cause.analysis}</p>
-              <ExecutiveEvidenceRenderer references={cause.evidence} />
+              <ExecutiveEvidenceSummary references={cause.evidence} />
             </div>
           ))}
         </div>
@@ -307,26 +330,10 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-white">{index + 1}. {action.action}</p>
               <RecommendationDetails action={action} />
-              <ExecutiveEvidenceRenderer references={action.evidence} />
+              <ExecutiveEvidenceSummary references={action.evidence} />
             </li>
           ))}
         </ol>
-      </section>
-
-      <section className="border-t border-white/10 pt-5">
-        <SectionHeading>Supporting Evidence</SectionHeading>
-        {visibleEvidenceGroups.length ? (
-          <div className="mt-3 space-y-4">
-            {visibleEvidenceGroups.map((group) => (
-              <div key={group.category}>
-                <p className="text-sm font-semibold text-white">{group.category}</p>
-                <ExecutiveEvidenceRenderer references={group.items} />
-              </div>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-2 text-sm leading-6 text-slate-400">No additional supporting evidence was used.</p>
-        )}
       </section>
 
       <section className="border-t border-white/10 pt-5">
@@ -356,6 +363,8 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
           </ul>
         </section>
       ) : null}
+
+      <SupportingEvidenceSection references={allEvidence} />
 
     </div>
   );

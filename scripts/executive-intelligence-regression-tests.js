@@ -91,17 +91,21 @@ assert.match(askResponse, /answer\.executiveBriefing/, "dedicated Ask must recog
 assert.match(askResponse, /<ExecutiveIntelligenceAnswer/, "dedicated Ask must render the executive briefing component");
 assert.match(askWorkspace, /<AskVaeroexResponse answer=\{answer\}/, "persistent Ask exchanges must use the validated answer renderer");
 assert.doesNotMatch(renderer, /summary_signal_ids|signal_id|relationship_candidates/, "the canonical transport and manifest must never be exposed in the UI");
-assert.match(renderer, /<ExecutiveEvidenceRenderer/, "every executive citation surface must use the shared evidence renderer");
+assert.equal((renderer.match(/<ExecutiveEvidenceRenderer/g) || []).length, 1, "structured evidence must render once in the shared deduplicated evidence catalog");
+assert.ok((renderer.match(/<ExecutiveEvidenceSummary/g) || []).length >= 6, "findings, interpretations, causes, and actions must use concise evidence summaries");
 assert.doesNotMatch(renderer, /reference\.support/, "Executive Analysis must never render canonical support serialization directly");
 assert.match(evidenceRenderer, /presentExecutiveEvidence\(reference\)/, "the shared renderer must apply the deterministic presentation adapter");
+assert.match(evidenceRenderer, /dedupeExecutiveEvidence\(references\)/, "the shared renderer must suppress duplicate citations before rendering details");
 assert.match(evidencePresentation, /INTERNAL_KEY_PATTERN/, "the presentation adapter must remove internal source fields");
+assert.match(renderer, /<summary[^>]*>View Evidence<\/summary>/, "detailed evidence must remain collapsed behind a clear View Evidence control");
+assert.match(renderer, /Each citation is shown once, even when it supports multiple conclusions/, "the evidence catalog must explain its cross-finding deduplication");
 assert.match(renderer, /What would change this recommendation:/, "recommendations must clearly identify the condition that would change them");
 assert.match(renderer, /Top priorities[\s\S]*Recommended actions[\s\S]*Known limitations/, "the Leadership Brief must present a concise executive hierarchy");
 assert.match(renderer, /highest-ranked validated drivers/, "Business Health explanations must summarize validated score drivers without a new model call");
 
 for (const heading of [
   "Executive Summary",
-  "Key Findings",
+  "Top Priorities",
   "Root Cause Analysis",
   "Business Impact",
   "Recommended Actions",
@@ -136,7 +140,12 @@ const { planVaeroexQuery } = require("../lib/ai/query-depth-planner.ts");
 const { estimateVaeroexCompletionRequest } = require("../lib/ai/vaeroex-client.ts");
 const { getVaeroexWorkflow } = require("../lib/ai/vaeroex-workflows.ts");
 const { estimateTokenCount } = require("../lib/ai/usage.ts");
-const { presentExecutiveEvidence, uniqueExecutiveLines } = require("../lib/presentation/executive-evidence.ts");
+const {
+  dedupeExecutiveEvidence,
+  presentExecutiveEvidence,
+  summarizeExecutiveEvidence,
+  uniqueExecutiveLines
+} = require("../lib/presentation/executive-evidence.ts");
 
 const serializedEvidence = presentExecutiveEvidence({
   citationId: 7,
@@ -173,6 +182,19 @@ assert.deepEqual(serializedEvidence.provenance, [
   { label: "Source row", value: "5" }
 ], "human evidence must retain useful workbook lineage without exposing internal indexes");
 assert.doesNotMatch(serializedEvidenceText, /56127a32|2ae9a95b|d247e46f|raw_data_json|source_file_id|import_id|worksheet index/i, "human evidence must never expose internal serialization or identifiers");
+
+const repeatedEvidence = [
+  { citationId: 7, title: "Revenue", sourceType: "KPI", support: JSON.stringify({ metric_name: "Revenue", value: 25, source_name: "Retail Performance workbook" }) },
+  { citationId: 7, title: "Revenue duplicate", sourceType: "KPI", support: "duplicate serialization" },
+  { citationId: 8, title: "Margin", sourceType: "KPI", support: JSON.stringify({ metric_name: "Margin", value: 12, source_name: "Retail Performance workbook" }) }
+];
+assert.deepEqual(dedupeExecutiveEvidence(repeatedEvidence).map((item) => item.citationId), [7, 8], "repeated evidence must be deduplicated by canonical citation ID");
+assert.deepEqual(summarizeExecutiveEvidence(repeatedEvidence), {
+  citationNumbers: [7, 8],
+  evidenceCount: 2,
+  sourceCount: 1,
+  text: "2 supporting metrics from Retail Performance workbook."
+}, "inline evidence must collapse to a concise source-aware summary");
 
 const malformedSerializedEvidence = presentExecutiveEvidence({
   citationId: 8,
