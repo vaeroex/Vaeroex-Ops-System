@@ -5,10 +5,11 @@ import { resolveAIProviderAttemptWindow, type AIProviderExecutionBudget } from "
 import { OpenAIProvider } from "@/lib/ai/providers/openai-provider";
 import { NvidiaProvider } from "@/lib/ai/providers/nvidia-provider";
 import { AIProviderError, AIProviderPolicyError, type AIGenerationMode, type AIProvider, type AIProviderInputPart, type AIProviderName } from "@/lib/ai/providers/types";
+import type { SafeAIValidationDiagnostic, StructuredOutputValidation } from "@/lib/ai/validation-diagnostics";
 
 export const NVIDIA_NEMOTRON_MODEL = "nvidia/llama-3.3-nemotron-super-49b-v1.5";
 
-export type StructuredOutputValidation<T> = { ok: true; value: T } | { ok: false; reason: string };
+export type { StructuredOutputValidation } from "@/lib/ai/validation-diagnostics";
 
 export type AIProviderAttempt = {
   provider: AIProviderName;
@@ -22,6 +23,9 @@ export type AIProviderAttempt = {
   totalTokens: number;
   requestId: string | null;
   failureType: "transport" | "structured_output" | "unsupported_input" | "deadline" | null;
+  finishReason: string | null;
+  truncationDetected: boolean;
+  validationDiagnostic: SafeAIValidationDiagnostic | null;
   timeoutBudgetMs?: number;
   deadlineRemainingMs?: number;
 };
@@ -74,7 +78,13 @@ function isRetryable(error: unknown) {
   );
 }
 
-function logAttempt(attempt: AIProviderAttempt, context: RunStructuredAIRequest<unknown>["logContext"], fallback: boolean) {
+function logAttempt(
+  attempt: AIProviderAttempt,
+  context: RunStructuredAIRequest<unknown>["logContext"],
+  fallback: boolean,
+  validationTelemetryEnabled: boolean
+) {
+  const diagnostic = validationTelemetryEnabled ? attempt.validationDiagnostic : null;
   const payload = {
     level: attempt.success ? "info" : "error",
     component: "vaeroex-ai-provider",
@@ -89,6 +99,16 @@ function logAttempt(attempt: AIProviderAttempt, context: RunStructuredAIRequest<
     attempt: attempt.attempt,
     fallback,
     failureType: attempt.failureType,
+    finishReason: attempt.finishReason,
+    truncationDetected: attempt.truncationDetected,
+    validationReasonCode: diagnostic?.reasonCode || null,
+    validationStage: diagnostic?.stage || null,
+    expectedField: diagnostic?.expectedField || null,
+    expectedType: diagnostic?.expectedType || null,
+    observedType: diagnostic?.observedType || null,
+    expectedCount: diagnostic?.expectedCount ?? null,
+    observedCount: diagnostic?.observedCount ?? null,
+    fieldPresent: diagnostic?.fieldPresent ?? null,
     timeoutBudgetMs: attempt.timeoutBudgetMs ?? null,
     deadlineRemainingMs: Number.isFinite(attempt.deadlineRemainingMs) ? attempt.deadlineRemainingMs : null,
     workflow: context?.workflow || null,
@@ -146,6 +166,7 @@ async function runProvider<T>({
   let lastError: unknown;
   let validationReason = "";
   const configuredProviderSettings = settingsForProvider(providerName, request.settings);
+  const validationTelemetryEnabled = request.generationMode === "interactive_executive";
 
   for (let attemptNumber = 1; attemptNumber <= maxAttempts; attemptNumber += 1) {
     const attemptWindow = resolveAIProviderAttemptWindow({
@@ -167,11 +188,14 @@ async function runProvider<T>({
         totalTokens: 0,
         requestId: null,
         failureType: "deadline",
+        finishReason: null,
+        truncationDetected: false,
+        validationDiagnostic: null,
         timeoutBudgetMs: attemptWindow.timeoutMs,
         deadlineRemainingMs: attemptWindow.remainingMs
       };
       attempts.push(skippedAttempt);
-      logAttempt(skippedAttempt, request.logContext, fallback);
+      logAttempt(skippedAttempt, request.logContext, fallback, validationTelemetryEnabled);
       throw new AIProviderError(`${providerName} was skipped because the workflow deadline had insufficient time remaining.`, providerName, true);
     }
     const providerSettings = {
@@ -189,6 +213,39 @@ async function runProvider<T>({
         maxOutputTokens: request.maxOutputTokens,
         settings: providerSettings
       });
+      if (result.truncationDetected) {
+        validationReason = "truncated response";
+        const failedAttempt: AIProviderAttempt = {
+          provider: providerName,
+          model,
+          attempt: attemptNumber,
+          fallback,
+          success: false,
+          latencyMs: result.latencyMs,
+          inputTokens: result.usage.inputTokens,
+          outputTokens: result.usage.outputTokens,
+          totalTokens: result.usage.totalTokens,
+          requestId: result.requestId,
+          failureType: "structured_output",
+          finishReason: result.finishReason,
+          truncationDetected: true,
+          validationDiagnostic: {
+            reasonCode: "unexpected_truncation",
+            stage: "canonical_schema",
+            expectedField: "$",
+            expectedType: "object",
+            observedType: "string",
+            truncationDetected: true
+          },
+          timeoutBudgetMs: attemptWindow.timeoutMs,
+          deadlineRemainingMs: attemptWindow.remainingMs
+        };
+        attempts.push(failedAttempt);
+        logAttempt(failedAttempt, request.logContext, fallback, validationTelemetryEnabled);
+        lastError = new AIProviderError(`${providerName} returned a truncated response.`, providerName, true);
+        if (attemptNumber < maxAttempts) await waitBeforeRetry(providerSettings, attemptNumber);
+        continue;
+      }
       let parsed: unknown;
       try {
         parsed = parseStructuredJson(result.content);
@@ -206,11 +263,21 @@ async function runProvider<T>({
           totalTokens: result.usage.totalTokens,
           requestId: result.requestId,
           failureType: "structured_output",
+          finishReason: result.finishReason,
+          truncationDetected: result.truncationDetected,
+          validationDiagnostic: {
+            reasonCode: "response_not_json",
+            stage: "json_parsing",
+            expectedField: "$",
+            expectedType: "object",
+            observedType: "string",
+            truncationDetected: false
+          },
           timeoutBudgetMs: attemptWindow.timeoutMs,
           deadlineRemainingMs: attemptWindow.remainingMs
         };
         attempts.push(failedAttempt);
-        logAttempt(failedAttempt, request.logContext, fallback);
+        logAttempt(failedAttempt, request.logContext, fallback, validationTelemetryEnabled);
         lastError = new AIProviderError(`${providerName} returned malformed JSON.`, providerName, true);
         if (attemptNumber < maxAttempts) await waitBeforeRetry(providerSettings, attemptNumber);
         continue;
@@ -231,11 +298,18 @@ async function runProvider<T>({
           totalTokens: result.usage.totalTokens,
           requestId: result.requestId,
           failureType: "structured_output",
+          finishReason: result.finishReason,
+          truncationDetected: result.truncationDetected,
+          validationDiagnostic: validation.diagnostic || {
+            reasonCode: "unknown_validation_failure",
+            stage: "contextual_validation",
+            truncationDetected: false
+          },
           timeoutBudgetMs: attemptWindow.timeoutMs,
           deadlineRemainingMs: attemptWindow.remainingMs
         };
         attempts.push(failedAttempt);
-        logAttempt(failedAttempt, request.logContext, fallback);
+        logAttempt(failedAttempt, request.logContext, fallback, validationTelemetryEnabled);
         lastError = new AIProviderError(`${providerName} returned invalid structured output.`, providerName, true);
         if (attemptNumber < maxAttempts) await waitBeforeRetry(providerSettings, attemptNumber);
         continue;
@@ -253,11 +327,14 @@ async function runProvider<T>({
         totalTokens: result.usage.totalTokens,
         requestId: result.requestId,
         failureType: null,
+        finishReason: result.finishReason,
+        truncationDetected: result.truncationDetected,
+        validationDiagnostic: null,
         timeoutBudgetMs: attemptWindow.timeoutMs,
         deadlineRemainingMs: attemptWindow.remainingMs
       };
       attempts.push(successfulAttempt);
-      logAttempt(successfulAttempt, request.logContext, fallback);
+      logAttempt(successfulAttempt, request.logContext, fallback, validationTelemetryEnabled);
       return { value: validation.value, result, provider: providerName, model };
     } catch (error) {
       if (error instanceof AIProviderPolicyError) throw error;
@@ -275,11 +352,14 @@ async function runProvider<T>({
         totalTokens: 0,
         requestId: null,
         failureType: unsupported ? "unsupported_input" : "transport",
+        finishReason: null,
+        truncationDetected: false,
+        validationDiagnostic: null,
         timeoutBudgetMs: attemptWindow.timeoutMs,
         deadlineRemainingMs: attemptWindow.remainingMs
       };
       attempts.push(failedAttempt);
-      logAttempt(failedAttempt, request.logContext, fallback);
+      logAttempt(failedAttempt, request.logContext, fallback, validationTelemetryEnabled);
       if (unsupported || !isRetryable(error)) break;
       if (attemptNumber < maxAttempts) await waitBeforeRetry(providerSettings, attemptNumber);
     }

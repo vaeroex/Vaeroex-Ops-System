@@ -138,6 +138,8 @@ const providerResult = (content, inputTokens, outputTokens) => ({
   content: JSON.stringify(content),
   requestId: "regression-request",
   latencyMs: 5,
+  finishReason: "stop",
+  truncationDetected: false,
   usage: { inputTokens, outputTokens, totalTokens: inputTokens + outputTokens }
 });
 
@@ -283,6 +285,102 @@ async function runRuntimeTests() {
       assert.equal(error.attempts.length, 2, "failed execution must retain the primary and fallback attempts");
       assert.equal(error.attempts[0].fallback, false, "the failed NVIDIA attempt must remain primary");
       assert.equal(error.attempts[1].fallback, true, "the failed OpenAI attempt must remain fallback");
+      return true;
+    }
+  );
+
+  const originalConsoleError = console.error;
+  const safeValidationLogs = [];
+  console.error = (...args) => safeValidationLogs.push(args.map((value) => String(value)).join(" "));
+  try {
+    await assert.rejects(
+      runStructuredAI({
+        ...request,
+        primaryProvider: "openai",
+        generationMode: "interactive_executive",
+        settings: { ...request.settings, maxRetries: 0 },
+        systemPrompt: "PRIVATE_SYSTEM_PROMPT_MARKER",
+        userContent: [{ type: "text", text: "PRIVATE_CUSTOMER_EVIDENCE_MARKER" }],
+        providers: {
+          nvidia: provider("nvidia", async () => providerResult({ ok: true }, 0, 0)),
+          openai: provider("openai", async () => providerResult({ private_model_output: "PRIVATE_MODEL_OUTPUT_MARKER" }, 55, 21))
+        },
+        validate() {
+          return {
+            ok: false,
+            reason: "synthetic validation failure",
+            diagnostic: {
+              reasonCode: "missing_required_signal",
+              stage: "ranked_signal_coverage",
+              expectedField: "analysis.findings[].signal_id",
+              expectedType: "string",
+              observedType: "array",
+              expectedCount: 3,
+              observedCount: 2,
+              fieldPresent: true,
+              truncationDetected: false
+            }
+          };
+        },
+        logContext: { workflow: "executive_intelligence", executionPath: "cross_business_reasoning" }
+      }),
+      (error) => {
+        assert.ok(error instanceof AIProviderExecutionError, "invalid canonical output must retain safe provider telemetry");
+        assert.equal(error.attempts[0].validationDiagnostic.reasonCode, "missing_required_signal");
+        assert.equal(error.attempts[0].finishReason, "stop");
+        return true;
+      }
+    );
+  } finally {
+    console.error = originalConsoleError;
+  }
+  const safeValidationLog = safeValidationLogs.join("\n");
+  assert.match(safeValidationLog, /"validationReasonCode":"missing_required_signal"/, "interactive validation logs must include the safe reason code");
+  assert.match(safeValidationLog, /"validationStage":"ranked_signal_coverage"/, "interactive validation logs must include the safe stage");
+  assert.match(safeValidationLog, /"finishReason":"stop"/, "interactive validation logs must include finish metadata");
+  assert.doesNotMatch(safeValidationLog, /PRIVATE_SYSTEM_PROMPT_MARKER|PRIVATE_CUSTOMER_EVIDENCE_MARKER|PRIVATE_MODEL_OUTPUT_MARKER/, "validation telemetry must never contain prompts, evidence, or model output");
+
+  await assert.rejects(
+    runStructuredAI({
+      ...request,
+      primaryProvider: "openai",
+      generationMode: "interactive_executive",
+      settings: { ...request.settings, maxRetries: 0 },
+      providers: {
+        nvidia: provider("nvidia", async () => providerResult({ ok: true }, 0, 0)),
+        openai: provider("openai", async () => ({
+          ...providerResult({ partial: true }, 40, 520),
+          finishReason: "max_output_tokens",
+          truncationDetected: true
+        }))
+      }
+    }),
+    (error) => {
+      assert.ok(error instanceof AIProviderExecutionError, "truncated output must retain provider attempt metadata");
+      assert.equal(error.attempts[0].validationDiagnostic.reasonCode, "unexpected_truncation");
+      assert.equal(error.attempts[0].truncationDetected, true);
+      return true;
+    }
+  );
+
+  await assert.rejects(
+    runStructuredAI({
+      ...request,
+      primaryProvider: "openai",
+      generationMode: "interactive_executive",
+      settings: { ...request.settings, maxRetries: 0 },
+      providers: {
+        nvidia: provider("nvidia", async () => providerResult({ ok: true }, 0, 0)),
+        openai: provider("openai", async () => ({
+          ...providerResult({ ignored: true }, 33, 8),
+          content: "not-json PRIVATE_MODEL_OUTPUT_MARKER"
+        }))
+      }
+    }),
+    (error) => {
+      assert.ok(error instanceof AIProviderExecutionError, "non-JSON output must retain provider attempt metadata");
+      assert.equal(error.attempts[0].validationDiagnostic.reasonCode, "response_not_json");
+      assert.equal(error.attempts[0].validationDiagnostic.stage, "json_parsing");
       return true;
     }
   );

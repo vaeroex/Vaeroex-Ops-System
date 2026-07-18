@@ -151,11 +151,9 @@ async function runDynamicProviderTests() {
       choices: [{ finish_reason: "length", message: { content: "{\"ok\":true}" } }],
       usage: { prompt_tokens: 10, completion_tokens: 400, total_tokens: 410 }
     }), { status: 200, headers: { "content-type": "application/json" } });
-    await assert.rejects(
-      provider.generate({ ...baseRequest, generationMode: "interactive_executive" }),
-      /incomplete response/i,
-      "a provider response stopped by the output limit must never be accepted as complete"
-    );
+    const truncated = await provider.generate({ ...baseRequest, generationMode: "interactive_executive" });
+    assert.equal(truncated.finishReason, "length", "provider finish metadata must preserve output-limit termination");
+    assert.equal(truncated.truncationDetected, true, "output-limit termination must be marked for provider-manager rejection");
   } finally {
     global.fetch = originalFetch;
     if (originalKey === undefined) delete process.env.NVIDIA_API_KEY;

@@ -24,6 +24,8 @@ function mockProvider(name: "openai" | "nvidia", responses: string[]): AIProvide
         content,
         requestId: `smoke-${name}-${index}`,
         latencyMs: 1,
+        finishReason: "stop",
+        truncationDetected: false,
         usage: { inputTokens: 10, outputTokens: 10, totalTokens: 20 }
       };
     }

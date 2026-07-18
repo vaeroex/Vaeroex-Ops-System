@@ -31,6 +31,8 @@ export type AIProviderResult = {
   requestId: string | null;
   latencyMs: number;
   usage: AIProviderUsage;
+  finishReason: string | null;
+  truncationDetected: boolean;
 };
 
 export type AIEmbeddingResult = {

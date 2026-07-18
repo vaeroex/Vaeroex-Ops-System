@@ -15,7 +15,6 @@ type ResponsesPayload = {
 };
 
 function extractContent(payload: ResponsesPayload) {
-  if (payload.status === "incomplete") throw new AIProviderError("OpenAI returned an incomplete response.", "openai", true);
   if (payload.output_text) return payload.output_text;
   for (const item of payload.output || []) {
     for (const part of item.content || []) {
@@ -82,7 +81,8 @@ export class OpenAIProvider implements AIProvider {
     }
 
     const content = extractContent(payload);
-    if (!content) throw new AIProviderError("OpenAI returned an empty response.", "openai", true);
+    const truncationDetected = payload.status === "incomplete";
+    if (!content && !truncationDetected) throw new AIProviderError("OpenAI returned an empty response.", "openai", true);
     const inputTokens = payload.usage?.input_tokens || 0;
     const outputTokens = payload.usage?.output_tokens || 0;
 
@@ -90,6 +90,8 @@ export class OpenAIProvider implements AIProvider {
       content,
       requestId: response.headers.get("x-request-id") || response.headers.get("openai-request-id"),
       latencyMs: Date.now() - startedAt,
+      finishReason: payload.incomplete_details?.reason || payload.status || null,
+      truncationDetected,
       usage: {
         inputTokens,
         outputTokens,

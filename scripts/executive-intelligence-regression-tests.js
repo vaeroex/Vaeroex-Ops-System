@@ -161,6 +161,81 @@ assert.equal(validateExecutiveEvidenceReferences(validOutput, catalog).ok, true,
 assert.deepEqual(Object.keys(validOutput), ["analysis", "executive_summary", "overall_confidence", "summary_signal_ids"], "the provider transport must contain only the compact canonical sections");
 assert.ok(estimateTokenCount(JSON.stringify(validOutput)) <= EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS, "a valid three-signal canonical response must fit its complete output budget without truncation");
 
+function assertDiagnostic(result, reasonCode, stage) {
+  assert.equal(result.ok, false, `${reasonCode} fixture must be rejected`);
+  assert.equal(result.diagnostic?.reasonCode, reasonCode, `${reasonCode} must retain its safe reason code`);
+  assert.equal(result.diagnostic?.stage, stage, `${reasonCode} must retain its validation stage`);
+  assert.doesNotMatch(JSON.stringify(result.diagnostic), /Revenue movement|Inventory movement|Customer activity/, "diagnostics must not contain model output or evidence text");
+}
+
+assertDiagnostic(validateExecutiveIntelligenceContract(null), "root_not_object", "canonical_schema");
+assertDiagnostic(validateExecutiveIntelligenceContract({}), "missing_analysis", "canonical_schema");
+assertDiagnostic(validateExecutiveIntelligenceContract({ analysis: [] }), "invalid_analysis_shape", "canonical_schema");
+
+const missingFindings = structuredClone(validOutput);
+delete missingFindings.analysis.findings;
+assertDiagnostic(validateExecutiveIntelligenceContract(missingFindings), "missing_findings", "canonical_schema");
+
+const findingsNotArray = structuredClone(validOutput);
+findingsNotArray.analysis.findings = {};
+assertDiagnostic(validateExecutiveIntelligenceContract(findingsNotArray), "findings_not_array", "canonical_schema");
+
+const noFindings = structuredClone(validOutput);
+noFindings.analysis.findings = [];
+assertDiagnostic(validateExecutiveIntelligenceContract(noFindings), "insufficient_required_findings", "canonical_schema");
+
+const unknownSignal = structuredClone(validOutput);
+unknownSignal.analysis.findings[0].signal_id = "not-a-signal";
+assertDiagnostic(validateExecutiveIntelligenceContract(unknownSignal), "unknown_signal_id", "canonical_schema");
+
+const duplicateSignal = structuredClone(validOutput);
+duplicateSignal.analysis.findings[1].signal_id = "S1";
+assertDiagnostic(validateExecutiveIntelligenceContract(duplicateSignal), "duplicate_signal_id", "canonical_schema");
+
+const invalidRelationshipShape = structuredClone(validOutput);
+invalidRelationshipShape.analysis.relationships = {};
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidRelationshipShape), "invalid_relationship", "canonical_schema");
+
+const invalidActionShape = structuredClone(validOutput);
+invalidActionShape.analysis.actions = [];
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidActionShape), "invalid_action", "canonical_schema");
+
+const invalidCitationShape = structuredClone(validOutput);
+invalidCitationShape.analysis.findings[0].citations = ["customer-evidence"];
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidCitationShape), "invalid_citation_id", "canonical_schema");
+
+const noSummarySignals = structuredClone(validOutput);
+delete noSummarySignals.summary_signal_ids;
+assertDiagnostic(validateExecutiveIntelligenceContract(noSummarySignals), "missing_summary_signal_ids", "canonical_schema");
+
+const invalidSummarySignals = structuredClone(validOutput);
+invalidSummarySignals.summary_signal_ids = "S1";
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidSummarySignals), "invalid_summary_signal_ids", "canonical_schema");
+
+const missingExecutiveSummary = structuredClone(validOutput);
+missingExecutiveSummary.executive_summary = "";
+assertDiagnostic(validateExecutiveIntelligenceContract(missingExecutiveSummary), "executive_summary_missing", "canonical_schema");
+
+const invalidOverallConfidence = structuredClone(validOutput);
+invalidOverallConfidence.overall_confidence = "Certain";
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidOverallConfidence), "invalid_overall_confidence", "confidence");
+
+const invalidSufficiency = structuredClone(validOutput);
+invalidSufficiency.analysis.evidence_sufficiency = "Enough";
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidSufficiency), "evidence_sufficiency_invalid", "canonical_schema");
+
+const invalidAgreement = structuredClone(validOutput);
+invalidAgreement.analysis.evidence_agreement = "Mostly";
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidAgreement), "agreement_invalid", "canonical_schema");
+
+const invalidUncertainty = structuredClone(validOutput);
+invalidUncertainty.analysis.uncertainty = "none";
+assertDiagnostic(validateExecutiveIntelligenceContract(invalidUncertainty), "uncertainty_invalid", "canonical_schema");
+
+const fieldTypeMismatch = structuredClone(validOutput);
+fieldTypeMismatch.analysis.findings[0].finding = 42;
+assertDiagnostic(validateExecutiveIntelligenceContract(fieldTypeMismatch), "schema_field_type_mismatch", "canonical_schema");
+
 const truncatedOutput = structuredClone(validOutput);
 delete truncatedOutput.summary_signal_ids;
 assert.equal(validateExecutiveIntelligenceContract(truncatedOutput).ok, false, "truncated canonical JSON must never be accepted");
@@ -188,6 +263,7 @@ assert.equal(
   false,
   "the executive summary must cover every required top-ranked signal"
 );
+assertDiagnostic(validateExecutiveEvidenceReferences(incompleteExecutiveSummary, signalAwareCatalog, threeSignalPolicy), "executive_summary_signal_coverage_failed", "ranked_signal_coverage");
 
 const dominantSignalOnly = structuredClone(validOutput);
 dominantSignalOnly.analysis.findings = dominantSignalOnly.analysis.findings.slice(0, 1);
@@ -198,6 +274,7 @@ assert.equal(
   false,
   "one dominant finding must not pass when three distinct supported signals are available"
 );
+assertDiagnostic(validateExecutiveEvidenceReferences(dominantSignalOnly, signalAwareCatalog, threeSignalPolicy), "insufficient_required_findings", "ranked_signal_coverage");
 
 const repeatedSignal = structuredClone(multiSignalOutput);
 repeatedSignal.analysis.findings[1].signal_id = "S1";
@@ -241,6 +318,15 @@ assert.equal(
   false,
   "the model must not invent a relationship outside the deterministic signal plan"
 );
+assertDiagnostic(validateExecutiveEvidenceReferences(unplannedRelationship, signalAwareCatalog, threeSignalPolicy), "unsupported_relationship", "relationship_support");
+
+const unknownCitationOutput = structuredClone(multiSignalOutput);
+unknownCitationOutput.analysis.findings[0].citations = [999];
+assertDiagnostic(validateExecutiveEvidenceReferences(unknownCitationOutput, signalAwareCatalog, threeSignalPolicy), "invalid_citation_id", "citation_provenance");
+
+const excessiveFindingConfidence = structuredClone(multiSignalOutput);
+excessiveFindingConfidence.analysis.findings[0].confidence = "High";
+assertDiagnostic(validateExecutiveEvidenceReferences(excessiveFindingConfidence, signalAwareCatalog, threeSignalPolicy), "confidence_ceiling_exceeded", "confidence");
 
 const appendixInflation = structuredClone(validOutput);
 appendixInflation.analysis.findings = appendixInflation.analysis.findings.slice(0, 1);

@@ -14,9 +14,6 @@ type NvidiaPayload = {
 };
 
 function extractContent(payload: NvidiaPayload) {
-  if (payload.choices?.[0]?.finish_reason === "length") {
-    throw new AIProviderError("NVIDIA returned an incomplete response.", "nvidia", true);
-  }
   const content = payload.choices?.[0]?.message?.content;
   if (typeof content === "string") return content;
   if (Array.isArray(content)) return content.map((part) => part.text || "").join("").trim();
@@ -75,7 +72,9 @@ export class NvidiaProvider implements AIProvider {
     }
 
     const content = extractContent(payload);
-    if (!content) throw new AIProviderError("NVIDIA returned an empty response.", "nvidia", true);
+    const finishReason = payload.choices?.[0]?.finish_reason || null;
+    const truncationDetected = finishReason === "length";
+    if (!content && !truncationDetected) throw new AIProviderError("NVIDIA returned an empty response.", "nvidia", true);
     const inputTokens = payload.usage?.prompt_tokens || 0;
     const outputTokens = payload.usage?.completion_tokens || 0;
 
@@ -83,6 +82,8 @@ export class NvidiaProvider implements AIProvider {
       content,
       requestId: response.headers.get("x-request-id") || response.headers.get("nv-request-id"),
       latencyMs: Date.now() - startedAt,
+      finishReason,
+      truncationDetected,
       usage: {
         inputTokens,
         outputTokens,

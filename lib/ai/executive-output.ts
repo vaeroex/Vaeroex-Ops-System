@@ -9,6 +9,13 @@ import type {
   GlobalSearchAnswer
 } from "@/lib/search/types";
 import type { Json } from "@/lib/supabase/types";
+import {
+  validationFailure,
+  validationValueType,
+  type AIValidationReasonCode,
+  type AIValidationStage,
+  type StructuredOutputValidation
+} from "@/lib/ai/validation-diagnostics";
 
 export const EXECUTIVE_CANONICAL_MAX_OUTPUT_TOKENS = 520;
 
@@ -168,35 +175,165 @@ function hasKeyOrder(value: Record<string, unknown>, expected: string[]) {
   return true;
 }
 
-export function validateExecutiveIntelligenceContract(value: unknown) {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function hasOwn(value: Record<string, unknown>, key: string) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function contractFailure({
+  reason,
+  reasonCode,
+  stage = "canonical_schema",
+  expectedField,
+  expectedType,
+  observed,
+  expectedCount,
+  observedCount,
+  fieldPresent
+}: {
+  reason: string;
+  reasonCode: AIValidationReasonCode;
+  stage?: AIValidationStage;
+  expectedField?: string;
+  expectedType?: "undefined" | "null" | "boolean" | "number" | "string" | "array" | "object";
+  observed?: unknown;
+  expectedCount?: number;
+  observedCount?: number;
+  fieldPresent?: boolean;
+}) {
+  return validationFailure(reason, {
+    reasonCode,
+    stage,
+    expectedField,
+    expectedType,
+    observedType: observed === undefined && fieldPresent === false ? "undefined" : validationValueType(observed),
+    expectedCount,
+    observedCount,
+    fieldPresent,
+    truncationDetected: false
+  });
+}
+
+function canonicalShapeFailure(value: Record<string, unknown>): StructuredOutputValidation<never> | null {
+  if (!hasOwn(value, "analysis")) {
+    return contractFailure({ reason: "Executive analysis is required.", reasonCode: "missing_analysis", expectedField: "analysis", expectedType: "object", observed: undefined, fieldPresent: false });
+  }
+  if (!isRecord(value.analysis)) {
+    return contractFailure({ reason: "Executive analysis must be an object.", reasonCode: "invalid_analysis_shape", expectedField: "analysis", expectedType: "object", observed: value.analysis, fieldPresent: true });
+  }
+  const analysis = value.analysis;
+
+  if (!evidenceSufficiencySchema.safeParse(analysis.evidence_sufficiency).success) {
+    return contractFailure({ reason: "Evidence sufficiency is invalid.", reasonCode: "evidence_sufficiency_invalid", expectedField: "analysis.evidence_sufficiency", expectedType: "string", observed: analysis.evidence_sufficiency, fieldPresent: hasOwn(analysis, "evidence_sufficiency") });
+  }
+  if (!evidenceAgreementSchema.safeParse(analysis.evidence_agreement).success) {
+    return contractFailure({ reason: "Evidence agreement is invalid.", reasonCode: "agreement_invalid", expectedField: "analysis.evidence_agreement", expectedType: "string", observed: analysis.evidence_agreement, fieldPresent: hasOwn(analysis, "evidence_agreement") });
+  }
+  if (!hasOwn(analysis, "findings")) {
+    return contractFailure({ reason: "Executive findings are required.", reasonCode: "missing_findings", expectedField: "analysis.findings", expectedType: "array", observed: undefined, fieldPresent: false });
+  }
+  if (!Array.isArray(analysis.findings)) {
+    return contractFailure({ reason: "Executive findings must be an array.", reasonCode: "findings_not_array", expectedField: "analysis.findings", expectedType: "array", observed: analysis.findings, fieldPresent: true });
+  }
+  if (analysis.findings.length < 1) {
+    return contractFailure({ reason: "At least one executive finding is required.", reasonCode: "insufficient_required_findings", expectedField: "analysis.findings", expectedType: "array", observed: analysis.findings, expectedCount: 1, observedCount: analysis.findings.length, fieldPresent: true });
+  }
+
+  const findingSignals: string[] = [];
+  const findingIds: string[] = [];
+  for (const finding of analysis.findings) {
+    if (!isRecord(finding)) {
+      return contractFailure({ reason: "Each finding must be an object.", reasonCode: "schema_field_type_mismatch", expectedField: "analysis.findings[]", expectedType: "object", observed: finding, fieldPresent: true });
+    }
+    if (typeof finding.signal_id !== "string" || !signalIdSchema.safeParse(finding.signal_id).success) {
+      return contractFailure({ reason: "A finding signal ID is invalid.", reasonCode: "unknown_signal_id", expectedField: "analysis.findings[].signal_id", expectedType: "string", observed: finding.signal_id, fieldPresent: hasOwn(finding, "signal_id") });
+    }
+    findingSignals.push(finding.signal_id);
+    if (typeof finding.id === "string") findingIds.push(finding.id);
+    if (!Array.isArray(finding.citations) || finding.citations.some((citation) => !Number.isInteger(citation) || Number(citation) <= 0)) {
+      return contractFailure({ reason: "Finding citation IDs are invalid.", reasonCode: "invalid_citation_id", expectedField: "analysis.findings[].citations", expectedType: "array", observed: finding.citations, fieldPresent: hasOwn(finding, "citations") });
+    }
+  }
+  if (new Set(findingSignals).size !== findingSignals.length) {
+    return contractFailure({ reason: "Each finding must represent a distinct signal.", reasonCode: "duplicate_signal_id", expectedField: "analysis.findings[].signal_id", expectedType: "string", observed: analysis.findings, expectedCount: findingSignals.length, observedCount: new Set(findingSignals).size, fieldPresent: true });
+  }
+  if (new Set(findingIds).size !== analysis.findings.length) {
+    return contractFailure({ reason: "Finding IDs must be unique and valid.", reasonCode: "contextual_validation_failed", expectedField: "analysis.findings[].id", expectedType: "string", observed: analysis.findings, expectedCount: analysis.findings.length, observedCount: new Set(findingIds).size, fieldPresent: true });
+  }
+
+  if (!Array.isArray(analysis.relationships)) {
+    return contractFailure({ reason: "Relationships must be an array.", reasonCode: "invalid_relationship", expectedField: "analysis.relationships", expectedType: "array", observed: analysis.relationships, fieldPresent: hasOwn(analysis, "relationships") });
+  }
+  for (const relationship of analysis.relationships) {
+    if (!isRecord(relationship) || !Array.isArray(relationship.finding_ids) || relationship.finding_ids.length !== 2 || !Array.isArray(relationship.citations)) {
+      return contractFailure({ reason: "A relationship is invalid.", reasonCode: "invalid_relationship", expectedField: "analysis.relationships[]", expectedType: "object", observed: relationship, fieldPresent: true });
+    }
+    if (relationship.citations.some((citation) => !Number.isInteger(citation) || Number(citation) <= 0)) {
+      return contractFailure({ reason: "Relationship citation IDs are invalid.", reasonCode: "invalid_citation_id", expectedField: "analysis.relationships[].citations", expectedType: "array", observed: relationship.citations, fieldPresent: true });
+    }
+  }
+
+  if (!Array.isArray(analysis.actions) || analysis.actions.length < 1) {
+    return contractFailure({ reason: "At least one valid action is required.", reasonCode: "invalid_action", expectedField: "analysis.actions", expectedType: "array", observed: analysis.actions, expectedCount: 1, observedCount: Array.isArray(analysis.actions) ? analysis.actions.length : undefined, fieldPresent: hasOwn(analysis, "actions") });
+  }
+  for (const action of analysis.actions) {
+    if (!isRecord(action) || !Array.isArray(action.citations) || action.citations.some((citation) => !Number.isInteger(citation) || Number(citation) <= 0)) {
+      return contractFailure({ reason: "An executive action is invalid.", reasonCode: "invalid_action", expectedField: "analysis.actions[]", expectedType: "object", observed: action, fieldPresent: true });
+    }
+  }
+
+  if (!Array.isArray(analysis.uncertainty) || analysis.uncertainty.some((item) => typeof item !== "string")) {
+    return contractFailure({ reason: "Uncertainty must be an array of strings.", reasonCode: "uncertainty_invalid", expectedField: "analysis.uncertainty", expectedType: "array", observed: analysis.uncertainty, fieldPresent: hasOwn(analysis, "uncertainty") });
+  }
+
+  if (!hasOwn(value, "executive_summary") || typeof value.executive_summary !== "string" || !value.executive_summary.trim()) {
+    return contractFailure({ reason: "Executive summary is required.", reasonCode: "executive_summary_missing", expectedField: "executive_summary", expectedType: "string", observed: value.executive_summary, fieldPresent: hasOwn(value, "executive_summary") });
+  }
+  if (!confidenceSchema.safeParse(value.overall_confidence).success) {
+    return contractFailure({ reason: "Overall confidence is invalid.", reasonCode: "invalid_overall_confidence", stage: "confidence", expectedField: "overall_confidence", expectedType: "string", observed: value.overall_confidence, fieldPresent: hasOwn(value, "overall_confidence") });
+  }
+  if (!hasOwn(value, "summary_signal_ids")) {
+    return contractFailure({ reason: "Summary signal IDs are required.", reasonCode: "missing_summary_signal_ids", expectedField: "summary_signal_ids", expectedType: "array", observed: undefined, fieldPresent: false });
+  }
+  if (!Array.isArray(value.summary_signal_ids) || value.summary_signal_ids.some((signalId) => typeof signalId !== "string" || !signalIdSchema.safeParse(signalId).success)) {
+    return contractFailure({ reason: "Summary signal IDs are invalid.", reasonCode: "invalid_summary_signal_ids", expectedField: "summary_signal_ids", expectedType: "array", observed: value.summary_signal_ids, fieldPresent: true });
+  }
+  if (new Set(value.summary_signal_ids).size !== value.summary_signal_ids.length || value.summary_signal_ids.some((signalId) => !findingSignals.includes(signalId))) {
+    return contractFailure({ reason: "Summary signal IDs must be unique returned signals.", reasonCode: "invalid_summary_signal_ids", expectedField: "summary_signal_ids", expectedType: "array", observed: value.summary_signal_ids, expectedCount: value.summary_signal_ids.length, observedCount: new Set(value.summary_signal_ids).size, fieldPresent: true });
+  }
+
+  if (!hasKeyOrder(value, ["analysis", "executive_summary", "overall_confidence", "summary_signal_ids"])) {
+    return contractFailure({ reason: "Executive analysis must be completed before the summary is written.", reasonCode: "contextual_validation_failed", expectedField: "canonical_field_order", expectedType: "object", observed: value, fieldPresent: true });
+  }
+  if (!hasKeyOrder(analysis, ["evidence_sufficiency", "evidence_agreement", "findings", "relationships", "actions", "uncertainty"])) {
+    return contractFailure({ reason: "Executive reasoning stages were not returned in the required order.", reasonCode: "invalid_analysis_shape", expectedField: "analysis_field_order", expectedType: "object", observed: analysis, fieldPresent: true });
+  }
+
+  return null;
+}
+
+export function validateExecutiveIntelligenceContract(value: unknown): StructuredOutputValidation<Json> {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return { ok: false as const, reason: "The executive response did not match its contract." };
+    return contractFailure({ reason: "The executive response must be an object.", reasonCode: "root_not_object", expectedField: "$", expectedType: "object", observed: value, fieldPresent: value !== undefined });
   }
 
   const objectValue = value as Record<string, unknown>;
-  if (!hasKeyOrder(objectValue, ["analysis", "executive_summary", "overall_confidence", "summary_signal_ids"])) {
-    return { ok: false as const, reason: "Executive analysis must be completed before the summary is written." };
-  }
-  if (
-    objectValue.analysis &&
-    typeof objectValue.analysis === "object" &&
-    !Array.isArray(objectValue.analysis) &&
-    !hasKeyOrder(objectValue.analysis as Record<string, unknown>, [
-      "evidence_sufficiency",
-      "evidence_agreement",
-      "findings",
-      "relationships",
-      "actions",
-      "uncertainty"
-    ])
-  ) {
-    return { ok: false as const, reason: "Executive reasoning stages were not returned in the required order." };
-  }
+  const shapeFailure = canonicalShapeFailure(objectValue);
+  if (shapeFailure) return shapeFailure;
 
   const parsed = executiveIntelligenceOutputSchema.safeParse(value);
   return parsed.success
     ? { ok: true as const, value: parsed.data as Json }
-    : { ok: false as const, reason: parsed.error.issues[0]?.message || "The executive response did not match its contract." };
+    : contractFailure({
+        reason: parsed.error.issues[0]?.message || "The executive response did not match its contract.",
+        reasonCode: "schema_field_type_mismatch",
+        expectedField: parsed.error.issues[0]?.path.join(".") || "$",
+        observed: value,
+        fieldPresent: true
+      });
 }
 
 function parsedExecutiveOutput(value: unknown): ParsedExecutiveOutput | null {
@@ -301,26 +438,28 @@ export function validateExecutiveEvidenceReferences(
   value: Json,
   catalog: ExecutiveCitationCatalogEntry[],
   signalPolicy?: ExecutiveSignalValidationPolicy
-) {
+): StructuredOutputValidation<Json> {
   const parsed = parsedExecutiveOutput(value);
-  if (!parsed) return { ok: false as const, reason: "The executive response did not match its contract." };
+  if (!parsed) {
+    return contractFailure({ reason: "The executive response did not match its contract.", reasonCode: "contextual_validation_failed", stage: "contextual_validation", expectedField: "$", expectedType: "object", observed: value, fieldPresent: true });
+  }
 
   const catalogById = new Map(catalog.map((item) => [item.citationId, item]));
   const unknownCitation = decisionCitationIds(parsed).find((citationId) => !catalogById.has(citationId));
   if (unknownCitation) {
-    return { ok: false as const, reason: `Evidence reference ${unknownCitation} was not supplied to this request.` };
+    return contractFailure({ reason: `Evidence reference ${unknownCitation} was not supplied to this request.`, reasonCode: "invalid_citation_id", stage: "citation_provenance", expectedField: "analysis.*.citations", expectedType: "array", observed: decisionCitationIds(parsed), fieldPresent: true });
   }
 
   const findingsById = new Map(parsed.analysis.findings.map((finding) => [finding.id, finding]));
   for (const finding of parsed.analysis.findings) {
     const citationSignals = signalIdsForCitations(finding.citations, catalogById);
     if (!citationSignals.has(finding.signal_id)) {
-      return { ok: false as const, reason: `Finding ${finding.id} is not supported by eligible citations for ${finding.signal_id}.` };
+      return contractFailure({ reason: `Finding ${finding.id} is not supported by eligible citations for ${finding.signal_id}.`, reasonCode: "missing_required_signal", stage: "citation_provenance", expectedField: "analysis.findings[].citations", expectedType: "array", observed: finding.citations, fieldPresent: true });
     }
     const sourceCount = independentSourceKeysForCitations(finding.citations, catalogById).size;
     const currentSourceCount = independentSourceKeysForCitations(finding.citations, catalogById, true).size;
     if (sourceCount < 1) {
-      return { ok: false as const, reason: "Every business finding must trace to eligible original evidence." };
+      return contractFailure({ reason: "Every business finding must trace to eligible original evidence.", reasonCode: "contextual_validation_failed", stage: "citation_provenance", expectedField: "analysis.findings[].citations", expectedType: "array", observed: finding.citations, expectedCount: 1, observedCount: sourceCount, fieldPresent: true });
     }
     const allowedConfidence = cappedConfidence(
       finding.confidence,
@@ -330,7 +469,7 @@ export function validateExecutiveEvidenceReferences(
       parsed.analysis.evidence_agreement
     );
     if (allowedConfidence !== finding.confidence) {
-      return { ok: false as const, reason: `Finding ${finding.id} exceeds the confidence supported by its cited evidence.` };
+      return contractFailure({ reason: `Finding ${finding.id} exceeds the confidence supported by its cited evidence.`, reasonCode: "confidence_ceiling_exceeded", stage: "confidence", expectedField: "analysis.findings[].confidence", expectedType: "string", observed: finding.confidence, fieldPresent: true });
     }
   }
 
@@ -338,49 +477,52 @@ export function validateExecutiveEvidenceReferences(
     const minimum = Math.min(3, signalPolicy.minimumDistinctFindings);
     const requiredSignalIds = signalPolicy.requiredSignalIds.slice(0, minimum);
     const returnedSignalIds = parsed.analysis.findings.slice(0, minimum).map((finding) => finding.signal_id);
-    if (parsed.analysis.findings.length < minimum || requiredSignalIds.some((signalId, index) => returnedSignalIds[index] !== signalId)) {
-      return { ok: false as const, reason: `The executive analysis must retain the ${minimum} highest-priority distinct evidence-backed findings in order.` };
+    if (parsed.analysis.findings.length < minimum) {
+      return contractFailure({ reason: `The executive analysis must retain ${minimum} findings.`, reasonCode: "insufficient_required_findings", stage: "ranked_signal_coverage", expectedField: "analysis.findings", expectedType: "array", observed: parsed.analysis.findings, expectedCount: minimum, observedCount: parsed.analysis.findings.length, fieldPresent: true });
+    }
+    if (requiredSignalIds.some((signalId, index) => returnedSignalIds[index] !== signalId)) {
+      return contractFailure({ reason: `The executive analysis must retain the ${minimum} highest-priority distinct evidence-backed findings in order.`, reasonCode: "missing_required_signal", stage: "ranked_signal_coverage", expectedField: "analysis.findings[].signal_id", expectedType: "string", observed: returnedSignalIds, expectedCount: requiredSignalIds.length, observedCount: returnedSignalIds.length, fieldPresent: true });
     }
     if (requiredSignalIds.some((signalId) => !parsed.summary_signal_ids.includes(signalId))) {
-      return { ok: false as const, reason: "The executive summary must synthesize every required highest-priority finding." };
+      return contractFailure({ reason: "The executive summary must synthesize every required highest-priority finding.", reasonCode: "executive_summary_signal_coverage_failed", stage: "ranked_signal_coverage", expectedField: "summary_signal_ids", expectedType: "array", observed: parsed.summary_signal_ids, expectedCount: requiredSignalIds.length, observedCount: parsed.summary_signal_ids.length, fieldPresent: true });
     }
   }
 
   const findingRanks = parsed.analysis.findings.map((finding) => earliestExecutiveRank(finding.citations, catalogById));
   if (findingRanks.some((rank, index) => index > 0 && rank < findingRanks[index - 1])) {
-    return { ok: false as const, reason: "Executive findings must remain ordered by verified signal priority." };
+    return contractFailure({ reason: "Executive findings must remain ordered by verified signal priority.", reasonCode: "contextual_validation_failed", stage: "ranked_signal_coverage", expectedField: "analysis.findings", expectedType: "array", observed: parsed.analysis.findings, fieldPresent: true });
   }
 
   let crossSignalRelationshipFound = false;
   for (const relationship of parsed.analysis.relationships) {
     const left = findingsById.get(relationship.finding_ids[0]);
     const right = findingsById.get(relationship.finding_ids[1]);
-    if (!left || !right) return { ok: false as const, reason: "A relationship references a finding that was not returned." };
+    if (!left || !right) return contractFailure({ reason: "A relationship references a finding that was not returned.", reasonCode: "invalid_relationship", stage: "relationship_support", expectedField: "analysis.relationships[].finding_ids", expectedType: "array", observed: relationship.finding_ids, fieldPresent: true });
     if (!allowedRelationshipPair(left.signal_id, right.signal_id, signalPolicy?.relationships)) {
-      return { ok: false as const, reason: "A relationship was not present in the supplied signal relationship plan." };
+      return contractFailure({ reason: "A relationship was not present in the supplied signal relationship plan.", reasonCode: "unsupported_relationship", stage: "relationship_support", expectedField: "analysis.relationships[].finding_ids", expectedType: "array", observed: relationship.finding_ids, fieldPresent: true });
     }
     const citedSignals = signalIdsForCitations(relationship.citations, catalogById);
     if (!citedSignals.has(left.signal_id) || !citedSignals.has(right.signal_id)) {
-      return { ok: false as const, reason: "A cross-signal relationship must retain citations from both findings." };
+      return contractFailure({ reason: "A cross-signal relationship must retain citations from both findings.", reasonCode: "unsupported_relationship", stage: "relationship_support", expectedField: "analysis.relationships[].citations", expectedType: "array", observed: relationship.citations, fieldPresent: true });
     }
     const sourceCount = independentSourceKeysForCitations(relationship.citations, catalogById).size;
     const currentSourceCount = independentSourceKeysForCitations(relationship.citations, catalogById, true).size;
     if (relationship.status === "Supported" && currentSourceCount < 2) {
-      return { ok: false as const, reason: "A supported relationship requires at least two independent current original sources." };
+      return contractFailure({ reason: "A supported relationship requires at least two independent current original sources.", reasonCode: "unsupported_relationship", stage: "relationship_support", expectedField: "analysis.relationships[].citations", expectedType: "array", observed: relationship.citations, expectedCount: 2, observedCount: currentSourceCount, fieldPresent: true });
     }
     if (relationship.status === "Possible" && sourceCount < 1) {
-      return { ok: false as const, reason: "A possible relationship must cite eligible original evidence." };
+      return contractFailure({ reason: "A possible relationship must cite eligible original evidence.", reasonCode: "unsupported_relationship", stage: "relationship_support", expectedField: "analysis.relationships[].citations", expectedType: "array", observed: relationship.citations, expectedCount: 1, observedCount: sourceCount, fieldPresent: true });
     }
     crossSignalRelationshipFound = true;
   }
   if (signalPolicy?.requireCrossSignalAssessment && !crossSignalRelationshipFound) {
-    return { ok: false as const, reason: "The executive analysis must evaluate at least one supplied relationship between distinct signals." };
+    return contractFailure({ reason: "The executive analysis must evaluate at least one supplied relationship between distinct signals.", reasonCode: "invalid_relationship", stage: "relationship_support", expectedField: "analysis.relationships", expectedType: "array", observed: parsed.analysis.relationships, expectedCount: 1, observedCount: parsed.analysis.relationships.length, fieldPresent: true });
   }
 
   for (const action of parsed.analysis.actions) {
     const sourceCount = independentSourceKeysForCitations(action.citations, catalogById).size;
     if (parsed.analysis.evidence_sufficiency !== "Insufficient" && sourceCount < 1) {
-      return { ok: false as const, reason: "Every recommendation must trace to eligible original evidence." };
+      return contractFailure({ reason: "Every recommendation must trace to eligible original evidence.", reasonCode: "invalid_action", stage: "citation_provenance", expectedField: "analysis.actions[].citations", expectedType: "array", observed: action.citations, expectedCount: 1, observedCount: sourceCount, fieldPresent: true });
     }
   }
 
@@ -391,13 +533,13 @@ export function validateExecutiveEvidenceReferences(
   const sufficiency = parsed.analysis.evidence_sufficiency;
 
   if (sufficiency === "Sufficient" && (currentIndependentSourceCount < 2 || originalSourceTypeCount < 2)) {
-    return { ok: false as const, reason: "Sufficient evidence requires two current independent original sources across more than one source type." };
+    return contractFailure({ reason: "Sufficient evidence requires two current independent original sources across more than one source type.", reasonCode: "evidence_sufficiency_invalid", stage: "contextual_validation", expectedField: "analysis.evidence_sufficiency", expectedType: "string", observed: sufficiency, expectedCount: 2, observedCount: Math.min(currentIndependentSourceCount, originalSourceTypeCount), fieldPresent: true });
   }
   if (sufficiency === "Partial" && independentSourceCount < 1) {
-    return { ok: false as const, reason: "Partial evidence requires at least one eligible original source." };
+    return contractFailure({ reason: "Partial evidence requires at least one eligible original source.", reasonCode: "evidence_sufficiency_invalid", stage: "contextual_validation", expectedField: "analysis.evidence_sufficiency", expectedType: "string", observed: sufficiency, expectedCount: 1, observedCount: independentSourceCount, fieldPresent: true });
   }
   if (sufficiency === "Conflicting" && independentSourceCount < 2) {
-    return { ok: false as const, reason: "Conflicting evidence requires at least two independent original sources." };
+    return contractFailure({ reason: "Conflicting evidence requires at least two independent original sources.", reasonCode: "evidence_sufficiency_invalid", stage: "contextual_validation", expectedField: "analysis.evidence_sufficiency", expectedType: "string", observed: sufficiency, expectedCount: 2, observedCount: independentSourceCount, fieldPresent: true });
   }
   const allowedOverallConfidence = cappedConfidence(
     parsed.overall_confidence,
@@ -407,7 +549,7 @@ export function validateExecutiveEvidenceReferences(
     parsed.analysis.evidence_agreement
   );
   if (allowedOverallConfidence !== parsed.overall_confidence) {
-    return { ok: false as const, reason: "Overall confidence exceeds the cited evidence ceiling." };
+    return contractFailure({ reason: "Overall confidence exceeds the cited evidence ceiling.", reasonCode: "confidence_ceiling_exceeded", stage: "confidence", expectedField: "overall_confidence", expectedType: "string", observed: parsed.overall_confidence, fieldPresent: true });
   }
 
   return { ok: true as const, value };
