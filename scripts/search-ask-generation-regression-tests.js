@@ -37,6 +37,7 @@ Module._load = function loadPatched(request, parent, isMain) {
 
 const globalSearch = read("components/app/GlobalSearch.tsx");
 const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
+const policyContract = read("lib/ai/providers/workflow-provider-policy-contract.ts");
 const searchRoute = read("app/api/search/route.ts");
 const providerManager = read("lib/ai/providers/provider-manager.ts");
 const vaeroexClient = read("lib/ai/vaeroex-client.ts");
@@ -87,6 +88,9 @@ assert.match(providerManager, /model:\s*finalResult\.model/, "successful generat
 assert.match(workflowProviderPolicy, /configuredProvider === "nvidia" \? "nvidia_first" : "openai_first"/, "normal execution must preserve the globally configured provider order");
 assert.match(workflowProviderPolicy, /vercelEnvironment !== "preview" \|\| !authorized/, "the A\/B selector must fail closed outside authorized Preview requests");
 assert.match(searchRoute, /request\.headers\.get\(EXECUTIVE_PROVIDER_POLICY_HEADER\)/, "the synchronous Executive Analysis route must select the Preview benchmark policy explicitly");
+assert.match(policyContract, /x-vaeroex-preview-executive-policy/, "the Preview benchmark header must use a narrow shared contract");
+assert.match(askWorkspace, /previewExecutiveProviderPolicyHeader\(\)/, "the dedicated Ask client must forward the explicit Preview benchmark policy");
+assert.match(askWorkspace, /new URLSearchParams\(window\.location\.search\)/, "the Preview benchmark selector must come from the current dedicated Ask URL");
 assert.match(searchRoute, /SEARCH_ASK_NVIDIA_SECONDARY_MINIMUM_REMAINING_MS = SEARCH_ASK_NVIDIA_TIMEOUT_MS \+ SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS/, "OpenAI-first routing must reserve a meaningful full NVIDIA secondary window");
 assert.match(searchRoute, /SEARCH_ASK_TOTAL_DEADLINE_MS = 27_000/, "interactive Search or Ask must use one workflow-level deadline");
 assert.match(searchRoute, /SEARCH_ASK_PROVIDER_MAX_RETRIES = 0/, "interactive Search or Ask must not spend its deadline on a second NVIDIA attempt");
@@ -205,7 +209,7 @@ async function runRuntimeTests() {
   const openAiDirect = await runStructuredAI({
     ...request,
     providerPolicy: openAiFirstPolicy,
-    settings: { ...request.settings, maxRetries: 0 },
+    settings: { ...request.settings, timeoutMs: 10_500, maxRetries: 0 },
     providers: {
       nvidia: provider("nvidia", async () => {
         unexpectedNvidiaCalls += 1;
@@ -223,7 +227,7 @@ async function runRuntimeTests() {
   const openAiToNvidiaFallback = await runStructuredAI({
     ...request,
     providerPolicy: openAiFirstPolicy,
-    settings: { ...request.settings, maxRetries: 0 },
+    settings: { ...request.settings, timeoutMs: 10_500, maxRetries: 0 },
     executionBudget: {
       deadlineAtMs: Date.now() + 20_000,
       providerTimeoutMs: { nvidia: 10_500, openai: 100 },

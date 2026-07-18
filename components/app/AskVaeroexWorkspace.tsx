@@ -20,6 +20,11 @@ import {
 } from "@/lib/search/ask-session";
 import { globalSearchApiErrorMessage } from "@/lib/search/api-errors";
 import type { GlobalSearchAnswer, GlobalSearchResponse } from "@/lib/search/types";
+import {
+  EXECUTIVE_PROVIDER_POLICY_HEADER,
+  EXECUTIVE_PROVIDER_POLICY_QUERY,
+  isExecutiveProviderPolicyVariant
+} from "@/lib/ai/providers/workflow-provider-policy-contract";
 
 type AskVaeroexWorkspaceProps = {
   workspaceId: string;
@@ -49,6 +54,13 @@ function formatTime(value: string) {
 
 function newSessionId() {
   return crypto.randomUUID();
+}
+
+function previewExecutiveProviderPolicyHeader(): Record<string, string> {
+  const requested = new URLSearchParams(window.location.search).get(EXECUTIVE_PROVIDER_POLICY_QUERY);
+  return isExecutiveProviderPolicyVariant(requested)
+    ? { [EXECUTIVE_PROVIDER_POLICY_HEADER]: requested }
+    : {};
 }
 
 function questionShortcut(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -246,7 +258,11 @@ export function AskVaeroexWorkspace({ workspaceId, workspaceName, userId, initia
       const response = await fetch("/api/search", {
         method: "POST",
         signal: controller.signal,
-        headers: { Accept: "application/json", "Content-Type": "application/json" },
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+          ...previewExecutiveProviderPolicyHeader()
+        },
         body: JSON.stringify(body)
       });
       const payload: unknown = await response.json().catch(() => ({}));
