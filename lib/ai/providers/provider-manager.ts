@@ -30,6 +30,17 @@ export type AIProviderAttempt = {
   deadlineRemainingMs?: number;
 };
 
+export type AIProviderRoutingPolicyStep = {
+  provider: AIProviderName;
+  model: string;
+  minimumRemainingMs?: number;
+};
+
+export type AIProviderRoutingPolicy = {
+  id: string;
+  steps: AIProviderRoutingPolicyStep[];
+};
+
 export class AIProviderExecutionError extends Error {
   constructor(
     cause: unknown,
@@ -55,8 +66,9 @@ type RunStructuredAIRequest<T> = {
   settings?: AIProviderRetrySettings;
   validate: (value: unknown) => StructuredOutputValidation<T>;
   providers?: ProviderRegistry;
-  logContext?: { workflow?: string; modelRoute?: string; executionPath?: string };
+  logContext?: { workflow?: string; modelRoute?: string; executionPath?: string; providerPolicyId?: string };
   executionBudget?: AIProviderExecutionBudget;
+  providerPolicy?: AIProviderRoutingPolicy;
 };
 
 function providerRegistry(): ProviderRegistry {
@@ -113,7 +125,8 @@ function logAttempt(
     deadlineRemainingMs: Number.isFinite(attempt.deadlineRemainingMs) ? attempt.deadlineRemainingMs : null,
     workflow: context?.workflow || null,
     modelRoute: context?.modelRoute || null,
-    executionPath: context?.executionPath || null
+    executionPath: context?.executionPath || null,
+    providerPolicyId: context?.providerPolicyId || null
   };
   const serialized = JSON.stringify(payload);
   if (attempt.success) console.log(serialized);
@@ -153,7 +166,8 @@ async function runProvider<T>({
   request,
   maxAttempts,
   fallback,
-  attempts
+  attempts,
+  minimumRemainingMs
 }: {
   provider: AIProvider;
   providerName: AIProviderName;
@@ -162,6 +176,7 @@ async function runProvider<T>({
   maxAttempts: number;
   fallback: boolean;
   attempts: AIProviderAttempt[];
+  minimumRemainingMs?: number;
 }) {
   let lastError: unknown;
   let validationReason = "";
@@ -175,7 +190,8 @@ async function runProvider<T>({
       fallback,
       configuredTimeoutMs: configuredProviderSettings.timeoutMs
     });
-    if (!attemptWindow.canStart) {
+    const hasPolicyWindow = !Number.isFinite(attemptWindow.remainingMs) || attemptWindow.remainingMs >= Math.max(0, minimumRemainingMs || 0);
+    if (!attemptWindow.canStart || !hasPolicyWindow) {
       const skippedAttempt: AIProviderAttempt = {
         provider: providerName,
         model,
@@ -371,43 +387,45 @@ async function runProvider<T>({
 export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
   const providers = request.providers || providerRegistry();
   const attempts: AIProviderAttempt[] = [];
-  const settings = settingsForProvider(request.primaryProvider, request.settings);
-  const primaryMaxAttempts = Math.max(1, Math.min(settings.maxRetries + 1, 2));
-  let finalResult: Awaited<ReturnType<typeof runProvider<T>>>;
+  const policy: AIProviderRoutingPolicy = request.providerPolicy || {
+    id: "legacy_configured_provider_order",
+    steps: [
+      { provider: request.primaryProvider, model: request.primaryModel },
+      ...(request.primaryProvider === "nvidia" ? [{ provider: "openai" as const, model: request.fallbackModel }] : [])
+    ]
+  };
+  if (!policy.steps.length || policy.steps.length > 2 || new Set(policy.steps.map((step) => step.provider)).size !== policy.steps.length) {
+    throw new AIProviderPolicyError("The AI provider policy is invalid.");
+  }
+  const primaryProvider = policy.steps[0].provider;
+  let finalResult: Awaited<ReturnType<typeof runProvider<T>>> | null = null;
+  let finalError: unknown;
+  let completed = false;
 
-  try {
-    finalResult = await runProvider({
-      provider: providers[request.primaryProvider],
-      providerName: request.primaryProvider,
-      model: request.primaryModel,
-      request,
-      maxAttempts: primaryMaxAttempts,
-      fallback: false,
-      attempts
-    });
-  } catch (primaryError) {
-    if (primaryError instanceof AIProviderPolicyError) throw primaryError;
-    if (request.primaryProvider !== "nvidia") {
-      throw new AIProviderExecutionError(primaryError, request.primaryProvider, attempts);
-    }
-
-    const fallbackSettings = settingsForProvider("openai", request.settings);
-    const fallbackMaxAttempts = Math.max(1, Math.min(fallbackSettings.maxRetries + 1, 2));
-
+  for (const [index, step] of policy.steps.entries()) {
+    const providerSettings = settingsForProvider(step.provider, request.settings);
+    const maxAttempts = Math.max(1, Math.min(providerSettings.maxRetries + 1, 2));
     try {
       finalResult = await runProvider({
-        provider: providers.openai,
-        providerName: "openai",
-        model: request.fallbackModel,
+        provider: providers[step.provider],
+        providerName: step.provider,
+        model: step.model,
         request,
-        maxAttempts: fallbackMaxAttempts,
-        fallback: true,
-        attempts
+        maxAttempts,
+        fallback: index > 0,
+        attempts,
+        minimumRemainingMs: step.minimumRemainingMs
       });
-    } catch (fallbackError) {
-      if (fallbackError instanceof AIProviderPolicyError) throw fallbackError;
-      throw new AIProviderExecutionError(fallbackError, request.primaryProvider, attempts);
+      completed = true;
+      break;
+    } catch (error) {
+      if (error instanceof AIProviderPolicyError) throw error;
+      finalError = error;
     }
+  }
+
+  if (!completed || !finalResult) {
+    throw new AIProviderExecutionError(finalError, primaryProvider, attempts);
   }
 
   const aggregate = attempts.reduce(
@@ -425,7 +443,8 @@ export async function runStructuredAI<T>(request: RunStructuredAIRequest<T>) {
     provider: finalResult.provider,
     model: finalResult.model,
     requestId: finalResult.result.requestId,
-    fallbackUsed: finalResult.provider !== request.primaryProvider,
+    fallbackUsed: finalResult.provider !== primaryProvider,
+    providerPolicyId: policy.id,
     attempts,
     ...aggregate
   };

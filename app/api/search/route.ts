@@ -17,6 +17,11 @@ import {
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
+import {
+  buildSynchronousExecutiveProviderPolicy,
+  EXECUTIVE_PROVIDER_POLICY_HEADER,
+  resolvePreviewExecutiveProviderPolicyVariant
+} from "@/lib/ai/providers/workflow-provider-policy";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { planVaeroexQuery, type VaeroexEvidenceDomain } from "@/lib/ai/query-depth-planner";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -47,6 +52,7 @@ const SEARCH_ASK_OPENAI_TIMEOUT_MS = 8_500;
 const SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS = 250;
 const SEARCH_ASK_MINIMUM_PROVIDER_WINDOW_MS = 5_000;
 const SEARCH_ASK_PROVIDER_MAX_RETRIES = 0;
+const SEARCH_ASK_NVIDIA_SECONDARY_MINIMUM_REMAINING_MS = SEARCH_ASK_NVIDIA_TIMEOUT_MS + SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS;
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -980,6 +986,15 @@ export async function POST(request: Request) {
   const workflow = getVaeroexWorkflow("executive_intelligence");
   const baseSettings = getAIProviderRetrySettings();
   const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
+  const previewProviderVariant = resolvePreviewExecutiveProviderPolicyVariant({
+    requested: request.headers.get(EXECUTIVE_PROVIDER_POLICY_HEADER),
+    authorized: isVaeroexAdminUser(user)
+  });
+  const providerPolicy = buildSynchronousExecutiveProviderPolicy({
+    modelRoute,
+    previewVariant: previewProviderVariant,
+    nvidiaSecondaryMinimumRemainingMs: SEARCH_ASK_NVIDIA_SECONDARY_MINIMUM_REMAINING_MS
+  });
   const generationStartedAt = Date.now();
   const routePreProviderMs = timing.elapsedMs();
   timing.record("route_pre_provider_ms", routePreProviderMs);
@@ -1026,6 +1041,7 @@ export async function POST(request: Request) {
         timeoutMs: Math.min(baseSettings.timeoutMs, queryPlan.timeoutMs),
         maxRetries: SEARCH_ASK_PROVIDER_MAX_RETRIES
       },
+      providerPolicy,
       providerExecutionBudget: {
         deadlineAtMs: requestStartedAt + SEARCH_ASK_TOTAL_DEADLINE_MS - SEARCH_ASK_RESPONSE_RESERVE_MS,
         providerTimeoutMs: {
@@ -1086,7 +1102,8 @@ export async function POST(request: Request) {
           preparation_timings_ms: timing.snapshot(),
           pre_provider_total_ms: routePreProviderMs + (timing.snapshot().provider_client_preparation_ms || 0),
           request_elapsed_before_persistence_ms: timing.elapsedMs(),
-          workflow_total_deadline_ms: SEARCH_ASK_TOTAL_DEADLINE_MS
+          workflow_total_deadline_ms: SEARCH_ASK_TOTAL_DEADLINE_MS,
+          provider_policy_id: providerPolicy.id
         }
       }
     });
@@ -1160,6 +1177,7 @@ export async function POST(request: Request) {
           pre_provider_total_ms: routePreProviderMs + (timing.snapshot().provider_client_preparation_ms || 0),
           request_elapsed_before_persistence_ms: timing.elapsedMs(),
           workflow_total_deadline_ms: SEARCH_ASK_TOTAL_DEADLINE_MS,
+          provider_policy_id: providerPolicy.id,
           timeout: /timed out|timeout|abort|deadline/i.test(error instanceof Error ? error.message : ""),
           provider: lastAttempt?.provider || null,
           primary_provider: error instanceof AIProviderExecutionError ? error.primaryProvider : null,

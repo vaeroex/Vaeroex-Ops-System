@@ -46,6 +46,7 @@ const providerResilience = read("lib/ai/provider-resilience.ts");
 const providerExecutionBudget = read("lib/ai/providers/execution-budget.ts");
 const workspaceContext = read("lib/workspaces/current.ts");
 const usageLimits = read("lib/billing/usage-limits.ts");
+const workflowProviderPolicy = read("lib/ai/providers/workflow-provider-policy.ts");
 
 assert.match(
   globalSearch,
@@ -79,11 +80,14 @@ assert.match(successfulUsage, /\.\.\.generation\.usage/, "persisted usage must i
 assert.match(successfulUsage, /\.\.\.\(isRecord\(generation\.usage\.metadata\)/, "provider attempt metadata must be preserved");
 assert.doesNotMatch(successfulUsage, /fallback_used:\s*false/, "Search or Ask must not overwrite a real OpenAI fallback with false");
 
-assert.match(providerManager, /primaryMaxAttempts = Math\.max\(1, Math\.min\(settings\.maxRetries \+ 1, 2\)\)/, "provider attempts must honor the caller's retry budget");
-assert.match(providerManager, /fallbackMaxAttempts = Math\.max\(1, Math\.min\(fallbackSettings\.maxRetries \+ 1, 2\)\)/, "OpenAI fallback attempts must honor the caller's retry budget");
-assert.match(providerManager, /fallbackUsed:\s*finalResult\.provider !== request\.primaryProvider/, "provider-manager fallback status must reflect the provider that completed the request");
+assert.match(providerManager, /maxAttempts = Math\.max\(1, Math\.min\(providerSettings\.maxRetries \+ 1, 2\)\)/, "each provider step must honor the caller's retry budget");
+assert.match(providerManager, /fallbackUsed:\s*finalResult\.provider !== primaryProvider/, "provider-manager fallback status must reflect the workflow policy's primary provider");
 assert.match(providerManager, /provider:\s*finalResult\.provider/, "successful NVIDIA generation must report NVIDIA as the final provider");
 assert.match(providerManager, /model:\s*finalResult\.model/, "successful generation must persist the model that actually completed it");
+assert.match(workflowProviderPolicy, /configuredProvider === "nvidia" \? "nvidia_first" : "openai_first"/, "normal execution must preserve the globally configured provider order");
+assert.match(workflowProviderPolicy, /vercelEnvironment !== "preview" \|\| !authorized/, "the A\/B selector must fail closed outside authorized Preview requests");
+assert.match(searchRoute, /request\.headers\.get\(EXECUTIVE_PROVIDER_POLICY_HEADER\)/, "the synchronous Executive Analysis route must select the Preview benchmark policy explicitly");
+assert.match(searchRoute, /SEARCH_ASK_NVIDIA_SECONDARY_MINIMUM_REMAINING_MS = SEARCH_ASK_NVIDIA_TIMEOUT_MS \+ SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS/, "OpenAI-first routing must reserve a meaningful full NVIDIA secondary window");
 assert.match(searchRoute, /SEARCH_ASK_TOTAL_DEADLINE_MS = 27_000/, "interactive Search or Ask must use one workflow-level deadline");
 assert.match(searchRoute, /SEARCH_ASK_PROVIDER_MAX_RETRIES = 0/, "interactive Search or Ask must not spend its deadline on a second NVIDIA attempt");
 assert.match(searchRoute, /provider_attempts:\s*providerAttempts/, "failed Search or Ask usage must preserve completed provider attempts");
@@ -133,6 +137,10 @@ const { resolveAIProviderAttemptWindow } = require("../lib/ai/providers/executio
 const { AIProviderError } = require("../lib/ai/providers/types.ts");
 const { recordVaeroexAiUsage } = require("../lib/ai/usage.ts");
 const { globalSearchApiErrorMessage } = require("../lib/search/api-errors.ts");
+const {
+  buildSynchronousExecutiveProviderPolicy,
+  resolvePreviewExecutiveProviderPolicyVariant
+} = require("../lib/ai/providers/workflow-provider-policy.ts");
 
 const providerResult = (content, inputTokens, outputTokens) => ({
   content: JSON.stringify(content),
@@ -169,6 +177,108 @@ const request = {
 };
 
 async function runRuntimeTests() {
+  assert.equal(
+    resolvePreviewExecutiveProviderPolicyVariant({ requested: "openai_first", vercelEnvironment: "production", authorized: true }),
+    null,
+    "Production must ignore the Preview-only provider policy selector"
+  );
+  assert.equal(
+    resolvePreviewExecutiveProviderPolicyVariant({ requested: "openai_first", vercelEnvironment: "preview", authorized: false }),
+    null,
+    "non-admin Preview users must not select a benchmark provider policy"
+  );
+  assert.equal(
+    resolvePreviewExecutiveProviderPolicyVariant({ requested: "openai_first", vercelEnvironment: "preview", authorized: true }),
+    "openai_first",
+    "an authorized Preview benchmark may select OpenAI-first routing"
+  );
+
+  const openAiFirstPolicy = buildSynchronousExecutiveProviderPolicy({
+    modelRoute: "cross_business_reasoning",
+    previewVariant: "openai_first",
+    nvidiaSecondaryMinimumRemainingMs: 10_750
+  });
+  assert.deepEqual(openAiFirstPolicy.steps.map((step) => step.provider), ["openai", "nvidia"], "Configuration B must use explicit OpenAI then NVIDIA order");
+  assert.equal(openAiFirstPolicy.steps[1].minimumRemainingMs, 10_750, "Configuration B must require a meaningful NVIDIA secondary window");
+
+  let unexpectedNvidiaCalls = 0;
+  const openAiDirect = await runStructuredAI({
+    ...request,
+    providerPolicy: openAiFirstPolicy,
+    settings: { ...request.settings, maxRetries: 0 },
+    providers: {
+      nvidia: provider("nvidia", async () => {
+        unexpectedNvidiaCalls += 1;
+        return providerResult({ ok: true }, 80, 15);
+      }),
+      openai: provider("openai", async () => providerResult({ ok: true }, 100, 20))
+    }
+  });
+  assert.equal(openAiDirect.provider, "openai", "Configuration B must accept a valid OpenAI primary response");
+  assert.equal(openAiDirect.fallbackUsed, false, "Configuration B must not label its OpenAI primary as fallback");
+  assert.equal(openAiDirect.providerPolicyId, "preview_executive_openai_first", "usage telemetry must retain the selected workflow policy");
+  assert.equal(unexpectedNvidiaCalls, 0, "a valid OpenAI response must not trigger a duplicate NVIDIA request");
+
+  const orderedCalls = [];
+  const openAiToNvidiaFallback = await runStructuredAI({
+    ...request,
+    providerPolicy: openAiFirstPolicy,
+    settings: { ...request.settings, maxRetries: 0 },
+    executionBudget: {
+      deadlineAtMs: Date.now() + 20_000,
+      providerTimeoutMs: { nvidia: 10_500, openai: 100 },
+      minimumAttemptWindowMs: { nvidia: 5_000, openai: 50 },
+      fallbackReserveMs: 0,
+      transitionReserveMs: 0
+    },
+    providers: {
+      openai: provider("openai", async () => {
+        orderedCalls.push("openai");
+        throw new AIProviderError("OpenAI timed out.", "openai", true);
+      }),
+      nvidia: provider("nvidia", async () => {
+        orderedCalls.push("nvidia");
+        return providerResult({ ok: true }, 80, 15);
+      })
+    }
+  });
+  assert.deepEqual(orderedCalls, ["openai", "nvidia"], "Configuration B must execute providers sequentially without duplicate calls");
+  assert.equal(openAiToNvidiaFallback.provider, "nvidia", "NVIDIA may complete Configuration B only after OpenAI fails with sufficient time remaining");
+  assert.equal(openAiToNvidiaFallback.fallbackUsed, true, "a successful secondary NVIDIA attempt must be recorded as fallback");
+
+  let skippedNvidiaCalls = 0;
+  const insufficientSecondaryWindow = {
+    deadlineAtMs: Date.now() + 10_500,
+    providerTimeoutMs: { nvidia: 10_500, openai: 100 },
+    minimumAttemptWindowMs: { nvidia: 5_000, openai: 50 },
+    fallbackReserveMs: 0,
+    transitionReserveMs: 0
+  };
+  await assert.rejects(
+    runStructuredAI({
+      ...request,
+      providerPolicy: openAiFirstPolicy,
+      settings: { ...request.settings, timeoutMs: 100, maxRetries: 0 },
+      executionBudget: insufficientSecondaryWindow,
+      providers: {
+        openai: provider("openai", async () => {
+          throw new AIProviderError("OpenAI timed out.", "openai", true);
+        }),
+        nvidia: provider("nvidia", async () => {
+          skippedNvidiaCalls += 1;
+          return providerResult({ ok: true }, 80, 15);
+        })
+      }
+    }),
+    (error) => {
+      assert.ok(error instanceof AIProviderExecutionError, "an exhausted policy must retain provider attempt telemetry");
+      assert.equal(error.attempts.at(-1).provider, "nvidia");
+      assert.equal(error.attempts.at(-1).failureType, "deadline");
+      return true;
+    }
+  );
+  assert.equal(skippedNvidiaCalls, 0, "NVIDIA secondary must not begin without the policy's full meaningful window");
+
   const boundedWindow = resolveAIProviderAttemptWindow({
     budget: {
       deadlineAtMs: 30_000,

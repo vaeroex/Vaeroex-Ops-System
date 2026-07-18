@@ -58,8 +58,9 @@ assert.match(nvidia, /temperature:\s*interactiveExecutive \? 0 : request\.temper
 assert.match(nvidia, /!interactiveExecutive \? \{ top_p: 0\.95 \} : \{\}/, "greedy mode must not also override top-p");
 assert.doesNotMatch(openai, /no_think|interactiveExecutive/, "the NVIDIA reasoning mode must not alter OpenAI behavior");
 assert.match(openai, /process\.env\.OPENAI_API_KEY/, "OpenAI fallback credentials must remain server-side");
-assert.match(manager, /primaryProvider !== "nvidia"/, "only NVIDIA primary calls should automatically enter the OpenAI fallback path");
-assert.match(manager, /primaryMaxAttempts = Math\.max\(1, Math\.min\(settings\.maxRetries \+ 1, 2\)\)/, "provider retries must honor workflow-specific settings");
+assert.match(manager, /request\.providerPolicy \|\|/, "workflow-specific provider order must be expressed as an explicit policy");
+assert.match(manager, /for \(const \[index, step\] of policy\.steps\.entries\(\)\)/, "the provider manager must execute one ordered policy step at a time");
+assert.match(manager, /maxAttempts = Math\.max\(1, Math\.min\(providerSettings\.maxRetries \+ 1, 2\)\)/, "provider retries must honor workflow-specific settings");
 assert.match(resilience, /maxRetries:\s*1/, "the default provider policy must retain one retry outside bounded workflows");
 assert.match(resilience, /const value = await consume\(response\)[\s\S]*recordAIProviderSuccess/, "provider success must be recorded only after the complete response body is consumed");
 assert.match(manager, /waitBeforeRetry/, "provider retries must use bounded backoff");

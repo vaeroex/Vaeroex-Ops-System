@@ -5,7 +5,7 @@ import { getVaeroexModelRoutingStatus, resolveConfiguredAIProvider, resolveVaero
 import { validateVaeroexWorkflowContract } from "@/lib/ai/output-contracts";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { getAIProviderCircuitSnapshot, getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
-import { getAIProviderRuntimeStatus, runStructuredAI } from "@/lib/ai/providers/provider-manager";
+import { getAIProviderRuntimeStatus, runStructuredAI, type AIProviderRoutingPolicy } from "@/lib/ai/providers/provider-manager";
 import type { AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
 import { AIProviderPolicyError, type AIGenerationMode, type AIProviderInputPart } from "@/lib/ai/providers/types";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
@@ -36,6 +36,7 @@ type RunVaeroexRequest = {
   outputValidator?: (value: Json) =>
     | { ok: true; value: Json }
     | { ok: false; reason: string };
+  providerPolicy?: AIProviderRoutingPolicy;
 };
 
 export type VaeroexRequestSizeMetrics = {
@@ -425,15 +426,18 @@ export async function runVaeroexCompletionWithUsage({
   maxInputTokens,
   maxOutputTokens,
   generationMode,
-  outputValidator
+  outputValidator,
+  providerPolicy
 }: RunVaeroexRequest) {
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     throw new Error("Vaeroex prompt is not configured.");
   }
 
   const requestId = randomUUID();
-  const primaryProvider = resolveConfiguredAIProvider();
-  const model = resolveVaeroexModel(modelRoute, primaryProvider);
+  const configuredProvider = resolveConfiguredAIProvider();
+  const policyPrimary = providerPolicy?.steps[0];
+  const primaryProvider = policyPrimary?.provider || configuredProvider;
+  const model = policyPrimary?.model || resolveVaeroexModel(modelRoute, primaryProvider);
   const fallbackModel = resolveVaeroexModel(modelRoute, "openai");
   const startedAt = Date.now();
   const promptConstructionStartedAt = Date.now();
@@ -456,6 +460,7 @@ export async function runVaeroexCompletionWithUsage({
     model,
     modelRoute,
     executionPath,
+    providerPolicyId: providerPolicy?.id || "legacy_configured_provider_order",
     estimatedRequestTokens,
     requestBodyBytes: requestSize.requestBodyBytes,
     estimatedTextTokens: requestSize.estimatedTextTokens,
@@ -534,7 +539,13 @@ export async function runVaeroexCompletionWithUsage({
       maxOutputTokens,
       settings: providerSettings,
       executionBudget: providerExecutionBudget,
-      logContext: { workflow: workflow.key, modelRoute, executionPath },
+      providerPolicy,
+      logContext: {
+        workflow: workflow.key,
+        modelRoute,
+        executionPath,
+        providerPolicyId: providerPolicy?.id || "legacy_configured_provider_order"
+      },
       validate(value) {
         const contract = validateVaeroexWorkflowContract(workflow.key, value);
         if (!contract.ok) return contract;
@@ -564,6 +575,7 @@ export async function runVaeroexCompletionWithUsage({
     executionPath,
     latencyMs,
     fallbackUsed: generation.fallbackUsed,
+    providerPolicyId: generation.providerPolicyId,
     inputTokens: generation.inputTokens,
     outputTokens: generation.outputTokens,
     totalTokens: generation.totalTokens
@@ -585,6 +597,8 @@ export async function runVaeroexCompletionWithUsage({
       generation_mode: generationMode || "default",
       provider: generation.provider,
       primary_provider: primaryProvider,
+      provider_policy_id: generation.providerPolicyId,
+      provider_order: (providerPolicy?.steps || [{ provider: primaryProvider }]).map((step) => step.provider),
       fallback_used: generation.fallbackUsed,
       provider_attempts: generation.attempts
     } satisfies Json
