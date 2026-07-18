@@ -42,6 +42,8 @@ const reasoning = read("lib/ai/executive-intelligence.ts");
 const fallbackSource = read("lib/ai/executive-fallback.ts");
 const boundedContextSource = read("lib/ai/bounded-context.ts");
 const renderer = read("components/app/ExecutiveIntelligenceAnswer.tsx");
+const evidenceRenderer = read("components/app/ExecutiveEvidenceRenderer.tsx");
+const evidencePresentation = read("lib/presentation/executive-evidence.ts");
 const globalSearch = read("components/app/GlobalSearch.tsx");
 const askResponse = read("components/app/AskVaeroexResponse.tsx");
 const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
@@ -89,6 +91,13 @@ assert.match(askResponse, /answer\.executiveBriefing/, "dedicated Ask must recog
 assert.match(askResponse, /<ExecutiveIntelligenceAnswer/, "dedicated Ask must render the executive briefing component");
 assert.match(askWorkspace, /<AskVaeroexResponse answer=\{answer\}/, "persistent Ask exchanges must use the validated answer renderer");
 assert.doesNotMatch(renderer, /summary_signal_ids|signal_id|relationship_candidates/, "the canonical transport and manifest must never be exposed in the UI");
+assert.match(renderer, /<ExecutiveEvidenceRenderer/, "every executive citation surface must use the shared evidence renderer");
+assert.doesNotMatch(renderer, /reference\.support/, "Executive Analysis must never render canonical support serialization directly");
+assert.match(evidenceRenderer, /presentExecutiveEvidence\(reference\)/, "the shared renderer must apply the deterministic presentation adapter");
+assert.match(evidencePresentation, /INTERNAL_KEY_PATTERN/, "the presentation adapter must remove internal source fields");
+assert.match(renderer, /What would change this recommendation:/, "recommendations must clearly identify the condition that would change them");
+assert.match(renderer, /Top priorities[\s\S]*Recommended actions[\s\S]*Known limitations/, "the Leadership Brief must present a concise executive hierarchy");
+assert.match(renderer, /highest-ranked validated drivers/, "Business Health explanations must summarize validated score drivers without a new model call");
 
 for (const heading of [
   "Executive Summary",
@@ -127,6 +136,56 @@ const { planVaeroexQuery } = require("../lib/ai/query-depth-planner.ts");
 const { estimateVaeroexCompletionRequest } = require("../lib/ai/vaeroex-client.ts");
 const { getVaeroexWorkflow } = require("../lib/ai/vaeroex-workflows.ts");
 const { estimateTokenCount } = require("../lib/ai/usage.ts");
+const { presentExecutiveEvidence, uniqueExecutiveLines } = require("../lib/presentation/executive-evidence.ts");
+
+const serializedEvidence = presentExecutiveEvidence({
+  citationId: 7,
+  title: "2.9",
+  sourceType: "Operational metric",
+  support: JSON.stringify({
+    id: "56127a32-2c8a-4f4f-9775-e9c124973c78",
+    metric_name: "2.9",
+    category: "Customer Context",
+    value: 176000,
+    metric_date: "2026-07-01",
+    source_file_id: "2ae9a95b-3b59-4f93-b9ab-8c4a4048d05c",
+    import_id: "d247e46f-14a3-47b9-8f0c-eb7a49ea4c36",
+    raw_data_json: {
+      Store: "Pasadena",
+      "Customer Rating": 2.9,
+      "Monthly Revenue": 176000,
+      "Vaeroex original source": "Retail operating workbook.xlsx",
+      "Vaeroex worksheet": "Store Performance",
+      "Vaeroex source row": 5,
+      "Vaeroex source file ID": "2ae9a95b-3b59-4f93-b9ab-8c4a4048d05c",
+      "Vaeroex worksheet index": 3
+    }
+  })
+});
+const serializedEvidenceText = JSON.stringify(serializedEvidence);
+assert.equal(serializedEvidence.sourceName, "Retail operating workbook.xlsx", "human evidence must retain the originating source name");
+assert.ok(serializedEvidence.details.some((item) => item.label === "Metric" && item.value === "Customer Rating"), "numeric metric labels must resolve to the matching human-readable measure");
+assert.ok(serializedEvidence.details.some((item) => item.label === "Observed value" && item.value === "2.9"), "human evidence must retain the observed metric value");
+assert.ok(serializedEvidence.details.some((item) => item.label === "Monthly Revenue" && item.value === "176,000"), "related validated measures may remain visible without raw serialization");
+assert.ok(serializedEvidence.details.some((item) => item.label === "Timeframe" && item.value === "2026-07-01"), "human evidence must retain the reporting period");
+assert.deepEqual(serializedEvidence.provenance, [
+  { label: "Worksheet", value: "Store Performance" },
+  { label: "Source row", value: "5" }
+], "human evidence must retain useful workbook lineage without exposing internal indexes");
+assert.doesNotMatch(serializedEvidenceText, /56127a32|2ae9a95b|d247e46f|raw_data_json|source_file_id|import_id|worksheet index/i, "human evidence must never expose internal serialization or identifiers");
+
+const malformedSerializedEvidence = presentExecutiveEvidence({
+  citationId: 8,
+  title: "Operational source",
+  sourceType: "Document",
+  support: '{"source_file_id":"private-reference"'
+});
+assert.equal(malformedSerializedEvidence.summary, "Validated source evidence supports this finding.", "malformed serialized support must fail closed to a calm human message");
+assert.deepEqual(
+  uniqueExecutiveLines(["Review current revenue.", "Review current revenue.", "Confirm inventory."]),
+  ["Review current revenue.", "Confirm inventory."],
+  "Leadership Brief presentation must suppress exact duplicate lines deterministically"
+);
 
 const validOutput = {
   analysis: {
