@@ -2,7 +2,14 @@ import {
   ExecutiveEvidenceRenderer,
   ExecutiveEvidenceSummary
 } from "@/components/app/ExecutiveEvidenceRenderer";
-import { dedupeExecutiveEvidence, summarizeExecutiveEvidence, uniqueExecutiveLines } from "@/lib/presentation/executive-evidence";
+import {
+  areExecutiveLinesEquivalent,
+  dedupeExecutiveEvidence,
+  distinctExecutiveLines,
+  presentExecutiveStatement,
+  summarizeExecutiveEvidence,
+  uniqueExecutiveLines
+} from "@/lib/presentation/executive-evidence";
 import type { ExecutiveEvidenceReference, ExecutiveIntelligenceBriefing } from "@/lib/search/types";
 
 function SectionHeading({ children }: { children: string }) {
@@ -11,7 +18,7 @@ function SectionHeading({ children }: { children: string }) {
 
 function BusinessHealthDrivers({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
   const score = briefing.executiveSummary.match(/business health(?: score)?(?: is|:)?\s*(\d{1,3})/i)?.[1];
-  const drivers = uniqueExecutiveLines(briefing.keyFindings.map((finding) => finding.finding)).slice(0, 4);
+  const drivers = uniqueExecutiveLines(briefing.keyFindings.map((finding) => presentExecutiveStatement(finding.finding, finding.evidence))).slice(0, 4);
   if (!score || !drivers.length) return null;
 
   return (
@@ -26,14 +33,18 @@ function BusinessHealthDrivers({ briefing }: { briefing: ExecutiveIntelligenceBr
   );
 }
 
-function LeadershipBrief({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
-  const priorities = uniqueExecutiveLines(briefing.keyFindings.map((finding) => finding.finding)).slice(0, 3);
-  const actions = uniqueExecutiveLines(briefing.recommendedActions.map((action) => action.action)).slice(0, 3);
-  const limitations = uniqueExecutiveLines([
+function knownLimitationsFor(briefing: ExecutiveIntelligenceBriefing) {
+  return uniqueExecutiveLines([
     ...briefing.missingInformation,
     ...briefing.confidenceAssessment.uncertainty,
     ...briefing.confidenceAssessment.conflicts
-  ]).slice(0, 3);
+  ]);
+}
+
+function LeadershipBrief({ briefing, knownLimitations }: { briefing: ExecutiveIntelligenceBriefing; knownLimitations: string[] }) {
+  const priorities = uniqueExecutiveLines(briefing.keyFindings.map((finding) => presentExecutiveStatement(finding.finding, finding.evidence))).slice(0, 3);
+  const actions = uniqueExecutiveLines(briefing.recommendedActions.map((action) => action.action)).slice(0, 3);
+  const limitations = knownLimitations.slice(0, 3);
 
   return (
     <section>
@@ -74,14 +85,24 @@ function LeadershipBrief({ briefing }: { briefing: ExecutiveIntelligenceBriefing
   );
 }
 
-function RecommendationDetails({ action }: { action: ExecutiveIntelligenceBriefing["recommendedActions"][number] }) {
+function RecommendationDetails({
+  action,
+  knownLimitations
+}: {
+  action: ExecutiveIntelligenceBriefing["recommendedActions"][number];
+  knownLimitations: string[];
+}) {
   const whyNow = uniqueExecutiveLines([action.whyPrioritized, action.urgency])[0];
   const expectedImpact = uniqueExecutiveLines([action.expectedBusinessImpact, action.expectedOutcome])[0];
+  const changeCondition = distinctExecutiveLines(
+    [action.wouldChangeIf],
+    [...knownLimitations, whyNow, expectedImpact]
+  )[0];
   return (
     <div className="mt-2 grid gap-x-5 gap-y-2 sm:grid-cols-2">
       {whyNow ? <p className="text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Why now:</span> {whyNow}</p> : null}
       {expectedImpact ? <p className="text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Expected impact:</span> {expectedImpact}</p> : null}
-      <p className="text-sm leading-6 text-slate-400 sm:col-span-2"><span className="font-semibold text-slate-200">What would change this recommendation:</span> {action.wouldChangeIf}</p>
+      {changeCondition ? <p className="text-sm leading-6 text-slate-400 sm:col-span-2"><span className="font-semibold text-slate-200">What would change this recommendation:</span> {changeCondition}</p> : null}
     </div>
   );
 }
@@ -121,10 +142,19 @@ function SupportingEvidenceSection({ references }: { references: ExecutiveEviden
 function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
   const limited = briefing.limitedEvidence;
   const allEvidence = collectExecutiveEvidence(briefing);
+  const knownLimitations = knownLimitationsFor(briefing);
+  const provisionalInterpretations = (limited?.provisionalInterpretations || []).filter((item) => (
+    !briefing.keyFindings.some((finding) => areExecutiveLinesEquivalent(item.statement, finding.finding))
+  ));
+  const decisionsToDefer = distinctExecutiveLines(limited?.decisionsToDefer || [], knownLimitations);
+  const missingInformation = distinctExecutiveLines(
+    briefing.missingInformation,
+    [...briefing.confidenceAssessment.uncertainty, ...briefing.confidenceAssessment.conflicts]
+  );
 
   return (
     <div className="space-y-6">
-      <LeadershipBrief briefing={briefing} />
+      <LeadershipBrief briefing={briefing} knownLimitations={knownLimitations} />
 
       <section className="border-t border-white/10 pt-5">
         <SectionHeading>Evidence Readiness</SectionHeading>
@@ -133,12 +163,12 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
 
       {briefing.keyFindings.length ? (
         <section className="border-t border-white/10 pt-5">
-          <SectionHeading>What Can Be Said</SectionHeading>
+          <SectionHeading>Supported Findings</SectionHeading>
           <div className="mt-3 space-y-4">
             {briefing.keyFindings.map((finding) => (
               <div key={finding.finding}>
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <p className="min-w-0 flex-1 text-sm font-semibold leading-6 text-white">{finding.finding}</p>
+                  <p className="min-w-0 flex-1 text-sm font-semibold leading-6 text-white">{presentExecutiveStatement(finding.finding, finding.evidence)}</p>
                   <span className="shrink-0 text-xs font-semibold text-slate-300">{finding.confidence}</span>
                 </div>
                 <p className="mt-1 text-sm leading-6 text-slate-300">{finding.businessImpact}</p>
@@ -149,13 +179,13 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
         </section>
       ) : null}
 
-      {limited?.provisionalInterpretations.length ? (
+      {provisionalInterpretations.length ? (
         <section className="border-t border-white/10 pt-5">
           <SectionHeading>Provisional Interpretations</SectionHeading>
           <div className="mt-3 space-y-4">
-            {limited.provisionalInterpretations.map((item) => (
+            {provisionalInterpretations.map((item) => (
               <div key={item.statement}>
-                <p className="text-sm leading-6 text-slate-200">{item.statement}</p>
+                <p className="text-sm leading-6 text-slate-200">{presentExecutiveStatement(item.statement, item.evidence)}</p>
                 <ExecutiveEvidenceSummary references={item.evidence} />
               </div>
             ))}
@@ -208,18 +238,18 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 <span className="text-xs text-slate-500">Confidence: {action.confidence}</span>
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-white">{index + 1}. {action.action}</p>
-              <RecommendationDetails action={action} />
+              <RecommendationDetails action={action} knownLimitations={knownLimitations} />
               <ExecutiveEvidenceSummary references={action.evidence} />
             </li>
           ))}
         </ol>
       </section>
 
-      {limited?.decisionsToDefer.length ? (
+      {decisionsToDefer.length ? (
         <section className="border-t border-white/10 pt-5">
           <SectionHeading>Decisions To Defer</SectionHeading>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-300">
-            {limited.decisionsToDefer.map((item) => <li key={item}>{item}</li>)}
+            {decisionsToDefer.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </section>
       ) : null}
@@ -231,18 +261,13 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
           <span className="text-xs text-slate-400">{briefing.confidenceAssessment.supportingSourceCount} independent source{briefing.confidenceAssessment.supportingSourceCount === 1 ? "" : "s"}</span>
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-300">{briefing.confidenceAssessment.explanation}</p>
-        {briefing.confidenceAssessment.conflicts.length ? (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-amber-100">
-            {briefing.confidenceAssessment.conflicts.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        ) : null}
       </section>
 
-      {briefing.missingInformation.length ? (
+      {missingInformation.length ? (
         <section className="border-t border-white/10 pt-5">
           <SectionHeading>Missing Information</SectionHeading>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-300">
-            {briefing.missingInformation.map((item) => <li key={item}>{item}</li>)}
+            {missingInformation.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </section>
       ) : null}
@@ -259,10 +284,15 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
   }
 
   const allEvidence = collectExecutiveEvidence(briefing);
+  const knownLimitations = knownLimitationsFor(briefing);
+  const missingInformation = distinctExecutiveLines(
+    briefing.missingInformation,
+    [...briefing.confidenceAssessment.uncertainty, ...briefing.confidenceAssessment.conflicts]
+  );
 
   return (
     <div className="space-y-6">
-      <LeadershipBrief briefing={briefing} />
+      <LeadershipBrief briefing={briefing} knownLimitations={knownLimitations} />
 
       <section className="border-t border-white/10 pt-5">
         <SectionHeading>Top Priorities</SectionHeading>
@@ -270,7 +300,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
           {briefing.keyFindings.map((finding, index) => (
             <li key={`${index}-${finding.finding}`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
-                <p className="min-w-0 flex-1 text-sm font-semibold leading-6 text-white">{index + 1}. {finding.finding}</p>
+                <p className="min-w-0 flex-1 text-sm font-semibold leading-6 text-white">{index + 1}. {presentExecutiveStatement(finding.finding, finding.evidence)}</p>
                 <span className="shrink-0 rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[0.7rem] font-semibold text-slate-200">
                   {finding.confidence}
                 </span>
@@ -329,7 +359,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 <span className="text-xs text-slate-500">Confidence: {action.confidence}</span>
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-white">{index + 1}. {action.action}</p>
-              <RecommendationDetails action={action} />
+              <RecommendationDetails action={action} knownLimitations={knownLimitations} />
               <ExecutiveEvidenceSummary references={action.evidence} />
             </li>
           ))}
@@ -343,23 +373,13 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
           <span className="text-xs text-slate-400">{briefing.confidenceAssessment.supportingSourceCount} independent source{briefing.confidenceAssessment.supportingSourceCount === 1 ? "" : "s"} · {briefing.confidenceAssessment.evidenceAgreement}</span>
         </div>
         <p className="mt-2 text-sm leading-6 text-slate-300">{briefing.confidenceAssessment.explanation}</p>
-        {briefing.confidenceAssessment.conflicts.length ? (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-amber-100">
-            {briefing.confidenceAssessment.conflicts.map((conflict) => <li key={conflict}>{conflict}</li>)}
-          </ul>
-        ) : null}
-        {briefing.confidenceAssessment.uncertainty.length ? (
-          <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-400">
-            {briefing.confidenceAssessment.uncertainty.map((item) => <li key={item}>{item}</li>)}
-          </ul>
-        ) : null}
       </section>
 
-      {briefing.missingInformation.length ? (
+      {missingInformation.length ? (
         <section className="border-t border-white/10 pt-5">
           <SectionHeading>Missing Information</SectionHeading>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-300">
-            {briefing.missingInformation.map((item) => <li key={item}>{item}</li>)}
+            {missingInformation.map((item) => <li key={item}>{item}</li>)}
           </ul>
         </section>
       ) : null}

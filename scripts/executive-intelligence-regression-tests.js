@@ -102,6 +102,9 @@ assert.match(renderer, /Each citation is shown once, even when it supports multi
 assert.match(renderer, /What would change this recommendation:/, "recommendations must clearly identify the condition that would change them");
 assert.match(renderer, /Top priorities[\s\S]*Recommended actions[\s\S]*Known limitations/, "the Leadership Brief must present a concise executive hierarchy");
 assert.match(renderer, /highest-ranked validated drivers/, "Business Health explanations must summarize validated score drivers without a new model call");
+assert.match(renderer, /SectionHeading>Supported Findings<\/SectionHeading>/, "limited analysis must label direct evidence-backed findings clearly");
+assert.match(renderer, /areExecutiveLinesEquivalent\(item\.statement, finding\.finding\)/, "provisional interpretations must omit presentation-equivalent supported findings");
+assert.match(renderer, /distinctExecutiveLines\(limited\?\.decisionsToDefer \|\| \[\], knownLimitations\)/, "defer guidance must not repeat known limitations");
 
 for (const heading of [
   "Executive Summary",
@@ -115,7 +118,7 @@ for (const heading of [
 ]) {
   assert.match(renderer, new RegExp(heading), `${heading} must be rendered`);
 }
-for (const heading of ["Evidence Readiness", "What Can Be Said", "Safe Next Actions", "Decisions To Defer", "Recommendation Confidence"]) {
+for (const heading of ["Evidence Readiness", "Supported Findings", "Safe Next Actions", "Decisions To Defer", "Recommendation Confidence"]) {
   assert.match(renderer, new RegExp(heading), `${heading} must be available in the limited-evidence variant`);
 }
 
@@ -141,8 +144,11 @@ const { estimateVaeroexCompletionRequest } = require("../lib/ai/vaeroex-client.t
 const { getVaeroexWorkflow } = require("../lib/ai/vaeroex-workflows.ts");
 const { estimateTokenCount } = require("../lib/ai/usage.ts");
 const {
+  areExecutiveLinesEquivalent,
   dedupeExecutiveEvidence,
+  distinctExecutiveLines,
   presentExecutiveEvidence,
+  presentExecutiveStatement,
   summarizeExecutiveEvidence,
   uniqueExecutiveLines
 } = require("../lib/presentation/executive-evidence.ts");
@@ -193,8 +199,55 @@ assert.deepEqual(summarizeExecutiveEvidence(repeatedEvidence), {
   citationNumbers: [7, 8],
   evidenceCount: 2,
   sourceCount: 1,
-  text: "2 supporting metrics from Retail Performance workbook."
+  text: "2 supporting metrics from 1 workbook."
 }, "inline evidence must collapse to a concise source-aware summary");
+assert.equal(
+  presentExecutiveStatement("Customer Context metric declined.", [{
+    citationId: 7,
+    title: "Customer metric",
+    sourceType: "Operational metric",
+    support: JSON.stringify({ metric_name: "Customer Rating", value: 2.9, source_name: "Retail Performance workbook.xlsx" })
+  }]),
+  "Customer Rating declined.",
+  "generic metric labels must use the single validated metric name when unambiguous"
+);
+assert.equal(
+  presentExecutiveStatement("Current customer context metrics show 188,000 interactions.", [{
+    citationId: 7,
+    title: "Customer metric",
+    sourceType: "Operational metric",
+    support: JSON.stringify({ metric_name: "Customer Rating", value: 3.1, source_name: "Retail Performance workbook.xlsx" })
+  }]),
+  "Customer Rating shows 188,000 interactions.",
+  "plural generic metric labels must use the validated metric name"
+);
+assert.equal(
+  presentExecutiveStatement("Customer engagement metrics indicate a volume of 176,000.", [{
+    citationId: 7,
+    title: "Customer metric",
+    sourceType: "Operational metric",
+    support: JSON.stringify({
+      metric_name: 2.9,
+      value: 2.9,
+      raw_data_json: { "Customer Rating": 2.9, "Monthly Revenue": 176000 },
+      source_name: "Retail Performance workbook.xlsx"
+    })
+  }]),
+  "Monthly Revenue indicates a volume of 176,000.",
+  "a validated value in the sentence must select its matching metric label"
+);
+assert.equal(
+  presentExecutiveStatement("Operational metric declined.", repeatedEvidence),
+  "Operational metric declined.",
+  "presentation must not guess between multiple validated metric names"
+);
+assert.equal(areExecutiveLinesEquivalent("Customer Rating declined.", "Customer Rating is declining."), true, "lightly varied duplicate findings must be presentation-equivalent");
+assert.equal(areExecutiveLinesEquivalent("Customer Rating declined.", "Customer Rating declined while revenue weakened."), false, "a distinct cross-metric interpretation must remain visible");
+assert.deepEqual(
+  distinctExecutiveLines(["Confirm current margin history.", "Defer expansion."], ["Confirm current margin history."]),
+  ["Defer expansion."],
+  "secondary sections must omit limitations already presented in Known Limitations"
+);
 
 const malformedSerializedEvidence = presentExecutiveEvidence({
   citationId: 8,

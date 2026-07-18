@@ -65,6 +65,30 @@ function sourceTypeLabel(value: string) {
   return safeText(humanizeKey(value), 80) || "Business evidence";
 }
 
+function executiveLineTokens(value: string) {
+  const stopWords = new Set(["a", "an", "and", "appears", "are", "currently", "indicates", "is", "may", "the"]);
+  return safeText(value, 360)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+    .split(" ")
+    .filter((token) => token && !stopWords.has(token))
+    .map((token) => token.replace(/(?:ing|ed|es|s)$/, ""));
+}
+
+export function areExecutiveLinesEquivalent(left: string, right: string) {
+  const leftTokens = executiveLineTokens(left);
+  const rightTokens = executiveLineTokens(right);
+  if (!leftTokens.length || !rightTokens.length) return false;
+  if (leftTokens.join(" ") === rightTokens.join(" ")) return true;
+
+  const leftSet = new Set(leftTokens);
+  const rightSet = new Set(rightTokens);
+  const shared = [...leftSet].filter((token) => rightSet.has(token)).length;
+  const union = new Set([...leftSet, ...rightSet]).size;
+  return shared >= 3 && shared / union >= 0.85;
+}
+
 function formattedValue(value: unknown, key = ""): string {
   if (typeof value === "number" && Number.isFinite(value)) {
     const formatted = new Intl.NumberFormat("en-US", { maximumFractionDigits: 2 }).format(value);
@@ -234,11 +258,12 @@ export function summarizeExecutiveEvidence(references: ExecutiveEvidenceReferenc
   const evidenceLabel = metricsOnly
     ? `supporting metric${evidence.length === 1 ? "" : "s"}`
     : `supporting evidence record${evidence.length === 1 ? "" : "s"}`;
+  const singleSource = evidence[0];
   const sourceDescription = sourceNames.length === 1
-    ? sourceNames[0]
-    : sourceNames.length === 2
-      ? `${sourceNames[0]} and ${sourceNames[1]}`
-      : `${sourceNames[0]} and ${sourceNames.length - 1} other sources`;
+    ? /\.(?:xlsx?|xlsm)$/i.test(sourceNames[0]) || /workbook|worksheet/i.test(`${sourceNames[0]} ${singleSource.sourceType}`)
+      ? "1 workbook"
+      : "1 source"
+    : `${sourceNames.length} sources`;
 
   return {
     citationNumbers: evidence.map((item) => item.citationNumber),
@@ -246,6 +271,56 @@ export function summarizeExecutiveEvidence(references: ExecutiveEvidenceReferenc
     sourceCount: sourceNames.length,
     text: `${evidence.length} ${evidenceLabel} from ${sourceDescription}.`
   };
+}
+
+function numericTokens(value: string) {
+  return [...value.matchAll(/[-+]?\d[\d,]*(?:\.\d+)?/g)].map((match) => match[0].replace(/,/g, ""));
+}
+
+export function presentExecutiveStatement(statement: string, references: ExecutiveEvidenceReference[]) {
+  const evidence = dedupeExecutiveEvidence(references).map(presentExecutiveEvidence);
+  const statementNumbers = new Set(numericTokens(statement));
+  const matchedMetricNames = evidence.flatMap((item) => {
+    const metric = item.details.find((detail) => detail.label === "Metric");
+    const observedValue = item.details.find((detail) => detail.label === "Observed value");
+    const matched: string[] = [];
+
+    if (metric && observedValue && numericTokens(observedValue.value).some((value) => statementNumbers.has(value))) {
+      matched.push(metric.value);
+    }
+    for (const detail of item.details) {
+      if (["Metric", "Observed value", "Timeframe", "Target", "Comparison", "Evidence count"].includes(detail.label)) continue;
+      if (numericTokens(detail.value).some((value) => statementNumbers.has(value))) matched.push(detail.label);
+    }
+    return matched;
+  });
+  const fallbackMetricNames = evidence.flatMap((item) => (
+    item.details.filter((detail) => detail.label === "Metric").map((detail) => detail.value)
+  ));
+  const metricNames = [...new Set((matchedMetricNames.length ? matchedMetricNames : fallbackMetricNames)
+    .filter((value) => value && !/^(?:customer context|operational|another operational) metric$/i.test(value)))];
+  if (metricNames.length !== 1) return statement;
+
+  const genericMetricPattern = /\b(?:current\s+)?(?:customer(?:\s+(?:context|engagement))?|another\s+operational|operational)\s+metrics?\b/i;
+  const match = statement.match(genericMetricPattern);
+  if (!match) return statement;
+
+  const rendered = statement.replace(genericMetricPattern, metricNames[0]);
+  if (!/metrics$/i.test(match[0]) || match.index === undefined) return rendered;
+
+  const metricEnd = match.index + metricNames[0].length;
+  return `${rendered.slice(0, metricEnd)}${rendered.slice(metricEnd).replace(
+    /^\s+(show|reflect|indicate|suggest|demonstrate)\b/i,
+    (_, verb: string) => ` ${verb}s`
+  )}`;
+}
+
+export function distinctExecutiveLines(
+  values: Array<string | null | undefined>,
+  excludedValues: Array<string | null | undefined> = []
+) {
+  const excluded = uniqueExecutiveLines(excludedValues);
+  return uniqueExecutiveLines(values).filter((value) => !excluded.some((item) => areExecutiveLinesEquivalent(value, item)));
 }
 
 export function uniqueExecutiveLines(values: Array<string | null | undefined>) {
