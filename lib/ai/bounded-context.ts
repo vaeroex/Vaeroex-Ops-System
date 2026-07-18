@@ -5,6 +5,7 @@ import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { buildKpiOverviewSummary, loadKpiOverviewData, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import type { VaeroexEvidenceDomain, VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
 import { estimateTokenCount } from "@/lib/ai/usage";
+import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
 import {
   filterBusinessEvidence,
   filterOriginalBusinessEvidence,
@@ -103,6 +104,15 @@ async function safeRows<T>(
   }
 
   return data || [];
+}
+
+async function timedContextStage<T>(stage: string, logger: WorkflowStageLogger | undefined, task: () => Promise<T>) {
+  const startedAt = Date.now();
+  try {
+    return await task();
+  } finally {
+    logger?.(stage, Date.now() - startedAt);
+  }
 }
 
 async function sourceEligibleRows<T extends { source_file_id?: string | null; import_id?: string | null }>({
@@ -343,52 +353,56 @@ export async function buildBoundedWorkspaceContext({
   supabase,
   workspaceId,
   query,
-  plan
+  plan,
+  stageLogger
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   query: string;
   plan: VaeroexQueryPlan;
+  stageLogger?: WorkflowStageLogger;
 }): Promise<BoundedWorkspaceContext> {
   const startedAt = Date.now();
   const limitations: string[] = [];
   const domainSet = new Set(plan.domains);
   const context: JsonRecord = {};
-  const loadedDomains: VaeroexEvidenceDomain[] = [];
+  const loadedDomainSet = new Set<VaeroexEvidenceDomain>();
   let structuredEvidenceCount = 0;
   let kpiSummary: KpiOverviewSummary | null = null;
   let businessHealthRows: Json[] = [];
 
-  if (domainSet.has("kpis") || domainSet.has("financials") || domainSet.has("business_health")) {
-    try {
-      const kpiData = await loadKpiOverviewData({ supabase, workspaceId });
-      const eligibleKpiRows = filterOriginalOrSourceBackedRows(kpiData.rows);
-      kpiSummary = buildKpiOverviewSummary(eligibleKpiRows, kpiData.settings);
-      context.kpi_summary = kpiSummary;
-      context.kpi_records = eligibleKpiRows.slice(0, 16).map((row) => ({
-        id: row.id,
-        name: row.name,
-        category: row.category,
-        target: row.target,
-        actual_value: row.actual_value,
-        metric_date: row.metric_date,
-        source_file_id: row.source_file_id,
-        import_id: row.import_id,
-        updated_at: row.updated_at,
-        created_at: row.created_at
-      }));
-      structuredEvidenceCount += kpiSummary.metrics.length;
-      loadedDomains.push("kpis");
-    } catch {
-      limitations.push("KPI context could not be loaded for this answer.");
-    }
-  }
-
   const loaders: Array<Promise<void>> = [];
+
+  if (domainSet.has("kpis") || domainSet.has("financials") || domainSet.has("business_health")) {
+    loaders.push(timedContextStage("kpi_context_loading_ms", stageLogger, async () => {
+      try {
+        const kpiData = await loadKpiOverviewData({ supabase, workspaceId });
+        const eligibleKpiRows = filterOriginalOrSourceBackedRows(kpiData.rows);
+        kpiSummary = buildKpiOverviewSummary(eligibleKpiRows, kpiData.settings);
+        context.kpi_summary = kpiSummary;
+        context.kpi_records = eligibleKpiRows.slice(0, 16).map((row) => ({
+          id: row.id,
+          name: row.name,
+          category: row.category,
+          target: row.target,
+          actual_value: row.actual_value,
+          metric_date: row.metric_date,
+          source_file_id: row.source_file_id,
+          import_id: row.import_id,
+          updated_at: row.updated_at,
+          created_at: row.created_at
+        }));
+        structuredEvidenceCount += kpiSummary.metrics.length;
+        loadedDomainSet.add("kpis");
+      } catch {
+        limitations.push("KPI context could not be loaded for this answer.");
+      }
+    }));
+  }
 
   if (domainSet.has("business_health")) {
     loaders.push(
-      safeRows(
+      timedContextStage("business_health_context_loading_ms", stageLogger, () => safeRows(
         "Business Health history",
         supabase
           .from("business_health_snapshots")
@@ -402,8 +416,8 @@ export async function buildBoundedWorkspaceContext({
         businessHealthRows = eligibleRows as Json[];
         context.business_health = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
-        loadedDomains.push("business_health");
-      })
+        loadedDomainSet.add("business_health");
+      }))
     );
   }
 
@@ -439,9 +453,9 @@ export async function buildBoundedWorkspaceContext({
         const eligibleRecommendations = filterBusinessEvidence(recommendations);
         context.risk_and_priority_evidence = { issues: eligibleIssues, recommendations: eligibleRecommendations };
         structuredEvidenceCount += eligibleIssues.length + eligibleRecommendations.length;
-        if (domainSet.has("risks")) loadedDomains.push("risks");
-        if (domainSet.has("priorities")) loadedDomains.push("priorities");
-        if (domainSet.has("decisions")) loadedDomains.push("decisions");
+        if (domainSet.has("risks")) loadedDomainSet.add("risks");
+        if (domainSet.has("priorities")) loadedDomainSet.add("priorities");
+        if (domainSet.has("decisions")) loadedDomainSet.add("decisions");
       })
     );
   }
@@ -472,7 +486,7 @@ export async function buildBoundedWorkspaceContext({
           evidence_lineage_available: hasExplicitReportLineage(row.source_data_json),
           evidence_limitation: "Saved report conclusions are not reused as current business evidence."
         }));
-        loadedDomains.push("reports");
+        loadedDomainSet.add("reports");
       })
     );
   }
@@ -506,8 +520,8 @@ export async function buildBoundedWorkspaceContext({
           updated_at: row.updated_at
         }));
         structuredEvidenceCount += eligibleRows.length;
-        if (domainSet.has("files")) loadedDomains.push("files");
-        if (domainSet.has("data_quality")) loadedDomains.push("data_quality");
+        if (domainSet.has("files")) loadedDomainSet.add("files");
+        if (domainSet.has("data_quality")) loadedDomainSet.add("data_quality");
       })
     );
   }
@@ -529,8 +543,8 @@ export async function buildBoundedWorkspaceContext({
         const eligibleRows = filterOriginalBusinessEvidence(rows).slice(0, 8);
         context.business_signals = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
-        if (domainSet.has("business_signals")) loadedDomains.push("business_signals");
-        if (domainSet.has("operations")) loadedDomains.push("operations");
+        if (domainSet.has("business_signals")) loadedDomainSet.add("business_signals");
+        if (domainSet.has("operations")) loadedDomainSet.add("operations");
       })
     );
   }
@@ -553,8 +567,8 @@ export async function buildBoundedWorkspaceContext({
         const eligibleRows = filterOriginalOrSourceBackedRows(sourceBackedRows);
         context.operational_metrics = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
-        if (domainSet.has("financials")) loadedDomains.push("financials");
-        if (domainSet.has("operations")) loadedDomains.push("operations");
+        if (domainSet.has("financials")) loadedDomainSet.add("financials");
+        if (domainSet.has("operations")) loadedDomainSet.add("operations");
       })
     );
   }
@@ -577,7 +591,7 @@ export async function buildBoundedWorkspaceContext({
         const eligibleRows = filterOriginalOrSourceBackedRows(sourceBackedRows);
         context.historical_customer_activity = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
-        loadedDomains.push("customers");
+        loadedDomainSet.add("customers");
       })
     );
   }
@@ -598,7 +612,7 @@ export async function buildBoundedWorkspaceContext({
       ).then((rows) => {
         context.people_context = rows;
         structuredEvidenceCount += rows.length;
-        loadedDomains.push("people");
+        loadedDomainSet.add("people");
       })
     );
   }
@@ -620,7 +634,7 @@ export async function buildBoundedWorkspaceContext({
         const eligibleRows = filterOriginalBusinessEvidence(rows).slice(0, 8);
         context.process_and_policy_context = eligibleRows;
         structuredEvidenceCount += eligibleRows.length;
-        loadedDomains.push("compliance");
+        loadedDomainSet.add("compliance");
       })
     );
   }
@@ -628,18 +642,36 @@ export async function buildBoundedWorkspaceContext({
   await Promise.all(loaders);
 
   if (domainSet.has("business_health")) {
+    const businessHealthStartedAt = Date.now();
     context.business_health_score_context = buildBusinessHealthDecisionContext({
       snapshots: businessHealthRows,
       kpiSummary
     });
+    stageLogger?.("business_health_context_assembly_ms", Date.now() - businessHealthStartedAt);
   }
+
+  const loadedDomains = plan.domains.filter((domain) => loadedDomainSet.has(domain));
+  const orderedContext = Object.fromEntries([
+    "kpi_summary",
+    "kpi_records",
+    "business_health",
+    "business_health_score_context",
+    "risk_and_priority_evidence",
+    "reports",
+    "sources",
+    "business_signals",
+    "operational_metrics",
+    "historical_customer_activity",
+    "people_context",
+    "process_and_policy_context"
+  ].flatMap((key) => context[key] === undefined ? [] : [[key, context[key]]])) as JsonRecord;
 
   const workspaceSnapshot = {
     scope: "bounded_cross_business_reasoning",
     query,
     requested_domains: plan.domains,
-    loaded_domains: Array.from(new Set(loadedDomains)),
-    structured_context: context,
+    loaded_domains: loadedDomains,
+    structured_context: orderedContext,
     scope_policy: {
       full_workspace_snapshot_excluded: true,
       unrelated_domains_excluded: true,
@@ -657,7 +689,7 @@ export async function buildBoundedWorkspaceContext({
   return {
     workspaceSnapshot,
     evidenceQuery: query.slice(0, 4_000),
-    loadedDomains: Array.from(new Set(loadedDomains)),
+    loadedDomains,
     structuredEvidenceCount,
     limitations,
     estimatedContextTokens,

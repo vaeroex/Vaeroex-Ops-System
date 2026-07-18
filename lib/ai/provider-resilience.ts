@@ -95,10 +95,11 @@ function timeoutError(provider: AIProviderName, timeoutMs: number) {
   return error;
 }
 
-export async function fetchWithAIProviderResilience(
+export async function consumeAIProviderResponse<T>(
   provider: AIProviderName,
   input: RequestInfo | URL,
   init: RequestInit,
+  consume: (response: Response) => Promise<T>,
   settings = getAIProviderRetrySettings(provider)
 ) {
   assertAIProviderCircuitClosed(provider);
@@ -107,9 +108,10 @@ export async function fetchWithAIProviderResilience(
 
   try {
     const response = await fetch(input, { ...init, signal: controller.signal });
+    const value = await consume(response);
     if (response.ok) recordAIProviderSuccess(provider);
     else if (isRetryableAIProviderStatus(response.status)) recordAIProviderFailure(provider, settings);
-    return response;
+    return { response, value };
   } catch (error) {
     recordAIProviderFailure(provider, settings);
     throw error;

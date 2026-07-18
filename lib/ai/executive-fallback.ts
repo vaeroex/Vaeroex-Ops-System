@@ -187,6 +187,26 @@ export function buildLimitedEvidenceExecutiveAnswer({
   const original = reasoningContext.rankedEvidence.find((item) => item.evidenceRole === "original") || null;
   const secondary = reasoningContext.rankedEvidence.find((item) => item.evidenceRole !== "supporting") || null;
   const healthEvidence = reasoningContext.rankedEvidence.find((item) => item.domain === "business_health") || null;
+  const rankedSignalFindings = reasoningContext.signalSynthesis.candidates.slice(0, 3).flatMap((signal) => {
+    const seenProvenance = new Set<string>();
+    const evidence = signal.originalCitationIds
+      .map((citationId) => reasoningContext.rankedEvidence[citationId - 1])
+      .filter((item): item is RankedExecutiveEvidence => Boolean(item))
+      .filter((item) => {
+        const key = item.independentSourceKey || item.key;
+        if (seenProvenance.has(key)) return false;
+        seenProvenance.add(key);
+        return true;
+      })
+      .slice(0, 2)
+      .map((item) => canonicalReference(
+        item,
+        reasoningContext,
+        "This original source supports this ranked signal; no cross-signal inference was completed."
+      ))
+      .filter((item): item is ExecutiveEvidenceReference => Boolean(item));
+    return evidence.length ? [{ signal, evidence }] : [];
+  });
   const selected = isBusinessHealthQuestion(query) ? healthEvidence || original || secondary : original || secondary;
   const reference = selected
     ? canonicalReference(
@@ -203,11 +223,14 @@ export function buildLimitedEvidenceExecutiveAnswer({
     ? canonicalReference(original, reasoningContext, "This original source supports the current assessment context.")
     : null;
   const references = [reference, originalReference].filter((item): item is ExecutiveEvidenceReference => Boolean(item));
+  const rankedSignalReferences = rankedSignalFindings.flatMap((finding) => finding.evidence);
   const independentSourceCount = reasoningContext.independentSourceCount;
   const sufficiency = independentSourceCount ? "Partial" as const : "Insufficient" as const;
   const businessHealth = isBusinessHealthQuestion(query) && score !== null;
   const directAnswer = businessHealth
     ? `Your Business Health score is ${score} out of 100; leadership should separate the operating findings affecting the score from the data-readiness gaps affecting how reliably it can be interpreted.`
+    : rankedSignalFindings.length > 1
+      ? `${rankedSignalFindings.length} distinct supported signals are available for review: ${rankedSignalFindings.map(({ signal }) => signal.title).join(", ")}. The deeper synthesis did not complete, so they are presented separately without inferring a relationship.`
     : original && independentSourceCount > 1
       ? `${original.title} is the most relevant current source for this question, but the cross-source analysis did not complete, so this response does not infer a broader conclusion.`
       : original
@@ -227,8 +250,15 @@ export function buildLimitedEvidenceExecutiveAnswer({
       : selected?.evidenceRole === "derived" || unlinkedReportTitle
         ? "Only secondary analysis is available for this question. Original evidence is required before its conclusions can support a new leadership decision."
         : "No independent original source currently supports this question. That limits decision confidence, but it does not indicate that the business itself is performing poorly.";
-  const narrowFinding = reference
-    ? [{
+  const conservativeFindings = !businessHealth && rankedSignalFindings.length
+    ? rankedSignalFindings.map(({ signal, evidence }) => ({
+        finding: `${signal.title} is one of the highest-ranked supported signals for this question.`,
+        businessImpact: "Its broader company-wide impact and relationship to other signals are not established because the deeper synthesis did not complete.",
+        confidence: "Low" as const,
+        evidence
+      }))
+    : reference
+      ? [{
         finding: businessHealth
           ? `The recorded Business Health score is ${score}, with a recorded data-quality base of ${dataQualityScore ?? "not established"}.`
           : `${reference.title} is relevant to the question, but its broader significance is not established.`,
@@ -238,7 +268,7 @@ export function buildLimitedEvidenceExecutiveAnswer({
         confidence: original ? "Low" as const : "Insufficient" as const,
         evidence: references
       }]
-    : [];
+      : [];
   const missingInformation = generalMissingInformation(query);
   const actions = limitedActions({ query, reference, evidence: references, healthContext });
   const readinessExplanation = sufficiency === "Partial"
@@ -256,7 +286,7 @@ export function buildLimitedEvidenceExecutiveAnswer({
     variant: "limited",
     evidenceSufficiency: { state: sufficiency, explanation: readinessExplanation },
     executiveSummary: directAnswer,
-    keyFindings: narrowFinding,
+    keyFindings: conservativeFindings,
     rootCauseAnalysis: [],
     businessImpact: {
       financial: "Not established from the current evidence.",
@@ -268,11 +298,13 @@ export function buildLimitedEvidenceExecutiveAnswer({
       ifIgnored: "Leadership may continue making decisions without a current, independently supported baseline."
     },
     recommendedActions: actions,
-    supportingEvidence: evidenceGroups(references),
+    supportingEvidence: evidenceGroups(
+      businessHealth ? references : rankedSignalReferences.length ? rankedSignalReferences : references
+    ),
     confidenceAssessment: {
       level: original ? "Low" : "Insufficient",
       explanation: confidenceExplanation,
-      supportingSourceCount: original ? 1 : 0,
+      supportingSourceCount: independentSourceCount,
       evidenceAgreement: "Insufficient",
       conflicts: [],
       uncertainty: missingInformation.slice(0, 3)
