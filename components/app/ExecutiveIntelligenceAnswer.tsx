@@ -1,22 +1,86 @@
-import type { ExecutiveEvidenceReference, ExecutiveIntelligenceBriefing } from "@/lib/search/types";
-
-function EvidenceReferences({ references }: { references: ExecutiveEvidenceReference[] }) {
-  if (!references.length) return null;
-
-  return (
-    <ul className="mt-3 space-y-2 border-l border-white/10 pl-3">
-      {references.map((reference) => (
-        <li key={`${reference.citationId}-${reference.title}`} className="text-xs leading-5 text-slate-300">
-          <span className="font-semibold text-slate-100">{reference.sourceType} · {reference.title}</span>
-          <span className="block text-slate-400">{reference.support}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
+import { ExecutiveEvidenceRenderer } from "@/components/app/ExecutiveEvidenceRenderer";
+import { uniqueExecutiveLines } from "@/lib/presentation/executive-evidence";
+import type { ExecutiveIntelligenceBriefing } from "@/lib/search/types";
 
 function SectionHeading({ children }: { children: string }) {
   return <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">{children}</h3>;
+}
+
+function BusinessHealthDrivers({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
+  const score = briefing.executiveSummary.match(/business health(?: score)?(?: is|:)?\s*(\d{1,3})/i)?.[1];
+  const drivers = uniqueExecutiveLines(briefing.keyFindings.map((finding) => finding.finding)).slice(0, 4);
+  if (!score || !drivers.length) return null;
+
+  return (
+    <div className="mt-4 border-l-2 border-vaeroex-accent/40 pl-3">
+      <p className="text-sm leading-6 text-slate-300">
+        Business Health is {score}/100. The highest-ranked validated drivers in this assessment are:
+      </p>
+      <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-200">
+        {drivers.map((driver) => <li key={driver}>{driver}</li>)}
+      </ul>
+    </div>
+  );
+}
+
+function LeadershipBrief({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
+  const priorities = uniqueExecutiveLines(briefing.keyFindings.map((finding) => finding.finding)).slice(0, 3);
+  const actions = uniqueExecutiveLines(briefing.recommendedActions.map((action) => action.action)).slice(0, 3);
+  const limitations = uniqueExecutiveLines([
+    ...briefing.missingInformation,
+    ...briefing.confidenceAssessment.uncertainty,
+    ...briefing.confidenceAssessment.conflicts
+  ]).slice(0, 3);
+
+  return (
+    <section>
+      <div className="flex flex-wrap items-center gap-2">
+        <SectionHeading>Leadership Brief</SectionHeading>
+        <span className="rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[0.7rem] font-semibold text-slate-200">
+          {briefing.evidenceSufficiency.state} evidence
+        </span>
+      </div>
+      <p className="mt-3 text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-slate-500">Executive Summary</p>
+      <p className="mt-1 text-sm leading-6 text-white">{briefing.executiveSummary}</p>
+      <BusinessHealthDrivers briefing={briefing} />
+      {priorities.length ? (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-100">Top priorities</p>
+          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-slate-200">
+            {priorities.map((priority) => <li key={priority}>{priority}</li>)}
+          </ol>
+        </div>
+      ) : null}
+      {actions.length ? (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-100">Recommended actions</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-300">
+            {actions.map((action) => <li key={action}>{action}</li>)}
+          </ul>
+        </div>
+      ) : null}
+      {limitations.length ? (
+        <div className="mt-4">
+          <p className="text-xs font-semibold text-slate-100">Known limitations</p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-400">
+            {limitations.map((limitation) => <li key={limitation}>{limitation}</li>)}
+          </ul>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function RecommendationDetails({ action }: { action: ExecutiveIntelligenceBriefing["recommendedActions"][number] }) {
+  const whyNow = uniqueExecutiveLines([action.whyPrioritized, action.urgency])[0];
+  const expectedImpact = uniqueExecutiveLines([action.expectedBusinessImpact, action.expectedOutcome])[0];
+  return (
+    <div className="mt-2 grid gap-x-5 gap-y-2 sm:grid-cols-2">
+      {whyNow ? <p className="text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Why now:</span> {whyNow}</p> : null}
+      {expectedImpact ? <p className="text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Expected impact:</span> {expectedImpact}</p> : null}
+      <p className="text-sm leading-6 text-slate-400 sm:col-span-2"><span className="font-semibold text-slate-200">What would change this recommendation:</span> {action.wouldChangeIf}</p>
+    </div>
+  );
 }
 
 function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveIntelligenceBriefing }) {
@@ -25,15 +89,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
 
   return (
     <div className="space-y-6">
-      <section>
-        <div className="flex flex-wrap items-center gap-2">
-          <SectionHeading>Executive Answer</SectionHeading>
-          <span className="rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[0.7rem] font-semibold text-slate-200">
-            {briefing.evidenceSufficiency.state} evidence
-          </span>
-        </div>
-        <p className="mt-2 text-sm leading-6 text-white">{briefing.executiveSummary}</p>
-      </section>
+      <LeadershipBrief briefing={briefing} />
 
       <section className="border-t border-white/10 pt-5">
         <SectionHeading>Evidence Readiness</SectionHeading>
@@ -51,7 +107,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                   <span className="shrink-0 text-xs font-semibold text-slate-300">{finding.confidence}</span>
                 </div>
                 <p className="mt-1 text-sm leading-6 text-slate-300">{finding.businessImpact}</p>
-                <EvidenceReferences references={finding.evidence} />
+                <ExecutiveEvidenceRenderer references={finding.evidence} />
               </div>
             ))}
           </div>
@@ -65,7 +121,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
             {limited.provisionalInterpretations.map((item) => (
               <div key={item.statement}>
                 <p className="text-sm leading-6 text-slate-200">{item.statement}</p>
-                <EvidenceReferences references={item.evidence} />
+                <ExecutiveEvidenceRenderer references={item.evidence} />
               </div>
             ))}
           </div>
@@ -79,7 +135,7 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
             {limited.alternativeExplanations.map((item) => (
               <div key={item.statement}>
                 <p className="text-sm leading-6 text-slate-300">{item.statement}</p>
-                <EvidenceReferences references={item.evidence} />
+                <ExecutiveEvidenceRenderer references={item.evidence} />
               </div>
             ))}
           </div>
@@ -117,10 +173,8 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 <span className="text-xs text-slate-500">Confidence: {action.confidence}</span>
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-white">{index + 1}. {action.action}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Why now:</span> {action.urgency}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Expected impact:</span> {action.expectedBusinessImpact}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-400"><span className="font-semibold text-slate-200">This would change if:</span> {action.wouldChangeIf}</p>
-              <EvidenceReferences references={action.evidence} />
+              <RecommendationDetails action={action} />
+              <ExecutiveEvidenceRenderer references={action.evidence} />
             </li>
           ))}
         </ol>
@@ -165,22 +219,13 @@ function LimitedExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
             {visibleEvidenceGroups.map((group) => (
               <div key={group.category}>
                 <p className="text-sm font-semibold text-white">{group.category}</p>
-                <EvidenceReferences references={group.items} />
+                <ExecutiveEvidenceRenderer references={group.items} />
               </div>
             ))}
           </div>
         </details>
       ) : null}
 
-      <section className="border-t border-white/10 pt-5">
-        <SectionHeading>Leadership Brief</SectionHeading>
-        <p className="mt-3 text-sm leading-6 text-slate-200">{briefing.leadershipBrief.firstLeadershipMeeting}</p>
-        <ol className="mt-3 list-decimal space-y-1 pl-5 text-sm leading-6 text-slate-200">
-          {briefing.leadershipBrief.priorities.map((priority) => <li key={priority}>{priority}</li>)}
-        </ol>
-        <p className="mt-3 text-sm leading-6 text-slate-300">{briefing.leadershipBrief.biggestDecision}</p>
-        <p className="mt-1 text-sm leading-6 text-slate-400">{briefing.leadershipBrief.biggestUnknown}</p>
-      </section>
     </div>
   );
 }
@@ -194,15 +239,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
 
   return (
     <div className="space-y-6">
-      <section>
-        <div className="flex flex-wrap items-center gap-2">
-          <SectionHeading>Executive Summary</SectionHeading>
-          <span className="rounded-full border border-white/10 bg-slate-950/45 px-2.5 py-1 text-[0.7rem] font-semibold text-slate-200">
-            {briefing.evidenceSufficiency.state} evidence
-          </span>
-        </div>
-        <p className="mt-2 text-sm leading-6 text-white">{briefing.executiveSummary}</p>
-      </section>
+      <LeadershipBrief briefing={briefing} />
 
       <section className="border-t border-white/10 pt-5">
         <SectionHeading>Key Findings</SectionHeading>
@@ -216,7 +253,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 </span>
               </div>
               <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Business impact:</span> {finding.businessImpact}</p>
-              <EvidenceReferences references={finding.evidence} />
+              <ExecutiveEvidenceRenderer references={finding.evidence} />
             </li>
           ))}
         </ol>
@@ -232,7 +269,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 <span className="shrink-0 text-xs font-semibold text-slate-300">{cause.status}</span>
               </div>
               <p className="mt-1 text-sm leading-6 text-slate-300">{cause.analysis}</p>
-              <EvidenceReferences references={cause.evidence} />
+              <ExecutiveEvidenceRenderer references={cause.evidence} />
             </div>
           ))}
         </div>
@@ -269,12 +306,8 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
                 <span className="text-xs text-slate-500">Confidence: {action.confidence}</span>
               </div>
               <p className="mt-2 text-sm font-semibold leading-6 text-white">{index + 1}. {action.action}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Why now:</span> {action.urgency}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Expected impact:</span> {action.expectedBusinessImpact}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-300"><span className="font-semibold text-slate-100">Expected outcome:</span> {action.expectedOutcome}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-400">{action.whyPrioritized}</p>
-              <p className="mt-1 text-sm leading-6 text-slate-400"><span className="font-semibold text-slate-200">This would change if:</span> {action.wouldChangeIf}</p>
-              <EvidenceReferences references={action.evidence} />
+              <RecommendationDetails action={action} />
+              <ExecutiveEvidenceRenderer references={action.evidence} />
             </li>
           ))}
         </ol>
@@ -287,7 +320,7 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
             {visibleEvidenceGroups.map((group) => (
               <div key={group.category}>
                 <p className="text-sm font-semibold text-white">{group.category}</p>
-                <EvidenceReferences references={group.items} />
+                <ExecutiveEvidenceRenderer references={group.items} />
               </div>
             ))}
           </div>
@@ -324,19 +357,6 @@ export function ExecutiveIntelligenceAnswer({ briefing }: { briefing: ExecutiveI
         </section>
       ) : null}
 
-      <section className="border-t border-white/10 pt-5">
-        <SectionHeading>Leadership Brief</SectionHeading>
-        <p className="mt-3 text-sm font-semibold leading-6 text-white">If I were leading this organization tomorrow morning, my priorities would be:</p>
-        <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm leading-6 text-slate-200">
-          {briefing.leadershipBrief.priorities.map((priority) => <li key={priority}>{priority}</li>)}
-        </ol>
-        <div className="mt-4 space-y-2 text-sm leading-6 text-slate-300">
-          <p>{briefing.leadershipBrief.firstLeadershipMeeting}</p>
-          <p>{briefing.leadershipBrief.biggestDecision}</p>
-          <p>{briefing.leadershipBrief.biggestOpportunity}</p>
-          <p>{briefing.leadershipBrief.biggestUnknown}</p>
-        </div>
-      </section>
     </div>
   );
 }
