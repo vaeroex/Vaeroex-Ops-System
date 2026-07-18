@@ -867,6 +867,7 @@ export function buildExecutiveReasoningContext({
             original_citation_ids: originalCitationIds,
             independent_original_source_count: independentSources.size,
             current_independent_original_source_count: currentIndependentSources.size,
+            maximum_finding_confidence: confidenceCeiling(independentSources.size, currentIndependentSources.size),
             priority_score: candidate.priorityScore,
             executive_rank: candidate.executiveRank
           };

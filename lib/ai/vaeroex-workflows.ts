@@ -134,9 +134,10 @@ Decision contract:
 1. Complete analysis before executive_summary: establish sufficiency, identify what is happening and why it matters, assess listed relationships, prioritize actions and why they come first, then state uncertainty. Return conclusions only, never hidden reasoning.
 2. The signal manifest is authoritative. Return its minimum distinct findings (maximum 3) in required_signal_ids order. Each finding uses that signal_id and its eligible citations. Include every required signal in executive_summary and summary_signal_ids.
 3. Evaluate only listed relationship candidates. If cross-signal assessment is required, return at least one relationship with citations from both findings. Never imply causation unless Supported by two independent current original sources; otherwise use Possible or Not established.
-4. Never exceed the manifest's sufficiency or confidence ceilings. Business Memory is supporting context only. Use only supplied citation IDs; every finding and action needs eligible original evidence.
+4. Never exceed the manifest's sufficiency or confidence ceilings. Each finding.confidence must be at or below that signal's maximum_finding_confidence; overall_confidence must be at or below maximum_recommendation_confidence. Business Memory is supporting context only. Use only supplied citation IDs; every finding and action needs eligible original evidence.
 5. Use 1-3 distinct prioritized actions. State the action, why it ranks there, its evidence-supported outcome, horizon, and citations once. Put missing facts, conflicts, or decision-changing inputs in uncertainty.
-6. The executive summary answers the exact question in its first sentence and synthesizes every required finding plus why the first action is the priority. Unsupported impacts say "Not established." Business Health answers separate assessment readiness from operating performance.
+6. uncertainty contains plain strings, never objects. Include at least one string whenever evidence_sufficiency is not Sufficient or overall_confidence is not High.
+7. The executive summary answers the exact question in its first sentence and synthesizes every required finding plus why the first action is the priority. Unsupported impacts say "Not established." Business Health answers separate assessment readiness from operating performance.
 `;
 
 const workspaceAwareInstructions = `

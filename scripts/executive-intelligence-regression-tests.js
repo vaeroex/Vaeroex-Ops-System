@@ -71,6 +71,9 @@ assert.match(reasoning, /businessImpact \* 0\.3[\s\S]*confidence \* 0\.25[\s\S]*
 assert.match(workflow, /Business Memory may support original evidence but is not an independent source/, "Business Memory must not inflate independent-source confidence");
 assert.match(workflow, /Derived analysis cannot establish a new fact without eligible original lineage/, "derived reports must not establish new business facts");
 assert.match(reasoning, /maximum_evidence_sufficiency/, "the reasoning manifest must cap evidence sufficiency before writing");
+assert.match(reasoning, /maximum_finding_confidence/, "each signal must expose its own source-backed finding-confidence ceiling");
+assert.match(workflow, /Each finding\.confidence must be at or below that signal's maximum_finding_confidence/i, "the model contract must apply signal-level confidence ceilings to every finding");
+assert.match(workflow, /uncertainty contains plain strings, never objects[\s\S]*at least one string whenever evidence_sufficiency is not Sufficient/i, "the model contract must make limited-evidence uncertainty shape explicit");
 assert.match(workflow, /systemInstructions:\s*executiveIntelligenceSystemInstructions/, "Executive Intelligence must use its compact workflow-specific system contract");
 assert.equal((workflow.match(/systemInstructions:\s*executiveIntelligenceSystemInstructions/g) || []).length, 1, "prompt compaction must remain isolated to Executive Intelligence");
 assert.match(client, /workflow\.systemInstructions\?\.trim\(\) \|\| VAEROEX_SYSTEM_PROMPT/, "other workflows must retain the existing base system prompt");
@@ -520,6 +523,7 @@ const oneSourceAnswer = buildLimitedEvidenceExecutiveAnswer({
 });
 assert.equal(oneSourceReasoning.independentSourceCount, 1, "one original source must remain one independent source");
 assert.equal(oneSourceReasoning.maximumEvidenceSufficiency, "Partial", "one original source cannot establish sufficient company-wide evidence");
+assert.equal(oneSourceReasoning.reasoningManifest.signal_synthesis.candidates[0].maximum_finding_confidence, "Low", "one-source signals must tell the provider that finding confidence cannot exceed Low");
 assert.equal(oneSourceAnswer.recommendationConfidence, "Low", "one source can support only low-confidence recommendations");
 assert.match(oneSourceAnswer.directAnswer, /one narrow evidence base/i, "one-source answers must explain their scope limitation");
 
