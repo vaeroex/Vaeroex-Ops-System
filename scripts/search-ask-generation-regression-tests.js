@@ -37,7 +37,6 @@ Module._load = function loadPatched(request, parent, isMain) {
 
 const globalSearch = read("components/app/GlobalSearch.tsx");
 const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
-const policyContract = read("lib/ai/providers/workflow-provider-policy-contract.ts");
 const searchRoute = read("app/api/search/route.ts");
 const providerManager = read("lib/ai/providers/provider-manager.ts");
 const vaeroexClient = read("lib/ai/vaeroex-client.ts");
@@ -85,12 +84,12 @@ assert.match(providerManager, /maxAttempts = Math\.max\(1, Math\.min\(providerSe
 assert.match(providerManager, /fallbackUsed:\s*finalResult\.provider !== primaryProvider/, "provider-manager fallback status must reflect the workflow policy's primary provider");
 assert.match(providerManager, /provider:\s*finalResult\.provider/, "successful NVIDIA generation must report NVIDIA as the final provider");
 assert.match(providerManager, /model:\s*finalResult\.model/, "successful generation must persist the model that actually completed it");
-assert.match(workflowProviderPolicy, /configuredProvider === "nvidia" \? "nvidia_first" : "openai_first"/, "normal execution must preserve the globally configured provider order");
-assert.match(workflowProviderPolicy, /vercelEnvironment !== "preview" \|\| !authorized/, "the A\/B selector must fail closed outside authorized Preview requests");
-assert.match(searchRoute, /request\.headers\.get\(EXECUTIVE_PROVIDER_POLICY_HEADER\)/, "the synchronous Executive Analysis route must select the Preview benchmark policy explicitly");
-assert.match(policyContract, /x-vaeroex-preview-executive-policy/, "the Preview benchmark header must use a narrow shared contract");
-assert.match(askWorkspace, /previewExecutiveProviderPolicyHeader\(\)/, "the dedicated Ask client must forward the explicit Preview benchmark policy");
-assert.match(askWorkspace, /new URLSearchParams\(window\.location\.search\)/, "the Preview benchmark selector must come from the current dedicated Ask URL");
+assert.match(workflowProviderPolicy, /id:\s*"synchronous_executive_openai_first_interim"/, "synchronous Executive Analysis must identify its latency-driven interim policy explicitly");
+assert.match(workflowProviderPolicy, /provider:\s*"openai"[\s\S]*provider:\s*"nvidia"/, "synchronous Executive Analysis must use explicit OpenAI then NVIDIA order");
+assert.doesNotMatch(workflowProviderPolicy, /resolveConfiguredAIProvider|previewVariant|VERCEL_ENV/, "the synchronous policy must neither inherit global order nor retain a Preview selector");
+assert.match(vaeroexClient, /const configuredProvider = resolveConfiguredAIProvider\(\)/, "all workflows without an explicit policy must preserve global provider configuration");
+assert.doesNotMatch(searchRoute, /EXECUTIVE_PROVIDER_POLICY_HEADER|resolvePreviewExecutiveProviderPolicyVariant/, "the release route must not retain benchmark request plumbing");
+assert.doesNotMatch(askWorkspace, /executive_provider_policy|previewExecutiveProviderPolicyHeader|x-vaeroex-preview-executive-policy/, "the Ask UI must not retain benchmark query or header plumbing");
 assert.match(searchRoute, /SEARCH_ASK_NVIDIA_SECONDARY_MINIMUM_REMAINING_MS = SEARCH_ASK_NVIDIA_TIMEOUT_MS \+ SEARCH_ASK_PROVIDER_TRANSITION_RESERVE_MS/, "OpenAI-first routing must reserve a meaningful full NVIDIA secondary window");
 assert.match(searchRoute, /SEARCH_ASK_TOTAL_DEADLINE_MS = 27_000/, "interactive Search or Ask must use one workflow-level deadline");
 assert.match(searchRoute, /SEARCH_ASK_PROVIDER_MAX_RETRIES = 0/, "interactive Search or Ask must not spend its deadline on a second NVIDIA attempt");
@@ -141,10 +140,7 @@ const { resolveAIProviderAttemptWindow } = require("../lib/ai/providers/executio
 const { AIProviderError } = require("../lib/ai/providers/types.ts");
 const { recordVaeroexAiUsage } = require("../lib/ai/usage.ts");
 const { globalSearchApiErrorMessage } = require("../lib/search/api-errors.ts");
-const {
-  buildSynchronousExecutiveProviderPolicy,
-  resolvePreviewExecutiveProviderPolicyVariant
-} = require("../lib/ai/providers/workflow-provider-policy.ts");
+const { buildSynchronousExecutiveProviderPolicy } = require("../lib/ai/providers/workflow-provider-policy.ts");
 
 const providerResult = (content, inputTokens, outputTokens) => ({
   content: JSON.stringify(content),
@@ -181,29 +177,13 @@ const request = {
 };
 
 async function runRuntimeTests() {
-  assert.equal(
-    resolvePreviewExecutiveProviderPolicyVariant({ requested: "openai_first", vercelEnvironment: "production", authorized: true }),
-    null,
-    "Production must ignore the Preview-only provider policy selector"
-  );
-  assert.equal(
-    resolvePreviewExecutiveProviderPolicyVariant({ requested: "openai_first", vercelEnvironment: "preview", authorized: false }),
-    null,
-    "non-admin Preview users must not select a benchmark provider policy"
-  );
-  assert.equal(
-    resolvePreviewExecutiveProviderPolicyVariant({ requested: "openai_first", vercelEnvironment: "preview", authorized: true }),
-    "openai_first",
-    "an authorized Preview benchmark may select OpenAI-first routing"
-  );
-
   const openAiFirstPolicy = buildSynchronousExecutiveProviderPolicy({
     modelRoute: "cross_business_reasoning",
-    previewVariant: "openai_first",
     nvidiaSecondaryMinimumRemainingMs: 10_750
   });
-  assert.deepEqual(openAiFirstPolicy.steps.map((step) => step.provider), ["openai", "nvidia"], "Configuration B must use explicit OpenAI then NVIDIA order");
-  assert.equal(openAiFirstPolicy.steps[1].minimumRemainingMs, 10_750, "Configuration B must require a meaningful NVIDIA secondary window");
+  assert.equal(openAiFirstPolicy.id, "synchronous_executive_openai_first_interim", "telemetry must identify the workflow-specific interim policy");
+  assert.deepEqual(openAiFirstPolicy.steps.map((step) => step.provider), ["openai", "nvidia"], "synchronous Executive Analysis must use explicit OpenAI then NVIDIA order");
+  assert.equal(openAiFirstPolicy.steps[1].minimumRemainingMs, 10_750, "synchronous Executive Analysis must require a meaningful NVIDIA secondary window");
 
   let unexpectedNvidiaCalls = 0;
   const openAiDirect = await runStructuredAI({
@@ -218,9 +198,9 @@ async function runRuntimeTests() {
       openai: provider("openai", async () => providerResult({ ok: true }, 100, 20))
     }
   });
-  assert.equal(openAiDirect.provider, "openai", "Configuration B must accept a valid OpenAI primary response");
-  assert.equal(openAiDirect.fallbackUsed, false, "Configuration B must not label its OpenAI primary as fallback");
-  assert.equal(openAiDirect.providerPolicyId, "preview_executive_openai_first", "usage telemetry must retain the selected workflow policy");
+  assert.equal(openAiDirect.provider, "openai", "the workflow must accept a valid OpenAI primary response");
+  assert.equal(openAiDirect.fallbackUsed, false, "the workflow must not label its OpenAI primary as fallback");
+  assert.equal(openAiDirect.providerPolicyId, "synchronous_executive_openai_first_interim", "usage telemetry must retain the final workflow policy");
   assert.equal(unexpectedNvidiaCalls, 0, "a valid OpenAI response must not trigger a duplicate NVIDIA request");
 
   const orderedCalls = [];
@@ -246,8 +226,8 @@ async function runRuntimeTests() {
       })
     }
   });
-  assert.deepEqual(orderedCalls, ["openai", "nvidia"], "Configuration B must execute providers sequentially without duplicate calls");
-  assert.equal(openAiToNvidiaFallback.provider, "nvidia", "NVIDIA may complete Configuration B only after OpenAI fails with sufficient time remaining");
+  assert.deepEqual(orderedCalls, ["openai", "nvidia"], "the workflow must execute providers sequentially without duplicate calls");
+  assert.equal(openAiToNvidiaFallback.provider, "nvidia", "NVIDIA may complete the workflow only after OpenAI fails with sufficient time remaining");
   assert.equal(openAiToNvidiaFallback.fallbackUsed, true, "a successful secondary NVIDIA attempt must be recorded as fallback");
 
   let skippedNvidiaCalls = 0;

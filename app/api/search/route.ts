@@ -17,11 +17,7 @@ import {
 import { buildDeterministicKpiOverviewOutput, classifyKpiOverviewIntent, loadKpiOverviewData, type KpiOverviewIntent, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
-import {
-  buildSynchronousExecutiveProviderPolicy,
-  EXECUTIVE_PROVIDER_POLICY_HEADER,
-  resolvePreviewExecutiveProviderPolicyVariant
-} from "@/lib/ai/providers/workflow-provider-policy";
+import { buildSynchronousExecutiveProviderPolicy } from "@/lib/ai/providers/workflow-provider-policy";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { planVaeroexQuery, type VaeroexEvidenceDomain } from "@/lib/ai/query-depth-planner";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -986,13 +982,8 @@ export async function POST(request: Request) {
   const workflow = getVaeroexWorkflow("executive_intelligence");
   const baseSettings = getAIProviderRetrySettings();
   const modelRoute = queryPlan.tier === 3 ? "cross_business_reasoning" as const : "focused_explanation" as const;
-  const previewProviderVariant = resolvePreviewExecutiveProviderPolicyVariant({
-    requested: request.headers.get(EXECUTIVE_PROVIDER_POLICY_HEADER),
-    authorized: isVaeroexAdminUser(user)
-  });
   const providerPolicy = buildSynchronousExecutiveProviderPolicy({
     modelRoute,
-    previewVariant: previewProviderVariant,
     nvidiaSecondaryMinimumRemainingMs: SEARCH_ASK_NVIDIA_SECONDARY_MINIMUM_REMAINING_MS
   });
   const generationStartedAt = Date.now();
