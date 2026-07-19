@@ -1,6 +1,20 @@
 import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  EVIDENCE_CANDIDATE_VERSION,
+  EVIDENCE_QUERY_VERSION,
+  type CandidateRetrievalResult,
+  type CandidateRetriever,
+  type EvidenceCandidate,
+  type EvidenceQuery
+} from "@/lib/ai/evidence-engine/contracts";
+import { buildEvidenceManifest } from "@/lib/ai/evidence-engine/manifest";
+import { NvidiaTextReranker, nvidiaTextRerankerShadowEnabled } from "@/lib/ai/evidence-engine/nvidia-text-reranker";
+import { DeterministicNoopReranker, runEvidenceRerankerShadow } from "@/lib/ai/evidence-engine/reranker";
+import { buildSourceRegistry } from "@/lib/ai/evidence-engine/source-registry";
+import { EvidenceDecisionTrace } from "@/lib/ai/evidence-engine/tracing";
+import { verifyEvidenceManifestCitations } from "@/lib/ai/evidence-engine/citation-verification";
 import { createAIEmbeddings } from "@/lib/ai/providers/provider-manager";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
@@ -57,6 +71,9 @@ const MAX_CHUNK_CHARACTERS = 1_400;
 const CHUNK_OVERLAP_CHARACTERS = 160;
 const DEFAULT_MAX_EVIDENCE_CHUNKS = 8;
 const MAX_INDEXED_CHUNKS_PER_FILE = 80;
+const ACTIVE_EMBEDDING_VERSION = "openai_text_embedding_active_v1";
+const CANDIDATE_RETRIEVER_VERSION = "supabase_pgvector_candidate_retriever_v1";
+const MEMORY_ELIGIBILITY_VERSION = "business_memory_eligibility_v1";
 const TECHNICAL_FAILURE_LANGUAGE = /\b(?:image|document|file|text|data|content|ocr|vision)\s+(?:extraction|processing|analysis|parsing)?\s*(?:failed|failure|error|timed?\s*out|unavailable|unsupported)\b|\b(?:extraction|ocr|parser|provider|model request|analysis request)\s+(?:failed|failure|error|timed?\s*out|unavailable)\b|\b(?:unable|could not|cannot|can't)\s+(?:to\s+)?(?:read|extract|analy[sz]e|parse|process|access)|\bno\s+(?:usable|readable|meaningful)\s+(?:data|text|content|information)|\bimage quality (?:is )?too low\b/i;
 const UNGROUNDED_VISIBILITY_LANGUAGE = /\b(?:lack|lacking|limited|insufficient|no)\s+(?:operational\s+)?visibility\b|\b(?:establish|implement|improve|create)\s+(?:a\s+)?(?:kpi|tracking|monitoring|reporting|visibility)\b/i;
 const BUSINESS_FACT_KEYS = [
@@ -381,6 +398,82 @@ function toEvidenceChunk(row: MatchMemoryChunk | MemoryChunkRow, similarity?: nu
   };
 }
 
+function canonicalMemorySourceKey(workspaceId: string, chunk: EvidenceContextChunk) {
+  if (chunk.sourceFileId) return `workspace:${workspaceId}:file:${chunk.sourceFileId}`;
+  if (chunk.sourceId) return `workspace:${workspaceId}:${chunk.sourceType}:${chunk.sourceId}`;
+  return `workspace:${workspaceId}:memory:${chunk.id}`;
+}
+
+function toNormalizedEvidenceCandidate({
+  workspaceId,
+  chunk,
+  mode,
+  baseRank,
+  embeddingVersion
+}: {
+  workspaceId: string;
+  chunk: EvidenceContextChunk;
+  mode: "vector" | "keyword";
+  baseRank: number;
+  embeddingVersion: string | null;
+}): EvidenceCandidate {
+  return {
+    version: EVIDENCE_CANDIDATE_VERSION,
+    candidateId: chunk.id,
+    workspaceId,
+    domain: "business_memory",
+    recordType: "business_memory_chunk",
+    title: chunk.title,
+    excerpt: chunk.excerpt,
+    summary: chunk.summary,
+    evidenceRole: "supporting",
+    source: {
+      sourceType: chunk.sourceType,
+      sourceId: chunk.sourceId,
+      sourceFileId: chunk.sourceFileId,
+      parentSourceId: chunk.sourceFileId || chunk.sourceId,
+      canonicalSourceKey: canonicalMemorySourceKey(workspaceId, chunk),
+      independentSourceKey: null
+    },
+    provenance: {
+      recordId: chunk.id,
+      indexedAt: chunk.indexedAt,
+      recordedAt: chunk.indexedAt,
+      lineageVersion: MEMORY_ELIGIBILITY_VERSION
+    },
+    eligibility: {
+      eligible: true,
+      lifecycleState: "active",
+      originalEvidenceEligible: false,
+      decisionVersion: MEMORY_ELIGIBILITY_VERSION
+    },
+    quality: chunk.quality,
+    confidenceScore: chunk.confidenceScore,
+    retrieval: {
+      mode,
+      baseRank,
+      score: typeof chunk.similarity === "number" ? chunk.similarity : null,
+      embeddingVersion
+    }
+  };
+}
+
+function normalizedCandidateToEvidenceChunk(candidate: EvidenceCandidate): EvidenceContextChunk {
+  return {
+    id: candidate.candidateId,
+    sourceType: candidate.source.sourceType,
+    sourceId: candidate.source.sourceId,
+    sourceFileId: candidate.source.sourceFileId,
+    title: candidate.title,
+    excerpt: candidate.excerpt,
+    summary: candidate.summary,
+    quality: candidate.quality,
+    confidenceScore: candidate.confidenceScore,
+    indexedAt: candidate.provenance.indexedAt,
+    ...(typeof candidate.retrieval.score === "number" ? { similarity: candidate.retrieval.score } : {})
+  };
+}
+
 function runIdForChunk(row: Pick<MemoryChunkRow, "source_metadata"> | Pick<MatchMemoryChunk, "source_metadata">) {
   const sourceMetadata = metadataRecord(row.source_metadata);
   const nestedMetadata = metadataRecord(sourceMetadata.metadata as Json | undefined);
@@ -517,12 +610,14 @@ async function keywordEvidence({
   supabase,
   workspaceId,
   query,
-  limit
+  limit,
+  candidateLimit
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   query: string;
   limit: number;
+  candidateLimit: number;
 }) {
   const queryTerms = terms(query);
   if (!queryTerms.length) return [];
@@ -563,8 +658,117 @@ async function keywordEvidence({
     })
     .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score || b.row.confidence_score - a.row.confidence_score)
-    .slice(0, limit)
+    .slice(0, candidateLimit)
     .map((item) => toEvidenceChunk(item.row, item.score / Math.max(queryTerms.length, 1)));
+}
+
+export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
+  readonly id = "supabase_pgvector";
+  readonly version = CANDIDATE_RETRIEVER_VERSION;
+
+  constructor(private readonly dependencies: {
+    supabase: SupabaseClient<Database>;
+    stageLogger?: EvidenceStageLogger;
+    timingLogger?: WorkflowStageLogger;
+    embeddingTimeoutMs?: number;
+  }) {}
+
+  async retrieve(query: EvidenceQuery): Promise<CandidateRetrievalResult & {
+    retrievalMode: EvidenceContext["retrievalMode"];
+  }> {
+    const { supabase, stageLogger, timingLogger, embeddingTimeoutMs } = this.dependencies;
+    const candidateLimit = Math.min(48, Math.max(query.resultLimit, query.candidateLimit));
+    let chunks: EvidenceContextChunk[] = [];
+    let retrievalMode: EvidenceContext["retrievalMode"] = "none";
+    let embeddingVersion: string | null = null;
+    const limitations: string[] = [];
+
+    if (query.strategy === "auto") {
+      stageLogger?.("embeddings_started", { queryLength: query.text.length, limit: query.resultLimit });
+      const embeddingStartedAt = Date.now();
+      const embedding = await createEmbeddings([query.text.slice(0, 4_000)], embeddingTimeoutMs);
+      timingLogger?.("embedding_retrieval_ms", Date.now() - embeddingStartedAt);
+      embeddingVersion = embedding.embeddings[0] ? embedding.model || ACTIVE_EMBEDDING_VERSION : null;
+      stageLogger?.("embeddings_finished", {
+        embeddingAvailable: Boolean(embedding.embeddings[0]),
+        embeddingError: embedding.error || null,
+        embeddingTokens: embedding.tokens
+      });
+
+      if (embedding.embeddings[0]) {
+        stageLogger?.("vector_retrieval_started", { limit: query.resultLimit });
+        const vectorStartedAt = Date.now();
+        const { data, error } = await supabase.rpc("match_business_memory_chunks", {
+          target_workspace_id: query.workspaceId,
+          query_embedding: embedding.embeddings[0],
+          match_count: candidateLimit,
+          min_similarity: 0.08
+        });
+        timingLogger?.("vector_database_retrieval_ms", Date.now() - vectorStartedAt);
+        stageLogger?.("vector_retrieval_finished", {
+          matchCount: data?.length || 0,
+          error: error?.message || null
+        });
+
+        if (!error && data?.length) {
+          const lifecycleFilterStartedAt = Date.now();
+          const eligibleRows = await filterEligibleMemoryRowsByLifecycle({
+            supabase,
+            workspaceId: query.workspaceId,
+            rows: data
+          });
+          timingLogger?.("memory_lifecycle_filter_ms", Date.now() - lifecycleFilterStartedAt);
+          chunks = eligibleRows
+            .slice(0, candidateLimit)
+            .map((row) => toEvidenceChunk(row, "similarity" in row ? row.similarity : undefined));
+          if (chunks.length) retrievalMode = "vector";
+        } else if (error) {
+          limitations.push("Vector retrieval is not available yet. Vaeroex used keyword evidence fallback.");
+        }
+      } else if (embedding.error) {
+        limitations.push("Embedding retrieval is unavailable. Vaeroex used keyword evidence fallback where possible.");
+      }
+    } else {
+      stageLogger?.("embeddings_skipped", { reason: "focused_keyword_scope", limit: query.resultLimit });
+    }
+
+    if (!chunks.length) {
+      stageLogger?.("keyword_retrieval_started", { limit: query.resultLimit });
+      const keywordStartedAt = Date.now();
+      chunks = await keywordEvidence({
+        supabase,
+        workspaceId: query.workspaceId,
+        query: query.text,
+        limit: query.resultLimit,
+        candidateLimit
+      });
+      timingLogger?.("keyword_database_retrieval_ms", Date.now() - keywordStartedAt);
+      stageLogger?.("keyword_retrieval_finished", { matchCount: Math.min(chunks.length, query.resultLimit) });
+      retrievalMode = chunks.length ? "keyword" : "none";
+      embeddingVersion = null;
+    }
+
+    const candidates = retrievalMode === "none"
+      ? []
+      : chunks.map((chunk, index) => toNormalizedEvidenceCandidate({
+          workspaceId: query.workspaceId,
+          chunk,
+          mode: retrievalMode as "vector" | "keyword",
+          baseRank: index + 1,
+          embeddingVersion
+        }));
+
+    return {
+      version: "candidate_retrieval_result_v1",
+      query,
+      retrieverId: this.id,
+      retrieverVersion: this.version,
+      retrievalMode,
+      candidates,
+      selectedCandidateIds: candidates.slice(0, query.resultLimit).map((candidate) => candidate.candidateId),
+      limitations
+    };
+  }
 }
 
 export async function buildWorkspaceEvidenceContext({
@@ -588,76 +792,133 @@ export async function buildWorkspaceEvidenceContext({
 }): Promise<EvidenceContext> {
   const configuredLimit = maxEvidenceChunks();
   const limit = Math.min(Math.max(maxChunks ?? configuredLimit, 1), configuredLimit);
-  let chunks: EvidenceContextChunk[] = [];
-  let retrievalMode: EvidenceContext["retrievalMode"] = "none";
-  const limitations: string[] = [];
+  const evidenceQuery: EvidenceQuery = {
+    version: EVIDENCE_QUERY_VERSION,
+    workspaceId,
+    text: query,
+    requestedDomains: ["business_memory"],
+    strategy: retrievalStrategy,
+    candidateLimit: Math.min(48, Math.max(limit, limit * 4)),
+    resultLimit: limit,
+    minimumSourceDiversity: 1,
+    freshnessAfter: null
+  };
+  const retriever = new SupabasePgvectorCandidateRetriever({
+    supabase,
+    stageLogger,
+    timingLogger,
+    embeddingTimeoutMs
+  });
+  const retrievalStartedAt = Date.now();
+  const retrieval = await retriever.retrieve(evidenceQuery);
+  const trace = new EvidenceDecisionTrace();
+  trace.add({
+    stage: "candidate_retrieval",
+    status: "success",
+    durationMs: Date.now() - retrievalStartedAt,
+    inputCount: null,
+    outputCount: retrieval.candidates.length,
+    provider: null,
+    model: null,
+    reasonCode: null
+  });
 
-  if (retrievalStrategy === "auto") {
-    const candidateLimit = Math.min(48, Math.max(limit, limit * 4));
-    stageLogger?.("embeddings_started", { queryLength: query.length, limit });
-    const embeddingStartedAt = Date.now();
-    const embedding = await createEmbeddings([query.slice(0, 4_000)], embeddingTimeoutMs);
-    timingLogger?.("embedding_retrieval_ms", Date.now() - embeddingStartedAt);
-    stageLogger?.("embeddings_finished", {
-      embeddingAvailable: Boolean(embedding.embeddings[0]),
-      embeddingError: embedding.error || null,
-      embeddingTokens: embedding.tokens
+  const selectedIds = new Set(retrieval.selectedCandidateIds);
+  const selectedCandidates = retrieval.candidates.filter((candidate) => selectedIds.has(candidate.candidateId));
+  const sourceRegistryStartedAt = Date.now();
+  const sourceRegistry = buildSourceRegistry({ workspaceId, candidates: selectedCandidates });
+  trace.add({
+    stage: "source_registry",
+    status: "success",
+    durationMs: Date.now() - sourceRegistryStartedAt,
+    inputCount: selectedCandidates.length,
+    outputCount: sourceRegistry.entries.length,
+    provider: "deterministic",
+    model: null,
+    reasonCode: null
+  });
+  const manifestStartedAt = Date.now();
+  const activeReranker = new DeterministicNoopReranker();
+  const manifest = buildEvidenceManifest({
+    workspaceId,
+    queryText: query,
+    candidates: selectedCandidates,
+    sourceRegistry,
+    generatedAt: new Date().toISOString(),
+    candidateRetrieverVersion: retriever.version,
+    embeddingVersion: selectedCandidates[0]?.retrieval.embeddingVersion || null,
+    rerankerVersion: activeReranker.version,
+    signalPlannerVersion: "existing_signal_planner_v1"
+  });
+  trace.add({
+    stage: "manifest",
+    status: "success",
+    durationMs: Date.now() - manifestStartedAt,
+    inputCount: selectedCandidates.length,
+    outputCount: manifest.evidence.length,
+    provider: "deterministic",
+    model: null,
+    reasonCode: null
+  });
+  const citationVerification = verifyEvidenceManifestCitations({
+    manifest,
+    citationIds: manifest.evidence.map((entry) => entry.citationId),
+    requiredCitationIds: manifest.evidence.map((entry) => entry.citationId)
+  });
+  trace.add({
+    stage: "citation_verification",
+    status: citationVerification.valid ? "success" : "failed",
+    durationMs: null,
+    inputCount: citationVerification.observedCount,
+    outputCount: citationVerification.verifiedCitationIds.length,
+    provider: "deterministic",
+    model: null,
+    reasonCode: citationVerification.valid ? null : "citation_verification_failed"
+  });
+
+  if (nvidiaTextRerankerShadowEnabled() && retrieval.candidates.length) {
+    await runEvidenceRerankerShadow({
+      queryText: query,
+      candidates: retrieval.candidates,
+      reranker: new NvidiaTextReranker(),
+      trace
     });
-
-    if (embedding.embeddings[0]) {
-      stageLogger?.("vector_retrieval_started", { limit });
-      const vectorStartedAt = Date.now();
-      const { data, error } = await supabase.rpc("match_business_memory_chunks", {
-        target_workspace_id: workspaceId,
-        query_embedding: embedding.embeddings[0],
-        match_count: candidateLimit,
-        min_similarity: 0.08
-      });
-      timingLogger?.("vector_database_retrieval_ms", Date.now() - vectorStartedAt);
-      stageLogger?.("vector_retrieval_finished", {
-        matchCount: data?.length || 0,
-        error: error?.message || null
-      });
-
-      if (!error && data?.length) {
-        const lifecycleFilterStartedAt = Date.now();
-        const eligibleRows = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: data });
-        timingLogger?.("memory_lifecycle_filter_ms", Date.now() - lifecycleFilterStartedAt);
-        chunks = eligibleRows
-          .slice(0, limit)
-          .map((row) => toEvidenceChunk(row, "similarity" in row ? row.similarity : undefined));
-        retrievalMode = "vector";
-      } else if (error) {
-        limitations.push("Vector retrieval is not available yet. Vaeroex used keyword evidence fallback.");
-      }
-    } else if (embedding.error) {
-      limitations.push("Embedding retrieval is unavailable. Vaeroex used keyword evidence fallback where possible.");
-    }
   } else {
-    stageLogger?.("embeddings_skipped", { reason: "focused_keyword_scope", limit });
+    trace.add({
+      stage: "rerank",
+      status: "skipped",
+      durationMs: 0,
+      inputCount: retrieval.candidates.length,
+      outputCount: retrieval.candidates.length,
+      provider: "nvidia",
+      model: "nvidia/llama-nemotron-rerank-1b-v2",
+      reasonCode: "shadow_disabled"
+    });
   }
+  const traceSnapshot = trace.snapshot();
+  stageLogger?.("evidence_engine_foundation_finished", {
+    traceVersion: traceSnapshot.version,
+    candidateCount: retrieval.candidates.length,
+    selectedCount: selectedCandidates.length,
+    sourceCount: sourceRegistry.entries.length,
+    citationCount: manifest.evidence.length,
+    citationVerificationValid: citationVerification.valid,
+    shadowRerankStatus: traceSnapshot.events.find((event) => event.stage === "rerank")?.status || "skipped"
+  });
 
-  if (!chunks.length) {
-    stageLogger?.("keyword_retrieval_started", { limit });
-    const keywordStartedAt = Date.now();
-    chunks = await keywordEvidence({ supabase, workspaceId, query, limit });
-    timingLogger?.("keyword_database_retrieval_ms", Date.now() - keywordStartedAt);
-    stageLogger?.("keyword_retrieval_finished", { matchCount: chunks.length });
-    retrievalMode = chunks.length ? "keyword" : "none";
-  }
-
+  const chunks = selectedCandidates.map(normalizedCandidateToEvidenceChunk);
   const confidenceScore = contextConfidence(chunks);
   const dataGaps = dataGapsFor(chunks);
 
   return {
     available: chunks.length > 0,
-    retrievalMode,
+    retrievalMode: retrieval.retrievalMode,
     chunks,
     maxChunks: limit,
     confidenceScore,
     confidenceLabel: confidenceLabel(confidenceScore),
     limitations: [
-      ...limitations,
+      ...retrieval.limitations,
       ...(confidenceScore < 46 ? ["Confidence is limited because Vaeroex has sparse matching evidence for this question."] : [])
     ],
     dataGaps,
