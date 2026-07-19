@@ -6,6 +6,7 @@ const root = process.cwd();
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 const route = read("app/api/internal/nvidia-qualification/route.ts");
+const page = read("app/app/admin/nvidia-qualification/page.tsx");
 const profiles = read("lib/ai/qualification/profiles.ts");
 const contracts = read("lib/ai/qualification/contracts.ts");
 const client = read("lib/ai/qualification/generation-client.ts");
@@ -58,5 +59,12 @@ assert.match(route, /return probeResponse\(\{ profileId, contractId, runIndex \}
 assert.match(route, /excluded:\s*\["deep_strategic_analysis"\]/, "the route must disclose the approved exclusion");
 assert.doesNotMatch(route, /\.from\(|workspaceId|evidence excerpt|systemPrompt|userContent|content:/, "the route must not read customer data or log prompt content");
 assert.match(route, /outputCharacters/, "content-free completion metadata should be retained");
+
+assert.match(page, /process\.env\.VERCEL_ENV === "preview"/, "the browser-compatible runner must remain Preview-only");
+assert.match(page, /getVaeroexAdminAccess/, "the browser-compatible runner must remain admin-only");
+assert.match(page, /runStageOneQualificationProbe/, "the page must use the same isolated Stage 1 runner");
+assert.match(page, /data-testid="qualification-result"/, "the page must expose only sanitized result metadata");
+assert.match(page, /excluded:\s*\["deep_strategic_analysis"\]/, "the browser-compatible runner must retain the approved scope exclusion");
+assert.doesNotMatch(page, /\.from\(|workspaceId|evidence excerpt|systemPrompt|userContent/, "the page must not read or render customer evidence");
 
 process.stdout.write("NVIDIA capability qualification regressions passed.\n");
