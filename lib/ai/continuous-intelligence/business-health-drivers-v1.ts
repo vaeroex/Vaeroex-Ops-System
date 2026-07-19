@@ -149,7 +149,20 @@ function explanation(score: number | null, drivers: readonly EligibleDriver[]) {
   if (!drivers.length) {
     return `Business Health is ${score}, but no eligible weighted drivers are available for explanation.`;
   }
-  const driverList = drivers.map((driver) => `${driver.name} (${driver.direction})`).join(", ");
+  const grouped = new Map<string, { name: string; directions: BusinessHealthDriverDirection[] }>();
+  for (const driver of drivers) {
+    const name = driver.name.normalize("NFKC").trim().replace(/\s+/g, " ");
+    const key = name.toLocaleLowerCase("en-US");
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { name, directions: [driver.direction] });
+    } else if (!existing.directions.includes(driver.direction)) {
+      existing.directions.push(driver.direction);
+    }
+  }
+  const driverList = Array.from(grouped.values())
+    .map((driver) => `${driver.name} (${driver.directions.join(" and ")})`)
+    .join(", ");
   return `Business Health is ${score}. The highest-weighted eligible drivers are ${driverList}.`;
 }
 

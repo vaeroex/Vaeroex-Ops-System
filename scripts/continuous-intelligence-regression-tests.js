@@ -131,6 +131,34 @@ function contextFor(manifest, authorizedWorkspaceId = manifest.workspaceId) {
   };
 }
 
+function remapCitationReferences(value, fromManifest, toManifest) {
+  const candidateByCitation = new Map(fromManifest.evidence.map((entry) => [entry.citationId, entry.candidateId]));
+  const citationByCandidate = new Map(toManifest.evidence.map((entry) => [entry.candidateId, entry.citationId]));
+
+  function remap(child) {
+    if (Array.isArray(child)) return child.map(remap);
+    if (!child || typeof child !== "object") return child;
+    return Object.fromEntries(Object.entries(child).map(([key, nested]) => {
+      if (key === "citationIds" && Array.isArray(nested)) {
+        return [key, nested
+          .map((citationId) => citationByCandidate.get(candidateByCitation.get(citationId)))
+          .filter((citationId) => Number.isInteger(citationId))];
+      }
+      return [key, remap(nested)];
+    }));
+  }
+
+  return remap(value);
+}
+
+function inputForManifest(input, fromManifest, toManifest) {
+  const { evidenceContext: _evidenceContext, ...contractInput } = input;
+  return {
+    ...remapCitationReferences(contractInput, fromManifest, toManifest),
+    evidenceContext: contextFor(toManifest)
+  };
+}
+
 function kpiRecord(overrides = {}) {
   return {
     recordId: overrides.recordId || "revenue-june",
@@ -309,6 +337,64 @@ function main() {
   });
   assert.equal(expanded.output.fingerprint, kpiResult.output.fingerprint, "unrelated evidence and settings must not churn a scoped fingerprint");
 
+  const secondUnrelatedCandidate = candidate("orders-unrelated", {
+    sourceKey: "file:orders",
+    independentSourceKey: "file:orders",
+    title: "Orders workbook",
+    excerpt: "Orders evidence outside this KPI scope."
+  });
+  const unrelatedBeforeManifest = manifestFor([unrelatedCandidate, ...baseCandidates]);
+  const unrelatedBefore = runKpiSummaryV1(inputForManifest(kpiInput, manifest, unrelatedBeforeManifest));
+  assert.equal(
+    unrelatedBefore.output.fingerprint,
+    kpiResult.output.fingerprint,
+    "adding unrelated evidence before relevant evidence must not churn the fingerprint"
+  );
+  const reorderedUnrelatedManifest = manifestFor([secondUnrelatedCandidate, unrelatedCandidate, ...baseCandidates]);
+  const reversedUnrelatedManifest = manifestFor([unrelatedCandidate, ...baseCandidates, secondUnrelatedCandidate]);
+  const reorderedUnrelated = runKpiSummaryV1(inputForManifest(kpiInput, manifest, reorderedUnrelatedManifest));
+  const reversedUnrelated = runKpiSummaryV1(inputForManifest(kpiInput, manifest, reversedUnrelatedManifest));
+  assert.equal(reorderedUnrelated.output.fingerprint, kpiResult.output.fingerprint);
+  assert.equal(reversedUnrelated.output.fingerprint, kpiResult.output.fingerprint);
+  assert.equal(
+    reorderedUnrelated.output.fingerprint,
+    reversedUnrelated.output.fingerprint,
+    "unrelated source and citation ordinal renumbering must not affect the fingerprint"
+  );
+
+  const relevantContentChangedManifest = manifestFor([
+    { ...baseCandidates[0], excerpt: "Revenue was revised to 101 in June 2026." },
+    ...baseCandidates.slice(1)
+  ]);
+  const relevantContentChanged = runKpiSummaryV1(inputForManifest(kpiInput, manifest, relevantContentChangedManifest));
+  assert.notEqual(
+    relevantContentChanged.output.fingerprint,
+    kpiResult.output.fingerprint,
+    "a relevant evidence content change must invalidate the fingerprint"
+  );
+
+  const relevantLineageChangedManifest = manifestFor([
+    {
+      ...baseCandidates[0],
+      provenance: { ...baseCandidates[0].provenance, lineageVersion: "test_lineage_v2" }
+    },
+    ...baseCandidates.slice(1)
+  ]);
+  const relevantLineageChanged = runKpiSummaryV1(inputForManifest(kpiInput, manifest, relevantLineageChangedManifest));
+  assert.notEqual(
+    relevantLineageChanged.output.fingerprint,
+    kpiResult.output.fingerprint,
+    "a relevant source-lineage change must invalidate the fingerprint"
+  );
+
+  const relevantSourceInactiveManifest = manifestFor([baseCandidates[2]]);
+  const relevantSourceInactive = runKpiSummaryV1(inputForManifest(kpiInput, manifest, relevantSourceInactiveManifest));
+  assert.notEqual(
+    relevantSourceInactive.output.fingerprint,
+    kpiResult.output.fingerprint,
+    "removing an inactive relevant source from the eligible manifest must invalidate the fingerprint"
+  );
+
   const changedTarget = runKpiSummaryV1({
     ...kpiInput,
     settings: kpiInput.settings.map((setting) => setting.metricKey === "revenue" ? { ...setting, target: 130 } : setting)
@@ -473,6 +559,64 @@ function main() {
     healthResult.output,
     "driver input order must not affect deterministic output"
   );
+  const healthWithUnrelatedBefore = runBusinessHealthDriversV1(inputForManifest({
+    evidenceContext: contextFor(manifest),
+    score: 22,
+    confidenceCeiling: "High",
+    asOf: kpiInput.asOf,
+    drivers: [
+      healthDriver({ citationIds: [1, 2] }),
+      healthDriver({
+        driverId: "customer-rating",
+        name: "Customer Rating",
+        value: 4.2,
+        direction: "favorable",
+        weight: 0.6,
+        scoreContribution: 5,
+        citationIds: [3]
+      })
+    ]
+  }, manifest, unrelatedBeforeManifest));
+  assert.equal(
+    healthWithUnrelatedBefore.output.fingerprint,
+    healthResult.output.fingerprint,
+    "Business Health fingerprint must ignore unrelated earlier evidence"
+  );
+
+  const duplicateDriverInput = {
+    evidenceContext: contextFor(manifest),
+    score: 22,
+    confidenceCeiling: "High",
+    asOf: kpiInput.asOf,
+    settings: { maximumDrivers: 4 },
+    drivers: [
+      healthDriver({ driverId: "margin-primary", name: "Margin pressure", weight: 1, citationIds: [1] }),
+      healthDriver({ driverId: "margin-secondary", name: "  margin   PRESSURE  ", weight: 0.9, citationIds: [2] }),
+      healthDriver({ driverId: "margin-tertiary", name: "Margin Pressure", weight: 0.8, direction: "neutral", citationIds: [3] }),
+      healthDriver({ driverId: "margin-trend", name: "Margin pressure trend", weight: 0.7, citationIds: [1] })
+    ]
+  };
+  const duplicateDriverHealth = runBusinessHealthDriversV1(duplicateDriverInput);
+  assert.equal(duplicateDriverHealth.output.drivers.length, 4, "semantic presentation deduplication must preserve selected drivers");
+  assert.deepEqual(
+    duplicateDriverHealth.output.drivers.map((driver) => driver.driverId),
+    ["margin-primary", "margin-secondary", "margin-tertiary", "margin-trend"]
+  );
+  assert.equal(
+    (duplicateDriverHealth.output.explanation.match(/margin pressure \(/gi) || []).length,
+    1,
+    "exact, case, and whitespace label variants must render once"
+  );
+  assert.match(duplicateDriverHealth.output.explanation, /Margin pressure \(unfavorable and neutral\)/);
+  assert.match(duplicateDriverHealth.output.explanation, /Margin pressure trend \(unfavorable\)/);
+  assert.deepEqual(
+    runBusinessHealthDriversV1({
+      ...duplicateDriverInput,
+      drivers: [...duplicateDriverInput.drivers].reverse()
+    }).output,
+    duplicateDriverHealth.output,
+    "deduplicated explanation ordering must remain deterministic"
+  );
 
   const conflictingHealth = runBusinessHealthDriversV1({
     evidenceContext: contextFor(sparseManifest),
@@ -555,6 +699,36 @@ function main() {
     }).output,
     changesResult.output,
     "change input order must not affect deterministic output"
+  );
+  const changesWithUnrelatedBefore = runEvidenceChangeSummaryV1(inputForManifest({
+    evidenceContext: contextFor(manifest),
+    confidenceCeiling: "High",
+    asOf: kpiInput.asOf,
+    changes: [
+      evidenceChange({ citationIds: [1, 2] }),
+      evidenceChange({
+        changeId: "rating-change",
+        recordName: "Customer Rating",
+        previousValue: 4,
+        currentValue: 4.2,
+        direction: "increased",
+        magnitude: 0.2,
+        rank: 2,
+        citationIds: [3]
+      }),
+      evidenceChange({
+        changeId: "immaterial-change",
+        recordName: "Non-material metric",
+        material: false,
+        rank: 3,
+        citationIds: [3]
+      })
+    ]
+  }, manifest, unrelatedBeforeManifest));
+  assert.equal(
+    changesWithUnrelatedBefore.output.fingerprint,
+    changesResult.output.fingerprint,
+    "evidence-change fingerprint must ignore unrelated earlier evidence"
   );
 
   const noMaterialChanges = runEvidenceChangeSummaryV1({
