@@ -39,6 +39,12 @@ export async function runStageOneQualificationProbe({
   let contractValid = false;
   let validationReasonCode: QualificationProbeResult["validationReasonCode"] = null;
   let validationStage: QualificationProbeResult["validationStage"] = null;
+  let validationExpectedField: QualificationProbeResult["validationExpectedField"] = null;
+  let validationExpectedType: QualificationProbeResult["validationExpectedType"] = null;
+  let validationObservedType: QualificationProbeResult["validationObservedType"] = null;
+  let validationExpectedCount: QualificationProbeResult["validationExpectedCount"] = null;
+  let validationObservedCount: QualificationProbeResult["validationObservedCount"] = null;
+  let validationFieldPresent: QualificationProbeResult["validationFieldPresent"] = null;
   if (generation.truncationDetected) {
     validationReasonCode = "unexpected_truncation";
     validationStage = "canonical_schema";
@@ -53,6 +59,12 @@ export async function runStageOneQualificationProbe({
       if (!validation.ok) {
         validationReasonCode = validation.reasonCode;
         validationStage = validation.stage;
+        validationExpectedField = validation.expectedField || null;
+        validationExpectedType = validation.expectedType || null;
+        validationObservedType = validation.observedType || null;
+        validationExpectedCount = validation.expectedCount ?? null;
+        validationObservedCount = validation.observedCount ?? null;
+        validationFieldPresent = validation.fieldPresent ?? null;
       }
     }
   }
@@ -71,6 +83,12 @@ export async function runStageOneQualificationProbe({
     contractValid,
     validationReasonCode,
     validationStage,
+    validationExpectedField,
+    validationExpectedType,
+    validationObservedType,
+    validationExpectedCount,
+    validationObservedCount,
+    validationFieldPresent,
     finishReason: generation.finishReason,
     truncationDetected: generation.truncationDetected,
     reasoningContentDetected: generation.reasoningContentDetected,
