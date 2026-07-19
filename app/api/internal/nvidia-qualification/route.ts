@@ -52,57 +52,37 @@ async function requirePreviewAdmin() {
   return { user };
 }
 
-export async function GET() {
-  const authorization = await requirePreviewAdmin();
-  if (authorization.response) return authorization.response;
-  return noStore(NextResponse.json({
-    ok: true,
-    benchmarkVersion: "nvidia_capability_stage_1_v1",
-    scope: [
-      "business_health_explanation_v1",
-      "executive_brief_benchmark_v1",
-      "leadership_priorities_benchmark_v1"
-    ],
-    excluded: ["deep_strategic_analysis"],
-    profiles: getQualificationModelProfiles().map((profile) => ({
-      id: profile.id,
-      provider: profile.provider,
-      model: profile.model,
-      reasoningMode: profile.reasoningMode,
-      maxOutputTokens: profile.maxOutputTokens
-    })),
-    fixtures: getQualificationFixtureMetadata(),
-    credentials: {
-      nvidiaPresent: Boolean(process.env.NVIDIA_API_KEY?.trim()),
-      openaiPresent: Boolean(process.env.OPENAI_API_KEY?.trim())
-    }
-  }));
-}
-
-export async function POST(request: Request) {
-  const authorization = await requirePreviewAdmin();
-  if (authorization.response) return authorization.response;
-  const body = (await request.json().catch(() => null)) as {
-    profileId?: unknown;
-    contractId?: unknown;
-    runIndex?: unknown;
-  } | null;
-  const profileId = typeof body?.profileId === "string" ? body.profileId.trim() : "";
-  const contractId = typeof body?.contractId === "string" ? body.contractId.trim() : "";
-  const runIndex = typeof body?.runIndex === "number" ? body.runIndex : null;
+function validProbeRequest({
+  profileId,
+  contractId,
+  runIndex
+}: {
+  profileId: string;
+  contractId: string;
+  runIndex: number | null;
+}) {
   if (!profileId || !QUALIFICATION_CONTRACT_IDS.includes(contractId as QualificationContractId)) {
-    return noStore(NextResponse.json(
-      { ok: false, error: "A valid profile and Stage 1 contract are required." },
-      { status: 400 }
-    ));
+    return "A valid profile and Stage 1 contract are required.";
   }
   if (runIndex !== null && (!Number.isInteger(runIndex) || runIndex < 1 || runIndex > 3)) {
-    return noStore(NextResponse.json(
-      { ok: false, error: "Stage 1 runIndex must be between 1 and 3." },
-      { status: 400 }
-    ));
+    return "Stage 1 runIndex must be between 1 and 3.";
   }
+  return null;
+}
 
+async function probeResponse({
+  profileId,
+  contractId,
+  runIndex
+}: {
+  profileId: string;
+  contractId: string;
+  runIndex: number | null;
+}) {
+  const invalid = validProbeRequest({ profileId, contractId, runIndex });
+  if (invalid) {
+    return noStore(NextResponse.json({ ok: false, error: invalid }, { status: 400 }));
+  }
   try {
     const result = await runStageOneQualificationProbe({
       profileId,
@@ -138,7 +118,7 @@ export async function POST(request: Request) {
       transportFailureCode: result.transportFailureCode
     }));
     return noStore(NextResponse.json({ ok: true, runIndex, result }));
-  } catch (error) {
+  } catch {
     console.error(JSON.stringify({
       level: "error",
       component: "nvidia-capability-qualification",
@@ -153,4 +133,53 @@ export async function POST(request: Request) {
       { status: 503 }
     ));
   }
+}
+
+export async function GET(request: Request) {
+  const authorization = await requirePreviewAdmin();
+  if (authorization.response) return authorization.response;
+  const url = new URL(request.url);
+  const profileId = url.searchParams.get("profileId")?.trim() || "";
+  const contractId = url.searchParams.get("contractId")?.trim() || "";
+  const runIndexValue = url.searchParams.get("runIndex");
+  if (profileId || contractId || runIndexValue !== null) {
+    const runIndex = runIndexValue === null ? null : Number(runIndexValue);
+    return probeResponse({ profileId, contractId, runIndex });
+  }
+  return noStore(NextResponse.json({
+    ok: true,
+    benchmarkVersion: "nvidia_capability_stage_1_v1",
+    scope: [
+      "business_health_explanation_v1",
+      "executive_brief_benchmark_v1",
+      "leadership_priorities_benchmark_v1"
+    ],
+    excluded: ["deep_strategic_analysis"],
+    profiles: getQualificationModelProfiles().map((profile) => ({
+      id: profile.id,
+      provider: profile.provider,
+      model: profile.model,
+      reasoningMode: profile.reasoningMode,
+      maxOutputTokens: profile.maxOutputTokens
+    })),
+    fixtures: getQualificationFixtureMetadata(),
+    credentials: {
+      nvidiaPresent: Boolean(process.env.NVIDIA_API_KEY?.trim()),
+      openaiPresent: Boolean(process.env.OPENAI_API_KEY?.trim())
+    }
+  }));
+}
+
+export async function POST(request: Request) {
+  const authorization = await requirePreviewAdmin();
+  if (authorization.response) return authorization.response;
+  const body = (await request.json().catch(() => null)) as {
+    profileId?: unknown;
+    contractId?: unknown;
+    runIndex?: unknown;
+  } | null;
+  const profileId = typeof body?.profileId === "string" ? body.profileId.trim() : "";
+  const contractId = typeof body?.contractId === "string" ? body.contractId.trim() : "";
+  const runIndex = typeof body?.runIndex === "number" ? body.runIndex : null;
+  return probeResponse({ profileId, contractId, runIndex });
 }

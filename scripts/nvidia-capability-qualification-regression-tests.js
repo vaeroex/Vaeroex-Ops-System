@@ -53,6 +53,8 @@ assert.match(route, /process\.env\.VERCEL_ENV === "preview"/, "the live harness 
 assert.match(route, /VAEROEX_AI_SMOKE_TEST_ENABLED/, "the live harness must require the existing explicit smoke-test gate");
 assert.match(route, /isVaeroexAdminUser/, "only an authorized Vaeroex admin may invoke probes");
 assert.match(route, /runIndex < 1 \|\| runIndex > 3/, "Stage 1 must cap measured repetitions at three");
+assert.match(route, /url\.searchParams\.get\("profileId"\)/, "the signed-in Preview may run one isolated probe through direct navigation");
+assert.match(route, /return probeResponse\(\{ profileId, contractId, runIndex \}\)/, "GET and POST must share one validated probe path");
 assert.match(route, /excluded:\s*\["deep_strategic_analysis"\]/, "the route must disclose the approved exclusion");
 assert.doesNotMatch(route, /\.from\(|workspaceId|evidence excerpt|systemPrompt|userContent|content:/, "the route must not read customer data or log prompt content");
 assert.match(route, /outputCharacters/, "content-free completion metadata should be retained");
