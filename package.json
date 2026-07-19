@@ -30,6 +30,7 @@
     "test:search-ask": "node scripts/search-ask-generation-regression-tests.js",
     "test:persistent-ask": "node scripts/persistent-ask-regression-tests.js",
     "test:evidence-engine": "node scripts/evidence-engine-regression-tests.js",
+    "test:continuous-intelligence": "node scripts/continuous-intelligence-regression-tests.js",
     "benchmark:evidence-engine-reranker": "node scripts/evidence-engine-reranker-benchmark.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
