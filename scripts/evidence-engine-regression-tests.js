@@ -282,6 +282,28 @@ async function main() {
   assert.equal(requestBody.includes("workspace-a"), false);
   assert.equal(capturedRequest.init.headers.Authorization, "Bearer test-only-key");
 
+  let hostedEndpoint;
+  const hostedNvidia = new NvidiaTextReranker({
+    apiKey: "test-only-key",
+    fetchImpl: async (url) => {
+      hostedEndpoint = url;
+      return new Response(JSON.stringify({
+        rankings: [{ index: 0, logit: 1 }],
+        usage: { prompt_tokens: 12 }
+      }), { status: 200 });
+    }
+  });
+  const hostedResult = await hostedNvidia.rerank({
+    queryText: "Which metric changed?",
+    candidates: [firstCandidate],
+    mode: "shadow"
+  });
+  assert.equal(hostedResult.status, "success");
+  assert.equal(
+    hostedEndpoint,
+    "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-1b-v2/reranking"
+  );
+
   const request = buildNvidiaTextRerankRequest({ queryText: "Which metric changed?", candidates: [firstCandidate] });
   assert.deepEqual(Object.keys(request), ["model", "query", "passages", "truncate"]);
   assert.deepEqual(Object.keys(request.passages[0]), ["text"]);

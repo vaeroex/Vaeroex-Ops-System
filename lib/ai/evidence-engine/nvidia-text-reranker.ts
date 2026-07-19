@@ -10,7 +10,8 @@ import { deepFreeze } from "@/lib/ai/evidence-engine/immutability";
 
 export const NVIDIA_TEXT_RERANKER_MODEL = "nvidia/llama-nemotron-rerank-1b-v2";
 export const NVIDIA_TEXT_RERANKER_ADAPTER_VERSION = "nvidia_text_reranker_v1";
-const DEFAULT_NVIDIA_RERANK_BASE_URL = "https://integrate.api.nvidia.com/v1";
+const DEFAULT_NVIDIA_RERANK_ENDPOINT =
+  "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-1b-v2/reranking";
 const MAX_SHADOW_CANDIDATES = 48;
 const MAX_PASSAGE_CHARACTERS = 1_800;
 
@@ -23,7 +24,9 @@ type NvidiaRankingPayload = {
 
 function endpoint(baseUrl: string) {
   const normalized = baseUrl.trim().replace(/\/+$/, "");
-  return normalized.endsWith("/ranking") ? normalized : `${normalized}/ranking`;
+  return normalized.endsWith("/ranking") || normalized.endsWith("/reranking")
+    ? normalized
+    : `${normalized}/ranking`;
 }
 
 function boundedPassage(candidate: EvidenceCandidate) {
@@ -143,7 +146,7 @@ export class NvidiaTextReranker implements EvidenceReranker {
     const startedAt = Date.now();
 
     try {
-      const response = await fetchImpl(endpoint(this.options.baseUrl || process.env.NVIDIA_RERANK_BASE_URL || DEFAULT_NVIDIA_RERANK_BASE_URL), {
+      const response = await fetchImpl(endpoint(this.options.baseUrl || process.env.NVIDIA_RERANK_BASE_URL || DEFAULT_NVIDIA_RERANK_ENDPOINT), {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
