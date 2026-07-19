@@ -37,6 +37,7 @@ assert.match(fixtures, /buildSourceRegistry/);
 assert.match(fixtures, /verifyEvidenceManifestCitations/);
 assert.match(fixtures, /ordinal as a JSON number/);
 assert.match(fixtures, /tradeoff as either a JSON string or null/);
+assert.match(fixtures, /uncertainty must be a complete sentence of at least 15 characters/);
 assert.match(fixtures, /Do not omit any field/);
 assert.equal((fixtures.match(/id: "bh-/g) || []).length, 8, "Stage 2 must freeze eight Business Health states");
 assert.equal((fixtures.match(/id: "brief-/g) || []).length, 6, "Stage 2 must freeze six Executive Brief states");
