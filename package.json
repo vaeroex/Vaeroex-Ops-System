@@ -31,6 +31,7 @@
     "test:persistent-ask": "node scripts/persistent-ask-regression-tests.js",
     "test:evidence-engine": "node scripts/evidence-engine-regression-tests.js",
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js",
+    "test:nvidia-qualification": "node scripts/nvidia-capability-qualification-regression-tests.js",
     "benchmark:evidence-engine-reranker": "node scripts/evidence-engine-reranker-benchmark.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
