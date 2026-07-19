@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { ArrowRight, Database, ShieldCheck, TrendingUp } from "lucide-react";
+import { BusinessHealthAnalysisPanel } from "@/components/intelligence/BusinessHealthAnalysisPanel";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
+import type {
+  BusinessHealthAnalysisState,
+  BusinessHealthCitationView,
+  BusinessHealthExplanationFacts
+} from "@/lib/ai/business-health-explanation/contracts";
 import type { ExecutiveHomepageModel, ExecutivePriorityCard } from "@/lib/intelligence/executive-homepage";
 
 type ExecutiveHomepageProps = {
@@ -9,6 +15,12 @@ type ExecutiveHomepageProps = {
   model: ExecutiveHomepageModel;
   healthHistory: BusinessHealthTrendPoint[];
   healthHistoryError?: string | null;
+  businessHealthAnalysis: {
+    state: BusinessHealthAnalysisState;
+    requestToken: string | null;
+    facts: BusinessHealthExplanationFacts;
+    citations: readonly BusinessHealthCitationView[];
+  };
 };
 
 function priorityTone(tone: ExecutivePriorityCard["tone"]) {
@@ -60,7 +72,8 @@ export function ExecutiveHomepage({
   lastUpdatedLabel,
   model,
   healthHistory,
-  healthHistoryError
+  healthHistoryError,
+  businessHealthAnalysis
 }: ExecutiveHomepageProps) {
   const heading = firstName ? `Good morning, ${firstName}` : "Executive overview";
   const trendDelta = model.health.trendDelta;
@@ -79,7 +92,8 @@ export function ExecutiveHomepage({
         <p className="text-xs text-muted">Last updated {lastUpdatedLabel}</p>
       </header>
 
-      <section className="overflow-hidden rounded-lg bg-vaeroex-navy p-5 text-white shadow-command" aria-labelledby="business-health-heading">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]" data-executive-opening>
+        <section className="overflow-hidden rounded-lg bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2" aria-labelledby="business-health-heading">
         <div className="grid gap-5 lg:grid-cols-[minmax(220px,.62fr)_minmax(0,1.38fr)] lg:items-start">
           <div>
             <div className="flex flex-wrap items-center gap-2">
@@ -104,7 +118,13 @@ export function ExecutiveHomepage({
           </div>
 
           <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
+              {businessHealthAnalysis.state.status === "current" ? "Validated executive interpretation" : "Current assessment"}
+            </p>
             <h2 className="text-xl font-semibold leading-7 sm:text-2xl">{model.health.summary}</h2>
+            {businessHealthAnalysis.state.status === "current" && businessHealthAnalysis.state.artifact ? (
+              <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
+            ) : null}
             <dl className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
               <div>
                 <dt className="text-xs font-semibold text-cyan-200">Main driver</dt>
@@ -116,10 +136,12 @@ export function ExecutiveHomepage({
                 <dd className="mt-1 text-xs text-slate-300">{model.health.memorySignals} eligible signal{model.health.memorySignals === 1 ? "" : "s"}</dd>
               </div>
             </dl>
-            <Link href="/app/intelligence" className="mt-4 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60">
-              Review findings
-              <ArrowRight aria-hidden="true" className="h-4 w-4" />
-            </Link>
+            <BusinessHealthAnalysisPanel
+              initialState={businessHealthAnalysis.state}
+              requestToken={businessHealthAnalysis.requestToken}
+              currentFacts={businessHealthAnalysis.facts}
+              currentCitations={businessHealthAnalysis.citations}
+            />
           </div>
         </div>
 
@@ -132,7 +154,8 @@ export function ExecutiveHomepage({
             errorMessage={healthHistoryError}
           />
         ) : null}
-      </section>
+        </section>
+      </div>
 
       <section aria-label="Executive priorities" className="grid items-start gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
         <article className={`rounded-lg border p-4 shadow-panel ${priorityTone(risk.tone)}`}>
