@@ -41,8 +41,7 @@ const nullableStringField = { type: ["string", "null"] } as const;
 const ordinalArray = {
   type: "array",
   items: { type: "integer", minimum: 1 },
-  minItems: 1,
-  uniqueItems: true
+  minItems: 1
 } as const;
 
 function baseSchema(contractId: StageTwoContractId): JsonSchema {

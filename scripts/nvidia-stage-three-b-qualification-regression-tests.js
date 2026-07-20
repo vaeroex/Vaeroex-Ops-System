@@ -69,6 +69,7 @@ assert.match(types, /one_pass/);
 assert.match(types, /deterministic_assembly/);
 assert.match(runner, /deterministicAssembly/);
 assert.match(runner, /covered_signal_ordinals/);
+assert.doesNotMatch(generation, /uniqueItems/, "OpenAI strict schemas must not use the unsupported uniqueItems keyword");
 assert.match(runner, /primary_concern_ordinal/);
 assert.match(runner, /strongest_positive_signal_ordinal/);
 assert.match(runner, /verifyEvidenceManifestCitations/);
