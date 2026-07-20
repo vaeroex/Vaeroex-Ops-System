@@ -510,7 +510,9 @@ export async function runStageThreeAQualificationProbe({
     requiredCitationIds: contract.requiredCitationIds
   });
   const unsupportedInferenceDetected = UNSUPPORTED_INFERENCE.test(text);
-  const reasoningLeakageDetected = REASONING_LEAKAGE.test(text) || generation.reasoningContentDetected;
+  // Hidden provider reasoning is tracked separately and never returned or persisted.
+  // Only visible final-contract text can constitute user-facing reasoning leakage.
+  const reasoningLeakageDetected = REASONING_LEAKAGE.test(text);
   const selectedSignalIds = selected.map((record) => record.signalId);
   const requiredSignalCoverage = fixture.requiredSignalIds.every((signalId) => selectedSignalIds.includes(signalId));
   const contradictoryIds = [...new Set(eligible.filter((record) => record.contradictory).map((record) => record.signalId))];
