@@ -46,6 +46,9 @@ assert.match(runner, /verifyEvidenceManifestCitations/);
 assert.match(runner, /stage_3a_bounded_distinct_signal_planner_v1/);
 assert.match(runner, /timeoutMs: 90_000/);
 assert.match(runner, /blindQuality/);
+assert.match(runner, /const reasoningLeakageDetected = REASONING_LEAKAGE\.test\(text\)/);
+assert.doesNotMatch(runner, /REASONING_LEAKAGE\.test\(text\) \|\| generation\.reasoningContentDetected/);
+assert.match(runner, /reasoningContentDetected: generation\.reasoningContentDetected/);
 for (const metric of [
   "relevantEvidenceRecall",
   "recallAt20",
