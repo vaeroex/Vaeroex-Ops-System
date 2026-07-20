@@ -40,8 +40,8 @@ assert.match(fixtures, /tradeoff as either a JSON string or null/);
 assert.match(fixtures, /uncertainty must be a complete sentence of at least 15 characters/);
 assert.match(fixtures, /Do not omit any field/);
 assert.equal((fixtures.match(/id: "bh-/g) || []).length, 8, "Stage 2 must freeze eight Business Health states");
-assert.equal((fixtures.match(/id: "brief-/g) || []).length, 6, "Stage 2 must freeze six Executive Brief states");
-assert.equal((fixtures.match(/id: "priorities-/g) || []).length, 6, "Stage 2 must freeze six Leadership Priorities states");
+assert.equal((fixtures.match(/id: "brief-/g) || []).length, 11, "Stage 3B must retain eleven Executive Brief states");
+assert.equal((fixtures.match(/id: "priorities-/g) || []).length, 9, "Stage 3B must retain nine Leadership Priorities states");
 
 assert.match(runner, /timeoutMs: fixture\.timeoutMs/);
 assert.match(runner, /blindQualityScore/);

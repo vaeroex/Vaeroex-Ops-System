@@ -34,6 +34,7 @@
     "test:nvidia-qualification": "node scripts/nvidia-capability-qualification-regression-tests.js",
     "test:nvidia-qualification-stage-two": "node scripts/nvidia-stage-two-qualification-regression-tests.js",
     "test:nvidia-qualification-stage-three-a": "node scripts/nvidia-stage-three-a-qualification-regression-tests.js",
+    "test:nvidia-qualification-stage-three-b": "node scripts/nvidia-stage-three-b-qualification-regression-tests.js",
     "benchmark:evidence-engine-reranker": "node scripts/evidence-engine-reranker-benchmark.js",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },

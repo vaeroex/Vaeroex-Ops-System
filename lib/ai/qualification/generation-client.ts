@@ -7,8 +7,9 @@ import { estimateTokenCount } from "@/lib/ai/usage";
 
 const NVIDIA_CHAT_COMPLETIONS_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
 
-type GenerationTransportResult = Readonly<{
+export type GenerationTransportResult = Readonly<{
   content: string;
+  runtimeModel?: string | null;
   endpointHealthy: boolean;
   httpStatus: number | null;
   completed: boolean;
@@ -19,6 +20,7 @@ type GenerationTransportResult = Readonly<{
   firstByteMs: number | null;
   firstTokenMs: number | null;
   inputTokens: number | null;
+  cachedInputTokens?: number | null;
   outputTokens: number | null;
   reasoningTokens: number | null;
   tokenCountsEstimated: boolean;
@@ -33,6 +35,7 @@ type GenerationTransportResult = Readonly<{
 }>;
 
 type NvidiaStreamPayload = {
+  model?: string;
   choices?: Array<{
     delta?: {
       content?: string | null;
@@ -51,6 +54,7 @@ type NvidiaStreamPayload = {
     completion_tokens?: number;
     total_tokens?: number;
     completion_tokens_details?: { reasoning_tokens?: number };
+    prompt_tokens_details?: { cached_tokens?: number };
   };
 };
 
@@ -176,6 +180,8 @@ async function runNvidiaGeneration({
     let inputTokens: number | null = null;
     let outputTokens: number | null = null;
     let reasoningTokens: number | null = null;
+    let cachedInputTokens: number | null = null;
+    let runtimeModel: string | null = null;
 
     if (contentType.includes("text/event-stream")) {
       const reader = response.body.getReader();
@@ -198,6 +204,7 @@ async function runNvidiaGeneration({
             continue;
           }
           const choice = payload.choices?.[0];
+          runtimeModel = payload.model || runtimeModel;
           const delta = choice?.delta;
           const visible = delta?.content || "";
           const reasoning = delta?.reasoning_content || delta?.reasoning || "";
@@ -209,6 +216,7 @@ async function runNvidiaGeneration({
             inputTokens = payload.usage.prompt_tokens ?? inputTokens;
             outputTokens = payload.usage.completion_tokens ?? outputTokens;
             reasoningTokens = payload.usage.completion_tokens_details?.reasoning_tokens ?? reasoningTokens;
+            cachedInputTokens = payload.usage.prompt_tokens_details?.cached_tokens ?? cachedInputTokens;
           }
         }
       }
@@ -220,6 +228,7 @@ async function runNvidiaGeneration({
         payload = {};
       }
       const choice = payload.choices?.[0];
+      runtimeModel = payload.model || null;
       output = choice?.message?.content || "";
       reasoningContentDetected = Boolean(choice?.message?.reasoning_content || choice?.message?.reasoning);
       firstTokenMs = output || reasoningContentDetected ? firstByteMs : null;
@@ -227,11 +236,13 @@ async function runNvidiaGeneration({
       inputTokens = payload.usage?.prompt_tokens ?? null;
       outputTokens = payload.usage?.completion_tokens ?? null;
       reasoningTokens = payload.usage?.completion_tokens_details?.reasoning_tokens ?? null;
+      cachedInputTokens = payload.usage?.prompt_tokens_details?.cached_tokens ?? null;
     }
 
     const estimates = estimatedTokenCounts(systemPrompt(profile, prompt), content, output);
     return {
       content: output,
+      runtimeModel,
       endpointHealthy: true,
       httpStatus: response.status,
       completed: Boolean(output),
@@ -242,6 +253,7 @@ async function runNvidiaGeneration({
       firstByteMs,
       firstTokenMs,
       inputTokens: inputTokens ?? estimates.input,
+      cachedInputTokens,
       outputTokens: outputTokens ?? estimates.output,
       reasoningTokens,
       tokenCountsEstimated: inputTokens === null || outputTokens === null,
@@ -317,6 +329,7 @@ async function runOpenAIGeneration({
     });
     return {
       content: result.content,
+      runtimeModel: profile.model,
       endpointHealthy: true,
       httpStatus: 200,
       completed: Boolean(result.content),
@@ -327,6 +340,7 @@ async function runOpenAIGeneration({
       firstByteMs: null,
       firstTokenMs: null,
       inputTokens: result.usage.inputTokens,
+      cachedInputTokens: null,
       outputTokens: result.usage.outputTokens,
       reasoningTokens: null,
       tokenCountsEstimated: false,
