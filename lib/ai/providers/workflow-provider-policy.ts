@@ -14,6 +14,7 @@ export const BUSINESS_HEALTH_GPT56_POLICY_ID = "business_health_preview_gpt56_so
 export const BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5.6-sol" as const;
 export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
 export const EXECUTIVE_BRIEF_GPT56_POLICY_ID = "executive_brief_preview_gpt56_sol_terra_v1" as const;
+export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
 
 const BUSINESS_HEALTH_LEGACY_DEADLINE_MS = 26_000;
@@ -68,9 +69,8 @@ export function isExecutiveBriefPreviewEnabled() {
     && process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
 }
 
-export function isFindingExplanationPreviewEnabled() {
-  return process.env.VERCEL_ENV === "preview"
-    && process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
+export function isFindingExplanationEnabled() {
+  return process.env.VAEROEX_FINDING_EXPLANATION_POLICY === FINDING_EXPLANATION_POLICY_SELECTOR;
 }
 
 export function buildSynchronousExecutiveProviderPolicy({
@@ -254,7 +254,7 @@ export function resolveFindingExplanationGenerationPolicy({
   startedAtMs: number;
   structuredOutput: AIProviderStructuredOutput;
 }): FindingExplanationGenerationPolicy {
-  if (!isFindingExplanationPreviewEnabled()) {
+  if (!isFindingExplanationEnabled()) {
     throw new Error("Finding explanation generation is not enabled for this environment.");
   }
 

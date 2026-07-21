@@ -4,7 +4,7 @@ import { SecurityResponseNotice } from "@/components/security/SecurityResponseNo
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
-import { isFindingExplanationPreviewEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
@@ -119,7 +119,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     operationalInsights
   });
   const userId = context.membership?.user_id;
-  const explanationTokens = isFindingExplanationPreviewEnabled() && userId
+  const explanationTokens = isFindingExplanationEnabled() && userId
     ? Object.fromEntries(intelligence.insights.flatMap((insight) => {
         if (!["Risk", "Anomaly", "Bottleneck"].includes(insight.type)) return [];
         try {

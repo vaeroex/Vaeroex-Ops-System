@@ -16,7 +16,7 @@ import {
 import { openFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
-import { isFindingExplanationPreviewEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
@@ -57,7 +57,7 @@ function failedUsage(error: unknown, latencyMs: number) {
 }
 export async function explainFindingAction(requestToken: string): Promise<FindingExplanationState> {
   const startedAt = Date.now();
-  if (!isFindingExplanationPreviewEnabled()) {
+  if (!isFindingExplanationEnabled()) {
     return { status: "unavailable", artifact: null, message: "Finding explanations are not enabled in this environment." };
   }
   const supabase = await createSupabaseServerClient();

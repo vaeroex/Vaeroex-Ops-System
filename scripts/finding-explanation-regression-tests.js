@@ -40,8 +40,11 @@ const { openFindingExplanationPackage, sealFindingExplanationPackage } = require
 const { verifyEvidenceManifestCitations } = require("../lib/ai/evidence-engine/citation-verification.ts");
 const {
   BUSINESS_HEALTH_GPT56_POLICY_SELECTOR,
+  FINDING_EXPLANATION_POLICY_SELECTOR,
   FINDING_EXPLANATION_GPT56_POLICY_ID,
-  isFindingExplanationPreviewEnabled,
+  isExecutiveBriefPreviewEnabled,
+  isFindingExplanationEnabled,
+  resolveBusinessHealthGenerationPolicy,
   resolveFindingExplanationGenerationPolicy
 } = require("../lib/ai/providers/workflow-provider-policy.ts");
 
@@ -136,10 +139,17 @@ assert.equal(openFindingExplanationPackage(token, { workspaceId, userId: "differ
 
 const originalVercelEnv = process.env.VERCEL_ENV;
 const originalSelector = process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
+const originalFindingSelector = process.env.VAEROEX_FINDING_EXPLANATION_POLICY;
 try {
-  process.env.VERCEL_ENV = "preview";
-  process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
-  assert.equal(isFindingExplanationPreviewEnabled(), true);
+  process.env.VERCEL_ENV = "production";
+  delete process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
+  process.env.VAEROEX_FINDING_EXPLANATION_POLICY = FINDING_EXPLANATION_POLICY_SELECTOR;
+  assert.equal(isFindingExplanationEnabled(), true, "the dedicated finding policy must activate independently in Production");
+  assert.equal(isExecutiveBriefPreviewEnabled(), false, "the finding policy must not activate Executive Brief");
+  assert.equal(resolveBusinessHealthGenerationPolicy({
+    startedAtMs: Date.now(),
+    structuredOutput: { name: "business_health_explanation_v1", strict: true, schema: { type: "object" } }
+  }).providerPolicy.id, "business_health_openai_primary_v1", "the finding policy must not alter Business Health routing");
   const policy = resolveFindingExplanationGenerationPolicy({
     startedAtMs: Date.now(),
     structuredOutput: { name: "finding_explanation_v1", strict: true, schema: { type: "object" } }
@@ -147,24 +157,34 @@ try {
   assert.equal(policy.providerPolicy.id, FINDING_EXPLANATION_GPT56_POLICY_ID);
   assert.deepEqual(policy.providerPolicy.steps.map((step) => step.model), ["gpt-5.6-sol", "gpt-5.6-terra"]);
   assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.maxAttempts === 1), "Sol and Terra receive one attempt each");
-  process.env.VERCEL_ENV = "production";
-  assert.equal(isFindingExplanationPreviewEnabled(), false, "the new synthesis path must not activate in Production");
+  process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
+  delete process.env.VAEROEX_FINDING_EXPLANATION_POLICY;
+  assert.equal(isFindingExplanationEnabled(), false, "the shared executive policy must not activate Explain Finding");
+  process.env.VERCEL_ENV = "preview";
+  assert.equal(isExecutiveBriefPreviewEnabled(), true, "Executive Brief must retain its existing independent Preview gate");
 } finally {
   if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = originalVercelEnv;
   if (originalSelector === undefined) delete process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
   else process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = originalSelector;
+  if (originalFindingSelector === undefined) delete process.env.VAEROEX_FINDING_EXPLANATION_POLICY;
+  else process.env.VAEROEX_FINDING_EXPLANATION_POLICY = originalFindingSelector;
 }
 
 const actionSource = read("app/app/finding-explanation/actions.ts");
 const serviceSource = read("lib/ai/finding-explanation/service.ts");
 const pageSource = read("app/app/intelligence/page.tsx");
+const inboxSource = read("components/intelligence/IntelligenceSignalInbox.tsx");
 assert.match(actionSource, /getWorkspaceContext/);
 assert.match(actionSource, /verifyEvidenceManifestCitations/);
 assert.match(actionSource, /original_evidence_eligible: false/, "derived explanations must not become original evidence");
 assert.match(serviceSource, /Do not summarize or restate them/);
 assert.match(serviceSource, /BUSINESS_HEALTH_GPT56_TERRA_MODEL/);
 assert.match(pageSource, /filterEligibleMemoryRowsByLifecycle[\s\S]+buildFindingExplanationPackage/, "finding packages must be built only after existing lifecycle filtering");
+assert.match(pageSource, /isFindingExplanationEnabled\(\)/, "the Intelligence UI must use the dedicated finding policy");
+assert.doesNotMatch(pageSource, /isFindingExplanationPreviewEnabled/, "the retired Preview-only finding gate must not remain");
+assert.match(inboxSource, /Explain Finding/, "the approved finding action must remain visible when authorized");
+assert.doesNotMatch(inboxSource, /Create Investigation Summary/, "the legacy finding action must not reappear");
 assert.doesNotMatch(`${actionSource}\n${serviceSource}`, /console\.(?:log|error)\([^)]*(?:approvedDevelopment|excerpt|requestToken)/, "telemetry must not log evidence or encrypted request tokens");
 
 process.stdout.write("Finding explanation regressions passed.\n");
