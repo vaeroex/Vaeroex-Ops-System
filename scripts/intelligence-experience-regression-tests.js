@@ -276,10 +276,12 @@ const saveActionSource = fs.readFileSync(path.join(root, "app/app/generated/acti
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const appNavigationSource = fs.readFileSync(path.join(root, "components/app/AppNavigation.tsx"), "utf8");
 const businessSignalsSource = fs.readFileSync(path.join(root, "app/app/tasks/page.tsx"), "utf8");
-assert.match(inboxSource, /label: "Summary".*label: "Evidence"/s, "selected finding must expose Summary and Evidence only");
+assert.match(inboxSource, /label: "Summary".*label: "Evidence".*label: "Analysis"/s, "selected findings may expose one bounded analysis view when authorized");
 assert.doesNotMatch(inboxSource, /label: "Understand"|label: "Executive Brief"/, "overlapping finding tabs must be removed");
-assert.match(inboxSource, /Create Investigation Summary/, "risk findings expose one normalized report action");
+assert.match(inboxSource, /Explain Finding/, "risk findings expose one bounded investigation action");
+assert.doesNotMatch(inboxSource, /Create Investigation Summary/, "the retired summary label must not remain in the Intelligence experience");
 assert.doesNotMatch(inboxSource, /Generate Executive Briefing|Generate Improvement Plan|Explain This/, "normal finding review must not show competing generator actions");
+assert.match(inboxSource, /explainFindingAction\(requestToken\)/, "Explain Finding must use the fixed server-side generation action");
 assert.match(inboxSource, /buildEvidenceGroups\(insight\.supportingRecords\)/, "evidence view must group supporting records deterministically");
 assert.match(inboxSource, /signalTypes\.filter\(\(type\) => counts\[type\] > 0\)/, "zero-count finding categories must be hidden");
 assert.match(inboxSource, /useState<SignalView>\("All"\)/, "All findings is the default executive view");

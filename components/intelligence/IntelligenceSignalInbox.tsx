@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import type { Route } from "next";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { explainFindingAction } from "@/app/app/finding-explanation/actions";
+import type { FindingExplanationState } from "@/lib/ai/finding-explanation/contracts";
 import {
   buildEvidenceActivity,
   buildEvidenceGroups,
@@ -19,7 +21,7 @@ const confidenceOptions: Array<"All" | IntelligenceConfidence> = ["All", "High",
 const pageSize = 10;
 
 type SortMode = "Priority" | "Newest" | "Confidence";
-type PanelMode = "summary" | "evidence";
+type PanelMode = "summary" | "evidence" | "analysis";
 
 function confidenceClass(confidence: IntelligenceConfidence) {
   if (confidence === "High") return "border-cyan-300/40 bg-cyan-400/15 text-cyan-100";
@@ -93,14 +95,15 @@ function evidenceDateRange(firstObserved: string, lastObserved: string) {
   return `${formatSignalDate(firstObserved)} - ${formatSignalDate(lastObserved)}`;
 }
 
-function PanelTabs({ mode, onChange }: { mode: PanelMode; onChange: (mode: PanelMode) => void }) {
+function PanelTabs({ mode, onChange, analysisAvailable }: { mode: PanelMode; onChange: (mode: PanelMode) => void; analysisAvailable: boolean }) {
   const tabs: Array<{ id: PanelMode; label: string }> = [
     { id: "summary", label: "Summary" },
-    { id: "evidence", label: "Evidence" }
+    { id: "evidence", label: "Evidence" },
+    ...(analysisAvailable ? [{ id: "analysis" as const, label: "Analysis" }] : [])
   ];
 
   return (
-    <div className="grid grid-cols-2 rounded-lg border border-white/10 bg-slate-950/50 p-1" role="tablist" aria-label="Selected finding view">
+    <div className={`grid ${analysisAvailable ? "grid-cols-3" : "grid-cols-2"} rounded-lg border border-white/10 bg-slate-950/50 p-1`} role="tablist" aria-label="Selected finding view">
       {tabs.map((tab) => (
         <button
           key={tab.id}
@@ -119,7 +122,15 @@ function PanelTabs({ mode, onChange }: { mode: PanelMode; onChange: (mode: Panel
   );
 }
 
-function SummaryPanel({ insight }: { insight: IntelligenceInsight }) {
+function SummaryPanel({
+  insight,
+  canExplain,
+  onExplain
+}: {
+  insight: IntelligenceInsight;
+  canExplain: boolean;
+  onExplain: () => void;
+}) {
   if (lacksFindingSpecificity(insight)) {
     return (
       <div className="space-y-3 text-sm leading-6">
@@ -147,12 +158,85 @@ function SummaryPanel({ insight }: { insight: IntelligenceInsight }) {
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Limitation</p>
         <p className="mt-2 text-slate-300">{compactText(limitationFor(insight), 280)}</p>
       </section>
-      <Link
-        href={generatedOutputHref({ type: outputTypeForInsight(insight), source: insight.id })}
-        className="inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
-      >
-        {insight.type === "Risk" || insight.type === "Anomaly" || insight.type === "Bottleneck" ? "Create Investigation Summary" : "Create report"}
-      </Link>
+      {insight.type === "Risk" || insight.type === "Anomaly" || insight.type === "Bottleneck" ? (
+        canExplain ? (
+          <button
+            type="button"
+            onClick={onExplain}
+            className="inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+          >
+            Explain Finding
+          </button>
+        ) : null
+      ) : (
+        <Link
+          href={generatedOutputHref({ type: outputTypeForInsight(insight), source: insight.id })}
+          className="inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+        >
+          Create report
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function FindingExplanationPanel({
+  state,
+  onRetry,
+  pending
+}: {
+  state: FindingExplanationState;
+  onRetry: () => void;
+  pending: boolean;
+}) {
+  if (state.status === "available" || state.status === "loading") {
+    return (
+      <div className="rounded-lg border border-white/10 bg-white/[0.025] p-4" role="status">
+        <p className="text-sm font-semibold text-white">Investigating this finding</p>
+        <p className="mt-2 text-sm leading-6 text-slate-300">Vaeroex is preparing a bounded explanation from the validated finding and its eligible evidence.</p>
+      </div>
+    );
+  }
+  if (!state.artifact) {
+    return (
+      <div className="space-y-3 rounded-lg border border-amber-300/20 bg-amber-950/10 p-4">
+        <p className="text-sm font-semibold text-amber-100">Explanation unavailable</p>
+        <p className="text-sm leading-6 text-slate-300">{state.message || "This finding could not be explained right now."}</p>
+        <button type="button" onClick={onRetry} disabled={pending} className="min-h-10 rounded-lg border border-white/15 px-3 py-2 text-sm font-semibold text-white hover:bg-white/[0.06] disabled:opacity-60">
+          Try again
+        </button>
+      </div>
+    );
+  }
+
+  const { analysis, citations } = state.artifact;
+  const sections = [
+    ["What happened", analysis.what_happened],
+    ["Why the evidence suggests it", analysis.why_evidence_suggests],
+    ["Why leadership should care", analysis.why_leadership_should_care],
+    ["What to investigate next", analysis.investigate_next],
+    ["What the evidence does not prove", analysis.what_evidence_does_not_prove]
+  ] as const;
+  return (
+    <div className="space-y-4 text-sm leading-6">
+      {sections.map(([label, value]) => (
+        <section key={label}>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
+          <p className="mt-2 text-slate-100">{value}</p>
+        </section>
+      ))}
+      <details className="border-t border-white/10 pt-3">
+        <summary className="min-h-10 cursor-pointer text-xs font-semibold text-cyan-200">Supporting evidence ({citations.length})</summary>
+        <ol className="mt-2 divide-y divide-white/10">
+          {citations.map((citation) => (
+            <li key={citation.citationId} className="py-3">
+              <p className="text-xs font-semibold text-white">[{citation.citationId}] {citation.title}</p>
+              <p className="mt-1 text-[11px] text-slate-500">{citation.sourceLabel} · {citation.sourceType}</p>
+              <p className="mt-1 text-xs leading-5 text-slate-300">{compactText(citation.excerpt, 220)}</p>
+            </li>
+          ))}
+        </ol>
+      </details>
     </div>
   );
 }
@@ -296,7 +380,15 @@ function EvidencePanel({ insight }: { insight: IntelligenceInsight }) {
   );
 }
 
-export function IntelligenceSignalInbox({ insights, initialFindingId }: { insights: IntelligenceInsight[]; initialFindingId?: string }) {
+export function IntelligenceSignalInbox({
+  insights,
+  initialFindingId,
+  explanationTokens = {}
+}: {
+  insights: IntelligenceInsight[];
+  initialFindingId?: string;
+  explanationTokens?: Readonly<Record<string, string>>;
+}) {
   const requestedFinding = initialFindingId ? insights.find((insight) => insight.id === initialFindingId) : null;
   const [activeType, setActiveType] = useState<SignalView>("All");
   const [selectedId, setSelectedId] = useState<string>(requestedFinding?.id || insights[0]?.id || "");
@@ -305,6 +397,9 @@ export function IntelligenceSignalInbox({ insights, initialFindingId }: { insigh
   const [hideLowConfidence, setHideLowConfidence] = useState(false);
   const [visibleCount, setVisibleCount] = useState(pageSize);
   const [panelMode, setPanelMode] = useState<PanelMode>("summary");
+  const [explanationStates, setExplanationStates] = useState<Record<string, FindingExplanationState>>({});
+  const [isExplanationPending, startExplanationTransition] = useTransition();
+  const explanationInFlight = useRef<Set<string>>(new Set());
 
   const counts = useMemo(
     () => signalTypes.reduce<Record<SignalView, number>>((acc, type) => ({ ...acc, [type]: insights.filter((insight) => insight.type === type).length }), { All: insights.length } as Record<SignalView, number>),
@@ -329,6 +424,39 @@ export function IntelligenceSignalInbox({ insights, initialFindingId }: { insigh
   function selectInsight(id: string) {
     setSelectedId(id);
     setPanelMode("summary");
+  }
+
+  function requestExplanation(insightId: string) {
+    const requestToken = explanationTokens[insightId];
+    if (!requestToken || explanationInFlight.current.has(insightId)) return;
+    setPanelMode("analysis");
+    explanationInFlight.current.add(insightId);
+    setExplanationStates((current) => ({
+      ...current,
+      [insightId]: { status: "loading", artifact: current[insightId]?.artifact || null, message: null }
+    }));
+    startExplanationTransition(async () => {
+      try {
+        const nextState = await explainFindingAction(requestToken);
+        setExplanationStates((current) => ({ ...current, [insightId]: nextState }));
+      } catch {
+        setExplanationStates((current) => ({
+          ...current,
+          [insightId]: {
+            status: "failed",
+            artifact: current[insightId]?.artifact || null,
+            message: "This finding could not be explained right now. The finding and evidence remain available."
+          }
+        }));
+      } finally {
+        explanationInFlight.current.delete(insightId);
+      }
+    });
+  }
+
+  function changePanelMode(mode: PanelMode) {
+    setPanelMode(mode);
+    if (mode === "analysis" && selectedInsight && !explanationStates[selectedInsight.id]) requestExplanation(selectedInsight.id);
   }
 
   return (
@@ -391,9 +519,22 @@ export function IntelligenceSignalInbox({ insights, initialFindingId }: { insigh
                 </div>
                 <button type="button" onClick={() => setSelectedId("")} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">Back to list</button>
               </div>
-              <PanelTabs mode={panelMode} onChange={setPanelMode} />
-              {panelMode === "summary" ? <SummaryPanel insight={selectedInsight} /> : null}
+              <PanelTabs mode={panelMode} onChange={changePanelMode} analysisAvailable={Boolean(explanationTokens[selectedInsight.id])} />
+              {panelMode === "summary" ? (
+                <SummaryPanel
+                  insight={selectedInsight}
+                  canExplain={Boolean(explanationTokens[selectedInsight.id])}
+                  onExplain={() => requestExplanation(selectedInsight.id)}
+                />
+              ) : null}
               {panelMode === "evidence" ? <EvidencePanel insight={selectedInsight} /> : null}
+              {panelMode === "analysis" ? (
+                <FindingExplanationPanel
+                  state={explanationStates[selectedInsight.id] || { status: "available", artifact: null, message: null }}
+                  onRetry={() => requestExplanation(selectedInsight.id)}
+                  pending={isExplanationPending}
+                />
+              ) : null}
             </div>
           ) : <div className="py-8 text-sm leading-6 text-slate-300">Select a finding to review its summary and supporting evidence.</div>}
         </aside>

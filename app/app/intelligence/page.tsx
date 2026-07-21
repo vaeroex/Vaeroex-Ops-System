@@ -2,6 +2,9 @@ import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceS
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
+import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/context";
+import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
+import { isFindingExplanationPreviewEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
@@ -115,10 +118,24 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     recommendationOutcomes: outcomesResult.data || [],
     operationalInsights
   });
+  const userId = context.membership?.user_id;
+  const explanationTokens = isFindingExplanationPreviewEnabled() && userId
+    ? Object.fromEntries(intelligence.insights.flatMap((insight) => {
+        if (!["Risk", "Anomaly", "Bottleneck"].includes(insight.type)) return [];
+        try {
+          const analysisPackage = buildFindingExplanationPackage({ workspaceId, insight });
+          if (!analysisPackage.requiredCitationIds.length) return [];
+          const token = trySealFindingExplanationPackage({ analysisPackage, workspaceId, userId });
+          return token ? [[insight.id, token]] : [];
+        } catch {
+          return [];
+        }
+      }))
+    : {};
   return (
     <div className="space-y-4">
       <ErrorNotice message={displayErrors[0]?.message || null} />
-      <IntelligenceSignalInbox insights={intelligence.insights} initialFindingId={params?.finding} />
+      <IntelligenceSignalInbox insights={intelligence.insights} initialFindingId={params?.finding} explanationTokens={explanationTokens} />
     </div>
   );
 }
