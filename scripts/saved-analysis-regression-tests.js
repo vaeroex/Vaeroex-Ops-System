@@ -74,12 +74,32 @@ assert.match(list, /deleteSavedAnalysesAction\(ids\)/);
 assert.doesNotMatch(reportsPage, /legacy[\s\S]{0,900}type="checkbox"/i, "legacy reports must not enter saved-analysis selection");
 
 assert.match(actions, /new Set\(ids\)/);
-assert.match(actions, /\.eq\("workspace_id", workspaceId\)[\s\S]+\.in\("id", uniqueIds\)[\s\S]+\.is\("deleted_at", null\)/);
-assert.match(actions, /valid\.length !== uniqueIds\.length/);
 assert.match(actions, /Nothing was deleted/);
 assert.match(actions, /toolName: "bulk_manage_records"/);
-assert.equal((actions.match(/\.update\(\{ deleted_at:/g) || []).length, 1, "bulk deletion must use one server-side update");
+assert.match(actions, /rpc\([\s\S]*"soft_delete_saved_analyses"/);
+assert.doesNotMatch(actions, /\.from\("reports"\)[\s\S]{0,180}\.update\(\{ deleted_at:/, "saved-analysis deletion must not use a non-transactional application update");
+assert.ok(actions.indexOf('toolName: "bulk_manage_records"') < actions.indexOf('"soft_delete_saved_analyses"'), "the Tool Execution Gateway must run before the transactional deletion function");
 assert.doesNotMatch(actions, /from\("ai_agent_runs"\)[\s\S]{0,240}\.update\(|from\("kpis"\)[\s\S]{0,240}\.delete\(/, "deletion must not mutate source artifacts or evidence");
+
+assert.match(migration, /create or replace function public\.soft_delete_saved_analyses/);
+assert.match(migration, /security invoker/);
+assert.match(migration, /public\.can_manage_workspace\(p_workspace_id\)/);
+assert.match(migration, /report\.workspace_id = p_workspace_id/);
+assert.match(migration, /report\.archived_at is null/);
+assert.match(migration, /report\.deleted_at is null/);
+assert.match(migration, /jsonb_typeof\(report\.source_data_json\) = 'object'/);
+assert.match(migration, /source_data_json ->> 'record_kind' = 'saved_analysis'/);
+assert.match(migration, /source_data_json ->> 'envelope_version' = '1'/);
+assert.match(migration, /source_data_json ->> 'analysis_type' in/);
+assert.match(migration, /nullif\(report\.source_data_json ->> 'saved_analysis_key', ''\) is not null/);
+assert.match(migration, /source_data_json ->> 'workspace_id' = p_workspace_id::text/);
+assert.match(migration, /source_data_json ->> 'release_channel' = p_release_channel/);
+assert.match(migration, /order by report\.id[\s\S]+for update/);
+assert.match(migration, /cardinality\(locked_ids\) <> cardinality\(p_report_ids\)[\s\S]+raise exception/);
+assert.match(migration, /get diagnostics deleted_count = row_count/);
+assert.match(migration, /deleted_count <> cardinality\(p_report_ids\)[\s\S]+raise exception/);
+assert.match(migration, /revoke all on function public\.soft_delete_saved_analyses\([\s\S]+from public, anon/);
+assert.match(migration, /grant execute on function public\.soft_delete_saved_analyses\([\s\S]+to authenticated/);
 
 assert.match(reportsNew, /permanentRedirect\("\/app\/reports"\)/);
 assert.match(generatedNew, /permanentRedirect\("\/app\/reports"\)/);
