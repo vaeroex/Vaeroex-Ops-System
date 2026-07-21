@@ -219,6 +219,10 @@ assert.match(homepageSource, /lg:grid-cols-\[1fr_1fr_\.78fr\]/, "executive focus
 assert.match(homepageSource, /Needs Attention/, "risk and leadership decision must be consolidated into one focus card");
 assert.match(homepageSource, /Positive Signal/, "the positive signal must remain distinct");
 assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
+assert.match(homepageSource, /Validated executive interpretation/, "the Version 1 homepage must label the visible validated interpretation correctly");
+assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the Version 1 Business Health snapshot must retain its score and interpretation columns");
+assert.match(homepageSource, /sm:text-right/, "the Version 1 snapshot must keep confidence aligned opposite the main driver");
+assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Version 1 homepage must keep Business Health as the cohesive opening snapshot");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
 assert.match(homepageSource, /trendDelta !== null && healthHistory\.length >= 2/, "the trend chart must require valid historical depth");
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
