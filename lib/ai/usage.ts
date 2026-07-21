@@ -90,9 +90,23 @@ function providerAttempts(metadata: Json | undefined) {
   return attempts.flatMap((attempt) => {
     if (!attempt || Array.isArray(attempt) || typeof attempt !== "object") return [];
     const value = attempt as Record<string, Json | undefined>;
-    const model = typeof value.model === "string" ? value.model : "";
-    const inputTokens = typeof value.inputTokens === "number" ? value.inputTokens : 0;
-    const outputTokens = typeof value.outputTokens === "number" ? value.outputTokens : 0;
+    const model = typeof value.runtime_model === "string"
+      ? value.runtime_model
+      : typeof value.model === "string"
+        ? value.model
+        : typeof value.requested_model === "string"
+          ? value.requested_model
+          : "";
+    const inputTokens = typeof value.input_tokens === "number"
+      ? value.input_tokens
+      : typeof value.inputTokens === "number"
+        ? value.inputTokens
+        : 0;
+    const outputTokens = typeof value.output_tokens === "number"
+      ? value.output_tokens
+      : typeof value.outputTokens === "number"
+        ? value.outputTokens
+        : 0;
     return model ? [{ model, inputTokens, outputTokens }] : [];
   });
 }

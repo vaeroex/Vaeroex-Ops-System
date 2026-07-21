@@ -232,7 +232,9 @@ const validOutput = {
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(validOutput, analysisPackage).ok, true, "grounded fixed-contract wording must validate");
-assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue is 42 points and Customer Retention remains visible." }, analysisPackage).ok, false, "invented numbers must be rejected");
+const numericFailure = validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue is 42 points and Customer Retention remains visible." }, analysisPackage);
+assert.equal(numericFailure.ok, false, "invented numbers must be rejected");
+assert.equal(numericFailure.diagnostic.reasonCode, "numeric_integrity_failed", "numeric failures must remain distinguishable for the bounded fallback allowlist");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, provisional_hypothesis: "Revenue was caused by customer behavior." }, analysisPackage).ok, false, "unauthorized hypotheses must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue was caused by weak execution while Customer Retention remains visible." }, analysisPackage).ok, false, "unsupported causation must be rejected");
 assert.equal(validateBusinessHealthExplanationOutput({
@@ -252,6 +254,7 @@ assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }
 const pageSource = read("app/app/page.tsx");
 const actionSource = read("app/app/business-health-analysis/actions.ts");
 const serviceSource = read("lib/ai/business-health-explanation/service.ts");
+const workflowPolicySource = read("lib/ai/providers/workflow-provider-policy.ts");
 const panelSource = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 assert.match(pageSource, /buildBusinessHealthExplanationPackage/, "Overview must build the deterministic package during server rendering");
 assert.doesNotMatch(pageSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
@@ -259,10 +262,14 @@ assert.match(actionSource, /getWorkspaceContext/, "the generation action must re
 assert.match(actionSource, /verifyEvidenceManifestCitations/, "the action must reverify centralized citations before generation");
 assert.match(actionSource, /evidence_classification:\s*"derived_analysis"/, "saved analysis must remain derived and ineligible as original evidence");
 assert.match(actionSource, /\.eq\("workspace_id", workspaceId\)/, "run mutations must remain explicitly workspace scoped");
-assert.match(serviceSource, /process\.env\.VERCEL_ENV === "preview"/, "NVIDIA-primary routing must remain Preview-specific");
-assert.match(serviceSource, /business_health_preview_nvidia_primary_v1/, "the fixed workflow must use an explicit Preview provider policy");
-assert.match(serviceSource, /business_health_openai_primary_v1/, "non-Preview routing must remain explicit and isolated");
+assert.match(workflowPolicySource, /process\.env\.VERCEL_ENV === "preview"/, "workflow-specific experimental routing must remain Preview-specific");
+assert.match(workflowPolicySource, /VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR/, "the GPT-5.6 experiment must require its exact Preview selector");
+assert.match(workflowPolicySource, /business_health_preview_nvidia_primary_v1/, "selector absence must preserve the existing Preview provider policy");
+assert.match(workflowPolicySource, /business_health_openai_primary_v1/, "non-Preview routing must remain explicit and isolated");
+assert.match(workflowPolicySource, /gpt-5\.6-sol[\s\S]*gpt-5\.6-terra/, "the Preview experiment must use code-owned Sol then Terra model IDs");
 assert.match(serviceSource, /runStructuredAI/, "the fixed workflow must use the provider-neutral manager");
+assert.match(actionSource, /loadBusinessHealthAnalysisState/, "a failed refresh must reload and preserve the last valid stale artifact");
+assert.match(actionSource, /action:\s*"business_health_explanation\.generate"[\s\S]*limit:\s*1[\s\S]*windowSeconds:\s*60[\s\S]*identifiers:\s*\[analysisPackage\.fingerprint\]/, "duplicate generation must remain rate-limited by the contract fingerprint");
 assert.match(panelSource, />\s*View analysis\s*</, "Overview must expose the approved executive action label");
 assert.match(panelSource, /sm:max-w-2xl/, "desktop must use a bounded right-side panel");
 assert.match(panelSource, /absolute inset-0 flex w-full/, "mobile must use a full-screen analysis sheet");

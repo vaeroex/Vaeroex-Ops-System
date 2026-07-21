@@ -164,6 +164,22 @@ export async function loadBusinessHealthAnalysisState({
     };
   }
 
+  return resolveBusinessHealthAnalysisStateFromRuns({
+    runs,
+    analysisPackage,
+    requestTokenAvailable
+  });
+}
+
+export function resolveBusinessHealthAnalysisStateFromRuns({
+  runs,
+  analysisPackage,
+  requestTokenAvailable
+}: {
+  runs: RunRow[];
+  analysisPackage: BusinessHealthExplanationPackage;
+  requestTokenAvailable: boolean;
+}): BusinessHealthAnalysisState {
   const completed = runs
     .filter((run) => run.status === "completed")
     .flatMap((run) => {

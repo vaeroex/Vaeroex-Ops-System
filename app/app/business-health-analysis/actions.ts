@@ -8,10 +8,14 @@ import {
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   type BusinessHealthAnalysisState
 } from "@/lib/ai/business-health-explanation/contracts";
-import { generateBusinessHealthExplanation } from "@/lib/ai/business-health-explanation/service";
+import {
+  businessHealthProviderAttemptTelemetry,
+  generateBusinessHealthExplanation
+} from "@/lib/ai/business-health-explanation/service";
 import {
   businessHealthArtifactForView,
-  findCurrentBusinessHealthExplanationArtifact
+  findCurrentBusinessHealthExplanationArtifact,
+  loadBusinessHealthAnalysisState
 } from "@/lib/ai/business-health-explanation/storage";
 import { openBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
@@ -23,24 +27,55 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 const SAFE_FAILURE_MESSAGE = "Business Health facts are available, but the analysis could not be prepared. Please try again.";
 
+function logBusinessHealthCacheEvent({
+  event,
+  fingerprint,
+  contractVersion,
+  validatorVersion,
+  freshness
+}: {
+  event: "cache_hit" | "cache_miss" | "last_valid_preserved";
+  fingerprint: string;
+  contractVersion: string;
+  validatorVersion: string;
+  freshness: string;
+}) {
+  console.log(JSON.stringify({
+    level: "info",
+    component: "business-health-explanation",
+    event,
+    contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
+    contractVersion,
+    validatorVersion,
+    fingerprint,
+    freshness
+  }));
+}
+
 function failedUsage(error: unknown, latencyMs: number) {
   const attempts = error instanceof AIProviderExecutionError ? error.attempts : [];
   const totals = attempts.reduce((sum, attempt) => ({
     inputTokens: sum.inputTokens + attempt.inputTokens,
     outputTokens: sum.outputTokens + attempt.outputTokens,
-    totalTokens: sum.totalTokens + attempt.totalTokens
-  }), { inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+    totalTokens: sum.totalTokens + attempt.totalTokens,
+    reasoningTokens: sum.reasoningTokens + attempt.reasoningTokens,
+    estimatedCostCents: sum.estimatedCostCents + attempt.estimatedCostCents
+  }), { inputTokens: 0, outputTokens: 0, totalTokens: 0, reasoningTokens: 0, estimatedCostCents: 0 });
   const lastAttempt = attempts.at(-1);
   return {
-    ...totals,
-    model: lastAttempt?.model || "business-health-provider-unavailable",
+    inputTokens: totals.inputTokens,
+    outputTokens: totals.outputTokens,
+    totalTokens: totals.totalTokens,
+    model: lastAttempt?.runtimeModel || lastAttempt?.model || "business-health-provider-unavailable",
     latencyMs,
     status: "failed" as const,
     metadata: {
       workflow: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
-      provider_attempts: attempts,
+      provider_attempts: attempts.map(businessHealthProviderAttemptTelemetry),
       fallback_used: attempts.some((attempt) => attempt.fallback),
-      timeout: attempts.some((attempt) => attempt.failureType === "transport" && attempt.latencyMs >= (attempt.timeoutBudgetMs || Number.POSITIVE_INFINITY)),
+      reasoning_tokens: totals.reasoningTokens,
+      estimated_cost_cents: totals.estimatedCostCents,
+      timeout: attempts.some((attempt) => attempt.fallbackReason === "timeout"),
       failure_stage: "provider_execution"
     } satisfies Json
   };
@@ -97,7 +132,23 @@ export async function generateBusinessHealthExplanationAction(
     workspaceId,
     fingerprint: analysisPackage.fingerprint
   }).catch(() => null);
-  if (cached) return { status: "current", artifact: cached, message: null };
+  if (cached) {
+    logBusinessHealthCacheEvent({
+      event: "cache_hit",
+      fingerprint: analysisPackage.fingerprint,
+      contractVersion: analysisPackage.contractVersion,
+      validatorVersion: analysisPackage.validatorVersion,
+      freshness: analysisPackage.facts.freshness
+    });
+    return { status: "current", artifact: cached, message: null };
+  }
+  logBusinessHealthCacheEvent({
+    event: "cache_miss",
+    fingerprint: analysisPackage.fingerprint,
+    contractVersion: analysisPackage.contractVersion,
+    validatorVersion: analysisPackage.validatorVersion,
+    freshness: analysisPackage.facts.freshness
+  });
 
   const usageLimit = await isUsageLimitReached({
     supabase,
@@ -113,6 +164,7 @@ export async function generateBusinessHealthExplanationAction(
     return { status: "unavailable", artifact: null, message: "This workspace has reached its monthly intelligence usage limit." };
   }
 
+  // Durable atomic deduplication belongs to the future background-generation path; this Preview flow retains fingerprint rate limiting.
   const claim = await enforceRateLimit({
     action: "business_health_explanation.generate",
     limit: 1,
@@ -153,7 +205,6 @@ export async function generateBusinessHealthExplanationAction(
     validator_version: analysisPackage.validatorVersion,
     fingerprint: analysisPackage.fingerprint,
     evidence_manifest_version: analysisPackage.manifest.version,
-    evidence_manifest_id: analysisPackage.manifest.manifestId,
     submode: analysisPackage.submode,
     evidence_count: analysisPackage.requiredCitationIds.length,
     driver_count: analysisPackage.facts.drivers.length,
@@ -219,6 +270,22 @@ export async function generateBusinessHealthExplanationAction(
       agentType: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
       usage: failedUsage(error, Date.now() - startedAt)
     });
+    const preserved = await loadBusinessHealthAnalysisState({
+      supabase,
+      workspaceId,
+      analysisPackage,
+      requestTokenAvailable: true
+    }).catch(() => null);
+    if (preserved?.status === "stale") {
+      logBusinessHealthCacheEvent({
+        event: "last_valid_preserved",
+        fingerprint: analysisPackage.fingerprint,
+        contractVersion: analysisPackage.contractVersion,
+        validatorVersion: analysisPackage.validatorVersion,
+        freshness: analysisPackage.facts.freshness
+      });
+      return preserved;
+    }
     return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
   }
 }

@@ -26,6 +26,8 @@ export const AI_VALIDATION_REASON_CODES = [
   "uncertainty_invalid",
   "schema_field_type_mismatch",
   "unexpected_truncation",
+  "unsupported_inference",
+  "numeric_integrity_failed",
   "contextual_validation_failed",
   "unknown_validation_failure"
 ] as const;
@@ -39,6 +41,7 @@ export type AIValidationStage =
   | "citation_provenance"
   | "confidence"
   | "relationship_support"
+  | "numeric_integrity"
   | "contextual_validation";
 
 export type AIValidationValueType =
