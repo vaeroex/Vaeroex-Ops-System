@@ -177,7 +177,7 @@ function build(overrides = {}) {
 const analysisPackage = build();
 assert.equal(analysisPackage.contractId, "executive_brief_v1");
 assert.equal(analysisPackage.contractVersion, "executive_brief_v1");
-assert.equal(analysisPackage.validatorVersion, "executive_brief_validator_v2");
+assert.equal(analysisPackage.validatorVersion, "executive_brief_validator_v3");
 assert.equal(analysisPackage.facts.businessHealth.score, 52, "the model package must preserve the application-owned score");
 assert.ok(analysisPackage.signals.length <= 5, "the signal plan must remain bounded");
 assert.ok(analysisPackage.manifest.evidence.length <= 10, "the EvidenceManifest must remain bounded");
@@ -331,6 +331,7 @@ assert.ok(qualificationFixtures.every((fixture) => verifyEvidenceManifestCitatio
 const pageSource = read("app/app/page.tsx");
 const actionSource = read("app/app/executive-brief/actions.ts");
 const serviceSource = read("lib/ai/executive-brief/service.ts");
+const contractSource = read("lib/ai/executive-brief/contracts.ts");
 const policySource = read("lib/ai/providers/workflow-provider-policy.ts");
 const homepageSource = read("components/intelligence/ExecutiveHomepage.tsx");
 const panelSource = read("components/intelligence/ExecutiveBriefPanel.tsx");
@@ -348,6 +349,7 @@ assert.match(serviceSource, /runStructuredAI/, "the workflow must use the provid
 assert.match(serviceSource, /uncertainty must be one complete 15-420 character sentence/, "the provider contract must match the canonical uncertainty validator");
 assert.match(serviceSource, /When permitted_relationships is empty, do not describe signals as correlated, associated, linked, co-moving, or moving with one another/, "the prompt must make the empty relationship boundary explicit");
 assert.match(serviceSource, /no_relationship_language_when_unpermitted: analysisPackage\.permittedRelationships\.length === 0/, "the bounded model input must carry the empty relationship rule deterministically");
+assert.match(contractSource, /EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v3"/, "prompt-boundary changes must invalidate pre-correction artifacts");
 assert.match(policySource, /BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5\.6-sol"[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5\.6-terra"/, "the Preview policy must pin Sol and Terra model IDs");
 assert.match(policySource, /resolveExecutiveBriefGenerationPolicy[\s\S]*model: BUSINESS_HEALTH_GPT56_SOL_MODEL[\s\S]*model: BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the Executive Brief policy must route Sol before Terra");
 assert.match(policySource, /isExecutiveBriefPreviewEnabled[\s\S]*VERCEL_ENV === "preview"/, "the provider experiment must remain Preview-only");

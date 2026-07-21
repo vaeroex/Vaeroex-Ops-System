@@ -2,7 +2,7 @@ import type { EvidenceManifest } from "@/lib/ai/evidence-engine/contracts";
 
 export const EXECUTIVE_BRIEF_CONTRACT_ID = "executive_brief_v1" as const;
 export const EXECUTIVE_BRIEF_CONTRACT_VERSION = "executive_brief_v1" as const;
-export const EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v2" as const;
+export const EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v3" as const;
 
 export const EXECUTIVE_BRIEF_JSON_SCHEMA = {
   type: "object",
