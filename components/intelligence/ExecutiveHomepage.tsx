@@ -2,11 +2,18 @@ import Link from "next/link";
 import { ArrowRight, Database, ShieldCheck, TrendingUp } from "lucide-react";
 import { BusinessHealthAnalysisPanel } from "@/components/intelligence/BusinessHealthAnalysisPanel";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
+import { ExecutiveBriefPanel } from "@/components/intelligence/ExecutiveBriefPanel";
 import type {
   BusinessHealthAnalysisState,
   BusinessHealthCitationView,
   BusinessHealthExplanationFacts
 } from "@/lib/ai/business-health-explanation/contracts";
+import type {
+  ExecutiveBriefCitationView,
+  ExecutiveBriefFacts,
+  ExecutiveBriefSignal,
+  ExecutiveBriefState
+} from "@/lib/ai/executive-brief/contracts";
 import type { ExecutiveHomepageModel, ExecutivePriorityCard } from "@/lib/intelligence/executive-homepage";
 
 type ExecutiveHomepageProps = {
@@ -15,6 +22,13 @@ type ExecutiveHomepageProps = {
   model: ExecutiveHomepageModel;
   healthHistory: BusinessHealthTrendPoint[];
   healthHistoryError?: string | null;
+  executiveBrief: {
+    state: ExecutiveBriefState;
+    requestToken: string | null;
+    facts: ExecutiveBriefFacts;
+    signals: readonly ExecutiveBriefSignal[];
+    citations: readonly ExecutiveBriefCitationView[];
+  };
   businessHealthAnalysis: {
     state: BusinessHealthAnalysisState;
     requestToken: string | null;
@@ -73,6 +87,7 @@ export function ExecutiveHomepage({
   model,
   healthHistory,
   healthHistoryError,
+  executiveBrief,
   businessHealthAnalysis
 }: ExecutiveHomepageProps) {
   const heading = firstName ? `Good morning, ${firstName}` : "Executive overview";
@@ -92,10 +107,19 @@ export function ExecutiveHomepage({
         <p className="text-xs text-muted">Last updated {lastUpdatedLabel}</p>
       </header>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]" data-executive-opening>
-        <section className="overflow-hidden rounded-lg bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2" aria-labelledby="business-health-heading">
-        <div className="grid gap-5 lg:grid-cols-[minmax(220px,.62fr)_minmax(0,1.38fr)] lg:items-start">
-          <div>
+      <section className="overflow-hidden rounded-lg bg-vaeroex-navy text-white shadow-command" data-executive-opening aria-label="Executive opening brief">
+        <div className="grid xl:grid-cols-[minmax(0,3fr)_minmax(320px,2fr)]">
+          <article className="min-w-0 p-5 sm:p-6">
+            <ExecutiveBriefPanel
+              initialState={executiveBrief.state}
+              requestToken={executiveBrief.requestToken}
+              currentFacts={executiveBrief.facts}
+              currentSignals={executiveBrief.signals}
+              currentCitations={executiveBrief.citations}
+            />
+          </article>
+
+          <section className="min-w-0 border-t border-white/10 p-5 sm:p-6 xl:border-l xl:border-t-0" aria-labelledby="business-health-heading">
             <div className="flex flex-wrap items-center gap-2">
               <p id="business-health-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Business Health</p>
               <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${healthTone(model.health.status)}`}>{model.health.status}</span>
@@ -106,31 +130,28 @@ export function ExecutiveHomepage({
                 <span className="pb-2 text-lg text-slate-300">/ 100</span>
               </div>
             ) : (
-              <p className="mt-5 text-2xl font-semibold">Business Health needs more eligible evidence.</p>
+              <p className="mt-5 text-xl font-semibold leading-7">Business Health needs more eligible evidence.</p>
             )}
             {model.health.available ? (
-              <p className="mt-3 text-sm text-slate-300">
+              <p className="mt-3 text-sm leading-6 text-slate-300">
                 {trendDelta === null
                   ? "Trend will appear after additional dated evidence is available."
                   : `${trendDelta > 0 ? "Up" : trendDelta < 0 ? "Down" : "Unchanged"} ${Math.abs(trendDelta)} point${Math.abs(trendDelta) === 1 ? "" : "s"} since the previous stored review.`}
               </p>
             ) : null}
-          </div>
-
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
-              {businessHealthAnalysis.state.status === "current" ? "Validated executive interpretation" : "Current assessment"}
+            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
+              {businessHealthAnalysis.state.status === "current" ? "Validated score explanation" : "Current assessment"}
             </p>
-            <h2 className="text-xl font-semibold leading-7 sm:text-2xl">{model.health.summary}</h2>
+            <h2 className="mt-1 text-xl font-semibold leading-7">{model.health.summary}</h2>
             {businessHealthAnalysis.state.status === "current" && businessHealthAnalysis.state.artifact ? (
               <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
             ) : null}
-            <dl className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
+            <dl className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-1">
               <div>
                 <dt className="text-xs font-semibold text-cyan-200">Main driver</dt>
                 <dd className="mt-1 leading-6 text-slate-200">{model.health.driver}</dd>
               </div>
-              <div className="sm:text-right">
+              <div>
                 <dt className="text-xs font-semibold text-cyan-200">Confidence</dt>
                 <dd className="mt-1 font-semibold text-white">{model.health.confidence}</dd>
                 <dd className="mt-1 text-xs text-slate-300">{model.health.memorySignals} eligible signal{model.health.memorySignals === 1 ? "" : "s"}</dd>
@@ -142,20 +163,21 @@ export function ExecutiveHomepage({
               currentFacts={businessHealthAnalysis.facts}
               currentCitations={businessHealthAnalysis.citations}
             />
-          </div>
+          </section>
         </div>
 
         {showHealthTrend ? (
-          <BusinessHealthTrendChart
-            points={healthHistory}
-            currentScore={model.health.score || 0}
-            currentStatus={model.health.status}
-            currentTrend={model.health.trend || "Not enough history"}
-            errorMessage={healthHistoryError}
-          />
+          <div className="border-t border-white/10 px-5 pb-5 sm:px-6 sm:pb-6">
+            <BusinessHealthTrendChart
+              points={healthHistory}
+              currentScore={model.health.score || 0}
+              currentStatus={model.health.status}
+              currentTrend={model.health.trend || "Not enough history"}
+              errorMessage={healthHistoryError}
+            />
+          </div>
         ) : null}
-        </section>
-      </div>
+      </section>
 
       <section aria-label="Executive priorities" className="grid items-start gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
         <article className={`rounded-lg border p-4 shadow-panel ${priorityTone(risk.tone)}`}>
