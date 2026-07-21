@@ -222,10 +222,15 @@ export function validateExecutiveBriefOutput(
   const approvedNumbers = new Set(numericClaims(approvedFactText).map(normalizeNumber));
   const unsupportedNumber = numericClaims(text).find((claim) => !approvedNumbers.has(normalizeNumber(claim)));
   if (unsupportedNumber) {
+    const field = OUTPUT_FIELDS.find((candidate) => {
+      const value = output[candidate];
+      return typeof value === "string"
+        && numericClaims(value).some((claim) => !approvedNumbers.has(normalizeNumber(claim)));
+    }) || "$";
     return validationFailure("The response introduced a number outside the approved deterministic facts.", {
       reasonCode: "numeric_integrity_failed",
       stage: "numeric_integrity",
-      expectedField: "$",
+      expectedField: field,
       expectedType: "string",
       observedType: "string"
     });
