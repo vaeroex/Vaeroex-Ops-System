@@ -135,8 +135,8 @@ export function validateBusinessHealthExplanationOutput(
   const unsupportedNumber = numericClaims(text).find((claim) => !approvedNumbers.has(normalizeNumber(claim)));
   if (unsupportedNumber) {
     return validationFailure("The response introduced a number outside the approved deterministic facts.", {
-      reasonCode: "contextual_validation_failed",
-      stage: "contextual_validation",
+      reasonCode: "numeric_integrity_failed",
+      stage: "numeric_integrity",
       expectedField: "$",
       expectedType: "string",
       observedType: "string"

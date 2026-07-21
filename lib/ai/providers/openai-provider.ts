@@ -7,11 +7,18 @@ const OPENAI_RESPONSES_ENDPOINT = "https://api.openai.com/v1/responses";
 const OPENAI_EMBEDDINGS_ENDPOINT = "https://api.openai.com/v1/embeddings";
 
 type ResponsesPayload = {
+  model?: string;
   output_text?: string;
   status?: string;
   incomplete_details?: { reason?: string } | null;
   output?: Array<{ content?: Array<{ type?: string; text?: string; refusal?: string }> }>;
-  usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+  usage?: {
+    input_tokens?: number;
+    output_tokens?: number;
+    total_tokens?: number;
+    input_tokens_details?: { cached_tokens?: number };
+    output_tokens_details?: { reasoning_tokens?: number };
+  };
 };
 
 function extractContent(payload: ResponsesPayload) {
@@ -19,7 +26,7 @@ function extractContent(payload: ResponsesPayload) {
   for (const item of payload.output || []) {
     for (const part of item.content || []) {
       if (part.type === "output_text" && part.text) return part.text;
-      if (part.type === "refusal" && part.refusal) throw new AIProviderError("OpenAI declined the request.", "openai", false);
+      if (part.type === "refusal" && part.refusal) throw new AIProviderError("OpenAI declined the request.", "openai", false, undefined, "refusal");
     }
   }
   return "";
@@ -39,7 +46,7 @@ export class OpenAIProvider implements AIProvider {
 
   async generate(request: AIProviderRequest) {
     const apiKey = process.env.OPENAI_API_KEY?.trim();
-    if (!apiKey) throw new AIProviderError("OpenAI API key is not configured.", "openai", false);
+    if (!apiKey) throw new AIProviderError("OpenAI API key is not configured.", "openai", false, undefined, "configuration");
 
     const userContent = request.userContent.length === 1 && request.userContent[0]?.type === "text"
       ? request.userContent[0].text
@@ -54,9 +61,27 @@ export class OpenAIProvider implements AIProvider {
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: request.model,
-        temperature: request.temperature,
+        ...(typeof request.temperature === "number" ? { temperature: request.temperature } : {}),
+        ...(typeof request.topP === "number" ? { top_p: request.topP } : {}),
+        ...(request.reasoning ? {
+          reasoning: {
+            effort: request.reasoning.effort,
+            ...(request.reasoning.mode === "pro" ? { mode: "pro" } : {})
+          }
+        } : {}),
         ...(request.maxOutputTokens ? { max_output_tokens: request.maxOutputTokens } : {}),
-        text: { format: { type: "json_object" } },
+        text: {
+          format: request.structuredOutput
+            ? {
+                type: "json_schema",
+                name: request.structuredOutput.name,
+                strict: request.structuredOutput.strict,
+                schema: request.structuredOutput.schema
+              }
+            : { type: "json_object" }
+        },
+        ...(typeof request.store === "boolean" ? { store: request.store } : {}),
+        ...(request.stream === false ? { stream: false } : {}),
         input: [
           { role: "system", content: request.systemPrompt },
           { role: "user", content: userContent }
@@ -76,13 +101,14 @@ export class OpenAIProvider implements AIProvider {
         response.status === 429 ? "OpenAI is temporarily rate limited." : "OpenAI could not complete the request.",
         "openai",
         isRetryableAIProviderStatus(response.status),
-        response.status
+        response.status,
+        "transport_failure"
       );
     }
 
     const content = extractContent(payload);
     const truncationDetected = payload.status === "incomplete";
-    if (!content && !truncationDetected) throw new AIProviderError("OpenAI returned an empty response.", "openai", true);
+    if (!content && !truncationDetected) throw new AIProviderError("OpenAI returned an empty response.", "openai", true, undefined, "empty_response");
     const inputTokens = payload.usage?.input_tokens || 0;
     const outputTokens = payload.usage?.output_tokens || 0;
 
@@ -92,10 +118,13 @@ export class OpenAIProvider implements AIProvider {
       latencyMs: Date.now() - startedAt,
       finishReason: payload.incomplete_details?.reason || payload.status || null,
       truncationDetected,
+      runtimeModel: payload.model || request.model,
       usage: {
         inputTokens,
         outputTokens,
-        totalTokens: payload.usage?.total_tokens || inputTokens + outputTokens
+        totalTokens: payload.usage?.total_tokens || inputTokens + outputTokens,
+        cachedInputTokens: payload.usage?.input_tokens_details?.cached_tokens || 0,
+        reasoningTokens: payload.usage?.output_tokens_details?.reasoning_tokens || 0
       }
     };
   }

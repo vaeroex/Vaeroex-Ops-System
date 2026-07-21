@@ -1,7 +1,46 @@
 import "server-only";
 
 import { resolveVaeroexModel, type VaeroexModelRoute } from "@/lib/ai/model-routing";
-import type { AIProviderRoutingPolicy } from "@/lib/ai/providers/provider-manager";
+import {
+  NVIDIA_NEMOTRON_MODEL,
+  type AIProviderFallbackReason,
+  type AIProviderRoutingPolicy
+} from "@/lib/ai/providers/provider-manager";
+import type { AIProviderExecutionBudget } from "@/lib/ai/providers/execution-budget";
+import type { AIProviderStructuredOutput } from "@/lib/ai/providers/types";
+
+export const BUSINESS_HEALTH_GPT56_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
+export const BUSINESS_HEALTH_GPT56_POLICY_ID = "business_health_preview_gpt56_sol_terra_v1" as const;
+export const BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5.6-sol" as const;
+export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
+
+const BUSINESS_HEALTH_LEGACY_DEADLINE_MS = 26_000;
+const BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS = 10_500;
+const BUSINESS_HEALTH_LEGACY_OPENAI_TIMEOUT_MS = 8_500;
+const BUSINESS_HEALTH_GPT56_DEADLINE_MS = 90_000;
+const BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS = 30_000;
+const BUSINESS_HEALTH_GPT56_MAX_OUTPUT_TOKENS = 2_500;
+
+export const BUSINESS_HEALTH_GPT56_FALLBACK_REASONS = [
+  "timeout",
+  "transport_failure",
+  "empty_response",
+  "malformed_response",
+  "schema_failure",
+  "contextual_validation_failure",
+  "unsupported_inference",
+  "unsupported_relationship",
+  "missing_required_signal",
+  "citation_integrity_failure",
+  "numeric_integrity_failure"
+] as const satisfies readonly AIProviderFallbackReason[];
+
+export type BusinessHealthGenerationPolicy = Readonly<{
+  providerPolicy: AIProviderRoutingPolicy;
+  executionBudget: AIProviderExecutionBudget;
+  requestTimeoutMs: number;
+  requestMaxOutputTokens: number;
+}>;
 
 export function buildSynchronousExecutiveProviderPolicy({
   modelRoute,
@@ -20,5 +59,97 @@ export function buildSynchronousExecutiveProviderPolicy({
         minimumRemainingMs: nvidiaSecondaryMinimumRemainingMs
       }
     ]
+  };
+}
+
+export function resolveBusinessHealthGenerationPolicy({
+  startedAtMs,
+  structuredOutput
+}: {
+  startedAtMs: number;
+  structuredOutput: AIProviderStructuredOutput;
+}): BusinessHealthGenerationPolicy {
+  if (
+    process.env.VERCEL_ENV === "preview" &&
+    process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR
+  ) {
+    return {
+      providerPolicy: {
+        id: BUSINESS_HEALTH_GPT56_POLICY_ID,
+        fallbackOn: BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
+        steps: [
+          {
+            provider: "openai",
+            model: BUSINESS_HEALTH_GPT56_SOL_MODEL,
+            workflowConfiguration: {
+              timeoutMs: BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS,
+              maxAttempts: 1,
+              maxOutputTokens: BUSINESS_HEALTH_GPT56_MAX_OUTPUT_TOKENS,
+              temperature: null,
+              topP: null,
+              reasoning: { mode: "standard", effort: "low" },
+              structuredOutput,
+              store: false,
+              stream: false
+            }
+          },
+          {
+            provider: "openai",
+            model: BUSINESS_HEALTH_GPT56_TERRA_MODEL,
+            minimumRemainingMs: 5_000,
+            workflowConfiguration: {
+              timeoutMs: BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS,
+              maxAttempts: 1,
+              maxOutputTokens: BUSINESS_HEALTH_GPT56_MAX_OUTPUT_TOKENS,
+              temperature: null,
+              topP: null,
+              reasoning: { mode: "standard", effort: "medium" },
+              structuredOutput,
+              store: false,
+              stream: false
+            }
+          }
+        ]
+      },
+      executionBudget: {
+        deadlineAtMs: startedAtMs + BUSINESS_HEALTH_GPT56_DEADLINE_MS,
+        providerTimeoutMs: { openai: BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS },
+        minimumAttemptWindowMs: { openai: 5_000 },
+        fallbackReserveMs: BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS,
+        reserveFallbackForPrimary: true,
+        transitionReserveMs: 1_000
+      },
+      requestTimeoutMs: BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS,
+      requestMaxOutputTokens: BUSINESS_HEALTH_GPT56_MAX_OUTPUT_TOKENS
+    };
+  }
+
+  const providerPolicy: AIProviderRoutingPolicy = process.env.VERCEL_ENV === "preview"
+    ? {
+        id: "business_health_preview_nvidia_primary_v1",
+        steps: [
+          { provider: "nvidia", model: NVIDIA_NEMOTRON_MODEL },
+          { provider: "openai", model: resolveVaeroexModel("cross_business_reasoning", "openai") }
+        ]
+      }
+    : {
+        id: "business_health_openai_primary_v1",
+        steps: [{ provider: "openai", model: resolveVaeroexModel("cross_business_reasoning", "openai") }]
+      };
+
+  return {
+    providerPolicy,
+    executionBudget: {
+      deadlineAtMs: startedAtMs + BUSINESS_HEALTH_LEGACY_DEADLINE_MS,
+      providerTimeoutMs: {
+        nvidia: BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS,
+        openai: BUSINESS_HEALTH_LEGACY_OPENAI_TIMEOUT_MS
+      },
+      minimumAttemptWindowMs: { nvidia: 4_000, openai: 3_500 },
+      fallbackReserveMs: BUSINESS_HEALTH_LEGACY_OPENAI_TIMEOUT_MS + 1_000,
+      transitionReserveMs: 700
+    },
+    requestTimeoutMs: BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS,
+    requestMaxOutputTokens: 420
   };
 }

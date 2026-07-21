@@ -4,6 +4,23 @@ export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID = "business_health_explanat
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION = "business_health_explanation_v1" as const;
 export const BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION = "business_health_explanation_validator_v1" as const;
 
+export const BUSINESS_HEALTH_EXPLANATION_JSON_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "executive_interpretation",
+    "why_it_matters",
+    "leadership_consideration",
+    "provisional_hypothesis"
+  ],
+  properties: {
+    executive_interpretation: { type: "string" },
+    why_it_matters: { type: "string" },
+    leadership_consideration: { type: "string" },
+    provisional_hypothesis: { type: ["string", "null"] }
+  }
+} as const;
+
 export type BusinessHealthExplanationSubmode =
   | "healthy_improving"
   | "healthy_slowing"

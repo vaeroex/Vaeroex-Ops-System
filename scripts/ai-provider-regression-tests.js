@@ -57,10 +57,14 @@ assert.match(nvidia, /interactiveExecutive \? `\/no_think/, "NVIDIA interactive 
 assert.match(nvidia, /temperature:\s*interactiveExecutive \? 0 : request\.temperature/, "NVIDIA reasoning-off mode must use greedy decoding");
 assert.match(nvidia, /!interactiveExecutive \? \{ top_p: 0\.95 \} : \{\}/, "greedy mode must not also override top-p");
 assert.doesNotMatch(openai, /no_think|interactiveExecutive/, "the NVIDIA reasoning mode must not alter OpenAI behavior");
+assert.match(openai, /type:\s*"json_schema"/, "OpenAI workflows must support strict Responses API schemas when explicitly requested");
+assert.match(openai, /request\.reasoning\.effort/, "OpenAI workflows must support explicit reasoning effort without changing legacy callers");
+assert.match(openai, /typeof request\.temperature === "number"/, "OpenAI must omit temperature when a workflow requires model-default sampling");
 assert.match(openai, /process\.env\.OPENAI_API_KEY/, "OpenAI fallback credentials must remain server-side");
 assert.match(manager, /request\.providerPolicy \|\|/, "workflow-specific provider order must be expressed as an explicit policy");
 assert.match(manager, /for \(const \[index, step\] of policy\.steps\.entries\(\)\)/, "the provider manager must execute one ordered policy step at a time");
-assert.match(manager, /maxAttempts = Math\.max\(1, Math\.min\(providerSettings\.maxRetries \+ 1, 2\)\)/, "provider retries must honor workflow-specific settings");
+assert.match(manager, /step\.workflowConfiguration\?\.maxAttempts[\s\S]*Math\.max\(1, Math\.min\(providerSettings\.maxRetries \+ 1, 2\)\)/, "provider retries must honor explicit step settings before legacy workflow settings");
+assert.match(manager, /fallbackUsed:\s*finalResult\.policyStep > 1/, "fallback attribution must use the accepted policy step rather than provider identity");
 assert.match(resilience, /maxRetries:\s*1/, "the default provider policy must retain one retry outside bounded workflows");
 assert.match(resilience, /const value = await consume\(response\)[\s\S]*recordAIProviderSuccess/, "provider success must be recorded only after the complete response body is consumed");
 assert.match(manager, /waitBeforeRetry/, "provider retries must use bounded backoff");

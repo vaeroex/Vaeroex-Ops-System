@@ -4,6 +4,25 @@ import type { AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 
 export type AIProviderName = "openai" | "nvidia";
 export type AIGenerationMode = "default" | "interactive_executive";
+export type AIProviderErrorCode =
+  | "transport_failure"
+  | "empty_response"
+  | "refusal"
+  | "configuration"
+  | "unsupported_input";
+export type AIReasoningMode = "standard" | "pro";
+export type AIReasoningEffort = "low" | "medium" | "high";
+
+export type AIProviderReasoning = Readonly<{
+  mode: AIReasoningMode;
+  effort: AIReasoningEffort;
+}>;
+
+export type AIProviderStructuredOutput = Readonly<{
+  name: string;
+  schema: Readonly<Record<string, unknown>>;
+  strict: true;
+}>;
 
 export type AIProviderInputPart =
   | { type: "text"; text: string }
@@ -14,9 +33,14 @@ export type AIProviderRequest = {
   model: string;
   systemPrompt: string;
   userContent: AIProviderInputPart[];
-  temperature: number;
+  temperature?: number;
+  topP?: number;
   generationMode?: AIGenerationMode;
   maxOutputTokens?: number;
+  reasoning?: AIProviderReasoning;
+  structuredOutput?: AIProviderStructuredOutput;
+  store?: boolean;
+  stream?: false;
   settings: AIProviderRetrySettings;
 };
 
@@ -24,6 +48,8 @@ export type AIProviderUsage = {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
+  cachedInputTokens?: number;
+  reasoningTokens?: number;
 };
 
 export type AIProviderResult = {
@@ -33,6 +59,7 @@ export type AIProviderResult = {
   usage: AIProviderUsage;
   finishReason: string | null;
   truncationDetected: boolean;
+  runtimeModel?: string | null;
 };
 
 export type AIEmbeddingResult = {
@@ -54,7 +81,8 @@ export class AIProviderError extends Error {
     message: string,
     readonly provider: AIProviderName,
     readonly retryable: boolean,
-    readonly status?: number
+    readonly status?: number,
+    readonly code?: AIProviderErrorCode
   ) {
     super(message);
     this.name = "AIProviderError";

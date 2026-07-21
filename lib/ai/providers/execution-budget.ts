@@ -5,6 +5,7 @@ export type AIProviderExecutionBudget = {
   providerTimeoutMs: Partial<Record<AIProviderName, number>>;
   minimumAttemptWindowMs: Partial<Record<AIProviderName, number>>;
   fallbackReserveMs: number;
+  reserveFallbackForPrimary?: boolean;
   transitionReserveMs?: number;
 };
 
@@ -39,7 +40,7 @@ export function resolveAIProviderAttemptWindow({
 
   const remainingMs = Math.max(0, Math.floor(budget.deadlineAtMs - nowMs));
   const transitionReserveMs = Math.max(0, Math.floor(budget.transitionReserveMs || 0));
-  const fallbackReserveMs = !fallback && provider === "nvidia"
+  const fallbackReserveMs = !fallback && (provider === "nvidia" || budget.reserveFallbackForPrimary === true)
     ? Math.max(0, Math.floor(budget.fallbackReserveMs))
     : 0;
   const reservedMs = transitionReserveMs + fallbackReserveMs;

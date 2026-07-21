@@ -47,6 +47,9 @@ const providerExecutionBudget = read("lib/ai/providers/execution-budget.ts");
 const workspaceContext = read("lib/workspaces/current.ts");
 const usageLimits = read("lib/billing/usage-limits.ts");
 const workflowProviderPolicy = read("lib/ai/providers/workflow-provider-policy.ts");
+const synchronousPolicyStart = workflowProviderPolicy.indexOf("export function buildSynchronousExecutiveProviderPolicy");
+const synchronousPolicyEnd = workflowProviderPolicy.indexOf("export function resolveBusinessHealthGenerationPolicy", synchronousPolicyStart);
+const synchronousWorkflowProviderPolicy = workflowProviderPolicy.slice(synchronousPolicyStart, synchronousPolicyEnd);
 
 assert.match(
   globalSearch,
@@ -80,13 +83,13 @@ assert.match(successfulUsage, /\.\.\.generation\.usage/, "persisted usage must i
 assert.match(successfulUsage, /\.\.\.\(isRecord\(generation\.usage\.metadata\)/, "provider attempt metadata must be preserved");
 assert.doesNotMatch(successfulUsage, /fallback_used:\s*false/, "Search or Ask must not overwrite a real OpenAI fallback with false");
 
-assert.match(providerManager, /maxAttempts = Math\.max\(1, Math\.min\(providerSettings\.maxRetries \+ 1, 2\)\)/, "each provider step must honor the caller's retry budget");
-assert.match(providerManager, /fallbackUsed:\s*finalResult\.provider !== primaryProvider/, "provider-manager fallback status must reflect the workflow policy's primary provider");
+assert.match(providerManager, /step\.workflowConfiguration\?\.maxAttempts[\s\S]*Math\.max\(1, Math\.min\(providerSettings\.maxRetries \+ 1, 2\)\)/, "each provider step must honor explicit step settings before the caller's retry budget");
+assert.match(providerManager, /fallbackUsed:\s*finalResult\.policyStep > 1/, "provider-manager fallback status must reflect the accepted workflow policy step");
 assert.match(providerManager, /provider:\s*finalResult\.provider/, "successful NVIDIA generation must report NVIDIA as the final provider");
 assert.match(providerManager, /model:\s*finalResult\.model/, "successful generation must persist the model that actually completed it");
-assert.match(workflowProviderPolicy, /id:\s*"synchronous_executive_openai_first_interim"/, "synchronous Executive Analysis must identify its latency-driven interim policy explicitly");
-assert.match(workflowProviderPolicy, /provider:\s*"openai"[\s\S]*provider:\s*"nvidia"/, "synchronous Executive Analysis must use explicit OpenAI then NVIDIA order");
-assert.doesNotMatch(workflowProviderPolicy, /resolveConfiguredAIProvider|previewVariant|VERCEL_ENV/, "the synchronous policy must neither inherit global order nor retain a Preview selector");
+assert.match(synchronousWorkflowProviderPolicy, /id:\s*"synchronous_executive_openai_first_interim"/, "synchronous Executive Analysis must identify its latency-driven interim policy explicitly");
+assert.match(synchronousWorkflowProviderPolicy, /provider:\s*"openai"[\s\S]*provider:\s*"nvidia"/, "synchronous Executive Analysis must use explicit OpenAI then NVIDIA order");
+assert.doesNotMatch(synchronousWorkflowProviderPolicy, /resolveConfiguredAIProvider|previewVariant|VERCEL_ENV/, "the synchronous policy must neither inherit global order nor retain a Preview selector");
 assert.match(vaeroexClient, /const configuredProvider = resolveConfiguredAIProvider\(\)/, "all workflows without an explicit policy must preserve global provider configuration");
 assert.doesNotMatch(searchRoute, /EXECUTIVE_PROVIDER_POLICY_HEADER|resolvePreviewExecutiveProviderPolicyVariant/, "the release route must not retain benchmark request plumbing");
 assert.doesNotMatch(askWorkspace, /executive_provider_policy|previewExecutiveProviderPolicyHeader|x-vaeroex-preview-executive-policy/, "the Ask UI must not retain benchmark query or header plumbing");
