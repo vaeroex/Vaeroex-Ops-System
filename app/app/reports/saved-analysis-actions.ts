@@ -359,19 +359,6 @@ export async function deleteSavedAnalysesAction(ids: readonly string[]): Promise
   }
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
   const channel = releaseChannel();
-  const { data, error } = await supabase
-    .from("reports")
-    .select("id,source_data_json")
-    .eq("workspace_id", workspaceId)
-    .in("id", uniqueIds)
-    .is("deleted_at", null);
-  const valid = (data || []).filter((row) => {
-    const envelope = parseSavedAnalysisEnvelope(row.source_data_json);
-    return envelope?.workspace_id === workspaceId && envelope.release_channel === channel;
-  });
-  if (error || valid.length !== uniqueIds.length) {
-    return { status: "error", message: "One or more selected analyses are unavailable. Nothing was deleted." };
-  }
 
   try {
     for (let index = 0; index < uniqueIds.length; index += 100) {
@@ -396,20 +383,30 @@ export async function deleteSavedAnalysesAction(ids: readonly string[]): Promise
     return { status: "error", message: "You do not have permission to delete these analyses. Nothing was deleted." };
   }
 
-  const { data: deleted, error: deleteError } = await supabase
-    .from("reports")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("workspace_id", workspaceId)
-    .in("id", uniqueIds)
-    .is("deleted_at", null)
-    .contains("source_data_json", { record_kind: "saved_analysis", release_channel: channel })
-    .select("id");
-  if (deleteError || deleted?.length !== uniqueIds.length) {
-    return { status: "error", message: "The selected analyses could not all be deleted. Refresh before trying again." };
+  const transactionalClient = supabase as unknown as {
+    rpc: (
+      name: "soft_delete_saved_analyses",
+      args: {
+        p_workspace_id: string;
+        p_report_ids: string[];
+        p_release_channel: SavedAnalysisReleaseChannel;
+      }
+    ) => Promise<{ data: number | null; error: { message: string } | null }>;
+  };
+  const { data: deletedCount, error: deleteError } = await transactionalClient.rpc(
+    "soft_delete_saved_analyses",
+    {
+      p_workspace_id: workspaceId,
+      p_report_ids: uniqueIds,
+      p_release_channel: channel
+    }
+  );
+  if (deleteError || deletedCount !== uniqueIds.length) {
+    return { status: "error", message: "One or more selected analyses are unavailable. Nothing was deleted." };
   }
 
   revalidatePath("/app/reports");
-  return { status: "deleted", count: deleted.length, message: `${deleted.length} saved ${deleted.length === 1 ? "analysis" : "analyses"} deleted.` };
+  return { status: "deleted", count: deletedCount, message: `${deletedCount} saved ${deletedCount === 1 ? "analysis" : "analyses"} deleted.` };
 }
 
 export async function currentSavedAnalysisReleaseChannel() {
