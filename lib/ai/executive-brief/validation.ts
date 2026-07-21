@@ -135,6 +135,11 @@ export function validateExecutiveBriefOutput(
     }, value);
     const observedType = validationValueType(observed);
     const lengthMismatch = observedType === "string" && (issue?.code === "too_small" || issue?.code === "too_big");
+    const expectedLength = issue?.code === "too_small"
+      ? Number(issue.minimum)
+      : issue?.code === "too_big"
+        ? Number(issue.maximum)
+        : undefined;
     return validationFailure("The Executive Brief response did not match its fixed output contract.", {
       reasonCode: field === "executive_summary"
         ? "executive_summary_missing"
@@ -145,7 +150,7 @@ export function validateExecutiveBriefOutput(
       expectedField: field,
       expectedType: "string",
       observedType,
-      expectedCount: issue?.code === "too_small" || issue?.code === "too_big" ? Number(issue.minimum ?? issue.maximum) : undefined,
+      expectedCount: expectedLength,
       observedCount: typeof observed === "string" ? observed.length : undefined,
       fieldPresent: observed !== undefined
     });
