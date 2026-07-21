@@ -15,7 +15,6 @@ import { SecurityResponseNotice } from "@/components/security/SecurityResponseNo
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { getVaeroexWorkflow, type VaeroexSaveTarget, type VaeroexWorkflowKey } from "@/lib/ai/vaeroex-workflows";
-import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import type { Json } from "@/lib/supabase/types";
 import { isSecurityResponseMessage, isSecurityResponseOutput } from "@/lib/security/security-response";
@@ -49,19 +48,19 @@ const WORKFLOW_GROUPS: Array<{
   keys: VaeroexWorkflowKey[];
 }> = [
   {
-    title: "Leadership Reports",
+    title: "Leadership Reviews",
     description: "Condensed intelligence for owners and managers deciding what deserves attention.",
-    keys: ["ceo_mode", "focus_priorities", "risk_simulation", "weekly_management_meeting", "business_review_package"]
+    keys: ["ceo_mode", "focus_priorities", "risk_simulation", "weekly_management_meeting"]
   },
   {
     title: "Operations Reviews",
     description: "Find bottlenecks, responsibility gaps, evidence, and executive review needs in the active workspace.",
-    keys: ["operations_audit", "bottleneck_detector", "follow_up"]
+    keys: ["operations_audit", "bottleneck_detector"]
   },
   {
     title: "Optional Outputs",
-    description: "Turn workspace context into draft SOPs, briefings, forms, checklists, and source analysis for review.",
-    keys: ["sop_generator", "weekly_report", "daily_summary", "form_builder", "checklist_builder", "file_analysis"]
+    description: "Turn workspace context into draft SOPs, forms, checklists, and source analysis for review.",
+    keys: ["sop_generator", "form_builder", "checklist_builder", "file_analysis"]
   }
 ];
 const WORKFLOW_CHOICES: Array<{
@@ -94,16 +93,6 @@ const WORKFLOW_CHOICES: Array<{
     label: "Review File",
     description: "Analyze uploaded source material.",
     href: "/app/sources"
-  },
-  {
-    label: "Generate Briefing",
-    description: "Generate a clean leadership briefing draft.",
-    workflowKey: "weekly_report"
-  },
-  {
-    label: "Generate Improvement Plan",
-    description: "Turn loose concerns into a reviewable improvement plan.",
-    workflowKey: "follow_up"
   },
   {
     label: "Ask Anything",
@@ -707,16 +696,12 @@ function hasDraftForTarget(output: JsonRecord, target: VaeroexSaveTarget, workfl
     return Boolean(getSopDrafts(output).length);
   }
 
-  if (target === "report") {
-    return Boolean(getReportDrafts(output).length || ["operations_audit", "weekly_report", "daily_summary", "bottleneck_detector"].includes(workflowKey));
-  }
-
   return false;
 }
 
 function SaveButtons({ runId, workflowKey, output }: { runId: string; workflowKey: string; output: JsonRecord }) {
   const workflow = getVaeroexWorkflow(workflowKey);
-  const targets = workflow.saveTargets.filter((target) => hasDraftForTarget(output, target, workflowKey));
+  const targets = workflow.saveTargets.filter((target) => target === "sop" && hasDraftForTarget(output, target, workflowKey));
 
   if (!targets.length) {
     return (
@@ -766,15 +751,6 @@ function RecommendationCard({
   runId: string;
   runTitle: string;
 }) {
-  const recommendationOutputType = recommendation.relatedModule.toLowerCase().includes("issue") || recommendation.relatedModule.toLowerCase().includes("risk") ? "risk_brief" : "action_plan";
-  const outputHref = generatedOutputHref({
-    type: recommendationOutputType,
-    title: recommendation.title,
-    summary: recommendation.why,
-    remedy: recommendation.why,
-    run: runId
-  });
-
   return (
     <article className="rounded-lg border border-cyan-300/20 bg-cyan-400/10 p-4">
       <div className="flex items-start justify-between gap-3">
@@ -786,25 +762,12 @@ function RecommendationCard({
       </div>
       <dl className="mt-3 grid gap-2 text-xs text-slate-400 sm:grid-cols-2">
         <div>
-          <dt className="font-semibold text-slate-100">Output path</dt>
-          <dd className="mt-1">Generate and review first</dd>
-        </div>
-        <div>
           <dt className="font-semibold text-slate-100">Internal tracking</dt>
           <dd className="mt-1">Handled in your existing systems</dd>
         </div>
       </dl>
       <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <Link href={outputHref} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70">
-          {recommendationOutputType === "risk_brief" ? "Generate Investigation Summary" : "Generate Improvement Plan"}
-        </Link>
-        <Link href={generatedOutputHref({ type: "executive_briefing", title: recommendation.title, summary: recommendation.why, remedy: recommendation.why, run: runId })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Generate Executive Briefing
-        </Link>
-        <Link href={generatedOutputHref({ type: "checklist", title: recommendation.title, summary: recommendation.why, remedy: recommendation.why, run: runId })} className="rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-400/20">
-          Generate Checklist
-        </Link>
         <form action={dismissRecommendationAction}>
           <input type="hidden" name="return_path" value={`/app/ask?run=${runId}`} />
           <input type="hidden" name="source_type" value="vaeroex_recommendation" />

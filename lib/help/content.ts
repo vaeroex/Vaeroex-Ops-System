@@ -116,11 +116,11 @@ export const helpArticles: HelpArticle[] = [
     ["creating-workspace", "Creating your workspace", "Set up the organization context Vaeroex uses for workspace intelligence.", "/app/setup"],
     ["dashboard", "Understanding the dashboard", "Use the dashboard to see business health, risks, opportunities, and priorities.", "/app"],
     ["first-kpi", "Creating your first KPI", "Start with a small set of metrics that actually drive decisions.", "/app/kpis"],
-    ["first-report", "Creating your first report", "Generate a period summary for leadership review.", "/app/reports"],
+    ["first-report", "Saving your first analysis", "Preserve a completed Executive Brief, Business Health analysis, or Finding Explanation for later review.", "/app/reports"],
     ["first-follow-up", "Adding your first Business Signal", "Capture business context Vaeroex can remember and analyze.", "/app/tasks"],
     ["first-sop", "Creating your first SOP", "Document the process that should happen the same way each time.", "/app/sops"],
     ["notifications", "Understanding notifications", "Use unread notifications to see what requires attention now.", "/app/notifications"],
-    ["report-subscriptions", "Understanding report subscriptions", "Choose which review summaries should be generated and delivered.", "/app/reports"],
+    ["report-subscriptions", "Understanding saved analyses", "Reports contains only analyses your team explicitly chose to save.", "/app/reports"],
     ["leadership-team", "How to use Vaeroex as a leadership team", "Use shared reports, roles, and reviews to run a clearer management rhythm.", "/app/people"]
   ].map(([id, title, summary, href]) =>
     article({
@@ -144,7 +144,7 @@ export const helpArticles: HelpArticle[] = [
     ["business-memory", "Business Memory", "A history of imports, reports, decisions, recommendations, and outcomes.", "/app"],
     ["profit-leak-detector", "Profit Leak Detector", "A review of revenue and opportunity leakage signals.", "/app"],
     ["focus-on", "What Should Leadership Review?", "A prioritized list of evidence-backed topics to review.", "/app"],
-    ["reports", "Reports", "Customer-ready summaries by day, week, month, quarter, year, or year-to-date.", "/app/reports"],
+    ["reports", "Reports", "A workspace-scoped library of completed analyses your team explicitly saved.", "/app/reports"],
     ["kpis", "KPIs", "Time-series metrics with targets, trend context, and evidence.", "/app/kpis"],
     ["crm", "Customer Activity Evidence", "Customer activity used as evidence for risk, opportunity, and revenue trends.", "/app/sources"],
     ["files-imports", "Evidence", "Upload files, review source findings, and approve structured imports.", "/app/sources"],
@@ -156,7 +156,7 @@ export const helpArticles: HelpArticle[] = [
     ["people", "Organization Context", "People, roles, and departments used as context for briefings and evidence.", "/app/people"],
     ["team-roles", "Workspace Roles", "Workspace access roles that control what users can view or manage.", "/app/people"],
     ["report-sharing", "Report Sharing", "Share report context through in-app notifications and workspace history.", "/app/reports"],
-    ["report-scheduling", "Report Scheduling", "Configure weekly, monthly, quarterly, and alert-driven report preferences.", "/app/reports"],
+    ["report-scheduling", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
     ["kpi-alerts", "KPI Alerts", "Create attention signals when important metrics drift from target.", "/app/kpis"],
     ["vaeroex-ai", "Ask Vaeroex", "Ask focused business questions using current workspace context.", "/app/ask"]
   ].map(([id, title, summary, href]) =>
@@ -326,21 +326,21 @@ export function searchHelpArticles(query: string) {
 export const contextualHelp: Record<string, { what: string; workflow: string[]; mistakes: string[]; related: string[] }> = {
   dashboard: {
     what: "The dashboard summarizes business health, KPI signals, risks, opportunities, and recommended leadership reviews.",
-    workflow: ["Review Business Health", "Check alerts", "Open supporting evidence", "Generate a report if leadership needs a summary"],
+    workflow: ["Review Business Health", "Check alerts", "Open supporting evidence", "Save a completed analysis when leadership should revisit it"],
     mistakes: ["Ignoring stale data", "Treating a score as a guarantee", "Skipping evidence review"],
     related: ["Business Health Score", "Reports", "Ask Vaeroex"]
   },
   files: {
     what: "Files store business documents and imports by workspace so Vaeroex can build historical memory from approved data.",
-    workflow: ["Select a file", "Analyze or import", "Review mappings", "Approve saved data", "Use results in reports"],
-    mistakes: ["Uploading sensitive data", "Creating reports from empty files", "Skipping import review"],
+    workflow: ["Select a file", "Analyze or import", "Review mappings", "Approve saved data", "Use eligible results in live analyses"],
+    mistakes: ["Uploading sensitive data", "Treating an incomplete file as sufficient evidence", "Skipping import review"],
     related: ["Evidence", "Sensitive Data Policy", "Reports"]
   },
   reports: {
-    what: "Reports turn workspace records into period summaries, trend comparisons, risks, and recommendations.",
-    workflow: ["Choose period", "Select filters", "Generate report", "Review output", "Save or export the summary"],
-    mistakes: ["Using reports without checking source data", "Overlooking date range", "Skipping human review"],
-    related: ["Report Scheduling", "Human Review Notice", "AI Disclaimer"]
+    what: "Reports stores completed analyses that a workspace member explicitly saved from Executive Brief, Business Health, or Explain Finding.",
+    workflow: ["Review a completed live analysis", "Choose Save Analysis", "Search or filter Reports", "Open the copied analysis when needed"],
+    mistakes: ["Assuming a legacy generated report is an exact saved analysis", "Overlooking freshness", "Skipping evidence review"],
+    related: ["Executive Brief", "Business Health Score", "Evidence"]
   },
   kpis: {
     what: "KPIs track the numbers that help leadership decide what needs attention.",

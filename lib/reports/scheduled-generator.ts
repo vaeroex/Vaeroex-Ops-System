@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { categoryConfig, categoryLabel, type ReportSubscriptionCategory } from "@/lib/reports/subscriptions";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -247,6 +248,9 @@ export async function createScheduledReport({
   preferences: PreferenceRow[];
   runDate?: Date;
 }) {
+  if (legacyReportGenerationDisabled()) {
+    throw new Error("Scheduled report generation is no longer available.");
+  }
   const config = categoryConfig(category);
   const range = rangeForCategory(category, runDate);
   const startDate = dateOnly(range.start);

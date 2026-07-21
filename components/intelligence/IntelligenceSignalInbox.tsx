@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { Route } from "next";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
+import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
 import type { FindingExplanationState } from "@/lib/ai/finding-explanation/contracts";
 import {
   buildEvidenceActivity,
@@ -12,7 +13,6 @@ import {
   selectCollapsedRepresentatives,
   supportingEvidenceHref
 } from "@/lib/intelligence/evidence-groups";
-import { generatedOutputHref, outputTypeForInsight } from "@/lib/intelligence/generated-output";
 import type { IntelligenceConfidence, IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceInsightType } from "@/lib/intelligence/layer";
 
 const signalTypes: IntelligenceInsightType[] = ["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"];
@@ -168,14 +168,7 @@ function SummaryPanel({
             Explain Finding
           </button>
         ) : null
-      ) : (
-        <Link
-          href={generatedOutputHref({ type: outputTypeForInsight(insight), source: insight.id })}
-          className="inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
-        >
-          Create report
-        </Link>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -237,6 +230,7 @@ function FindingExplanationPanel({
           ))}
         </ol>
       </details>
+      <SaveAnalysisButton analysisType="finding_explanation" fingerprint={state.artifact.fingerprint} generatedAt={state.artifact.generatedAt} />
     </div>
   );
 }

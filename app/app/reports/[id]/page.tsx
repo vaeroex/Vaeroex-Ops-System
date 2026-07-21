@@ -2,9 +2,11 @@ import Link from "next/link";
 import type { Route } from "next";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ShieldCheck } from "lucide-react";
+import { currentSavedAnalysisReleaseChannel } from "@/app/app/reports/saved-analysis-actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { ReportExportActions } from "@/components/reports/ReportExportActions";
-import { ReportLifecycleMenu } from "@/components/reports/ReportLifecycleMenu";
+import { SavedAnalysisRenderer } from "@/components/reports/SavedAnalysisRenderer";
+import { parseSavedAnalysisEnvelope } from "@/lib/reports/saved-analysis";
 import {
   normalizedReportType,
   parseReportSections,
@@ -47,6 +49,23 @@ export default async function ReportDetailPage({ params, searchParams }: ReportD
   if (error || !data) notFound();
 
   const report = data as ReportRow;
+  const savedAnalysis = parseSavedAnalysisEnvelope(report.source_data_json);
+
+  if (savedAnalysis) {
+    const channel = await currentSavedAnalysisReleaseChannel();
+    if (savedAnalysis.workspace_id !== workspaceId || savedAnalysis.release_channel !== channel) notFound();
+    return (
+      <div className="space-y-6 text-slate-100">
+        <Link href="/app/reports" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-white">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />Back to Reports
+        </Link>
+        <ErrorNotice message={query?.error} />
+        {query?.message ? <div className="rounded-lg border border-emerald-300/30 bg-emerald-950/25 p-3 text-sm text-emerald-100">{query.message}</div> : null}
+        <SavedAnalysisRenderer envelope={savedAnalysis} />
+      </div>
+    );
+  }
+
   const title = reportDisplayTitle(report);
   const type = normalizedReportType(report);
   const readiness = reportEvidenceReadiness(report);
@@ -71,8 +90,8 @@ export default async function ReportDetailPage({ params, searchParams }: ReportD
         <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{reportTypeLabel(type)} · Derived analysis</p>
-              <span className="rounded-full border border-emerald-300/25 bg-emerald-400/10 px-2 py-0.5 text-[0.68rem] font-semibold text-emerald-100">Saved</span>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{reportTypeLabel(type)} · Legacy generated report</p>
+              <span className="rounded-full border border-slate-400/25 bg-slate-500/10 px-2 py-0.5 text-[0.68rem] font-semibold text-slate-200">Read-only</span>
             </div>
             <h1 className="mt-2 text-2xl font-semibold leading-tight text-white sm:text-3xl print:text-black">{title}</h1>
             <p className="mt-2 text-sm text-slate-400 print:text-slate-600">{reportPeriodLabel(report)} · Generated {new Date(report.created_at).toLocaleString()}</p>
@@ -80,7 +99,6 @@ export default async function ReportDetailPage({ params, searchParams }: ReportD
           </div>
           <div className="flex items-center gap-2 print:hidden">
             <ReportExportActions title={title} reportType={reportTypeLabel(type)} dateRange={reportPeriodLabel(report)} body={report.body_markdown || ""} />
-            <ReportLifecycleMenu reportId={report.id} reportTitle={title} archived={Boolean(report.archived_at)} />
           </div>
         </div>
       </header>

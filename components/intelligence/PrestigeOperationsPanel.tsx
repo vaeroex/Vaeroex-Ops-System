@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   createBusinessDecisionAction,
-  createBusinessReviewPackageAction,
   createKpiAlertFromPrestigeAction,
   dismissPrestigeRecommendationAction
 } from "@/app/app/intelligence/actions";
@@ -14,7 +13,6 @@ import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
-import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import type { PrestigeAction, PrestigeIntelligence, ProfitLeak } from "@/lib/intelligence/prestige";
 
 type PrestigeOperationsPanelProps = {
@@ -172,13 +170,11 @@ function ActionButtons({
   item,
   returnPath,
   isDemoWorkspace,
-  showReport = false,
   showAlert = false
 }: {
   item: PrestigeAction | ProfitLeak;
   returnPath: string;
   isDemoWorkspace?: boolean;
-  showReport?: boolean;
   showAlert?: boolean;
 }) {
   if (isDemoWorkspace) {
@@ -194,14 +190,6 @@ function ActionButtons({
 
   return (
     <div className="flex flex-wrap gap-2">
-      <Link href={generatedOutputHref({ type: "action_plan", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">
-        Generate Improvement Plan
-      </Link>
-      {showReport ? (
-        <Link href={generatedOutputHref({ type: "risk_brief", title: item.title, summary: item.why, why: item.evidence, remedy: item.action })} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-          Generate Investigation Summary
-        </Link>
-      ) : null}
       {showAlert ? (
         <form action={createKpiAlertFromPrestigeAction}>
           <input type="hidden" name="return_path" value={returnPath} />
@@ -234,14 +222,12 @@ function ActionCard({
   returnPath,
   isDemoWorkspace,
   children,
-  showReport,
   showAlert
 }: {
   item: PrestigeAction | ProfitLeak;
   returnPath: string;
   isDemoWorkspace?: boolean;
   children?: ReactNode;
-  showReport?: boolean;
   showAlert?: boolean;
 }) {
   const confidence = confidenceForAction(item.priority);
@@ -282,7 +268,7 @@ function ActionCard({
       </details>
       {children}
       <div className="mt-4">
-        <ActionButtons item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showReport={showReport} showAlert={showAlert} />
+        <ActionButtons item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showAlert={showAlert} />
       </div>
     </article>
   );
@@ -338,8 +324,6 @@ function IntelligenceAccordion({
 export function PrestigeOperationsPanel({
   intelligence,
   returnPath = "/app",
-  dateRangeStart,
-  dateRangeEnd,
   compact = false,
   isDemoWorkspace = false,
   showHealthHero = true
@@ -428,7 +412,7 @@ export function PrestigeOperationsPanel({
           <div className="space-y-3">
             {intelligence.profitLeaks.length ? (
               intelligence.profitLeaks.map((item) => (
-                <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showReport showAlert>
+                <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showAlert>
                   <p className="mt-3 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">
                     Estimated impact: {item.estimatedImpact} · Severity: {item.severity}
                   </p>
@@ -616,10 +600,6 @@ export function PrestigeOperationsPanel({
           summary={`${intelligence.meetingMode.agenda.length} agenda item${intelligence.meetingMode.agenda.length === 1 ? "" : "s"} ready for the next management review.`}
         >
           <MiniList items={intelligence.meetingMode.agenda} empty="No agenda available." />
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href={generatedOutputHref({ type: "action_plan", title: "Weekly leadership improvement plan", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white">Generate Improvement Plan</Link>
-            <Link href={generatedOutputHref({ type: "executive_briefing", title: "Weekly meeting briefing", summary: intelligence.meetingMode.agenda.join("; ") })} className="rounded-lg border border-line px-3 py-2 text-xs font-semibold">Generate Executive Briefing</Link>
-          </div>
         </IntelligenceAccordion>
 
         <IntelligenceAccordion
@@ -677,22 +657,6 @@ export function PrestigeOperationsPanel({
               </article>
             ))}
           </div>
-          {isDemoWorkspace ? (
-            <div className="mt-4">
-              <DemoPreviewNotice />
-            </div>
-          ) : (
-            <form action={createBusinessReviewPackageAction} className="mt-4">
-              <input type="hidden" name="return_path" value={returnPath} />
-              <input type="hidden" name="title" value={intelligence.businessReviewPackage.title} />
-              <input type="hidden" name="body_markdown" value={intelligence.businessReviewPackage.body} />
-              <input type="hidden" name="date_range_start" value={dateRangeStart || ""} />
-              <input type="hidden" name="date_range_end" value={dateRangeEnd || ""} />
-              <ConfirmSubmitButton message="Save this Business Review Package to Reports?">
-                Prepare Business Review Package
-              </ConfirmSubmitButton>
-            </form>
-          )}
         </IntelligenceAccordion>
       </section>
     </div>

@@ -37,6 +37,7 @@ import {
   type WorksheetType
 } from "@/lib/imports/worksheet-types";
 import { approvedKpiColor } from "@/lib/kpis/settings";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
 import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
@@ -4274,6 +4275,9 @@ export async function saveExtractedImportAction(formData: FormData) {
 }
 
 export async function createReportFromFileAction(formData: FormData) {
+  if (legacyReportGenerationDisabled()) {
+    redirectWithFileError("File-to-report generation is no longer available. Save a completed analysis from its live view instead.", text(formData, "file_id"));
+  }
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
   const reportTitle = text(formData, "report_title") || `File Report - ${file.display_name}`;

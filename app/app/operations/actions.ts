@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -987,6 +988,9 @@ export async function createSopAction(formData: FormData) {
 }
 
 export async function createReportAction(formData: FormData) {
+  if (legacyReportGenerationDisabled()) {
+    redirectWithError("/app/reports", "Manual report generation is no longer available. Save a completed analysis from its live view instead.");
+  }
   if (!VAEROEX_SYSTEM_PROMPT.trim()) {
     redirectWithError("/app/reports", "Vaeroex prompt is not configured.");
   }

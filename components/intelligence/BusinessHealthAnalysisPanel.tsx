@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { ArrowRight, Clock3, Eye, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { generateBusinessHealthExplanationAction } from "@/app/app/business-health-analysis/actions";
+import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
 import type {
   BusinessHealthAnalysisState,
   BusinessHealthCitationView,
@@ -302,6 +303,8 @@ export function BusinessHealthAnalysisPanel({
                   </button>
                 </div>
               ) : null}
+
+              {artifact ? <div className="mt-7"><SaveAnalysisButton analysisType="business_health" fingerprint={artifact.fingerprint} generatedAt={artifact.generatedAt} light /></div> : null}
             </div>
           </aside>
         </div>

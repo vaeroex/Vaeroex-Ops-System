@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { ArrowRight, Clock3, FileText, Loader2, RefreshCw, ShieldCheck, X } from "lucide-react";
 import { generateExecutiveBriefAction } from "@/app/app/executive-brief/actions";
+import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
 import type {
   ExecutiveBriefCitationView,
   ExecutiveBriefFacts,
@@ -357,6 +358,8 @@ export function ExecutiveBriefPanel({
                   </button>
                 </div>
               ) : null}
+
+              {artifact ? <div className="mt-7"><SaveAnalysisButton analysisType="executive_brief" fingerprint={artifact.fingerprint} generatedAt={artifact.generatedAt} light /></div> : null}
             </div>
           </aside>
         </div>

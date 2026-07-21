@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -232,6 +233,9 @@ export async function createKpiAlertFromPrestigeAction(formData: FormData) {
 
 export async function createBusinessReviewPackageAction(formData: FormData) {
   const path = returnPath(formData);
+  if (legacyReportGenerationDisabled()) {
+    redirectWithError(path, "Business Review Package generation is no longer available. Save completed analyses from their live views instead.");
+  }
   const { supabase, user, workspace, workspaceId } = await requireWorkspace(path);
   requireLiveWorkspace(path, workspace);
   const title = text(formData, "title") || "Business Review Package";

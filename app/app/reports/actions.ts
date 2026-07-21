@@ -8,6 +8,7 @@ import { requireActiveSubscription } from "@/lib/billing/require-active-subscrip
 import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys, sanitizeBusinessEvidenceText } from "@/lib/intelligence/evidence-eligibility";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -791,6 +792,9 @@ Comparison period: ${previousRange.startDate} to ${previousRange.endDate}`;
 }
 
 export async function generateReportAction(formData: FormData) {
+  if (legacyReportGenerationDisabled()) {
+    redirectWithError("Report generation is no longer available. Save a completed analysis from its live view instead.");
+  }
   const { supabase, user, workspace, workspaceId } = await requireWorkspace();
   const returnPath = safeReportsReturnPath(text(formData, "return_path"));
   const periodValue = text(formData, "report_period");
