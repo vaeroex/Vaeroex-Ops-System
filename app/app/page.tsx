@@ -1084,10 +1084,6 @@ function IntelligenceLayerSummary({
           </dl>
           <BusinessHealthTrendChart
             points={businessHealthHistory}
-            currentScore={intelligence.businessHealth.score}
-            currentStatus={intelligence.businessHealth.status}
-            currentTrend={intelligence.businessHealth.trend}
-            isDemoWorkspace={isDemoWorkspace}
             errorMessage={businessHealthHistoryError}
           />
         </div>
@@ -2036,7 +2032,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     snapshotDate: snapshot.snapshot_date,
     score: snapshot.score,
     status: snapshot.status,
-    trend: snapshot.trend
+    trend: snapshot.trend,
+    recordedAt: snapshot.created_at
   }));
   const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
     kpis,

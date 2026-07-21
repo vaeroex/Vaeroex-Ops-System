@@ -91,11 +91,9 @@ export function ExecutiveHomepage({
   businessHealthAnalysis
 }: ExecutiveHomepageProps) {
   const heading = firstName ? `Good morning, ${firstName}` : "Executive overview";
-  const trendDelta = model.health.trendDelta;
   const risk = model.priorities[0];
   const opportunity = model.priorities[1];
   const decision = model.priorities[2];
-  const showHealthTrend = model.health.available && trendDelta !== null && healthHistory.length >= 2;
 
   return (
     <div className="space-y-5">
@@ -132,19 +130,8 @@ export function ExecutiveHomepage({
             ) : (
               <p className="mt-5 text-xl font-semibold leading-7">Business Health needs more eligible evidence.</p>
             )}
-            {model.health.available ? (
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                {trendDelta === null
-                  ? "Trend will appear after additional dated evidence is available."
-                  : `${trendDelta > 0 ? "Up" : trendDelta < 0 ? "Down" : "Unchanged"} ${Math.abs(trendDelta)} point${Math.abs(trendDelta) === 1 ? "" : "s"} since the previous stored review.`}
-              </p>
-            ) : null}
-            <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
-              {businessHealthAnalysis.state.status === "current" ? "Validated score explanation" : "Current assessment"}
-            </p>
-            <h2 className="mt-1 text-xl font-semibold leading-7">{model.health.summary}</h2>
-            {businessHealthAnalysis.state.status === "current" && businessHealthAnalysis.state.artifact ? (
-              <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
+            {model.health.available && model.health.score !== null ? (
+              <BusinessHealthTrendChart points={healthHistory} errorMessage={healthHistoryError} />
             ) : null}
             <dl className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-[minmax(0,1fr)_auto] xl:grid-cols-1">
               <div>
@@ -165,18 +152,6 @@ export function ExecutiveHomepage({
             />
           </section>
         </div>
-
-        {showHealthTrend ? (
-          <div className="border-t border-white/10 px-5 pb-5 sm:px-6 sm:pb-6">
-            <BusinessHealthTrendChart
-              points={healthHistory}
-              currentScore={model.health.score || 0}
-              currentStatus={model.health.status}
-              currentTrend={model.health.trend || "Not enough history"}
-              errorMessage={healthHistoryError}
-            />
-          </div>
-        ) : null}
       </section>
 
       <section aria-label="Executive priorities" className="grid items-start gap-4 lg:grid-cols-[1fr_1fr_.78fr]">

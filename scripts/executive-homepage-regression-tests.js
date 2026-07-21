@@ -29,6 +29,7 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 };
 
 const { buildExecutiveHomepageModel } = require("../lib/intelligence/executive-homepage.ts");
+const { buildBusinessHealthChartPoints } = require("../lib/intelligence/business-health-trend.ts");
 
 function snapshotDate(daysAgo = 0) {
   const date = new Date();
@@ -200,6 +201,55 @@ const onePriorReview = buildExecutiveHomepageModel({
 });
 assert.equal(onePriorReview.changes.state, "changes", "a prior-day snapshot must be the comparison baseline");
 
+const trendNow = new Date("2026-07-21T17:00:00.000Z");
+const trendPoint = (snapshotDate, score, recordedAt = `${snapshotDate}T12:00:00.000Z`) => ({
+  snapshotDate,
+  score,
+  recordedAt,
+  status: "Watch",
+  trend: "Holding steady"
+});
+const dailyTrend = buildBusinessHealthChartPoints([
+  trendPoint("2026-07-14", 60),
+  trendPoint("2026-07-15", 61, "2026-07-15T08:00:00.000Z"),
+  trendPoint("2026-07-15", 63, "2026-07-15T18:00:00.000Z"),
+  trendPoint("2026-07-17", 64),
+  trendPoint("2026-07-21", 66)
+], "7D", trendNow);
+assert.deepEqual(dailyTrend.map((point) => [point.key, point.score]), [
+  ["2026-07-15", 63],
+  ["2026-07-17", 64],
+  ["2026-07-21", 66]
+], "7D must use the latest stored snapshot per UTC calendar day without inventing missing dates");
+
+const weeklyTrend = buildBusinessHealthChartPoints([
+  trendPoint("2026-06-09", 48),
+  trendPoint("2026-06-14", 50),
+  trendPoint("2026-06-23", 52),
+  trendPoint("2026-07-05", 54),
+  trendPoint("2026-07-19", 57),
+  trendPoint("2026-07-20", 90)
+], "6W", trendNow);
+assert.deepEqual(weeklyTrend.map((point) => [point.key, point.score]), [
+  ["2026-06-08", 50],
+  ["2026-06-22", 52],
+  ["2026-06-29", 54],
+  ["2026-07-13", 57]
+], "6W must use the latest snapshot in each completed Monday-Sunday UTC week and omit missing weeks");
+
+const monthlyTrend = buildBusinessHealthChartPoints([
+  trendPoint("2026-01-03", 41),
+  trendPoint("2026-01-31", 44),
+  trendPoint("2026-03-12", 49),
+  trendPoint("2026-06-30", 58),
+  trendPoint("2026-07-01", 99)
+], "6M", trendNow);
+assert.deepEqual(monthlyTrend.map((point) => [point.key, point.score]), [
+  ["2026-01", 44],
+  ["2026-03", 49],
+  ["2026-06", 58]
+], "6M must use the latest snapshot in each completed UTC month without averaging or inventing missing months");
+
 const partial = buildExecutiveHomepageModel({
   intelligence: intelligence(), coverage: coverage({ overallCoverage: 55 }), snapshots: [], kpiTrends: [], sourceDataAvailable: true
 });
@@ -213,6 +263,9 @@ const navigationSource = fs.readFileSync(path.join(root, "components/app/AppNavi
 const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const healthTrendSource = fs.readFileSync(path.join(root, "components/intelligence/BusinessHealthTrendChart.tsx"), "utf8");
+const healthTrendLogicSource = fs.readFileSync(path.join(root, "lib/intelligence/business-health-trend.ts"), "utf8");
+const healthHistorySource = fs.readFileSync(path.join(root, "lib/intelligence/business-health-history.ts"), "utf8");
+const healthAnalysisPanelSource = fs.readFileSync(path.join(root, "components/intelligence/BusinessHealthAnalysisPanel.tsx"), "utf8");
 const kpiPageSource = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8");
 assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visible loading state");
 assert.match(homepageSource, /lg:grid-cols-\[1fr_1fr_\.78fr\]/, "executive focus and readiness cards must use horizontal space without forcing mobile columns");
@@ -220,7 +273,14 @@ assert.match(homepageSource, /Needs Attention/, "risk and leadership decision mu
 assert.match(homepageSource, /Positive Signal/, "the positive signal must remain distinct");
 assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
-assert.match(homepageSource, /trendDelta !== null && healthHistory\.length >= 2/, "the trend chart must require valid historical depth");
+assert.doesNotMatch(homepageSource, /Validated score explanation|artifact\.analysis\.executive_interpretation/, "the homepage card must not repeat the expanded interpretation");
+assert.match(homepageSource, /BusinessHealthTrendChart points=\{healthHistory\}/, "the deterministic score graph must sit in the Business Health card");
+assert.match(healthTrendSource, /"7D"[\s\S]*"6W"[\s\S]*"6M"/, "the score graph must expose the approved ranges");
+assert.match(healthTrendSource, /selectedPoints\.length >= 2/, "the score graph must require two real points before drawing a line");
+assert.match(healthTrendSource, /Trend will appear after additional Business Health scores are recorded\./, "insufficient history must use the approved honest empty state");
+assert.doesNotMatch(healthTrendSource + healthTrendLogicSource, /runStructuredAI|provider-manager|gpt-5|nemotron|server action/i, "graph loading and range changes must never invoke an AI provider");
+assert.match(healthHistorySource, /\.eq\("workspace_id", workspaceId\)/, "Business Health history must remain workspace scoped");
+assert.match(healthAnalysisPanelSource, /Executive interpretation[\s\S]*Why it matters[\s\S]*Leadership consideration[\s\S]*Known limitations[\s\S]*What the evidence shows/, "the restored expanded Business Health hierarchy must remain unchanged");
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
 assert.doesNotMatch(homepageSource, /View full intelligence|Executive Brief/, "Overview must not expose redundant page actions or report generation");
 assert.doesNotMatch(intelligencePageSource, /Business Health|Business Intelligence Coverage|What leadership should know/, "Intelligence must start with findings instead of repeating Overview");
