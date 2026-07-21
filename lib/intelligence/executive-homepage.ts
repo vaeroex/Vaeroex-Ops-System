@@ -70,7 +70,7 @@ function conciseSentences(value: string | null | undefined, fallback: string, co
   const normalized = (value || "").replace(/\s+/g, " ").trim();
   const source = normalized || fallback;
 
-  const sentences = source.match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map((sentence) => sentence.trim()).filter(Boolean) || [];
+  const sentences = source.split(/(?<=[.!?])\s+(?=\S)/).map((sentence) => sentence.trim()).filter(Boolean);
   const concise = (sentences.length ? sentences.slice(0, count).join(" ") : source).trim();
   const maximumLength = 360;
   if (concise.length <= maximumLength) return concise;

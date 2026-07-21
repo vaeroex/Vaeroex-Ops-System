@@ -144,6 +144,23 @@ assert.equal(populated.priorities.length, 3, "exactly three priorities must rend
 assert.doesNotMatch(populated.priorities[0].title, /may indicate a pattern/i, "homepage titles must state the supported issue directly");
 assert.equal(populated.changes.state, "changes");
 
+const decimalSummary = buildExecutiveHomepageModel({
+  intelligence: intelligence({
+    topRisk: insight({
+      summary: "Gross margin declined from 52.1% to 49.8%. Revenue remains below target."
+    })
+  }),
+  coverage: coverage(),
+  snapshots: [],
+  kpiTrends: [],
+  sourceDataAvailable: true
+});
+assert.equal(
+  decimalSummary.health.summary,
+  "Gross margin declined from 52.1% to 49.8%. Revenue remains below target.",
+  "sentence compaction must not split decimal values"
+);
+
 const longOutput = buildExecutiveHomepageModel({
   intelligence: intelligence({
     topRisk: insight({
