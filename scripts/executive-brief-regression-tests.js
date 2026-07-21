@@ -346,6 +346,8 @@ assert.match(actionSource, /\.eq\("workspace_id", workspaceId\)/, "all run mutat
 assert.match(actionSource, /action:\s*"executive_brief\.generate"[\s\S]*limit:\s*1[\s\S]*identifiers:\s*\[analysisPackage\.fingerprint\]/, "duplicate generation must be fingerprint-limited");
 assert.match(serviceSource, /runStructuredAI/, "the workflow must use the provider-neutral manager");
 assert.match(serviceSource, /uncertainty must be one complete 15-420 character sentence/, "the provider contract must match the canonical uncertainty validator");
+assert.match(serviceSource, /When permitted_relationships is empty, do not describe signals as correlated, associated, linked, co-moving, or moving with one another/, "the prompt must make the empty relationship boundary explicit");
+assert.match(serviceSource, /no_relationship_language_when_unpermitted: analysisPackage\.permittedRelationships\.length === 0/, "the bounded model input must carry the empty relationship rule deterministically");
 assert.match(policySource, /BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5\.6-sol"[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5\.6-terra"/, "the Preview policy must pin Sol and Terra model IDs");
 assert.match(policySource, /resolveExecutiveBriefGenerationPolicy[\s\S]*model: BUSINESS_HEALTH_GPT56_SOL_MODEL[\s\S]*model: BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the Executive Brief policy must route Sol before Terra");
 assert.match(policySource, /isExecutiveBriefPreviewEnabled[\s\S]*VERCEL_ENV === "preview"/, "the provider experiment must remain Preview-only");
