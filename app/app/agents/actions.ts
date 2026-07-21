@@ -20,7 +20,7 @@ import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage, securityResponseOutput, type SecurityIntentClassification } from "@/lib/security/security-response";
-import { logSecurityAuditEvent, requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
+import { logSecurityAuditEvent, requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type JsonRecord = Record<string, unknown>;
@@ -556,6 +556,9 @@ async function storeSecurityBlockedRun({
 export async function runVaeroexAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const workflow = getVaeroexWorkflow(text(formData, "workflow_key"));
+  if (["weekly_report", "daily_summary", "business_review_package", "follow_up"].includes(workflow.key)) {
+    redirectWithError("Secondary report generation is no longer available. Review current analyses in their live product views.");
+  }
   const userPrompt = text(formData, "user_prompt");
   const requestId = randomUUID();
   const startedAt = Date.now();
@@ -1216,15 +1219,11 @@ export async function saveVaeroexOutputAction(formData: FormData) {
   const runId = text(formData, "run_id");
   const target = text(formData, "save_target") as VaeroexSaveTarget;
 
-  if (!runId || !["sop", "report"].includes(target)) {
+  if (!runId || target !== "sop") {
     redirectWithError("Choose a Vaeroex result and save target.");
   }
 
   const { supabase, user, workspaceId, membership, run, output } = await getRun(runId);
-  const toolByTarget: Record<VaeroexSaveTarget, RegisteredToolName> = {
-    sop: "save_vaeroex_output_sop",
-    report: "save_vaeroex_output_report"
-  };
   try {
     await requireToolExecution<{ runId: string }>(
       {
@@ -1234,7 +1233,7 @@ export async function saveVaeroexOutputAction(formData: FormData) {
         userRole: membership.role
       },
       {
-        toolName: toolByTarget[target],
+        toolName: "save_vaeroex_output_sop",
         args: { runId },
         initiatedBy: "user",
         confirmationReceived: true,
@@ -1281,41 +1280,6 @@ export async function saveVaeroexOutputAction(formData: FormData) {
 
     createdIds.push(...(data || []).map((item) => item.id));
     revalidatePath("/app/sops");
-  }
-
-  if (target === "report") {
-    const drafts = reportDrafts(output);
-
-    if (!drafts.length) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent("This Vaeroex result has no report draft to save.")}`);
-    }
-
-    const { data, error } = await supabase
-      .from("reports")
-      .insert(
-        drafts.map((report) => ({
-          workspace_id: workspaceId,
-          report_type: report.report_type,
-          title: report.title,
-          date_range_start: report.date_range_start,
-          date_range_end: report.date_range_end,
-          body_markdown: report.body_markdown,
-          source_data_json: {
-            vaeroex_run_id: run.id,
-            workflow: run.agent_type,
-            saved_at: new Date().toISOString()
-          } satisfies Json,
-          created_by: user.id
-        }))
-      )
-      .select("id");
-
-    if (error) {
-      redirect(`/app/agents?run=${run.id}&error=${encodeURIComponent(error.message)}`);
-    }
-
-    createdIds.push(...(data || []).map((item) => item.id));
-    revalidatePath("/app/reports");
   }
 
   if (!createdIds.length) {

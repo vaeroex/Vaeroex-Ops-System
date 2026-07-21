@@ -29,7 +29,6 @@ import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } fr
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
-import { generatedOutputHref } from "@/lib/intelligence/generated-output";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
@@ -599,7 +598,6 @@ function buildSmartAlerts({
   staleSops,
   oldIssues,
   unanalyzedFiles,
-  hasCurrentReport,
   checklistsWithoutRecentRuns
 }: {
   overdueTasks: TaskRow[];
@@ -609,7 +607,6 @@ function buildSmartAlerts({
   staleSops: SopRow[];
   oldIssues: IssueRow[];
   unanalyzedFiles: FileUploadRow[];
-  hasCurrentReport: boolean;
   checklistsWithoutRecentRuns: ChecklistRow[];
 }) {
   return [
@@ -681,16 +678,6 @@ function buildSmartAlerts({
           why: "Uploaded files should either feed historical memory or produce clear findings for reports.",
           action: "Review files",
           href: "/app/sources"
-        }
-      : null,
-    !hasCurrentReport
-      ? {
-          id: "missing-report",
-          severity: "Low",
-          title: "No report generated for this period",
-          why: "A saved report gives leadership a clean management summary and a record of decisions.",
-          action: "Generate report",
-          href: "/app/reports"
         }
       : null,
     checklistsWithoutRecentRuns.length
@@ -1016,21 +1003,21 @@ function IntelligenceLayerSummary({
       label: "Top risk",
       title: intelligence.topRisk?.title || "No major risk visible",
       body: intelligence.topRisk?.summary || "Vaeroex does not see a strong active risk signal yet.",
-      href: intelligence.topRisk ? generatedOutputHref({ type: "risk_brief", source: intelligence.topRisk.id }) : ("/app/intelligence" as Route),
+      href: intelligence.topRisk ? (`/app/intelligence?finding=${encodeURIComponent(intelligence.topRisk.id)}` as Route) : ("/app/intelligence" as Route),
       tone: "border-red-400/30 bg-red-950/25"
     },
     {
       label: "Top opportunity",
       title: intelligence.topOpportunity?.title || "Needs more context",
       body: intelligence.topOpportunity?.summary || "Add customer, KPI, file, or report history to reveal stronger opportunities.",
-      href: intelligence.topOpportunity ? generatedOutputHref({ type: "executive_briefing", source: intelligence.topOpportunity.id }) : ("/app/sources" as Route),
+      href: intelligence.topOpportunity ? (`/app/intelligence?finding=${encodeURIComponent(intelligence.topOpportunity.id)}` as Route) : ("/app/sources" as Route),
       tone: "border-emerald-400/30 bg-emerald-950/25"
     },
     {
       label: "Executive recommendation",
       title: intelligence.topRecommendation?.recommendedAction || "Add source data",
       body: intelligence.topRecommendation?.why || "Vaeroex recommends adding business context before making stronger executive recommendations.",
-      href: intelligence.topRecommendation ? generatedOutputHref({ type: "action_plan", source: intelligence.topRecommendation.id }) : ("/app/reports" as Route),
+      href: intelligence.topRecommendation ? (`/app/intelligence?finding=${encodeURIComponent(intelligence.topRecommendation.id)}` as Route) : ("/app/intelligence" as Route),
       tone: "border-cyan-400/30 bg-cyan-950/25"
     }
   ];
@@ -1268,16 +1255,10 @@ function IntelligenceBriefingHero({
                 <div className="mt-3">
                   {id === "action" ? (
                     <Link
-                      href={generatedOutputHref({
-                        type: "executive_briefing",
-                        title: item.title,
-                        summary: item.context,
-                        why: signalReasoning(item, tone),
-                        remedy: signalRecommendedAction(item, tone)
-                      })}
+                      href={`/app/intelligence?finding=${encodeURIComponent(item.id)}` as Route}
                       className="inline-flex min-h-10 items-center rounded-lg border border-cyan-300/25 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:border-vaeroex-accent/60 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
                     >
-                      Generate Executive Brief
+                      Review finding
                     </Link>
                   ) : (
                     <ContextualAskVaeroex
@@ -1680,7 +1661,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     negativeTrends.length ? "Review declining KPIs against recent imports, customer activity evidence, and Business Signals." : "",
     !kpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
     !crmLeads.length ? "Connect or import customer activity evidence when available." : "",
-    !reports.length ? "Generate a report for this period so the management summary is saved." : ""
+    !reports.length ? "Save a completed leadership analysis when it should remain available for later review." : ""
   ].filter(Boolean);
   const latestKpiRows = latestKpisByName(kpis);
   const belowTargetKpis = latestKpiRows.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
@@ -1689,11 +1670,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const staleSops = sops.filter((sop) => isOlderThan(sop.updated_at || sop.created_at, 90));
   const oldIssues = openIssues.filter((issue) => isOlderThan(issue.created_at, 14));
   const unanalyzedFiles = files.filter((file) => !file.analysis_summary && !file.archived_at && !file.deleted_at);
-  const hasCurrentReport = reports.some((report) =>
-    report.date_range_start && report.date_range_end
-      ? report.date_range_start <= range.endDate && report.date_range_end >= range.startDate
-      : inIsoRange(report.created_at, range.start, range.end)
-  );
   const recentRunChecklistIds = new Set(checklistRuns.filter((run) => inIsoRange(run.created_at, range.start, range.end)).map((run) => run.checklist_id));
   const checklistsWithoutRecentRuns = checklists.filter((checklist) => !recentRunChecklistIds.has(checklist.id));
   const baseSmartAlerts = buildSmartAlerts({
@@ -1704,7 +1680,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     staleSops,
     oldIssues,
     unanalyzedFiles,
-    hasCurrentReport,
     checklistsWithoutRecentRuns
   });
   const demoStoryAlerts: DashboardAlert[] = isViewingDemoWorkspace
@@ -2226,9 +2201,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   <Link href="/app/sources" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
                     Review customer context
                   </Link>
-                  <Link href={generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-                    Generate Executive Briefing
-                  </Link>
                 </div>
               </SectionCard>
             </section>
@@ -2445,8 +2417,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <Link href="/app/sources" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
               {files.length ? "Review files" : "Upload files"}
             </Link>
-            <Link href={reports.length ? "/app/reports" : generatedOutputHref({ type: "executive_briefing" })} className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              {reports.length ? "Review reports" : "Generate Executive Brief"}
+            <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
+              Review saved analyses
             </Link>
           </div>
         </article>

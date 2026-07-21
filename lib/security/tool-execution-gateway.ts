@@ -143,6 +143,13 @@ const generatedBriefingSchema = z
     sourceData: z.unknown().optional()
   })
   .strict();
+const completedAnalysisSaveSchema = z
+  .object({
+    sourceArtifactId: uuidSchema,
+    analysisType: z.enum(["executive_brief", "business_health", "finding_explanation"]),
+    fingerprint: z.string().regex(/^[a-f0-9]{64}$/i)
+  })
+  .strict();
 const deleteGeneratedInsightsSchema = z
   .object({
     runIds: z.array(uuidSchema).min(1).max(25),
@@ -165,6 +172,15 @@ const DEFAULT_BLOCK_RATE_LIMIT = 12;
 const BLOCK_RATE_LIMIT_WINDOW_MINUTES = 10;
 
 export const TOOL_EXECUTION_REGISTRY = {
+  save_completed_analysis: {
+    name: "save_completed_analysis",
+    operationType: "CREATE_RECORD",
+    targetTable: "reports",
+    schema: completedAnalysisSaveSchema,
+    requiresConfirmation: true,
+    destructive: false,
+    allowedRoles: OPERATOR_ROLES
+  },
   save_vaeroex_output_sop: {
     name: "save_vaeroex_output_sop",
     operationType: "CREATE_RECORD",

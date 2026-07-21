@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { createScheduledReport } from "@/lib/reports/scheduled-generator";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import {
   categoryLabel,
   clampScheduleDay,
@@ -195,6 +196,9 @@ export async function saveReportSubscriptionPreferenceAction(formData: FormData)
 
 export async function runReportSubscriptionNowAction(formData: FormData) {
   const path = returnPath(formData);
+  if (legacyReportGenerationDisabled()) {
+    redirectWithError(path, "Scheduled report generation is no longer available.");
+  }
   const { supabase, user, workspace, workspaceId, membership } = await requireWorkspace(path);
   const category = reportSubscriptionCategory(text(formData, "category"));
   const canRunNow = isVaeroexAdminUser(user) || ["owner", "admin"].includes(membership?.role || "");

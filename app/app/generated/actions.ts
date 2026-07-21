@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
+import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
@@ -30,6 +31,9 @@ function parseJson(value: string): Json {
 }
 
 export async function saveGeneratedOutputToReportsAction(formData: FormData) {
+  if (legacyReportGenerationDisabled()) {
+    redirectWithError("Secondary generated outputs can no longer be saved as reports.");
+  }
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
   const title = text(formData, "title") || "Generated Vaeroex output";
   const outputType = text(formData, "output_type") || "Generated Output";
