@@ -25,6 +25,7 @@ import {
 import {
   BUSINESS_HEALTH_GPT56_SOL_MODEL,
   BUSINESS_HEALTH_GPT56_TERRA_MODEL,
+  BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
   EXECUTIVE_BRIEF_GPT56_DEADLINE_MS,
   EXECUTIVE_BRIEF_GPT56_SOL_OUTPUT_TOKENS,
   EXECUTIVE_BRIEF_GPT56_SOL_TIMEOUT_MS,
@@ -294,10 +295,12 @@ function blindQuality(output: Record<string, unknown>, analysisPackage: Executiv
 
 export async function runExecutiveBriefQualificationProbe({
   profileId,
-  fixtureId
+  fixtureId,
+  forceTerraFallback = false
 }: {
   profileId: ExecutiveBriefQualificationProfileId;
   fixtureId: string;
+  forceTerraFallback?: boolean;
 }) {
   const fixture = getExecutiveBriefQualificationFixtures().find((item) => item.id === fixtureId);
   if (!fixture) throw new Error("Unknown Executive Brief qualification fixture.");
@@ -305,28 +308,68 @@ export async function runExecutiveBriefQualificationProbe({
   const startedAt = Date.now();
   const content = JSON.stringify(executiveBriefModelInput(fixture.analysisPackage));
   const settings = getAIProviderRetrySettings("openai");
+  const structuredOutput = { name: EXECUTIVE_BRIEF_CONTRACT_ID, strict: true, schema: EXECUTIVE_BRIEF_JSON_SCHEMA } as const;
+  const policyId = forceTerraFallback
+    ? `${EXECUTIVE_BRIEF_QUALIFICATION_VERSION}:forced-terra-fallback`
+    : `${EXECUTIVE_BRIEF_QUALIFICATION_VERSION}:${profileId}`;
+  const steps = forceTerraFallback
+    ? [
+        {
+          provider: "openai" as const,
+          model: BUSINESS_HEALTH_GPT56_SOL_MODEL,
+          workflowConfiguration: {
+            timeoutMs: 1,
+            maxAttempts: 1,
+            maxOutputTokens: EXECUTIVE_BRIEF_GPT56_SOL_OUTPUT_TOKENS,
+            temperature: null,
+            topP: null,
+            reasoning: { mode: "standard" as const, effort: "high" as const },
+            structuredOutput,
+            store: false,
+            stream: false as const
+          }
+        },
+        {
+          provider: "openai" as const,
+          model: BUSINESS_HEALTH_GPT56_TERRA_MODEL,
+          minimumRemainingMs: 10_000,
+          workflowConfiguration: {
+            timeoutMs: EXECUTIVE_BRIEF_GPT56_TERRA_TIMEOUT_MS,
+            maxAttempts: 1,
+            maxOutputTokens: EXECUTIVE_BRIEF_GPT56_TERRA_OUTPUT_TOKENS,
+            temperature: null,
+            topP: null,
+            reasoning: { mode: "standard" as const, effort: "high" as const },
+            structuredOutput,
+            store: false,
+            stream: false as const
+          }
+        }
+      ]
+    : [{
+        provider: "openai" as const,
+        model: selectedProfile.model,
+        workflowConfiguration: {
+          timeoutMs: selectedProfile.timeoutMs,
+          maxAttempts: 1,
+          maxOutputTokens: selectedProfile.maxOutputTokens,
+          temperature: null,
+          topP: null,
+          reasoning: { mode: "standard" as const, effort: "high" as const },
+          structuredOutput,
+          store: false,
+          stream: false as const
+        }
+      }];
   try {
     const generation = await runStructuredAI({
       primaryProvider: "openai",
-      primaryModel: selectedProfile.model,
-      fallbackModel: selectedProfile.model,
+      primaryModel: forceTerraFallback ? BUSINESS_HEALTH_GPT56_SOL_MODEL : selectedProfile.model,
+      fallbackModel: forceTerraFallback ? BUSINESS_HEALTH_GPT56_TERRA_MODEL : selectedProfile.model,
       providerPolicy: {
-        id: `${EXECUTIVE_BRIEF_QUALIFICATION_VERSION}:${profileId}`,
-        steps: [{
-          provider: "openai",
-          model: selectedProfile.model,
-          workflowConfiguration: {
-            timeoutMs: selectedProfile.timeoutMs,
-            maxAttempts: 1,
-            maxOutputTokens: selectedProfile.maxOutputTokens,
-            temperature: null,
-            topP: null,
-            reasoning: { mode: "standard", effort: "high" },
-            structuredOutput: { name: EXECUTIVE_BRIEF_CONTRACT_ID, strict: true, schema: EXECUTIVE_BRIEF_JSON_SCHEMA },
-            store: false,
-            stream: false
-          }
-        }]
+        id: policyId,
+        fallbackOn: forceTerraFallback ? BUSINESS_HEALTH_GPT56_FALLBACK_REASONS : undefined,
+        steps
       },
       systemPrompt: EXECUTIVE_BRIEF_SYSTEM_PROMPT,
       userContent: [{ type: "text", text: content }],
@@ -335,9 +378,9 @@ export async function runExecutiveBriefQualificationProbe({
       settings: { ...settings, timeoutMs: Math.min(settings.timeoutMs, selectedProfile.timeoutMs), maxRetries: 0 },
       executionBudget: {
         deadlineAtMs: startedAt + EXECUTIVE_BRIEF_GPT56_DEADLINE_MS,
-        providerTimeoutMs: { openai: selectedProfile.timeoutMs },
-        minimumAttemptWindowMs: { openai: 5_000 },
-        fallbackReserveMs: 0,
+        providerTimeoutMs: { openai: EXECUTIVE_BRIEF_GPT56_SOL_TIMEOUT_MS },
+        minimumAttemptWindowMs: { openai: forceTerraFallback ? 1 : 5_000 },
+        fallbackReserveMs: forceTerraFallback ? EXECUTIVE_BRIEF_GPT56_TERRA_TIMEOUT_MS + 1_000 : 0,
         transitionReserveMs: 500
       },
       validate: (value) => validateExecutiveBriefOutput(value, fixture.analysisPackage),
@@ -345,7 +388,7 @@ export async function runExecutiveBriefQualificationProbe({
         workflow: EXECUTIVE_BRIEF_CONTRACT_ID,
         modelRoute: "executive_brief_qualification",
         executionPath: "frozen_synthetic_fixture",
-        providerPolicyId: `${EXECUTIVE_BRIEF_QUALIFICATION_VERSION}:${profileId}`
+        providerPolicyId: policyId
       }
     });
     const verification = verifyEvidenceManifestCitations({
@@ -356,7 +399,9 @@ export async function runExecutiveBriefQualificationProbe({
     return {
       benchmarkVersion: EXECUTIVE_BRIEF_QUALIFICATION_VERSION,
       profileId,
-      model: selectedProfile.model,
+      model: generation.model,
+      fallbackUsed: generation.fallbackUsed,
+      attemptCount: generation.attempts.length,
       fixtureId,
       fixtureFingerprint: fixture.analysisPackage.fingerprint,
       state: fixture.state,
@@ -388,6 +433,8 @@ export async function runExecutiveBriefQualificationProbe({
       benchmarkVersion: EXECUTIVE_BRIEF_QUALIFICATION_VERSION,
       profileId,
       model: selectedProfile.model,
+      fallbackUsed: attempts.some((attempt) => attempt.fallback),
+      attemptCount: attempts.length,
       fixtureId,
       fixtureFingerprint: fixture.analysisPackage.fingerprint,
       state: fixture.state,

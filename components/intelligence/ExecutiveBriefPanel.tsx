@@ -180,7 +180,11 @@ export function ExecutiveBriefPanel({
   const leadershipFocus = artifact?.analysis.leadership_focus
     || signals.find((signal) => signal.roles.includes("leadership_focus"))?.approvedLeadershipFocus
     || "Keep attention on the highest-ranked eligible evidence.";
-  const summary = artifact?.analysis.executive_summary || facts.deterministicReadout[0]
+  const unavailableWithoutArtifact = !artifact && ["failed", "unavailable"].includes(state.status);
+  const summary = artifact?.analysis.executive_summary
+    || (unavailableWithoutArtifact
+      ? "Executive facts remain available while the validated brief is unavailable."
+      : facts.deterministicReadout[0])
     || "Vaeroex needs more eligible evidence before it can establish the current executive story.";
   const showRefresh = Boolean(requestToken && ["stale", "failed"].includes(state.status) && !isPending);
 
@@ -265,13 +269,15 @@ export function ExecutiveBriefPanel({
                 </div>
               ) : null}
 
-              <section aria-labelledby={`${titleId}-summary`}>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">Executive summary</p>
-                <h3 id={`${titleId}-summary`} className="sr-only">Executive summary</h3>
-                <p className="mt-2 text-xl font-semibold leading-8 text-ink">{summary}</p>
-              </section>
+              {artifact ? (
+                <section aria-labelledby={`${titleId}-summary`}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">Executive summary</p>
+                  <h3 id={`${titleId}-summary`} className="sr-only">Executive summary</h3>
+                  <p className="mt-2 text-xl font-semibold leading-8 text-ink">{summary}</p>
+                </section>
+              ) : null}
 
-              <section className="mt-7 border-t border-line pt-6" aria-labelledby={`${titleId}-facts`}>
+              <section className={`${artifact ? "mt-7 border-t pt-6" : ""} border-line`} aria-labelledby={`${titleId}-facts`}>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">What the evidence shows</p>
                 <h3 id={`${titleId}-facts`} className="mt-2 text-lg font-semibold text-ink">
                   Business Health is {facts.businessHealth.score === null ? "not yet established" : `${facts.businessHealth.score} out of 100`}.

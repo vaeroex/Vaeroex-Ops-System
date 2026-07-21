@@ -44,6 +44,7 @@ const {
   sealExecutiveBriefPackage
 } = require("../lib/ai/executive-brief/token.ts");
 const {
+  parseExecutiveBriefArtifact,
   resolveExecutiveBriefStateFromRuns
 } = require("../lib/ai/executive-brief/storage.ts");
 const {
@@ -176,7 +177,7 @@ function build(overrides = {}) {
 const analysisPackage = build();
 assert.equal(analysisPackage.contractId, "executive_brief_v1");
 assert.equal(analysisPackage.contractVersion, "executive_brief_v1");
-assert.equal(analysisPackage.validatorVersion, "executive_brief_validator_v1");
+assert.equal(analysisPackage.validatorVersion, "executive_brief_validator_v2");
 assert.equal(analysisPackage.facts.businessHealth.score, 52, "the model package must preserve the application-owned score");
 assert.ok(analysisPackage.signals.length <= 5, "the signal plan must remain bounded");
 assert.ok(analysisPackage.manifest.evidence.length <= 10, "the EvidenceManifest must remain bounded");
@@ -242,9 +243,16 @@ const validOutput = {
   provisional_hypothesis: null
 };
 assert.equal(validateExecutiveBriefOutput(validOutput, analysisPackage).ok, true, "grounded final-contract wording must validate");
+const shortUncertainty = validateExecutiveBriefOutput({ ...validOutput, uncertainty: "Unknown." }, analysisPackage);
+assert.equal(shortUncertainty.diagnostic.reasonCode, "uncertainty_invalid", "short uncertainty must have a precise safe reason code");
+assert.equal(shortUncertainty.diagnostic.expectedField, "uncertainty");
+assert.equal(shortUncertainty.diagnostic.expectedCount, 15);
+assert.equal(shortUncertainty.diagnostic.observedCount, 8);
 assert.equal(validateExecutiveBriefOutput({ ...validOutput, executive_summary: "Monthly Revenue is 42 while Customer Retention remains visible." }, analysisPackage).diagnostic.reasonCode, "numeric_integrity_failed");
 assert.equal(validateExecutiveBriefOutput({ ...validOutput, why_it_matters: "See [2] for supporting evidence." }, analysisPackage).diagnostic.reasonCode, "invalid_citation_id");
-assert.equal(validateExecutiveBriefOutput({ ...validOutput, why_it_matters: "Monthly Revenue was caused by weak execution." }, analysisPackage).diagnostic.reasonCode, "unsupported_inference");
+const unsupportedInference = validateExecutiveBriefOutput({ ...validOutput, why_it_matters: "Monthly Revenue was caused by weak execution." }, analysisPackage);
+assert.equal(unsupportedInference.diagnostic.reasonCode, "unsupported_inference");
+assert.equal(unsupportedInference.diagnostic.expectedField, "why_it_matters", "safe diagnostics must locate the rejected field without logging content");
 const missingRiskOutput = {
   ...validOutput,
   executive_summary: "Customer Retention remains above target in the current evidence.",
@@ -285,6 +293,25 @@ const completedRun = {
 };
 assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [completedRun], analysisPackage, requestTokenAvailable: true }).status, "current");
 assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [completedRun], analysisPackage: changedPackage, requestTokenAvailable: true }).status, "stale", "a previous valid artifact must be preserved after relevant evidence changes");
+const failedChangedRun = {
+  ...completedRun,
+  id: "run-failed-current",
+  status: "failed",
+  input_json: { fingerprint: changedPackage.fingerprint },
+  output_json: {},
+  error_message: "Executive Brief generation failed.",
+  created_at: new Date(now.getTime() + 60_000).toISOString(),
+  updated_at: new Date(now.getTime() + 60_000).toISOString()
+};
+const preservedAfterFailure = resolveExecutiveBriefStateFromRuns({
+  runs: [failedChangedRun, completedRun],
+  analysisPackage: changedPackage,
+  requestTokenAvailable: true
+});
+assert.equal(preservedAfterFailure.status, "stale", "two-provider failure must preserve the last valid brief as stale");
+assert.equal(preservedAfterFailure.artifact.fingerprint, analysisPackage.fingerprint);
+assert.notEqual(preservedAfterFailure.artifact.fingerprint, changedPackage.fingerprint, "a mismatched prior artifact must never appear as current");
+assert.equal(parseExecutiveBriefArtifact({ ...artifact, validatorVersion: "executive_brief_validator_v1" }), null, "artifacts from the superseded validator must not appear current");
 assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [], analysisPackage, requestTokenAvailable: true }).status, "available");
 assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [], analysisPackage: build({ homepage: homepage({ available: false, score: null }) }), requestTokenAvailable: true }).status, "insufficient_evidence");
 
@@ -318,6 +345,7 @@ assert.match(actionSource, /original_evidence_eligible:\s*false/);
 assert.match(actionSource, /\.eq\("workspace_id", workspaceId\)/, "all run mutations must remain explicitly workspace scoped");
 assert.match(actionSource, /action:\s*"executive_brief\.generate"[\s\S]*limit:\s*1[\s\S]*identifiers:\s*\[analysisPackage\.fingerprint\]/, "duplicate generation must be fingerprint-limited");
 assert.match(serviceSource, /runStructuredAI/, "the workflow must use the provider-neutral manager");
+assert.match(serviceSource, /uncertainty must be one complete 15-420 character sentence/, "the provider contract must match the canonical uncertainty validator");
 assert.match(policySource, /BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5\.6-sol"[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5\.6-terra"/, "the Preview policy must pin Sol and Terra model IDs");
 assert.match(policySource, /resolveExecutiveBriefGenerationPolicy[\s\S]*model: BUSINESS_HEALTH_GPT56_SOL_MODEL[\s\S]*model: BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the Executive Brief policy must route Sol before Terra");
 assert.match(policySource, /isExecutiveBriefPreviewEnabled[\s\S]*VERCEL_ENV === "preview"/, "the provider experiment must remain Preview-only");
@@ -329,12 +357,35 @@ assert.match(panelSource, /absolute inset-0 flex w-full/, "mobile must open a fu
 assert.match(panelSource, /event\.key !== "Tab"/, "keyboard focus must remain inside the open sheet");
 assert.doesNotMatch(panelSource, /providerAttribution|provider_policy|runtimeModel|token usage/, "normal users must not see provider metadata");
 assert.doesNotMatch(panelSource, /workspace_id|source_file_id|raw_data_json|manifest_id|candidate_id/, "normal users must not see internal serialization labels");
+assert.match(panelSource, /artifact \? \([\s\S]*Executive summary/, "only a validated artifact may render the Executive summary section");
+assert.match(panelSource, /Executive facts remain available while the validated brief is unavailable\./, "the unavailable card must use a concise polished status");
+assert.doesNotMatch(panelSource, /artifact\?\.analysis\.executive_summary \|\| facts\.deterministicReadout\[0\]/, "legacy deterministic copy must not masquerade as a generated Executive Summary");
 assert.match(qualificationSource, /EXECUTIVE_BRIEF_SYSTEM_PROMPT/, "qualification must use the final workflow prompt");
 assert.match(qualificationSource, /executiveBriefModelInput/, "qualification must use the final bounded input serializer");
 assert.match(qualificationSource, /validateExecutiveBriefOutput/, "qualification must use the final contextual validator");
 assert.doesNotMatch(qualificationSource, /nvidia|NVIDIA/i, "the final Sol/Terra comparison must not activate NVIDIA synthesis");
 assert.match(qualificationRouteSource, /VERCEL_ENV === "preview"[\s\S]*VAEROEX_AI_SMOKE_TEST_ENABLED/, "the frozen benchmark endpoint must remain Preview-only");
 assert.match(qualificationRouteSource, /isVaeroexAdminUser/, "the frozen benchmark endpoint must require Vaeroex admin access");
+assert.match(qualificationRouteSource, /forceTerraFallback/, "Preview qualification must support one controlled Terra fallback verification");
+assert.match(qualificationSource, /timeoutMs: 1[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the controlled fallback probe must fail Sol transport before invoking Terra");
 assert.match(qualificationRouteSource, /const \{ blindOutput: _blindOutput, \.\.\.safeTelemetry \} = result/, "logs must remove synthetic output content");
+
+const malformedPackage = build({
+  homepage: homepage({ summary: "Gross margin declined from 52.1% to 49.8%. revenue is on or above target idk" }),
+  intelligence: intelligence({
+    topOpportunity: insight({
+      id: "opportunity-revenue",
+      type: "Opportunity",
+      title: "revenue is on or above target idk",
+      affectedArea: "idk",
+      fingerprint: "opportunity:revenue:target",
+      supportingRecords: [evidenceRecord({ id: "kpi:revenue-target" })]
+    })
+  })
+});
+assert.match(malformedPackage.facts.deterministicReadout[0], /52\.1% to 49\.8%\./, "decimal values and units must remain complete");
+assert.doesNotMatch(JSON.stringify(malformedPackage.facts), /\bidk\b/i, "placeholder text must not enter executive-facing facts");
+assert.ok(malformedPackage.signals.every((signal) => /^[A-Z]/.test(signal.label)), "signal labels must use normalized capitalization");
+assert.ok(malformedPackage.signals.every((signal) => !/\b\d+[.]$/.test(signal.approvedFact)), "incomplete numeric sentences must not render");
 
 process.stdout.write("Executive Brief regressions passed.\n");

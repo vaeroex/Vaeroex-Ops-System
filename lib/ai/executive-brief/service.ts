@@ -23,6 +23,8 @@ Write one complete executive readout from only the supplied facts, rankings, mat
 Do not create or alter facts, metrics, state, trajectory, concern, positive signal, leadership rank, confidence, freshness, limitations, citations, IDs, severity, forecasts, recommendations, causes, or business outcomes.
 Address each required signal as part of the business story without mechanically repeating every input field. Keep distinctions between observed facts, interpretation, and uncertainty clear.
 primary_concern must be null when the application establishes none. positive_signal must be null when the application establishes none. provisional_hypothesis must be null unless an exact permitted hypothesis is supplied.
+Every non-null field must be a complete sentence. uncertainty must be one complete 15-420 character sentence that states a supplied evidence limitation; never return an empty value, placeholder, or one-word answer.
+Describe executive relevance without asserting that one signal caused, drove, led to, proved, predicted, forecast, or will produce another fact or outcome. Keep leadership_focus within the exact approved focus supplied by the application.
 Do not include markdown, citation numbers, hidden reasoning, or internal identifiers.
 Return exactly one JSON object with executive_summary, why_it_matters, primary_concern, positive_signal, leadership_focus, uncertainty, and provisional_hypothesis.`;
 
@@ -46,6 +48,11 @@ export function executiveBriefProviderAttemptTelemetry(attempt: AIProviderAttemp
     fallback_reason: attempt.fallbackReason,
     validation_stage: attempt.validationDiagnostic?.stage || null,
     validation_reason_code: attempt.validationDiagnostic?.reasonCode || null,
+    expected_field: attempt.validationDiagnostic?.expectedField || null,
+    expected_type: attempt.validationDiagnostic?.expectedType || null,
+    observed_type: attempt.validationDiagnostic?.observedType || null,
+    expected_count: attempt.validationDiagnostic?.expectedCount ?? null,
+    observed_count: attempt.validationDiagnostic?.observedCount ?? null,
     truncation_detected: attempt.truncationDetected
   };
 }

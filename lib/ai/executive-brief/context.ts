@@ -27,6 +27,9 @@ const MAX_SIGNALS = 5;
 const MAX_RECORDS_PER_SIGNAL = 2;
 const MAX_EVIDENCE_RECORDS = 10;
 const STALE_AFTER_DAYS = 45;
+const PLACEHOLDER_TEXT_PATTERN = /^(?:idk|tbd|unknown|n\/?a|none|placeholder)$/i;
+const TRAILING_PLACEHOLDER_PATTERN = /(?:\s+|[,;:()\-]+)(?:idk|tbd|placeholder)[.!?]*$/i;
+const INCOMPLETE_NUMERIC_ENDING_PATTERN = /\b\d+[.]$/;
 
 type SelectedInsight = {
   stableKey: string;
@@ -39,6 +42,21 @@ function compactText(value: string | null | undefined, maximum: number) {
   if (normalized.length <= maximum) return normalized;
   const shortened = normalized.slice(0, maximum + 1).replace(/\s+\S*$/, "").trim();
   return `${shortened || normalized.slice(0, maximum).trim()}...`;
+}
+
+function readablePhrase(value: string | null | undefined, maximum: number, fallback: string) {
+  const compacted = compactText(value, maximum).replace(TRAILING_PLACEHOLDER_PATTERN, "").trim();
+  const candidate = !compacted || PLACEHOLDER_TEXT_PATTERN.test(compacted) ? fallback : compacted;
+  if (!candidate) return "";
+  return `${candidate.charAt(0).toUpperCase()}${candidate.slice(1)}`;
+}
+
+function readableSentence(value: string | null | undefined, maximum: number, fallback: string) {
+  const candidate = readablePhrase(value, maximum, fallback).replace(TRAILING_PLACEHOLDER_PATTERN, "").trim();
+  const safeCandidate = !candidate || INCOMPLETE_NUMERIC_ENDING_PATTERN.test(candidate)
+    ? readablePhrase(fallback, maximum, "Validated evidence is available.")
+    : candidate;
+  return /[.!?]$/.test(safeCandidate) ? safeCandidate : `${safeCandidate}.`;
 }
 
 function safeDate(value: string | null | undefined) {
@@ -250,8 +268,8 @@ function sourceLabelForCitation(
 function materialChanges(homepage: ExecutiveHomepageModel): ExecutiveBriefMaterialChange[] {
   return homepage.changes.items.slice(0, 3).map((change) => ({
     stableKey: evidenceEngineHash({ id: change.id, title: change.title, detail: change.detail, tone: change.tone }),
-    label: compactText(change.title, 180),
-    fact: compactText(change.detail, 320),
+    label: readablePhrase(change.title, 180, "Business metric change"),
+    fact: readableSentence(change.detail, 320, "A material eligible change was recorded"),
     direction: change.tone
   }));
 }
@@ -316,17 +334,22 @@ export function buildExecutiveBriefPackage({
 
   const signals: ExecutiveBriefSignal[] = selected
     .map((item) => {
-      const fact = compactText(`${item.insight.summary} ${item.insight.why}`, 520);
+      const label = readablePhrase(item.insight.title, 180, "Eligible business signal");
+      const fact = readableSentence(
+        `${item.insight.summary} ${item.insight.why}`,
+        520,
+        `${label} remains supported by eligible evidence`
+      );
       return {
         ordinal: 0,
         stableKey: item.stableKey,
         roles: Array.from(item.roles),
         classification: signalClassification(item.insight),
-        domain: compactText(item.insight.affectedArea, 100),
-        label: compactText(item.insight.title, 180),
+        domain: readablePhrase(item.insight.affectedArea, 100, "Operations"),
+        label,
         approvedFact: fact,
         approvedLeadershipFocus: item.roles.has("leadership_focus")
-          ? compactText(item.insight.recommendedAction, 360) || null
+          ? readableSentence(item.insight.recommendedAction, 360, `Review ${label} during the next evidence review`) || null
           : null,
         coverageTerms: coverageTerms(item.insight.title, fact),
         citationIds: citationIdsBySignal.get(item.stableKey) || []
@@ -401,7 +424,11 @@ export function buildExecutiveBriefPackage({
   const positiveSignal = signals.find((signal) => signal.ordinal === positiveSignalOrdinal);
   const leadershipSignal = signals.find((signal) => leadershipFocusOrdinals.includes(signal.ordinal));
   const deterministicReadout = uniqueStrings([
-    homepage.health.summary,
+    readableSentence(
+      homepage.health.summary,
+      360,
+      primaryConcern?.approvedFact || positiveSignal?.approvedFact || "Validated executive facts remain available"
+    ),
     primaryConcern ? `Primary concern: ${primaryConcern.label}.` : "No evidence-backed primary concern currently stands out.",
     positiveSignal ? `Positive signal: ${positiveSignal.label}.` : null,
     leadershipSignal?.approvedLeadershipFocus

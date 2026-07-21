@@ -2,7 +2,7 @@ import type { EvidenceManifest } from "@/lib/ai/evidence-engine/contracts";
 
 export const EXECUTIVE_BRIEF_CONTRACT_ID = "executive_brief_v1" as const;
 export const EXECUTIVE_BRIEF_CONTRACT_VERSION = "executive_brief_v1" as const;
-export const EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v1" as const;
+export const EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v2" as const;
 
 export const EXECUTIVE_BRIEF_JSON_SCHEMA = {
   type: "object",
@@ -17,13 +17,13 @@ export const EXECUTIVE_BRIEF_JSON_SCHEMA = {
     "provisional_hypothesis"
   ],
   properties: {
-    executive_summary: { type: "string" },
-    why_it_matters: { type: "string" },
-    primary_concern: { type: ["string", "null"] },
-    positive_signal: { type: ["string", "null"] },
-    leadership_focus: { type: "string" },
-    uncertainty: { type: "string" },
-    provisional_hypothesis: { type: ["string", "null"] }
+    executive_summary: { type: "string", description: "A complete 40-1000 character executive summary covering every required signal." },
+    why_it_matters: { type: "string", description: "A complete 25-520 character explanation of executive relevance using only approved facts." },
+    primary_concern: { type: ["string", "null"], description: "A complete 20-520 character statement of the application-selected concern, or null when none is established." },
+    positive_signal: { type: ["string", "null"], description: "A complete 20-520 character statement of the application-selected positive signal, or null when none is established." },
+    leadership_focus: { type: "string", description: "A complete 25-620 character statement tied to the application-approved leadership focus." },
+    uncertainty: { type: "string", description: "One complete 15-420 character sentence stating an evidence limitation; never empty or a placeholder." },
+    provisional_hypothesis: { type: ["string", "null"], description: "A complete 20-420 character provisional statement only when the application supplies an exact permitted hypothesis; otherwise null." }
   }
 } as const;
 

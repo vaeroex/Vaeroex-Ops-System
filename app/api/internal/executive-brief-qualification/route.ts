@@ -50,13 +50,16 @@ export async function POST(request: Request) {
     profileId?: string;
     fixtureId?: string;
     runIndex?: number;
+    forceTerraFallback?: boolean;
   } | null;
   const profileId = body?.profileId?.trim() || "";
   const fixtureId = body?.fixtureId?.trim() || "";
   const runIndex = body?.runIndex;
+  const forceTerraFallback = body?.forceTerraFallback === true;
   if (
     !EXECUTIVE_BRIEF_QUALIFICATION_PROFILE_IDS.includes(profileId as ExecutiveBriefQualificationProfileId)
     || !getExecutiveBriefQualificationMetadata().some((fixture) => fixture.id === fixtureId)
+    || (forceTerraFallback && profileId !== "gpt56-sol")
     || !Number.isInteger(runIndex)
     || Number(runIndex) < 1
     || Number(runIndex) > 5
@@ -65,7 +68,8 @@ export async function POST(request: Request) {
   }
   const result = await runExecutiveBriefQualificationProbe({
     profileId: profileId as ExecutiveBriefQualificationProfileId,
-    fixtureId
+    fixtureId,
+    forceTerraFallback
   });
   const { blindOutput: _blindOutput, ...safeTelemetry } = result;
   console.log(JSON.stringify({

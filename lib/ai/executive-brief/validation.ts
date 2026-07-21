@@ -41,6 +41,24 @@ function combinedText(output: ExecutiveBriefModelOutput) {
   ].join(" ");
 }
 
+const OUTPUT_FIELDS = [
+  "executive_summary",
+  "why_it_matters",
+  "primary_concern",
+  "positive_signal",
+  "leadership_focus",
+  "uncertainty",
+  "provisional_hypothesis"
+] as const;
+
+function fieldWithMatch(output: ExecutiveBriefModelOutput, pattern: RegExp) {
+  return OUTPUT_FIELDS.find((field) => {
+    const value = output[field];
+    pattern.lastIndex = 0;
+    return typeof value === "string" && pattern.test(value);
+  }) || "$";
+}
+
 function numericClaims(value: string) {
   return value.match(/(?<![A-Za-z0-9])-?\$?\d[\d,]*(?:\.\d+)?%?/g) || [];
 }
@@ -115,11 +133,20 @@ export function validateExecutiveBriefOutput(
       if (!current || typeof current !== "object") return undefined;
       return (current as Record<string | number, unknown>)[key];
     }, value);
+    const observedType = validationValueType(observed);
+    const lengthMismatch = observedType === "string" && (issue?.code === "too_small" || issue?.code === "too_big");
     return validationFailure("The Executive Brief response did not match its fixed output contract.", {
-      reasonCode: field === "executive_summary" ? "executive_summary_missing" : "schema_field_type_mismatch",
+      reasonCode: field === "executive_summary"
+        ? "executive_summary_missing"
+        : field === "uncertainty" && lengthMismatch
+          ? "uncertainty_invalid"
+          : "schema_field_type_mismatch",
       stage: "canonical_schema",
       expectedField: field,
-      observedType: validationValueType(observed),
+      expectedType: "string",
+      observedType,
+      expectedCount: issue?.code === "too_small" || issue?.code === "too_big" ? Number(issue.minimum ?? issue.maximum) : undefined,
+      observedCount: typeof observed === "string" ? observed.length : undefined,
       fieldPresent: observed !== undefined
     });
   }
@@ -136,19 +163,21 @@ export function validateExecutiveBriefOutput(
     });
   }
   if (REASONING_LEAKAGE_PATTERN.test(text)) {
+    const field = fieldWithMatch(output, REASONING_LEAKAGE_PATTERN);
     return validationFailure("The response exposed internal reasoning or instructions.", {
       reasonCode: "contextual_validation_failed",
       stage: "contextual_validation",
-      expectedField: "$",
+      expectedField: field,
       expectedType: "string",
       observedType: "string"
     });
   }
   if (CAUSATION_OR_FORECAST_PATTERN.test(text)) {
+    const field = fieldWithMatch(output, CAUSATION_OR_FORECAST_PATTERN);
     return validationFailure("The response introduced an unsupported cause, forecast, or outcome.", {
       reasonCode: "unsupported_inference",
       stage: "contextual_validation",
-      expectedField: "$",
+      expectedField: field,
       expectedType: "string",
       observedType: "string"
     });
