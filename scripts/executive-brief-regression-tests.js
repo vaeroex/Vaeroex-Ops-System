@@ -389,8 +389,8 @@ assert.match(contractSource, /EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_bri
 assert.match(policySource, /BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5\.6-sol"[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5\.6-terra"/, "the Preview policy must pin Sol and Terra model IDs");
 assert.match(policySource, /resolveExecutiveBriefGenerationPolicy[\s\S]*model: BUSINESS_HEALTH_GPT56_SOL_MODEL[\s\S]*model: BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the Executive Brief policy must route Sol before Terra");
 assert.match(policySource, /isExecutiveBriefPreviewEnabled[\s\S]*VERCEL_ENV === "preview"/, "the provider experiment must remain Preview-only");
-assert.match(homepageSource, /xl:grid-cols-\[minmax\(0,3fr\)_minmax\(320px,2fr\)\]/, "desktop must preserve the approved 60/40 opening hierarchy");
-assert.ok(homepageSource.indexOf("<ExecutiveBriefPanel") < homepageSource.indexOf('aria-labelledby="business-health-heading"'), "mobile source order must place the Executive Brief first");
+assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the homepage must preserve the approved Business Health Version 1 hierarchy");
+assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Business Health Version 1 homepage must not embed the Executive Brief ahead of its snapshot");
 assert.match(panelSource, />\s*Read full brief\s*</, "the approved executive action copy must render");
 assert.match(panelSource, /sm:max-w-3xl/, "desktop must open a bounded side panel");
 assert.match(panelSource, /absolute inset-0 flex w-full/, "mobile must open a full-screen sheet");
