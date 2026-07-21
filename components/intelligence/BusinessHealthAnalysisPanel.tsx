@@ -207,43 +207,8 @@ export function BusinessHealthAnalysisPanel({
                 </div>
               ) : null}
 
-              <section aria-labelledby={`${titleId}-facts`}>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">What the evidence shows</p>
-                <h3 id={`${titleId}-facts`} className="mt-2 text-lg font-semibold text-ink">
-                  Business Health is {factsForDisplay.score === null ? "not yet established" : `${factsForDisplay.score} out of 100`}.
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-700">{factsForDisplay.deterministicSummary}</p>
-                <dl className="mt-4 grid gap-3 border-y border-line py-4 sm:grid-cols-2">
-                  <div>
-                    <dt className="text-xs font-semibold text-muted">State and trajectory</dt>
-                    <dd className="mt-1 text-sm font-semibold text-ink">{factsForDisplay.status}{factsForDisplay.trajectory ? ` · ${factsForDisplay.trajectory}` : ""}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs font-semibold text-muted">Previous review</dt>
-                    <dd className="mt-1 text-sm font-semibold text-ink">{factsForDisplay.comparison}</dd>
-                  </div>
-                </dl>
-                {factsForDisplay.drivers.length ? (
-                  <div className="mt-4">
-                    <p className="text-sm font-semibold text-ink">Highest-weighted drivers</p>
-                    <ul className="mt-2 space-y-3">
-                      {factsForDisplay.drivers.map((driver, index) => (
-                        <li key={`${driver.kind}-${driver.label}-${index}`} className="border-l-2 border-vaeroex-accent/45 pl-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-ink">{driver.label}</span>
-                            <span className="text-xs font-semibold text-muted">{driver.scoreImpact > 0 ? "+" : ""}{driver.scoreImpact} points</span>
-                            {driver.citationIds.map((citationId) => <span key={citationId} className="text-xs font-semibold text-vaeroex-blue">[{citationId}]</span>)}
-                          </div>
-                          <p className="mt-1 text-sm leading-6 text-slate-700">{driver.fact}</p>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </section>
-
               {state.status === "loading" || isPending ? (
-                <div className="mt-6 flex min-h-40 items-center justify-center border-y border-line py-8 text-center" role="status" aria-live="polite">
+                <div className="flex min-h-40 items-center justify-center border-b border-line pb-8 text-center" role="status" aria-live="polite">
                   <div>
                     <Loader2 aria-hidden="true" className="mx-auto h-6 w-6 animate-spin text-vaeroex-blue" />
                     <p className="mt-3 text-sm font-semibold text-ink">Preparing the latest validated analysis</p>
@@ -251,7 +216,7 @@ export function BusinessHealthAnalysisPanel({
                   </div>
                 </div>
               ) : artifact ? (
-                <section className="mt-7 border-t border-line pt-6" aria-labelledby={`${titleId}-interpretation`}>
+                <section aria-labelledby={`${titleId}-interpretation`}>
                   <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">Executive interpretation</p>
                   <h3 id={`${titleId}-interpretation`} className="sr-only">Executive interpretation</h3>
                   <p className="mt-2 text-lg font-semibold leading-8 text-ink">{artifact.analysis.executive_interpretation}</p>
@@ -288,6 +253,41 @@ export function BusinessHealthAnalysisPanel({
                   </ul>
                 </section>
               ) : null}
+
+              <section className="mt-7 border-t border-line pt-6" aria-labelledby={`${titleId}-facts`}>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">What the evidence shows</p>
+                <h3 id={`${titleId}-facts`} className="mt-2 text-lg font-semibold text-ink">
+                  Business Health is {factsForDisplay.score === null ? "not yet established" : `${factsForDisplay.score} out of 100`}.
+                </h3>
+                <p className="mt-2 text-sm leading-6 text-slate-700">{factsForDisplay.deterministicSummary}</p>
+                <dl className="mt-4 grid gap-3 border-y border-line py-4 sm:grid-cols-2">
+                  <div>
+                    <dt className="text-xs font-semibold text-muted">State and trajectory</dt>
+                    <dd className="mt-1 text-sm font-semibold text-ink">{factsForDisplay.status}{factsForDisplay.trajectory ? ` · ${factsForDisplay.trajectory}` : ""}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs font-semibold text-muted">Previous review</dt>
+                    <dd className="mt-1 text-sm font-semibold text-ink">{factsForDisplay.comparison}</dd>
+                  </div>
+                </dl>
+                {factsForDisplay.drivers.length ? (
+                  <div className="mt-4">
+                    <p className="text-sm font-semibold text-ink">Highest-weighted drivers</p>
+                    <ul className="mt-2 space-y-3">
+                      {factsForDisplay.drivers.map((driver, index) => (
+                        <li key={`${driver.kind}-${driver.label}-${index}`} className="border-l-2 border-vaeroex-accent/45 pl-3">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-semibold text-ink">{driver.label}</span>
+                            <span className="text-xs font-semibold text-muted">{driver.scoreImpact > 0 ? "+" : ""}{driver.scoreImpact} points</span>
+                            {driver.citationIds.map((citationId) => <span key={citationId} className="text-xs font-semibold text-vaeroex-blue">[{citationId}]</span>)}
+                          </div>
+                          <p className="mt-1 text-sm leading-6 text-slate-700">{driver.fact}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : null}
+              </section>
 
               <details className="mt-7 border-y border-line py-4">
                 <summary className="cursor-pointer text-sm font-semibold text-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55">Supporting evidence ({analysisCitations.length})</summary>

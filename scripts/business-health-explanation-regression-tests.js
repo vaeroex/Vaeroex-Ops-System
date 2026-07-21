@@ -278,4 +278,25 @@ assert.match(panelSource, /event\.key !== "Tab"/, "keyboard focus must remain wi
 assert.doesNotMatch(panelSource, /providerAttribution|provider_policy|model:/, "normal users must not see model-routing details");
 assert.doesNotMatch(panelSource, /stableKey|source_file_id|workspaceId|UUID/, "the executive view must not render internal identifiers");
 
+const executiveInterpretationIndex = panelSource.indexOf("Executive interpretation");
+const whyItMattersIndex = panelSource.indexOf("Why it matters");
+const leadershipConsiderationIndex = panelSource.indexOf("Leadership consideration");
+const knownLimitationsIndex = panelSource.indexOf("Known limitations");
+const evidenceFactsIndex = panelSource.indexOf("What the evidence shows");
+const stateTrajectoryIndex = panelSource.indexOf("State and trajectory");
+const previousReviewIndex = panelSource.indexOf("Previous review");
+const weightedDriversIndex = panelSource.indexOf("Highest-weighted drivers");
+const supportingEvidenceIndex = panelSource.indexOf("Supporting evidence");
+assert.ok(
+  executiveInterpretationIndex < whyItMattersIndex
+    && whyItMattersIndex < leadershipConsiderationIndex
+    && leadershipConsiderationIndex < knownLimitationsIndex
+    && knownLimitationsIndex < evidenceFactsIndex
+    && evidenceFactsIndex < stateTrajectoryIndex
+    && stateTrajectoryIndex < previousReviewIndex
+    && previousReviewIndex < weightedDriversIndex
+    && weightedDriversIndex < supportingEvidenceIndex,
+  "the expanded Business Health panel must lead with interpretation before deterministic evidence mechanics"
+);
+
 process.stdout.write("Business Health explanation regressions passed.\n");
