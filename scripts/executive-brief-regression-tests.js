@@ -38,7 +38,10 @@ Module._load = function loadPatched(request, parent, isMain) {
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-executive-brief-regression-secret";
 
 const { buildExecutiveBriefPackage } = require("../lib/ai/executive-brief/context.ts");
-const { validateExecutiveBriefOutput } = require("../lib/ai/executive-brief/validation.ts");
+const {
+  executiveBriefSemanticOverlap,
+  validateExecutiveBriefOutput
+} = require("../lib/ai/executive-brief/validation.ts");
 const {
   openExecutiveBriefPackage,
   sealExecutiveBriefPackage
@@ -166,6 +169,7 @@ function build(overrides = {}) {
     workspaceId,
     intelligence: overrides.intelligence || intelligence(),
     homepage: overrides.homepage || homepage(),
+    businessHealthPresentation: overrides.businessHealthPresentation,
     sourceLabelsByKey: overrides.sourceLabelsByKey || {
       "source-file:retail-workbook": "Retail Performance Workbook",
       "source-file:customer-workbook": "Customer Experience Workbook"
@@ -177,7 +181,7 @@ function build(overrides = {}) {
 const analysisPackage = build();
 assert.equal(analysisPackage.contractId, "executive_brief_v1");
 assert.equal(analysisPackage.contractVersion, "executive_brief_v1");
-assert.equal(analysisPackage.validatorVersion, "executive_brief_validator_v5");
+assert.equal(analysisPackage.validatorVersion, "executive_brief_validator_v6");
 assert.equal(analysisPackage.facts.businessHealth.score, 52, "the model package must preserve the application-owned score");
 assert.ok(analysisPackage.signals.length <= 5, "the signal plan must remain bounded");
 assert.ok(analysisPackage.manifest.evidence.length <= 10, "the EvidenceManifest must remain bounded");
@@ -234,15 +238,42 @@ assert.equal(build({ now: new Date("2027-01-19T12:00:00.000Z") }).submode, "evid
 assert.equal(build({ homepage: homepage({ available: false, score: null }) }).submode, "insufficient_evidence");
 
 const validOutput = {
-  executive_summary: "Monthly Revenue remains below target while Customer Retention remains above target, leaving leadership with a mixed current picture.",
-  why_it_matters: "The approved financial and customer signals point in different directions and should be monitored together without assuming a cause.",
-  primary_concern: "Monthly Revenue remains the primary concern because its latest eligible value is below target.",
-  positive_signal: "Customer Retention remains the strongest positive signal because its latest eligible value is above target.",
+  executive_summary: "The business has a mixed picture: Monthly Revenue needs attention, but Customer Retention provides a positive counterpoint.",
+  why_it_matters: "Customer Retention does not remove the need to examine Monthly Revenue before the next review.",
+  primary_concern: "Monthly Revenue is the first issue to examine because the application ranks it as the primary concern.",
+  positive_signal: "Customer Retention is the clearest positive fact in the approved evidence.",
   leadership_focus: "Keep attention on Monthly Revenue during the next reporting-period review.",
   uncertainty: "The current evidence does not explain why these metrics moved.",
   provisional_hypothesis: null
 };
 assert.equal(validateExecutiveBriefOutput(validOutput, analysisPackage).ok, true, "grounded final-contract wording must validate");
+assert.equal(executiveBriefSemanticOverlap(validOutput, analysisPackage), null, "a synthesized business story must remain distinct from Business Health");
+const repeatedBusinessHealth = {
+  ...validOutput,
+  executive_summary: "Revenue is below target while retention remains above target, so the current business picture is mixed."
+};
+const repeatedBusinessHealthResult = validateExecutiveBriefOutput(repeatedBusinessHealth, analysisPackage);
+assert.equal(repeatedBusinessHealthResult.diagnostic.reasonCode, "contextual_validation_failed");
+assert.equal(executiveBriefSemanticOverlap(repeatedBusinessHealth, analysisPackage)?.kind, "business_health");
+const repeatedBriefField = {
+  ...validOutput,
+  why_it_matters: "Monthly Revenue is the first issue to examine because the application ranks it as the primary concern."
+};
+assert.equal(executiveBriefSemanticOverlap(repeatedBriefField, analysisPackage)?.kind, "brief_field", "near-verbatim brief fields must be flagged");
+assert.equal(
+  validateExecutiveBriefOutput({ ...validOutput, why_it_matters: "The approved facts indicate operational pressure across the business." }, analysisPackage).diagnostic.expectedField,
+  "why_it_matters",
+  "vague consultant shorthand must be rejected"
+);
+assert.equal(
+  validateExecutiveBriefOutput({
+    ...validOutput,
+    executive_summary: "Monthly Revenue and Customer Retention are both present in the current review.",
+    why_it_matters: "Monthly Revenue and Customer Retention require continued review."
+  }, analysisPackage).diagnostic.expectedField,
+  "why_it_matters",
+  "an established positive signal must be placed in the broader business context"
+);
 const shortUncertainty = validateExecutiveBriefOutput({ ...validOutput, uncertainty: "Unknown." }, analysisPackage);
 assert.equal(shortUncertainty.diagnostic.reasonCode, "uncertainty_invalid", "short uncertainty must have a precise safe reason code");
 assert.equal(shortUncertainty.diagnostic.expectedField, "uncertainty");
@@ -349,9 +380,12 @@ assert.match(serviceSource, /runStructuredAI/, "the workflow must use the provid
 assert.match(serviceSource, /uncertainty must be one complete 15-420 character sentence/, "the provider contract must match the canonical uncertainty validator");
 assert.match(serviceSource, /use neutral "does not establish" wording and never use caused by, results in, leads to, drives, proves, forecasts, predicts, correlated, associated, linked, co-moving, or moves with/, "the prompt must keep uncertainty wording inside the unchanged inference and relationship boundary");
 assert.match(serviceSource, /Use numeric values only when they appear in approved_fact or immutable_business_state/, "the prompt must keep narrative numbers inside the unchanged numeric-integrity boundary");
+assert.match(serviceSource, /Write for an intelligent small-business owner in plain, direct English/, "the brief must use plain business language");
+assert.match(serviceSource, /Business Health separately explains why its score has that value/, "the brief must preserve the Business Health presentation boundary");
+assert.match(serviceSource, /operational pressure, execution quality, growth quality/, "the provider contract must explicitly reject vague consultant shorthand");
 assert.match(serviceSource, /When permitted_relationships is empty, do not describe signals as correlated, associated, linked, co-moving, or moving with one another/, "the prompt must make the empty relationship boundary explicit");
 assert.match(serviceSource, /no_relationship_language_when_unpermitted: analysisPackage\.permittedRelationships\.length === 0/, "the bounded model input must carry the empty relationship rule deterministically");
-assert.match(contractSource, /EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v5"/, "prompt-boundary changes must invalidate pre-correction artifacts");
+assert.match(contractSource, /EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v6"/, "prompt-boundary changes must invalidate pre-correction artifacts");
 assert.match(policySource, /BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5\.6-sol"[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5\.6-terra"/, "the Preview policy must pin Sol and Terra model IDs");
 assert.match(policySource, /resolveExecutiveBriefGenerationPolicy[\s\S]*model: BUSINESS_HEALTH_GPT56_SOL_MODEL[\s\S]*model: BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the Executive Brief policy must route Sol before Terra");
 assert.match(policySource, /isExecutiveBriefPreviewEnabled[\s\S]*VERCEL_ENV === "preview"/, "the provider experiment must remain Preview-only");
@@ -364,6 +398,8 @@ assert.match(panelSource, /event\.key !== "Tab"/, "keyboard focus must remain in
 assert.doesNotMatch(panelSource, /providerAttribution|provider_policy|runtimeModel|token usage/, "normal users must not see provider metadata");
 assert.doesNotMatch(panelSource, /workspace_id|source_file_id|raw_data_json|manifest_id|candidate_id/, "normal users must not see internal serialization labels");
 assert.match(panelSource, /artifact \? \([\s\S]*Executive summary/, "only a validated artifact may render the Executive summary section");
+assert.doesNotMatch(panelSource, />What the evidence shows</, "the successful Executive Brief must not repeat the Business Health evidence section");
+assert.match(panelSource, />Current executive facts</, "provider failure must retain a concise validated-facts fallback");
 assert.match(panelSource, /Executive facts remain available while the validated brief is unavailable\./, "the unavailable card must use a concise polished status");
 assert.doesNotMatch(panelSource, /artifact\?\.analysis\.executive_summary \|\| facts\.deterministicReadout\[0\]/, "legacy deterministic copy must not masquerade as a generated Executive Summary");
 assert.match(qualificationSource, /EXECUTIVE_BRIEF_SYSTEM_PROMPT/, "qualification must use the final workflow prompt");

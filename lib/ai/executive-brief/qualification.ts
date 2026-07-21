@@ -36,7 +36,7 @@ import { STAGE_TWO_FIXTURES } from "@/lib/ai/qualification/stage-two-fixtures";
 import type { StageTwoFixture } from "@/lib/ai/qualification/stage-two-types";
 import { estimateTokenCount } from "@/lib/ai/usage";
 
-export const EXECUTIVE_BRIEF_QUALIFICATION_VERSION = "executive_brief_final_contract_qualification_v1" as const;
+export const EXECUTIVE_BRIEF_QUALIFICATION_VERSION = "executive_brief_content_refinement_qualification_v2" as const;
 export const EXECUTIVE_BRIEF_QUALIFICATION_PROFILE_IDS = ["gpt56-sol", "gpt56-terra"] as const;
 export type ExecutiveBriefQualificationProfileId = (typeof EXECUTIVE_BRIEF_QUALIFICATION_PROFILE_IDS)[number];
 
@@ -191,6 +191,10 @@ function packageForEntry(entry: ReturnType<typeof fixtureEntries>[number]): Exec
       opportunityOrdinal ? `Positive signal: ${signals.find((signal) => signal.ordinal === opportunityOrdinal)?.label}.` : "No evidence-backed positive signal currently stands out."
     ]
   } as const;
+  const presentationBoundary = {
+    businessHealthSummary: facts.deterministicReadout[0] || null,
+    businessHealthDriverStatements: signals.slice(0, 3).map((signal) => `${signal.label}: ${signal.approvedFact}`)
+  } as const;
   const permittedRelationships = input.permitted_relationship && signals.length >= 2
     ? [{ signalOrdinals: [signals[0].ordinal, signals[1].ordinal] as const, statement: input.permitted_relationship }]
     : [];
@@ -202,6 +206,7 @@ function packageForEntry(entry: ReturnType<typeof fixtureEntries>[number]): Exec
     state: input.business_state,
     facts,
     signals: signals.map(({ citationIds: _citationIds, ordinal: _ordinal, ...signal }) => signal),
+    presentationBoundary,
     permittedRelationships,
     permittedHypothesis: input.permitted_hypothesis
   });
@@ -220,6 +225,7 @@ function packageForEntry(entry: ReturnType<typeof fixtureEntries>[number]): Exec
     leadershipFocusOrdinals: leadershipOrdinal ? [leadershipOrdinal] : [],
     permittedRelationships,
     permittedHypothesis: input.permitted_hypothesis,
+    presentationBoundary,
     requiredCitationIds,
     citations
   };

@@ -277,23 +277,14 @@ export function ExecutiveBriefPanel({
                 </section>
               ) : null}
 
-              <section className={`${artifact ? "mt-7 border-t pt-6" : ""} border-line`} aria-labelledby={`${titleId}-facts`}>
-                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">What the evidence shows</p>
-                <h3 id={`${titleId}-facts`} className="mt-2 text-lg font-semibold text-ink">
-                  Business Health is {facts.businessHealth.score === null ? "not yet established" : `${facts.businessHealth.score} out of 100`}.
-                </h3>
-                <p className="mt-1 text-sm leading-6 text-slate-700">
-                  {facts.businessHealth.status}{facts.businessHealth.trajectory ? ` · ${facts.businessHealth.trajectory}` : ""}
-                </p>
-                {facts.materialChanges.length ? (
-                  <ul className="mt-4 space-y-2 text-sm leading-6 text-slate-700">
-                    {facts.materialChanges.map((change) => <li key={change.stableKey}><span className="font-semibold text-ink">{change.label}:</span> {change.fact}</li>)}
-                  </ul>
-                ) : (
-                  <p className="mt-4 text-sm leading-6 text-muted">No material change is established since the previous valid review.</p>
-                )}
-                {signals.length ? <ul className="mt-5 space-y-4">{signals.map((signal) => <SignalFact key={signal.stableKey} signal={signal} />)}</ul> : null}
-              </section>
+              {!artifact && signals.length ? (
+                <section aria-labelledby={`${titleId}-facts`}>
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-vaeroex-blue">Current executive facts</p>
+                  <h3 id={`${titleId}-facts`} className="sr-only">Current executive facts</h3>
+                  <p className="mt-2 text-sm leading-6 text-muted">Validated facts remain available while the narrative is being prepared.</p>
+                  <ul className="mt-4 space-y-4">{signals.slice(0, 3).map((signal) => <SignalFact key={signal.stableKey} signal={signal} />)}</ul>
+                </section>
+              ) : null}
 
               {state.status === "loading" || isPending ? (
                 <div className="mt-7 flex min-h-40 items-center justify-center border-y border-line py-8 text-center" role="status" aria-live="polite">

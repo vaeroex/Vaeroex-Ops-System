@@ -2,7 +2,7 @@ import type { EvidenceManifest } from "@/lib/ai/evidence-engine/contracts";
 
 export const EXECUTIVE_BRIEF_CONTRACT_ID = "executive_brief_v1" as const;
 export const EXECUTIVE_BRIEF_CONTRACT_VERSION = "executive_brief_v1" as const;
-export const EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v5" as const;
+export const EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_brief_validator_v6" as const;
 
 export const EXECUTIVE_BRIEF_JSON_SCHEMA = {
   type: "object",
@@ -103,6 +103,11 @@ export type ExecutiveBriefCitationView = Readonly<{
   recordedAt: string | null;
 }>;
 
+export type ExecutiveBriefPresentationBoundary = Readonly<{
+  businessHealthSummary: string | null;
+  businessHealthDriverStatements: readonly string[];
+}>;
+
 export type ExecutiveBriefPackage = Readonly<{
   contractId: typeof EXECUTIVE_BRIEF_CONTRACT_ID;
   contractVersion: typeof EXECUTIVE_BRIEF_CONTRACT_VERSION;
@@ -118,6 +123,7 @@ export type ExecutiveBriefPackage = Readonly<{
   leadershipFocusOrdinals: readonly number[];
   permittedRelationships: readonly ExecutiveBriefPermittedRelationship[];
   permittedHypothesis: string | null;
+  presentationBoundary: ExecutiveBriefPresentationBoundary;
   requiredCitationIds: readonly number[];
   citations: readonly ExecutiveBriefCitationView[];
 }>;

@@ -16,6 +16,7 @@ import {
   type ExecutiveBriefConfidence,
   type ExecutiveBriefMaterialChange,
   type ExecutiveBriefPackage,
+  type ExecutiveBriefPresentationBoundary,
   type ExecutiveBriefSignal,
   type ExecutiveBriefSignalRole,
   type ExecutiveBriefSubmode
@@ -213,7 +214,7 @@ function confidenceCeiling(
   return confidence;
 }
 
-function uniqueStrings(values: Array<string | null | undefined>, maximum = 6) {
+function uniqueStrings(values: readonly (string | null | undefined)[], maximum = 6) {
   const normalized = values.map((value) => compactText(value, 280)).filter(Boolean);
   return normalized
     .filter((value, index) => normalized.findIndex((candidate) => candidate.toLowerCase() === value.toLowerCase()) === index)
@@ -278,12 +279,14 @@ export function buildExecutiveBriefPackage({
   workspaceId,
   intelligence,
   homepage,
+  businessHealthPresentation,
   sourceLabelsByKey = {},
   now = new Date()
 }: {
   workspaceId: string;
   intelligence: IntelligenceLayerResult;
   homepage: ExecutiveHomepageModel;
+  businessHealthPresentation?: ExecutiveBriefPresentationBoundary;
   sourceLabelsByKey?: Readonly<Record<string, string>>;
   now?: Date;
 }): ExecutiveBriefPackage {
@@ -435,6 +438,16 @@ export function buildExecutiveBriefPackage({
       ? `Leadership focus: ${leadershipSignal.approvedLeadershipFocus}`
       : "Leadership focus should remain on validating the highest-ranked eligible signals."
   ], 5);
+  const presentationBoundary: ExecutiveBriefPresentationBoundary = {
+    businessHealthSummary: compactText(
+      businessHealthPresentation?.businessHealthSummary || homepage.health.summary,
+      620
+    ) || null,
+    businessHealthDriverStatements: uniqueStrings(
+      businessHealthPresentation?.businessHealthDriverStatements || [homepage.health.driver],
+      5
+    )
+  };
   const facts = {
     available,
     businessHealth: {
@@ -504,7 +517,8 @@ export function buildExecutiveBriefPackage({
       .map((signal) => signal.stableKey)
       .sort(),
     permittedRelationships: [],
-    permittedHypothesis: null
+    permittedHypothesis: null,
+    presentationBoundary
   });
 
   return {
@@ -522,6 +536,7 @@ export function buildExecutiveBriefPackage({
     leadershipFocusOrdinals,
     permittedRelationships: [],
     permittedHypothesis: null,
+    presentationBoundary,
     requiredCitationIds,
     citations
   };

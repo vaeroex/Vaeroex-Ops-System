@@ -2108,6 +2108,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     workspaceId,
     intelligence: intelligenceLayer,
     homepage: executiveHomepageModel,
+    businessHealthPresentation: {
+      businessHealthSummary: businessHealthAnalysisPackage.facts.deterministicSummary,
+      businessHealthDriverStatements: businessHealthAnalysisPackage.facts.drivers.map((driver) => `${driver.label}: ${driver.fact}`)
+    },
     sourceLabelsByKey: executiveSourceLabelsByKey
   });
   const executiveBriefToken = user && dashboardMode === "Executive View" && isExecutiveBriefPreviewEnabled()

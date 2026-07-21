@@ -42,6 +42,7 @@ function validPackage(value: unknown): value is ExecutiveBriefPackage {
     Boolean(candidate.facts && typeof candidate.facts === "object") &&
     Array.isArray(candidate.signals) &&
     Boolean(candidate.manifest && typeof candidate.manifest === "object") &&
+    Boolean(candidate.presentationBoundary && typeof candidate.presentationBoundary === "object") &&
     Array.isArray(candidate.requiredSignalOrdinals) &&
     Array.isArray(candidate.requiredCitationIds) &&
     Array.isArray(candidate.citations)

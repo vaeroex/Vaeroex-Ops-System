@@ -28,6 +28,13 @@ const REASONING_LEAKAGE_PATTERN = /\b(?:chain of thought|hidden reasoning|intern
 const CAUSATION_OR_FORECAST_PATTERN = /\b(?:caused? by|results? in|leads? to|drives?\b|will (?:cause|create|produce)|guarantees?|proves?|forecasts?|predicts?)\b/i;
 const RELATIONSHIP_PATTERN = /\b(?:correlat(?:e|ed|ion)|associated? with|linked? to|co-mov(?:e|ement)|moves? with)\b/i;
 const UNSUPPORTED_ACTION_PATTERN = /\b(?:hire|fire|lay off|acquire|sell|launch|expand|close|invest|borrow|raise prices?|cut prices?|increase budget|reduce headcount)\b/i;
+const VAGUE_EXECUTIVE_JARGON_PATTERN = /\b(?:operational pressure|execution quality|growth quality|cross-functional deterioration|strategic headwinds|isolated indicators|operational constraints)\b/i;
+const CONTRAST_PATTERN = /\b(?:while|but|however|although|even though|despite|does not|doesn't|cannot|outweigh|offset|broader|overall)\b/i;
+const OVERLAP_STOP_WORDS = new Set([
+  "about", "after", "again", "against", "because", "being", "between", "business", "current",
+  "during", "evidence", "health", "into", "latest", "more", "remains", "review", "score", "signal",
+  "that", "their", "these", "this", "those", "through", "under", "value", "with", "without"
+]);
 
 function combinedText(output: ExecutiveBriefModelOutput) {
   return [
@@ -111,6 +118,67 @@ function uncertaintyMatchesState(value: string, context: ExecutiveBriefPackage) 
   return true;
 }
 
+function proseSentences(value: string) {
+  return value
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(/(?<=[.!?])\s+(?=[A-Z0-9])/)
+    .map((sentence) => sentence.trim())
+    .filter(Boolean);
+}
+
+function overlapTerms(value: string) {
+  return Array.from(new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, " ")
+      .split(/\s+/)
+      .filter((term) => term.length >= 4 && !OVERLAP_STOP_WORDS.has(term))
+  ));
+}
+
+function materiallyOverlaps(left: string, right: string, threshold: number) {
+  const leftTerms = overlapTerms(left);
+  const rightTerms = overlapTerms(right);
+  if (leftTerms.length < 5 || rightTerms.length < 5) return false;
+  const rightSet = new Set(rightTerms);
+  const shared = leftTerms.filter((term) => rightSet.has(term)).length;
+  return shared >= 5 && shared / Math.min(leftTerms.length, rightTerms.length) >= threshold;
+}
+
+export function executiveBriefSemanticOverlap(
+  output: ExecutiveBriefModelOutput,
+  context: ExecutiveBriefPackage
+) {
+  const outputEntries = OUTPUT_FIELDS.flatMap((field) => {
+    const value = output[field];
+    return typeof value === "string"
+      ? proseSentences(value).map((sentence) => ({ field, sentence }))
+      : [];
+  });
+  const businessHealthReferences = [
+    context.presentationBoundary.businessHealthSummary,
+    ...context.presentationBoundary.businessHealthDriverStatements
+  ].flatMap((value) => value ? proseSentences(value) : []);
+
+  for (const entry of outputEntries) {
+    if (businessHealthReferences.some((reference) => materiallyOverlaps(entry.sentence, reference, 0.72))) {
+      return { field: entry.field, kind: "business_health" as const };
+    }
+  }
+  for (let index = 0; index < outputEntries.length; index += 1) {
+    for (let candidate = index + 1; candidate < outputEntries.length; candidate += 1) {
+      const left = outputEntries[index];
+      const right = outputEntries[candidate];
+      if (left.field === right.field) continue;
+      if (materiallyOverlaps(left.sentence, right.sentence, 0.9)) {
+        return { field: right.field, kind: "brief_field" as const };
+      }
+    }
+  }
+  return null;
+}
+
 export function validateExecutiveBriefOutput(
   value: unknown,
   context: ExecutiveBriefPackage
@@ -170,6 +238,16 @@ export function validateExecutiveBriefOutput(
   if (REASONING_LEAKAGE_PATTERN.test(text)) {
     const field = fieldWithMatch(output, REASONING_LEAKAGE_PATTERN);
     return validationFailure("The response exposed internal reasoning or instructions.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: field,
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+  if (VAGUE_EXECUTIVE_JARGON_PATTERN.test(text)) {
+    const field = fieldWithMatch(output, VAGUE_EXECUTIVE_JARGON_PATTERN);
+    return validationFailure("The brief used vague executive shorthand instead of approved business facts.", {
       reasonCode: "contextual_validation_failed",
       stage: "contextual_validation",
       expectedField: field,
@@ -296,6 +374,27 @@ export function validateExecutiveBriefOutput(
       reasonCode: "invalid_action",
       stage: "ranked_signal_coverage",
       expectedField: "leadership_focus",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+
+  if (primaryConcern && positiveSignal && !CONTRAST_PATTERN.test(`${output.executive_summary} ${output.why_it_matters}`)) {
+    return validationFailure("The brief did not place the established positive signal in the broader business context.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: "why_it_matters",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+
+  const overlap = executiveBriefSemanticOverlap(output, context);
+  if (overlap) {
+    return validationFailure("The brief repeated an existing explanation instead of adding executive synthesis.", {
+      reasonCode: "contextual_validation_failed",
+      stage: "contextual_validation",
+      expectedField: overlap.field,
       expectedType: "string",
       observedType: "string"
     });
