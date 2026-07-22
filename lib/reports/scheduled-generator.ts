@@ -274,35 +274,10 @@ export async function createScheduledReport({
   }
 
   const timestamp = new Date().toISOString();
-  const notifications = preferences.map((preference) => ({
-    workspace_id: workspace.id,
-    type: "scheduled_report_ready",
-    title: `${categoryLabel(category)} is ready`,
-    body: "Vaeroex generated this scheduled report from eligible original business evidence. Email delivery is preference-based and never forced.",
-    priority: category === "quarterly_business_review" ? "High" : "Medium",
-    related_module: "Reports",
-    related_record_type: "report",
-    related_record_id: report.id,
-    action_label: "Open report",
-    action_href: "/app/reports",
-    recipient_scope: preference.preference_scope,
-    recipient_person_id: preference.person_id,
-    recipient_role: preference.role,
-    recipient_department: null,
-    metadata_json: { subscription_category: category, preference_id: preference.id } satisfies Json
-  }));
-
-  if (notifications.length) {
-    const { error } = await supabase.from("notifications").insert(notifications);
-    if (error) {
-      throw new Error(error.message);
-    }
-  }
-
   if (preferences.length) {
     await supabase
       .from("report_subscription_preferences")
-      .update({ last_generated_at: timestamp, last_notified_at: timestamp })
+      .update({ last_generated_at: timestamp })
       .in("id", preferences.map((preference) => preference.id));
   }
 

@@ -48,20 +48,7 @@ type AppShellProps = {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
   membership: WorkspaceMember | null;
-  notificationUnreadCount?: number;
 };
-
-function NotificationBadge({ count, light = false }: { count: number; light?: boolean }) {
-  if (!count) {
-    return null;
-  }
-
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${light ? "bg-white text-vaeroex-blue" : "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"}`}>
-      {count > 99 ? "99+" : count}
-    </span>
-  );
-}
 
 function workspaceAccessLabel(workspace: Workspace | null) {
   if (!workspace) return "Setup required";
@@ -78,7 +65,7 @@ function workspaceStatusTone(label: string) {
   return "border-red-300/30 bg-red-400/15 text-red-100";
 }
 
-export function AppShell({ children, profile, workspaces, activeWorkspace, notificationUnreadCount = 0 }: AppShellProps) {
+export function AppShell({ children, profile, workspaces, activeWorkspace }: AppShellProps) {
   const navSections = isVaeroexAdminEmail(profile?.email) ? [...baseNavSections, adminNavSection] : baseNavSections;
   const accessLabel = workspaceAccessLabel(activeWorkspace);
   const isDemoWorkspace = activeWorkspace?.subscription_status === "demo";
@@ -124,7 +111,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
           ) : null}
         </form>
 
-        <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} />
+        <AppNavigation sections={navSections} />
 
         <form action={signOutAction} className="mt-3">
           <button className="w-full rounded-lg border border-white/10 px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
@@ -150,14 +137,6 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
               <GlobalSearch className="hidden w-64 shrink-0 xl:block 2xl:w-96" />
               <GlobalSearch variant="icon" className="xl:hidden" />
-              <Link
-                href="/app/notifications"
-                className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm font-semibold text-slate-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
-              >
-                <span className="hidden xl:inline">Notifications</span>
-                <span className="xl:hidden">Alerts</span>
-                <NotificationBadge count={notificationUnreadCount} />
-              </Link>
               <ThemeControls variant="compact" />
               <div className="hidden max-w-48 truncate rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-100 2xl:block">
                 {profile?.full_name || profile?.email || "User"}
@@ -167,7 +146,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, notif
         </header>
 
         <nav className="border-b border-line bg-white px-3 py-2 sm:px-4 lg:hidden">
-          <AppNavigation sections={navSections} notificationUnreadCount={notificationUnreadCount} mobile />
+          <AppNavigation sections={navSections} mobile />
         </nav>
 
         <main className="mx-auto w-full max-w-[1480px] space-y-5 overflow-x-hidden p-3 sm:p-4 lg:p-6">

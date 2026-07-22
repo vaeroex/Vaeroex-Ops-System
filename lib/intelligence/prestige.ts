@@ -13,7 +13,6 @@ type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
-type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
@@ -44,7 +43,6 @@ export type PrestigeInput = {
   reports: ReportRow[];
   vaeroexRuns: VaeroexRunRow[];
   operationalMetrics: OperationalMetricRow[];
-  notifications: NotificationRow[];
   assignments: AssignmentRow[];
   shares: ShareRow[];
   people: PersonRow[];

@@ -119,7 +119,6 @@ export const helpArticles: HelpArticle[] = [
     ["first-report", "Saving your first analysis", "Preserve a completed Executive Brief, Business Health analysis, or Finding Explanation for later review.", "/app/reports"],
     ["first-follow-up", "Uploading your first Evidence source", "Add current business information through the existing Evidence upload flow.", "/app/sources"],
     ["first-sop", "Creating your first SOP", "Document the process that should happen the same way each time.", "/app/sops"],
-    ["notifications", "Understanding notifications", "Use unread notifications to see what requires attention now.", "/app/notifications"],
     ["report-subscriptions", "Understanding saved analyses", "Reports contains only analyses your team explicitly chose to save.", "/app/reports"],
     ["leadership-team", "How to use Vaeroex as a leadership team", "Use shared reports, roles, and reviews to run a clearer management rhythm.", "/app/people"]
   ].map(([id, title, summary, href]) =>
@@ -154,9 +153,8 @@ export const helpArticles: HelpArticle[] = [
     ["assets", "Assets", "Tracked equipment, tools, locations, readiness, and status checks.", "/app/assets"],
     ["people", "Organization Context", "People, roles, and departments used as context for briefings and evidence.", "/app/people"],
     ["team-roles", "Workspace Roles", "Workspace access roles that control what users can view or manage.", "/app/people"],
-    ["report-sharing", "Report Sharing", "Share report context through in-app notifications and workspace history.", "/app/reports"],
+    ["report-sharing", "Report Sharing", "Preserve report context in workspace history.", "/app/reports"],
     ["report-scheduling", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
-    ["kpi-alerts", "KPI Alerts", "Create attention signals when important metrics drift from target.", "/app/kpis"],
     ["vaeroex-ai", "Ask Vaeroex", "Ask focused business questions using current workspace context.", "/app/ask"]
   ].map(([id, title, summary, href]) =>
     article({
@@ -210,7 +208,6 @@ export const helpArticles: HelpArticle[] = [
     ["how-many-kpis", "How many KPIs should I track?", "Start with 5 to 10 meaningful metrics before adding more."],
     ["sop-review", "How often should SOPs be reviewed?", "Review critical SOPs at least quarterly and update them after recurring issues."],
     ["weekly-meeting", "How to run a weekly leadership review", "Use KPIs, open risks, Evidence, and reports to keep the conversation focused."],
-    ["quiet-kpi-alerts", "How to use KPI alerts without creating noise", "Use alerts only for metrics that require action when they drift."],
     ["report-subscription-practice", "How to use report subscriptions", "Subscribe to summaries that match the leadership rhythm, then pause what is not useful."],
     ["accountability-roles", "How to use roles as context", "Use roles and departments as context for evidence and briefings while keeping operational execution in your existing systems."],
     ["monthly-performance", "How to review business performance monthly", "Compare KPI trends, revenue, customer activity, issues, SOP changes, and decisions."],
@@ -230,10 +227,10 @@ export const helpArticles: HelpArticle[] = [
       why: "Good operating habits make Vaeroex more useful and reduce confusion.",
       when: "Use this guidance when building your leadership rhythm or cleaning up workspace records.",
       workflow: ["Pick one habit", "Apply it for one week", "Review the result", "Update the evidence", "Document what changed"],
-      mistakes: ["Overcomplicating the system", "Creating noisy alerts", "Letting stale records pile up"],
+      mistakes: ["Overcomplicating the system", "Creating noisy records", "Letting stale records pile up"],
       nextLabel: "Open dashboard",
       nextHref: "/app",
-      related: ["Reports", "KPIs", "Notifications"]
+      related: ["Reports", "KPIs", "Business Health Score"]
     })
   ),
   ...[
@@ -343,9 +340,9 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
   },
   kpis: {
     what: "KPIs track the numbers that help leadership decide what needs attention.",
-    workflow: ["Create a KPI", "Set target", "Add values over time", "Review trends", "Use alerts sparingly"],
+    workflow: ["Create a KPI", "Set target", "Add values over time", "Review trends", "Review the source evidence"],
     mistakes: ["Tracking too many KPIs", "No targets", "No source context"],
-    related: ["KPI Alerts", "Reports", "Business Health Score"]
+    related: ["Evidence", "Reports", "Business Health Score"]
   },
   crm: {
     what: "Customer activity evidence helps Vaeroex understand revenue, conversion, response speed, and opportunity signals.",

@@ -41,8 +41,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     kpiResult,
     checklistRunResult,
     crmResult,
-    reportResult,
-    notificationResult
+    reportResult
   ] = await Promise.all([
     supabase
       .from("people")
@@ -55,8 +54,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(200),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
-    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50)
+    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20)
   ]);
   const peopleRows = (people || []) as PersonRow[];
   const sourceParentResult = await loadSourceParentEligibilityResult({
@@ -85,7 +83,6 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     reports: [],
     vaeroexRuns: [],
     operationalMetrics: [],
-    notifications: notificationResult.data || [],
     assignments: assignmentResult.data || [],
     shares: [],
     people: peopleRows,
@@ -133,7 +130,7 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       <PageHeader
         eyebrow="People"
         title="People"
-        description="Add team members so reports, follow-ups, alerts, and Vaeroex insights can be assigned or shared with the right people. These workspace roles do not grant app admin access."
+        description="Add people, roles, and departments as organizational context for leadership review. These workspace roles do not grant app admin access."
       />
 
       <ErrorNotice
@@ -147,7 +144,6 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
           checklistRunResult.error?.message ||
           crmResult.error?.message ||
           reportResult.error?.message ||
-          notificationResult.error?.message ||
           sourceParentResult.error?.message
         }
       />

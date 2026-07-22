@@ -2,13 +2,11 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   createBusinessDecisionAction,
-  createKpiAlertFromPrestigeAction,
   dismissPrestigeRecommendationAction
 } from "@/app/app/intelligence/actions";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
-import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -161,7 +159,7 @@ export function BusinessHealthHero({
 function DemoPreviewNotice() {
   return (
     <p className="rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3 text-xs leading-5 text-vaeroex-navy">
-      Demo Workspace actions are previews only. No real emails, customer notifications, or live operational records are created from these prestige controls.
+      Demo Workspace actions are previews only. No real emails or live operational records are created from these prestige controls.
     </p>
   );
 }
@@ -169,13 +167,11 @@ function DemoPreviewNotice() {
 function ActionButtons({
   item,
   returnPath,
-  isDemoWorkspace,
-  showAlert = false
+  isDemoWorkspace
 }: {
   item: PrestigeAction | ProfitLeak;
   returnPath: string;
   isDemoWorkspace?: boolean;
-  showAlert?: boolean;
 }) {
   if (isDemoWorkspace) {
     return (
@@ -190,17 +186,6 @@ function ActionButtons({
 
   return (
     <div className="flex flex-wrap gap-2">
-      {showAlert ? (
-        <form action={createKpiAlertFromPrestigeAction}>
-          <input type="hidden" name="return_path" value={returnPath} />
-          <input type="hidden" name="kpi_name" value={item.relatedModule === "Customer Evidence" ? "Conversion Rate" : item.relatedModule} />
-          <input type="hidden" name="owner" value={item.owner} />
-          <input type="hidden" name="priority" value={item.priority} />
-          <ConfirmSubmitButton message={`Create a KPI alert from "${item.title}"?`} className="rounded-lg border border-line bg-white px-3 py-2 text-xs font-semibold">
-            Add KPI alert
-          </ConfirmSubmitButton>
-        </form>
-      ) : null}
       <form action={dismissPrestigeRecommendationAction}>
         <input type="hidden" name="return_path" value={returnPath} />
         <input type="hidden" name="title" value={item.title} />
@@ -221,14 +206,12 @@ function ActionCard({
   item,
   returnPath,
   isDemoWorkspace,
-  children,
-  showAlert
+  children
 }: {
   item: PrestigeAction | ProfitLeak;
   returnPath: string;
   isDemoWorkspace?: boolean;
   children?: ReactNode;
-  showAlert?: boolean;
 }) {
   const confidence = confidenceForAction(item.priority);
 
@@ -268,7 +251,7 @@ function ActionCard({
       </details>
       {children}
       <div className="mt-4">
-        <ActionButtons item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showAlert={showAlert} />
+        <ActionButtons item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} />
       </div>
     </article>
   );
@@ -412,7 +395,7 @@ export function PrestigeOperationsPanel({
           <div className="space-y-3">
             {intelligence.profitLeaks.length ? (
               intelligence.profitLeaks.map((item) => (
-                <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace} showAlert>
+                <ActionCard key={item.id} item={item} returnPath={returnPath} isDemoWorkspace={isDemoWorkspace}>
                   <p className="mt-3 rounded-lg bg-white/70 p-3 text-xs leading-5 text-slate-700">
                     Estimated impact: {item.estimatedImpact} · Severity: {item.severity}
                   </p>

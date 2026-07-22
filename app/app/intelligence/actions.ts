@@ -135,32 +135,6 @@ export async function dismissPrestigeRecommendationAction(formData: FormData) {
   redirectWithMessage(path, "Recommendation dismissed.");
 }
 
-export async function createKpiAlertFromPrestigeAction(formData: FormData) {
-  const path = returnPath(formData);
-  const { supabase, user, workspace, workspaceId } = await requireWorkspace(path);
-  requireLiveWorkspace(path, workspace);
-  const kpiName = text(formData, "kpi_name") || text(formData, "related_kpi") || "Revenue";
-
-  const { error } = await supabase.from("kpi_alert_rules").insert({
-    workspace_id: workspaceId,
-    kpi_name: kpiName,
-    condition_type: "below_target",
-    threshold_value: null,
-    recipient_scope: "role",
-    role: text(formData, "owner") || "Manager",
-    priority: text(formData, "priority") || "High",
-    is_active: true,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath("/app/kpis");
-  redirectWithMessage(path, "KPI alert rule created.");
-}
-
 export async function createBusinessReviewPackageAction(formData: FormData) {
   const path = returnPath(formData);
   if (legacyReportGenerationDisabled()) {

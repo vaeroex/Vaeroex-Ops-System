@@ -172,7 +172,7 @@ function sourceHref(sourceType: string | null, title: string | null) {
   if (normalized.includes("sop")) return hrefWithQuery("/app/sops", query);
   if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer")) return hrefWithQuery("/app/sources", query);
 
-  return "/app/notifications";
+  return "/app";
 }
 
 function shouldSearchDiagnostics(query: string, user: { email?: string | null; app_metadata?: Record<string, unknown> | null }) {
