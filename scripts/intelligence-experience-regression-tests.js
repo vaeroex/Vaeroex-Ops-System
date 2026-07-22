@@ -40,9 +40,9 @@ function kpi(overrides = {}) {
   };
 }
 
-function signal(overrides = {}) {
+function issue(overrides = {}) {
   return {
-    id: "signal-1", title: "Follow-up completion needs review", description: "Several follow-up records need review.", category: "Operations", status: "open", related_type: null, due_date: null, created_at: "2026-07-10T00:00:00Z", updated_at: "2026-07-10T00:00:00Z",
+    id: "issue-1", title: "Follow-up completion needs review", description: "Several follow-up records need review.", issue_type: "Operations", severity: "Medium", status: "Open", root_cause: null, recommended_fix: null, created_at: "2026-07-10T00:00:00Z", updated_at: "2026-07-10T00:00:00Z", archived_at: null, deleted_at: null,
     ...overrides
   };
 }
@@ -53,15 +53,14 @@ assert.equal(supported.topRisk?.confidence, "Medium", "one manual KPI series can
 assert.equal(supported.topRisk?.supportingRecords.length, 3, "KPI findings retain concrete supporting records");
 assert.match(supported.topRisk?.supportingRecords[0]?.href || "", /\/app\/kpis\?metric=Revenue/, "KPI evidence links to the original KPI detail");
 
-const sparse = buildIntelligenceLayer({ tasks: [signal()] });
-assert.equal(sparse.topRisk?.title, "Customer follow-up ownership is unclear", "specific signal evidence must replace generic pattern titles");
-assert.doesNotMatch(sparse.topRisk?.summary || "", /may indicate a pattern|customer response, conversion, service quality/i, "sparse signals must not claim unsupported impacts");
-assert.match(sparse.topRisk?.impact || "", /no measured outcome/i, "sparse signal impact must retain uncertainty");
-assert.match(sparse.topRisk?.limitation || "", /one recurring process failure/i, "weak evidence must state exactly what cannot be confirmed");
+const sparse = buildIntelligenceLayer({ issues: [issue()] });
+assert.equal(sparse.topRisk?.title, "Follow-up completion needs review", "specific issue evidence must retain its validated title");
+assert.doesNotMatch(sparse.topRisk?.summary || "", /may indicate a pattern|customer response, conversion, service quality/i, "sparse evidence must not claim unsupported impacts");
+assert.match(sparse.topRisk?.limitation || "", /root cause and measured business outcome/i, "weak evidence must state exactly what cannot be confirmed");
 
-const setupOnly = buildIntelligenceLayer({ tasks: [signal({ id: "setup-signal", title: "Starter checklist created during setup" })] });
+const setupOnly = buildIntelligenceLayer({ issues: [issue({ id: "setup-issue", title: "Starter checklist created during setup" })] });
 assert.equal(setupOnly.topRisk, undefined, "setup/bootstrap records must not become finding evidence");
-const archivedOnly = buildIntelligenceLayer({ tasks: [signal({ id: "archived-signal", archived_at: "2026-07-11T00:00:00Z" })] });
+const archivedOnly = buildIntelligenceLayer({ issues: [issue({ id: "archived-issue", archived_at: "2026-07-11T00:00:00Z" })] });
 assert.equal(archivedOnly.topRisk, undefined, "archived records must not become finding evidence");
 
 const retailFile = {
@@ -207,11 +206,11 @@ assert.equal(deterministicLatest.topOpportunity?.supportingRecords[0]?.id, "kpi:
 const evidenceFixture = Array.from({ length: 120 }, (_, index) => ({
   id: `signal:00000000-0000-4000-8000-${String(index).padStart(12, "0")}`,
   title: `Evidence record ${index % 17}`,
-  recordType: "Business Signal",
+  recordType: "Source Evidence",
   date: `2026-${String((index % 6) + 1).padStart(2, "0")}-${String((index % 27) + 1).padStart(2, "0")}`,
   value: `Observed condition ${index % 17}`,
   support: `The saved description documents the ${["Operations", "Customer", "Finance", "Sales", "Strategy", "Vendor"][index % 6].toLowerCase()} condition summarized by this finding.`,
-  href: `/app/tasks#signal-${index}`,
+  href: `/app/sources#source-${index}`,
   classification: "Manual",
   sourceKey: `signal-source:${index}`,
   groupHint: ["Operations", "Customer", "Finance", "Sales", "Strategy", "Vendor"][index % 6]
@@ -228,18 +227,18 @@ assert.equal(new Set(selectedRepresentatives.map((record) => record.id)).size, s
 const filteredEvidenceHref = supportingEvidenceHref({
   ...sparse.topRisk,
   id: "finding-123",
+  sourceHref: "/app/sources",
   supportingRecords: evidenceFixture.slice(0, 6)
 });
-assert.match(filteredEvidenceHref, /^\/app\/tasks\?/, "Business Signal findings must open the existing Business Signals view");
+assert.match(filteredEvidenceHref, /^\/app\/sources\?/, "source-backed findings must open the existing Evidence view");
 assert.match(filteredEvidenceHref, /finding=finding-123/, "view-all links retain the finding fingerprint");
-assert.match(filteredEvidenceHref, /evidence_ids=/, "view-all links retain the exact supporting record IDs");
 const scalableEvidenceHref = supportingEvidenceHref({
   ...sparse.topRisk,
   id: "source-signal-review-pattern",
+  sourceHref: "/app/sources",
   supportingRecords: evidenceFixture
 });
-assert.match(scalableEvidenceHref, /evidence_scope=related-signal-pattern/, "large evidence sets use a bounded deterministic filter instead of an oversized ID list");
-assert.doesNotMatch(scalableEvidenceHref, /evidence_ids=/, "large evidence destinations must not create unbounded URLs");
+assert.match(scalableEvidenceHref, /^\/app\/sources\?finding=/, "large evidence sets use the bounded Evidence destination");
 assert.match(supportingEvidenceHref(supported.topRisk), /\/app\/kpis\?metric=Revenue/, "single-metric evidence destinations preserve the KPI filter");
 
 const duplicate = {
@@ -275,7 +274,7 @@ const savedReportSource = fs.readFileSync(path.join(root, "app/app/reports/[id]/
 const saveActionSource = fs.readFileSync(path.join(root, "app/app/reports/saved-analysis-actions.ts"), "utf8");
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const appNavigationSource = fs.readFileSync(path.join(root, "components/app/AppNavigation.tsx"), "utf8");
-const businessSignalsSource = fs.readFileSync(path.join(root, "app/app/tasks/page.tsx"), "utf8");
+const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
 assert.match(inboxSource, /label: "Summary".*label: "Evidence".*label: "Analysis"/s, "selected findings may expose one bounded analysis view when authorized");
 assert.doesNotMatch(inboxSource, /label: "Understand"|label: "Executive Brief"/, "overlapping finding tabs must be removed");
 assert.match(inboxSource, /Explain Finding/, "risk findings expose one bounded investigation action");
@@ -297,10 +296,8 @@ assert.match(inboxSource, /xl:grid-cols-\[minmax\(0,1fr\)_minmax\(23rem,.82fr\)\
 assert.match(inboxSource, /grid gap-4 xl:grid-cols/, "finding layout remains single-column before the desktop breakpoint");
 assert.match(inboxSource, /xl:max-h-\[calc\(100dvh-8rem\)\].*xl:overflow-y-auto/, "desktop detail panel scrolls independently");
 assert.doesNotMatch(inboxSource, /(?<!xl:)max-h-\[calc\(100dvh|(?<!xl:)overflow-y-auto/, "mobile evidence flow must not create a nested viewport scroller");
-assert.match(businessSignalsSource, /\.eq\("workspace_id", workspaceId\)/, "supporting-record destinations remain workspace scoped");
-assert.match(businessSignalsSource, /showArchived = param\(params\?\.view\) === "archived" && !evidenceFilterRequested/, "supporting-record destinations must remain active-only even if the view parameter is altered");
-assert.match(businessSignalsSource, /archived_at \|\| signal\.deleted_at.*evidenceFilterRequested/s, "lifecycle eligibility must be applied before evidence-ID filtering");
-assert.match(businessSignalsSource, /evidence_ids/, "Business Signals must honor exact supporting-record filters");
+assert.match(sourcesPageSource, /\.eq\("workspace_id", workspaceId\)/, "supporting Evidence destinations remain workspace scoped");
+assert.match(sourcesPageSource, /filterEligibleMemoryRowsByLifecycle/, "supporting Evidence destinations must validate lifecycle lineage");
 assert.match(outputPageSource, /permanentRedirect\("\/app\/reports"\)/, "retired report-draft routes must redirect to Reports");
 assert.match(legacyOutputPageSource, /permanentRedirect\("\/app\/reports"\)/, "legacy generated routes must redirect to Reports");
 assert.match(inboxSource, /SaveAnalysisButton analysisType="finding_explanation"/, "completed finding explanations must expose explicit Save Analysis");

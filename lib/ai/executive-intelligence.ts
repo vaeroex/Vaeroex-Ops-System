@@ -213,7 +213,6 @@ function hasStructuredSignal(record: JsonRecord, sourceType: string) {
   if (sourceType === "KPI measurement") return populated(record.actual_value);
   if (sourceType === "Document") return stringValue(record.analysis_summary).length >= 12;
   if (sourceType === "Risk") return Boolean(stringValue(record.title) || stringValue(record.description));
-  if (sourceType === "Business Signal") return Boolean(stringValue(record.title) || stringValue(record.description));
   if (sourceType === "Operational metric") return populated(record.value);
   if (sourceType === "Customer activity") return Boolean(record.raw_data_json || record.last_activity_at || record.status);
   if (sourceType === "People context") return Boolean(record.role_title || record.department || record.status);
@@ -339,7 +338,6 @@ function structuredEvidenceCandidates(context: BoundedWorkspaceContext): Executi
     { domain: "decisions", sourceType: "Recommendation", records: values(riskContext.recommendations), role: "derived", fallbackTitle: "Prior recommendation" },
     { domain: "reports", sourceType: "Report", records: values(structured.reports).filter((value) => isRecord(value) && value.evidence_lineage_available === true), role: "derived", fallbackTitle: "Saved report" },
     { domain: "documents", sourceType: "Document", records: values(structured.sources), role: "original", fallbackTitle: "Source document" },
-    { domain: "operations", sourceType: "Business Signal", records: values(structured.business_signals), role: "original", fallbackTitle: "Business Signal" },
     { domain: "operations", sourceType: "Operational metric", records: values(structured.operational_metrics), role: "original", fallbackTitle: "Operational metric" },
     { domain: "customers", sourceType: "Customer activity", records: values(structured.historical_customer_activity), role: "original", fallbackTitle: "Customer activity" },
     { domain: "people", sourceType: "People context", records: values(structured.people_context), role: "original", fallbackTitle: "People context" },

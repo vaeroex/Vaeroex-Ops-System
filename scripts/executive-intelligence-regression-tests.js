@@ -561,7 +561,7 @@ assert.ok(ranked.every((item) => Number.isFinite(item.rankScore)), "every eviden
 
 const executivePlan = planVaeroexQuery({ query: "What should leadership focus on this week?" });
 assert.equal(executivePlan.classification, "cross_business_reasoning", "explicit leadership questions must use bounded cross-business reasoning");
-for (const domain of ["kpis", "financials", "operations", "customers", "people", "risks", "reports", "files", "business_memory", "business_signals"]) {
+for (const domain of ["kpis", "business_health", "financials", "operations", "customers", "people", "risks", "priorities", "reports", "files", "business_memory", "compliance", "data_quality", "decisions"]) {
   assert.ok(executivePlan.domains.includes(domain), `executive reasoning must include the bounded ${domain} domain`);
 }
 
@@ -887,7 +887,7 @@ const scaleRecord = (index) => {
   if (domainIndex === 2) return ["issues", { ...common, title: "Returns rate risk", description: "Returns require current leadership review." }];
   if (domainIndex === 3) return ["historical_customer_activity", { ...common, status: "Current", raw_data_json: { summary: "Customer activity changed during the current period." } }];
   if (domainIndex === 4) return ["people_context", { ...common, role_title: "Capacity constraint", department: "Operations", status: "Current" }];
-  return ["business_signals", { ...common, title: "Supplier delivery pressure", description: "Supplier delivery timing requires review." }];
+  return ["sources", { ...common, title: "Supplier delivery evidence", description: "Supplier delivery timing requires review." }];
 };
 const buildScaleContext = (recordCount) => {
   const structured = {
@@ -896,7 +896,7 @@ const buildScaleContext = (recordCount) => {
     risk_and_priority_evidence: { issues: [] },
     historical_customer_activity: [],
     people_context: [],
-    business_signals: []
+    sources: []
   };
   for (let index = 0; index < recordCount; index += 1) {
     const [collection, value] = scaleRecord(index);

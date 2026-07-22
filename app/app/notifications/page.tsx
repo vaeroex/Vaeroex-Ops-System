@@ -217,7 +217,7 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
       <PageHeader
         eyebrow="Notifications"
         title="Notification Center"
-        description="Review shared reports, KPI alerts, file analysis updates, Business Signals, and Vaeroex recommendations."
+        description="Review shared reports, KPI alerts, file analysis updates, and Vaeroex recommendations."
       />
 
       <ErrorNotice message={params?.error || notificationResult.error?.message || assignmentResult.error?.message} />
@@ -283,13 +283,13 @@ export default async function NotificationsPage({ searchParams }: NotificationsP
               description={
                 view === "unread"
                   ? "You are caught up. Read and archived history is still available in the other tabs."
-                  : "Shared reports, KPI alerts, Business Signals, file analysis, and Vaeroex recommendations will appear here."
+                  : "Shared reports, KPI alerts, file analysis, and Vaeroex recommendations will appear here."
               }
             />
           )}
         </SectionCard>
 
-        <SectionCard title="Workspace signals" description="Business Signals and shared-review signals from reports, KPI alerts, checklists, and Vaeroex recommendations.">
+        <SectionCard title="Workspace signals" description="Shared-review signals from reports, KPI alerts, checklists, and Vaeroex recommendations.">
           {assignments.length ? (
             <div className="space-y-2">
               {assignments.slice(0, 12).map((assignment) => (

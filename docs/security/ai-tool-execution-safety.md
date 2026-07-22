@@ -69,7 +69,6 @@ Vaeroex treats all retrieved or uploaded content as untrusted evidence, includin
 - image OCR text
 - business notes
 - file metadata
-- Business Signals
 - form submissions
 - Business Memory chunks
 - user prompts

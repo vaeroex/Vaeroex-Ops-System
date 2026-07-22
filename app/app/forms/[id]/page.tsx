@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { convertSubmissionToTaskAction, createFormSubmissionAction } from "@/app/app/operations/actions";
-import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { createFormSubmissionAction } from "@/app/app/operations/actions";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -89,13 +88,6 @@ export default async function FormDetailPage({ params, searchParams }: FormDetai
                   <div className="mt-4">
                     <ReadableData value={submission.data_json} empty="No submission details saved." />
                   </div>
-                  <form action={convertSubmissionToTaskAction} className="mt-4">
-                    <input type="hidden" name="form_id" value={form.id} />
-                    <input type="hidden" name="submission_id" value={submission.id} />
-                    <ConfirmSubmitButton message="Create a Business Signal from this submission?">
-                      Create Business Signal
-                    </ConfirmSubmitButton>
-                  </form>
                 </article>
               ))}
             </div>

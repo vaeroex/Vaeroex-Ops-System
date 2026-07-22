@@ -16,7 +16,7 @@ const engineScenarios = [
   {
     tab: "Change",
     question: "What changed this month?",
-    evidence: "Dated KPI history, new source files, Business Signals, and the prior stored intelligence review.",
+    evidence: "Dated KPI history, new source files, issues, and the prior stored intelligence review.",
     interpretation: "Customer demand improved while fulfillment consistency weakened across two recent reporting periods.",
     recommendation: "Protect the demand gain by reviewing the fulfillment pattern before the next reporting cycle.",
     outcome: "Leadership sees the meaningful change, not a list of every updated record.",

@@ -419,7 +419,7 @@ export function PrestigeOperationsPanel({
                 </ActionCard>
               ))
             ) : (
-              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer activity evidence, KPI targets, and Business Signals current.</p>
+              <p className="text-sm leading-6 text-muted">No obvious profit leaks were found. Keep customer activity evidence and KPI targets current.</p>
             )}
           </div>
         </IntelligenceAccordion>
@@ -486,7 +486,7 @@ export function PrestigeOperationsPanel({
                   <span className="rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold">{card.score}/100</span>
                 </div>
                 <p className="mt-2 text-xs leading-5">{card.explanation}</p>
-                <p className="mt-2 text-xs">Open signals: {card.openTasks} · Overdue: {card.overdueTasks} · Issues: {card.openIssues}</p>
+                <p className="mt-2 text-xs">Open review items: {card.openReviewItems} · Past due: {card.pastDueReviewItems} · Issues: {card.openIssues}</p>
               </article>
             ))}
           </div>

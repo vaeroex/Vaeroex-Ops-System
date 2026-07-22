@@ -36,7 +36,6 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
   const [
     { data: people, error },
     folderResult,
-    taskResult,
     issueResult,
     assignmentResult,
     kpiResult,
@@ -51,7 +50,6 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
       .eq("workspace_id", workspaceId)
       .order("full_name", { ascending: true }),
     getRecordFolders(supabase, workspaceId, "people"),
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(200),
@@ -76,7 +74,6 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
     periodLabel: "People",
     range: { startDate: today, endDate: today, previousStartDate: today, previousEndDate: today },
     kpis: eligibleKpis,
-    tasks: taskResult.data || [],
     issues: issueResult.data || [],
     assets: [],
     checklists: [],
@@ -144,7 +141,6 @@ export default async function PeoplePage({ searchParams }: PeoplePageProps) {
           (params?.error as string | undefined) ||
           error?.message ||
           folderResult.error?.message ||
-          taskResult.error?.message ||
           issueResult.error?.message ||
           assignmentResult.error?.message ||
           kpiResult.error?.message ||

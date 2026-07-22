@@ -232,7 +232,7 @@ for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Rep
   assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
 }
 assert.match(appShellSource, /label: "Primary",\s*collapsible: false/, "primary navigation must not be hidden in a workspace accordion");
-assert.match(appShellSource, /label: "Business Memory"/, "Business Signals must sit under the Business Memory label");
+assert.doesNotMatch(appShellSource, /Business Signals?|href: "\/app\/tasks"/, "retired Business Signals must not remain in authenticated navigation");
 assert.match(navigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested report draft routes must keep Reports active");
 assert.doesNotMatch(appShellSource, /href: "\/app", label: "Home"/, "authenticated navigation must use Overview instead of Home");
 assert.match(sourcesPageSource, />Evidence<\//, "the Sources workspace must present the broader Evidence purpose");

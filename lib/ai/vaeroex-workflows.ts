@@ -144,7 +144,7 @@ const workspaceAwareInstructions = `
 Workspace-aware recommendation rules:
 - First inspect workspace_context.module_state, workspace_context.metrics, workspace_context.workspace_gaps, and recent records.
 - Treat existing modules as source context for analysis, not as systems Vaeroex owns.
-- Treat Business Signals as evidence, observations, and strategic context, not as Vaeroex-owned tasks, assignments, follow-ups, or work items.
+- Treat source evidence as context, not as Vaeroex-owned tasks, assignments, follow-ups, or work items.
 - Treat customer records as evidence from external systems, imports, or source files. Do not present Vaeroex as a CRM, lead manager, or customer management product.
 - Do not recommend replacing Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or other customer systems.
 - Never recommend creating customer-management records, follow-up tracking, or ownership assignments as generic advice.
@@ -228,7 +228,7 @@ ${sharedJsonInstructions}
   {
     key: "weekly_report",
     title: "Weekly Report",
-    description: "Draft a weekly intelligence report from Business Signals, issues, assets, forms, checklist runs, and recent Vaeroex results.",
+    description: "Draft a weekly intelligence report from evidence, issues, assets, forms, checklist runs, and recent Vaeroex results.",
     actionLabel: "Draft weekly report",
     promptPlaceholder: "Optional reporting focus or date range notes.",
     saveTargets: ["report"],
@@ -242,7 +242,7 @@ ${sharedJsonInstructions}
   {
     key: "daily_summary",
     title: "Daily Summary",
-    description: "Summarize today's business activity, risks, Business Signals, and executive recommendations.",
+    description: "Summarize today's business activity, risks, evidence, and executive recommendations.",
     actionLabel: "Draft daily summary",
     promptPlaceholder: "Optional shift, team, location, or day-specific notes.",
     saveTargets: ["report"],
@@ -311,7 +311,7 @@ ${sharedJsonInstructions}
     instructions: `
 Generate a concrete improvement plan from the user's request and workspace context.
 Include what happened, evidence, likely cause, business impact, confidence, what leadership should review, and suggested supporting documents.
-Use existing Business Signals, issues, file reviews, reports, customer activity evidence, KPIs, and SOPs as evidence.
+Use existing issues, file reviews, reports, customer activity evidence, KPIs, and SOPs as evidence.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -360,7 +360,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional focus area, such as this week, Sales, Operations, or Customer Service.",
     saveTargets: ["report"],
     instructions: `
-Scan workspace KPIs, customer activity evidence, Business Signals, issues, reports, SOPs, files, alerts, source context, and checklist completion.
+Scan workspace KPIs, customer activity evidence, issues, reports, SOPs, files, alerts, source context, and checklist completion.
 Return only the top 3-5 priorities. Each priority must include title, what happened, why it matters, evidence, confidence, business impact, and what leadership should review.
 Do not return a long generic list.
 ${workspaceAwareInstructions}
@@ -375,7 +375,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional planning horizon, such as next month or next quarter.",
     saveTargets: ["report"],
     instructions: `
-Analyze declining KPIs, Business Signal patterns, repeated issues, stale SOPs, customer activity changes, checklist misses, and open risks.
+Analyze declining KPIs, repeated issues, stale SOPs, customer activity changes, checklist misses, and open risks.
 Return predicted risks, why each may happen, evidence, confidence, potential business impact, and what leadership should review.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
@@ -389,7 +389,7 @@ ${sharedJsonInstructions}
     promptPlaceholder: "Optional team or department focus.",
     saveTargets: ["report"],
     instructions: `
-Generate a weekly leadership meeting agenda with these sections: KPI review, customer activity evidence, open issues, Business Signal patterns, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
+Generate a weekly leadership meeting agenda with these sections: KPI review, customer activity evidence, open issues, evidence patterns, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
 Do not build video or chat. This is a leadership meeting agenda, not a task-management workflow.
 Include a report draft.
 ${workspaceAwareInstructions}

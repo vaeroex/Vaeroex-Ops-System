@@ -132,11 +132,11 @@ for (const source of [reportActions, scheduledReports]) {
 }
 assert.match(reportPage, /parseSavedAnalysisEnvelope/, "Reports must render copied saved analyses instead of rebuilding them from evidence");
 assert.match(reportPage, /envelope\.workspace_id === workspaceId/, "saved analyses must retain explicit workspace lineage");
-assert.match(reportActions, activeQuery("tasks"), "deleted Business Signals cannot unlock report generation");
+assert.doesNotMatch(reportActions, /\.from\("tasks"\)/, "retired Business Signals cannot enter report generation");
 assert.match(reportActions, activeQuery("issues"), "inactive issues cannot become report evidence");
 assert.match(reportActions, /eligibleChecklistIds\.has\(row\.checklist_id\)/, "report checklist evidence must have an eligible active parent");
 assert.match(reportActions, /eligibleFormIds\.has\(row\.form_id\)/, "report submission evidence must have an eligible active parent");
-assert.match(scheduledReports, activeQuery("tasks"), "scheduled reports must exclude inactive Business Signals");
+assert.doesNotMatch(scheduledReports, /\.from\("tasks"\)/, "scheduled reports must not read retired Business Signals");
 assert.match(scheduledReports, /eligibleChecklistIds\.has\(row\.checklist_id\)/, "scheduled checklist evidence must have an eligible active parent");
 
 assert.match(sourcesPage, /filterEligibleMemoryRowsByLifecycle\([\s\S]{0,180}rows: rawMemoryChunks\.filter/, "Learned Knowledge must validate active parent lineage");
@@ -145,7 +145,7 @@ assert.match(sourcesPage, /chunk\.archived_at && !chunk\.deleted_at/, "the archi
 for (const table of ["file_uploads", "kpis", "issues", "checklists", "sops", "reports"]) {
   assert.match(workspaceSnapshot, activeQuery(table), `legacy snapshot counts must include active ${table} only`);
 }
-assert.match(workspaceSnapshot, /filterOriginalBusinessEvidence\(recentTasks\.data/, "snapshot reasoning must exclude setup-only Business Signals");
+assert.doesNotMatch(workspaceSnapshot, /\.from\("tasks"\)|recentTasks/, "workspace snapshots must not read retired Business Signals");
 assert.match(workspaceSnapshot, /sourceKind: "platform_run"/, "technical failures must remain excluded from snapshot evidence");
 assert.match(sourceParentEligibilityHelper, /\.eq\("workspace_id", workspaceId\)/, "parent lifecycle lookups must remain workspace-scoped");
 for (const source of [searchRoute, boundedContext, reportActions, scheduledReports, workspaceSnapshot]) {

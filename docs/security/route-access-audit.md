@@ -18,7 +18,7 @@ Status labels: SAFE means the route has server-side guard coverage or is intenti
 | `/app/sops` | Authenticated | Active/manual/demo subscription access | Current workspace SOPs only | SAFE |
 | `/app/kpis` | Authenticated | Active/manual/demo subscription access | Current workspace KPIs only | SAFE |
 | `/app/crm` | Authenticated | Active/manual/demo subscription access | Current workspace CRM only | SAFE |
-| `/app/tasks` | Authenticated | Active/manual/demo subscription access | Current workspace tasks only | SAFE |
+| `/app/tasks` | Authenticated | Retired route | Permanently redirects to `/app/sources` | SAFE |
 | `/app/checklists` | Authenticated | Active/manual/demo subscription access | Current workspace checklists and runs only | SAFE |
 | `/app/issues` | Authenticated | Active/manual/demo subscription access | Current workspace issues only | SAFE |
 | `/app/assets` | Authenticated | Active/manual/demo subscription access | Current workspace assets and checks only | SAFE |

@@ -285,7 +285,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               ) : trimmedQuery.length < 2 ? (
                 <div className="border-l-2 border-vaeroex-accent/45 py-2 pl-4">
                   <p className="text-sm font-semibold text-white">Find a workspace record.</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a KPI, report title, source file, Business Signal, issue, or learned observation.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a KPI, report title, source file, issue, or learned observation.</p>
                 </div>
               ) : error ? (
                 <div className="rounded-lg border border-red-400/30 bg-red-950/30 p-4 text-sm text-red-100" role="alert">{error}</div>
@@ -334,7 +334,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               ) : (
                 <div className="border-l-2 border-white/15 py-2 pl-4">
                   <p className="text-sm font-semibold text-white">No matching workspace records found.</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a more specific title, KPI, file name, report, issue, or Business Signal.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a more specific title, KPI, file name, report, or issue.</p>
                 </div>
               )}
             </div>

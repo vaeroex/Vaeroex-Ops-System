@@ -91,12 +91,12 @@ function buildVaeroexAuditSummary(companyName: string, mainProblem: string, orga
       organizationDescription || "The organization"
     } needs clearer business evidence, context, and leadership review rhythms for repeatable growth.`,
     current_operational_problems: [mainProblem || "Visibility and review priorities need to be clarified during setup."],
-    main_bottlenecks: ["Limited visibility", "Missing Business Signals", "No weekly leadership review cadence"],
-    accountability_gaps: ["Business Signals need evidence, context, and clear review standards."],
-    recommended_systems_to_build: ["Business Signals", "KPI context", "Source evidence", "Executive review cadence", "Weekly intelligence report"],
-    suggested_dashboard_metrics: ["Business Signals", "Signals with limited context", "Open risks", "Assets needing attention"],
+    main_bottlenecks: ["Limited visibility", "Missing source evidence", "No weekly leadership review cadence"],
+    accountability_gaps: ["Source evidence needs context and clear review standards."],
+    recommended_systems_to_build: ["Evidence sources", "KPI context", "Executive review cadence", "Weekly intelligence review"],
+    suggested_dashboard_metrics: ["Evidence readiness", "Source coverage", "Open risks", "Assets needing attention"],
     thirty_day_action_plan: [
-      "Week 1: Capture the first Business Signals.",
+      "Week 1: Upload the first source evidence.",
       "Week 2: Review evidence and KPI patterns.",
       "Week 3: Summarize repeated issues for leadership.",
       "Week 4: Generate a weekly intelligence report and refine review priorities."
@@ -317,24 +317,6 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
         created_by: user.id
       }))
     ),
-    supabase.from("tasks").insert(
-      [
-        ["Initial forms configured", "Generated forms were created during setup and can provide future business context."],
-        ["Checklist evidence configured", "Checklist results can help Vaeroex understand operating rhythm and leadership signals."],
-        ["Issue categories configured", "Initial issue categories were selected to help Vaeroex interpret risk patterns."],
-        ["SOP drafts configured", "Initial SOP drafts can help Vaeroex understand process context."],
-        ["Vaeroex review available", "Vaeroex can review real workspace data once the workspace has more business activity."]
-      ].map(([title, description]) => ({
-        workspace_id: workspaceId,
-        title,
-        description,
-        status: "Business Signal",
-        priority: "Context",
-        category: "Setup",
-        ai_generated: false,
-        created_by: user.id
-      }))
-    ),
     supabase.from("assets").insert(
       (category.assetExamples || ["Tracked asset", "Manager device", "Supply bin", "Vehicle", "Checklist station"])
         .slice(0, 5)
@@ -384,5 +366,5 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     redirect(`/app/setup?error=${encodeURIComponent(failed.error.message)}`);
   }
 
-  redirect("/app");
+  redirect("/app/sources");
 }

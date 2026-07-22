@@ -25,13 +25,6 @@ const baseNavSections = [
       { href: "/app/reports", label: "Reports" },
       { href: "/app/settings", label: "Settings" }
     ]
-  },
-  {
-    label: "Business Memory",
-    defaultOpen: false,
-    items: [
-      { href: "/app/tasks", label: "Business Signals" }
-    ]
   }
 ] satisfies Array<{ label: string; defaultOpen?: boolean; collapsible?: boolean; items: Array<{ href: string; label: string }> }>;
 

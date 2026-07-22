@@ -32,6 +32,7 @@
     "test:persistent-ask": "node scripts/persistent-ask-regression-tests.js",
     "test:evidence-engine": "node scripts/evidence-engine-regression-tests.js",
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js && node scripts/gpt56-business-health-routing-regression-tests.js",
+    "test:business-signals-retirement": "node scripts/business-signals-retirement-regression-tests.js",
     "test:executive-brief": "node scripts/executive-brief-regression-tests.js",
     "test:finding-explanation": "node scripts/finding-explanation-regression-tests.js",
     "test:gpt56-business-health-routing": "node scripts/gpt56-business-health-routing-regression-tests.js",

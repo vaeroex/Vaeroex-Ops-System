@@ -40,7 +40,7 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
         <h2 className="mt-2 text-2xl font-semibold">Create your Vaeroex workspace</h2>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
           Answer a few setup questions and choose the type of operational environment Vaeroex will analyze. This helps configure initial
-          dashboards, terminology, Business Signals, and intelligence context. You can adjust this later.
+          dashboards, terminology, source context, and intelligence settings. You can adjust this later.
         </p>
       </section>
       <ComplianceNotice />

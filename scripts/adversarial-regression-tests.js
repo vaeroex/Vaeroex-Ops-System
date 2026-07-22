@@ -401,7 +401,7 @@ function runContextualExplanationRoutingTests() {
     "Explain this evidence",
     "Explain this KPI",
     "Explain this report",
-    "Explain this Business Signal",
+    "Explain this operational issue",
     "Explain this result",
     "Explain this output"
   ];

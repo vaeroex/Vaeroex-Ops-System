@@ -68,14 +68,6 @@ export const REPORT_SUBSCRIPTION_CATEGORIES = [
     reportPeriod: null,
     reportType: null,
     scheduledReport: false
-  },
-  {
-    key: "assigned_tasks",
-    label: "Business Signal Updates",
-    cadence: "When relevant",
-    reportPeriod: null,
-    reportType: null,
-    scheduledReport: false
   }
 ] as const;
 

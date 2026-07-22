@@ -21,8 +21,7 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [tasksResult, issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
+  const [issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
@@ -41,7 +40,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   ]);
 
   const errors = [
-    tasksResult.error,
     issuesResult.error,
     kpisResult.error,
     filesResult.error,
@@ -102,7 +100,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const displayErrors = [...errors, sourceParentResult.error, memoryEligibilityError].filter(Boolean) as Array<{ message: string }>;
   const intelligence = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
-    tasks: tasksResult.data || [],
     issues: issuesResult.data || [],
     kpis: eligibleKpis,
     files: filesResult.data || [],

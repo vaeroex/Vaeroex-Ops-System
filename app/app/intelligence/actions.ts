@@ -38,12 +38,6 @@ function requireTitle(path: string, title: string) {
   }
 }
 
-function futureDate(days: number) {
-  const date = new Date();
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
 async function requireWorkspace(path: string) {
   const supabase = await createSupabaseServerClient();
 
@@ -108,70 +102,6 @@ export async function createBusinessDecisionAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/reports");
   redirectWithMessage(path, "Decision logged. Vaeroex will include it in future reviews.");
-}
-
-export async function acceptPrestigeRecommendationAction(formData: FormData) {
-  const path = returnPath(formData);
-  const { supabase, user, workspace, workspaceId } = await requireWorkspace(path);
-  requireLiveWorkspace(path, workspace);
-  const title = text(formData, "title");
-
-  requireTitle(path, title);
-
-  const description = text(formData, "description") || text(formData, "evidence") || "Review this Vaeroex recommendation as business context.";
-  const priority = text(formData, "priority") || "Medium";
-  const dueDate = nullableText(formData, "due_date");
-  const relatedModule = text(formData, "related_module") || "Business Signals";
-  const owner = nullableText(formData, "owner");
-  const { data: task, error: taskError } = await supabase
-    .from("tasks")
-    .insert({
-      workspace_id: workspaceId,
-      title,
-      description,
-      status: "Business Signal",
-      priority: "Context",
-      category: relatedModule,
-      assigned_role: null,
-      due_date: dueDate,
-      ai_generated: true,
-      related_type: "vaeroex_recommendation",
-      created_by: user.id
-    })
-    .select("id")
-    .single();
-
-  if (taskError || !task) {
-    redirectWithError(path, taskError?.message || "Business Signal could not be created.");
-  }
-
-  const { error } = await supabase.from("vaeroex_recommendation_outcomes").insert({
-    workspace_id: workspaceId,
-    title,
-    source_type: text(formData, "source_type") || "prestige_intelligence",
-    source_title: nullableText(formData, "source_title"),
-    evidence: nullableText(formData, "evidence"),
-    related_module: relatedModule,
-    related_kpi: nullableText(formData, "related_kpi"),
-    expected_outcome: nullableText(formData, "expected_outcome"),
-    created_action_type: "task",
-    created_action_id: task.id,
-    related_task_id: task.id,
-    owner,
-    priority,
-    review_date: nullableText(formData, "review_date") || futureDate(30),
-    status: "assigned",
-    metadata_json: { accepted_from: path } satisfies Json,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath("/app");
-  revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Recommendation saved as source context.");
 }
 
 export async function dismissPrestigeRecommendationAction(formData: FormData) {
