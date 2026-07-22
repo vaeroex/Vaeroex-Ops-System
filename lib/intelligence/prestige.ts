@@ -426,7 +426,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const customerScore = satisfaction?.actual_value ?? (responseTime && metricOnTarget(responseTime) === false ? 62 : input.crmLeads.length ? 76 : 55);
   const operationsScore = clampScore(88 - openIssues.length * 3 + Math.max(0, (checkRate ?? 80) - 85) / 2);
   const salesScore = clampScore((revenue && metricOnTarget(revenue) ? 88 : 66) + (conversion && metricOnTarget(conversion) ? 8 : -8) - leadsWithoutFollowUp.length * 3);
-  const sourceVisibilityScore = clampScore(dataQuality.score + Math.min(10, input.files.filter((file) => Boolean(file.analysis_summary)).length * 2));
+  const sourceVisibilityScore = clampScore(90 + Math.min(10, input.assignments.filter((item) => lower(item.status) === "done").length * 2));
   const teamScore = clampScore(70 + input.people.filter((person) => person.role_title && person.department).length * 4);
   const categories = [
     healthCategory({
@@ -489,12 +489,12 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const score = clampScore(categories.reduce((sum, category) => sum + category.score, 0) / categories.length);
   const weak = categories.filter((category) => category.score < 70).sort((a, b) => a.score - b.score)[0];
   const strong = categories.filter((category) => category.score >= 80).sort((a, b) => b.score - a.score)[0];
-  const dataMissing = !input.kpis.length || !input.crmLeads.length || !input.files.length;
+  const dataMissing = !input.kpis.length || !input.crmLeads.length || !input.reports.length;
 
   return {
     score,
     explanation: `Business Health Score: ${score}/100. ${strong ? `${strong.name} is strongest because ${strong.improved.toLowerCase()}` : "The workspace is still building enough history."} ${weak ? `${weak.name} needs attention because ${weak.declined.toLowerCase()}` : "No category is critically weak right now."}`,
-    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, customer activity evidence, and files are added." : null,
+    dataQualityWarning: dataMissing ? "Some score inputs are missing. Vaeroex is using available workspace data and will improve confidence as KPIs, customer activity evidence, reports, and files are added." : null,
     categories
   };
 }
