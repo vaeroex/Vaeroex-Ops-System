@@ -405,7 +405,7 @@ check(fileActions.includes("save_file_analysis_business_memory"), "Saving file a
 const operationsActions = read("app/app/operations/actions.ts");
 check(operationsActions.includes("update_kpi_record") && operationsActions.includes("delete_kpi_record"), "KPI edits/deletes must pass through the gateway.");
 check(operationsActions.includes("update_kpi_settings"), "KPI configuration edits must pass through the gateway.");
-check(operationsActions.includes("business_signal_delete"), "Business Memory/Signal deletion must be audited through the gateway.");
+check(operationsActions.includes("deleteBusinessSignalAction") && operationsActions.includes("BUSINESS_SIGNALS_RETIRED_MESSAGE"), "Retired Business Signal deletion must fail closed after workspace authorization.");
 
 const sourcesActions = read("app/app/sources/actions.ts");
 check(sourcesActions.includes("delete_generated_insights"), "Generated insight deletion must pass through the gateway.");

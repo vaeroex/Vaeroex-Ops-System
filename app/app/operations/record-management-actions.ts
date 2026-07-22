@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
+import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -284,6 +285,10 @@ function redirectWithMessage(path: Route | string, message: string): never {
 }
 
 function assertMutationAllowed(collection: ManagedCollection, path: Route | string) {
+  if (collection === "tasks") {
+    redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
+  }
+
   if (collection === "crm_leads") {
     redirectWithError(path, RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE);
   }

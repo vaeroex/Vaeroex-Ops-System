@@ -85,7 +85,8 @@ const sourcesPage = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"),
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql"), "utf8");
 const packageJson = require("../package.json");
 
-assert.match(operationsActions, /update_business_signal_lifecycle/, "Business Signal delete must use the transactional lifecycle function");
+assert.match(operationsActions, /deleteBusinessSignalAction[\s\S]{0,320}BUSINESS_SIGNALS_RETIRED_MESSAGE/, "retired Business Signal deletion must fail closed");
+assert.doesNotMatch(operationsActions, /deleteBusinessSignalAction[\s\S]{0,900}update_business_signal_lifecycle/, "retired customer actions must not mutate Business Signal lifecycle");
 assert.doesNotMatch(operationsActions, /\.from\("tasks"\)[\s\S]{0,220}\.delete\(\)[\s\S]{0,220}\.single\(\)/, "Business Signal delete must not hard-delete through a single-row coercion");
 assert.match(recordActions, /\.maybeSingle\(\)/, "single-record mutations must allow a zero-row result without a single JSON coercion error");
 assert.doesNotMatch(recordActions, /select\("id"\)\.single\(\)/, "managed lifecycle mutations must not coerce a mutation result to one JSON object");

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
+import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -315,6 +316,11 @@ export async function createAssignmentAction(formData: FormData) {
   const department = scope === "department" ? nullableText(formData, "department") : null;
   const priority = text(formData, "priority") || "Medium";
   const status = text(formData, "status") || "Open";
+
+  if (sourceType === "task") {
+    redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
+  }
+
   const personName = await getPersonName(supabase, workspaceId, personId);
   const recipient = recipientLabel({ scope, personName, role, department });
 

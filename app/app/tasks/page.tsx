@@ -1,9 +1,4 @@
-import { createBusinessSignalAction, deleteBusinessSignalAction } from "@/app/app/operations/actions";
-import { manageRecordAction, updateManagedRecordAction } from "@/app/app/operations/record-management-actions";
-import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
-import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { businessSignalMatchesEvidenceScope, type BusinessSignalEvidenceScope } from "@/lib/intelligence/business-signal-evidence";
 import { isOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
@@ -31,23 +26,6 @@ type BusinessSignalRow = {
   deleted_at?: string | null;
 };
 
-const businessSignalCategories = [
-  "Leadership",
-  "Customer",
-  "Market",
-  "Product",
-  "Pricing",
-  "Vendor",
-  "Operations",
-  "Finance",
-  "Sales",
-  "Strategy",
-  "Regulatory",
-  "Seasonal",
-  "Facilities",
-  "Other"
-];
-const signalSources = ["Manual", "Uploaded"];
 function param(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] || "" : value || "";
 }
@@ -72,10 +50,6 @@ function sourceLabel(signal: { ai_generated?: boolean | null; related_type?: str
   if (source === "vaeroex_run" || source === "vaeroex_recommendation") return "Vaeroex Result";
 
   return "Manual Entry";
-}
-
-function editSourceValue(signal: { related_type?: string | null }) {
-  return sourceLabel(signal) === "Uploaded File" ? "Uploaded" : "Manual";
 }
 
 function businessSignalConfidence(signal: BusinessSignalRow) {
@@ -170,30 +144,6 @@ function SignalBadge({
   );
 }
 
-function BusinessSignalEditForm({ signal }: { signal: BusinessSignalRow }) {
-  return (
-    <form action={updateManagedRecordAction} className="grid gap-4 sm:grid-cols-2">
-      <input type="hidden" name="collection" value="tasks" />
-      <input type="hidden" name="record_id" value={signal.id} />
-      <input type="hidden" name="return_path" value="/app/tasks" />
-      <input type="hidden" name="status" value="Business Signal" />
-      <input type="hidden" name="priority" value="Context" />
-      <input type="hidden" name="assigned_role" value="" />
-      <input type="hidden" name="assigned_department" value="" />
-      <TextInput label="Title" name="title" required defaultValue={signal.title} />
-      <SelectInput label="Category" name="category" defaultValue={signal.category || "Operations"} options={businessSignalCategories} />
-      <TextInput label="Date" name="due_date" type="date" defaultValue={signal.due_date || ""} />
-      <SelectInput label="Source" name="related_type" defaultValue={editSourceValue(signal)} options={signalSources} />
-      <div className="sm:col-span-2">
-        <TextArea label="Description" name="description" rows={5} defaultValue={signal.description || ""} />
-      </div>
-      <div className="sm:col-span-2">
-        <PrimaryButton>Save changes</PrimaryButton>
-      </div>
-    </form>
-  );
-}
-
 function BusinessSignalDetails({ signal }: { signal: BusinessSignalRow }) {
   const confidence = businessSignalConfidence(signal);
   const source = sourceLabel(signal);
@@ -240,65 +190,21 @@ function BusinessSignalDetails({ signal }: { signal: BusinessSignalRow }) {
   );
 }
 
-const menuItemClass =
-  "block min-h-10 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45";
-
-function BusinessSignalActions({ signal, archived = false }: { signal: BusinessSignalRow; archived?: boolean }) {
+function BusinessSignalViewAction({ signal }: { signal: BusinessSignalRow }) {
   return (
-    <details className="relative">
-      <summary
-        className="grid h-9 w-9 cursor-pointer list-none place-items-center rounded-md border border-white/10 bg-white/[0.04] text-lg font-semibold text-slate-200 hover:border-cyan-300/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45"
-        aria-label={`Actions for ${signal.title}`}
-      >
-        ...
-      </summary>
-      <div className="absolute right-0 z-30 mt-2 w-52 space-y-1 rounded-lg border border-white/10 bg-[#08111f] p-2 text-slate-100 shadow-2xl shadow-black/30">
-        <RecordDetailDrawer
-          title={signal.title}
-          description={signal.description || "Business Signal details"}
-          eyebrow="Business Signal"
-          triggerLabel="View"
-          triggerClassName={menuItemClass}
-        >
-          <BusinessSignalDetails signal={signal} />
-        </RecordDetailDrawer>
-        <RecordDetailDrawer
-          title={signal.title}
-          description="Edit this Business Signal. Changes stay inside this workspace."
-          eyebrow="Edit Business Signal"
-          triggerLabel="Edit"
-          triggerClassName={menuItemClass}
-        >
-          <BusinessSignalEditForm signal={signal} />
-        </RecordDetailDrawer>
-        <form action={manageRecordAction}>
-          <input type="hidden" name="collection" value="tasks" />
-          <input type="hidden" name="record_id" value={signal.id} />
-          <input type="hidden" name="record_action" value={archived ? "restore" : "archive"} />
-          <input type="hidden" name="return_path" value={archived ? "/app/tasks?view=archived" : "/app/tasks"} />
-          <ConfirmSubmitButton
-            message={archived ? `Restore "${signal.title}" to active Business Memory?` : `Archive "${signal.title}"? It will leave active memory but remain in historical context.`}
-            className={menuItemClass}
-          >
-            {archived ? "Restore" : "Archive"}
-          </ConfirmSubmitButton>
-        </form>
-        <form action={deleteBusinessSignalAction}>
-          <input type="hidden" name="record_id" value={signal.id} />
-          <input type="hidden" name="return_path" value={archived ? "/app/tasks?view=archived" : "/app/tasks"} />
-          <ConfirmSubmitButton
-            message={`Permanently delete "${signal.title}"? This may affect future Vaeroex intelligence, forecasts, and briefings.`}
-            className="block min-h-10 w-full rounded-md px-3 py-2 text-left text-sm font-semibold text-red-100 hover:bg-red-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300/45"
-          >
-            Delete
-          </ConfirmSubmitButton>
-        </form>
-      </div>
-    </details>
+    <RecordDetailDrawer
+      title={signal.title}
+      description={signal.description || "Business Signal details"}
+      eyebrow="Historical Business Signal"
+      triggerLabel="View"
+      triggerClassName="inline-flex min-h-9 items-center rounded-md border border-white/10 bg-white/[0.04] px-3 py-1.5 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/45"
+    >
+      <BusinessSignalDetails signal={signal} />
+    </RecordDetailDrawer>
   );
 }
 
-function BusinessSignalRowCard({ signal, archived = false }: { signal: BusinessSignalRow; archived?: boolean }) {
+function BusinessSignalRowCard({ signal }: { signal: BusinessSignalRow }) {
   const confidence = businessSignalConfidence(signal);
   const source = sourceLabel(signal);
 
@@ -338,7 +244,7 @@ function BusinessSignalRowCard({ signal, archived = false }: { signal: BusinessS
           <SignalBadge label="Source" value={source} explanation={sourceExplanation(source)} />
         </div>
         <div className="md:justify-self-end">
-          <BusinessSignalActions signal={signal} archived={archived} />
+          <BusinessSignalViewAction signal={signal} />
         </div>
       </div>
     </article>
@@ -386,41 +292,17 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-        <PageHeader
-          eyebrow="Business Memory"
-          title="Business Signals"
-          description={showArchived ? "Archived context is retained for history and excluded from active intelligence." : "Capture meaningful business events, observations, or strategic context that help Vaeroex build long-term understanding of your business."}
-        />
-        <CreateDrawer title="Add Business Signal" description="Save context that should become part of Business Memory." triggerLabel="New Business Signal">
-          <form action={createBusinessSignalAction} className="grid gap-4 lg:grid-cols-2">
-            <TextInput label="Title" name="title" required placeholder="Example: Major customer lost" />
-            <SelectInput label="Category" name="category" defaultValue="Operations" options={businessSignalCategories} />
-            <TextInput label="Date (optional)" name="signal_date" type="date" />
-            <SelectInput label="Source" name="source" defaultValue="Manual" options={signalSources} />
-            <div className="lg:col-span-2">
-              <TextArea
-                label="Description"
-                name="description"
-                rows={5}
-                placeholder="Describe what happened, why it may matter, and any context leadership should remember."
-              />
-            </div>
-            <label className="flex items-start gap-3 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-sm text-slate-100 lg:col-span-2">
-              <input name="save_to_memory" type="checkbox" defaultChecked className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-vaeroex-blue" />
-              <span>
-                <span className="block font-semibold">Save to Business Memory</span>
-                <span className="mt-1 block text-slate-400">This signal will help Vaeroex interpret future intelligence, confidence, forecasts, and executive briefings.</span>
-              </span>
-            </label>
-            <div className="lg:col-span-2">
-              <PrimaryButton>Save Business Signal</PrimaryButton>
-            </div>
-          </form>
-        </CreateDrawer>
-      </div>
+      <PageHeader
+        eyebrow="Business Memory"
+        title="Business Signals"
+        description={showArchived ? "Archived context is retained for history and excluded from active intelligence." : "Historical Business Signal records remain available for citations, lineage, and prior deep links."}
+      />
 
       <ErrorNotice message={(params?.error as string | undefined) || error?.message} />
+      <div className="flex flex-col gap-2 rounded-lg border border-cyan-300/20 bg-cyan-950/20 px-3 py-2 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
+        <p>Business Signals are retired. Existing records are read-only compatibility data.</p>
+        <a href="/app/sources" className="shrink-0 font-semibold text-cyan-200 hover:text-white">Open Evidence</a>
+      </div>
       {evidenceFilterRequested ? (
         <div className="flex flex-col gap-2 rounded-lg border border-cyan-300/20 bg-cyan-950/20 px-3 py-2 text-sm text-slate-200 sm:flex-row sm:items-center sm:justify-between">
           <p>Showing {signals.length} active supporting Business Signal{signals.length === 1 ? "" : "s"} for the selected Intelligence finding.</p>
@@ -487,7 +369,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
                 </summary>
                 <div>
                   {group.items.map((signal) => (
-                    <BusinessSignalRowCard key={signal.id} signal={signal} archived={showArchived} />
+                    <BusinessSignalRowCard key={signal.id} signal={signal} />
                   ))}
                 </div>
               </details>
@@ -495,7 +377,7 @@ export default async function TasksPage({ searchParams }: TasksPageProps) {
           </div>
         ) : (
           <div className="rounded-lg border border-white/10 bg-[#08111f] p-5 text-sm text-slate-400">
-            {showArchived ? "No archived Business Signals." : "No Business Signals yet. Add meaningful context when something happens that Vaeroex should remember."}
+            {showArchived ? "No archived Business Signals." : "No historical Business Signals are available in this view."}
           </div>
         )}
       </section>

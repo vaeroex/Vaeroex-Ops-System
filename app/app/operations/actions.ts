@@ -5,6 +5,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
+import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
@@ -217,43 +218,10 @@ export async function createFormSubmissionAction(formData: FormData) {
 }
 
 export async function convertSubmissionToTaskAction(formData: FormData) {
-  const submissionId = text(formData, "submission_id");
   const formId = text(formData, "form_id");
   const path = returnPath(formData, formId ? `/app/forms/${formId}` : "/app/form-submissions");
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-
-  const { data: submission, error: submissionError } = await supabase
-    .from("form_submissions")
-    .select("*")
-    .eq("id", submissionId)
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
-
-  if (submissionError || !submission) {
-    redirectWithError(path, submissionError?.message || "Submission not found.");
-  }
-
-  const { error } = await supabase.from("tasks").insert({
-    workspace_id: workspaceId,
-    title: `Business signal: ${submission.submitter_name || "Form submission"}`,
-    description: submission.ai_summary || "Review form submission as source evidence.",
-    status: "Business Signal",
-    priority: "Context",
-    category: "Form context",
-    related_type: "form_submission",
-    related_id: submission.id,
-    ai_generated: true,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app/form-submissions");
-  revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Business signal saved to Business Memory.");
+  await requireWorkspace(path);
+  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function createChecklistAction(formData: FormData) {
@@ -316,144 +284,28 @@ export async function runChecklistAction(formData: FormData) {
   redirectWithMessage(path, "Checklist run saved.");
 }
 
-export async function createTaskAction(formData: FormData) {
+export async function createTaskAction(_formData: FormData) {
   const path = "/app/tasks";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const title = text(formData, "title");
-
-  requireValue(path, "Business signal title", title);
-  validateLength(path, "Business signal description", text(formData, "description"), 2000);
-
-  const { error } = await supabase.from("tasks").insert({
-    workspace_id: workspaceId,
-    title,
-    description: text(formData, "description"),
-    status: text(formData, "status") || "Business Signal",
-    priority: text(formData, "priority") || "Context",
-    category: text(formData, "category"),
-    assigned_person_id: text(formData, "person_id") || null,
-    assigned_role: text(formData, "role") || null,
-    assigned_department: text(formData, "department") || null,
-    due_date: text(formData, "due_date") || null,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  redirectWithMessage(path, "Business signal saved to Business Memory.");
+  await requireWorkspace(path);
+  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
-export async function createBusinessSignalAction(formData: FormData) {
+export async function createBusinessSignalAction(_formData: FormData) {
   const path = "/app/tasks";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const title = text(formData, "title");
-  const description = text(formData, "description");
-  const category = text(formData, "category") || "General";
-  const signalDate = text(formData, "signal_date");
-  const source = text(formData, "source") || "Manual";
-
-  requireValue(path, "Business signal title", title);
-  validateLength(path, "Business signal description", description, 2000);
-
-  const { error } = await supabase.from("tasks").insert({
-    workspace_id: workspaceId,
-    title,
-    description,
-    status: "Business Signal",
-    priority: "Context",
-    category,
-    due_date: signalDate || null,
-    related_type: source === "Uploaded" ? "Uploaded" : "Manual",
-    ai_generated: false,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app");
-  revalidatePath("/app/intelligence");
-  redirectWithMessage(path, "Business signal saved to Business Memory.");
+  await requireWorkspace(path);
+  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
-export async function updateTaskStatusAction(formData: FormData) {
+export async function updateTaskStatusAction(_formData: FormData) {
   const path = "/app/tasks";
-  const { supabase, workspaceId } = await requireWorkspace(path);
-  const taskId = text(formData, "task_id");
-
-  const { error } = await supabase
-    .from("tasks")
-    .update({ status: text(formData, "status") || "Business Signal" })
-    .eq("id", taskId)
-    .eq("workspace_id", workspaceId);
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  redirectWithMessage(path, "Business signal updated.");
+  await requireWorkspace(path);
+  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function deleteBusinessSignalAction(formData: FormData) {
   const path = returnPath(formData, "/app/tasks");
-  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
-  const recordId = text(formData, "record_id");
-
-  if (!recordId) {
-    redirectWithError(path, "Business Signal is required.");
-  }
-
-  try {
-    await requireToolExecution(
-      {
-        supabase,
-        workspaceId,
-        userId: user.id,
-        userRole: membership.role
-      },
-      {
-        toolName: "delete_record",
-        args: {
-          recordId,
-          collection: "business_signals",
-          action: "delete"
-        },
-        initiatedBy: "user",
-        confirmationReceived: true,
-        targetRecordId: recordId,
-        metadata: {
-          source: "business_signal_delete"
-        } satisfies Json
-      }
-    );
-  } catch (error) {
-    redirectWithError(path, error instanceof Error ? error.message : "Business Signal deletion was blocked by Vaeroex security policy.");
-  }
-
-  const lifecycleClient = supabase as unknown as {
-    rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id: string }> | null; error: { message: string } | null }>;
-  };
-  const { data, error } = await lifecycleClient.rpc("update_business_signal_lifecycle", {
-    p_workspace_id: workspaceId,
-    p_signal_id: recordId,
-    p_action: "delete"
-  });
-
-  if (error || !data?.length) {
-    redirectWithError(path, error?.message || "Business Signal could not be deleted.");
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app");
-  revalidatePath("/app/intelligence");
-  revalidatePath("/app/reports");
-  redirectWithMessage(path, "Business Signal deleted and removed from active intelligence.");
+  await requireWorkspace(path);
+  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function createKpiAction(formData: FormData) {
@@ -832,45 +684,10 @@ export async function createIssueAction(formData: FormData) {
   redirectWithMessage(path, "Issue logged.");
 }
 
-export async function convertIssueToTaskAction(formData: FormData) {
+export async function convertIssueToTaskAction(_formData: FormData) {
   const path = "/app/issues";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const issueId = text(formData, "issue_id");
-
-  const { data: issue, error: issueError } = await supabase
-    .from("issues")
-    .select("*")
-    .eq("id", issueId)
-    .eq("workspace_id", workspaceId)
-    .maybeSingle();
-
-  if (issueError || !issue) {
-    redirectWithError(path, issueError?.message || "Issue not found.");
-  }
-
-  const { error } = await supabase.from("tasks").insert({
-    workspace_id: workspaceId,
-    title: `Business signal: ${issue.title}`,
-    description: issue.description || issue.root_cause || issue.recommended_fix || "Review issue as business context.",
-    status: "Business Signal",
-    priority: "Context",
-    category: "Issue context",
-    assigned_person_id: issue.assigned_person_id,
-    assigned_role: issue.assigned_role,
-    assigned_department: issue.assigned_department,
-    due_date: issue.due_date,
-    related_type: "issue",
-    related_id: issue.id,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app/tasks");
-  redirectWithMessage(path, "Business signal saved to Business Memory.");
+  await requireWorkspace(path);
+  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function createAssetAction(formData: FormData) {
