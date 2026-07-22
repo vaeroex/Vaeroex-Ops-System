@@ -3,7 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
 import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
-import { KpiAlertRulePanel, ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
+import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -56,7 +56,6 @@ type KpisPageProps = {
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
-type KpiAlertRuleRow = Database["public"]["Tables"]["kpi_alert_rules"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
 type KpiDirection = "higher" | "lower" | "exact" | null;
@@ -1627,29 +1626,6 @@ function KpiChartSettingsForm({
   );
 }
 
-function AlertRuleList({ rules }: { rules: KpiAlertRuleRow[] }) {
-  if (!rules.length) {
-    return <p className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-3 text-sm text-slate-300">No KPI alert rules yet.</p>;
-  }
-
-  return (
-    <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-      <h4 className="text-sm font-semibold text-white">Active alert rules</h4>
-      <div className="mt-3 space-y-2">
-        {rules.slice(0, 8).map((rule) => (
-          <div key={rule.id} className="grid gap-2 rounded-lg border border-white/10 bg-[#08111f] p-3 text-sm text-slate-300 md:grid-cols-[1fr_auto_auto]">
-            <span className="font-medium">{rule.kpi_name}</span>
-            <span className="text-slate-400 capitalize">{rule.condition_type.replace(/_/g, " ")}</span>
-            <span className="text-slate-400">
-              {rule.recipient_scope === "role" ? rule.role : rule.recipient_scope === "department" ? rule.department : rule.recipient_scope}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default async function KpisPage({ searchParams }: KpisPageProps) {
   const params = await searchParams;
   const { supabase, context, workspaceId } = await requireWorkspacePage();
@@ -1659,14 +1635,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     kpiResult,
     folderResult,
     peopleResult,
-    alertRulesResult,
     shareResult,
     issueResult,
     checklistRunResult,
     crmResult,
     fileResult,
     reportResult,
-    notificationResult,
     kpiSettingsResult
   ] = await Promise.all([
     supabase
@@ -1679,14 +1653,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       .order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
-    supabase.from("kpi_alert_rules").select("*").eq("workspace_id", workspaceId).eq("is_active", true).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
-    supabase.from("notifications").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(50),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
 
@@ -1706,7 +1678,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const kpis = filterKpisByTimeline(adjustedKpis, selectedTimelineRange);
   const allVisibleKpis = adjustedKpis;
   const people = (peopleResult.data || []) as TeamPersonOption[];
-  const alertRules = (alertRulesResult.data || []) as KpiAlertRuleRow[];
   const shares = (shareResult.data || []) as ShareRow[];
   const revenue = findLatestMetric(kpis, ["revenue", "sales"]);
   const leads = findLatestMetric(kpis, ["lead"]);
@@ -1728,7 +1699,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     reports: [],
     vaeroexRuns: [],
     operationalMetrics: [],
-    notifications: notificationResult.data || [],
     assignments: [],
     shares,
     people: [],
@@ -1783,7 +1753,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const managedKpis = filteredKpis.map((kpi) => {
     const management = managedValues(kpi);
     const kpiShares = shares.filter((share) => share.source_id === kpi.id);
-    const matchingAlertRules = alertRules.filter((rule) => rule.kpi_name === kpi.name);
 
     return {
       id: kpi.id,
@@ -1803,8 +1772,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         { label: "Actual", value: formatNumericValue(kpi.actual_value, kpi.name) },
         { label: "Target", value: kpi.target === null ? "No target" : formatNumericValue(kpi.target, kpi.name) },
         { label: "Source", value: kpi.source || "Manual" },
-        { label: "Shares", value: kpiShares.length ? `${kpiShares.length} share record${kpiShares.length === 1 ? "" : "s"}` : "Not shared" },
-        { label: "Alert rules", value: matchingAlertRules.length ? matchingAlertRules.length : "None" }
+        { label: "Shares", value: kpiShares.length ? `${kpiShares.length} share record${kpiShares.length === 1 ? "" : "s"}` : "Not shared" }
       ],
       editFields: kpiEditFields,
       editValues: {
@@ -1864,14 +1832,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
           kpiResult.error?.message ||
     folderResult.error?.message ||
     peopleResult.error?.message ||
-    alertRulesResult.error?.message ||
     shareResult.error?.message ||
           issueResult.error?.message ||
           checklistRunResult.error?.message ||
     crmResult.error?.message ||
     fileResult.error?.message ||
     reportResult.error?.message ||
-    notificationResult.error?.message ||
     kpiSettingsResult.error?.message ||
     sourceParentResult.error?.message
         }
@@ -2252,16 +2218,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             emptyDescription="Create your first KPI for revenue, conversion rate, response time, customer activity, or any custom metric leadership reviews."
             searchParams={params}
           />
-
-          <KpiDetailPanel
-            title="Alerts and ownership"
-            summary={`${alertRules.length} KPI alert rule${alertRules.length === 1 ? "" : "s"} configured. Expand to add alert rules or review active thresholds.`}
-          >
-            <section className="grid gap-4 xl:grid-cols-[1.2fr_.8fr]">
-              <KpiAlertRulePanel kpiNames={metricNames} people={people} />
-              <AlertRuleList rules={alertRules} />
-            </section>
-          </KpiDetailPanel>
 
           <KpiDetailPanel
             title="Benchmarks and data quality"

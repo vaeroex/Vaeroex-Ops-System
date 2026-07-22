@@ -38,7 +38,6 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     futureCapability: [
       "Workspace profile editing",
       "Member and role management",
-      "Notification preferences",
       "Future integrations and branding controls"
     ]
   },

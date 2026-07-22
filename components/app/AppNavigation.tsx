@@ -18,21 +18,8 @@ type NavSection = {
 
 type AppNavigationProps = {
   sections: NavSection[];
-  notificationUnreadCount: number;
   mobile?: boolean;
 };
-
-function NotificationBadge({ count, light = false }: { count: number; light?: boolean }) {
-  if (!count) {
-    return null;
-  }
-
-  return (
-    <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${light ? "bg-white text-vaeroex-blue" : "bg-vaeroex-blue text-white shadow-sm shadow-blue-900/20"}`}>
-      {count > 99 ? "99+" : count}
-    </span>
-  );
-}
 
 function isActivePath(pathname: string, href: string) {
   if (href === "/app") {
@@ -42,7 +29,7 @@ function isActivePath(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function DesktopSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
+function DesktopSection({ section, pathname }: { section: NavSection; pathname: string }) {
   const links = section.items.map((item) => {
     const active = isActivePath(pathname, item.href);
 
@@ -55,7 +42,6 @@ function DesktopSection({ section, notificationUnreadCount, pathname }: { sectio
         }`}
       >
         <span>{item.label}</span>
-        {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} light /> : null}
       </Link>
     );
   });
@@ -75,7 +61,7 @@ function DesktopSection({ section, notificationUnreadCount, pathname }: { sectio
   );
 }
 
-function MobileSection({ section, notificationUnreadCount, pathname }: { section: NavSection; notificationUnreadCount: number; pathname: string }) {
+function MobileSection({ section, pathname }: { section: NavSection; pathname: string }) {
   if (section.collapsible === false) {
     return (
       <>
@@ -90,7 +76,6 @@ function MobileSection({ section, notificationUnreadCount, pathname }: { section
               }`}
             >
               <span>{item.label}</span>
-              {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} /> : null}
             </Link>
           );
         })}
@@ -114,7 +99,6 @@ function MobileSection({ section, notificationUnreadCount, pathname }: { section
               }`}
             >
               <span>{item.label}</span>
-              {item.href === "/app/notifications" ? <NotificationBadge count={notificationUnreadCount} /> : null}
             </Link>
           );
         })}
@@ -123,14 +107,14 @@ function MobileSection({ section, notificationUnreadCount, pathname }: { section
   );
 }
 
-export function AppNavigation({ sections, notificationUnreadCount, mobile = false }: AppNavigationProps) {
+export function AppNavigation({ sections, mobile = false }: AppNavigationProps) {
   const pathname = usePathname();
 
   if (mobile) {
     return (
       <div className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto pb-1">
         {sections.map((section) => (
-          <MobileSection key={section.label} section={section} notificationUnreadCount={notificationUnreadCount} pathname={pathname} />
+          <MobileSection key={section.label} section={section} pathname={pathname} />
         ))}
       </div>
     );
@@ -139,7 +123,7 @@ export function AppNavigation({ sections, notificationUnreadCount, mobile = fals
   return (
     <nav className="mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto pr-1">
       {sections.map((section) => (
-        <DesktopSection key={section.label} section={section} notificationUnreadCount={notificationUnreadCount} pathname={pathname} />
+        <DesktopSection key={section.label} section={section} pathname={pathname} />
       ))}
     </nav>
   );

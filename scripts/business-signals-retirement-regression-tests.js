@@ -130,7 +130,6 @@ const taskFreeInput = {
   reports: [{ id: "r1", title: "Report", created_at: "2026-07-01" }],
   vaeroexRuns: [],
   operationalMetrics: [],
-  notifications: [],
   assignments: [{ id: "a1", title: "Review", status: "Done", created_at: "2026-07-01" }],
   shares: [],
   people: [

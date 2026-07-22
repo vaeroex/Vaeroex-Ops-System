@@ -16,13 +16,6 @@ export const ASSIGNMENT_STATUSES = ["Open", "In Progress", "Waiting", "Done", "D
 export const PRIORITIES = ["Low", "Medium", "High", "Urgent"];
 export const SHARE_SCOPES = ["Person", "Role", "Department", "Entire workspace"];
 export const DISTRIBUTION_SCHEDULES = ["One-time share", "Daily", "Weekly", "Monthly", "Quarterly"];
-export const KPI_ALERT_CONDITIONS = [
-  "Below target",
-  "Above target",
-  "Changes more than percent",
-  "Declined for 2 periods",
-  "No update this month"
-];
 
 export function suggestOperationalRole(text: string) {
   const normalized = text.toLowerCase();

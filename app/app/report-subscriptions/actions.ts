@@ -294,6 +294,5 @@ export async function runReportSubscriptionNowAction(formData: FormData) {
   }
 
   revalidatePath("/app/reports");
-  revalidatePath("/app/notifications");
   redirectWithMessage(path, `${categoryLabel(category)} generated now.`);
 }

@@ -63,7 +63,6 @@ type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"]
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
-type NotificationRow = Database["public"]["Tables"]["notifications"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
@@ -574,14 +573,6 @@ function latestKpisByName(kpis: KpiRow[]) {
   }
 
   return [...latest.values()];
-}
-
-function groupCounts(values: Array<string | null | undefined>) {
-  return values.reduce<Record<string, number>>((counts, value) => {
-    const label = value || "Workspace";
-    counts[label] = (counts[label] || 0) + 1;
-    return counts;
-  }, {});
 }
 
 function buildSmartAlerts({
@@ -1320,7 +1311,7 @@ function DemoWorkspaceBanner({
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
-            Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails or customer notifications are sent.
+            Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails are sent.
             It includes YTD KPI movement, customer activity evidence, weak-month alerts, reports, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>
@@ -1409,7 +1400,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     reportResult,
     vaeroexRunResult,
     metricResult,
-    notificationResult,
     assignmentResult,
     shareResult,
     peopleResult,
@@ -1437,14 +1427,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),
-    supabase
-      .from("notifications")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .is("archived_at", null)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(30),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100),
@@ -1493,7 +1475,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
   const businessEvidenceRuns = filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" });
   const operationalMetrics = filterBySourceParentEligibility(filterBusinessEvidence(rawOperationalMetrics), sourceParentEligibility);
-  const notifications = (notificationResult.data || []) as NotificationRow[];
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
   const shares = (shareResult.data || []) as ShareRow[];
   const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
@@ -1525,7 +1506,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     reportResult.error,
     vaeroexRunResult.error,
     metricResult.error,
-    notificationResult.error,
     assignmentResult.error,
     shareResult.error,
     peopleResult.error,
@@ -1830,12 +1810,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     const status = lower(assignment.status);
     return !assignment.archived_at && status !== "done" && status !== "dismissed" && status !== "complete";
   });
-  const attentionNotifications = [...notifications].sort((a, b) => {
-    const readSort = Number(Boolean(a.read_at)) - Number(Boolean(b.read_at));
-    return readSort || new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-  });
-  const unreadNotifications = attentionNotifications.filter((notification) => !notification.read_at);
-  const kpiAlertNotifications = attentionNotifications.filter((notification) => notification.type === "kpi_alert");
   const recentReportShares = shares.filter((share) => share.source_type === "report").slice(0, 5);
   const dueSoonAssignments = activeAssignments
     .filter((assignment) => assignment.due_date && assignment.due_date >= todayDate && assignment.due_date <= dueWindowEndDate)
@@ -1849,8 +1823,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ? activeAssignments.filter((assignment) => assignment.assigned_department === currentUserPerson.department).slice(0, 5)
     : [];
   const recommendationAssignments = activeAssignments.filter((assignment) => assignment.source_type === "vaeroex_recommendation");
-  const alertsByRole = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_role)));
-  const alertsByDepartment = Object.entries(groupCounts(kpiAlertNotifications.map((notification) => notification.recipient_department)));
   const shareRecipientLabel = (share: ShareRow) => {
     if (share.person_id && peopleById.has(share.person_id)) {
       return peopleById.get(share.person_id)?.full_name || "Person";
@@ -1877,7 +1849,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     reports: [],
     vaeroexRuns: businessEvidenceRuns,
     operationalMetrics,
-    notifications,
     assignments,
     shares,
     people,
@@ -2149,47 +2120,23 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         <>
           <DashboardAccordion
             title="Workspace signals"
-            summary={`${unreadNotifications.length} unread notification${unreadNotifications.length === 1 ? "" : "s"}, ${overdueOperationalAssignments.length} unresolved review item${overdueOperationalAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
+            summary={`${overdueOperationalAssignments.length} unresolved review item${overdueOperationalAssignments.length === 1 ? "" : "s"}, ${dueSoonAssignments.length} upcoming item${dueSoonAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
         <SectionCard
 	          title="Workspace signals"
-	          description="Notifications, shared reports, KPI alerts, and review items for this workspace."
+	          description="Shared reports and assigned review items for this workspace."
         >
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <StatCard label="Unread" value={unreadNotifications.length} detail="Notifications waiting" tone={unreadNotifications.length ? "border-vaeroex-accent/50 bg-vaeroex-soft text-vaeroex-blue" : undefined} />
-            <StatCard label="KPI alerts" value={kpiAlertNotifications.length} detail="Rules triggered" tone={kpiAlertNotifications.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
             <StatCard label="Shared reports" value={recentReportShares.length} detail="Recent in-app shares" />
 	            <StatCard label="Upcoming signals" value={dueSoonAssignments.length} detail="Time-sensitive context" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
 	            <StatCard label="Unresolved" value={overdueOperationalAssignments.length} detail="Signals needing review" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
             <StatCard label="Saved recs" value={recommendationAssignments.length} detail="Vaeroex recommendations" />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/app/notifications" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
-              Open notifications
-            </Link>
             <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
               Reports
             </Link>
-          </div>
-          <div className="mt-5">
-            <h3 className="text-sm font-semibold text-ink">Needs attention</h3>
-            <SimpleList
-              items={unreadNotifications.slice(0, 5)}
-              empty="No unread notifications need attention."
-              render={(notification: NotificationRow) => (
-                <Link
-                  key={notification.id}
-                  href="/app/notifications"
-                  className="block rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3 text-sm hover:border-vaeroex-accent"
-                >
-                  <span className="font-semibold text-ink">{notification.title}</span>
-                  <span className="mt-1 block text-xs text-muted">
-                    {notification.priority} · {notification.related_module || notification.type} · {new Date(notification.created_at).toLocaleDateString()}
-                  </span>
-                </Link>
-              )}
-            />
           </div>
         </SectionCard>
 
@@ -2254,7 +2201,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         </SectionCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
+      <section>
         <SectionCard title="Recent shares" description="Reports, KPI views, file analyses, and Vaeroex decision support shared inside the workspace.">
           <SimpleList
             items={shares.slice(0, 6)}
@@ -2265,32 +2212,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                 <p className="mt-1 text-xs text-muted">
                   {share.source_type.replace(/_/g, " ")} · {shareRecipientLabel(share)} · {share.distribution_schedule.replace(/_/g, " ")}
                 </p>
-              </div>
-            )}
-          />
-        </SectionCard>
-
-        <SectionCard title="KPI alerts by role" description="Who is receiving KPI alert signals.">
-          <SimpleList
-            items={alertsByRole.map(([label, count]) => ({ id: label, label, count }))}
-            empty="No role-based KPI alerts have triggered yet."
-            render={(item: { id: string; label: string; count: number }) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-3 text-sm">
-                <span className="font-semibold text-ink">{item.label}</span>
-                <span className="text-muted">{item.count}</span>
-              </div>
-            )}
-          />
-        </SectionCard>
-
-        <SectionCard title="KPI alerts by department" description="Departments with recent alert activity.">
-          <SimpleList
-            items={alertsByDepartment.map(([label, count]) => ({ id: label, label, count }))}
-            empty="No department KPI alerts have triggered yet."
-            render={(item: { id: string; label: string; count: number }) => (
-              <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border border-line p-3 text-sm">
-                <span className="font-semibold text-ink">{item.label}</span>
-                <span className="text-muted">{item.count}</span>
               </div>
             )}
           />

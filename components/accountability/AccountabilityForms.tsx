@@ -1,7 +1,6 @@
-import { createAssignmentAction, createKpiAlertRuleAction, evaluateKpiAlertsAction, shareRecordAction } from "@/app/app/accountability/actions";
-import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
+import { createAssignmentAction, shareRecordAction } from "@/app/app/accountability/actions";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
-import { DISTRIBUTION_SCHEDULES, KPI_ALERT_CONDITIONS, OPERATIONAL_ROLES, PRIORITIES, SHARE_SCOPES, TEAM_DEPARTMENTS } from "@/lib/team/options";
+import { DISTRIBUTION_SCHEDULES, OPERATIONAL_ROLES, PRIORITIES, SHARE_SCOPES, TEAM_DEPARTMENTS } from "@/lib/team/options";
 
 export type TeamPersonOption = {
   id: string;
@@ -82,7 +81,7 @@ export function ShareRecordPanel({
     <section className="rounded-lg border border-line bg-slate-50 p-4">
       <h4 className="text-sm font-semibold text-ink">Share / Distribute</h4>
       <p className="mt-1 text-sm leading-6 text-muted">
-        Create an in-app share record and notification. Email sending is not enabled yet.
+        Preserve an internal share record for this workspace. No message is sent.
       </p>
       <form action={shareRecordAction} className="mt-4 grid gap-3">
         {hiddenRecordFields({ sourceType, sourceId, sourceTitle, relatedModule, returnPath, actionHref })}
@@ -140,45 +139,6 @@ export function AssignmentPanel({
           <SelectInput label="Status" name="status" options={["Open", "In Progress", "Waiting", "Done"]} defaultValue="Open" />
         </div>
         <PrimaryButton>Assign</PrimaryButton>
-      </form>
-    </section>
-  );
-}
-
-export function KpiAlertRulePanel({
-  kpiNames,
-  people,
-  returnPath = "/app/kpis"
-}: {
-  kpiNames: string[];
-  people: TeamPersonOption[];
-  returnPath?: string;
-}) {
-  return (
-    <section className="rounded-lg border border-line bg-white p-5 shadow-panel">
-      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-        <div>
-          <h3 className="text-sm font-semibold text-ink">KPI alerts</h3>
-          <p className="mt-1 text-sm leading-6 text-muted">
-            Create in-app alerts for KPI changes. Vaeroex will create notification records when rules are checked.
-          </p>
-        </div>
-        <form action={evaluateKpiAlertsAction}>
-          <input type="hidden" name="return_path" value={returnPath} />
-          <ConfirmSubmitButton message="Check active KPI alert rules now?">Check alerts now</ConfirmSubmitButton>
-        </form>
-      </div>
-      <form action={createKpiAlertRuleAction} className="mt-4 grid gap-3 lg:grid-cols-2">
-        <input type="hidden" name="return_path" value={returnPath} />
-        <SelectInput label="KPI" name="kpi_name" options={kpiNames} required />
-        <SelectInput label="Alert when" name="condition_type" options={KPI_ALERT_CONDITIONS} defaultValue="Below target" required />
-        <TextInput label="Change percent threshold" name="threshold_value" type="number" step="0.01" placeholder="Example: 10" />
-        <SelectInput label="Notify" name="recipient_scope" options={SHARE_SCOPES} defaultValue="Entire workspace" />
-        <div className="lg:col-span-2">{recipientFields(people)}</div>
-        <SelectInput label="Priority" name="priority" options={PRIORITIES} defaultValue="Medium" />
-        <div className="self-end">
-          <PrimaryButton>Create alert rule</PrimaryButton>
-        </div>
       </form>
     </section>
   );
