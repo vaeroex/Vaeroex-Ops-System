@@ -12,7 +12,8 @@ import {
 import {
   executiveBriefArtifactForView,
   findCurrentExecutiveBriefArtifact,
-  loadExecutiveBriefState
+  loadExecutiveBriefState,
+  resolveExecutiveBriefReleaseChannel
 } from "@/lib/ai/executive-brief/storage";
 import { openExecutiveBriefPackage } from "@/lib/ai/executive-brief/token";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
@@ -102,6 +103,7 @@ export async function generateExecutiveBriefAction(requestToken: string): Promis
     return { status: "unavailable", artifact: null, message: "Workspace access is required." };
   }
   const workspaceId = context.activeWorkspace.id;
+  const releaseChannel = resolveExecutiveBriefReleaseChannel();
   const opened = openExecutiveBriefPackage(requestToken, { workspaceId, userId: user.id });
   if (!opened.ok) {
     return {
@@ -132,7 +134,8 @@ export async function generateExecutiveBriefAction(requestToken: string): Promis
   const cached = await findCurrentExecutiveBriefArtifact({
     supabase,
     workspaceId,
-    fingerprint: analysisPackage.fingerprint
+    fingerprint: analysisPackage.fingerprint,
+    releaseChannel
   }).catch(() => null);
   if (cached) {
     logExecutiveBriefCacheEvent({
@@ -183,7 +186,8 @@ export async function generateExecutiveBriefAction(requestToken: string): Promis
     const completed = await findCurrentExecutiveBriefArtifact({
       supabase,
       workspaceId,
-      fingerprint: analysisPackage.fingerprint
+      fingerprint: analysisPackage.fingerprint,
+      releaseChannel
     }).catch(() => null);
     return completed
       ? { status: "current", artifact: completed, message: null }
@@ -210,6 +214,7 @@ export async function generateExecutiveBriefAction(requestToken: string): Promis
     evidence_count: analysisPackage.requiredCitationIds.length,
     signal_count: analysisPackage.signals.length,
     independent_source_count: analysisPackage.facts.independentSourceCount,
+    release_channel: releaseChannel,
     evidence_classification: "derived_analysis",
     original_evidence_eligible: false
   } satisfies Json;
@@ -274,7 +279,8 @@ export async function generateExecutiveBriefAction(requestToken: string): Promis
       supabase,
       workspaceId,
       analysisPackage,
-      requestTokenAvailable: true
+      requestTokenAvailable: true,
+      releaseChannel
     }).catch(() => null);
     if (preserved?.status === "stale") {
       logExecutiveBriefCacheEvent({

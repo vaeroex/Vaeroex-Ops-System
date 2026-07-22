@@ -20,7 +20,7 @@ import { buildBusinessHealthExplanationPackage } from "@/lib/ai/business-health-
 import { loadBusinessHealthAnalysisState } from "@/lib/ai/business-health-explanation/storage";
 import { trySealBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
 import { buildExecutiveBriefPackage } from "@/lib/ai/executive-brief/context";
-import { loadExecutiveBriefState } from "@/lib/ai/executive-brief/storage";
+import { loadExecutiveBriefState, resolveExecutiveBriefReleaseChannel } from "@/lib/ai/executive-brief/storage";
 import { trySealExecutiveBriefPackage } from "@/lib/ai/executive-brief/token";
 import { isExecutiveBriefPreviewEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
@@ -2101,7 +2101,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         supabase,
         workspaceId,
         analysisPackage: executiveBriefPackage,
-        requestTokenAvailable: Boolean(executiveBriefToken)
+        requestTokenAvailable: Boolean(executiveBriefToken),
+        releaseChannel: resolveExecutiveBriefReleaseChannel()
       })
     : { status: "available" as const, artifact: null, message: null };
   const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];

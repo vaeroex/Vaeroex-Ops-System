@@ -11,7 +11,11 @@ import {
   type ExecutiveBriefState,
   type ExecutiveBriefViewArtifact
 } from "@/lib/ai/executive-brief/contracts";
+import { EXECUTIVE_BRIEF_GPT56_POLICY_ID } from "@/lib/ai/providers/workflow-provider-policy";
 import type { Database, Json } from "@/lib/supabase/types";
+
+export const EXECUTIVE_BRIEF_RELEASE_CHANNELS = ["production", "preview", "development"] as const;
+export type ExecutiveBriefReleaseChannel = (typeof EXECUTIVE_BRIEF_RELEASE_CHANNELS)[number];
 
 const analysisSchema = z.object({
   executive_summary: z.string(),
@@ -103,6 +107,31 @@ function runFingerprint(run: RunRow) {
   return typeof input.fingerprint === "string" ? input.fingerprint : null;
 }
 
+function isExecutiveBriefReleaseChannel(value: unknown): value is ExecutiveBriefReleaseChannel {
+  return typeof value === "string" && EXECUTIVE_BRIEF_RELEASE_CHANNELS.includes(value as ExecutiveBriefReleaseChannel);
+}
+
+export function resolveExecutiveBriefReleaseChannel(): ExecutiveBriefReleaseChannel {
+  if (process.env.VERCEL_ENV === "production") return "production";
+  if (process.env.VERCEL_ENV === "preview") return "preview";
+  return "development";
+}
+
+export function classifyExecutiveBriefRunReleaseChannel(run: Pick<RunRow, "input_json" | "output_json">): ExecutiveBriefReleaseChannel | null {
+  const input = record(run.input_json);
+  if ("release_channel" in input) {
+    return isExecutiveBriefReleaseChannel(input.release_channel) ? input.release_channel : null;
+  }
+
+  const output = record(run.output_json);
+  const attribution = record(output.providerAttribution ?? null);
+  return attribution.providerPolicyId === EXECUTIVE_BRIEF_GPT56_POLICY_ID ? "preview" : null;
+}
+
+function runsForReleaseChannel(runs: RunRow[], releaseChannel: ExecutiveBriefReleaseChannel) {
+  return runs.filter((run) => classifyExecutiveBriefRunReleaseChannel(run) === releaseChannel);
+}
+
 export function parseExecutiveBriefArtifact(value: Json) {
   const parsed = artifactSchema.safeParse(value);
   return parsed.success ? parsed.data as ExecutiveBriefArtifact : null;
@@ -139,14 +168,16 @@ async function loadRuns(supabase: SupabaseClient<Database>, workspaceId: string)
 export async function findCurrentExecutiveBriefArtifact({
   supabase,
   workspaceId,
-  fingerprint
+  fingerprint,
+  releaseChannel
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   fingerprint: string;
+  releaseChannel: ExecutiveBriefReleaseChannel;
 }) {
   const runs = await loadRuns(supabase, workspaceId);
-  const artifact = runs
+  const artifact = runsForReleaseChannel(runs, releaseChannel)
     .filter((run) => run.status === "completed" && runFingerprint(run) === fingerprint)
     .map((run) => parseExecutiveBriefArtifact(run.output_json))
     .find((candidate): candidate is ExecutiveBriefArtifact => Boolean(candidate)) || null;
@@ -157,12 +188,14 @@ export async function loadExecutiveBriefState({
   supabase,
   workspaceId,
   analysisPackage,
-  requestTokenAvailable
+  requestTokenAvailable,
+  releaseChannel
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   analysisPackage: ExecutiveBriefPackage;
   requestTokenAvailable: boolean;
+  releaseChannel: ExecutiveBriefReleaseChannel;
 }): Promise<ExecutiveBriefState> {
   let runs: RunRow[];
   try {
@@ -174,19 +207,22 @@ export async function loadExecutiveBriefState({
       message: "Executive facts are available, but the saved brief is temporarily unavailable."
     };
   }
-  return resolveExecutiveBriefStateFromRuns({ runs, analysisPackage, requestTokenAvailable });
+  return resolveExecutiveBriefStateFromRuns({ runs, analysisPackage, requestTokenAvailable, releaseChannel });
 }
 
 export function resolveExecutiveBriefStateFromRuns({
   runs,
   analysisPackage,
-  requestTokenAvailable
+  requestTokenAvailable,
+  releaseChannel
 }: {
   runs: RunRow[];
   analysisPackage: Pick<ExecutiveBriefPackage, "fingerprint" | "facts">;
   requestTokenAvailable: boolean;
+  releaseChannel: ExecutiveBriefReleaseChannel;
 }): ExecutiveBriefState {
-  const completed = runs
+  const eligibleRuns = runsForReleaseChannel(runs, releaseChannel);
+  const completed = eligibleRuns
     .filter((run) => run.status === "completed")
     .flatMap((run) => {
       const artifact = parseExecutiveBriefArtifact(run.output_json);
@@ -212,7 +248,7 @@ export function resolveExecutiveBriefStateFromRuns({
     };
   }
 
-  const failedCurrent = runs.find((run) => run.status === "failed" && runFingerprint(run) === analysisPackage.fingerprint);
+  const failedCurrent = eligibleRuns.find((run) => run.status === "failed" && runFingerprint(run) === analysisPackage.fingerprint);
   if (failedCurrent) {
     return {
       status: "failed",

@@ -47,7 +47,9 @@ const {
   sealExecutiveBriefPackage
 } = require("../lib/ai/executive-brief/token.ts");
 const {
+  classifyExecutiveBriefRunReleaseChannel,
   parseExecutiveBriefArtifact,
+  resolveExecutiveBriefReleaseChannel,
   resolveExecutiveBriefStateFromRuns
 } = require("../lib/ai/executive-brief/storage.ts");
 const {
@@ -316,19 +318,19 @@ const artifact = {
 const completedRun = {
   id: "run-current",
   status: "completed",
-  input_json: { fingerprint: analysisPackage.fingerprint },
+  input_json: { fingerprint: analysisPackage.fingerprint, release_channel: "preview" },
   output_json: artifact,
   error_message: null,
   created_at: now.toISOString(),
   updated_at: now.toISOString()
 };
-assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [completedRun], analysisPackage, requestTokenAvailable: true }).status, "current");
-assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [completedRun], analysisPackage: changedPackage, requestTokenAvailable: true }).status, "stale", "a previous valid artifact must be preserved after relevant evidence changes");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [completedRun], analysisPackage, requestTokenAvailable: true, releaseChannel: "preview" }).status, "current");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [completedRun], analysisPackage: changedPackage, requestTokenAvailable: true, releaseChannel: "preview" }).status, "stale", "a previous valid artifact must be preserved after relevant evidence changes");
 const failedChangedRun = {
   ...completedRun,
   id: "run-failed-current",
   status: "failed",
-  input_json: { fingerprint: changedPackage.fingerprint },
+  input_json: { fingerprint: changedPackage.fingerprint, release_channel: "preview" },
   output_json: {},
   error_message: "Executive Brief generation failed.",
   created_at: new Date(now.getTime() + 60_000).toISOString(),
@@ -337,14 +339,78 @@ const failedChangedRun = {
 const preservedAfterFailure = resolveExecutiveBriefStateFromRuns({
   runs: [failedChangedRun, completedRun],
   analysisPackage: changedPackage,
-  requestTokenAvailable: true
+  requestTokenAvailable: true,
+  releaseChannel: "preview"
 });
 assert.equal(preservedAfterFailure.status, "stale", "two-provider failure must preserve the last valid brief as stale");
 assert.equal(preservedAfterFailure.artifact.fingerprint, analysisPackage.fingerprint);
 assert.notEqual(preservedAfterFailure.artifact.fingerprint, changedPackage.fingerprint, "a mismatched prior artifact must never appear as current");
 assert.equal(parseExecutiveBriefArtifact({ ...artifact, validatorVersion: "executive_brief_validator_v1" }), null, "artifacts from the superseded validator must not appear current");
-assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [], analysisPackage, requestTokenAvailable: true }).status, "available");
-assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [], analysisPackage: build({ homepage: homepage({ available: false, score: null }) }), requestTokenAvailable: true }).status, "insufficient_evidence");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [], analysisPackage, requestTokenAvailable: true, releaseChannel: "preview" }).status, "available");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [], analysisPackage: build({ homepage: homepage({ available: false, score: null }) }), requestTokenAvailable: true, releaseChannel: "preview" }).status, "insufficient_evidence");
+
+const productionRun = {
+  ...completedRun,
+  id: "run-production",
+  input_json: { fingerprint: analysisPackage.fingerprint, release_channel: "production" }
+};
+const developmentRun = {
+  ...completedRun,
+  id: "run-development",
+  input_json: { fingerprint: analysisPackage.fingerprint, release_channel: "development" }
+};
+const legacyPreviewArtifact = {
+  ...artifact,
+  providerAttribution: {
+    provider: "openai",
+    model: "gpt-5.6-terra",
+    fallbackUsed: true,
+    providerPolicyId: "executive_brief_preview_gpt56_sol_terra_v1"
+  }
+};
+const legacyPreviewRun = {
+  ...completedRun,
+  id: "run-legacy-preview",
+  input_json: { fingerprint: analysisPackage.fingerprint },
+  output_json: legacyPreviewArtifact
+};
+const unknownLegacyRun = {
+  ...completedRun,
+  id: "run-legacy-unknown",
+  input_json: { fingerprint: analysisPackage.fingerprint }
+};
+const ambiguousChannelRun = {
+  ...legacyPreviewRun,
+  id: "run-ambiguous-channel",
+  input_json: { fingerprint: analysisPackage.fingerprint, release_channel: "staging" }
+};
+
+assert.equal(classifyExecutiveBriefRunReleaseChannel(productionRun), "production");
+assert.equal(classifyExecutiveBriefRunReleaseChannel(developmentRun), "development");
+assert.equal(classifyExecutiveBriefRunReleaseChannel(legacyPreviewRun), "preview", "the existing Preview policy must classify legacy artifacts as Preview-only");
+assert.equal(classifyExecutiveBriefRunReleaseChannel(unknownLegacyRun), null, "unknown legacy attribution must fail closed");
+assert.equal(classifyExecutiveBriefRunReleaseChannel(ambiguousChannelRun), null, "invalid explicit release-channel attribution must fail closed");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [legacyPreviewRun], analysisPackage, requestTokenAvailable: false, releaseChannel: "production" }).artifact, null, "Production must reject Preview artifacts");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [legacyPreviewRun], analysisPackage, requestTokenAvailable: true, releaseChannel: "preview" }).status, "current", "Preview must reuse matching legacy Preview artifacts");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [productionRun], analysisPackage, requestTokenAvailable: true, releaseChannel: "preview" }).artifact, null, "Preview must reject Production artifacts");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [developmentRun], analysisPackage, requestTokenAvailable: true, releaseChannel: "development" }).status, "current", "Development must reuse only Development artifacts");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [developmentRun, productionRun], analysisPackage, requestTokenAvailable: true, releaseChannel: "preview" }).artifact, null, "cross-channel current artifacts must be ignored");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [productionRun], analysisPackage: changedPackage, requestTokenAvailable: true, releaseChannel: "preview" }).artifact, null, "cross-channel stale artifacts must be ignored");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [legacyPreviewRun], analysisPackage, requestTokenAvailable: true, releaseChannel: "preview" }).artifact.fingerprint, analysisPackage.fingerprint, "Terra fallback artifacts must remain reusable in Preview");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [legacyPreviewRun], analysisPackage, requestTokenAvailable: false, releaseChannel: "production" }).artifact, null, "Terra fallback artifacts must not cross into Production");
+assert.equal(resolveExecutiveBriefStateFromRuns({ runs: [unknownLegacyRun], analysisPackage, requestTokenAvailable: false, releaseChannel: "production" }).artifact, null, "unknown legacy artifacts must not load in Production");
+
+const originalVercelEnv = process.env.VERCEL_ENV;
+process.env.VERCEL_ENV = "production";
+assert.equal(resolveExecutiveBriefReleaseChannel(), "production");
+process.env.VERCEL_ENV = "preview";
+assert.equal(resolveExecutiveBriefReleaseChannel(), "preview");
+process.env.VERCEL_ENV = "development";
+assert.equal(resolveExecutiveBriefReleaseChannel(), "development");
+delete process.env.VERCEL_ENV;
+assert.equal(resolveExecutiveBriefReleaseChannel(), "development", "local execution must fail into the Development channel");
+if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
+else process.env.VERCEL_ENV = originalVercelEnv;
 
 const qualificationFixtures = getExecutiveBriefQualificationFixtures();
 assert.deepEqual(EXECUTIVE_BRIEF_QUALIFICATION_PROFILE_IDS, ["gpt56-sol", "gpt56-terra"]);
@@ -368,12 +434,16 @@ const homepageSource = read("components/intelligence/ExecutiveHomepage.tsx");
 const panelSource = read("components/intelligence/ExecutiveBriefPanel.tsx");
 const qualificationSource = read("lib/ai/executive-brief/qualification.ts");
 const qualificationRouteSource = read("app/api/internal/executive-brief-qualification/route.ts");
+const storageSource = read("lib/ai/executive-brief/storage.ts");
 assert.match(pageSource, /buildExecutiveBriefPackage/, "Overview must build the bounded deterministic package");
 assert.doesNotMatch(pageSource, /generateExecutiveBrief\(/, "server rendering must never invoke a generation provider");
+assert.match(pageSource, /releaseChannel: resolveExecutiveBriefReleaseChannel\(\)/, "server rendering must select artifacts using its own release channel");
 assert.match(actionSource, /getWorkspaceContext/, "the action must reauthorize active workspace membership");
 assert.match(actionSource, /verifyEvidenceManifestCitations/, "the action must reverify centralized citations");
 assert.match(actionSource, /evidence_classification:\s*"derived_analysis"/, "saved briefs must remain derived and original-evidence-ineligible");
 assert.match(actionSource, /original_evidence_eligible:\s*false/);
+assert.match(actionSource, /release_channel: releaseChannel/, "new Executive Brief runs must persist the server-derived release channel");
+assert.match(actionSource, /const releaseChannel = resolveExecutiveBriefReleaseChannel\(\)/, "the generation action must not accept a client-supplied release channel");
 assert.match(actionSource, /\.eq\("workspace_id", workspaceId\)/, "all run mutations must remain explicitly workspace scoped");
 assert.match(actionSource, /action:\s*"executive_brief\.generate"[\s\S]*limit:\s*1[\s\S]*identifiers:\s*\[analysisPackage\.fingerprint\]/, "duplicate generation must be fingerprint-limited");
 assert.match(serviceSource, /runStructuredAI/, "the workflow must use the provider-neutral manager");
@@ -389,6 +459,8 @@ assert.match(contractSource, /EXECUTIVE_BRIEF_VALIDATOR_VERSION = "executive_bri
 assert.match(policySource, /BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5\.6-sol"[\s\S]*BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5\.6-terra"/, "the Preview policy must pin Sol and Terra model IDs");
 assert.match(policySource, /resolveExecutiveBriefGenerationPolicy[\s\S]*model: BUSINESS_HEALTH_GPT56_SOL_MODEL[\s\S]*model: BUSINESS_HEALTH_GPT56_TERRA_MODEL/, "the Executive Brief policy must route Sol before Terra");
 assert.match(policySource, /isExecutiveBriefPreviewEnabled[\s\S]*VERCEL_ENV === "preview"/, "the provider experiment must remain Preview-only");
+assert.match(storageSource, /EXECUTIVE_BRIEF_RELEASE_CHANNELS = \["production", "preview", "development"\]/, "the release-channel contract must remain closed to exactly three values");
+assert.match(storageSource, /providerPolicyId === EXECUTIVE_BRIEF_GPT56_POLICY_ID \? "preview" : null/, "legacy Preview policy artifacts must classify as Preview while unknown artifacts fail closed");
 assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the homepage must preserve the approved Business Health Version 1 hierarchy");
 assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Business Health Version 1 homepage must not embed the Executive Brief ahead of its snapshot");
 assert.match(panelSource, />\s*Read full brief\s*</, "the approved executive action copy must render");
