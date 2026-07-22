@@ -25,7 +25,6 @@ export const VAEROEX_PLAN_FEATURES = [
   "Continuous platform improvements",
   "Leadership decision support",
   "Executive Visibility Dashboard",
-  "Business Signals",
   "Files",
   "Generated Outputs",
   "Business Health Score",

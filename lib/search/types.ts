@@ -3,7 +3,6 @@ export type GlobalSearchGroupLabel =
   | "Reports"
   | "Files"
   | "Issues"
-  | "Business Signals"
   | "Review Signals"
   | "Customer Evidence"
   | "SOPs"

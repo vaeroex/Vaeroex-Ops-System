@@ -75,8 +75,7 @@ function list(values: string[], fallback: string) {
 }
 
 async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: string, start: Date, end: Date) {
-  const [tasks, issues, checklistRuns, checklistDefinitions, kpis, kpiSettings, crm, assignments, files] = await Promise.all([
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
+  const [issues, checklistRuns, checklistDefinitions, kpis, kpiSettings, crm, assignments, files] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
     supabase.from("checklists").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
@@ -88,7 +87,6 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   ]);
 
   const sourceErrors = [
-    tasks.error,
     issues.error,
     checklistRuns.error,
     checklistDefinitions.error,
@@ -109,7 +107,6 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
     rows: [...(kpis.data || []), ...(crm.data || [])]
   });
 
-  const taskRows = filterOriginalBusinessEvidence(tasks.data || []);
   const issueRows = filterOriginalBusinessEvidence(issues.data || []);
   const eligibleChecklistIds = new Set(filterOriginalBusinessEvidence(checklistDefinitions.data || []).map((row) => row.id));
   const checklistRows = filterOriginalBusinessEvidence(checklistRuns.data || []).filter((row) => eligibleChecklistIds.has(row.checklist_id));
@@ -121,13 +118,6 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const crmRows = filterBySourceParentEligibility(filterOriginalBusinessEvidence(crm.data || []), parentEligibility);
   const assignmentRows = filterOriginalBusinessEvidence(assignments.data || []);
   const fileRows = filterOriginalBusinessEvidence(files.data || []);
-  const openTasks = taskRows.filter((task) => !["Done", "Complete"].includes(task.status || ""));
-  const businessSignalsInPeriod = taskRows.filter((task) => inRange(task.due_date || task.created_at, start, end) || inRange(task.created_at, start, end));
-  const contextualBusinessSignals = businessSignalsInPeriod.filter((task) =>
-    Boolean(task.description || task.category || task.related_type || task.ai_generated)
-  );
-  const overdueTasks = contextualBusinessSignals;
-  const completedTasks = businessSignalsInPeriod;
   const openIssues = issueRows.filter((issue) => !["Closed", "Resolved"].includes(issue.status || ""));
   const checklistExceptions = checklistRows.filter((run) => !["Done", "Complete"].includes(run.status || "") && inRange(run.created_at, start, end));
   const currentKpis = kpiRows.filter((kpi) => kpi.metric_date >= dateOnly(start) && kpi.metric_date <= dateOnly(end));
@@ -136,7 +126,6 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const openAssignments = assignmentRows.filter((assignment) => !["Done", "Dismissed"].includes(assignment.status || ""));
   const uploadedFiles = fileRows.filter((file) => inRange(file.created_at, start, end));
   const originalSourceIds = independentOriginalEvidenceKeys([
-    { kind: "business_signal", values: taskRows },
     { kind: "issue", values: issueRows },
     { kind: "kpi", values: kpiRows },
     { kind: "customer_evidence", values: crmRows },
@@ -148,9 +137,6 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
       original_source_count: originalSourceIds.size
     },
     counts: {
-      completed_tasks: completedTasks.length,
-      open_tasks: openTasks.length,
-      overdue_tasks: overdueTasks.length,
       open_issues: openIssues.length,
       checklist_exceptions: checklistExceptions.length,
       kpis_recorded: currentKpis.length,
@@ -160,8 +146,6 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
       uploaded_files: uploadedFiles.length
     },
     items: {
-      completed_tasks: completedTasks.slice(0, 8).map((task) => task.title),
-      overdue_tasks: overdueTasks.slice(0, 8).map((task) => task.title),
       open_issues: openIssues.slice(0, 8).map((issue) => `${issue.title}${issue.severity ? ` (${issue.severity})` : ""}`),
       checklist_exceptions: checklistExceptions.slice(0, 8).map((run) => run.notes || `Checklist run ${run.id.slice(0, 8)} needs review`),
       below_target_kpis: belowTargetKpis.slice(0, 8).map((kpi) => `${kpi.name}: ${kpi.actual_value} vs target ${kpi.target}`),
@@ -187,13 +171,11 @@ function reportBody({
 }) {
   const title = categoryLabel(category);
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} Business Signal${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate response, handoff, customer, market, or operational context worth leadership review.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} are still unresolved.` : "",
     source.counts.below_target_kpis ? `${source.counts.below_target_kpis} KPI${source.counts.below_target_kpis === 1 ? "" : "s"} are below target.` : "",
     source.counts.checklist_exceptions ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.` : ""
   ].filter(Boolean);
   const actions = [
-    source.counts.overdue_tasks ? "Review the Business Signal pattern before the next leadership check-in." : "",
     source.counts.below_target_kpis ? "Review below-target KPIs and decide whether leadership needs an improvement plan for each key metric." : "",
     source.counts.open_issues ? "Review the most important unresolved issues with leadership." : "",
     source.counts.uploaded_files ? "Review recent uploads and approve any mappings that should feed KPI history." : ""
@@ -205,19 +187,13 @@ Period: ${startDate} to ${endDate}
 Workspace: ${workspaceName}
 
 ## Executive Summary
-Vaeroex generated this scheduled report from ${source.evidence.original_source_count} eligible original evidence source${source.evidence.original_source_count === 1 ? "" : "s"}, including KPI history, customer activity evidence, Business Signals, and uploaded files. This period includes ${source.counts.completed_tasks} Business Signal${source.counts.completed_tasks === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer activity record${source.counts.crm_leads === 1 ? "" : "s"}, and ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}.
+  Vaeroex generated this scheduled report from ${source.evidence.original_source_count} eligible original evidence source${source.evidence.original_source_count === 1 ? "" : "s"}, including KPI history, customer activity evidence, issues, and uploaded files. This period includes ${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"}, ${source.counts.crm_leads} new customer activity record${source.counts.crm_leads === 1 ? "" : "s"}, and ${source.counts.kpis_recorded} KPI record${source.counts.kpis_recorded === 1 ? "" : "s"}.
 
 ## What Needs Attention
 ${list(risks, "No urgent risks were detected for this scheduled report.")}
 
-## Business Signals
-${list(source.items.completed_tasks, "No Business Signals were found in this period.")}
-
 ## Open Issues
 ${list(source.items.open_issues, "No open issues were found.")}
-
-## Business Signal Evidence
-${list(source.items.overdue_tasks, "No Business Signal evidence was found.")}
 
 ## KPI Signals
 ${list(source.items.below_target_kpis, "No below-target KPIs were found for this period.")}

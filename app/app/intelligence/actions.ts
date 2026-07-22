@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -103,12 +102,6 @@ export async function createBusinessDecisionAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/reports");
   redirectWithMessage(path, "Decision logged. Vaeroex will include it in future reviews.");
-}
-
-export async function acceptPrestigeRecommendationAction(formData: FormData) {
-  const path = returnPath(formData);
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function dismissPrestigeRecommendationAction(formData: FormData) {

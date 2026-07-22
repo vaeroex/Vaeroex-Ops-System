@@ -14,7 +14,6 @@ export type DemoWorkspaceCounts = {
   operationalMetrics: number;
   reports: number;
   sops: number;
-  tasks: number;
   issues: number;
   files: number;
   fileAnalyses: number;
@@ -31,7 +30,7 @@ type DemoMonth = {
   conversion: number;
   responseHours: number;
   openIssues: number;
-  overdueTasks: number;
+  overdueFollowups: number;
   satisfaction: number;
   sopReview: number;
   checklistCompletion: number;
@@ -64,7 +63,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 24,
     responseHours: 22,
     openIssues: 4,
-    overdueTasks: 4,
+    overdueFollowups: 4,
     satisfaction: 89,
     sopReview: 82,
     checklistCompletion: 93,
@@ -82,7 +81,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 27,
     responseHours: 19,
     openIssues: 3,
-    overdueTasks: 3,
+    overdueFollowups: 3,
     satisfaction: 91,
     sopReview: 88,
     checklistCompletion: 96,
@@ -100,7 +99,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 18,
     responseHours: 32,
     openIssues: 9,
-    overdueTasks: 11,
+    overdueFollowups: 11,
     satisfaction: 82,
     sopReview: 62,
     checklistCompletion: 78,
@@ -118,7 +117,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 22,
     responseHours: 28,
     openIssues: 8,
-    overdueTasks: 7,
+    overdueFollowups: 7,
     satisfaction: 86,
     sopReview: 84,
     checklistCompletion: 88,
@@ -136,7 +135,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 29,
     responseHours: 18,
     openIssues: 5,
-    overdueTasks: 4,
+    overdueFollowups: 4,
     satisfaction: 92,
     sopReview: 96,
     checklistCompletion: 97,
@@ -154,7 +153,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 23,
     responseHours: 26,
     openIssues: 6,
-    overdueTasks: 8,
+    overdueFollowups: 8,
     satisfaction: 88,
     sopReview: 91,
     checklistCompletion: 90,
@@ -172,7 +171,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 26,
     responseHours: 21,
     openIssues: 5,
-    overdueTasks: 5,
+    overdueFollowups: 5,
     satisfaction: 90,
     sopReview: 94,
     checklistCompletion: 94,
@@ -190,7 +189,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 21,
     responseHours: 29,
     openIssues: 8,
-    overdueTasks: 9,
+    overdueFollowups: 9,
     satisfaction: 85,
     sopReview: 79,
     checklistCompletion: 86,
@@ -208,7 +207,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 28,
     responseHours: 20,
     openIssues: 5,
-    overdueTasks: 4,
+    overdueFollowups: 4,
     satisfaction: 91,
     sopReview: 95,
     checklistCompletion: 96,
@@ -226,7 +225,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 30,
     responseHours: 17,
     openIssues: 4,
-    overdueTasks: 3,
+    overdueFollowups: 3,
     satisfaction: 93,
     sopReview: 97,
     checklistCompletion: 98,
@@ -244,7 +243,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 27,
     responseHours: 21,
     openIssues: 5,
-    overdueTasks: 5,
+    overdueFollowups: 5,
     satisfaction: 91,
     sopReview: 92,
     checklistCompletion: 95,
@@ -262,7 +261,7 @@ const DEMO_MONTHS: DemoMonth[] = [
     conversion: 31,
     responseHours: 18,
     openIssues: 4,
-    overdueTasks: 4,
+    overdueFollowups: 4,
     satisfaction: 94,
     sopReview: 98,
     checklistCompletion: 97,
@@ -378,7 +377,7 @@ function monthMetricRows(month: DemoMonth): DemoMetricRow[] {
       name: "Overdue Follow-ups",
       category: "Accountability",
       target: 5,
-      value: month.overdueTasks,
+      value: month.overdueFollowups,
       owner: "General Manager",
       note: "Lower is better. Target is fewer than 5 overdue follow-ups."
     },
@@ -441,7 +440,6 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
     operationalMetrics,
     reports,
     sops,
-    tasks,
     issues,
     files,
     fileAnalyses,
@@ -454,7 +452,6 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
     supabase.from("operational_metrics").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("sops").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("issues").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("analysis_summary", "is", null),
@@ -469,7 +466,6 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
     operationalMetrics: countValue(operationalMetrics),
     reports: countValue(reports),
     sops: countValue(sops),
-    tasks: countValue(tasks),
     issues: countValue(issues),
     files: countValue(files),
     fileAnalyses: countValue(fileAnalyses),
@@ -494,6 +490,7 @@ async function clearDemoWorkspaceData(supabase: AppSupabaseClient, workspaceId: 
     "assets",
     "operational_metrics",
     "kpis",
+    // Remove task rows created by older demo versions; no new task fixtures are seeded.
     "tasks",
     "issues",
     "people",
@@ -755,100 +752,8 @@ async function seedCrm(supabase: AppSupabaseClient, workspaceId: string, user: D
   }
 }
 
-async function seedTasksAndIssues(supabase: AppSupabaseClient, workspaceId: string, user: DemoUser) {
+async function seedIssues(supabase: AppSupabaseClient, workspaceId: string, user: DemoUser) {
   const year = todayUtc().getUTCFullYear();
-  const tasks = await supabase.from("tasks").insert([
-    {
-      workspace_id: workspaceId,
-      title: "Investigate response time increase",
-      description: "March response time rose to 32 hours, which coincided with lower conversion and satisfaction.",
-      status: "Done",
-      priority: "High",
-      category: "Customer Service",
-      due_date: dateForMonth(year, 2, 20),
-      created_by: user.id,
-      created_at: isoForMonth(year, 2, 16)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Review March customer response evidence",
-      description: "Review March customer records with proposal or lost status and identify response-quality signals.",
-      status: "Done",
-      priority: "High",
-      category: "Customer Evidence",
-      due_date: dateForMonth(year, 2, 24),
-      created_by: user.id,
-      created_at: isoForMonth(year, 2, 18)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Update customer follow-up SOP",
-      description: "Add response evidence and escalation context after the March dip.",
-      status: "Done",
-      priority: "High",
-      category: "SOP",
-      due_date: dateForMonth(year, 3, 10),
-      created_by: user.id,
-      created_at: isoForMonth(year, 3, 2)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Review unresolved March issues",
-      description: "Review issues carried from March into April and decide whether leadership review is needed.",
-      status: "In Progress",
-      priority: "Medium",
-      category: "Issues",
-      due_date: dateFromNow(-2),
-      created_by: user.id,
-      created_at: isoFromNow(-12)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Review recovery progress",
-      description: "Compare April and May against the March dip and confirm which fixes worked.",
-      status: "Done",
-      priority: "Medium",
-      category: "Management",
-      due_date: dateForMonth(year, 4, 18),
-      created_by: user.id,
-      created_at: isoForMonth(year, 4, 10)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Review customer response pattern",
-      description: "Compare open proposals, response time, and conversion before the next month closes.",
-      status: "In Progress",
-      priority: "High",
-      category: "Customer Evidence",
-      due_date: dateFromNow(-1),
-      created_by: user.id,
-      created_at: isoFromNow(-7)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Generate monthly recovery report",
-      description: "Summarize March dip, April recovery plan, and May progress for the owner.",
-      status: "Done",
-      priority: "Medium",
-      category: "Reports",
-      due_date: dateForMonth(year, 4, 28),
-      created_by: user.id,
-      created_at: isoForMonth(year, 4, 21)
-    },
-    {
-      workspace_id: workspaceId,
-      title: "Confirm KPI targets for next month",
-      description: "Review revenue, conversion, response time, and checklist completion targets before next month.",
-      status: "To Do",
-      priority: "Medium",
-      category: "KPI Review",
-      due_date: dateFromNow(5),
-      created_by: user.id,
-      created_at: isoFromNow(-1)
-    }
-  ]);
-  throwIfError(tasks.error, "Demo tasks");
-
   const issues = await supabase.from("issues").insert([
     {
       workspace_id: workspaceId,
@@ -1244,24 +1149,6 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
           related_module: "Reports"
         }
       ],
-      suggested_tasks: [
-        {
-          title: "Review March missed follow-up evidence",
-          description: "Review March lost/proposal customer activity and summarize where the response pattern weakened.",
-          priority: "High",
-          category: "Customer Evidence",
-          due_date_recommendation: dateFromNow(2),
-          reason_this_matters: "March customer activity was stable, but conversion dropped."
-        },
-        {
-          title: "Confirm next-month KPI targets",
-          description: "Review revenue, conversion, response time, checklist completion, and overdue-follow-up targets before the next month starts.",
-          priority: "Medium",
-          category: "KPI Review",
-          due_date_recommendation: dateFromNow(5),
-          reason_this_matters: "The current month is mixed and needs leadership review before targets drift."
-        }
-      ],
       suggested_systems: [
         "Use KPI Dashboard YTD view to compare March, April, May, and the current month.",
         "Use customer activity evidence to detect possible revenue leakage.",
@@ -1409,7 +1296,7 @@ async function seedYtdDemoWorkspace(supabase: AppSupabaseClient, workspaceId: st
   await seedOperationalMetrics(supabase, workspaceId, user, timeline);
   await seedPeopleAndAssets(supabase, workspaceId, user);
   await seedCrm(supabase, workspaceId, user, timeline);
-  await seedTasksAndIssues(supabase, workspaceId, user);
+  await seedIssues(supabase, workspaceId, user);
   await seedSopsAndChecklists(supabase, workspaceId, user, timeline);
   await seedFilesAndReports(supabase, workspaceId, user, timeline);
   await seedVaeroexInsight(supabase, workspaceId, user);

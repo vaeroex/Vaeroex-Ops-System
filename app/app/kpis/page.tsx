@@ -149,14 +149,6 @@ function metricTone(actual: number | null, target: number | null, direction: Kpi
   return Math.abs(actual - target) <= tolerance ? "yellow" : "red";
 }
 
-function openTaskTone(openTasks: number): KpiTone {
-  if (openTasks === 0) {
-    return "green";
-  }
-
-  return openTasks <= 5 ? "yellow" : "red";
-}
-
 function statusLabel(tone: KpiTone) {
   if (tone === "green") return "On Track";
   if (tone === "yellow") return "Near Target";
@@ -1665,13 +1657,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
   const [
     kpiResult,
-    completedTasksResult,
-    openTasksResult,
     folderResult,
     peopleResult,
     alertRulesResult,
     shareResult,
-    taskResult,
     issueResult,
     checklistRunResult,
     crmResult,
@@ -1688,13 +1677,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       .is("deleted_at", null)
       .order("metric_date", { ascending: false })
       .order("created_at", { ascending: false }),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).eq("status", "Done"),
-    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).neq("status", "Done"),
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("kpi_alert_rules").select("*").eq("workspace_id", workspaceId).eq("is_active", true).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("tasks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
@@ -1725,15 +1711,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const revenue = findLatestMetric(kpis, ["revenue", "sales"]);
   const leads = findLatestMetric(kpis, ["lead"]);
   const conversionRate = findLatestMetric(kpis, ["conversion"]);
-  const completedTasks = completedTasksResult.count || 0;
-  const openTasks = openTasksResult.count || 0;
   const intelligence = buildPrestigeIntelligence({
     workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
     isDemoWorkspace: false,
     periodLabel: "KPIs",
     range: { startDate: today, endDate: today, previousStartDate: today, previousEndDate: today },
     kpis,
-    tasks: taskResult.data || [],
     issues: issueResult.data || [],
     assets: [],
     checklists: [],
@@ -1879,13 +1862,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         message={
           params?.error ||
           kpiResult.error?.message ||
-          completedTasksResult.error?.message ||
-          openTasksResult.error?.message ||
     folderResult.error?.message ||
     peopleResult.error?.message ||
     alertRulesResult.error?.message ||
     shareResult.error?.message ||
-          taskResult.error?.message ||
           issueResult.error?.message ||
           checklistRunResult.error?.message ||
     crmResult.error?.message ||

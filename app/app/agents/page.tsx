@@ -242,18 +242,18 @@ function workflowDataUsed(key: VaeroexWorkflowKey) {
   }
 
   if (key === "weekly_report" || key === "daily_summary" || key === "business_review_package") {
-    return "KPIs, Business Signals, issues, customer activity evidence, reports, Vaeroex runs";
+    return "KPIs, issues, customer activity evidence, reports, Vaeroex runs";
   }
 
   if (key === "sop_generator" || key === "form_builder" || key === "checklist_builder") {
-    return "Existing SOPs, forms, checklists, issues, Business Signals";
+    return "Existing SOPs, forms, checklists, issues, and eligible evidence";
   }
 
   if (key === "ceo_mode" || key === "focus_priorities" || key === "risk_simulation" || key === "weekly_management_meeting") {
-    return "Workspace health, risks, KPIs, decisions, Business Signals, business memory";
+    return "Workspace health, risks, KPIs, decisions, evidence, and business memory";
   }
 
-  return "Workspace records, Business Signals, issues, files, reports";
+  return "Workspace records, issues, files, reports, and eligible evidence";
 }
 
 function resultTitle(output: JsonRecord, fallback: string) {
@@ -318,8 +318,6 @@ function businessSections(output: JsonRecord) {
   ]);
   const actions = collectItems(output, [
     "recommended_actions",
-    "suggested_tasks",
-    "tasks",
     "thirty_day_action_plan",
     "manager_actions"
   ]);
@@ -601,24 +599,6 @@ function savedRecords(output: JsonRecord) {
   return asArray(output.saved_records).filter(isRecord);
 }
 
-function getTaskDrafts(output: JsonRecord) {
-  return [...asArray(output.suggested_tasks), ...asArray(output.tasks), ...asArray(output.follow_up_tasks)].map((task, index) => {
-    const record = asRecord(task);
-
-    return {
-      title: str(record.title, typeof task === "string" ? task : `Recommended review ${index + 1}`),
-      description:
-        str(record.description) ||
-        str(record.reason_this_matters) ||
-        str(record.recommended_action) ||
-        "Review this recommendation as an executive intelligence signal.",
-      priority: str(record.priority, "Medium"),
-      category: str(record.category, "Executive review"),
-      timing: str(record.timing) || str(record.review_cadence)
-    };
-  });
-}
-
 function getFormDrafts(output: JsonRecord) {
   return [...asArray(output.form), ...asArray(output.forms), ...asArray(output.suggested_forms)].map((draft, index) => {
     const record = asRecord(draft);
@@ -889,33 +869,6 @@ function ReadableText({ value }: { value: unknown }) {
   );
 }
 
-function TaskDraftSection({ tasks }: { tasks: ReturnType<typeof getTaskDrafts> }) {
-  if (!tasks.length) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-lg border border-line bg-white p-4">
-      <h4 className="text-sm font-semibold">Review Drafts</h4>
-      <div className="mt-3 space-y-3">
-        {tasks.map((task) => (
-          <article key={`${task.title}-${task.description}`} className="rounded-lg border border-line bg-slate-50 p-3">
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <p className="text-sm font-semibold">{task.title}</p>
-              <StatusBadge value={task.priority} />
-            </div>
-            <p className="mt-2 text-sm leading-6 text-muted">{task.description}</p>
-            <p className="mt-2 text-xs text-muted">
-              {task.category}
-              {task.timing ? ` - ${task.timing}` : ""}
-            </p>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function FormDraftSection({ forms }: { forms: ReturnType<typeof getFormDrafts> }) {
   if (!forms.length) {
     return null;
@@ -1044,7 +997,6 @@ function ReportDraftSection({ reports }: { reports: ReturnType<typeof getReportD
 function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId: string; runTitle: string }) {
   const visibleOutput = displayOutput(output);
   const sections = businessSections(visibleOutput);
-  const tasks = getTaskDrafts(visibleOutput);
   const forms = getFormDrafts(visibleOutput);
   const checklists = getChecklistDrafts(visibleOutput);
   const sops = getSopDrafts(visibleOutput);
@@ -1054,7 +1006,7 @@ function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId
   const topProblems = sections.problems.slice(0, 3);
   const topAction = recommendations[0]?.title || sections.actions[0];
   const topActionWhy = recommendations[0]?.why || outputReasoning(visibleOutput);
-  const hasRecordDrafts = Boolean(tasks.length || checklists.length || forms.length || sops.length);
+  const hasRecordDrafts = Boolean(checklists.length || forms.length || sops.length);
 
   return (
     <div className="space-y-4">
@@ -1084,7 +1036,6 @@ function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId
             View suggested documents, SOPs, forms, or checklists
           </summary>
           <div className="mt-4 space-y-4">
-            <TaskDraftSection tasks={tasks} />
             <ChecklistDraftSection checklists={checklists} />
             <FormDraftSection forms={forms} />
             <SopDraftSection sops={sops} />
@@ -1161,7 +1112,8 @@ function evidenceSourceLabel(item: string) {
 
   if (/crm|pipeline|lead|customer|follow-up|follow up/.test(normalized)) return "Customer Evidence";
   if (/kpi|metric|revenue|target|trend|history|forecast|score/.test(normalized)) return "KPI History";
-  if (/business signal|signal|business memory|memory/.test(normalized)) return "Business Signals";
+  if (/business memory|memory/.test(normalized)) return "Business Memory";
+  if (/signal/.test(normalized)) return "Evidence";
   if (/report|brief|briefing|review/.test(normalized)) return "Reports";
   if (/file|source|upload|document|spreadsheet|csv|xlsx|pdf/.test(normalized)) return "Source Files";
   if (/sop|process|procedure|policy/.test(normalized)) return "Process Documents";

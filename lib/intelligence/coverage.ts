@@ -85,7 +85,6 @@ export type BusinessIntelligenceCoverageResult = {
 
 export type BusinessIntelligenceCoverageInput = {
   kpis?: TableRow<"kpis">[];
-  tasks?: TableRow<"tasks">[];
   issues?: TableRow<"issues">[];
   checklists?: TableRow<"checklists">[];
   checklistRuns?: TableRow<"checklist_runs">[];
@@ -372,7 +371,6 @@ function makeSourceMix(input: BusinessIntelligenceCoverageInput) {
     { label: "Files", count: activeRows(input.files || []).length },
     { label: "Reports", count: activeRows(input.reports || []).length },
     { label: "SOPs", count: activeRows(input.sops || []).length },
-    { label: "Business Signals", count: activeRows(input.tasks || []).length },
     { label: "Financials", count: activeRows(input.operationalMetrics || []).filter((metric) => includesAny(sourceText(metric.metric_name, metric.category), ["revenue", "cost", "expense", "profit", "margin", "cash", "financial"])).length },
     { label: "Issues", count: activeRows(input.issues || []).length },
     { label: "People context", count: activeRows(input.people || []).length }
@@ -447,7 +445,6 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   input = {
     ...input,
     kpis: filterBySourceParentEligibility(activeRows(input.kpis || []), parentEligibility),
-    tasks: activeRows(input.tasks || []),
     issues: activeRows(input.issues || []),
     checklists: activeChecklists,
     checklistRuns: activeRows(input.checklistRuns || []).filter((run) => activeChecklistIds.has(run.checklist_id)),
@@ -492,7 +489,6 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   const operationsSources = [
     ...kpiSources(input.kpis || [], operationsKeywords),
     ...operationalMetricSources(input.operationalMetrics || [], operationsKeywords),
-    ...activeRows(input.tasks || []).slice(0, 80).map((task) => evidence(`signal:${task.id}`, task.title, "Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category))),
     ...fileSources(input.files || [], operationsKeywords),
     ...reportSources(input.reports || [], operationsKeywords)
   ];
@@ -521,7 +517,6 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
   ];
   const riskSources = [
     ...(input.issues || []).map((issue) => evidence(`issue:${issue.id}`, issue.title, "Issues", issue.updated_at || issue.created_at, true, issue.root_cause || issue.recommended_fix ? "strong" : "developing", sourceText(issue.description, issue.issue_type, issue.severity, issue.root_cause, issue.recommended_fix))),
-    ...activeRows(input.tasks || []).filter((task) => includesAny(sourceText(task.title, task.description, task.category, task.status), riskKeywords)).map((task) => evidence(`signal:${task.id}`, task.title, "Risk Business Signals", task.updated_at || task.created_at, true, "developing", sourceText(task.description, task.category, task.status))),
     ...fileSources(input.files || [], riskKeywords, "Risk Files"),
     ...reportSources(input.reports || [], riskKeywords, "Risk Reports"),
   ];
@@ -558,15 +553,13 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     ...activeRows(input.files || []).map((file) => evidence(`file:${file.id}`, file.display_name, "Files", file.processed_at || file.created_at, true, "strong")),
     ...activeRows(input.reports || []).map((report) => evidence(`report:${report.id}`, report.title, "Reports", report.date_range_end || report.created_at, false, "developing")),
     ...activeRows(input.sops || []).map((sop) => evidence(`sop:${sop.id}`, sop.title, "SOPs", sop.updated_at || sop.created_at, false, "developing")),
-    ...activeRows(input.tasks || []).map((task) => evidence(`signal:${task.id}`, task.title, "Business Signals", task.updated_at || task.created_at, true, "developing")),
     ...activeRows(input.issues || []).map((issue) => evidence(`issue:${issue.id}`, issue.title, "Issues", issue.updated_at || issue.created_at, true, "developing")),
     ...activeRows(input.operationalMetrics || []).map((metric) => evidence(`metric:${metric.source_file_id || metric.import_id || "manual"}:${lower(metric.metric_name)}`, metric.metric_name, "Operational metrics", metric.metric_date || metric.created_at, true, metric.source_file_id || metric.import_id ? "strong" : "developing"))
   ]);
-  const activeSignalIds = new Set(activeRows(input.tasks || []).map((signal) => signal.id));
   const activeFileIds = new Set(activeRows(input.files || []).map((file) => file.id));
   const memoryItemCount = filterBusinessEvidence(input.memoryChunks || []).filter((chunk) => {
     const sourceType = lower(chunk.source_type);
-    if (sourceType.includes("signal") || sourceType === "task") return Boolean(chunk.source_id && activeSignalIds.has(chunk.source_id));
+    if (sourceType.includes("signal") || sourceType === "task") return false;
     if (chunk.source_file_id) return activeFileIds.has(chunk.source_file_id);
     return sourceType !== "platform_run" && sourceType !== "ai_agent_run";
   }).length;

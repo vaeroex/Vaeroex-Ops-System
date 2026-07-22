@@ -129,7 +129,7 @@ export default function OperationsIntelligencePage() {
           <div>
             <FileSearch2 className="h-6 w-6 text-cyan-200" aria-hidden="true" />
             <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-normal">Business information enters as evidence, not as unsupported conclusions.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-300">Operations Intelligence supports structured workbooks, documents, images, KPIs, and Business Signals while retaining the lineage leadership needs to inspect why a conclusion exists.</p>
+            <p className="mt-4 text-base leading-7 text-slate-300">Operations Intelligence supports structured workbooks, documents, images, and KPIs while retaining the lineage leadership needs to inspect why a conclusion exists.</p>
           </div>
           <div className="divide-y divide-white/10 border-y border-white/10">
             {evidenceInputs.map(([title, body]) => (

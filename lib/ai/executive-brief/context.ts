@@ -337,7 +337,7 @@ export function buildExecutiveBriefPackage({
 
   const signals: ExecutiveBriefSignal[] = selected
     .map((item) => {
-      const label = readablePhrase(item.insight.title, 180, "Eligible business signal");
+      const label = readablePhrase(item.insight.title, 180, "Eligible evidence signal");
       const fact = readableSentence(
         `${item.insight.summary} ${item.insight.why}`,
         520,

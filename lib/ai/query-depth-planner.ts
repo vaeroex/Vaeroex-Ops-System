@@ -14,7 +14,6 @@ export type VaeroexEvidenceDomain =
   | "reports"
   | "files"
   | "business_memory"
-  | "business_signals"
   | "financials"
   | "customers"
   | "operations"
@@ -54,7 +53,6 @@ const DOMAIN_PATTERNS: Array<[VaeroexEvidenceDomain, RegExp]> = [
   ["reports", /\b(report|reports|briefing|briefings|executive brief|board summary)\b/i],
   ["files", /\b(file|files|document|documents|spreadsheet|upload|uploads|source|sources)\b/i],
   ["business_memory", /\b(business memory|learned knowledge|historical context|workspace knowledge|evidence)\b/i],
-  ["business_signals", /\b(business signal|business signals|observation|observations|business event|business events)\b/i],
   ["financials", /\b(revenue|profit|profitability|margin|cash|cost|costs|expense|expenses|financial|financials|invoice|invoices)\b/i],
   ["customers", /\b(customer|customers|retention|complaint|complaints|satisfaction|conversion|engagement|crm|salesforce|hubspot)\b/i],
   ["operations", /\b(operation|operations|operational|process|processes|delay|delays|throughput|inventory|service quality|department)\b/i],
@@ -76,7 +74,6 @@ const EXECUTIVE_LEADERSHIP_DOMAINS: VaeroexEvidenceDomain[] = [
   "reports",
   "files",
   "business_memory",
-  "business_signals",
   "compliance",
   "data_quality",
   "decisions"
@@ -96,7 +93,7 @@ function domainsFromContextType(contextType: string) {
   if (normalized.includes("briefing") || normalized.includes("report") || normalized.includes("generated_output")) domains.push("reports");
   if (normalized.includes("file") || normalized.includes("source")) domains.push("files");
   if (normalized.includes("memory") || normalized.includes("knowledge")) domains.push("business_memory");
-  if (normalized.includes("signal")) domains.push("business_signals");
+  if (normalized.includes("signal")) domains.push("operations");
 
   return domains;
 }

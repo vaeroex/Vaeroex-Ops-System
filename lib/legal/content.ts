@@ -61,7 +61,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
         title: "Description of Service",
         body: [
           "Vaeroex LLC provides Operations Intelligence, software designed to help organizations turn business information into evidence-backed understanding for leadership.",
-          "Operations Intelligence may include an Executive Overview, Business Health, KPI records, Evidence, Reports, Business Signals, Business Memory, evidence retrieval, and Vaeroex-generated recommendations."
+          "Operations Intelligence may include an Executive Overview, Business Health, KPI records, Evidence, Reports, Business Memory, evidence retrieval, and Vaeroex-generated recommendations."
         ]
       },
       {
@@ -222,7 +222,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     sections: [
       { title: "Information We Collect", body: ["Vaeroex may collect account information, workspace data, uploaded files, usage data, support messages, and technical information needed to operate the platform."] },
       { title: "Account Information", body: ["Account information may include name, email address, authentication identifiers, and profile details entered by the user."] },
-      { title: "Workspace Data", body: ["Workspace data may include business records, KPI records, source evidence, reports, Business Signals, notifications, and workspace settings."] },
+      { title: "Workspace Data", body: ["Workspace data may include business records, KPI records, source evidence, reports, notifications, and workspace settings."] },
       { title: "Uploaded Files", body: ["Uploaded files may be stored and processed so Vaeroex can provide file libraries, imports, analysis, reports, and historical business memory."] },
       { title: "Usage Data", body: ["Vaeroex may collect usage data such as feature activity, report generation, Vaeroex runs, timestamps, user agent, and operational logs. IP address may be processed where available for security, audit, abuse prevention, or platform operation."] },
       { title: "Payment Data", body: ["Payment and subscription checkout are handled through Vaeroex checkout and official Vaeroex sales channels. Vaeroex may process subscription status, customer email, order identifiers, and related billing metadata, but it does not need full payment card details to operate the workspace."] },
@@ -304,7 +304,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Designed Use", body: ["Vaeroex is designed for operational business records, not regulated sensitive records."] },
       { title: "Do Not Upload or Enter", body: ["Do not upload or enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, payment card numbers, government IDs, highly sensitive personal data, or regulated health, legal, financial, or employment data unless appropriate legal, security, and compliance requirements are in place and Vaeroex explicitly supports that use."] },
       { title: "Customer Responsibility", body: ["Customers are responsible for understanding the laws, contracts, policies, and compliance obligations that apply to their business data."] },
-      { title: "Where This Matters", body: ["This policy applies to setup, files, reports, support requests, Search, Ask Vaeroex, Business Signals, KPIs, and any other place where users enter business information."] }
+      { title: "Where This Matters", body: ["This policy applies to setup, Evidence, files, reports, support requests, Search, Ask Vaeroex, KPIs, and any other place where users enter business information."] }
     ]
   },
   "subscription-billing-terms": {
@@ -370,7 +370,7 @@ export const releaseNotes = [
     date: "June 2026",
     title: "Operations Intelligence foundation",
     type: "Feature added",
-    body: "Vaeroex now includes the Operations Intelligence foundation: workspace setup, dashboard intelligence, KPIs, source evidence, reports, Business Signals, business memory, and Vaeroex recommendations."
+    body: "Vaeroex now includes the Operations Intelligence foundation: workspace setup, dashboard intelligence, KPIs, source evidence, reports, business memory, and Vaeroex recommendations."
   },
   {
     date: "June 2026",

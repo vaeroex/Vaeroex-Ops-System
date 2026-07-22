@@ -526,29 +526,6 @@ export async function buildBoundedWorkspaceContext({
     );
   }
 
-  if (domainSet.has("business_signals") || domainSet.has("operations")) {
-    loaders.push(
-      safeRows(
-        "Business Signals",
-          supabase
-            .from("tasks")
-          .select("id,title,description,category,related_type,ai_generated,created_at,updated_at,archived_at,deleted_at")
-          .eq("workspace_id", workspaceId)
-          .is("deleted_at", null)
-          .is("archived_at", null)
-          .order("updated_at", { ascending: false })
-          .limit(24),
-        limitations
-      ).then((rows) => {
-        const eligibleRows = filterOriginalBusinessEvidence(rows).slice(0, 8);
-        context.business_signals = eligibleRows;
-        structuredEvidenceCount += eligibleRows.length;
-        if (domainSet.has("business_signals")) loadedDomainSet.add("business_signals");
-        if (domainSet.has("operations")) loadedDomainSet.add("operations");
-      })
-    );
-  }
-
   if (domainSet.has("financials") || domainSet.has("operations")) {
     loaders.push(
       safeRows(
@@ -659,7 +636,6 @@ export async function buildBoundedWorkspaceContext({
     "risk_and_priority_evidence",
     "reports",
     "sources",
-    "business_signals",
     "operational_metrics",
     "historical_customer_activity",
     "people_context",
@@ -715,13 +691,11 @@ export function buildDeterministicBoundedAnswer({
   const healthRows = Array.isArray(structured.business_health) ? structured.business_health : [];
   const reports = Array.isArray(structured.reports) ? structured.reports : [];
   const sources = Array.isArray(structured.sources) ? structured.sources : [];
-  const signals = Array.isArray(structured.business_signals) ? structured.business_signals : [];
   const firstIssue = jsonRecord(issues[0]);
   const firstRecommendation = jsonRecord(recommendations[0]);
   const latestHealth = jsonRecord(healthRows[0]);
   const firstReport = jsonRecord(reports[0]);
   const firstSource = jsonRecord(sources[0]);
-  const firstSignal = jsonRecord(signals[0]);
   const metrics = Array.isArray(kpiSummary.metrics) ? kpiSummary.metrics : [];
   const firstMetric = jsonRecord(metrics[0]);
   const observations = [
@@ -736,7 +710,6 @@ export function buildDeterministicBoundedAnswer({
         reports.length ? `${reports.length} recent report${reports.length === 1 ? "" : "s"}` : "",
         sources.length ? `${sources.length} active source file${sources.length === 1 ? "" : "s"}` : "",
         issues.length ? `${issues.length} current risk record${issues.length === 1 ? "" : "s"}` : "",
-        signals.length ? `${signals.length} recent Business Signal${signals.length === 1 ? "" : "s"}` : "",
         Array.isArray(kpiSummary.metrics) && kpiSummary.metrics.length ? `${kpiSummary.metrics.length} current KPI${kpiSummary.metrics.length === 1 ? "" : "s"}` : ""
       ].filter(Boolean).join(", ")
     : "";
@@ -749,9 +722,7 @@ export function buildDeterministicBoundedAnswer({
           ? `${firstIssue.title} is the clearest current risk record available for this question.`
           : /\b(priority|recommendation)\b/i.test(query) && typeof firstRecommendation.title === "string"
             ? `${firstRecommendation.title} is the leading current recommendation available for this question.`
-            : /\b(signal|observation|event)\b/i.test(query) && typeof firstSignal.title === "string"
-              ? `${firstSignal.title} is the latest relevant Business Signal available for this question.`
-              : "";
+            : "";
   const directAnswer = countAnswer
     ? `The current workspace information includes ${countAnswer}.`
     : targetedObservation || (observations.length

@@ -19,7 +19,6 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 
 export type ManagedRecordCollection =
   | "sops"
-  | "tasks"
   | "checklists"
   | "checklist_runs"
   | "issues"
@@ -165,7 +164,6 @@ function listParams(searchParams?: ManagedRecordListProps["searchParams"]) {
 function collectionLabel(collection: ManagedRecordCollection) {
   const labels: Record<ManagedRecordCollection, string> = {
     sops: "SOPs",
-    tasks: "business signals",
     checklists: "checklists",
     checklist_runs: "checklist runs",
     issues: "issues",

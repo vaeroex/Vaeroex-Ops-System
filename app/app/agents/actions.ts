@@ -1069,30 +1069,6 @@ async function getRun(runId: string) {
   return { supabase, user, workspaceId, membership, run, output: asRecord(run.output_json) };
 }
 
-function taskDrafts(output: JsonRecord) {
-  return [
-    ...asArray(output.suggested_tasks),
-    ...asArray(output.tasks),
-    ...asArray(output.follow_up_tasks)
-  ].map((task, index) => {
-    const record = asRecord(task);
-    const title = str(record.title, typeof task === "string" ? task : `Vaeroex review ${index + 1}`);
-    const description =
-      str(record.description) ||
-      str(record.reason_this_matters) ||
-      str(record.recommended_action) ||
-      "Review this Vaeroex recommendation as an executive intelligence signal.";
-
-    return {
-      title,
-      description,
-      priority: priority(record.priority),
-      category: str(record.category, "Vaeroex review"),
-      due_date: dateOrNull(record.due_date) ?? dateOrNull(record.recommended_due_date)
-    };
-  });
-}
-
 function fieldSchema(fields: unknown, formName: string): Json {
   const values = asArray(fields).length ? asArray(fields) : ["Submitted by", "Business details", "Priority", "Manager notes"];
 

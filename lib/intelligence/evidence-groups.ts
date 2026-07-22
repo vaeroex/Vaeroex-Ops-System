@@ -1,5 +1,4 @@
 import type { IntelligenceEvidenceRecord, IntelligenceInsight } from "@/lib/intelligence/layer";
-import { evidenceScopeForFinding } from "@/lib/intelligence/business-signal-evidence";
 
 export const collapsedEvidenceGroupLimit = 5;
 export const collapsedEvidenceRepresentativeLimit = 5;
@@ -160,22 +159,6 @@ function appendFindingContext(href: string, insight: IntelligenceInsight) {
 
 export function supportingEvidenceHref(insight: IntelligenceInsight) {
   const records = uniqueRecords(insight.supportingRecords);
-  const signalIds = records
-    .filter((record) => record.recordType === "Business Signal" && record.id.startsWith("signal:"))
-    .map((record) => record.id.slice("signal:".length));
-
-  if (signalIds.length === records.length && signalIds.length) {
-    const params = new URLSearchParams({
-      view: "active",
-      finding: insight.id
-    });
-    const encodedIds = signalIds.join(",");
-    const scope = evidenceScopeForFinding(insight.id);
-    if (encodedIds.length <= 3000) params.set("evidence_ids", encodedIds);
-    else if (scope) params.set("evidence_scope", scope);
-    return `/app/tasks?${params.toString()}`;
-  }
-
   const recordTypes = new Set(records.map((record) => record.recordType));
   const recordTitles = new Set(records.map((record) => normalize(record.title)));
   if (records.length === 1 || (recordTypes.size === 1 && recordTitles.size === 1)) {

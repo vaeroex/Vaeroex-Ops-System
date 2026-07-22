@@ -54,7 +54,6 @@ type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
-type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
@@ -70,7 +69,6 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Reports",
   "Files",
   "Issues",
-  "Business Signals",
   "Review Signals",
   "Customer Evidence",
   "SOPs",
@@ -165,7 +163,7 @@ function sourceHref(sourceType: string | null, title: string | null) {
   const normalized = (sourceType || "").toLowerCase();
   const query = title || "";
 
-  if (normalized.includes("task") || normalized.includes("follow")) return hrefWithQuery("/app/tasks", query);
+  if (normalized.includes("task") || normalized.includes("follow")) return hrefWithQuery("/app/sources", query);
   if (normalized.includes("issue")) return hrefWithQuery("/app/issues", query);
   if (normalized.includes("report")) return hrefWithQuery("/app/reports", query);
   if (normalized.includes("kpi")) return hrefWithQuery("/app/kpis", query);
@@ -331,7 +329,6 @@ export async function GET(request: Request) {
     reports,
     files,
     issues,
-    tasks,
     assignments,
     rawCrmLeads,
     sops,
@@ -390,18 +387,6 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(24)
     ).then((rows) => filterOriginalBusinessEvidence<IssueRow>(rows as IssueRow[]).slice(0, 6)),
-    scopedResults<TaskRow>(
-      includesDomain("business_signals", "operations", "priorities"),
-      () => supabase
-        .from("tasks")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .or(orFilter(["title", "description", "status", "priority", "category", "assigned_role", "assigned_department"], words))
-        .order("updated_at", { ascending: false })
-        .limit(24)
-    ).then((rows) => filterOriginalBusinessEvidence<TaskRow>(rows as TaskRow[]).slice(0, 6)),
     scopedResults<AssignmentRow>(
       includesDomain("operations", "priorities"),
       () => supabase
@@ -596,19 +581,6 @@ export async function GET(request: Request) {
       preview: truncate(issue.description || issue.root_cause || issue.recommended_fix),
       href: hrefWithQuery("/app/issues", issue.title),
       meta: compact([issue.severity, issue.status, issue.issue_type])
-    }))
-  );
-
-  addGroup(
-    groups,
-    "Business Signals",
-    tasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      sourceType: "Business Signal",
-      preview: truncate(task.description || compact([task.category, task.related_type, task.due_date])),
-      href: hrefWithQuery("/app/tasks", task.title),
-      meta: compact([task.category, task.related_type, task.due_date])
     }))
   );
 

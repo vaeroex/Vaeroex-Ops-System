@@ -35,14 +35,14 @@ Module._load = function loadPatched(request, parent, isMain) {
 const { filterBusinessEvidence } = require("../lib/intelligence/evidence-eligibility.ts");
 const { filterEligibleMemoryRows } = require("../lib/ai/evidence-index.ts");
 
-const activeSignal = { id: "signal-1", status: "Business Signal", archived_at: null, deleted_at: null };
-const archivedSignal = { ...activeSignal, archived_at: "2026-07-11T00:00:00.000Z" };
-const deletedSignal = { ...archivedSignal, deleted_at: "2026-07-11T00:00:01.000Z" };
+const activeEvidence = { id: "evidence-1", archived_at: null, deleted_at: null };
+const archivedEvidence = { ...activeEvidence, archived_at: "2026-07-11T00:00:00.000Z" };
+const deletedEvidence = { ...archivedEvidence, deleted_at: "2026-07-11T00:00:01.000Z" };
 
-assert.equal(filterBusinessEvidence([activeSignal]).length, 1, "active Business Signals must remain eligible");
-assert.equal(filterBusinessEvidence([archivedSignal]).length, 0, "archived Business Signals must leave active intelligence");
-assert.equal(filterBusinessEvidence([deletedSignal]).length, 0, "deleted Business Signals must leave active intelligence");
-assert.equal(filterBusinessEvidence([activeSignal, archivedSignal, deletedSignal]).length, 1, "only active signals may contribute to active counts");
+assert.equal(filterBusinessEvidence([activeEvidence]).length, 1, "active evidence must remain eligible");
+assert.equal(filterBusinessEvidence([archivedEvidence]).length, 0, "archived evidence must leave active intelligence");
+assert.equal(filterBusinessEvidence([deletedEvidence]).length, 0, "deleted evidence must leave active intelligence");
+assert.equal(filterBusinessEvidence([activeEvidence, archivedEvidence, deletedEvidence]).length, 1, "only active evidence may contribute to active counts");
 
 const signalChunk = {
   id: "chunk-1",
@@ -55,24 +55,9 @@ const signalChunk = {
 };
 
 assert.equal(
-  filterEligibleMemoryRows({ rows: [signalChunk], files: [], runs: [], businessSignals: [activeSignal] }).length,
-  1,
-  "active signal memory may be retrieved"
-);
-assert.equal(
-  filterEligibleMemoryRows({ rows: [signalChunk], files: [], runs: [], businessSignals: [archivedSignal] }).length,
+  filterEligibleMemoryRows({ rows: [signalChunk], files: [], runs: [] }).length,
   0,
-  "archived signals must invalidate dependent memory retrieval"
-);
-assert.equal(
-  filterEligibleMemoryRows({ rows: [signalChunk], files: [], runs: [], businessSignals: [deletedSignal] }).length,
-  0,
-  "deleted signals must invalidate dependent memory retrieval"
-);
-assert.equal(
-  filterEligibleMemoryRows({ rows: [signalChunk], files: [], runs: [], businessSignals: [] }).length,
-  0,
-  "orphaned signal memory must not retrieve"
+  "legacy task-backed memory must fail closed after Business Signals retirement"
 );
 
 const operationsActions = fs.readFileSync(path.join(root, "app/app/operations/actions.ts"), "utf8");
@@ -85,17 +70,15 @@ const sourcesPage = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"),
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql"), "utf8");
 const packageJson = require("../package.json");
 
-assert.match(operationsActions, /deleteBusinessSignalAction[\s\S]{0,320}BUSINESS_SIGNALS_RETIRED_MESSAGE/, "retired Business Signal deletion must fail closed");
-assert.doesNotMatch(operationsActions, /deleteBusinessSignalAction[\s\S]{0,900}update_business_signal_lifecycle/, "retired customer actions must not mutate Business Signal lifecycle");
-assert.doesNotMatch(operationsActions, /\.from\("tasks"\)[\s\S]{0,220}\.delete\(\)[\s\S]{0,220}\.single\(\)/, "Business Signal delete must not hard-delete through a single-row coercion");
+assert.doesNotMatch(operationsActions, /deleteBusinessSignalAction|\.from\("tasks"\)|update_business_signal_lifecycle/, "retired Business Signal mutations must be absent");
 assert.match(recordActions, /\.maybeSingle\(\)/, "single-record mutations must allow a zero-row result without a single JSON coercion error");
 assert.doesNotMatch(recordActions, /select\("id"\)\.single\(\)/, "managed lifecycle mutations must not coerce a mutation result to one JSON object");
 assert.match(recordActions, /revalidatePath\("\/app\/intelligence"\)/, "evidence mutations must invalidate Intelligence");
 assert.match(recordActions, /revalidatePath\("\/app\/reports"\)/, "evidence mutations must invalidate reports");
 assert.match(fileActions, /update_source_file_lifecycle/, "file lifecycle changes must atomically include learned evidence");
-assert.match(boundedContext, /\.from\("tasks"\)[\s\S]{0,420}\.is\("deleted_at", null\)[\s\S]{0,120}\.is\("archived_at", null\)/, "Ask Vaeroex bounded context must exclude inactive signals before limiting");
-assert.match(searchRoute, /\.from\("tasks"\)[\s\S]{0,420}\.is\("deleted_at", null\)[\s\S]{0,120}\.is\("archived_at", null\)/, "search must exclude inactive signals before limiting");
-assert.match(workspaceSnapshot, /from\("tasks"\)[\s\S]{0,200}\.is\("deleted_at", null\)[\s\S]{0,120}\.is\("archived_at", null\)/, "workspace snapshots must count only active signals");
+for (const source of [boundedContext, searchRoute, workspaceSnapshot]) {
+  assert.doesNotMatch(source, /\.from\("tasks"\)/, "active retrieval paths must not read retired task storage");
+}
 assert.match(sourcesPage, /chunk\.archived_at && !chunk\.deleted_at/, "archived knowledge view must exclude deleted knowledge");
 assert.doesNotMatch(sourcesPage, /archivedOnly \? Boolean\(chunk\.archived_at \|\| chunk\.deleted_at\)/, "deleted knowledge must not remain in the archive view");
 assert.match(migration, /update public\.tasks[\s\S]+update public\.business_memory_chunks/, "signal lifecycle must update the source and dependent memory in one transaction");

@@ -2,7 +2,6 @@ import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
-import { businessSignalMatchesEvidenceScope, isOpenBusinessSignal } from "@/lib/intelligence/business-signal-evidence";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
@@ -93,7 +92,6 @@ export type IntelligenceLayerResult = {
 };
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
-type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
@@ -114,7 +112,6 @@ export type IntelligenceLayerInput = {
     size?: string | null;
   } | null;
   kpis?: KpiRow[];
-  tasks?: TaskRow[];
   issues?: IssueRow[];
   files?: FileUploadRow[];
   reports?: ReportRow[];
@@ -318,25 +315,11 @@ function latestDate(values: Array<string | null | undefined>) {
   return values.filter(Boolean).sort().at(-1) || new Date().toISOString();
 }
 
-function businessSignalPatternTitle(signals: TaskRow[]) {
-  const sourceText = signals
-    .flatMap((signal) => [signal.title, signal.description, signal.category])
-    .filter((value): value is string => Boolean(value))
-    .join(" ")
-    .toLowerCase();
-
-  if (/follow.?up|response/.test(sourceText)) return "Customer follow-up ownership is unclear";
-  if (/handoff|handover/.test(sourceText)) return "Repeated handoff gaps are visible";
-  if (/process|procedure|sop/.test(sourceText)) return "Process records show inconsistent follow-through";
-  return "Related operating signals need one leadership decision";
-}
-
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
   const files = filterOriginalBusinessEvidence(input.files);
   const parentEligibility = buildSourceParentEligibility({ files, imports: input.imports || [] });
   const kpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility);
-  const tasks = filterOriginalBusinessEvidence(input.tasks);
   const issues = filterOriginalBusinessEvidence(input.issues);
   // Reports are derived outputs. They remain reviewable, but never become
   // original evidence for new health, coverage, risk, or recommendation logic.
@@ -354,9 +337,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const decisions: DecisionRow[] = [];
   const recommendationOutcomes: RecommendationOutcomeRow[] = [];
   const operationalInsights = input.operationalInsights || [];
-  const openTasks = tasks.filter(isOpenBusinessSignal);
-  const businessSignalsForReview = openTasks.filter((task) => businessSignalMatchesEvidenceScope(task, "related-signal-pattern"));
-  const signalsWithLimitedContext = openTasks.filter((task) => businessSignalMatchesEvidenceScope(task, "limited-signal-context"));
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const latestKpis = latestKpisByName(kpis);
   const historyCounts = kpiHistoryCounts(kpis);
@@ -372,13 +352,12 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   });
   const customerContextWithoutFollowup = crmLeads.filter((lead) => !isClosed(lead.status) && (!lead.last_activity_at || isOverdue(lead.last_activity_at)));
   const originalKpiSeries = new Set(kpis.map((kpi) => `${kpi.source_file_id || kpi.import_id || "manual"}:${kpi.name.toLowerCase()}`));
-  const originalSourceRecords = originalKpiSeries.size + files.length + reports.length + sops.length + forms.length + submissions.length + tasks.length + issues.length + crmLeads.length + people.length;
+  const originalSourceRecords = originalKpiSeries.size + files.length + reports.length + sops.length + forms.length + submissions.length + issues.length + crmLeads.length + people.length;
   const originalSourceTypes = [
     originalKpiSeries.size > 0,
     files.length > 0,
     reports.length > 0,
     sops.length > 0,
-    tasks.length > 0,
     issues.length > 0,
     crmLeads.length > 0,
     people.length > 0
@@ -389,7 +368,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     !reports.length ? "Upload or generate prior management reports." : "",
     !files.length ? "Upload a recent spreadsheet, report, meeting note, or SOP." : "",
     !crmLeads.length ? "Add customer context or import a customer/lead list." : "",
-    !people.length ? "Add leadership or area context so Vaeroex can interpret Business Signals." : ""
+    !people.length ? "Add leadership or area context so Vaeroex can interpret the evidence." : ""
   ].filter(Boolean);
   const dataQualityScore = Math.min(
     100,
@@ -398,7 +377,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         (files.length ? 15 : 0) +
         (kpis.length ? 25 : 0) +
         (reports.length ? 15 : 0) +
-        (crmLeads.length || issues.length || tasks.length ? 10 : 0) +
+        (crmLeads.length || issues.length ? 10 : 0) +
         (decisions.length || recommendationOutcomes.length ? 10 : 0)
     )
   );
@@ -450,102 +429,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         fingerprint: ""
       };
     }),
-    businessSignalsForReview.length
-      ? (() => {
-          const signalPriority = businessSignalsForReview.length >= 5 ? "High" : "Medium";
-          const examples = businessSignalsForReview
-            .slice(0, 3)
-            .map((task) => task.title)
-            .join(", ");
-          const evidence = [`Business Signals in this pattern: ${businessSignalsForReview.length}`, examples ? `Examples: ${examples}` : "Examples: no titles available"];
-          const supportingRecords = businessSignalsForReview.map((task) => evidenceRecord({
-            id: `signal:${task.id}`,
-            title: task.title,
-            recordType: "Business Signal",
-            date: task.due_date || task.updated_at || task.created_at,
-            value: task.description || "No description recorded.",
-            support: task.description
-              ? `The "${task.title}" record provides direct ${task.category ? task.category.toLowerCase() : "operating"} context for this finding.`
-              : "The title is the only recorded context available for this signal.",
-            href: `/app/tasks?q=${encodeURIComponent(task.title)}#signal-${task.id}`,
-            classification: recordClassification(task),
-            sourceKey: task.related_id ? `${task.related_type || "record"}:${task.related_id}` : `signal:${task.id}`,
-            groupHint: task.category || task.related_type || "Business Signals"
-          }));
-          const missingEvidence = [
-            !businessSignalsForReview.some((task) => Boolean(task.assigned_to || task.assigned_person_id)) ? "A responsible party or accountable business role" : "",
-            !businessSignalsForReview.some((task) => Boolean(task.due_date)) ? "Completion or event dates" : "",
-            "A measured customer or operating outcome"
-          ].filter(Boolean);
-          const limitation = `${businessSignalsForReview.length} related record${businessSignalsForReview.length === 1 ? " was" : "s were"} found, but ${missingEvidence.join(", ").toLowerCase()} ${missingEvidence.length === 1 ? "is" : "are"} missing. Vaeroex cannot yet confirm whether this is one recurring process failure.`;
-
-          return {
-            id: "source-signal-review-pattern",
-            type: "Risk" as const,
-            title: businessSignalPatternTitle(businessSignalsForReview),
-            summary: `${businessSignalsForReview.length} active Business Signals describe related follow-up, handoff, or process context.`,
-            why: `The records share a common operating area and remain active; ${missingEvidence.length ? "the missing fields prevent a confirmed root cause" : "their combined evidence supports a recurring pattern"}.`,
-            impact: "Inconsistent follow-through can delay decisions or customer response, but no measured outcome is attached to these records yet.",
-            recommendedAction: "Decide whether leadership needs one accountable follow-up standard and which existing system should record the outcome.",
-            confidence: supportingRecords.length >= 4 && missingEvidence.length <= 1 ? "High" : "Medium",
-            evidence,
-            evidenceCount: supportingRecords.length,
-            supportingRecords,
-            independentSourceCount: new Set(supportingRecords.map((record) => record.sourceKey)).size,
-            contradictoryEvidence: [],
-            missingEvidence,
-            sourceTypes: ["Business Signals"],
-            sourceHref: "/app/tasks",
-            priority: signalPriority,
-            lastUpdated: latestDate(businessSignalsForReview.map((task) => task.updated_at || task.created_at)),
-            affectedArea: businessSignalsForReview[0]?.category || "Operations",
-            timePeriod: latestDate(businessSignalsForReview.map((task) => task.updated_at || task.created_at)).slice(0, 7),
-            limitation,
-            fingerprint: ""
-          };
-        })()
-      : null,
-    signalsWithLimitedContext.length
-      ? (() => {
-          const supportingRecords = signalsWithLimitedContext.map((task) => evidenceRecord({
-            id: `signal:${task.id}`,
-            title: task.title,
-            recordType: "Business Signal",
-            date: task.due_date || task.updated_at || task.created_at,
-            value: task.description || "No description recorded.",
-            support: "The missing description or category prevents reliable interpretation.",
-            href: `/app/tasks?q=${encodeURIComponent(task.title)}#signal-${task.id}`,
-            classification: recordClassification(task),
-            sourceKey: task.related_id ? `${task.related_type || "record"}:${task.related_id}` : `signal:${task.id}`,
-            groupHint: task.category || task.related_type || "Business Signals"
-          }));
-
-          return {
-          id: "unclear-source-signals",
-          type: "Bottleneck" as const,
-          title: `${signalsWithLimitedContext.length} Business Signal${signalsWithLimitedContext.length === 1 ? " lacks" : "s lack"} decision context`,
-          summary: `${signalsWithLimitedContext.length} operating record${signalsWithLimitedContext.length === 1 ? " has" : "s have"} limited description or category information.`,
-          why: "The records cannot be reliably connected to a specific process, outcome, or business impact with the available context.",
-          impact: "This limits confidence in related operational conclusions rather than confirming a business problem.",
-          recommendedAction: "Decide whether these signals should be completed with source context or excluded from leadership review.",
-          confidence: signalsWithLimitedContext.length >= 5 ? "High" : "Medium",
-          evidence: [`Business Signals with limited context: ${signalsWithLimitedContext.length}`, `Business Signals in memory: ${openTasks.length}`, signalsWithLimitedContext[0]?.title ? `Example: ${signalsWithLimitedContext[0].title}` : "No example available"],
-          evidenceCount: supportingRecords.length,
-          supportingRecords,
-          independentSourceCount: new Set(supportingRecords.map((record) => record.sourceKey)).size,
-          contradictoryEvidence: [],
-          missingEvidence: ["Clear description", "Business area or category", "Source reference or outcome"],
-          sourceTypes: ["Business Signals"],
-          sourceHref: "/app/tasks",
-          priority: signalsWithLimitedContext.length >= 5 ? "High" : "Medium",
-          lastUpdated: latestDate(signalsWithLimitedContext.map((task) => task.updated_at || task.created_at)),
-          affectedArea: "Business Signals",
-          timePeriod: latestDate(signalsWithLimitedContext.map((task) => task.updated_at || task.created_at)).slice(0, 7),
-          limitation: "These records are visible, but they do not contain enough context to support a business conclusion.",
-          fingerprint: ""
-        };
-      })()
-      : null,
     ...belowTargetKpis.slice(0, 4).map((kpi) => {
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;

@@ -10,7 +10,7 @@ const storySteps = [
   ["Leadership Clarity", "Insights become clearer briefings, better questions, and stronger decisions."]
 ] as const;
 
-const signalCards = ["Reports", "KPIs", "Customer Activity", "Files", "Business Signals", "Issues"];
+const signalCards = ["Reports", "KPIs", "Customer Activity", "Files", "Evidence", "Issues"];
 
 export function ScrollStory() {
   const stepRefs = useRef<Array<HTMLDivElement | null>>([]);

@@ -23,7 +23,6 @@ type DateRange = {
   startIso: string;
   endIso: string;
 };
-type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
 type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
@@ -267,12 +266,7 @@ function matchesCategory(category: string, row: { category?: string | null; issu
 
   const target = normalizeCategory(category);
   const normalizedModule = normalizeCategory(moduleName);
-  const moduleAliases =
-    normalizedModule === "business signals"
-      ? ["tasks", "source signals", "follow-ups"]
-      : normalizedModule === "customer evidence"
-        ? ["customer activity", "customer evidence", "crm"]
-        : [];
+  const moduleAliases = normalizedModule === "customer evidence" ? ["customer activity", "customer evidence", "crm"] : [];
 
   return (
     normalizedModule === target ||
@@ -404,7 +398,6 @@ async function fetchReportSource(
   category: string
 ) {
   const [
-    tasks,
     issues,
     checklistRuns,
     checklistDefinitions,
@@ -420,14 +413,6 @@ async function fetchReportSource(
     crmLeadHistory,
     operationalMetrics
   ] = await Promise.all([
-    supabase
-      .from("tasks")
-      .select("id,title,description,status,priority,category,related_type,ai_generated,due_date,created_at,updated_at,archived_at,deleted_at")
-      .eq("workspace_id", workspaceId)
-      .is("archived_at", null)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(500),
     supabase
       .from("issues")
       .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,due_date,created_at,updated_at,archived_at,deleted_at")
@@ -530,7 +515,6 @@ async function fetchReportSource(
   ]);
 
   const sourceErrors = [
-    tasks.error,
     issues.error,
     checklistRuns.error,
     checklistDefinitions.error,
@@ -562,7 +546,6 @@ async function fetchReportSource(
     ]
   });
 
-  const taskRows = filterOriginalBusinessEvidence((tasks.data ?? []) as TaskRow[]).filter((task) => matchesCategory(category, task, "Business Signals"));
   const issueRows = filterOriginalBusinessEvidence((issues.data ?? []) as IssueRow[]).filter((issue) => matchesCategory(category, issue, "Issues"));
   const eligibleChecklistIds = new Set(filterOriginalBusinessEvidence((checklistDefinitions.data ?? []) as ChecklistRow[]).map((row) => row.id));
   const checklistRunRows = filterOriginalBusinessEvidence((checklistRuns.data ?? []) as ChecklistRunRow[]).filter((row) =>
@@ -596,14 +579,6 @@ async function fetchReportSource(
     (metric) => matchesCategory(category, metric, "Business metrics") || matchesCategory(category, metric, "Operational metrics")
   );
 
-  const businessSignalsInPeriod = taskRows.filter((task) => inIsoRange(task.due_date || task.created_at, range) || inIsoRange(task.created_at, range));
-  const contextualBusinessSignals = businessSignalsInPeriod.filter((task) =>
-    Boolean(task.description || task.category || task.related_type || task.ai_generated)
-  );
-  const completedTasks = businessSignalsInPeriod;
-  const createdTasks = taskRows.filter((task) => inIsoRange(task.created_at, range));
-  const overdueTasks = contextualBusinessSignals;
-  const openTasks = taskRows.filter((task) => task.status !== "Done");
   const completedChecklistRuns = checklistRunRows.filter(
     (run) => (run.completed_at && inIsoRange(run.completed_at, range)) || (run.status === "Complete" && inIsoRange(run.created_at, range))
   );
@@ -629,7 +604,6 @@ async function fetchReportSource(
   );
   const sourceLinkedKpis = recordedKpis.filter((kpi) => Boolean(kpi.source_file_id || kpi.import_id));
   const originalSourceIds = independentOriginalEvidenceKeys([
-    { kind: "business_signal", values: taskRows },
     { kind: "issue", values: issueRows },
     { kind: "file", values: fileRows },
     { kind: "kpi", values: kpiRows },
@@ -640,7 +614,6 @@ async function fetchReportSource(
     evidence: {
       original_source_count: originalSourceIds.size,
       source_types: [
-        taskRows.length ? "Business Signals" : "",
         issueRows.length ? "Issues" : "",
         fileRows.length ? "Files" : "",
         kpiRows.length ? "KPIs" : "",
@@ -648,10 +621,6 @@ async function fetchReportSource(
       ].filter(Boolean)
     },
     counts: {
-      completed_tasks: completedTasks.length,
-      created_tasks: createdTasks.length,
-      open_tasks: openTasks.length,
-      overdue_tasks: overdueTasks.length,
       checklist_completions: completedChecklistRuns.length,
       checklist_exceptions: checklistExceptions.length,
       new_issues: newIssues.length,
@@ -672,8 +641,6 @@ async function fetchReportSource(
       file_analyses: analyzedFiles.length
     },
     items: {
-      completed_tasks: completedTasks.slice(0, 8).map((task) => task.title),
-      overdue_tasks: overdueTasks.slice(0, 8).map((task) => task.title),
       open_issues: openIssues.slice(0, 8).map((issue) => `${issue.title}${issue.severity ? ` (${issue.severity})` : ""}`),
       checklist_completions: completedChecklistRuns.slice(0, 8).map((run) => run.notes || `Checklist run ${run.id.slice(0, 8)}`),
       checklist_exceptions: checklistExceptions.slice(0, 8).map((run) => run.notes || `Checklist run ${run.id.slice(0, 8)} needs review`),
@@ -710,7 +677,6 @@ async function fetchReportSource(
 
 function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const risks = [
-    source.counts.overdue_tasks ? `${source.counts.overdue_tasks} Business Signal${source.counts.overdue_tasks === 1 ? "" : "s"} may indicate a pattern worth leadership review.` : "",
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} remain unresolved.` : "",
     source.counts.flagged_assets ? `${source.counts.flagged_assets} asset${source.counts.flagged_assets === 1 ? "" : "s"} are not marked ready.` : "",
     source.counts.imported_files && source.counts.kpis_recorded === 0 && source.counts.operational_metrics === 0
@@ -724,7 +690,6 @@ function riskItems(source: Awaited<ReturnType<typeof fetchReportSource>>) {
 function recommendedActions(source: Awaited<ReturnType<typeof fetchReportSource>>) {
   const actions = [
     source.counts.open_issues ? "Review the most severe open issue and determine whether a focused investigation is warranted." : "",
-    source.counts.overdue_tasks ? "Review the Business Signal pattern with leadership before drawing a broader conclusion." : "",
     source.counts.kpis_recorded ? "Review the strongest and weakest KPI movements against current targets." : "",
     source.counts.uploaded_files ? "Confirm that newly uploaded evidence is current and relevant to the decisions under review." : ""
   ].filter(Boolean);
@@ -768,7 +733,6 @@ ${summary}
 ## What Changed
 - KPI records: ${trendPhrase(current.counts.kpis_recorded, previous.counts.kpis_recorded)} vs ${previousLabel}
 - New issues: ${trendPhrase(current.counts.new_issues, previous.counts.new_issues)} vs ${previousLabel}
-- Business Signals: ${trendPhrase(current.counts.completed_tasks, previous.counts.completed_tasks)} vs ${previousLabel}
 - New source files: ${trendPhrase(current.counts.uploaded_files, previous.counts.uploaded_files)} vs ${previousLabel}
 ${readableList(current.items.kpi_trend_observations, "Historical depth is not yet sufficient for a supported KPI comparison.")}
 

@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { requireToolExecution, type RegisteredToolName } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -12,7 +11,6 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type ManagedCollection =
   | "sops"
-  | "tasks"
   | "checklists"
   | "checklist_runs"
   | "issues"
@@ -94,22 +92,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "assigned_department", kind: "text", maxLength: 140 },
       { name: "notes", kind: "textarea", maxLength: 1000 },
       { name: "responses_json", kind: "lines", maxLength: 6000 }
-    ]
-  },
-  tasks: {
-    table: "tasks",
-    path: "/app/tasks",
-    titleField: "title",
-    fields: [
-      { name: "title", kind: "requiredText", maxLength: 180 },
-      { name: "description", kind: "textarea", maxLength: 2000 },
-      { name: "status", kind: "select", maxLength: 80 },
-      { name: "priority", kind: "select", maxLength: 80 },
-      { name: "category", kind: "text", maxLength: 120 },
-      { name: "related_type", kind: "select", maxLength: 80 },
-      { name: "assigned_role", kind: "text", maxLength: 120 },
-      { name: "assigned_department", kind: "text", maxLength: 140 },
-      { name: "due_date", kind: "date" }
     ]
   },
   issues: {
@@ -285,10 +267,6 @@ function redirectWithMessage(path: Route | string, message: string): never {
 }
 
 function assertMutationAllowed(collection: ManagedCollection, path: Route | string) {
-  if (collection === "tasks") {
-    redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
-  }
-
   if (collection === "crm_leads") {
     redirectWithError(path, RETIRED_CUSTOMER_RECORD_MUTATION_MESSAGE);
   }
@@ -434,7 +412,7 @@ function revalidateRelatedPaths(collection: ManagedCollection, path: Route | str
 
   // These collections can affect intelligence presentation or saved-output
   // availability. Revalidation does not make derived records original evidence.
-  if (["tasks", "kpis", "files", "reports", "issues", "checklists", "ai_agent_runs", "crm_leads"].includes(collection)) {
+  if (["kpis", "files", "reports", "issues", "checklists", "ai_agent_runs", "crm_leads"].includes(collection)) {
     revalidatePath("/app");
     revalidatePath("/app/intelligence");
     revalidatePath("/app/sources");
@@ -726,40 +704,28 @@ export async function manageRecordAction(formData: FormData) {
     redirectWithError(path, error instanceof Error ? error.message : "Record action was blocked by Vaeroex security policy.");
   }
 
-  if ((collection === "tasks" || collection === "files") && (action === "archive" || action === "delete" || action === "restore")) {
+  if (collection === "files" && (action === "archive" || action === "delete" || action === "restore")) {
     const lifecycleClient = supabase as unknown as {
-      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id?: string; file_id?: string }> | null; error: { message: string } | null }>;
+      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ file_id?: string }> | null; error: { message: string } | null }>;
     };
-    const { data, error } = collection === "tasks"
-      ? await lifecycleClient.rpc("update_business_signal_lifecycle", {
-          p_workspace_id: workspaceId,
-          p_signal_id: recordId,
-          p_action: action
-        })
-      : await lifecycleClient.rpc("update_source_file_lifecycle", {
-          p_workspace_id: workspaceId,
-          p_file_id: recordId,
-          p_action: action
-        });
+    const { data, error } = await lifecycleClient.rpc("update_source_file_lifecycle", {
+      p_workspace_id: workspaceId,
+      p_file_id: recordId,
+      p_action: action
+    });
 
     if (error || !data?.length) {
-      redirectWithError(path, friendlyMutationError(error?.message, `${collection === "tasks" ? "Business Signal" : "Source"} could not be changed. Refresh and try again.`));
+      redirectWithError(path, friendlyMutationError(error?.message, "Source could not be changed. Refresh and try again."));
     }
 
     revalidateRelatedPaths(collection, path);
     redirectWithMessage(
       path,
-      collection === "files"
-        ? action === "delete"
-          ? "Source deleted from active views and removed from active intelligence."
-          : action === "archive"
-            ? "Source archived and excluded from active intelligence."
-            : "Source restored without duplicating its learned evidence."
-        : action === "delete"
-          ? "Business Signal deleted and removed from active intelligence."
-          : action === "archive"
-            ? "Business Signal archived and excluded from active intelligence."
-            : "Business Signal restored without duplicating its learned evidence."
+      action === "delete"
+        ? "Source deleted from active views and removed from active intelligence."
+        : action === "archive"
+          ? "Source archived and excluded from active intelligence."
+          : "Source restored without duplicating its learned evidence."
     );
   }
 
@@ -842,17 +808,11 @@ export async function bulkManageRecordsAction(formData: FormData) {
     redirectWithError(path, error instanceof Error ? error.message : "Bulk action was blocked by Vaeroex security policy.");
   }
 
-  if ((collection === "tasks" || collection === "files") && (action === "archive" || action === "delete" || action === "restore")) {
+  if (collection === "files" && (action === "archive" || action === "delete" || action === "restore")) {
     const lifecycleClient = supabase as unknown as {
-      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ signal_id?: string; file_id?: string }> | null; error: { message: string } | null }>;
+      rpc: (name: string, args: Record<string, string>) => Promise<{ data: Array<{ file_id?: string }> | null; error: { message: string } | null }>;
     };
-    const results = await Promise.all(ids.map((recordId) => collection === "tasks"
-      ? lifecycleClient.rpc("update_business_signal_lifecycle", {
-          p_workspace_id: workspaceId,
-          p_signal_id: recordId,
-          p_action: action
-        })
-      : lifecycleClient.rpc("update_source_file_lifecycle", {
+    const results = await Promise.all(ids.map((recordId) => lifecycleClient.rpc("update_source_file_lifecycle", {
           p_workspace_id: workspaceId,
           p_file_id: recordId,
           p_action: action
@@ -860,12 +820,12 @@ export async function bulkManageRecordsAction(formData: FormData) {
     const failed = results.find((result) => result.error || !result.data?.length);
 
     if (failed) {
-      redirectWithError(path, friendlyMutationError(failed.error?.message, `Selected ${collection === "tasks" ? "Business Signals" : "Sources"} could not all be changed. Refresh and try again.`));
+      redirectWithError(path, friendlyMutationError(failed.error?.message, "Selected Sources could not all be changed. Refresh and try again."));
     }
 
     revalidateRelatedPaths(collection, path);
     const actionLabel = action === "delete" ? "deleted and removed from active intelligence" : action === "archive" ? "archived and excluded from active intelligence" : "restored";
-    redirectWithMessage(path, `${ids.length} ${collection === "tasks" ? "Business Signal" : "Source"}${ids.length === 1 ? "" : "s"} ${actionLabel}.`);
+    redirectWithMessage(path, `${ids.length} Source${ids.length === 1 ? "" : "s"} ${actionLabel}.`);
   }
 
   const query = dbClient(supabase).from(config.table).update(update) as {

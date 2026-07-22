@@ -50,12 +50,11 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
   const { data: workspaces } = await workspacesQuery.order("created_at", { ascending: false }).limit(40);
   const workspaceRows = (workspaces || []) as WorkspaceRow[];
   const workspaceIds = workspaceRows.map((workspace) => workspace.id);
-  const [kpiRows, leadRows, fileRows, taskRows, vaeroexRows, reportRows] = workspaceIds.length
+  const [kpiRows, leadRows, fileRows, vaeroexRows, reportRows] = workspaceIds.length
     ? await Promise.all([
         access.admin.from("kpis").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("crm_leads").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("file_uploads").select("workspace_id").in("workspace_id", workspaceIds),
-        access.admin.from("tasks").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("ai_agent_runs").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("reports").select("workspace_id").in("workspace_id", workspaceIds)
       ])
@@ -63,7 +62,6 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
   const kpiCounts = countByWorkspace(kpiRows?.data || []);
   const leadCounts = countByWorkspace(leadRows?.data || []);
   const fileCounts = countByWorkspace(fileRows?.data || []);
-  const taskCounts = countByWorkspace(taskRows?.data || []);
   const vaeroexCounts = countByWorkspace(vaeroexRows?.data || []);
   const reportCounts = countByWorkspace(reportRows?.data || []);
 
@@ -98,12 +96,11 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
               Boolean(kpiCounts[workspace.id]),
               Boolean(leadCounts[workspace.id]),
               Boolean(fileCounts[workspace.id]),
-              Boolean(taskCounts[workspace.id]),
               Boolean(vaeroexCounts[workspace.id]),
               Boolean(reportCounts[workspace.id])
             ].filter(Boolean).length;
-            const progress = Math.round((completed / 8) * 100);
-            const usage = (kpiCounts[workspace.id] || 0) + (leadCounts[workspace.id] || 0) + (fileCounts[workspace.id] || 0) + (taskCounts[workspace.id] || 0) + (vaeroexCounts[workspace.id] || 0) + (reportCounts[workspace.id] || 0);
+            const progress = Math.round((completed / 7) * 100);
+            const usage = (kpiCounts[workspace.id] || 0) + (leadCounts[workspace.id] || 0) + (fileCounts[workspace.id] || 0) + (vaeroexCounts[workspace.id] || 0) + (reportCounts[workspace.id] || 0);
 
             return (
             <article key={workspace.id} className="rounded-lg border border-line p-4">
@@ -126,12 +123,12 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
                 <div className="rounded-lg border border-line bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Onboarding progress</p>
                   <p className="mt-2 text-lg font-semibold">{progress}%</p>
-                  <p className="mt-1 text-xs text-muted">{completed} of 8 activation steps detected</p>
+                  <p className="mt-1 text-xs text-muted">{completed} of 7 activation steps detected</p>
                 </div>
                 <div className="rounded-lg border border-line bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Usage</p>
                   <p className="mt-2 text-lg font-semibold">{usage} records</p>
-                  <p className="mt-1 text-xs text-muted">KPIs, customer evidence, files, Business Signals, Vaeroex runs, reports</p>
+                  <p className="mt-1 text-xs text-muted">KPIs, customer evidence, files, Vaeroex runs, reports</p>
                 </div>
                 <div className="rounded-lg border border-line bg-slate-50 p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted">Customer status</p>

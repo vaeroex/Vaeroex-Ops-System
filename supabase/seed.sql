@@ -95,14 +95,6 @@ begin
       'Seeded demo workspace access.'
     );
 
-    insert into public.tasks (workspace_id, title, description, status, priority, category, due_date, created_by)
-    values
-      (workspace_id, 'Customer response pattern changed', 'Customer response evidence shows gaps that leadership should review.', 'To Do', 'High', 'Customer Evidence', current_date + 1, demo_user),
-      (workspace_id, 'Weekly leadership review signal', 'Recurring review evidence is needed for issues, assets, and checklist misses.', 'In Progress', 'Medium', 'Leadership review', current_date + 3, demo_user),
-      (workspace_id, 'Start-of-day readiness signal', 'Readiness evidence and open items should be visible before work begins.', 'Backlog', 'Medium', 'Checklist', current_date + 5, demo_user),
-      (workspace_id, 'Review SOP drafts', 'Turn the highest-risk process into a first approved operating procedure.', 'To Do', 'High', 'SOP', current_date + 7, demo_user),
-      (workspace_id, 'Asset readiness context is incomplete', 'Confirm which vehicles, devices, or key operating assets need clearer evidence.', 'Waiting', 'Medium', 'Assets', current_date + 10, demo_user);
-
     insert into public.issues (workspace_id, title, description, issue_type, severity, status, root_cause, recommended_fix, due_date, created_by)
     values
       (workspace_id, 'Customer response evidence is inconsistent', 'Customer response details are not consistently preserved after work is completed.', 'Customer evidence gap', 'High', 'Open', 'No required closeout evidence.', 'Create a job completion record with customer response evidence.', current_date + 2, demo_user),
@@ -210,9 +202,9 @@ begin
 
     insert into public.checklists (workspace_id, name, description, category, frequency, items_json, assigned_role, created_by)
     values
-      (workspace_id, 'Start-of-Day Checklist', 'Confirm readiness before work begins.', 'Readiness', 'Daily', jsonb_build_array('Review Business Signals', 'Check schedule', 'Confirm asset readiness', 'Escalate blockers'), 'Manager', demo_user),
+      (workspace_id, 'Start-of-Day Checklist', 'Confirm readiness before work begins.', 'Readiness', 'Daily', jsonb_build_array('Review open issues', 'Check schedule', 'Confirm asset readiness', 'Escalate blockers'), 'Manager', demo_user),
       (workspace_id, 'Job Completion Checklist', 'Confirm each job or workflow is complete before closeout.', 'Completion', 'Per job', jsonb_build_array('Confirm work completed', 'Log customer notes', 'Preserve response evidence', 'Mark issue if unresolved'), 'Staff', demo_user),
-      (workspace_id, 'Weekly Leadership Review', 'Review operational health and unresolved work.', 'Leadership review', 'Weekly', jsonb_build_array('Review Business Signals', 'Review open issues', 'Review assets needing attention', 'Capture executive decisions'), 'Manager', demo_user);
+      (workspace_id, 'Weekly Leadership Review', 'Review operational health and unresolved work.', 'Leadership review', 'Weekly', jsonb_build_array('Review KPI evidence', 'Review open issues', 'Review assets needing attention', 'Capture executive decisions'), 'Manager', demo_user);
 
     select id into start_checklist_id from public.checklists where public.checklists.workspace_id = seed_data.workspace_id and name = 'Start-of-Day Checklist' limit 1;
     select id into job_checklist_id from public.checklists where public.checklists.workspace_id = seed_data.workspace_id and name = 'Job Completion Checklist' limit 1;
@@ -220,16 +212,16 @@ begin
 
     insert into public.checklist_runs (workspace_id, checklist_id, assigned_to, status, responses_json, notes, completed_at)
     values
-      (workspace_id, start_checklist_id, demo_user, 'Complete', jsonb_build_array('Reviewed open tasks', 'Checked schedule', 'Confirmed asset readiness'), 'Morning readiness completed.', now() - interval '1 day'),
-      (workspace_id, start_checklist_id, demo_user, 'Needs review', jsonb_build_array('Reviewed open tasks', 'Tablet not charged'), 'Operations tablet needs follow-up.', null),
+      (workspace_id, start_checklist_id, demo_user, 'Complete', jsonb_build_array('Reviewed open issues', 'Checked schedule', 'Confirmed asset readiness'), 'Morning readiness completed.', now() - interval '1 day'),
+      (workspace_id, start_checklist_id, demo_user, 'Needs review', jsonb_build_array('Reviewed open issues', 'Tablet not charged'), 'Operations tablet needs follow-up.', null),
       (workspace_id, job_checklist_id, demo_user, 'Complete', jsonb_build_array('Work completed', 'Response evidence preserved'), 'Closeout complete with response evidence.', now() - interval '2 days'),
-      (workspace_id, manager_checklist_id, demo_user, 'In progress', jsonb_build_array('Reviewed Business Signals', 'Reviewed open issues'), 'Leadership review started; asset issues still pending.', null);
+      (workspace_id, manager_checklist_id, demo_user, 'In progress', jsonb_build_array('Reviewed KPI evidence', 'Reviewed open issues'), 'Leadership review started; asset issues still pending.', null);
 
     insert into public.sops (workspace_id, title, department, category, body_markdown, status, version, created_by, ai_generated)
     values
       (workspace_id, 'Customer Response Evidence SOP', 'Operations', 'Customer Evidence', '# Customer Response Evidence SOP\n\nDraft source context, review cadence, and escalation evidence.', 'Draft', 1, demo_user, true),
       (workspace_id, 'Equipment Issue Escalation SOP', 'Operations', 'Assets', '# Equipment Issue Escalation SOP\n\nDraft process for reporting, assigning, reviewing, and closing asset issues.', 'Draft', 1, demo_user, true),
-      (workspace_id, 'Weekly Leadership Review SOP', 'Management', 'Review', '# Weekly Leadership Review SOP\n\nDraft agenda for Business Signal review, issue review, asset readiness, and executive decisions.', 'Draft', 1, demo_user, true);
+      (workspace_id, 'Weekly Leadership Review SOP', 'Management', 'Review', '# Weekly Leadership Review SOP\n\nDraft agenda for KPI review, issue review, asset readiness, and executive decisions.', 'Draft', 1, demo_user, true);
 
     insert into public.assets (workspace_id, asset_name, asset_type, identifier, location, status, last_checked_at, notes)
     values
@@ -262,7 +254,7 @@ begin
       'Weekly Operations Report - Generated by Vaeroex',
       current_date - 7,
       current_date,
-      '# Weekly Operations Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\nThe workspace has useful starter systems but needs stronger source evidence, customer response context, and leadership review cadence.\n\n## Recommended Next Actions\n- Review open Business Signals.\n- Review assets marked needs review or missing.\n- Convert repeated issues into SOP drafts.',
+      '# Weekly Operations Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\nThe workspace has useful starter systems but needs stronger source evidence, customer response context, and leadership review cadence.\n\n## Recommended Next Actions\n- Review open issues.\n- Review assets marked needs review or missing.\n- Convert repeated issues into SOP drafts.',
       jsonb_build_object('seeded', true, 'source', 'Vaeroex demo data'),
       demo_user
     );
@@ -294,8 +286,8 @@ begin
         jsonb_build_object('demo', true, 'workspace', workspace_record.name),
         jsonb_build_object(
           'title', 'Weekly Operations Report - Generated by Vaeroex',
-          'summary', 'Business Signals and asset readiness need leadership focus this week.',
-          'response_markdown', '# Weekly Operations Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\nCustomer response evidence, asset readiness, and checklist consistency are the top focus areas.\n\n## Recommended Next Actions\n- Review urgent Business Signals.\n- Review tablet readiness issue.\n- Review missed checklist run.',
+          'summary', 'Open issues and asset readiness need leadership focus this week.',
+          'response_markdown', '# Weekly Operations Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\nCustomer response evidence, asset readiness, and checklist consistency are the top focus areas.\n\n## Recommended Next Actions\n- Review urgent issues.\n- Review tablet readiness issue.\n- Review missed checklist run.',
           'report', jsonb_build_object(
             'title', 'Weekly Operations Report - Generated by Vaeroex',
             'report_type', 'Weekly Operations Report',
@@ -315,14 +307,14 @@ begin
         jsonb_build_object(
           'title', 'Shift Handoff Form',
           'summary', 'Vaeroex drafted a shift handoff form for manager review.',
-          'response_markdown', 'Draft a shift handoff form to capture open tasks, blockers, asset issues, and manager notes.',
+          'response_markdown', 'Draft a shift handoff form to capture open work, blockers, asset issues, and manager notes.',
           'form', jsonb_build_object(
             'name', 'Shift Handoff Form',
-            'description', 'Capture open tasks, blockers, asset issues, and manager notes before shift change.',
+            'description', 'Capture open work, blockers, asset issues, and manager notes before shift change.',
             'form_type', 'handoff',
             'fields', jsonb_build_array(
               jsonb_build_object('label', 'Submitted by', 'key', 'submitted-by', 'type', 'text', 'required', true),
-              jsonb_build_object('label', 'Open tasks', 'key', 'open-tasks', 'type', 'long_text', 'required', true),
+              jsonb_build_object('label', 'Open work', 'key', 'open-work', 'type', 'long_text', 'required', true),
               jsonb_build_object('label', 'Blockers', 'key', 'blockers', 'type', 'long_text', 'required', false),
               jsonb_build_object('label', 'Manager notes', 'key', 'manager-notes', 'type', 'long_text', 'required', false)
             )

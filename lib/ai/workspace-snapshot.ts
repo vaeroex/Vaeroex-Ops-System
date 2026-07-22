@@ -22,11 +22,8 @@ function countByStatus<T extends { status?: string | null }>(rows: T[] | null | 
 }
 
 export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>, workspaceId: string) {
-  const today = new Date().toISOString().slice(0, 10);
-
   const [
     workspace,
-    recentTasks,
     recentIssues,
     recentForms,
     recentSubmissions,
@@ -55,14 +52,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     recentRecommendationOutcomes
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
-    supabase
-      .from("tasks")
-      .select("id,title,description,status,priority,category,due_date,ai_generated,created_at")
-      .eq("workspace_id", workspaceId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(12),
     supabase
       .from("issues")
       .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,due_date,created_at")
@@ -242,7 +231,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     analysis_summary: sanitizeBusinessEvidenceText(file.analysis_summary) || null
   }));
   const recentLeadRows = filterBySourceParentEligibility(filterOriginalBusinessEvidence(recentCrmLeads.data ?? []), parentEligibility);
-  const recentTaskRows = filterOriginalBusinessEvidence(recentTasks.data ?? []);
   const recentIssueRows = filterOriginalBusinessEvidence(recentIssues.data ?? []);
   const recentChecklistRows = filterOriginalBusinessEvidence(checklists.data ?? []);
   const recentSopRows = filterOriginalBusinessEvidence(sops.data ?? []);
@@ -266,8 +254,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
   const eligibleVaeroexRuns = filterBusinessEvidence(vaeroexRuns.data ?? [], { sourceKind: "platform_run" });
   const analyzedFiles = recentFileRows.filter((file) => Boolean(file.analysis_summary));
   const pendingImports = recentImportRows.filter((item) => ["extracted", "needs_review"].includes(item.status));
-  const activeBusinessSignalCount = recentTaskRows.filter((row) => row.status !== "Done").length;
-  const businessSignalsNeedingReview = recentTaskRows.filter((row) => row.status !== "Done" && Boolean(row.due_date && row.due_date < today)).length;
   const activeIssueCount = recentIssueRows.filter((row) => row.status !== "Closed").length;
   const flaggedAssetCount = recentAssetRows.filter((row) => row.status !== "Ready").length;
   const moduleState = {
@@ -305,13 +291,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       records: recentLeadRows.length,
       statuses: countByStatus(recentLeadRows),
       guidance: "Customer activity records may exist as source context from external systems or imports. Use them only as evidence for revenue, retention, response quality, or customer-risk intelligence. Do not describe Vaeroex as a CRM or lead-management system."
-    },
-    business_signals: {
-      exists: true,
-      open_records: activeBusinessSignalCount,
-      observations_needing_review: businessSignalsNeedingReview,
-      statuses: countByStatus(recentTaskRows),
-      guidance: "Business Signals already exist as evidence and strategic context. Recommend reviewing observation patterns, source quality, category coverage, and whether leadership needs an executive report or improvement plan. Do not treat them as Vaeroex-owned tasks."
     },
     issue_tracking: {
       exists: true,
@@ -371,7 +350,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     !(checklistCount.count ?? 0) ? "Checklist module exists but has no checklist records yet." : "",
     !(reportCount.count ?? 0) ? "Reports module exists but has no saved reports yet." : "",
     pendingImports.length ? `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"} are waiting for review or approval.` : "",
-    businessSignalsNeedingReview ? `${businessSignalsNeedingReview} Business Signal${businessSignalsNeedingReview === 1 ? "" : "s"} may need leadership interpretation.` : "",
     activeIssueCount ? `${activeIssueCount} issue${activeIssueCount === 1 ? "" : "s"} are open.` : ""
   ].filter(Boolean);
 
@@ -382,17 +360,13 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       "Do not recommend creating a Vaeroex module that already exists in module_state.",
       "If a module exists, treat it as source context for analysis and recommend leadership review, evidence gathering, or portable documents.",
       "Distinguish current KPI availability from forecast readiness. Current KPI records can support visibility even when dated history is still insufficient for responsible forecasting.",
-      "Treat Business Signals as evidence, observations, and strategic context. Mention Business Signal patterns only as evidence for Business Memory, risks, opportunities, predictions, confidence, or executive briefings.",
-      "Mention the specific existing workspace records, counts, gaps, Business Signals, stale items, file analyses, reports, KPIs, customer activity evidence, SOPs, checklists, issues, assets, or role context that support the recommendation.",
+      "Mention the specific existing workspace records, counts, gaps, stale items, file analyses, reports, KPIs, customer activity evidence, SOPs, checklists, issues, assets, or role context that support the recommendation.",
       "Classify recommendations into Improve Existing, Fill Missing Data, Review Stale Items, Leadership Review, Business Risk, Dashboard / KPI Improvement, Customer / Revenue Intelligence, SOP / Process Improvement, or File / Report Review.",
       "Never recommend creating dashboards, CRM records, follow-up tracking, ownership assignments, SOPs, reports, or uploads as generic work. Vaeroex is an intelligence layer, not the system of record."
     ],
     module_state: moduleState,
     workspace_gaps: gaps,
     metrics: {
-      open_tasks: activeBusinessSignalCount,
-      business_signals: activeBusinessSignalCount,
-      source_observations_needing_review: businessSignalsNeedingReview,
       open_issues: activeIssueCount,
       flagged_assets: flaggedAssetCount,
       form_submissions: recentSubmissionRows.length,
@@ -410,7 +384,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
       assets: assetCount.count ?? 0,
       people: peopleCount.count ?? 0
     },
-    recent_tasks: recentTaskRows,
     recent_issues: recentIssueRows,
     forms: recentFormRows,
     recent_form_submissions: recentSubmissionRows,

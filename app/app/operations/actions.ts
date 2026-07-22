@@ -5,7 +5,6 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
@@ -217,13 +216,6 @@ export async function createFormSubmissionAction(formData: FormData) {
   redirectWithMessage(path, "Submission saved.");
 }
 
-export async function convertSubmissionToTaskAction(formData: FormData) {
-  const formId = text(formData, "form_id");
-  const path = returnPath(formData, formId ? `/app/forms/${formId}` : "/app/form-submissions");
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
-}
-
 export async function createChecklistAction(formData: FormData) {
   const path = "/app/checklists";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
@@ -282,30 +274,6 @@ export async function runChecklistAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app/checklist-runs");
   redirectWithMessage(path, "Checklist run saved.");
-}
-
-export async function createTaskAction(_formData: FormData) {
-  const path = "/app/tasks";
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
-}
-
-export async function createBusinessSignalAction(_formData: FormData) {
-  const path = "/app/tasks";
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
-}
-
-export async function updateTaskStatusAction(_formData: FormData) {
-  const path = "/app/tasks";
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
-}
-
-export async function deleteBusinessSignalAction(formData: FormData) {
-  const path = returnPath(formData, "/app/tasks");
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function createKpiAction(formData: FormData) {
@@ -682,12 +650,6 @@ export async function createIssueAction(formData: FormData) {
 
   revalidatePath(path);
   redirectWithMessage(path, "Issue logged.");
-}
-
-export async function convertIssueToTaskAction(_formData: FormData) {
-  const path = "/app/issues";
-  await requireWorkspace(path);
-  redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
 }
 
 export async function createAssetAction(formData: FormData) {

@@ -4,7 +4,6 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { BUSINESS_SIGNALS_RETIRED_MESSAGE } from "@/lib/business-signals/retirement";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -317,10 +316,6 @@ export async function createAssignmentAction(formData: FormData) {
   const priority = text(formData, "priority") || "Medium";
   const status = text(formData, "status") || "Open";
 
-  if (sourceType === "task") {
-    redirectWithError(path, BUSINESS_SIGNALS_RETIRED_MESSAGE);
-  }
-
   const personName = await getPersonName(supabase, workspaceId, personId);
   const recipient = recipientLabel({ scope, personName, role, department });
 
@@ -348,21 +343,6 @@ export async function createAssignmentAction(formData: FormData) {
 
   if (error) {
     redirectWithError(path, error.message);
-  }
-
-  if (sourceId && sourceType === "task") {
-    await supabase
-      .from("tasks")
-      .update({
-        assigned_person_id: personId,
-        assigned_role: role,
-        assigned_department: department,
-        due_date: nullableText(formData, "due_date"),
-        priority,
-        status
-      })
-      .eq("id", sourceId)
-      .eq("workspace_id", workspaceId);
   }
 
   if (sourceId && sourceType === "issue") {
@@ -406,7 +386,6 @@ export async function createAssignmentAction(formData: FormData) {
   revalidatePath(path);
   revalidatePath("/app");
   revalidatePath("/app/notifications");
-  revalidatePath("/app/tasks");
   revalidatePath("/app/issues");
   redirectWithMessage(path, `Assigned to ${recipient}.`);
 }

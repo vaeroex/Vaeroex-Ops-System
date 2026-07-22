@@ -79,17 +79,9 @@ function conciseSentences(value: string | null | undefined, fallback: string, co
   return `${shortened || concise.slice(0, maximumLength).trim()}...`;
 }
 
-function businessSignalExample(insight: IntelligenceInsight) {
-  const examples = insight.evidence.find((entry) => entry.startsWith("Examples:"));
-  const example = examples?.replace(/^Examples:\s*/i, "").split(",")[0]?.trim();
-  return example ? conciseSentences(example, "", 1) : null;
-}
-
 function findingTitle(insight: IntelligenceInsight, kind: "risk" | "opportunity") {
   if (insight.title.toLowerCase().includes("may indicate")) {
-    const example = businessSignalExample(insight);
-    if (example) return example;
-    return kind === "risk" ? "Current Business Signals need more context" : "A supported opportunity is emerging";
+    return kind === "risk" ? "Current evidence needs more context" : "A supported opportunity is emerging";
   }
 
   return conciseSentences(insight.title, kind === "risk" ? "Current risk requires review" : "A supported opportunity is emerging", 1);
@@ -158,10 +150,7 @@ function decisionFromIntelligence(intelligence: IntelligenceLayerResult): Execut
   if (!recommendation) return emptyPriority("decision");
 
   const sourceTitle = findingTitle(recommendation, "risk");
-  const example = businessSignalExample(recommendation);
-  const title = recommendation.sourceTypes.includes("Business Signals")
-    ? example ? `Review ${example}` : "Review the underlying Business Signal evidence"
-    : recommendation.sourceTypes.includes("KPIs")
+  const title = recommendation.sourceTypes.includes("KPIs")
       ? `Review ${recommendation.title.replace(/ is below target$/i, "")} performance`
       : `Review ${sourceTitle.replace(/^\d+ /, "").replace(/ require leadership review$/i, "")}`;
 
