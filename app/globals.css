@@ -540,6 +540,236 @@ button.bg-vaeroex-blue:hover {
   }
 }
 
+/* Shared executive-priority semantics. Meaning is selected in application code;
+   these values only define how that meaning is rendered in each theme. */
+:root {
+  --semantic-critical-fg: #9f1239;
+  --semantic-critical-bg: #fff1f2;
+  --semantic-critical-border: #fda4af;
+  --semantic-risk-high-fg: #9a3412;
+  --semantic-risk-high-bg: #fff7ed;
+  --semantic-risk-high-border: #fdba74;
+  --semantic-risk-medium-fg: #854d0e;
+  --semantic-risk-medium-bg: #fefce8;
+  --semantic-risk-medium-border: #fde68a;
+  --semantic-positive-fg: #166534;
+  --semantic-positive-bg: #f0fdf4;
+  --semantic-positive-border: #86efac;
+  --semantic-opportunity-fg: #1d4ed8;
+  --semantic-opportunity-bg: #eff6ff;
+  --semantic-opportunity-border: #93c5fd;
+  --semantic-anomaly-fg: #6b21a8;
+  --semantic-anomaly-bg: #faf5ff;
+  --semantic-anomaly-border: #d8b4fe;
+  --semantic-neutral-fg: #475569;
+  --semantic-neutral-bg: #f8fafc;
+  --semantic-neutral-border: #cbd5e1;
+  --semantic-unavailable-fg: #475569;
+  --semantic-unavailable-bg: #f1f5f9;
+  --semantic-unavailable-border: #94a3b8;
+  --semantic-focus: #1d4ed8;
+}
+
+.pulsar {
+  --semantic-critical-fg: #fecaca;
+  --semantic-critical-bg: rgba(127, 29, 29, 0.28);
+  --semantic-critical-border: rgba(251, 113, 133, 0.7);
+  --semantic-risk-high-fg: #fed7aa;
+  --semantic-risk-high-bg: rgba(124, 45, 18, 0.28);
+  --semantic-risk-high-border: rgba(251, 146, 60, 0.68);
+  --semantic-risk-medium-fg: #fef3c7;
+  --semantic-risk-medium-bg: rgba(120, 53, 15, 0.26);
+  --semantic-risk-medium-border: rgba(251, 191, 36, 0.62);
+  --semantic-positive-fg: #bbf7d0;
+  --semantic-positive-bg: rgba(20, 83, 45, 0.28);
+  --semantic-positive-border: rgba(74, 222, 128, 0.62);
+  --semantic-opportunity-fg: #bfdbfe;
+  --semantic-opportunity-bg: rgba(30, 64, 175, 0.26);
+  --semantic-opportunity-border: rgba(96, 165, 250, 0.66);
+  --semantic-anomaly-fg: #e9d5ff;
+  --semantic-anomaly-bg: rgba(88, 28, 135, 0.28);
+  --semantic-anomaly-border: rgba(192, 132, 252, 0.65);
+  --semantic-neutral-fg: #dbeafe;
+  --semantic-neutral-bg: rgba(51, 65, 85, 0.28);
+  --semantic-neutral-border: rgba(148, 163, 184, 0.5);
+  --semantic-unavailable-fg: #cbd5e1;
+  --semantic-unavailable-bg: rgba(71, 85, 105, 0.28);
+  --semantic-unavailable-border: rgba(148, 163, 184, 0.58);
+  --semantic-focus: #a5f3fc;
+}
+
+.vaeroex-semantic-card,
+.vaeroex-semantic-badge,
+.vaeroex-semantic-frame,
+.vaeroex-semantic-detail {
+  --semantic-current-fg: var(--semantic-neutral-fg);
+  --semantic-current-bg: var(--semantic-neutral-bg);
+  --semantic-current-border: var(--semantic-neutral-border);
+}
+
+.vaeroex-semantic-critical {
+  --semantic-current-fg: var(--semantic-critical-fg);
+  --semantic-current-bg: var(--semantic-critical-bg);
+  --semantic-current-border: var(--semantic-critical-border);
+}
+
+.vaeroex-semantic-risk-high {
+  --semantic-current-fg: var(--semantic-risk-high-fg);
+  --semantic-current-bg: var(--semantic-risk-high-bg);
+  --semantic-current-border: var(--semantic-risk-high-border);
+}
+
+.vaeroex-semantic-risk-medium {
+  --semantic-current-fg: var(--semantic-risk-medium-fg);
+  --semantic-current-bg: var(--semantic-risk-medium-bg);
+  --semantic-current-border: var(--semantic-risk-medium-border);
+}
+
+.vaeroex-semantic-positive {
+  --semantic-current-fg: var(--semantic-positive-fg);
+  --semantic-current-bg: var(--semantic-positive-bg);
+  --semantic-current-border: var(--semantic-positive-border);
+}
+
+.vaeroex-semantic-opportunity {
+  --semantic-current-fg: var(--semantic-opportunity-fg);
+  --semantic-current-bg: var(--semantic-opportunity-bg);
+  --semantic-current-border: var(--semantic-opportunity-border);
+}
+
+.vaeroex-semantic-anomaly {
+  --semantic-current-fg: var(--semantic-anomaly-fg);
+  --semantic-current-bg: var(--semantic-anomaly-bg);
+  --semantic-current-border: var(--semantic-anomaly-border);
+}
+
+.vaeroex-semantic-neutral {
+  --semantic-current-fg: var(--semantic-neutral-fg);
+  --semantic-current-bg: var(--semantic-neutral-bg);
+  --semantic-current-border: var(--semantic-neutral-border);
+}
+
+.vaeroex-semantic-unavailable {
+  --semantic-current-fg: var(--semantic-unavailable-fg);
+  --semantic-current-bg: var(--semantic-unavailable-bg);
+  --semantic-current-border: var(--semantic-unavailable-border);
+}
+
+.vaeroex-semantic-card {
+  border-color: var(--semantic-current-border) !important;
+  border-left-width: 4px;
+  background-color: var(--semantic-current-bg) !important;
+  color: var(--semantic-current-fg);
+}
+
+.vaeroex-semantic-badge {
+  border-color: var(--semantic-current-border) !important;
+  background-color: var(--semantic-current-bg) !important;
+  color: var(--semantic-current-fg) !important;
+}
+
+.vaeroex-semantic-frame {
+  box-shadow: inset 4px 0 0 var(--semantic-current-border), 0 22px 70px rgba(11, 31, 77, 0.18);
+}
+
+.pulsar .vaeroex-semantic-frame {
+  box-shadow: inset 4px 0 0 var(--semantic-current-border), 0 24px 80px rgba(0, 0, 0, 0.48), 0 0 30px var(--semantic-current-bg);
+}
+
+.vaeroex-semantic-detail {
+  border-left-color: var(--semantic-current-border) !important;
+  color: var(--semantic-current-fg);
+}
+
+.vaeroex-confidence-badge {
+  border-color: rgba(59, 130, 246, 0.42);
+  background-color: #eff6ff;
+  color: #1e3a8a;
+}
+
+.vaeroex-confidence-medium {
+  border-color: rgba(37, 99, 235, 0.36);
+  background-color: #eff6ff;
+  color: #1e40af;
+}
+
+.vaeroex-confidence-low {
+  border-color: #cbd5e1;
+  background-color: #f8fafc;
+  color: #475569;
+}
+
+.pulsar .vaeroex-confidence-badge {
+  border-color: rgba(103, 232, 249, 0.45);
+  background-color: rgba(8, 145, 178, 0.2);
+  color: #cffafe;
+}
+
+.pulsar .vaeroex-confidence-medium {
+  border-color: rgba(147, 197, 253, 0.42);
+  background-color: rgba(30, 64, 175, 0.22);
+  color: #dbeafe;
+}
+
+.pulsar .vaeroex-confidence-low {
+  border-color: rgba(148, 163, 184, 0.42);
+  background-color: rgba(71, 85, 105, 0.28);
+  color: #e2e8f0;
+}
+
+.vaeroex-semantic-interactive:focus-visible,
+.vaeroex-priority-surface :focus-visible {
+  outline: 2px solid var(--semantic-focus) !important;
+  outline-offset: 3px;
+}
+
+[data-theme="light"] .vaeroex-priority-surface .text-muted,
+[data-theme="light"] .vaeroex-priority-surface .text-slate-400,
+[data-theme="light"] .vaeroex-priority-surface .text-slate-500 {
+  color: #526176 !important;
+}
+
+[data-theme="light"] .vaeroex-priority-surface .vaeroex-semantic-card .text-white,
+[data-theme="light"] .vaeroex-priority-surface .vaeroex-semantic-card .text-slate-100,
+[data-theme="light"] .vaeroex-priority-surface .vaeroex-semantic-card .text-slate-300 {
+  color: #172033 !important;
+}
+
+[data-theme="light"] .vaeroex-intelligence-inbox {
+  background-color: #ffffff !important;
+  border-color: #dbe3ef !important;
+  color: #111827;
+}
+
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-slate-950\/35,
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-slate-950\/45,
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-slate-950\/50,
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-slate-950\/55,
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-slate-950\/70,
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-slate-950\/80,
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-white\/\[0\.025\],
+[data-theme="light"] .vaeroex-intelligence-inbox .bg-white\/\[0\.04\] {
+  background-color: #f8fafc !important;
+}
+
+[data-theme="light"] .vaeroex-intelligence-inbox .border-white\/10,
+[data-theme="light"] .vaeroex-intelligence-inbox .border-white\/15,
+[data-theme="light"] .vaeroex-intelligence-inbox .divide-white\/10 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #dbe3ef !important;
+}
+
+[data-theme="light"] .vaeroex-intelligence-inbox .text-white,
+[data-theme="light"] .vaeroex-intelligence-inbox .text-slate-100,
+[data-theme="light"] .vaeroex-intelligence-inbox .text-slate-200 {
+  color: #111827 !important;
+}
+
+[data-theme="light"] .vaeroex-intelligence-inbox .text-slate-300,
+[data-theme="light"] .vaeroex-intelligence-inbox .text-slate-400,
+[data-theme="light"] .vaeroex-intelligence-inbox .text-slate-500 {
+  color: #526176 !important;
+}
+
 .dark {
   color-scheme: dark;
 }

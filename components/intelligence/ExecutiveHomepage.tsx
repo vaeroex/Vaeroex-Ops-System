@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Database, ShieldCheck, TrendingUp } from "lucide-react";
+import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react";
 import { BusinessHealthAnalysisPanel } from "@/components/intelligence/BusinessHealthAnalysisPanel";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import type {
@@ -14,6 +14,13 @@ import type {
   ExecutiveBriefState
 } from "@/lib/ai/executive-brief/contracts";
 import type { ExecutiveHomepageModel, ExecutivePriorityCard } from "@/lib/intelligence/executive-homepage";
+import {
+  businessHealthStatus,
+  findingPriorityStatus,
+  intelligenceReadinessStatus,
+  semanticPresentation,
+  semanticStatusClass
+} from "@/lib/presentation/semantic-status";
 
 type ExecutiveHomepageProps = {
   firstName?: string | null;
@@ -36,33 +43,31 @@ type ExecutiveHomepageProps = {
   };
 };
 
-function priorityTone(tone: ExecutivePriorityCard["tone"]) {
-  if (tone === "risk") return "border-line border-l-4 border-l-red-500 bg-white text-ink";
-  if (tone === "opportunity") return "border-line border-l-4 border-l-emerald-500 bg-white text-ink";
-  return "border-line border-l-4 border-l-vaeroex-blue bg-white text-ink";
-}
-
 function confidenceTone(confidence: ExecutivePriorityCard["confidence"]) {
-  if (confidence === "High") return "border-emerald-400/40 bg-emerald-950/20 text-emerald-700 dark:text-emerald-100";
-  if (confidence === "Medium") return "border-amber-400/40 bg-amber-950/20 text-amber-800 dark:text-amber-100";
-  return "border-slate-400/40 bg-slate-950/10 text-slate-600 dark:text-slate-200";
+  return `vaeroex-confidence-badge vaeroex-confidence-${confidence.toLowerCase()}`;
 }
 
-function healthTone(status: string) {
-  if (status === "Healthy") return "border-emerald-300/40 bg-emerald-400/10 text-emerald-100";
-  if (status === "Watch") return "border-amber-300/40 bg-amber-400/10 text-amber-100";
-  if (status === "Critical") return "border-red-300/40 bg-red-400/10 text-red-100";
-  return "border-slate-300/30 bg-white/[0.05] text-slate-200";
+function priorityStatus(card: ExecutivePriorityCard) {
+  if (card.tone === "risk") return "critical" as const;
+  if (card.tone === "opportunity") return "opportunity" as const;
+  return "neutral" as const;
 }
 
 function PriorityCard({ card }: { card: ExecutivePriorityCard }) {
+  const status = priorityStatus(card);
+  const presentation = semanticPresentation(status);
+  const Icon = presentation.Icon;
+  const priority = semanticPresentation(findingPriorityStatus(card.priority));
+  const PriorityIcon = priority.Icon;
+
   return (
-    <article className={`flex flex-col rounded-lg border p-4 shadow-panel ${priorityTone(card.tone)}`}>
+    <article className={`vaeroex-semantic-card ${semanticStatusClass(status)} flex flex-col rounded-lg border p-4 shadow-panel`}>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">{card.label}</p>
-        <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(card.confidence)}`}>
-          {card.empty ? "No active finding" : `Confidence: ${card.confidence}`}
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${semanticStatusClass(status)}`}><Icon aria-hidden="true" className="h-3.5 w-3.5" />{card.label}</span>
+          {!card.empty ? <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${semanticStatusClass(priority.status)}`}><PriorityIcon aria-hidden="true" className="h-3.5 w-3.5" />{priority.label}</span> : null}
+        </div>
+        <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(card.confidence)}`}>{card.empty ? "No active finding" : `Confidence: ${card.confidence}`}</span>
       </div>
       <h2 className="mt-3 text-lg font-semibold leading-6">{card.title}</h2>
       <p className="mt-2 text-sm leading-6 opacity-80">{card.summary}</p>
@@ -70,7 +75,7 @@ function PriorityCard({ card }: { card: ExecutivePriorityCard }) {
       <div className="mt-4">
         <Link
           href={card.href}
-          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-current/20 px-3 py-2 text-sm font-semibold hover:bg-blue-950/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+          className="vaeroex-semantic-interactive inline-flex min-h-11 items-center gap-2 rounded-lg border border-current/20 px-3 py-2 text-sm font-semibold hover:bg-blue-950/10"
         >
           {card.actionLabel}
           <ArrowRight aria-hidden="true" className="h-4 w-4" />
@@ -94,9 +99,20 @@ export function ExecutiveHomepage({
   const opportunity = model.priorities[1];
   const decision = model.priorities[2];
   const showHealthTrend = model.health.available && trendDelta !== null && healthHistory.length >= 2;
+  const healthStatus = businessHealthStatus(model.health.status);
+  const healthPresentation = semanticPresentation(healthStatus);
+  const HealthIcon = healthPresentation.Icon;
+  const riskStatus = priorityStatus(risk);
+  const riskPresentation = semanticPresentation(riskStatus);
+  const RiskIcon = riskPresentation.Icon;
+  const riskPriority = semanticPresentation(findingPriorityStatus(risk.priority));
+  const RiskPriorityIcon = riskPriority.Icon;
+  const readinessStatus = intelligenceReadinessStatus(model.readiness.label);
+  const readinessPresentation = semanticPresentation(readinessStatus);
+  const ReadinessIcon = readinessPresentation.Icon;
 
   return (
-    <div className="space-y-5">
+    <div className="vaeroex-priority-surface space-y-5">
       <header className="flex flex-col gap-2 border-b border-line/80 pb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ink sm:text-3xl">{heading}</h1>
@@ -106,12 +122,12 @@ export function ExecutiveHomepage({
       </header>
 
       <div className="grid gap-4 xl:grid-cols-[minmax(0,3fr)_minmax(360px,2fr)]" data-executive-opening>
-        <section className="overflow-hidden rounded-lg bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2" aria-labelledby="business-health-heading">
+        <section className={`vaeroex-semantic-frame ${semanticStatusClass(healthStatus)} overflow-hidden rounded-lg bg-vaeroex-navy p-5 text-white shadow-command xl:col-span-2`} aria-labelledby="business-health-heading">
           <div className="grid gap-5 lg:grid-cols-[minmax(220px,.62fr)_minmax(0,1.38fr)] lg:items-start">
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p id="business-health-heading" className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Business Health</p>
-                <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${healthTone(model.health.status)}`}>{model.health.status}</span>
+                <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(healthStatus)}`}><HealthIcon aria-hidden="true" className="h-3.5 w-3.5" />{model.health.status}</span>
               </div>
               {model.health.available && model.health.score !== null ? (
                 <div className="mt-4 flex items-end gap-2" aria-label={`Business Health score ${model.health.score} out of 100`}>
@@ -139,7 +155,7 @@ export function ExecutiveHomepage({
                 <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
               ) : null}
               <dl className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
-                <div>
+                <div className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(healthStatus)}`}>
                   <dt className="text-xs font-semibold text-cyan-200">Main driver</dt>
                   <dd className="mt-1 leading-6 text-slate-200">{model.health.driver}</dd>
                 </div>
@@ -171,9 +187,12 @@ export function ExecutiveHomepage({
       </div>
 
       <section aria-label="Executive priorities" className="grid items-start gap-4 lg:grid-cols-[1fr_1fr_.78fr]">
-        <article className={`rounded-lg border p-4 shadow-panel ${priorityTone(risk.tone)}`}>
+        <article className={`vaeroex-semantic-card ${semanticStatusClass(riskStatus)} rounded-lg border p-4 shadow-panel`}>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs font-semibold uppercase tracking-[0.12em] opacity-75">Needs Attention</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${semanticStatusClass(riskStatus)}`}><RiskIcon aria-hidden="true" className="h-3.5 w-3.5" />Needs Attention</span>
+              {!risk.empty ? <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${semanticStatusClass(riskPriority.status)}`}><RiskPriorityIcon aria-hidden="true" className="h-3.5 w-3.5" />{riskPriority.label}</span> : null}
+            </div>
             <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(risk.confidence)}`}>{risk.empty ? "No active finding" : `Confidence: ${risk.confidence}`}</span>
           </div>
           <h2 className="mt-3 text-lg font-semibold leading-6">{risk.title}</h2>
@@ -181,10 +200,10 @@ export function ExecutiveHomepage({
           {!decision.empty ? <p className="mt-3 border-t border-current/10 pt-3 text-sm leading-6"><span className="font-semibold">Decision:</span> {decision.summary}</p> : null}
           <Link href={risk.href} className="mt-4 inline-flex min-h-10 items-center gap-2 text-sm font-semibold hover:underline">{risk.actionLabel} <ArrowRight aria-hidden="true" className="h-4 w-4" /></Link>
         </article>
-        <PriorityCard card={{ ...opportunity, label: "Positive Signal" }} />
-        <div className="rounded-lg border border-line/80 bg-white p-4 shadow-panel">
+        <PriorityCard card={{ ...opportunity, label: "Top Opportunity" }} />
+        <div className={`vaeroex-semantic-card ${semanticStatusClass(readinessStatus)} rounded-lg border p-4 shadow-panel`}>
           <div className="flex items-center gap-2">
-            <Database aria-hidden="true" className="h-5 w-5 text-vaeroex-blue" />
+            <ReadinessIcon aria-hidden="true" className="h-5 w-5" />
             <h2 className="text-base font-semibold text-ink">Intelligence readiness</h2>
           </div>
           {model.readiness.available ? (
@@ -194,7 +213,7 @@ export function ExecutiveHomepage({
                   <p className="text-3xl font-semibold text-ink">{model.readiness.coverage}%</p>
                   <p className="mt-1 text-sm font-semibold text-muted">{model.readiness.label} understanding</p>
                 </div>
-                <ShieldCheck aria-label={`${model.readiness.label} intelligence readiness`} className="h-8 w-8 text-vaeroex-blue" />
+                <ShieldCheck aria-label={`${model.readiness.label} intelligence readiness`} className="h-8 w-8" />
               </div>
               <dl className="mt-4 grid gap-2 text-sm">
                 <div>

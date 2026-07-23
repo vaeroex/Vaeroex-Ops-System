@@ -14,6 +14,12 @@ import {
   supportingEvidenceHref
 } from "@/lib/intelligence/evidence-groups";
 import type { IntelligenceConfidence, IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceInsightType } from "@/lib/intelligence/layer";
+import {
+  findingCategoryStatus,
+  findingPriorityStatus,
+  semanticPresentation,
+  semanticStatusClass
+} from "@/lib/presentation/semantic-status";
 
 const signalTypes: IntelligenceInsightType[] = ["Risk", "Opportunity", "Forecast", "Bottleneck", "Recommendation", "Anomaly"];
 type SignalView = "All" | IntelligenceInsightType;
@@ -24,15 +30,7 @@ type SortMode = "Priority" | "Newest" | "Confidence";
 type PanelMode = "summary" | "evidence" | "analysis";
 
 function confidenceClass(confidence: IntelligenceConfidence) {
-  if (confidence === "High") return "border-cyan-300/40 bg-cyan-400/15 text-cyan-100";
-  if (confidence === "Medium") return "border-blue-300/30 bg-blue-500/15 text-blue-100";
-  return "border-slate-400/30 bg-slate-500/15 text-slate-100";
-}
-
-function priorityClass(priority: "High" | "Medium" | "Low") {
-  if (priority === "High") return "border-red-300/40 bg-red-500/15 text-red-100";
-  if (priority === "Medium") return "border-amber-300/35 bg-amber-500/15 text-amber-100";
-  return "border-slate-400/30 bg-slate-500/15 text-slate-100";
+  return `vaeroex-confidence-badge vaeroex-confidence-${confidence.toLowerCase()}`;
 }
 
 function typeEmptyMessage(type: SignalView) {
@@ -44,7 +42,7 @@ function typeEmptyMessage(type: SignalView) {
 
 function typeTabLabel(type: SignalView) {
   if (type === "All") return "All findings";
-  if (type === "Opportunity") return "Positive signals";
+  if (type === "Opportunity") return "Opportunities";
   if (type === "Anomaly") return "Anomalies";
   return `${type}s`;
 }
@@ -95,7 +93,17 @@ function evidenceDateRange(firstObserved: string, lastObserved: string) {
   return `${formatSignalDate(firstObserved)} - ${formatSignalDate(lastObserved)}`;
 }
 
-function PanelTabs({ mode, onChange, analysisAvailable }: { mode: PanelMode; onChange: (mode: PanelMode) => void; analysisAvailable: boolean }) {
+function PanelTabs({
+  mode,
+  onChange,
+  analysisAvailable,
+  categoryStatus
+}: {
+  mode: PanelMode;
+  onChange: (mode: PanelMode) => void;
+  analysisAvailable: boolean;
+  categoryStatus: ReturnType<typeof findingCategoryStatus>;
+}) {
   const tabs: Array<{ id: PanelMode; label: string }> = [
     { id: "summary", label: "Summary" },
     { id: "evidence", label: "Evidence" },
@@ -111,8 +119,8 @@ function PanelTabs({ mode, onChange, analysisAvailable }: { mode: PanelMode; onC
           role="tab"
           aria-selected={mode === tab.id}
           onClick={() => onChange(tab.id)}
-          className={`min-h-10 rounded-md px-2 py-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${
-            mode === tab.id ? "bg-vaeroex-blue text-white" : "text-slate-300 hover:bg-cyan-950/35 hover:text-white"
+          className={`vaeroex-semantic-interactive min-h-10 rounded-md px-2 py-2 text-xs font-semibold transition ${
+            mode === tab.id ? `vaeroex-semantic-badge ${semanticStatusClass(categoryStatus)}` : "text-slate-300 hover:bg-cyan-950/35 hover:text-white"
           }`}
         >
           {tab.label}
@@ -125,11 +133,13 @@ function PanelTabs({ mode, onChange, analysisAvailable }: { mode: PanelMode; onC
 function SummaryPanel({
   insight,
   canExplain,
-  onExplain
+  onExplain,
+  categoryStatus
 }: {
   insight: IntelligenceInsight;
   canExplain: boolean;
   onExplain: () => void;
+  categoryStatus: ReturnType<typeof findingCategoryStatus>;
 }) {
   if (lacksFindingSpecificity(insight)) {
     return (
@@ -150,7 +160,7 @@ function SummaryPanel({
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Why it matters</p>
         <p className="mt-2 text-slate-200">{compactText(insight.impact, 260)}</p>
       </section>
-      <section className="border-l-2 border-cyan-300/50 pl-3">
+      <section className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(categoryStatus)}`}>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100">Leadership decision</p>
         <p className="mt-2 text-slate-100">{compactText(insight.recommendedAction, 260)}</p>
       </section>
@@ -163,7 +173,7 @@ function SummaryPanel({
           <button
             type="button"
             onClick={onExplain}
-            className="inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+            className="vaeroex-semantic-interactive inline-flex min-h-10 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500"
           >
             Explain Finding
           </button>
@@ -454,7 +464,7 @@ export function IntelligenceSignalInbox({
   }
 
   return (
-    <section className="rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
+    <section className="vaeroex-intelligence-inbox vaeroex-priority-surface rounded-xl border border-white/10 bg-[#07101f] p-4 text-slate-100 shadow-command">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Intelligence</p>
@@ -485,40 +495,65 @@ export function IntelligenceSignalInbox({
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(23rem,.82fr)]">
         <div className="space-y-3 xl:max-h-[calc(100dvh-10rem)] xl:overflow-y-auto xl:pr-1">
           <p className="text-xs text-slate-400">Showing {filteredInsights.length ? `1-${visibleInsights.length}` : "0"} of {filteredInsights.length}.</p>
-          {visibleInsights.length ? visibleInsights.map((insight) => (
-            <button key={insight.id} type="button" onClick={() => selectInsight(insight.id)} className={`block w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60 ${selectedInsight?.id === insight.id ? "border-cyan-300/45 bg-cyan-950/25" : "border-white/10 bg-slate-950/35 hover:border-cyan-300/35 hover:bg-cyan-950/15"}`}>
+          {visibleInsights.length ? visibleInsights.map((insight) => {
+            const categoryStatus = findingCategoryStatus(insight.type);
+            const priorityStatus = findingPriorityStatus(insight.priority);
+            const category = semanticPresentation(categoryStatus);
+            const priority = semanticPresentation(priorityStatus);
+            const CategoryIcon = category.Icon;
+            const PriorityIcon = priority.Icon;
+
+            return (
+            <button key={insight.id} type="button" onClick={() => selectInsight(insight.id)} className={`vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition ${selectedInsight?.id === insight.id ? "ring-1 ring-current/30" : "hover:brightness-[1.03]"}`}>
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(categoryStatus)}`}><CategoryIcon aria-hidden="true" className="h-3.5 w-3.5" />{insight.type}</span>
+                    <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(priorityStatus)}`}><PriorityIcon aria-hidden="true" className="h-3.5 w-3.5" />{priority.label}</span>
+                  </div>
                   <h3 className="text-sm font-semibold leading-5 text-white">{compactText(insight.title, 110)}</h3>
                   <p className="mt-1 text-sm leading-5 text-slate-300">{compactText(insight.summary)}</p>
                 </div>
-                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(insight.confidence)}`}>{insight.confidence}</span>
+                <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(insight.confidence)}`}>Confidence: {insight.confidence}</span>
               </div>
               <p className="mt-2 text-xs text-slate-500">{formatSignalDate(insight.lastUpdated)}</p>
             </button>
-          )) : <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{typeEmptyMessage(activeType)}</div>}
+            );
+          }) : <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{typeEmptyMessage(activeType)}</div>}
           {filteredInsights.length > visibleInsights.length ? <button type="button" onClick={() => setVisibleCount((count) => count + pageSize)} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
         </div>
 
-        <aside className="rounded-lg border border-white/10 bg-slate-950/45 p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto">
+        <aside className={`vaeroex-semantic-card ${selectedInsight ? semanticStatusClass(findingCategoryStatus(selectedInsight.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
           {selectedInsight ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="flex flex-wrap gap-2">
-                    <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${priorityClass(selectedInsight.priority)}`}>Priority: {selectedInsight.priority}</span>
+                    {(() => {
+                      const categoryStatus = findingCategoryStatus(selectedInsight.type);
+                      const priorityStatus = findingPriorityStatus(selectedInsight.priority);
+                      const category = semanticPresentation(categoryStatus);
+                      const priority = semanticPresentation(priorityStatus);
+                      const CategoryIcon = category.Icon;
+                      const PriorityIcon = priority.Icon;
+                      return <>
+                        <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(categoryStatus)}`}><CategoryIcon aria-hidden="true" className="h-3.5 w-3.5" />{selectedInsight.type}</span>
+                        <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(priorityStatus)}`}><PriorityIcon aria-hidden="true" className="h-3.5 w-3.5" />{priority.label}</span>
+                      </>;
+                    })()}
                     <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(selectedInsight.confidence)}`}>Confidence: {selectedInsight.confidence}</span>
                   </div>
                   <h3 className="mt-3 break-words text-lg font-semibold leading-7 text-white">{compactText(selectedInsight.title, 140)}</h3>
                 </div>
                 <button type="button" onClick={() => setSelectedId("")} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">Back to list</button>
               </div>
-              <PanelTabs mode={panelMode} onChange={changePanelMode} analysisAvailable={Boolean(explanationTokens[selectedInsight.id])} />
+              <PanelTabs mode={panelMode} onChange={changePanelMode} analysisAvailable={Boolean(explanationTokens[selectedInsight.id])} categoryStatus={findingCategoryStatus(selectedInsight.type)} />
               {panelMode === "summary" ? (
                 <SummaryPanel
                   insight={selectedInsight}
                   canExplain={Boolean(explanationTokens[selectedInsight.id])}
                   onExplain={() => requestExplanation(selectedInsight.id)}
+                  categoryStatus={findingCategoryStatus(selectedInsight.type)}
                 />
               ) : null}
               {panelMode === "evidence" ? <EvidencePanel insight={selectedInsight} /> : null}

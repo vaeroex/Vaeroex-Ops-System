@@ -10,6 +10,7 @@ export type ExecutivePriorityCard = {
   summary: string;
   metadata: string;
   confidence: "High" | "Medium" | "Low";
+  priority: "High" | "Medium" | "Low";
   actionLabel: string;
   href: "/app/intelligence" | "/app/sources";
   tone: ExecutivePriorityTone;
@@ -95,6 +96,7 @@ function emptyPriority(tone: ExecutivePriorityTone): ExecutivePriorityCard {
       summary: "Vaeroex does not currently see a supported risk that should dominate leadership attention.",
       metadata: "No active high-priority risk",
       confidence: "Low",
+      priority: "Low",
       actionLabel: "Review intelligence",
       href: "/app/intelligence",
       tone,
@@ -109,6 +111,7 @@ function emptyPriority(tone: ExecutivePriorityTone): ExecutivePriorityCard {
       summary: "Current eligible evidence does not support a specific opportunity claim yet.",
       metadata: "More relevant history may reveal one",
       confidence: "Low",
+      priority: "Low",
       actionLabel: "Review intelligence",
       href: "/app/intelligence",
       tone,
@@ -122,6 +125,7 @@ function emptyPriority(tone: ExecutivePriorityTone): ExecutivePriorityCard {
     summary: "Continue monitoring current evidence until a material risk or opportunity emerges.",
     metadata: "No decision threshold reached",
     confidence: "Low",
+    priority: "Low",
     actionLabel: "Review intelligence",
     href: "/app/intelligence",
     tone,
@@ -138,6 +142,7 @@ function priorityFromInsight(insight: IntelligenceInsight | undefined, tone: "ri
     summary: conciseSentences(insight.summary, "Open the supporting intelligence for the current conclusion."),
     metadata: `Evidence: ${insight.evidenceCount} supporting item${insight.evidenceCount === 1 ? "" : "s"}`,
     confidence: insight.confidence,
+    priority: insight.priority,
     actionLabel: tone === "risk" ? "Review risk" : "Review opportunity",
     href: "/app/intelligence",
     tone,
@@ -160,6 +165,7 @@ function decisionFromIntelligence(intelligence: IntelligenceLayerResult): Execut
     summary: conciseSentences(recommendation.recommendedAction, recommendation.why, 1),
     metadata: `Priority: ${recommendation.priority}`,
     confidence: recommendation.confidence,
+    priority: recommendation.priority,
     actionLabel: "Review decision",
     href: "/app/intelligence",
     tone: "decision",

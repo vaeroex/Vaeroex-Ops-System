@@ -9,6 +9,11 @@ import type {
   BusinessHealthCitationView,
   BusinessHealthExplanationFacts
 } from "@/lib/ai/business-health-explanation/contracts";
+import {
+  businessHealthStatus,
+  semanticPresentation,
+  semanticStatusClass
+} from "@/lib/presentation/semantic-status";
 
 type BusinessHealthAnalysisPanelProps = {
   initialState: BusinessHealthAnalysisState;
@@ -35,10 +40,10 @@ function statusLabel(state: BusinessHealthAnalysisState) {
 }
 
 function statusTone(state: BusinessHealthAnalysisState) {
-  if (state.status === "current") return "border-emerald-300/35 bg-emerald-400/10 text-emerald-100";
-  if (state.status === "stale") return "border-amber-300/40 bg-amber-400/10 text-amber-100";
-  if (state.status === "failed" || state.status === "unavailable") return "border-red-300/35 bg-red-400/10 text-red-100";
-  return "border-white/15 bg-white/[0.06] text-slate-200";
+  if (state.status === "current") return semanticStatusClass("positive");
+  if (state.status === "stale") return semanticStatusClass("risk-medium");
+  if (state.status === "failed" || state.status === "unavailable") return semanticStatusClass("unavailable");
+  return semanticStatusClass("neutral");
 }
 
 function EvidenceList({ citations }: { citations: readonly BusinessHealthCitationView[] }) {
@@ -153,6 +158,9 @@ export function BusinessHealthAnalysisPanel({
   const analysisCitations = artifact?.citations || currentCitations;
   const showRefresh = Boolean(requestToken && ["stale", "failed"].includes(state.status) && !isPending);
   const factsForDisplay = analysisFacts;
+  const healthStatus = businessHealthStatus(factsForDisplay.status);
+  const healthPresentation = semanticPresentation(healthStatus);
+  const HealthIcon = healthPresentation.Icon;
 
   return (
     <>
@@ -177,7 +185,7 @@ export function BusinessHealthAnalysisPanel({
             aria-label="Close Business Health analysis"
             onClick={() => setOpen(false)}
           />
-          <aside ref={panelRef} className="absolute inset-0 flex w-full flex-col overflow-hidden bg-white shadow-2xl sm:left-auto sm:max-w-2xl sm:border-l sm:border-line">
+          <aside ref={panelRef} className="vaeroex-priority-surface absolute inset-0 flex w-full flex-col overflow-hidden bg-white shadow-2xl sm:left-auto sm:max-w-2xl sm:border-l sm:border-line">
             <header className="shrink-0 border-b border-line bg-white px-4 py-4 sm:px-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
@@ -203,7 +211,7 @@ export function BusinessHealthAnalysisPanel({
 
             <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-4 py-5 sm:px-6">
               {state.status === "stale" || state.status === "failed" || state.status === "unavailable" || state.status === "insufficient_evidence" ? (
-                <div className={`mb-5 rounded-lg border px-4 py-3 text-sm leading-6 ${statusTone(state)}`} role={state.status === "failed" ? "alert" : "status"}>
+                <div className={`vaeroex-semantic-card mb-5 rounded-lg border px-4 py-3 text-sm leading-6 ${statusTone(state)}`} role={state.status === "failed" ? "alert" : "status"}>
                   {state.message}
                 </div>
               ) : null}
@@ -264,7 +272,9 @@ export function BusinessHealthAnalysisPanel({
                 <dl className="mt-4 grid gap-3 border-y border-line py-4 sm:grid-cols-2">
                   <div>
                     <dt className="text-xs font-semibold text-muted">State and trajectory</dt>
-                    <dd className="mt-1 text-sm font-semibold text-ink">{factsForDisplay.status}{factsForDisplay.trajectory ? ` · ${factsForDisplay.trajectory}` : ""}</dd>
+                    <dd className="mt-1 text-sm font-semibold text-ink">
+                      <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(healthStatus)}`}><HealthIcon aria-hidden="true" className="h-3.5 w-3.5" />{factsForDisplay.status}{factsForDisplay.trajectory ? ` · ${factsForDisplay.trajectory}` : ""}</span>
+                    </dd>
                   </div>
                   <div>
                     <dt className="text-xs font-semibold text-muted">Previous review</dt>
