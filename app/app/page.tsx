@@ -742,11 +742,11 @@ function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportun
   }
 
   if (tone === "risk") {
-    return "Review the source evidence and decide whether leadership needs an executive report or improvement plan.";
+    return "Review the source evidence and decide what leadership should investigate next.";
   }
 
   if (tone === "opportunity") {
-    return "Open the related evidence and decide whether leadership needs a report, meeting agenda, or improvement plan.";
+    return "Open the related evidence and decide what leadership should validate next.";
   }
 
   return "Review the executive recommendation and decide what leadership should examine next.";
@@ -804,7 +804,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       evidence: recommendation?.evidence || `${intelligence.recommendationTracking.approvalQueue.length} recommendation${intelligence.recommendationTracking.approvalQueue.length === 1 ? "" : "s"} waiting for review.`,
       reasoning: recommendation?.why || "Vaeroex produces recommendations for human review; execution stays in the systems and teams the business already uses.",
       confidence: confidenceForPriority(recommendation?.priority),
-      action: recommendation?.action || "Review the queue and choose which recommendation needs an executive report, meeting agenda, or improvement plan."
+      action: recommendation?.action || "Review the queue and choose which recommendation deserves leadership attention next."
     },
     {
       title: "Profit Leak Detector",
@@ -818,9 +818,9 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       title: "Business Memory",
       href: memory?.href || ("/app/reports" as Route),
       evidence: memory?.whatHappened || `${intelligence.memoryTimeline.length} memory record${intelligence.memoryTimeline.length === 1 ? "" : "s"} stored.`,
-      reasoning: memory?.cause || "Vaeroex uses prior reports, decisions, imports, and outcomes to explain why current signals matter.",
+      reasoning: memory?.cause || "Vaeroex uses prior Saved Analyses, decisions, imports, and outcomes to explain why current signals matter.",
       confidence: memory ? "Medium" : "Low",
-      action: memory?.actionTaken || "Log decisions, reports, and outcomes so future briefings can compare what changed."
+      action: memory?.actionTaken || "Log decisions and outcomes so future intelligence can compare what changed."
     },
     {
       title: "Risk Simulation",
@@ -828,7 +828,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       evidence: risk?.evidence || `${intelligence.riskSimulation.length} forward-looking risk scenario${intelligence.riskSimulation.length === 1 ? "" : "s"} generated.`,
       reasoning: risk?.why || "Vaeroex projects unresolved signals forward so leaders can decide before the issue becomes normal.",
       confidence: confidenceForPriority(risk?.priority),
-      action: risk?.action || "Review the scenario and decide whether leadership needs an executive report, meeting agenda, or escalation discussion."
+      action: risk?.action || "Review the scenario and decide whether leadership needs a focused investigation or escalation discussion."
     },
     {
       title: "Decision Journal",
@@ -844,7 +844,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       evidence: benchmark?.evidence || `${intelligence.benchmarkMode.length} operating benchmark${intelligence.benchmarkMode.length === 1 ? "" : "s"} available.`,
       reasoning: "Vaeroex compares this workspace against default operating standards, not anonymous customer data.",
       confidence: benchmark?.status === "Missing data" ? "Low" : "Medium",
-      action: benchmark?.recommendedAction || "Use benchmark gaps to decide which KPI, checklist, or report needs stronger structure."
+      action: benchmark?.recommendedAction || "Use benchmark gaps to decide which KPI, checklist, or evidence area needs stronger structure."
     }
   ];
 

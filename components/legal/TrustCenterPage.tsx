@@ -8,20 +8,20 @@ import { trustSections } from "@/lib/legal/content";
 
 const trustGroups = [
   {
-    title: "Workspace and file protection",
-    summary: "How customer workspaces, records, and private source files are separated.",
+    title: "Workspace and data protection",
+    summary: "How customer information is separated, protected, and kept under authorized control.",
     icon: FileLock2,
     items: [trustSections[0], trustSections[1], trustSections[7]]
   },
   {
-    title: "Evidence and Vaeroex outputs",
-    summary: "How relevant evidence is retrieved and kept distinct from generated analysis.",
+    title: "Evidence and intelligence quality",
+    summary: "How Vaeroex keeps business facts, supporting evidence, and executive interpretation distinct.",
     icon: Database,
     items: [trustSections[2], trustSections[3], trustSections[4]]
   },
   {
-    title: "Actions, permissions, and audit records",
-    summary: "How model-influenced actions are validated, confirmed, and recorded.",
+    title: "Explainability, review, and accountability",
+    summary: "How recommendations remain inspectable, advisory, and subject to leadership control.",
     icon: ShieldCheck,
     items: [trustSections[5], trustSections[6], trustSections[8]]
   },
@@ -39,8 +39,8 @@ function TrustContent({ inApp }: { inApp: boolean }) {
       {inApp ? (
         <header className="border-b border-line/80 pb-5">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Trust Center</p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-ink">How Vaeroex handles evidence, access, and human review.</h1>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">A factual view of the current platform posture, including the protections in place and the boundaries customers should understand.</p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-normal text-ink">How Vaeroex builds trustworthy intelligence systems.</h1>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">A factual view of workspace protection, evidence-backed intelligence, explainable reasoning, and the boundaries customers should understand.</p>
         </header>
       ) : null}
 
@@ -104,8 +104,8 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="Trust at Vaeroex Intelligence Systems"
-        title="Trustworthy intelligence starts with clear boundaries."
-        description="See how Operations Intelligence separates workspaces, preserves evidence lineage, distinguishes original evidence from derived analysis, and excludes archived or deleted records from current intelligence."
+        title="Intelligence you can inspect, understand, and control."
+        description="See how Vaeroex builds trustworthy intelligence systems through secure workspaces, evidence-backed conclusions, deterministic business intelligence, explainable reasoning, and human control."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">

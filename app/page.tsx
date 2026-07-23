@@ -18,28 +18,29 @@ import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Intelligence Systems | Evidence-Backed Intelligence Software",
-  description: "Vaeroex builds evidence-backed intelligence systems that turn fragmented information into decision-ready understanding for leadership.",
+  title: "Vaeroex Intelligence Systems | Executive Clarity",
+  description: "Vaeroex builds intelligence systems that transform business information into visibility, awareness, prediction, and executive action.",
   path: "/"
 });
 
 const systems = [
-  { title: "Evidence architecture", description: "Original sources retain provenance, eligibility, and lifecycle status instead of disappearing into an untraceable answer.", icon: FileCheck2 },
-  { title: "Organizational understanding", description: "Business Memory preserves relevant context while keeping remembered knowledge distinct from original evidence.", icon: Brain },
-  { title: "Decision-ready intelligence", description: "Leadership receives a direct view of what changed, why it matters, and what deserves review next.", icon: Lightbulb }
+  { title: "Trusted business understanding", description: "Connect business information while keeping facts, sources, and context clear and inspectable.", icon: FileCheck2 },
+  { title: "Deterministic intelligence", description: "Business facts, KPI values, and current conditions remain grounded in verified calculations.", icon: Brain },
+  { title: "Advanced executive reasoning", description: "Supported patterns become clear explanations, priorities, and decision support for leadership.", icon: Lightbulb }
 ] as const;
 
 const intelligencePath = [
-  ["Collect", "Bring reports, spreadsheets, documents, images, metrics, and business observations into a private workspace."],
-  ["Qualify", "Vaeroex checks source eligibility, lineage, freshness, and lifecycle before information can support intelligence."],
-  ["Understand", "Relevant evidence is compared for change, agreement, risk, opportunity, and meaningful operating context."],
-  ["Explain", "The result arrives with supporting evidence, calibrated confidence, and clear limitations for leadership review."]
+  ["Connect Your Business", "Bring reports, spreadsheets, documents, KPIs, and relevant business information into one secure workspace."],
+  ["Build Trusted Business Understanding", "Vaeroex organizes information with source context so facts remain distinct from interpretation."],
+  ["Transform Information into Executive Intelligence", "Deterministic intelligence identifies current conditions, meaningful changes, and leadership priorities."],
+  ["Advanced Executive Reasoning", "Supported patterns are explained in clear business language, with uncertainty and limitations kept visible."],
+  ["Executive Clarity", "Leadership receives a concise, evidence-backed view of what matters, why it matters, and where to focus next."]
 ] as const;
 
 const differences = [
-  ["Evidence before assertion", "Unsupported conclusions stay out. Limited coverage produces limited claims rather than invented certainty."],
-  ["Understanding before automation", "Vaeroex is designed to improve leadership judgment, not act as an autonomous operator."],
-  ["One current product, broader company discipline", "Operations Intelligence is available today. The underlying evidence discipline gives Vaeroex room to expand carefully over time."]
+  ["Facts first. Reasoning second.", "Deterministic business facts remain separate from the interpretation that explains what they mean together."],
+  ["Clarity before automation", "Vaeroex is designed to strengthen leadership judgment, not act as an autonomous operator."],
+  ["One flagship platform, broader systems mission", "Operations Intelligence is available today. Vaeroex is building intelligence systems for clearer decisions over time."]
 ] as const;
 
 function NvidiaInceptionSection() {
@@ -71,9 +72,9 @@ export default function HomePage() {
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Vaeroex Intelligence Systems"
-        title="Systems that turn information into intelligence."
-        description="Vaeroex develops evidence-backed intelligence systems that help leadership understand what is happening, what changed, why it matters, and what should be reviewed next."
+        eyebrow="VAEROEX · INTELLIGENCE SYSTEMS"
+        title="Transform business information into executive clarity."
+        description="Vaeroex builds intelligence systems that transform business information into visibility, awareness, prediction, and executive action—helping leaders understand what matters, why it matters, and where to focus next."
         actions={
           <>
             <Link href="/operations-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
@@ -84,9 +85,9 @@ export default function HomePage() {
               Start With Vaeroex
             </a>
             <div className="hidden w-full flex-wrap gap-x-5 gap-y-2 pt-1 text-xs font-semibold text-slate-400 sm:flex" aria-label="Company principles">
-              <span>Evidence-backed systems</span>
-              <span>Decision-ready understanding</span>
-              <span>Conservative by design</span>
+              <span>Facts first. Reasoning second.</span>
+              <span>Evidence-backed intelligence.</span>
+              <span>Built for leadership.</span>
             </div>
           </>
         }
@@ -97,8 +98,8 @@ export default function HomePage() {
         <div className="mx-auto max-w-7xl">
           <PublicSectionHeading
             eyebrow="What Vaeroex builds"
-            title="Intelligence systems designed around evidence, context, and executive understanding."
-            description="Vaeroex connects information without erasing where it came from, then turns the supported result into a clearer leadership review."
+            title="Intelligence systems designed for visibility, awareness, prediction, and action."
+            description="Vaeroex turns trusted business information into explainable intelligence that helps leadership understand the present and focus on what comes next."
           />
           <div className="mt-8 grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 md:grid-cols-3">
             {systems.map((system, index) => {
@@ -120,10 +121,10 @@ export default function HomePage() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Flagship product</p>
             <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-white sm:text-4xl">Operations Intelligence by Vaeroex.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-300">A system for turning business evidence into executive understanding. It brings Business Health, current changes, prioritized findings, KPI context, Business Memory, and evidence-backed Reports into one calm review.</p>
+            <p className="mt-4 text-base leading-7 text-slate-300">Vaeroex&apos;s flagship Executive Intelligence platform, built to turn trusted business evidence into Business Health, prioritized intelligence, focused explanations, and executive decision support.</p>
             <div className="mt-6 flex flex-wrap gap-3">
               <Link href="/operations-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                See the product
+                Explore Operations Intelligence
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="/pricing" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">View pricing</Link>
@@ -131,10 +132,11 @@ export default function HomePage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             {[
-              ["Business Health", "A conservative view of current business condition, shown only when eligible evidence supports it."],
-              ["Prioritized Intelligence", "Needs Attention, Positive Signal, and What Changed keep the executive review focused."],
-              ["Evidence & Business Memory", "Relevant context stays connected to its source, confidence, and lifecycle."],
-              ["Reports", "Executive Brief, Board Report, Improvement Plan, and Investigation Summary turn supported findings into review-ready analysis."]
+              ["Business Health", "A concise, evidence-backed view of current business condition and the drivers behind it."],
+              ["Intelligence", "Prioritized findings, risks, opportunities, and changes keep leadership focused on what matters."],
+              ["Explain Finding", "A focused investigation helps leadership understand one supported issue without repeating the facts."],
+              ["Evidence", "The trusted business information behind each conclusion remains clear and available for review."],
+              ["Saved Analyses", "Completed analyses can be preserved for later leadership review without rewriting their content."]
             ].map(([title, body]) => (
               <div key={title} className="border-t border-white/15 pt-4">
                 <h3 className="font-semibold text-white">{title}</h3>
@@ -148,9 +150,9 @@ export default function HomePage() {
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
           <PublicSectionHeading
-            eyebrow="How intelligence is created"
-            title="A bounded path from source information to supported understanding."
-            description="The process is designed to retrieve what is relevant, preserve source accountability, and keep uncertainty visible."
+            eyebrow="How it works"
+            title="From connected business information to executive clarity."
+            description="Vaeroex keeps facts grounded, applies advanced executive reasoning where it adds value, and presents conclusions leadership can inspect."
           />
           <ol className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {intelligencePath.map(([title, description], index) => (
@@ -169,7 +171,7 @@ export default function HomePage() {
           <div>
             <Radar className="h-6 w-6 text-cyan-200" aria-hidden="true" />
             <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-normal text-white sm:text-4xl">Built for understanding, not feature accumulation.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-300">Vaeroex is not another system where teams manage every task, contact, or workflow. It is an intelligence layer that helps leadership interpret the evidence those systems create.</p>
+            <p className="mt-4 text-base leading-7 text-slate-300">Vaeroex is not another system where teams manage every task, contact, or workflow. It is an Intelligence Systems company focused on helping leadership understand the information those systems create.</p>
           </div>
           <div className="divide-y divide-white/10 border-y border-white/10">
             {differences.map(([title, body]) => (
@@ -190,8 +192,8 @@ export default function HomePage() {
               <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-950/25 text-cyan-100">
                 <LockKeyhole className="h-5 w-5" aria-hidden="true" />
               </div>
-              <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-normal sm:text-4xl">Trust starts with knowing what each conclusion is built on.</h2>
-              <p className="mt-4 text-base leading-7 text-slate-300">Private workspaces, evidence lineage, lifecycle exclusion, and a clear boundary between original evidence and derived analysis help keep conclusions accountable.</p>
+              <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-normal sm:text-4xl">Trust starts with knowing what is fact and what is interpretation.</h2>
+              <p className="mt-4 text-base leading-7 text-slate-300">Secure workspaces, inspectable evidence, explainable recommendations, and visible limitations help keep executive intelligence accountable.</p>
               <Link href="/trust" className="mt-5 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                 Review the Trust Center
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
@@ -199,9 +201,9 @@ export default function HomePage() {
             </div>
             <div className="divide-y divide-white/10 border-y border-white/10">
               {[
-                ["Original evidence", "Files, structured imports, and business observations retain source identity and eligibility."],
-                ["Relevant context", "Business Memory retrieves useful context without turning every remembered item into a separate original source."],
-                ["Derived analysis", "Findings and Reports remain interpretations of evidence, not new evidence about the business."]
+                ["Business facts", "KPI values, Business Health, and source records remain distinct from interpretation."],
+                ["Executive interpretation", "Advanced reasoning explains supported patterns without becoming a new fact about the business."],
+                ["Leadership control", "Confidence, freshness, citations, and limitations remain visible for review."]
               ].map(([title, description]) => (
                 <div key={title} className="grid gap-2 py-4 sm:grid-cols-[2rem_minmax(0,.38fr)_minmax(0,.62fr)] sm:items-start">
                   <FileCheck2 className="h-5 w-5 text-cyan-200" aria-hidden="true" />
@@ -215,7 +217,7 @@ export default function HomePage() {
             <Waypoints className="h-5 w-5 text-cyan-200" aria-hidden="true" />
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Long-term company direction</p>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">Vaeroex is building a disciplined intelligence architecture that can support more complex environments over time. Operations Intelligence is the product available today.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">Vaeroex is building intelligence systems that transform business information into visibility, awareness, prediction, and executive action. Operations Intelligence is the flagship product available today.</p>
             </div>
           </div>
         </div>
@@ -223,8 +225,8 @@ export default function HomePage() {
 
       <PublicCtaBand
         eyebrow="Vaeroex Intelligence Systems"
-        title="Start with the business evidence leadership already depends on."
-        description="Operations Intelligence turns that information into a clearer view of what changed, what matters, and what deserves review next."
+        title="Turn the information leadership already has into executive clarity."
+        description="Explore how Operations Intelligence connects trusted business information with deterministic intelligence and advanced executive reasoning."
         primaryHref="/operations-intelligence"
         primaryLabel="Explore Operations Intelligence"
         secondaryHref="/pricing"

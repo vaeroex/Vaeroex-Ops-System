@@ -87,7 +87,7 @@ export function MarketingDashboardPreview() {
           </div>
         </div>
       </div>
-      <p className="border-t border-white/10 px-4 py-3 text-[0.68rem] leading-5 text-slate-500 sm:px-5">Illustrative product preview. Workspace conclusions depend on eligible customer evidence.</p>
+      <p className="border-t border-white/10 px-4 py-3 text-[0.68rem] leading-5 text-slate-500 sm:px-5">Illustrative product preview. Workspace conclusions depend on the customer evidence available for review.</p>
     </aside>
   );
 }

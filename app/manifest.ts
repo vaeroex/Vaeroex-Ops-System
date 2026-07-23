@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Vaeroex",
     short_name: "Vaeroex",
-    description: "Operations Intelligence Platform",
+    description: "Vaeroex Operations Intelligence",
     start_url: "/app",
     scope: "/",
     display: "standalone",

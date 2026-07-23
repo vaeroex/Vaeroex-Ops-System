@@ -206,7 +206,7 @@ export function parseSavedAnalysisEnvelope(value: unknown): SavedAnalysisEnvelop
 }
 
 export function savedAnalysisTypeLabel(type: SavedAnalysisType) {
-  if (type === "executive_brief") return "Executive Brief";
+  if (type === "executive_brief") return "Legacy Leadership Analysis";
   if (type === "business_health") return "Business Health";
   return "Finding Explanation";
 }

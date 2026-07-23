@@ -52,9 +52,9 @@ export function OperationsIntelligenceEngineDemo() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Illustrative product experience</p>
-            <h2 className="mt-2 text-2xl font-semibold text-white">Choose a leadership question.</h2>
+            <h2 className="mt-2 text-2xl font-semibold text-white">Choose an executive view.</h2>
           </div>
-          <p className="max-w-md text-sm leading-6 text-slate-400">Vaeroex narrows the evidence, explains what it means, and keeps uncertainty visible.</p>
+          <p className="max-w-md text-sm leading-6 text-slate-400">Vaeroex connects the relevant evidence, explains what it means, and keeps uncertainty visible.</p>
         </div>
         <div className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap" role="tablist" aria-label="Leadership question examples">
           {engineScenarios.map((scenario, index) => {
@@ -83,7 +83,7 @@ export function OperationsIntelligenceEngineDemo() {
           <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-950/30 text-cyan-100">
             <Search className="h-5 w-5" aria-hidden="true" />
           </div>
-          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Business question</p>
+          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Executive focus</p>
           <h3 className="mt-2 text-2xl font-semibold leading-8 text-white">{active.question}</h3>
           <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.035] p-4">
             <div className="flex items-center gap-2 text-xs font-semibold text-cyan-100">
@@ -117,7 +117,7 @@ export function OperationsIntelligenceEngineDemo() {
         </div>
       </div>
 
-      <p className="border-t border-white/10 px-4 py-3 text-[0.68rem] leading-5 text-slate-500 sm:px-5">Illustrative examples only. Actual conclusions depend on the eligible evidence available in each private workspace.</p>
+      <p className="border-t border-white/10 px-4 py-3 text-[0.68rem] leading-5 text-slate-500 sm:px-5">Illustrative examples only. Actual conclusions depend on the customer evidence available in each private workspace.</p>
     </div>
   );
 }

@@ -39,7 +39,7 @@ export function PublicFooter() {
             <VaeroexLogo variant="symbol" size="xs" />
             <span className="font-semibold">Vaeroex</span>
           </Link>
-          <p className="mt-3 max-w-sm leading-6 text-slate-300">Vaeroex Intelligence Systems builds evidence-backed software that turns fragmented information into clearer leadership understanding.</p>
+          <p className="mt-3 max-w-sm leading-6 text-slate-300">Vaeroex Intelligence Systems transforms business information into visibility, awareness, prediction, and executive action.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-4 text-xs leading-5">
             <p className="font-semibold text-slate-200">Business Address</p>

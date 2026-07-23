@@ -8,7 +8,7 @@ function helpKey(title: string, eyebrow?: string) {
   if (text.includes("report")) return "reports";
   if (text.includes("kpi")) return "kpis";
   if (text.includes("crm")) return "crm";
-  if (text.includes("vaeroex") || text.includes("ask")) return "ask vaeroex";
+  if (text.includes("analysis")) return "analysis";
   return "default";
 }
 
