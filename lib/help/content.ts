@@ -155,7 +155,7 @@ export const helpArticles: HelpArticle[] = [
     ["team-roles", "Workspace Roles", "Workspace access roles that control what users can view or manage.", "/app/people"],
     ["report-sharing", "Saved Analysis Review", "Preserve completed analysis context in workspace history.", "/app/reports"],
     ["report-scheduling", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
-    ["vaeroex-ai", "Ask Vaeroex", "Ask focused business questions using current workspace context.", "/app/ask"]
+    ["vaeroex-ai", "Executive Intelligence", "Review prioritized findings and focused explanations grounded in current workspace evidence.", "/app/intelligence"]
   ].map(([id, title, summary, href]) =>
     article({
       id,
@@ -165,7 +165,7 @@ export const helpArticles: HelpArticle[] = [
       what: summary,
       why: "This helps improve operational clarity and reduces the need to chase information across disconnected tools.",
       when: "Use it when leadership needs evidence, context, or a repeatable review point.",
-      workflow: ["Open the page", "Review existing evidence first", "Add or update only what is useful", "Use reports or Vaeroex to review patterns"],
+      workflow: ["Open the page", "Review existing evidence first", "Add or update only what is useful", "Use Intelligence or Saved Analyses to review patterns"],
       mistakes: ["Creating duplicate records", "Treating incomplete data as complete", "Using stale data without review"],
       nextLabel: "Open feature",
       nextHref: href as Route,
@@ -194,12 +194,12 @@ export const helpArticles: HelpArticle[] = [
       title,
       summary,
       what: summary,
-      why: "Vaeroex recommendations are advisory operations intelligence, not automatic decisions.",
-      when: "Use Vaeroex when you want a structured second look at workspace activity.",
-      workflow: ["Ask a specific question", "Review the evidence", "Edit the recommendation if needed", "Save only useful outputs", "Compare results over time"],
+      why: "Vaeroex recommendations are advisory executive intelligence, not automatic decisions.",
+      when: "Use Executive Intelligence when leadership needs a structured second look at workspace activity.",
+      workflow: ["Open Intelligence", "Review a prioritized finding", "Inspect the evidence", "Open Explain Finding when useful", "Save completed analysis when leadership should revisit it"],
       mistakes: ["Treating output as guaranteed", "Skipping human review", "Uploading sensitive data"],
-      nextLabel: "Ask Vaeroex",
-      nextHref: "/app/ask",
+      nextLabel: "Open Intelligence",
+      nextHref: "/app/intelligence",
       related: ["AI Disclaimer", "Human Review Notice", "Sensitive Data Policy"]
     })
   ),
