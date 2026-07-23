@@ -353,7 +353,7 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
     what: "Use Intelligence for structured analysis and Search to locate workspace records.",
     workflow: ["Open Intelligence", "Choose a supported finding", "Review evidence", "Save a completed analysis when useful"],
     mistakes: ["Treating output as professional advice", "Skipping review", "Uploading sensitive data"],
-    related: ["AI Disclaimer", "Human Review Notice", "Sensitive Data Policy"]
+    related: ["Executive Intelligence", "AI Disclaimer", "Sensitive Data Policy"]
   },
   default: {
     what: "This page helps organize business evidence for visibility, context, and leadership review.",

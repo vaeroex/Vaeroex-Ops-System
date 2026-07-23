@@ -859,7 +859,7 @@ function runCrmRetirementTests() {
 
 function runGlobalSearchAskMergeTests() {
   const appShell = read("components/app/AppShell.tsx");
-  assert.match(appShell, /href:\s*"\/app\/ask",\s*label:\s*"Ask Vaeroex"/, "Ask Vaeroex must have a dedicated authenticated destination");
+  assert.match(appShell, /isPremiumConversationalVaeroexEnabled\(\)[\s\S]*href:\s*"\/app\/ask"/, "Ask must remain hidden behind its dedicated premium policy");
   assert.match(appShell, /GlobalSearch/, "app shell must preserve the separate global Search entry point");
 
   const globalSearch = read("components/app/GlobalSearch.tsx");
@@ -893,12 +893,12 @@ function runGlobalSearchAskMergeTests() {
   assert.match(searchRoute, /buildBoundedWorkspaceContext/, "explicit global questions should load only planner-selected domains");
 
   const legacyAskPage = read("app/app/ask/page.tsx");
-  assert.match(legacyAskPage, /params\.run/, "dedicated /app/ask must preserve saved legacy result links");
-  assert.match(legacyAskPage, /AskVaeroexWorkspace/, "blank /app/ask visits must render persistent Executive Analysis");
+  assert.match(legacyAskPage, /params\.run[\s\S]*redirect\(`\/app\/agents/, "legacy /app/ask result links must move to the result viewer");
+  assert.match(legacyAskPage, /isPremiumConversationalVaeroexEnabled[\s\S]*redirect\("\/app\/intelligence"\)/, "blank /app/ask visits must fail closed in Version 1");
 
   const agentsPage = read("app/app/agents/page.tsx");
   assert.match(agentsPage, /Saved Vaeroex Result/, "legacy agents route should read as saved results, not a primary Ask destination");
-  assert.match(agentsPage, /redirect\("\/app\/ask"\)/, "blank /app/agents visits must redirect into dedicated Ask");
+  assert.match(agentsPage, /redirect\("\/app\/intelligence"\)/, "blank /app/agents visits must redirect into structured Intelligence");
 }
 
 function runQueryDepthPlannerTests() {

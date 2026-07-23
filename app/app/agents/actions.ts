@@ -16,6 +16,7 @@ import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { getVaeroexWorkflow, type VaeroexSaveTarget } from "@/lib/ai/vaeroex-workflows";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
+import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -556,6 +557,9 @@ async function storeSecurityBlockedRun({
 export async function runVaeroexAction(formData: FormData) {
   const { supabase, user, workspaceId } = await requireWorkspace();
   const workflow = getVaeroexWorkflow(text(formData, "workflow_key"));
+  if (workflow.key === "ask_vaeroex" && !isPremiumConversationalVaeroexEnabled()) {
+    redirectWithError("Conversational analysis is not available in this product version.");
+  }
   if (["weekly_report", "daily_summary", "business_review_package", "follow_up"].includes(workflow.key)) {
     redirectWithError("Secondary report generation is no longer available. Review current analyses in their live product views.");
   }

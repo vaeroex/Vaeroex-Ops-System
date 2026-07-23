@@ -31,6 +31,7 @@ import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMess
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
+import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -716,6 +717,13 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isPremiumConversationalVaeroexEnabled()) {
+    return NextResponse.json(
+      { error: "Conversational analysis is not available in this product version." },
+      { status: 404 }
+    );
+  }
+
   const requestStartedAt = Date.now();
   const executionId = randomUUID();
   const timing = createWorkflowStageRecorder({ startedAtMs: requestStartedAt });
@@ -868,7 +876,7 @@ export async function POST(request: Request) {
   if (queryPlan.classification === "search_navigation") {
     return respond({
       kind: "navigation_answer",
-      directAnswer: "Use Search to open a specific workspace record. Ask Vaeroex is reserved for executive analysis.",
+      directAnswer: "Use Search to open a specific workspace record. Structured analysis is available in Intelligence.",
       evidenceNote: "Press Cmd/Ctrl + K to search workspace records without starting a generated analysis."
     } satisfies GlobalSearchAnswer);
   }

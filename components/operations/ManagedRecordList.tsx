@@ -9,7 +9,6 @@ import {
   renameRecordFolderAction,
   updateManagedRecordAction
 } from "@/app/app/operations/record-management-actions";
-import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { CompactSummaryChips } from "@/components/operations/CompactSummaryChips";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -652,7 +651,6 @@ export function ManagedRecordList({
   const currentCount = activeCount;
   const chips = activeFilterChips({ params: baseParams, folders, returnPath, labels, defaultView });
   const hasFilter = Boolean(chips.length || param(searchParams?.limit));
-  const askPrompt = `Explain what the current ${collectionLabel(collection)} view shows. Focus on the most important supported pattern, why it matters, and any meaningful limitation.`;
   const summaryChips =
     collection === "files"
       ? ([
@@ -788,25 +786,6 @@ export function ManagedRecordList({
               More
             </summary>
             <div className="absolute right-0 z-20 mt-2 w-[min(28rem,calc(100vw-2rem))] space-y-3 rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-2xl shadow-black/30">
-              <ContextualAskVaeroex
-                label="Explain This Page"
-                prompt={askPrompt}
-                contextType={`managed_${collection}`}
-                contextId={collection}
-                sourceTitle={title}
-                sourceSummary={`${description || `Managed ${collectionLabel(collection)} page.`} Showing ${visibleRecords.length} records, with ${activeCount} active, ${archivedCount} archived, and ${deletedCount} hidden.`}
-                evidence={[
-                  `Collection: ${collectionLabel(collection)}`,
-                  `Active records: ${activeCount}`,
-                  `Visible records after filters: ${visibleRecords.length}`,
-                  `Displayed records: ${displayedRecords.length}`,
-                  `Archived records: ${archivedCount}`,
-                  `Hidden records: ${deletedCount}`,
-                  activeFolder ? `Active folder: ${getFolderName(folders, activeFolder)}` : "No folder filter selected",
-                  statusOptions.length ? `${labels.status} visible: ${statusOptions.slice(0, 8).join(", ")}` : `No ${labels.status.toLowerCase()} values visible`
-                ]}
-                compact
-              />
               <FolderManager collection={collection} folders={folders} returnPath={returnPath} />
             </div>
           </details>
