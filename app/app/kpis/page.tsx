@@ -15,6 +15,12 @@ import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import {
+  kpiStatus,
+  semanticPresentation,
+  semanticStatusClass,
+  type SemanticStatus
+} from "@/lib/presentation/semantic-status";
+import {
   applyKpiSettingsToRows,
   getConfiguredMetricNames,
   KPI_COLOR_PALETTE,
@@ -161,11 +167,17 @@ function kpiStatusText(row: KpiRow, direction: KpiDirection) {
   return statusLabel(metricTone(row.actual_value, row.target, direction));
 }
 
+function statusForTone(tone: KpiTone): SemanticStatus {
+  return kpiStatus({
+    tone,
+    hasCurrentValue: true,
+    hasTarget: tone !== "neutral",
+    hasDirection: tone !== "neutral"
+  });
+}
+
 function toneClasses(tone: KpiTone) {
-  if (tone === "green") return "border-emerald-400/35 bg-emerald-950/30 text-emerald-100";
-  if (tone === "yellow") return "border-amber-400/35 bg-amber-950/30 text-amber-100";
-  if (tone === "red") return "border-red-400/35 bg-red-950/30 text-red-100";
-  return "border-slate-600/40 bg-slate-950/55 text-slate-200";
+  return `vaeroex-semantic-card ${semanticStatusClass(statusForTone(tone))}`;
 }
 
 function formatMetricValue(kpi: KpiRow | undefined, fallback = "Not set") {
@@ -299,12 +311,13 @@ function recommendedTargetForMetric(metricName: string, rows: KpiRow[]): KpiTarg
   };
 }
 
-function KpiStatusBadge({ tone }: { tone: KpiTone }) {
-  if (tone === "neutral") return null;
-
+function KpiStatusBadge({ label, status }: { label: string; status: SemanticStatus }) {
+  const presentation = semanticPresentation(status);
+  const Icon = presentation.Icon;
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClasses(tone)}`}>
-      {statusLabel(tone)}
+    <span className={`vaeroex-semantic-badge inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs font-semibold ${semanticStatusClass(status)}`}>
+      <Icon aria-hidden="true" className="h-3.5 w-3.5" />
+      {label}
     </span>
   );
 }
@@ -438,15 +451,12 @@ function StatusFilterCard({
   active: boolean;
   href: Route;
 }) {
+  const status = statusForTone(tone);
   return (
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
-      className={`block rounded-lg border p-3 transition ${
-        active
-          ? "border-vaeroex-accent bg-cyan-950/45 text-cyan-50 shadow-panel ring-1 ring-vaeroex-accent/40"
-          : `${toneClasses(tone)} hover:border-vaeroex-accent/50 hover:bg-cyan-950/30 hover:text-cyan-50`
-      }`}
+      className={`vaeroex-semantic-interactive ${toneClasses(tone)} block rounded-lg border p-3 transition ${active ? "shadow-panel ring-2 ring-current/30" : "hover:brightness-[1.03]"}`}
     >
       <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">{label}</span>
       <span className="mt-2 block text-2xl font-semibold">{value}</span>
@@ -470,13 +480,19 @@ function KpiTile({
 }) {
   const direction = explicitKpiDirection(kpi.name, rows, settings);
   const tone = metricTone(kpi.actual_value, kpi.target, direction);
+  const semanticStatus = kpiStatus({
+    tone,
+    hasCurrentValue: kpi.actual_value !== null,
+    hasTarget: kpi.target !== null,
+    hasDirection: Boolean(direction)
+  });
   const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
   const difference = kpi.actual_value !== null && kpi.target !== null
     ? formatNumericValue(kpi.actual_value - kpi.target, kpi.name)
     : "Not available";
 
   return (
-    <article className="rounded-lg border border-white/10 bg-[#08111f] p-3 text-slate-100 shadow-panel">
+    <article className={`vaeroex-semantic-card vaeroex-priority-surface ${semanticStatusClass(semanticStatus)} rounded-lg border p-3 text-slate-100 shadow-panel`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -484,7 +500,7 @@ function KpiTile({
             <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
         </div>
-        {direction ? <KpiStatusBadge tone={tone} /> : null}
+        <KpiStatusBadge label={kpiStatusText(kpi, direction)} status={semanticStatus} />
       </div>
       <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
@@ -501,7 +517,7 @@ function KpiTile({
           {kpi.updated_at ? formatShortDate(kpi.updated_at.slice(0, 10)) : formatShortDate(kpi.metric_date)}
         </p>
       </div>
-      <Link href={href} className="mt-3 inline-flex min-h-10 items-center rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45">
+      <Link href={href} className="vaeroex-semantic-interactive mt-3 inline-flex min-h-10 items-center rounded-lg border border-current/25 px-3 py-2 text-xs font-semibold hover:bg-white/40">
         View details
       </Link>
       <span className="sr-only">KPI tile {index + 1}</span>
@@ -1782,7 +1798,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   });
 
   return (
-    <div className="space-y-6">
+    <div className="vaeroex-priority-surface space-y-6">
       <PageHeader
         eyebrow="Measurement Layer"
         title="KPIs"
@@ -1908,7 +1924,15 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <h2 className="mt-2 text-xl font-semibold text-white">{primaryMetric}</h2>
                     <p className="mt-1 text-sm leading-6 text-slate-400">{kpiDefinition(primaryMetric, kpiSettings) || "No definition set yet."}</p>
                   </div>
-                  {selectedKpiDirection ? <KpiStatusBadge tone={metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null, selectedKpiDirection)} /> : null}
+                  {selectedKpiDirection ? (() => {
+                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null, selectedKpiDirection);
+                    return <KpiStatusBadge label={statusLabel(tone)} status={kpiStatus({
+                      tone,
+                      hasCurrentValue: selectedLatestKpi?.actual_value !== null && selectedLatestKpi?.actual_value !== undefined,
+                      hasTarget: selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined,
+                      hasDirection: true
+                    })} />;
+                  })() : null}
                 </div>
                 <div className="mt-4 grid gap-3 sm:grid-cols-3">
                   <TrendSummaryCard
@@ -2209,7 +2233,10 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <article key={item.title} className="rounded-lg border border-white/10 bg-slate-950/35 p-4 text-slate-100">
                       <div className="flex items-start justify-between gap-3">
                         <p className="text-sm font-semibold text-white">{item.title}</p>
-                        <KpiStatusBadge tone={item.status === "On track" ? "green" : item.status === "Needs attention" ? "yellow" : "neutral"} />
+                        {(() => {
+                          const tone = item.status === "On track" ? "green" : item.status === "Needs attention" ? "yellow" : "neutral";
+                          return <KpiStatusBadge label={item.status} status={statusForTone(tone)} />;
+                        })()}
                       </div>
                       <p className="mt-2 text-sm leading-6 text-slate-300">{item.evidence}</p>
                       <p className="mt-2 text-xs leading-5 text-slate-400">{item.recommendedAction}</p>

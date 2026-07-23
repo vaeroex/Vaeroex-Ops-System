@@ -217,7 +217,7 @@ const kpiPageSource = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), 
 assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visible loading state");
 assert.match(homepageSource, /lg:grid-cols-\[1fr_1fr_\.78fr\]/, "executive focus and readiness cards must use horizontal space without forcing mobile columns");
 assert.match(homepageSource, /Needs Attention/, "risk and leadership decision must be consolidated into one focus card");
-assert.match(homepageSource, /Positive Signal/, "the positive signal must remain distinct");
+assert.match(homepageSource, /Top Opportunity/, "the opportunity must remain distinct without being presented as a positive signal");
 assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
 assert.match(homepageSource, /Validated executive interpretation/, "the Version 1 homepage must label the visible validated interpretation correctly");
 assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the Version 1 Business Health snapshot must retain its score and interpretation columns");
@@ -243,7 +243,8 @@ assert.match(sourcesPageSource, /hasCompletedAnalysis[\s\S]*if \(hasCompletedAna
 assert.match(sourcesPageSource, /tab\.key !== "knowledge"[\s\S]*memoryChunks\.some/, "zero-count Learned Knowledge must be hidden");
 assert.match(kpiPageSource, /function explicitKpiDirection/, "KPI directionality must come from explicit existing metadata");
 assert.match(kpiPageSource, /actual === null \|\| target === null \|\| !direction/, "KPI status must remain neutral without explicit direction");
-assert.match(kpiPageSource, /if \(tone === "neutral"\) return null/, "neutral KPIs must not show favorable or unfavorable status badges");
+assert.match(kpiPageSource, /if \(row\.target === null\) return "Target not set"/, "neutral KPIs must use neutral target language instead of a favorable or unfavorable status");
+assert.match(kpiPageSource, /if \(!direction\) return "Direction not set"/, "KPIs without an explicit direction must remain neutral");
 assert.match(kpiPageSource, /!\(key === "status" && value === "all"\)/, "the KPI URL builder must preserve show=all while omitting the default status");
 assert.match(kpiPageSource, /showAllTiles \? filteredLatestKpiRows : filteredLatestKpiRows\.slice\(0, INITIAL_KPI_CARD_COUNT\)/, "expanded KPI rendering must use the full filtered result set");
 assert.match(kpiPageSource, /showAllTiles \? "Show fewer KPIs" : `Show all \$\{filteredLatestKpiRows\.length\} KPIs`/, "the KPI expansion control must expose both expanded and collapsed labels");

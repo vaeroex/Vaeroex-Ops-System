@@ -284,7 +284,7 @@ assert.match(inboxSource, /explainFindingAction\(requestToken\)/, "Explain Findi
 assert.match(inboxSource, /buildEvidenceGroups\(insight\.supportingRecords\)/, "evidence view must group supporting records deterministically");
 assert.match(inboxSource, /signalTypes\.filter\(\(type\) => counts\[type\] > 0\)/, "zero-count finding categories must be hidden");
 assert.match(inboxSource, /useState<SignalView>\("All"\)/, "All findings is the default executive view");
-assert.match(inboxSource, /Positive signals/, "opportunities use plain executive language");
+assert.match(inboxSource, /Opportunities/, "opportunities use the approved executive category language");
 assert.match(inboxSource, /Vaeroex found related records, but the available information does not identify an owner, completed outcome, or measurable business effect\./, "weak findings must use a concise specificity fallback");
 assert.match(inboxSource, /More information needed: owner, completion status, and outcome\./, "weak findings must state the missing fields directly");
 assert.match(inboxSource, /selectCollapsedRepresentatives\(groups\)/, "evidence view must use bounded representative records");
