@@ -5,7 +5,6 @@ import {
   exitDemoWorkspaceAction,
   resetDemoWorkspaceAction
 } from "@/app/app/demo/actions";
-import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import { ExecutiveHomepage } from "@/components/intelligence/ExecutiveHomepage";
@@ -916,25 +915,6 @@ function SignalList({
           <p className="mt-2 line-clamp-2 text-xs leading-5 opacity-90">
             <span className="font-semibold opacity-95">Evidence:</span> {signalEvidence(item)}
           </p>
-          <div className="mt-3">
-            <ContextualAskVaeroex
-              label="Explain This"
-              prompt="Explain what this intelligence signal means, why it matters, which evidence supports it, and what remains uncertain. Stay focused on this signal."
-              contextType={`home_${tone}_signal`}
-              contextId={item.id}
-              sourceTitle={item.title}
-              sourceSummary={item.context}
-              evidence={[
-                `Source: ${item.source}`,
-                `Status: ${item.status || "Not labeled"}`,
-                `Evidence: ${signalEvidence(item)}`,
-                `Reasoning: ${signalReasoning(item, tone)}`,
-                `Confidence: ${confidenceForSignal(item, tone)}`,
-                `Leadership review: ${signalRecommendedAction(item, tone)}`
-              ]}
-              compact
-            />
-          </div>
         </article>
       )}
     />
@@ -982,26 +962,6 @@ function IntelligenceLayerSummary({
       tone: "border-cyan-400/30 bg-cyan-950/25"
     }
   ];
-  const memorySignals = intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords;
-  const briefingEvidence = [
-    `Business health: ${intelligence.businessHealth.score}/100 (${intelligence.businessHealth.status})`,
-    `Trend: ${intelligence.businessHealth.trend}`,
-    `Data confidence: ${intelligence.dataQuality.confidence} (${intelligence.dataQuality.score}/100)`,
-    `Business Memory signals: ${memorySignals}`,
-    intelligence.topRisk
-      ? `Top Risk: ${intelligence.topRisk.title}. ${intelligence.topRisk.summary} Evidence: ${intelligence.topRisk.evidence.join("; ")}`
-      : "Top Risk: no major risk visible",
-    intelligence.topOpportunity
-      ? `Top Opportunity: ${intelligence.topOpportunity.title}. ${intelligence.topOpportunity.summary} Evidence: ${intelligence.topOpportunity.evidence.join("; ")}`
-      : "Top Opportunity: more context needed",
-    intelligence.topRecommendation
-      ? `Executive Recommendation: ${intelligence.topRecommendation.recommendedAction}. Why: ${intelligence.topRecommendation.why}`
-      : "Executive Recommendation: add source data",
-    intelligence.topForecast
-      ? `Forecast signal: ${intelligence.topForecast.title}. Confidence: ${intelligence.topForecast.confidence}`
-      : `Forecast readiness: ${intelligence.forecastReadiness.label}. ${intelligence.forecastReadiness.reason}`
-  ];
-
   return (
     <section className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#061225] text-white shadow-command">
       <div className="grid gap-5 p-5 xl:grid-cols-[.78fr_1.22fr] xl:p-6">
@@ -1067,25 +1027,6 @@ function IntelligenceLayerSummary({
               Add evidence
             </Link>
           </div>
-          <div className="rounded-lg border border-cyan-300/20 bg-slate-950/35 p-4">
-            <div className="mb-3">
-              <p className="text-sm font-semibold text-white">Explain this briefing</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">
-                Generate an inline explanation of this recommendation without leaving Home.
-              </p>
-            </div>
-            <ContextualAskVaeroex
-              label="Explain This"
-              prompt="Explain the current Home briefing directly. Describe what it means, why it matters, which supplied evidence supports it, and any meaningful uncertainty. Do not expand into a general report or forecast."
-              contextType="home_leadership_briefing"
-              contextId="home-what-leadership-should-know-now"
-              sourceTitle="What leadership should know now"
-              sourceSummary={intelligence.executiveSummary}
-              evidence={briefingEvidence}
-              compact
-              defaultCollapsed={false}
-            />
-          </div>
         </div>
       </div>
     </section>
@@ -1095,13 +1036,11 @@ function IntelligenceLayerSummary({
 function IntelligenceBriefingHero({
   risk,
   opportunity,
-  attention,
   action,
   period
 }: {
   risk?: DashboardSignal;
   opportunity?: DashboardSignal;
-  attention?: DashboardSignal;
   action?: DashboardSignal;
   period: DashboardPeriod;
 }) {
@@ -1134,43 +1073,16 @@ function IntelligenceBriefingHero({
       tone: "action" as const
     }
   ];
-  const briefingEvidence = [
-    `Period: ${period}`,
-    risk ? `Biggest risk: ${risk.title}. ${risk.context}. Evidence: ${signalEvidence(risk)}` : "Biggest risk: no major risk visible",
-    opportunity
-      ? `Biggest opportunity: ${opportunity.title}. ${opportunity.context}. Evidence: ${signalEvidence(opportunity)}`
-      : "Biggest opportunity: no clear opportunity visible",
-    attention
-      ? `Requires attention: ${attention.title}. ${attention.context}. Recommended: ${signalRecommendedAction(attention, "risk")}`
-      : "Requires attention: no immediate attention item visible",
-    action
-      ? `Executive recommendation: ${action.title}. ${action.context}. Recommended: ${signalRecommendedAction(action, "action")}`
-      : "Executive recommendation: keep adding records for stronger recommendations"
-  ];
-
   return (
     <section className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#061225] text-white shadow-command">
       <div className="border-b border-white/10 bg-[radial-gradient(circle_at_15%_0%,rgba(56,189,248,0.22),transparent_34%),linear-gradient(135deg,rgba(30,107,255,0.18),transparent_58%)] p-6">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Leadership Intelligence Briefing</p>
             <h2 className="mt-3 text-3xl font-semibold tracking-tight md:text-4xl">What should leadership know that is not immediately obvious?</h2>
             <p className="mt-3 max-w-4xl text-sm leading-6 text-slate-200">
               Vaeroex is reading the {period.toLowerCase()} workspace context for risk, opportunity, attention, and the next decision.
             </p>
-          </div>
-          <div className="w-full max-w-md rounded-lg border border-cyan-300/20 bg-slate-950/30 p-3 lg:w-auto">
-            <ContextualAskVaeroex
-              label="Explain This"
-              prompt="Explain this leadership briefing directly. Connect only the selected risk, opportunity, and recommendation when the supplied evidence supports that relationship, then state any meaningful uncertainty."
-              contextType="home_intelligence_briefing"
-              contextId={`home-intelligence-briefing-${period}`}
-              sourceTitle="Leadership Intelligence Briefing"
-              sourceSummary={`Risk: ${risk?.title || "none visible"}. Opportunity: ${opportunity?.title || "none visible"}. Executive recommendation: ${action?.title || "keep adding context"}.`}
-              evidence={briefingEvidence}
-              compact
-              defaultCollapsed={false}
-            />
           </div>
         </div>
       </div>
@@ -1214,32 +1126,12 @@ function IntelligenceBriefingHero({
 
               {item ? (
                 <div className="mt-3">
-                  {id === "action" ? (
-                    <Link
-                      href={`/app/intelligence?finding=${encodeURIComponent(item.id)}` as Route}
-                      className="inline-flex min-h-10 items-center rounded-lg border border-cyan-300/25 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:border-vaeroex-accent/60 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
-                    >
-                      Review finding
-                    </Link>
-                  ) : (
-                    <ContextualAskVaeroex
-                      label="Explain This"
-                      prompt="Explain what this briefing card means, why it matters, which evidence supports it, and what remains uncertain. Stay focused on this card."
-                      contextType={`home_briefing_${id}`}
-                      contextId={item.id}
-                      sourceTitle={item.title}
-                      sourceSummary={item.context}
-                      evidence={[
-                        `Source: ${item.source}`,
-                        `Status: ${item.status || "Not labeled"}`,
-                        `Evidence: ${signalEvidence(item)}`,
-                        `Reasoning: ${signalReasoning(item, tone)}`,
-                        `Confidence: ${confidence}`,
-                        `Leadership review: ${signalRecommendedAction(item, tone)}`
-                      ]}
-                      compact
-                    />
-                  )}
+                  <Link
+                    href={`/app/intelligence?finding=${encodeURIComponent(item.id)}` as Route}
+                    className="inline-flex min-h-10 items-center rounded-lg border border-cyan-300/25 px-3 py-2 text-xs font-semibold text-cyan-100 transition hover:border-vaeroex-accent/60 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45"
+                  >
+                    Review finding
+                  </Link>
                 </div>
               ) : (
                 <p className="mt-3 text-xs leading-5 text-slate-400">Add more records, imports, decisions, and outcomes to strengthen this signal.</p>
@@ -1995,7 +1887,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         requestTokenAvailable: Boolean(executiveBriefToken)
       })
     : { status: "available" as const, artifact: null, message: null };
-  const topAttentionSignal = riskSignals[1] || recommendedActionSignals[0] || riskSignals[0];
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
   const isIntelligenceView = dashboardMode === "Intelligence View";
@@ -2061,7 +1952,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <IntelligenceBriefingHero
             risk={riskSignals[0]}
             opportunity={opportunitySignals[0]}
-            attention={topAttentionSignal}
             action={recommendedActionSignals[0]}
             period={period}
           />

@@ -15,6 +15,7 @@ import {
   filterBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
+import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { contextualSecurityIntentInput, isSecurityResponseMessage, isSecuritySensitiveRequest, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
@@ -175,6 +176,13 @@ function outputToAnswer(outputJson: Json, fallbackTitle: string, fallbackContext
 }
 
 export async function runContextualAskVaeroexAction(_previousState: ContextualAskState, formData: FormData): Promise<ContextualAskState> {
+  if (!isPremiumConversationalVaeroexEnabled()) {
+    return {
+      status: "error",
+      error: "Conversational analysis is not available in this product version."
+    };
+  }
+
   const prompt = text(formData, "prompt");
   const followUp = text(formData, "follow_up");
   const contextType = text(formData, "context_type") || "contextual_explanation";

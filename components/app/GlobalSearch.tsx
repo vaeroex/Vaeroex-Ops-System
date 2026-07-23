@@ -82,7 +82,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
 
   useEffect(() => {
     if (searchParams.get("ask") === "1") {
-      router.replace("/app/ask" as Route, { scroll: false });
+      router.replace("/app/intelligence" as Route, { scroll: false });
       return;
     }
     if (searchParams.get("search") !== "1") return;

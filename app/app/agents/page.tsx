@@ -63,43 +63,6 @@ const WORKFLOW_GROUPS: Array<{
     keys: ["sop_generator", "form_builder", "checklist_builder", "file_analysis"]
   }
 ];
-const WORKFLOW_CHOICES: Array<{
-  label: string;
-  description: string;
-  workflowKey?: VaeroexWorkflowKey;
-  href?: Route;
-}> = [
-  {
-    label: "Executive Brief",
-    description: "What should leadership know right now?",
-    workflowKey: "ceo_mode"
-  },
-  {
-    label: "Find Focus",
-    description: "Top priorities with evidence and confidence.",
-    workflowKey: "focus_priorities"
-  },
-  {
-    label: "Simulate Risks",
-    description: "Likely problems before they become normal.",
-    workflowKey: "risk_simulation"
-  },
-  {
-    label: "Prepare Meeting",
-    description: "Weekly agenda, decisions, and review questions.",
-    workflowKey: "weekly_management_meeting"
-  },
-  {
-    label: "Review File",
-    description: "Analyze uploaded source material.",
-    href: "/app/sources"
-  },
-  {
-    label: "Ask Anything",
-    description: "Ask a direct question with workspace context.",
-    workflowKey: "ask_vaeroex"
-  }
-];
 const vaeroexSubmitClass =
   "min-h-11 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-blue-900/10 hover:bg-blue-950/70 hover:text-white hover:ring-1 hover:ring-vaeroex-accent/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/45 disabled:cursor-not-allowed disabled:opacity-70";
 
@@ -749,7 +712,7 @@ function RecommendationCard({
       <p className="mt-3 text-sm leading-6 text-slate-200">{recommendation.why}</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <form action={dismissRecommendationAction}>
-          <input type="hidden" name="return_path" value={`/app/ask?run=${runId}`} />
+          <input type="hidden" name="return_path" value={`/app/agents?run=${runId}`} />
           <input type="hidden" name="source_type" value="vaeroex_recommendation" />
           <input type="hidden" name="source_id" value={runId} />
           <input type="hidden" name="source_title" value={runTitle} />
@@ -1389,11 +1352,13 @@ function FailurePanel({
         <input type="hidden" name="date_range_start" value={str(extraInputs.date_range_start)} />
         <input type="hidden" name="date_range_end" value={str(extraInputs.date_range_end)} />
         <input type="hidden" name="subject" value={str(extraInputs.subject)} />
-        <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying..." activityDisabled={run.agent_type === "ask_vaeroex"}>
-          Retry
-        </PendingSubmitButton>
-        <Link href="/app/ask" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
-          Start New Analysis
+        {run.agent_type !== "ask_vaeroex" ? (
+          <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Retrying...">
+            Retry
+          </PendingSubmitButton>
+        ) : null}
+        <Link href="/app/intelligence" className="rounded-lg border border-red-300/35 bg-red-400/10 px-4 py-2 text-sm font-semibold text-red-50 hover:bg-red-400/20">
+          Open Intelligence
         </Link>
       </form>
       {canViewDebug ? (
@@ -1518,7 +1483,7 @@ function SelectedResult({
         ) : null}
 
         {canViewDebug && !debugMode ? (
-          <Link href={{ pathname: "/app/ask", query: { run: run.id, debug: "1" } }} className="inline-flex text-xs font-semibold text-muted underline">
+          <Link href={{ pathname: "/app/agents", query: { run: run.id, debug: "1" } }} className="inline-flex text-xs font-semibold text-muted underline">
             Open admin debug output
           </Link>
         ) : null}
@@ -1592,8 +1557,8 @@ function WorkflowRunForm({
 export default async function VaeroexHubPage({ searchParams }: VaeroexHubPageProps) {
   const params = await searchParams;
 
-  if (!params?.run && !params?.error && !params?.saved && !params?.debug) {
-    redirect("/app/ask");
+  if (!params?.run) {
+    redirect("/app/intelligence");
   }
 
   const { supabase, workspaceId } = await requireWorkspacePage();
@@ -1611,12 +1576,10 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
   ]);
   const runParam = typeof params?.run === "string" ? params.run : "";
   const selectedRun = runParam ? runs?.find((run) => run.id === runParam) ?? null : null;
+  if (!selectedRun) redirect("/app/intelligence");
   const selectedOutput = selectedRun ? asRecord(selectedRun.output_json) : {};
   const canViewDebug = isVaeroexAdminUser(user);
   const debugMode = params?.debug === "1";
-  const promptDefault = typeof params?.prompt === "string" ? params.prompt : "";
-  const requestedWorkflowKey = typeof params?.workflow === "string" ? params.workflow : "ask_vaeroex";
-  const selectedWorkflow = requestedWorkflowKey ? getVaeroexWorkflow(requestedWorkflowKey) : null;
   const pageErrorMessage = friendlyHubError(
     (selectedRun ? undefined : (params?.error as string | undefined)) || error?.message || folderResult.error?.message
   );
@@ -1674,74 +1637,14 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
       <PageHeader
         eyebrow="Vaeroex Results"
         title="Saved Vaeroex Result"
-        description={canViewDebug ? "Review a saved Vaeroex answer or admin diagnostic record. New questions now start in Ask Vaeroex." : "Review this saved Vaeroex answer. New questions now start in Ask Vaeroex."}
+        description={canViewDebug ? "Review a saved Vaeroex result or admin diagnostic record. Current analysis is available in Intelligence." : "Review this saved Vaeroex result. Current analysis is available in Intelligence."}
       />
 
       <ErrorNotice message={pageErrorMessage} />
       <SuccessNotice message={params?.saved as string | undefined} />
 
       <section className="space-y-6">
-        {!selectedRun ? (
-        <section className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel">
-          {selectedWorkflow ? (
-            <div className="rounded-lg border border-cyan-300/25 bg-[#071526] p-4 text-slate-100">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">Question first</p>
-                  <h3 className="mt-2 text-lg font-semibold text-white">{selectedWorkflow.title}</h3>
-                  <p className="mt-1 text-sm leading-6 text-slate-300">{selectedWorkflow.description}</p>
-                </div>
-              </div>
-              <p className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3 text-xs leading-5 text-slate-300">
-                <span className="font-semibold text-white">Data used:</span> {workflowDataUsed(selectedWorkflow.key)}
-              </p>
-              <WorkflowRunForm workflowKey={selectedWorkflow.key} defaultPrompt={promptDefault} compact />
-            </div>
-          ) : (
-            <p className="mt-4 text-sm leading-6 text-muted">
-              Choose one workflow. Vaeroex will show one focused input area, then return an answer with evidence available when you need it.
-            </p>
-          )}
-
-          <details className="mt-4 rounded-lg border border-white/10 bg-white/[0.04] p-3">
-            <summary className="cursor-pointer text-sm font-semibold text-slate-100">Change workflow</summary>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              {WORKFLOW_CHOICES.map((choice) => {
-                const isActive = selectedWorkflow?.key === choice.workflowKey;
-                const className = `rounded-lg border p-4 text-left transition ${
-                  isActive
-                    ? "border-cyan-300/60 bg-cyan-400/15 text-cyan-50"
-                    : "border-white/10 bg-[#08111f] text-slate-100 hover:border-cyan-300/45 hover:bg-blue-950/30"
-                }`;
-
-                if (choice.href) {
-                  return (
-                    <Link key={choice.label} href={choice.href} className={className}>
-                      <span className="block text-sm font-semibold">{choice.label}</span>
-                      <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
-                    </Link>
-                  );
-                }
-
-                return (
-                  <Link
-                    key={choice.label}
-                    href="/app?search=1"
-                    className={className}
-                  >
-                    <span className="block text-sm font-semibold">{choice.label}</span>
-                    <span className="mt-2 block text-xs leading-5 text-slate-400">{choice.description}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </details>
-        </section>
-        ) : null}
-
-        {selectedRun ? (
-          <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
-        ) : null}
+        <SelectedResult run={selectedRun} output={selectedOutput} canViewDebug={canViewDebug} debugMode={debugMode} />
 
         {canViewDebug ? (
           <section className="space-y-4 rounded-lg border border-white/10 bg-[#08111f] p-4">
@@ -1755,7 +1658,7 @@ export default async function VaeroexHubPage({ searchParams }: VaeroexHubPagePro
                   title="Vaeroex result records"
                   description="Admin-only execution history and diagnostics. Customer-facing business knowledge is managed in Sources → Learned Knowledge."
                   emptyTitle="No Vaeroex results yet"
-                  emptyDescription="Use Ask Vaeroex, contextual explanations, or generated outputs to create saved Vaeroex results."
+                  emptyDescription="Validated structured workflows create result records when analysis is available."
                   returnPath="/app/agents"
                   searchParams={params}
                 />

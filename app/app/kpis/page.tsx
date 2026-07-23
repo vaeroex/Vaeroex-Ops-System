@@ -2,7 +2,6 @@ import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
-import { ContextualAskVaeroex } from "@/components/ai/ContextualAskVaeroex";
 import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -1374,26 +1373,6 @@ function KpiTargetRecommendationPanel({
             Apply recommended target
           </button>
         </form>
-      </div>
-      <div className="mt-4">
-        <ContextualAskVaeroex
-          label="Explain This"
-          prompt={`Explain why ${recommendation.value} was recommended as the target for ${metricName}, which KPI evidence supports it, and what uncertainty should be considered.`}
-          contextType="kpi_recommended_target"
-          contextId={latest?.id || metricName}
-          sourceTitle={`${metricName} recommended target`}
-          sourceSummary={`Recommended target ${recommendation.value}. Current/manual target ${setting?.target ?? latest?.target ?? "not set"}. Latest value ${latest?.actual_value ?? "not set"}.`}
-          evidence={[
-            recommendation.reason,
-            recommendation.dataUsed,
-            `Date range: ${recommendation.dateRange}`,
-            `Confidence: ${recommendation.confidence === "Higher" ? "High" : recommendation.confidence}`,
-            `Limitations: ${recommendation.limitation}`,
-            `Outliers: ${recommendation.outliers}`
-          ]}
-          defaultCollapsed={false}
-          compact
-        />
       </div>
     </div>
   );

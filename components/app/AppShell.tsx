@@ -10,6 +10,7 @@ import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
 import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
 import { legalLinks } from "@/lib/legal/content";
+import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
 
 const baseNavSections = [
@@ -18,7 +19,9 @@ const baseNavSections = [
     collapsible: false,
     items: [
       { href: "/app", label: "Overview" },
-      { href: "/app/ask", label: "Ask Vaeroex" },
+      ...(isPremiumConversationalVaeroexEnabled()
+        ? [{ href: "/app/ask", label: "Ask Vaeroex" }]
+        : []),
       { href: "/app/intelligence", label: "Intelligence" },
       { href: "/app/kpis", label: "Performance" },
       { href: "/app/sources", label: "Evidence" },

@@ -218,7 +218,9 @@ const askWorkspace = read("components/app/AskVaeroexWorkspace.tsx");
 const askResponse = read("components/app/AskVaeroexResponse.tsx");
 const askSession = read("lib/search/ask-session.ts");
 const askSessionToken = read("lib/search/ask-session-token.ts");
-check(appShell.includes('href: "/app/ask"') && appShell.includes('label: "Ask Vaeroex"'), "Ask Vaeroex must have a dedicated authenticated navigation destination.");
+const conversationalPolicy = read("lib/product/conversational-vaeroex.ts");
+check(conversationalPolicy.includes('VAEROEX_CONVERSATIONAL_POLICY') && conversationalPolicy.includes('premium_conversational_v1'), "Dormant conversational access must require its dedicated server-side premium policy.");
+check(appShell.includes("isPremiumConversationalVaeroexEnabled") && appShell.includes('href: "/app/ask"'), "The future premium Ask destination must remain hidden unless its dedicated policy is enabled.");
 check(appShell.includes("GlobalSearch"), "The authenticated shell must preserve the separate global Search overlay.");
 check(globalSearch.includes("Search workspace") && globalSearch.includes("vaeroex:open-global-search"), "Global Search must remain a Search-only in-place panel.");
 check(globalSearch.includes("openSelectedResult") && globalSearch.includes("/api/search?q="), "Global Search Enter must navigate deterministic GET results.");
@@ -240,8 +242,9 @@ check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|w
 check(searchRoute.includes("business_memory_chunks") && searchRoute.includes('"Learned Knowledge"'), "Global Search or Ask must search active Learned Knowledge instead of implementation-only result records.");
 check(searchRoute.includes("shouldSearchDiagnostics") && searchRoute.includes("isVaeroexAdminUser"), "Global Search or Ask must keep execution diagnostics admin-explicit.");
 check(!/sourceType:\s*"Vaeroex Result"/.test(searchRoute), "Global Search or Ask must not expose Vaeroex Result records as ordinary customer-facing knowledge.");
-check(legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes("params.run"), "Dedicated /app/ask must render persistent analysis while preserving saved legacy result links.");
-check(agentsPage.includes('redirect("/app/ask")') && agentsPage.includes("Saved Vaeroex Result"), "Blank legacy /app/agents visits must open the dedicated Ask destination while saved runs remain readable.");
+check(legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes("isPremiumConversationalVaeroexEnabled") && legacyAskPage.includes('redirect("/app/intelligence")'), "The dormant premium Ask workspace must fail closed to Intelligence in Version 1.");
+check(legacyAskPage.includes('redirect(`/app/agents') && agentsPage.includes("Saved Vaeroex Result"), "Saved legacy result links must remain readable outside the retired Ask route.");
+check(agentsPage.includes('redirect("/app/intelligence")'), "Blank legacy result visits must return to structured Intelligence.");
 check(agentsPage.includes("canViewDebug ?") && agentsPage.includes("Admin result records"), "Legacy Vaeroex result records must be admin/debug-only outside bookmarked saved runs.");
 check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
 check(agentsPage.includes("data-vaeroex-skip-global-activity={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex form must bypass the document-level global activity submit listener.");
@@ -252,6 +255,7 @@ check(!agentsPage.includes("Evidence Summary") && !agentsPage.includes("Vaeroex 
 check(!agentsPage.includes("Generate Executive Strategy") && !agentsPage.includes("Create Improvement Plan"), "Ask Vaeroex direct-answer mode must not preemptively show generated-output action buttons.");
 
 const agentsActionsRuntime = read("app/app/agents/actions.ts");
+check(agentsActionsRuntime.includes('workflow.key === "ask_vaeroex"') && agentsActionsRuntime.includes("isPremiumConversationalVaeroexEnabled"), "Legacy Ask server actions must fail closed unless the premium conversational policy is enabled.");
 check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), "Ask Vaeroex must bound Business Memory retrieval so server actions can return.");
 check(agentsActionsRuntime.includes("withStageTimeout") && agentsActionsRuntime.includes("Business Memory retrieval"), "Ask Vaeroex must apply a stage timeout to Business Memory retrieval.");
 check(agentsActionsRuntime.includes("reducedEvidenceContext") && agentsActionsRuntime.includes("continuingWithReducedContext"), "Ask Vaeroex must continue with reduced context when Business Memory retrieval fails safely.");
@@ -275,6 +279,7 @@ check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClie
 check(vaeroexClientRuntime.includes("modelRoute") && vaeroexClientRuntime.includes("executionPath"), "Vaeroex OpenAI usage must identify model route and execution path.");
 check(vaeroexClientRuntime.includes("collectBoundedSourceIds") && vaeroexClientRuntime.includes("allowedSourceIds"), "Vaeroex output citations must be validated against bounded request evidence.");
 const contextualAskRuntime = read("app/app/contextual-ask/actions.ts");
+check(contextualAskRuntime.includes("isPremiumConversationalVaeroexEnabled"), "Contextual conversational actions must fail closed unless the premium policy is enabled.");
 check(!contextualAskRuntime.includes("buildWorkspaceSnapshot") && contextualAskRuntime.includes("buildFocusedExplanationContext"), "Contextual explanations must use selected-item context instead of a broad workspace snapshot.");
 check(contextualAskRuntime.includes('retrievalStrategy: "keyword_only"') && contextualAskRuntime.includes("maxEvidenceChunks"), "Contextual explanations must use bounded low-cost evidence retrieval.");
 const usageRuntime = read("lib/ai/usage.ts");
