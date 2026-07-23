@@ -6,7 +6,7 @@ type LegalSafetyNoticeProps = {
 };
 
 const copy = {
-  ai: "Vaeroex recommendations are advisory operational-support outputs. Review and approve them before relying on them.",
+  ai: "Vaeroex recommendations are advisory executive decision-support outputs. Review and approve them before relying on them.",
   sensitive: "Do not enter patient data, PHI/ePHI, Social Security numbers, payment card numbers, government IDs, or regulated sensitive data unless proper controls exist.",
   review: "Human review is required before Vaeroex-generated content is saved or used for important business decisions."
 };

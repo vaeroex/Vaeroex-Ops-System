@@ -21,7 +21,7 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
         <Link href="/" className="text-sm font-semibold text-vaeroex-blue">Vaeroex</Link>
         <h1 className="mt-4 text-3xl font-semibold">Contact Vaeroex support</h1>
         <p className="mt-3 text-sm leading-6 text-muted">
-          Send account, billing, setup, or Vaeroex result questions for review.
+          Send account, billing, setup, or intelligence-result questions for review.
         </p>
         <div className="mt-4 grid gap-2 rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-muted">
           <p>
@@ -48,8 +48,8 @@ export default async function PublicSupportPage({ searchParams }: SupportPagePro
           <TextInput label="Name" name="name" required />
           <TextInput label="Email" name="email" type="email" required />
           <TextInput label="Workspace" name="workspace" placeholder="Workspace name or ID" />
-          <TextInput label="Page/module" name="page_module" placeholder="Overview, Evidence, Reports, Billing..." />
-          <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Vaeroex result", "Bug or error", "Billing question", "Other"]} />
+          <TextInput label="Page/module" name="page_module" placeholder="Overview, Evidence, Saved Analyses, Billing..." />
+          <SelectInput label="Issue type" name="issue_type" required options={["Subscription access", "Workspace setup", "Intelligence result", "Bug or error", "Billing question", "Other"]} />
           <SelectInput label="Priority" name="priority" required defaultValue="Medium" options={["Low", "Medium", "High", "Urgent"]} />
           <div className="md:col-span-2">
             <TextArea label="Message" name="message" required rows={6} />

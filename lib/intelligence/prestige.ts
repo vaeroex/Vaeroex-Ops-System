@@ -449,7 +449,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       explanation: `${input.files.length} source file${input.files.length === 1 ? " is" : "s are"} available; ${dataQuality.gaps.length} evidence gap${dataQuality.gaps.length === 1 ? " remains" : "s remain"}.`,
       improved: sourceVisibilityScore >= 85 ? "Source evidence is sufficiently complete for useful review." : "Available sources provide a starting point for leadership review.",
       declined: dataQuality.gaps.length ? "Missing source context, targets, or history reduce confidence." : "No major source-context drag is visible.",
-      nextAction: "Review the top Vaeroex priority and decide whether leadership needs an executive report, meeting agenda, or improvement plan."
+      nextAction: "Review the top Vaeroex priority and decide what leadership should investigate next."
     }),
     healthCategory({
       name: "Customer Experience Health",
@@ -600,7 +600,7 @@ function buildProfitLeaks(input: PrestigeInput) {
         evidence: `${staleLeads.length} customer activity record${staleLeads.length === 1 ? "" : "s"} have no recent activity evidence.`,
         owner: "Leadership Review",
         dueDate: addDays(todayDate(), 2),
-        action: "Review customer activity evidence and decide whether leadership needs an executive report or improvement plan.",
+        action: "Review customer activity evidence and decide what leadership should validate next.",
         priority: "High",
         relatedModule: "Customer Evidence",
         href: "/app/sources"
@@ -700,7 +700,7 @@ function buildMemoryTimeline(input: PrestigeInput, focus: PrestigeAction[]) {
       title: `${kpi.name} missed target`,
       whatHappened: `${kpi.name} recorded ${formatMetric(kpi.actual_value, kpi.name)} against target ${formatMetric(kpi.target, kpi.name)}.`,
       cause: kpi.notes || "Likely connected to workload, response activity, process, or data quality changes.",
-      actionTaken: focus[0]?.action || "Review related source records and decide whether an improvement plan is needed.",
+      actionTaken: focus[0]?.action || "Review related source records and decide whether a focused investigation is needed.",
       outcome: "Outcome will be clearer after the next KPI update.",
       href: "/app/kpis"
     });
@@ -913,7 +913,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
       title: "Critical issues should show clear responsibility",
       status: openIssues.some((issue) => !issue.assigned_person_id && !issue.assigned_role && !issue.assigned_department) ? "Needs attention" : openIssues.length ? "On track" : "Missing data",
       evidence: `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} found.`,
-      recommendedAction: "Review unresolved critical issues with leadership and prepare an investigation summary if needed."
+      recommendedAction: "Review unresolved critical issues with leadership and open a focused explanation if needed."
     },
     {
       title: "Weekly reports should be generated consistently",
@@ -945,7 +945,7 @@ function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: Pr
       role: "Owner / Executive",
       title: "Owner briefing",
       summary: `Business health is ${healthScore}/100. Focus on revenue, risk, responsibility visibility, customer experience, and the top Vaeroex intelligence signals.`,
-      focus: topFocus.length ? topFocus : ["Review revenue and conversion", "Review open risks", "Generate an executive report"]
+      focus: topFocus.length ? topFocus : ["Review revenue and conversion", "Review open risks", "Review current Intelligence"]
     },
     {
       role: "Director",
@@ -968,14 +968,14 @@ function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: Pr
     {
       role: "Coordinator / Staff",
       title: "Staff briefing",
-      summary: "Focus on visible source evidence, shared reports, and checklist results.",
-      focus: ["Review Evidence", "Open shared reports", "Review checklist evidence"]
+      summary: "Focus on visible source evidence, Saved Analyses, and checklist results.",
+      focus: ["Review Evidence", "Open Saved Analyses", "Review checklist evidence"]
     },
     {
       role: "Viewer",
       title: "Viewer briefing",
-      summary: "Read-only users should review the executive summary, current risks, and recent reports.",
-      focus: ["Review dashboard", "Read latest report", "Watch current risks"]
+      summary: "Read-only users should review Business Health, current risks, and recent Saved Analyses.",
+      focus: ["Review Business Health", "Open Saved Analyses", "Watch current risks"]
     }
   ];
 }

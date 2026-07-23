@@ -60,8 +60,8 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Description of Service",
         body: [
-          "Vaeroex LLC provides Operations Intelligence, software designed to help organizations turn business information into evidence-backed understanding for leadership.",
-          "Operations Intelligence may include an Executive Overview, Business Health, KPI records, Evidence, Reports, Business Memory, evidence retrieval, and Vaeroex-generated recommendations."
+          "Vaeroex LLC builds intelligence systems, including Operations Intelligence, its flagship Executive Intelligence platform.",
+          "Operations Intelligence may include Business Health, KPI records, Intelligence, Explain Finding, Evidence, Business Memory, Saved Analyses, and evidence-backed recommendations."
         ]
       },
       {
@@ -103,7 +103,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
         title: "Customer Data Ownership",
         body: [
           "Customers retain ownership of the business records and files they enter into their workspace.",
-          "Vaeroex needs permission to process customer data to provide the platform, generate reports, support features, and operate the service."
+          "Vaeroex needs permission to process customer data to provide analyses, support platform features, and operate the service."
         ]
       },
       {
@@ -222,12 +222,12 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     sections: [
       { title: "Information We Collect", body: ["Vaeroex may collect account information, workspace data, uploaded files, usage data, support messages, and technical information needed to operate the platform."] },
       { title: "Account Information", body: ["Account information may include name, email address, authentication identifiers, and profile details entered by the user."] },
-      { title: "Workspace Data", body: ["Workspace data may include business records, KPI records, source evidence, reports, notifications, and workspace settings."] },
-      { title: "Uploaded Files", body: ["Uploaded files may be stored and processed so Vaeroex can provide file libraries, imports, analysis, reports, and historical business memory."] },
-      { title: "Usage Data", body: ["Vaeroex may collect usage data such as feature activity, report generation, Vaeroex runs, timestamps, user agent, and operational logs. IP address may be processed where available for security, audit, abuse prevention, or platform operation."] },
+      { title: "Workspace Data", body: ["Workspace data may include business records, KPI records, source evidence, saved analyses, historical service records, and workspace settings."] },
+      { title: "Uploaded Files", body: ["Uploaded files may be stored and processed so Vaeroex can provide Evidence, structured imports, analysis, and historical business context."] },
+      { title: "Usage Data", body: ["Vaeroex may collect usage data such as feature activity, analysis activity, timestamps, user agent, and operational logs. IP address may be processed where available for security, audit, abuse prevention, or platform operation."] },
       { title: "Payment Data", body: ["Payment and subscription checkout are handled through Vaeroex checkout and official Vaeroex sales channels. Vaeroex may process subscription status, customer email, order identifiers, and related billing metadata, but it does not need full payment card details to operate the workspace."] },
-      { title: "How We Use Information", body: ["Vaeroex uses information to provide the platform, maintain workspace access, generate reports, support users, improve reliability, investigate issues, protect the service, and communicate about account or support matters."] },
-      { title: "Vaeroex Processing Notice", body: ["When users ask Vaeroex for recommendations, summaries, file analysis, or reports, relevant workspace context may be sent to configured AI service providers to generate the requested output. Users should not submit sensitive or regulated data unless proper controls exist."] },
+      { title: "How We Use Information", body: ["Vaeroex uses information to provide the platform, maintain workspace access, produce requested intelligence, support users, improve reliability, investigate issues, protect the service, and communicate about account or support matters."] },
+      { title: "Vaeroex Processing Notice", body: ["When users request supported Vaeroex analyses, recommendations, summaries, or file analysis, relevant workspace context may be sent to configured AI service providers to generate the requested output. Users should not submit sensitive or regulated data unless proper controls exist."] },
       { title: "How We Share Information", body: ["Vaeroex may share information with service providers used to host, operate, process, secure, support, or improve the platform. Vaeroex may also disclose information when required by law or to protect the platform and customers."] },
       { title: "Service Providers and Subprocessors", body: ["A subprocessors list should be finalized before broad commercial launch. Examples may include hosting, database, authentication, payment, email, analytics, support, and AI infrastructure providers."] },
       { title: "Data Security", body: ["Vaeroex is designed with workspace-scoped access and role-aware controls. No service can guarantee absolute security, and customers remain responsible for account access, workspace roles, and the data they choose to enter."] },
@@ -281,11 +281,11 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   "ai-disclaimer": {
     id: "ai-disclaimer",
     title: "Vaeroex Disclaimer",
-    summary: "How to use Vaeroex-generated recommendations, summaries, reports, and analysis safely.",
+    summary: "How to use Vaeroex-generated recommendations and executive analysis safely.",
     href: "/ai-disclaimer",
     updated: LEGAL_DOCUMENT_VERSIONS.aiDisclaimer,
     sections: [
-      { title: "Operations Intelligence Support", body: ["Operations Intelligence uses AI-assisted systems to support analysis, decision support, recommendations, summaries, file reviews, and reports."] },
+      { title: "Operations Intelligence Support", body: ["Operations Intelligence uses advanced reasoning systems to support analysis, executive decision support, recommendations, and focused explanations."] },
       { title: "Possible Errors", body: ["Outputs may be incomplete, inaccurate, outdated, or unsuitable for a specific business situation."] },
       { title: "Human Review Required", body: ["Users must review Vaeroex-generated analysis before relying on it for important decisions or saving it into business records."] },
       { title: "No Professional Advice", body: ["Vaeroex does not provide legal, medical, financial, tax, insurance, employment, compliance, safety, or regulated professional advice."] },
@@ -304,7 +304,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Designed Use", body: ["Vaeroex is designed for operational business records, not regulated sensitive records."] },
       { title: "Do Not Upload or Enter", body: ["Do not upload or enter patient data, PHI/ePHI, medical record numbers, insurance IDs, Social Security numbers, payment card numbers, government IDs, highly sensitive personal data, or regulated health, legal, financial, or employment data unless appropriate legal, security, and compliance requirements are in place and Vaeroex explicitly supports that use."] },
       { title: "Customer Responsibility", body: ["Customers are responsible for understanding the laws, contracts, policies, and compliance obligations that apply to their business data."] },
-      { title: "Where This Matters", body: ["This policy applies to setup, Evidence, files, reports, support requests, Search, Ask Vaeroex, KPIs, and any other place where users enter business information."] }
+      { title: "Where This Matters", body: ["This policy applies to setup, Evidence, Saved Analyses, support requests, Search, Intelligence, KPIs, and any other place where users enter business information."] }
     ]
   },
   "subscription-billing-terms": {
@@ -342,23 +342,23 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     updated: "2026-06-19",
     sections: [
       { title: "Review Before Use", body: ["Vaeroex outputs should be reviewed by a qualified person before they are used for important business actions."] },
-      { title: "Approval Before Saving", body: ["When Vaeroex drafts reports, SOPs, checklists, KPIs, or other supporting materials, users should confirm the output before saving or implementing it."] },
+      { title: "Approval Before Saving", body: ["When Vaeroex produces recommendations, explanations, or other supporting analysis, users should confirm the output before saving or implementing it."] },
       { title: "Professional Review", body: ["For legal, medical, financial, tax, insurance, employment, compliance, safety, or regulated decisions, customers should involve qualified professionals."] }
     ]
   }
 };
 
 export const trustSections = [
-  ["Workspace Isolation", "Vaeroex uses workspace-scoped records, private workspace file paths, role-aware access checks, and Supabase Row Level Security policies to keep customer workspaces separated."],
-  ["Private File Storage", "Uploaded files are stored in a private workspace file bucket. File metadata and storage paths are scoped to the active workspace, and supported upload types are allowlisted."],
-  ["Evidence Lineage", "Eligible evidence retains its workspace, source, file, worksheet, row, and parent relationships where applicable so supporting records remain inspectable."],
-  ["Original Evidence and Derived Analysis", "Original source evidence remains distinct from generated findings and Reports. Derived analysis cannot increase original-evidence coverage or become a new fact about the business."],
-  ["Business Memory Retrieval", "Business Memory stores eligible extracted context by workspace and retrieves a bounded set relevant to the current question instead of sending every uploaded file into one long conversation."],
-  ["Prompt and Content Safeguards", "Uploaded files, OCR text, spreadsheet rows, and Business Memory are treated as untrusted evidence, not instructions. Commands embedded inside source material are not treated as user authority."],
-  ["Actions and Confirmation", "Model-influenced mutations must pass through server-side authorization, validation, workspace checks, and confirmation rules. Vaeroex does not present generated recommendations as autonomous authority."],
-  ["Archive, Restore, and Soft-Delete", "Archived or soft-deleted records are excluded from current Business Memory, Search, Ask, Business Health, Coverage, Intelligence, Reports, and Profit Leakage. Restore can return eligible records to active use."],
-  ["Audit Logging", "Security-sensitive actions, blocked model-influenced actions, billing webhook processing, admin operations, and selected support events are designed to create audit records for review."],
-  ["Server-Side Processing and AI Limits", "Model requests run server-side using Vaeroex production configuration. Customer browsers do not receive provider API keys, and generated outputs may still be incomplete or inaccurate."],
+  ["Workspace Isolation", "Customer records, files, and analyses are kept within the authorized workspace and protected by role-aware access controls."],
+  ["Secure Data Handling", "Vaeroex uses encrypted connections, private file access, and managed cloud protections to help safeguard customer information."],
+  ["Evidence-Backed Intelligence", "Supporting information remains connected to its source so leadership can inspect what each conclusion is based on."],
+  ["Deterministic Business Intelligence", "Business facts, KPI values, and Business Health calculations remain separate from executive interpretation."],
+  ["Explainable Executive Reasoning", "Vaeroex presents supported interpretation with citations, confidence, freshness, and limitations instead of hiding uncertainty."],
+  ["Source Content Safeguards", "Information inside uploaded files is treated as business content to evaluate, not as authority to change system behavior or customer records."],
+  ["Leadership Control", "Recommendations remain advisory. Authorized users review important conclusions and remain responsible for business decisions and actions."],
+  ["Current Information Controls", "Archived or deleted information is excluded from current intelligence while supported restore and retention behavior remains available."],
+  ["Accountability Records", "Selected security-sensitive, administrative, billing, and support activity is recorded to support review and investigation."],
+  ["Advanced Reasoning Boundaries", "Executive interpretation is produced through protected service connections. It may still be incomplete or inaccurate and requires human review."],
   ["Sensitive Data Boundaries", "Vaeroex is not intended for unrestricted regulated sensitive data such as PHI/ePHI, Social Security numbers, payment card numbers, government IDs, or highly sensitive personal records unless appropriate controls exist."],
   ["Current Compliance Status", "Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR certification, government certification, malware scanning certification, or absolute security."],
   ["Customer Responsibility", "Customers remain responsible for the information they upload, workspace roles they assign, legal obligations that apply to their data, and final decisions they make."],
@@ -370,7 +370,7 @@ export const releaseNotes = [
     date: "June 2026",
     title: "Operations Intelligence foundation",
     type: "Feature added",
-    body: "Vaeroex now includes the Operations Intelligence foundation: workspace setup, dashboard intelligence, KPIs, source evidence, reports, business memory, and Vaeroex recommendations."
+    body: "Vaeroex now includes the Operations Intelligence foundation: workspace setup, Business Health, KPIs, Evidence, Intelligence, Business Memory, and Saved Analyses."
   },
   {
     date: "June 2026",

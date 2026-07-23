@@ -11,21 +11,21 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Operations Intelligence Pricing | Vaeroex",
-  description: "Operations Intelligence by Vaeroex Intelligence Systems is $500 per month for a private workspace, Business Memory, KPI context, prioritized findings, and evidence-backed Reports.",
+  description: "Operations Intelligence by Vaeroex is $500 per month for a private workspace with Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses.",
   path: "/pricing"
 });
 
 const planInclusions = [
   "Private business workspace",
-  "Business Memory",
-  "Executive Overview and Business Health",
+  "Business Health and View Analysis",
+  "Prioritized Intelligence",
+  "Explain Finding",
+  "Evidence and trusted business context",
   "KPI trends and performance context",
-  "Prioritized risks and positive signals",
   "Evidence-backed recommendations",
-  "Executive Brief and Board Report",
-  "Improvement Plan and Investigation Summary",
+  "Saved Analyses",
   "Document, image, and multi-worksheet workbook analysis",
-  "Search or ask across eligible workspace evidence",
+  "Workspace Search",
   "Continuous platform improvements"
 ] as const;
 
@@ -93,8 +93,8 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
 
       <PublicPageHero
         eyebrow="Operations Intelligence by Vaeroex Intelligence Systems"
-        title="Pay for operational clarity—not another place to manage work."
-        description="One monthly subscription gives leadership a private Operations Intelligence workspace with Business Memory, performance context, prioritized findings, and evidence-backed Reports."
+        title="One subscription for executive clarity."
+        description="Give leadership a private Operations Intelligence workspace with Business Health, prioritized intelligence, focused explanations, trusted Evidence, and Saved Analyses."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.billing} className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">Billing questions</a>
         }

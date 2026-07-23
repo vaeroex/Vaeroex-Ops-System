@@ -15,7 +15,7 @@ type Filter = "all" | SavedAnalysisType;
 
 const filters: Array<{ value: Filter; label: string }> = [
   { value: "all", label: "All" },
-  { value: "executive_brief", label: "Executive Briefs" },
+  { value: "executive_brief", label: "Legacy Leadership" },
   { value: "business_health", label: "Business Health" },
   { value: "finding_explanation", label: "Finding Explanations" }
 ];
@@ -160,7 +160,7 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
       ) : (
         <div className="rounded-lg border border-dashed border-white/15 bg-[#08111f] p-6 text-center">
           <h3 className="text-base font-semibold text-white">No saved analyses match this view</h3>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Open a completed Executive Brief, Business Health analysis, or Finding Explanation and choose Save Analysis.</p>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Open a completed Business Health analysis or Finding Explanation and choose Save Analysis.</p>
         </div>
       )}
       {message ? <p className="text-sm text-slate-300" role="status">{message}</p> : null}

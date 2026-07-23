@@ -3,14 +3,11 @@ import type { Metadata } from "next";
 import {
   ArrowRight,
   Brain,
-  ChartNoAxesCombined,
-  CircleGauge,
   FileSearch2,
   FileText,
   Gauge,
   ScanSearch,
-  ShieldCheck,
-  TrendingDown
+  ShieldCheck
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
@@ -21,32 +18,31 @@ import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { operationsIntelligenceJsonLd, publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Operations Intelligence by Vaeroex",
-  description: "Operations Intelligence by Vaeroex turns business evidence into executive understanding, prioritized findings, KPI context, Business Memory, and Reports.",
+  title: "Operations Intelligence | Vaeroex Executive Intelligence Platform",
+  description: "Operations Intelligence is Vaeroex's flagship Executive Intelligence platform for Business Health, prioritized intelligence, focused explanations, Evidence, and Saved Analyses.",
   path: "/operations-intelligence"
 });
 
 const processSteps = [
-  ["Information", "Business records, source files, metrics, and observations enter a private workspace."],
-  ["Evidence", "Vaeroex preserves provenance and retrieves only the context relevant to the question."],
-  ["Understanding", "Signals are compared for change, agreement, risk, and meaningful business impact."],
-  ["Leadership review", "The result arrives with confidence, limitations, and a clear recommendation to consider."]
+  ["Connect Your Business", "Bring reports, spreadsheets, documents, KPIs, and relevant business information into one secure workspace."],
+  ["Build Trusted Business Understanding", "Vaeroex organizes information with source context so facts remain distinct from interpretation."],
+  ["Transform Information into Executive Intelligence", "Deterministic intelligence identifies current conditions, meaningful changes, and leadership priorities."],
+  ["Advanced Executive Reasoning", "Supported patterns are explained in clear business language, with uncertainty and limitations kept visible."],
+  ["Executive Clarity", "Leadership receives a concise, evidence-backed view of what matters, why it matters, and where to focus next."]
 ] as const;
 
 const capabilities = [
-  { title: "Executive Overview", body: "Business Health, Needs Attention, Positive Signal, Intelligence Readiness, and What Changed in one calm review.", icon: CircleGauge },
-  { title: "Business Health", body: "A conservative current-state signal grounded in eligible original evidence and valid history.", icon: Gauge },
-  { title: "Prioritized findings", body: "Supported risks and positive signals ranked for leadership attention with confidence and evidence.", icon: ScanSearch },
-  { title: "KPI trends", body: "Actuals, targets, freshness, and direction shown without inventing favorable or unfavorable meaning.", icon: ChartNoAxesCombined },
-  { title: "Evidence & Business Memory", body: "Source-backed organizational context that retains provenance, eligibility, and lifecycle status.", icon: Brain },
-  { title: "Reports", body: "Executive Brief, Board Report, Improvement Plan, and Investigation Summary built from eligible evidence.", icon: FileText },
-  { title: "Profit Leakage foundation", body: "Supported amounts are totaled only when independent structured evidence establishes them; otherwise the result is Not established.", icon: TrendingDown }
+  { title: "Business Health", body: "The executive summary experience: a concise current-state view with the strongest supported drivers.", icon: Gauge },
+  { title: "Intelligence", body: "Prioritized findings, risks, opportunities, and changes ranked for leadership attention.", icon: ScanSearch },
+  { title: "Explain Finding", body: "A focused investigation that explains one supported issue, why it matters, and what to examine next.", icon: FileSearch2 },
+  { title: "Evidence", body: "The trusted business information behind each conclusion remains clear and available for inspection.", icon: Brain },
+  { title: "Saved Analyses", body: "Completed analyses can be preserved for later leadership review without regenerating or rewriting them.", icon: FileText }
 ] as const;
 
 const evidenceInputs = [
-  ["Multi-worksheet workbooks", "Supported worksheets are detected and prepared independently while preserving workbook, worksheet, row, and source lineage."],
-  ["Documents and images", "Supported PDFs, documents, and images use grounded extraction before any content can enter Business Memory."],
-  ["Lifecycle-aware evidence", "Archive, restore, and soft-delete remove inactive records from current intelligence without presenting deletion as immediate database erasure."]
+  ["Connected business information", "Bring together supported spreadsheets, documents, images, KPIs, and operating records without losing their business context."],
+  ["Clear source accountability", "Supporting information remains connected to its source so leadership can inspect what each conclusion is based on."],
+  ["Current and historical perspective", "Freshness and prior periods remain visible so current conditions are not confused with outdated information."]
 ] as const;
 
 const audience = ["Owners reviewing a growing business", "CEOs and COOs connecting performance across systems", "Operations leaders preparing an evidence-backed review", "Department leaders who need context beyond one report"] as const;
@@ -61,9 +57,9 @@ export default function OperationsIntelligencePage() {
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Operations Intelligence by Vaeroex"
-        title="Turn business evidence into executive understanding."
-        description="Operations Intelligence connects fragmented business information into Business Health, meaningful change, prioritized findings, KPI context, and evidence-backed Reports without replacing the systems your organization already uses."
+        eyebrow="Operations Intelligence · A Vaeroex product"
+        title="Operations Intelligence"
+        description="Vaeroex's flagship Executive Intelligence platform helps leaders see what is happening, understand why it matters, and know what deserves attention next."
         actions={
           <>
             <StartWithVaeroexMenu />
@@ -85,8 +81,8 @@ export default function OperationsIntelligencePage() {
         <div className="mx-auto max-w-7xl">
           <PublicSectionHeading
             eyebrow="How it works"
-            title="The systems keep recording activity. Vaeroex helps leadership understand it."
-            description="A bounded evidence path turns the right information into a supported answer, without treating every record or generated output as an independent fact."
+            title="From connected business information to executive clarity."
+            description="Business facts remain facts. Advanced executive reasoning explains what the supported information means together."
           />
           <ol className="mt-8 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {processSteps.map(([title, body], index) => (
@@ -103,7 +99,7 @@ export default function OperationsIntelligencePage() {
               <span>
                 <span className="block text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Current product</span>
                 <span className="mt-2 block text-2xl font-semibold text-white">The intelligence leadership can review today.</span>
-                <span className="mt-2 block text-sm leading-6 text-slate-400">Executive Overview · Business Health · Prioritized findings · KPI trends · Evidence · Business Memory · Reports</span>
+                <span className="mt-2 block text-sm leading-6 text-slate-400">Business Health · Intelligence · Explain Finding · Evidence · Saved Analyses</span>
               </span>
               <span className="shrink-0 text-sm font-semibold text-cyan-200 group-open:hidden">Explore capabilities</span>
               <span className="hidden shrink-0 text-sm font-semibold text-cyan-200 group-open:block">Hide capabilities</span>
@@ -128,8 +124,8 @@ export default function OperationsIntelligencePage() {
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,.72fr)_minmax(0,1.28fr)]">
           <div>
             <FileSearch2 className="h-6 w-6 text-cyan-200" aria-hidden="true" />
-            <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-normal">Business information enters as evidence, not as unsupported conclusions.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-300">Operations Intelligence supports structured workbooks, documents, images, and KPIs while retaining the lineage leadership needs to inspect why a conclusion exists.</p>
+            <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-normal">Business information becomes trusted understanding, not unsupported conclusions.</h2>
+            <p className="mt-4 text-base leading-7 text-slate-300">Operations Intelligence connects supported business information while keeping its source context available for leadership review.</p>
           </div>
           <div className="divide-y divide-white/10 border-y border-white/10">
             {evidenceInputs.map(([title, body]) => (
@@ -148,10 +144,10 @@ export default function OperationsIntelligencePage() {
             <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-cyan-300/20 bg-cyan-950/25 text-cyan-100">
               <FileSearch2 className="h-5 w-5" aria-hidden="true" />
             </div>
-            <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-normal">Business Memory keeps context. Evidence keeps it accountable.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-300">Source files, structured records, and business observations retain provenance. Business Memory preserves relevant context. Generated reports and recommendations remain derived analysis rather than new original evidence.</p>
+            <h2 className="mt-5 text-3xl font-semibold leading-tight tracking-normal">Facts remain facts. Interpretation remains explainable.</h2>
+            <p className="mt-4 text-base leading-7 text-slate-300">Vaeroex preserves the distinction between business information, deterministic calculations, and the executive interpretation built from them.</p>
             <div className="mt-6 grid gap-3">
-              {["Original evidence remains identifiable", "Archived and deleted records stay excluded", "Technical failures never become business conclusions"].map((item) => (
+              {["Supporting sources remain identifiable", "Business facts stay separate from interpretation", "Technical failures never become business conclusions"].map((item) => (
                 <div key={item} className="flex items-center gap-3 text-sm text-slate-200">
                   <ShieldCheck className="h-4 w-4 shrink-0 text-emerald-200" aria-hidden="true" />
                   {item}
@@ -162,14 +158,14 @@ export default function OperationsIntelligencePage() {
 
           <div className="divide-y divide-white/10 border-y border-white/10">
             <div className="py-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Confidence & coverage</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Evidence-backed intelligence</p>
               <p className="mt-2 text-lg font-semibold text-white">Vaeroex shows what it understands—and what it does not.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Confidence grows with relevant source depth, recency, agreement, and history. Limited evidence produces limited conclusions, not invented certainty.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Confidence, freshness, supporting sources, and limitations remain visible. Limited evidence produces limited conclusions, not invented certainty.</p>
             </div>
             <div className="py-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Evidence-backed Reports</p>
-              <p className="mt-2 text-lg font-semibold text-white">The right report for the leadership review at hand.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Executive Briefs, Board Reports, Improvement Plans, and Investigation Summaries remain derived analysis and cannot increase original-evidence coverage.</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Advanced executive reasoning</p>
+              <p className="mt-2 text-lg font-semibold text-white">Explanation that adds understanding, not new facts.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-400">Executive interpretation connects supported patterns, priorities, and limitations without altering the underlying business information.</p>
             </div>
             <div className="py-5">
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">Human review</p>
@@ -202,7 +198,7 @@ export default function OperationsIntelligencePage() {
       <PublicCtaBand
         eyebrow="Operations Intelligence by Vaeroex"
         title="Give leadership a clearer basis for the next decision."
-        description="Start with one private workspace for Business Health, prioritized findings, KPI context, Evidence, Business Memory, and evidence-backed Reports."
+        description="Start with one private workspace for Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses."
         primaryHref="/pricing"
         primaryLabel="View pricing"
         secondaryHref="/contact"

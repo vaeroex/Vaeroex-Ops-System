@@ -65,7 +65,7 @@ assert.match(migration, /create unique index(?: if not exists)? reports_saved_an
 assert.match(migration, /where deleted_at is null[\s\S]+record_kind[\s\S]+saved_analysis/i);
 
 assert.match(list, /Search saved analyses/);
-for (const label of ["All", "Executive Briefs", "Business Health", "Finding Explanations"]) assert.match(list, new RegExp(label));
+for (const label of ["All", "Legacy Leadership", "Business Health", "Finding Explanations"]) assert.match(list, new RegExp(label));
 assert.match(list, /Select all visible/);
 assert.match(list, /Clear selection/);
 assert.match(list, /Delete selected/);

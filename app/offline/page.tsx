@@ -12,7 +12,7 @@ export default function OfflinePage() {
         <p className="mt-8 text-xs font-semibold uppercase tracking-[0.22em] text-vaeroex-accent">Offline</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">Vaeroex is waiting for a connection.</h1>
         <p className="mt-4 max-w-lg text-sm leading-6 text-slate-300">
-          Your device appears to be offline. Reconnect to continue using your Vaeroex workspace, reports, files, and intelligence briefing.
+          Your device appears to be offline. Reconnect to continue using your Vaeroex workspace, Saved Analyses, Evidence, and Intelligence.
         </p>
         <Link
           href="/app"

@@ -10,17 +10,17 @@ export type ReportPresentationType = NormalizedReportType | "source_review" | "s
 
 export const REPORT_FILTERS: Array<{ value: "all" | NormalizedReportType; label: string }> = [
   { value: "all", label: "All" },
-  { value: "executive_brief", label: "Executive Briefs" },
-  { value: "board_report", label: "Board Reports" },
-  { value: "improvement_plan", label: "Improvement Plans" },
-  { value: "investigation_summary", label: "Investigation Summaries" }
+  { value: "executive_brief", label: "Legacy Leadership Reports" },
+  { value: "board_report", label: "Legacy Governance Reports" },
+  { value: "improvement_plan", label: "Legacy Planning Reports" },
+  { value: "investigation_summary", label: "Legacy Investigation Reports" }
 ];
 
 const REPORT_LABELS: Record<ReportPresentationType, string> = {
-  executive_brief: "Executive Brief",
-  board_report: "Board Report",
-  improvement_plan: "Improvement Plan",
-  investigation_summary: "Investigation Summary",
+  executive_brief: "Legacy Leadership Report",
+  board_report: "Legacy Governance Report",
+  improvement_plan: "Legacy Planning Report",
+  investigation_summary: "Legacy Investigation Report",
   source_review: "Source Review",
   supporting_document: "Supporting Document"
 };

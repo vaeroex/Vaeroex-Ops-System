@@ -10,14 +10,14 @@ type DemoPageProps = {
 };
 
 const previewItems = [
-  "Executive Overview",
   "Business Health",
+  "Intelligence",
+  "Explain Finding",
+  "Evidence",
+  "Saved Analyses",
   "KPI trends",
-  "Prioritized Intelligence findings",
-  "Evidence and source lineage",
-  "Business Memory",
-  "Evidence-backed Reports",
-  "Profit Leakage foundation"
+  "Evidence-backed recommendations",
+  "Executive decision support"
 ];
 
 export default async function DemoPage({ searchParams }: DemoPageProps) {
@@ -31,7 +31,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Vaeroex Demo</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Request a Vaeroex demo.</h1>
           <p className="mt-4 text-sm leading-6 text-muted">
-            Tell us what you want to understand. Vaeroex will review your request and help you see how Operations Intelligence turns business evidence into executive understanding.
+            Tell us what leadership needs to understand. Vaeroex will help you see how Operations Intelligence turns trusted business information into executive clarity.
           </p>
           <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Operations Intelligence by Vaeroex Intelligence Systems.</p>
           <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
