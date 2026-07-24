@@ -67,7 +67,7 @@ export function ExecutiveKpiAnalysis({
         <div className="min-w-0">
           <p id="executive-kpi-analysis-title" className="text-sm font-semibold text-white">Executive KPI Analysis</p>
           <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-400">
-            Generate a bounded interpretation of the validated KPI comparison. Values, direction, confidence, and relationship status remain application-owned.
+            Understand the story behind the selected KPIs, including important patterns, possible relationships, and what leadership should investigate next.
           </p>
         </div>
         {!analysis ? (
@@ -88,7 +88,7 @@ export function ExecutiveKpiAnalysis({
           <div>
             <LoaderCircle aria-hidden="true" className="mx-auto h-6 w-6 animate-spin text-cyan-200" />
             <p className="mt-3 text-sm font-semibold text-white">Reviewing the selected KPI story</p>
-            <p className="mt-1 text-xs text-slate-400">The chart and deterministic facts remain available while this completes.</p>
+            <p className="mt-1 text-xs text-slate-400">The chart and validated KPI facts remain available while this completes.</p>
           </div>
         </div>
       ) : null}
