@@ -42,6 +42,7 @@ const {
   BUSINESS_HEALTH_GPT56_SOL_MODEL,
   BUSINESS_HEALTH_GPT56_TERRA_MODEL,
   EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID,
+  executiveKpiAnalysisReleaseChannel,
   isExecutiveKpiAnalysisEnabled,
   resolveExecutiveKpiAnalysisGenerationPolicy
 } = require("../lib/ai/providers/workflow-provider-policy.ts");
@@ -155,12 +156,20 @@ assert.equal(openExecutiveKpiAnalysisPackage(token, { workspaceId: "44444444-444
 process.env.VERCEL_ENV = "preview";
 process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
 assert.equal(isExecutiveKpiAnalysisEnabled(), true);
+assert.equal(executiveKpiAnalysisReleaseChannel(), "preview");
 const policy = resolveExecutiveKpiAnalysisGenerationPolicy({ startedAtMs: 1000, structuredOutput: { name: "test", strict: true, schema: {} } });
 assert.equal(policy.providerPolicy.id, EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID);
 assert.deepEqual(policy.providerPolicy.steps.map((step) => step.model), [BUSINESS_HEALTH_GPT56_SOL_MODEL, BUSINESS_HEALTH_GPT56_TERRA_MODEL]);
 assert.equal(policy.providerPolicy.fallbackOn.includes("unknown_signal_id"), true, "unknown KPI references must invoke the qualified Terra fallback");
 process.env.VERCEL_ENV = "production";
-assert.equal(isExecutiveKpiAnalysisEnabled(), false, "generation must remain Preview-only");
+assert.equal(isExecutiveKpiAnalysisEnabled(), true, "the approved selector must activate Production generation");
+assert.equal(executiveKpiAnalysisReleaseChannel(), "production");
+delete process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
+assert.equal(isExecutiveKpiAnalysisEnabled(), false, "Production generation must fail closed without the approved selector");
+process.env.VERCEL_ENV = "development";
+process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
+assert.equal(isExecutiveKpiAnalysisEnabled(), false, "Development must remain disabled");
+assert.equal(executiveKpiAnalysisReleaseChannel(), "development");
 
 const pageSource = read("app/app/kpis/page.tsx");
 const componentSource = read("components/intelligence/ExecutiveKpiAnalysis.tsx");
@@ -175,10 +184,11 @@ assert.doesNotMatch(componentSource, /deterministic facts/);
 assert.doesNotMatch(componentSource, /useEffect\(/, "page render must not trigger generation");
 assert.match(componentSource, /onClick=\{generate\}/, "generation must require an explicit click");
 assert.match(componentSource, /Validated KPI facts/, "deterministic fallback must remain visible on failure");
-assert.match(actionSource, /isExecutiveKpiAnalysisEnabled\(\)/, "the action must fail closed outside Preview policy");
-assert.match(actionSource, /workspaceId, fingerprint: analysisPackage\.fingerprint/, "cache lookup must be workspace and fingerprint scoped");
+assert.match(actionSource, /isExecutiveKpiAnalysisEnabled\(\)/, "the action must fail closed without the approved policy");
+assert.match(actionSource, /workspaceId,[\s\S]*fingerprint: analysisPackage\.fingerprint,[\s\S]*releaseChannel/, "cache lookup must be workspace, fingerprint, and release-channel scoped");
 assert.match(actionSource, /original_evidence_eligible: false/, "derived analysis must never become original evidence");
 assert.match(storageSource, /\.eq\("workspace_id", workspaceId\)/, "persisted artifact selection must be workspace scoped");
-assert.match(storageSource, /record\(run\.input_json\)\.fingerprint === fingerprint/, "cached artifacts must match the current fingerprint");
+assert.match(storageSource, /input\.fingerprint === fingerprint/, "cached artifacts must match the current fingerprint");
+assert.match(storageSource, /input\.release_channel === releaseChannel/, "cached artifacts must match the current server-derived release channel");
 
 console.log("Executive KPI Analysis regressions passed.");

@@ -16,7 +16,7 @@ export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
 export const EXECUTIVE_BRIEF_GPT56_POLICY_ID = "executive_brief_preview_gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
-export const EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID = "executive_kpi_analysis_preview_gpt56_sol_terra_v1" as const;
+export const EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID = "executive_kpi_analysis_gpt56_sol_terra_v1" as const;
 
 const BUSINESS_HEALTH_LEGACY_DEADLINE_MS = 26_000;
 const BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS = 10_500;
@@ -85,8 +85,14 @@ export function isFindingExplanationEnabled() {
 }
 
 export function isExecutiveKpiAnalysisEnabled() {
-  return process.env.VERCEL_ENV === "preview"
+  return (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production")
     && process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
+}
+
+export function executiveKpiAnalysisReleaseChannel(): "production" | "preview" | "development" {
+  if (process.env.VERCEL_ENV === "production") return "production";
+  if (process.env.VERCEL_ENV === "preview") return "preview";
+  return "development";
 }
 
 export function buildSynchronousExecutiveProviderPolicy({
