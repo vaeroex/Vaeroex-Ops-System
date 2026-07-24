@@ -1,6 +1,6 @@
 export const EXECUTIVE_KPI_ANALYSIS_CONTRACT_ID = "executive_kpi_analysis_v1" as const;
-export const EXECUTIVE_KPI_ANALYSIS_CONTRACT_VERSION = "executive_kpi_analysis_v1" as const;
-export const EXECUTIVE_KPI_ANALYSIS_VALIDATOR_VERSION = "executive_kpi_analysis_validator_v1" as const;
+export const EXECUTIVE_KPI_ANALYSIS_CONTRACT_VERSION = "executive_kpi_analysis_v2" as const;
+export const EXECUTIVE_KPI_ANALYSIS_VALIDATOR_VERSION = "executive_kpi_analysis_validator_v2" as const;
 
 export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
   type: "object",
@@ -18,7 +18,7 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
     significant_trends: {
       type: "array",
       minItems: 1,
-      maxItems: 4,
+      maxItems: 3,
       items: {
         type: "object",
         additionalProperties: false,
@@ -32,16 +32,16 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
     potential_kpi_relationships: {
       type: "array",
       minItems: 1,
-      maxItems: 4,
+      maxItems: 3,
       items: {
         type: "object",
         additionalProperties: false,
         required: ["metric_ordinals", "status", "statement"],
         properties: {
-          metric_ordinals: { type: "array", minItems: 2, maxItems: 2, items: { type: "integer", minimum: 1 } },
+          metric_ordinals: { type: "array", minItems: 2, maxItems: 4, items: { type: "integer", minimum: 1 } },
           status: {
             type: "string",
-            enum: ["Observed movement", "Possible relationship", "Supported correlation", "Strong supported relationship", "No meaningful relationship detected"]
+            enum: ["Pattern worth investigating", "Possible relationship", "Supported correlation", "Strong supported relationship", "No clear relationship detected"]
           },
           statement: { type: "string" }
         }
@@ -50,13 +50,13 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
     possible_business_drivers: {
       type: "array",
       minItems: 1,
-      maxItems: 3,
+      maxItems: 2,
       items: {
         type: "object",
         additionalProperties: false,
         required: ["metric_ordinals", "statement"],
         properties: {
-          metric_ordinals: { type: "array", items: { type: "integer", minimum: 1 } },
+          metric_ordinals: { type: "array", minItems: 2, maxItems: 4, items: { type: "integer", minimum: 1 } },
           statement: { type: "string" }
         }
       }
@@ -70,7 +70,7 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
     analysis_limitations: {
       type: "array",
       minItems: 1,
-      maxItems: 4,
+      maxItems: 3,
       items: { type: "string" }
     }
   }
@@ -87,7 +87,7 @@ export type ExecutiveKpiAnalysisModelOutput = Readonly<{
   significant_trends: readonly Readonly<{ metric_ordinals: readonly number[]; statement: string }>[];
   potential_kpi_relationships: readonly Readonly<{
     metric_ordinals: readonly number[];
-    status: "Observed movement" | "Possible relationship" | "Supported correlation" | "Strong supported relationship" | "No meaningful relationship detected";
+    status: "Pattern worth investigating" | "Possible relationship" | "Supported correlation" | "Strong supported relationship" | "No clear relationship detected";
     statement: string;
   }>[];
   possible_business_drivers: readonly Readonly<{ metric_ordinals: readonly number[]; statement: string }>[];
