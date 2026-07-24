@@ -47,6 +47,7 @@ const PLACEHOLDER_PATTERN = /\b(?:idk|tbd|placeholder|lorem ipsum)\b/i;
 const KPI_ORDINAL_REFERENCE_PATTERN = /\bKPI\s+(\d+)\b/gi;
 const CONDITIONAL_LANGUAGE_PATTERN = /\b(?:may|might|could|possibly|potential|suggests?|appears?|worth investigating|does not (?:show|prove|confirm|establish))\b/i;
 const CERTAINTY_PATTERN = /\b(?:proves?|guarantees?|definitely|the business will|will (?:cause|create|produce))\b/i;
+const NEGATED_CERTAINTY_PATTERN = /\b(?:does not|doesn't|cannot|can't|may not|might not|could not|not enough to)\s+(?:prove|guarantee|confirm|establish)\b/i;
 const TECHNICAL_CUSTOMER_LANGUAGE_PATTERN = /\b(?:penultimate observation|immutable ordinal|application-owned|observed movement only|contextual validation|underlying driver is not established|correlation, significance, and causation are not established)\b/i;
 const LIMITED_DATA_LANGUAGE_PATTERN = /\b(?:limited (?:history|data)|history is limited|fewer than \d+|only \d+ observations?)\b/i;
 
@@ -131,7 +132,7 @@ export function validateExecutiveKpiAnalysisOutput(
     });
   }
   const unsupportedCausation = sentences(text).find((sentence) => (
-    CERTAINTY_PATTERN.test(sentence)
+    (CERTAINTY_PATTERN.test(sentence) && !NEGATED_CERTAINTY_PATTERN.test(sentence))
     || (ASSERTIVE_CAUSATION_PATTERN.test(sentence) && !CONDITIONAL_LANGUAGE_PATTERN.test(sentence))
   ));
   if (unsupportedCausation) {
