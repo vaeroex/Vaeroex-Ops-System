@@ -5,6 +5,7 @@ import {
   EXECUTIVE_KPI_ANALYSIS_CONTRACT_ID,
   EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA,
   type ExecutiveKpiAnalysisArtifact,
+  type ExecutiveKpiAnalysisModelOutput,
   type ExecutiveKpiAnalysisPackage
 } from "@/lib/ai/executive-kpi-analysis/contracts";
 import { validateExecutiveKpiAnalysisOutput } from "@/lib/ai/executive-kpi-analysis/validation";
@@ -19,12 +20,45 @@ import type { Database, Json } from "@/lib/supabase/types";
 
 export const EXECUTIVE_KPI_ANALYSIS_SYSTEM_PROMPT = `You are Vaeroex's fixed Executive KPI Analysis synthesizer.
 Interpret only the immutable deterministic KPI package. The application owns every KPI name, value, percentage, normalized value, trend direction, directionality, period, freshness state, confidence value, relationship status, citation, and limitation.
-Use exact supplied KPI names only. Never create, rename, calculate, or reinterpret a KPI or number. Never emit citation IDs, source IDs, internal IDs, markdown, or hidden reasoning.
+Refer to every supplied metric in prose only as "KPI <ordinal>" using its immutable ordinal, such as "KPI 1". Never write, paraphrase, or rename a KPI name; application code restores the exact deterministic name after validation. Never create, calculate, or reinterpret a KPI or number. Never emit citation IDs, source IDs, internal IDs, markdown, or hidden reasoning.
 The package does not establish statistical correlation, significance, causation, or an underlying business driver unless it explicitly says otherwise. Never upgrade observed movement into correlation or causation. Use cautious language: "the selected KPIs show", "may", "the timing is consistent with", and "the evidence does not establish".
 For significant_trends and relationships, return the exact supplied KPI ordinal references that support the statement. Ordinals are structural references, not prose citations.
 For possible_business_drivers, this contract currently authorizes no driver evidence. Return exactly one item with an empty metric_ordinals array and the exact sentence: "The available evidence does not establish the underlying driver."
 Leadership considerations may recommend monitoring the supplied KPIs or investigating the underlying business records, but must not invent a cause, impact, urgency, forecast, recommendation, metric, department, or outside industry assumption.
 If movement is weak, mixed, stale, or limited, say so plainly. Return exactly one JSON object matching the supplied schema.`;
+
+const KPI_ORDINAL_REFERENCE_PATTERN = /\bKPI\s+(\d+)\b/g;
+
+function materializeStatement(statement: string, analysisPackage: ExecutiveKpiAnalysisPackage) {
+  const metricNames = new Map(analysisPackage.facts.metrics.map((metric) => [metric.ordinal, metric.name]));
+  return statement.replace(KPI_ORDINAL_REFERENCE_PATTERN, (reference, rawOrdinal: string) => (
+    metricNames.get(Number(rawOrdinal)) || reference
+  ));
+}
+
+export function materializeExecutiveKpiNames(
+  output: ExecutiveKpiAnalysisModelOutput,
+  analysisPackage: ExecutiveKpiAnalysisPackage
+): ExecutiveKpiAnalysisModelOutput {
+  const materialize = (statement: string) => materializeStatement(statement, analysisPackage);
+  return {
+    executive_summary: materialize(output.executive_summary),
+    significant_trends: output.significant_trends.map((item) => ({
+      ...item,
+      statement: materialize(item.statement)
+    })),
+    potential_kpi_relationships: output.potential_kpi_relationships.map((item) => ({
+      ...item,
+      statement: materialize(item.statement)
+    })),
+    possible_business_drivers: output.possible_business_drivers.map((item) => ({
+      ...item,
+      statement: materialize(item.statement)
+    })),
+    leadership_considerations: output.leadership_considerations.map(materialize),
+    analysis_limitations: output.analysis_limitations.map(materialize)
+  };
+}
 
 export function executiveKpiProviderAttemptTelemetry(attempt: AIProviderAttempt) {
   return {
@@ -134,13 +168,14 @@ export async function generateExecutiveKpiAnalysis({
       providerPolicyId: policy.id
     }
   });
+  const materializedAnalysis = materializeExecutiveKpiNames(generation.output, analysisPackage);
   const artifact: ExecutiveKpiAnalysisArtifact = {
     contractId: analysisPackage.contractId,
     contractVersion: analysisPackage.contractVersion,
     validatorVersion: analysisPackage.validatorVersion,
     fingerprint: analysisPackage.fingerprint,
     generatedAt: new Date().toISOString(),
-    analysis: generation.output,
+    analysis: materializedAnalysis,
     facts: analysisPackage.facts,
     citations: analysisPackage.citations,
     providerAttribution: {
