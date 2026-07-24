@@ -3,7 +3,6 @@ import { VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export type HelpCategory =
   | "Getting Started"
-  | "Operations Intelligence"
   | "Executive Intelligence"
   | "Best Practices"
   | "Legal & Compliance"
@@ -28,7 +27,6 @@ export type HelpArticle = {
 
 export const helpCategories: HelpCategory[] = [
   "Getting Started",
-  "Operations Intelligence",
   "Executive Intelligence",
   "Best Practices",
   "Legal & Compliance",
@@ -49,12 +47,12 @@ export const helpArticles: HelpArticle[] = [
     summary: "Vaeroex is an Intelligence Systems company.",
     what: "Vaeroex builds intelligence systems that transform business information into visibility, awareness, prediction, and executive action.",
     why: "Organizations often have many signals but limited structure for understanding what is happening, why it matters, what may happen next, and what action should follow.",
-    when: "Use this guide when you want the company-level explanation before learning the current Operations Intelligence product.",
-    workflow: ["Understand the Vaeroex company mission", "Review Operations Intelligence as the flagship product", "Open Trust Center before uploading data", "Use support or contact channels when needed"],
+    when: "Use this guide when you want the company-level explanation before learning the current Executive Intelligence product.",
+    workflow: ["Understand the Vaeroex company mission", "Review Executive Intelligence as the flagship product", "Open Trust Center before uploading data", "Use support or contact channels when needed"],
     mistakes: ["Treating Vaeroex as only one product screen", "Assuming outputs replace judgment", "Uploading regulated sensitive data"],
     nextLabel: "View platform",
     nextHref: "/",
-    related: ["Operations Intelligence", "Business Memory", "Trust Center"]
+    related: ["Executive Intelligence", "Business Memory", "Trust Center"]
   }),
   article({
     id: "intelligence-platform",
@@ -63,7 +61,7 @@ export const helpArticles: HelpArticle[] = [
     summary: "A platform that turns trusted business information into evidence-backed understanding and executive decision support.",
     what: "An Executive Intelligence platform connects business facts, historical context, risks, opportunities, and explainable recommendations so leaders can make better-informed decisions.",
     why: "Information alone is not intelligence. Intelligence requires context, awareness, prediction, and a path to action.",
-    when: "Use this guide when you want to understand the category that Operations Intelligence represents.",
+    when: "Use this guide when you want to understand the category that Executive Intelligence represents.",
     workflow: ["Connect business information", "Build trusted understanding", "Identify meaningful patterns", "Apply executive reasoning", "Support decisions"],
     mistakes: ["Tracking too many metrics at once", "Treating outputs as certainty", "Ignoring stale records"],
     nextLabel: "Explore platform",
@@ -73,15 +71,15 @@ export const helpArticles: HelpArticle[] = [
   article({
     id: "operations-intelligence-suite",
     category: "Getting Started",
-    title: "What is Operations Intelligence?",
+    title: "What is Executive Intelligence?",
     summary: "Vaeroex's flagship Executive Intelligence platform for Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses.",
-    what: "Operations Intelligence connects trusted business information with deterministic intelligence and advanced executive reasoning.",
+    what: "Executive Intelligence connects trusted business information with deterministic intelligence and advanced executive reasoning.",
     why: "It helps leaders understand current conditions, meaningful change, risk, opportunity, and what deserves attention next.",
     when: "Use it when leadership needs a clearer operating view, KPI context, focused explanations, and evidence-backed decision support.",
     workflow: ["Add business evidence", "Review Business Health", "Open prioritized Intelligence", "Explain a supported finding", "Save useful analyses"],
     mistakes: ["Expecting automatic decisions", "Skipping human review", "Treating limited data as complete"],
     nextLabel: "Learn more",
-    nextHref: "/operations-intelligence",
+    nextHref: "/executive-intelligence",
     related: ["Business Health Score", "Profit Leak Detection", "Recommendation Tracking"]
   }),
   article({
@@ -96,7 +94,7 @@ export const helpArticles: HelpArticle[] = [
     mistakes: ["Trying to perfect every workflow before starting", "Treating one signal as the whole picture", "Using saved analysis without review"],
     nextLabel: "Open Intelligence",
     nextHref: "/app/intelligence",
-    related: ["Operations Intelligence", "Visibility", "Action"]
+    related: ["Executive Intelligence", "Visibility", "Action"]
   }),
   article({
     id: "visibility-accountability-execution",
@@ -159,7 +157,7 @@ export const helpArticles: HelpArticle[] = [
   ].map(([id, title, summary, href]) =>
     article({
       id,
-      category: "Operations Intelligence",
+      category: "Executive Intelligence",
       title,
       summary,
       what: summary,

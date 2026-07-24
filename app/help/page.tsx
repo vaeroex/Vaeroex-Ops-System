@@ -11,7 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Help | Vaeroex Intelligence Systems",
-  description: "Find direct help for Vaeroex accounts, Operations Intelligence, Business Health, Intelligence, Explain Finding, Evidence, Saved Analyses, billing, privacy, and support.",
+  description: "Find direct help for Vaeroex accounts, Executive Intelligence, Business Health, Intelligence, Explain Finding, Evidence, Saved Analyses, billing, privacy, and support.",
   path: "/help"
 });
 
@@ -29,11 +29,11 @@ export default async function PublicHelpPage() {
   const loggedIn = await getLoggedIn();
   const workspaceHref = (loggedIn ? "/app/help" : "/login") as Route;
   const categories: HelpCategory[] = [
-    { title: "Getting started", description: "Understand the current product, pricing, and first workspace steps.", links: [{ label: "Explore Operations Intelligence", href: "/operations-intelligence" }, { label: "View pricing", href: "/pricing" }, { label: loggedIn ? "Open workspace guides" : "Login for workspace guides", href: workspaceHref }] },
+    { title: "Getting started", description: "Understand the current product, pricing, and first workspace steps.", links: [{ label: "Explore Executive Intelligence", href: "/executive-intelligence" }, { label: "View pricing", href: "/pricing" }, { label: loggedIn ? "Open workspace guides" : "Login for workspace guides", href: workspaceHref }] },
     { title: "Account and workspace", description: "Sign in, create an account, reset access, or return to workspace guidance.", links: [{ label: "Login", href: "/login" }, { label: "Create account", href: "/signup" }, { label: "Reset password", href: "/forgot-password" }] },
     { title: "Sources and evidence", description: "Learn how to add files, import structured data, and understand source status.", links: [{ label: loggedIn ? "Open evidence guides" : "Login for evidence guides", href: workspaceHref }, { label: "Review Trust Center", href: "/trust" }] },
-    { title: "Business Health", description: "Understand the executive summary, score availability, current state, drivers, and limitations.", links: [{ label: loggedIn ? "Open Business Health guide" : "Login for product guides", href: workspaceHref }, { label: "See the product", href: "/operations-intelligence" }] },
-    { title: "Intelligence and Explain Finding", description: "Learn how to review prioritized findings and open a focused explanation of one supported issue.", links: [{ label: loggedIn ? "Open Intelligence guides" : "Login for product guides", href: workspaceHref }, { label: "See the product", href: "/operations-intelligence" }] },
+    { title: "Business Health", description: "Understand the executive summary, score availability, current state, drivers, and limitations.", links: [{ label: loggedIn ? "Open Business Health guide" : "Login for product guides", href: workspaceHref }, { label: "See the product", href: "/executive-intelligence" }] },
+    { title: "Intelligence and Explain Finding", description: "Learn how to review prioritized findings and open a focused explanation of one supported issue.", links: [{ label: loggedIn ? "Open Intelligence guides" : "Login for product guides", href: workspaceHref }, { label: "See the product", href: "/executive-intelligence" }] },
     { title: "Saved Analyses", description: "Learn how to preserve and reopen completed analyses without regenerating their content.", links: [{ label: loggedIn ? "Open Saved Analyses guides" : "Login for product guides", href: workspaceHref }, { label: "Human review guidance", href: "/human-review" }] },
     { title: "Business Memory", description: "Learn how organizational context, source accountability, confidence, archive, and deletion work.", links: [{ label: loggedIn ? "Open Business Memory guide" : "Login for product guides", href: workspaceHref }, { label: "Evidence and reasoning boundaries", href: "/trust" }] },
     { title: "Billing", description: "Review pricing, subscription terms, refunds, or ask a billing question.", links: [{ label: "Pricing", href: "/pricing" }, { label: "Subscription terms", href: "/subscription-billing-terms" }, { label: "Refund policy", href: "/refund-policy" }] },
@@ -47,7 +47,7 @@ export default async function PublicHelpPage() {
       <PublicPageHero
         eyebrow="Vaeroex Intelligence Systems"
         title="Find the answer or reach the right team."
-        description="Choose the area that matches what you are trying to do. Product guidance stays close to Operations Intelligence, while billing, privacy, trust, and support resources remain available here."
+        description="Choose the area that matches what you are trying to do. Product guidance stays close to Executive Intelligence, while billing, privacy, trust, and support resources remain available here."
         actions={
           <>
             <Link href="/support" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">

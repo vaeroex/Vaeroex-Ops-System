@@ -16,7 +16,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
   return (
     <AuthShell
       title="Get Started With Vaeroex"
-      subtitle="Create your workspace and access Operations Intelligence."
+      subtitle="Create your Executive Intelligence Workspace and access the product."
     >
       <form action={signUpAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />

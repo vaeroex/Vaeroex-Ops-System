@@ -1203,7 +1203,7 @@ function DemoWorkspaceBanner({
           <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
-            Demo Workspace &mdash; operations intelligence sample data from January to current month. No real emails are sent.
+            Demo Workspace &mdash; executive intelligence sample data from January to current month. No real emails are sent.
             It includes YTD KPI movement, customer activity evidence, weak-month alerts, reports, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
           </p>
         </div>

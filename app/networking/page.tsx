@@ -92,7 +92,7 @@ export default function NetworkingPage() {
         description={`Send a concise introduction to ${VAEROEX_CONTACT_EMAILS.partners}. Include your background, organization, and the relationship you want to explore.`}
         primaryHref="/contact"
         primaryLabel="Contact Vaeroex"
-        secondaryHref="/operations-intelligence"
+        secondaryHref="/executive-intelligence"
         secondaryLabel="Understand the product"
       />
       <PublicFooter />

@@ -18,9 +18,9 @@ import { ScrollReveal } from "@/components/motion/ScrollReveal";
 import { operationsIntelligenceJsonLd, publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Operations Intelligence | Vaeroex Executive Intelligence Platform",
-  description: "Operations Intelligence is Vaeroex's flagship Executive Intelligence platform for Business Health, prioritized intelligence, focused explanations, Evidence, and Saved Analyses.",
-  path: "/operations-intelligence"
+  title: "Executive Intelligence | Vaeroex",
+  description: "Executive Intelligence is Vaeroex's flagship evidence-backed platform for Business Health, prioritized intelligence, focused explanations, Evidence, and Saved Analyses.",
+  path: "/executive-intelligence"
 });
 
 const processSteps = [
@@ -57,8 +57,8 @@ export default function OperationsIntelligencePage() {
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Operations Intelligence · A Vaeroex product"
-        title="Operations Intelligence"
+        eyebrow="Executive Intelligence · A Vaeroex product"
+        title="Executive Intelligence"
         description="Vaeroex's flagship Executive Intelligence platform helps leaders see what is happening, understand why it matters, and know what deserves attention next."
         actions={
           <>
@@ -125,7 +125,7 @@ export default function OperationsIntelligencePage() {
           <div>
             <FileSearch2 className="h-6 w-6 text-cyan-200" aria-hidden="true" />
             <h2 className="mt-4 text-3xl font-semibold leading-tight tracking-normal">Business information becomes trusted understanding, not unsupported conclusions.</h2>
-            <p className="mt-4 text-base leading-7 text-slate-300">Operations Intelligence connects supported business information while keeping its source context available for leadership review.</p>
+            <p className="mt-4 text-base leading-7 text-slate-300">Executive Intelligence connects supported business information while keeping its source context available for leadership review.</p>
           </div>
           <div className="divide-y divide-white/10 border-y border-white/10">
             {evidenceInputs.map(([title, body]) => (
@@ -196,9 +196,9 @@ export default function OperationsIntelligencePage() {
       </section>
 
       <PublicCtaBand
-        eyebrow="Operations Intelligence by Vaeroex"
+        eyebrow="Executive Intelligence by Vaeroex"
         title="Give leadership a clearer basis for the next decision."
-        description="Start with one private workspace for Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses."
+        description="Start with one private Executive Intelligence Workspace for Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses."
         primaryHref="/pricing"
         primaryLabel="View pricing"
         secondaryHref="/contact"

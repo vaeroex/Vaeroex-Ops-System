@@ -71,14 +71,14 @@ export const organizationJsonLd = {
 export const operationsIntelligenceJsonLd = {
   "@context": "https://schema.org",
   "@type": "SoftwareApplication",
-  name: "Operations Intelligence",
+  name: "Executive Intelligence",
   applicationCategory: "BusinessApplication",
   operatingSystem: "Web",
-  url: `${PUBLIC_SITE_URL}/operations-intelligence`,
+  url: `${PUBLIC_SITE_URL}/executive-intelligence`,
   publisher: {
     "@type": "Organization",
     name: "Vaeroex Intelligence Systems",
     url: PUBLIC_SITE_URL
   },
-  description: "Operations Intelligence is Vaeroex's flagship Executive Intelligence platform for Business Health, prioritized Intelligence, Explain Finding, Evidence, and Saved Analyses."
+  description: "Executive Intelligence is Vaeroex's flagship evidence-backed platform for Business Health, prioritized Intelligence, Explain Finding, Evidence, and Saved Analyses."
 };

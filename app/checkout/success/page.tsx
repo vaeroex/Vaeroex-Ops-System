@@ -20,7 +20,7 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Checkout</p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">Subscription started</h1>
           <p className="mt-4 max-w-2xl text-sm leading-6 text-muted">
-            Your Operations Intelligence subscription has been received. Create your Vaeroex account with the same email address used at checkout so Vaeroex can match your subscription access.
+            Your Executive Intelligence subscription has been received. Create your Vaeroex account with the same email address used at checkout so Vaeroex can match your subscription access.
           </p>
 
           {!hasSession ? (

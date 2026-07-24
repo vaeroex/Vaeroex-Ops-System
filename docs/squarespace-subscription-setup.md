@@ -16,9 +16,9 @@ Squarespace remains the source of truth for checkout pricing, discounts, promoti
 
 ## 2. Product Positioning
 
-Use the Vaeroex product for the complete Operations Intelligence Platform:
+Use the Vaeroex product for the complete Executive Intelligence experience:
 
-- Operations Intelligence Dashboard
+- Executive Intelligence Workspace
 - CRM
 - KPIs
 - Reports
@@ -103,7 +103,7 @@ NEXT_PUBLIC_SQUARESPACE_VAEROEX_CHECKOUT_URL=
 The app maps these current product names automatically:
 
 - Vaeroex
-- Vaeroex Operations Intelligence Platform
+- Vaeroex Executive Intelligence
 
 For backward compatibility, old legacy product names/SKUs are still accepted by the webhook and mapped to the single internal `vaeroex` plan.
 

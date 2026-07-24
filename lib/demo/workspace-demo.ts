@@ -1097,7 +1097,7 @@ async function seedVaeroexInsight(supabase: AppSupabaseClient, workspaceId: stri
       prompt: "Audit the YTD demo workspace and explain the weak months."
     } satisfies Json,
     output_json: {
-      title: "YTD Demo Operations Intelligence Review",
+      title: "YTD Demo Executive Intelligence Review",
       executive_summary:
         "Vaeroex found a realistic business pattern: January was steady, February improved, March fell below target, April recovered partially, May improved, and the current month is mixed. March revenue fell below target while response time increased, checklist completion dropped, and open issues rose.",
       problems_identified: [
@@ -1234,7 +1234,7 @@ async function seedPrestigeIntelligenceExamples(supabase: AppSupabaseClient, wor
       workspace_id: workspaceId,
       title: "Review customer response evidence",
       source_type: "prestige_demo",
-      source_title: "Vaeroex YTD Demo Operations Intelligence Review",
+      source_title: "Vaeroex YTD Demo Executive Intelligence Review",
       evidence: "Proposal-stage customer activity stalled after response time increased.",
       related_module: "Customer Evidence",
       related_kpi: "Conversion Rate",

@@ -1,6 +1,6 @@
 # Vaeroex Ops System
 
-Vaeroex Ops System is an Operations Intelligence Platform for small and mid-sized businesses.
+Vaeroex Ops System powers Vaeroex Executive Intelligence for small and mid-sized businesses.
 
 Build the structure your growth depends on.
 
@@ -83,7 +83,7 @@ Phase 5 is now implemented in the scaffold:
 
 Phase 6 is now implemented in the scaffold:
 
-- Stripe checkout for new Operations Intelligence subscriptions, with manual subscription support retained
+- Stripe checkout for new Executive Intelligence subscriptions, with manual subscription support retained
 - Subscription plans, customer subscriptions, subscription events, manual activation requests, and Vaeroex usage tracking
 - Billing-required page with manual activation request flow
 - Account subscription page with status, plan, usage, Stripe portal access when available, and contact links
@@ -187,7 +187,7 @@ VAEROEX_ADMIN_EMAILS=owner@vaeroex.com,admin@vaeroex.com
 
 ## Stripe Billing
 
-New customer checkout uses Stripe. The Pricing page sends customers to `/api/stripe/checkout`, which creates a Stripe Checkout subscription session for Operations Intelligence. Stripe returns successful purchases to `/checkout/success`, where customers are prompted to create a Vaeroex account with the same checkout email.
+New customer checkout uses Stripe. The Pricing page sends customers to `/api/stripe/checkout`, which creates a Stripe Checkout subscription session for Executive Intelligence. Stripe returns successful purchases to `/checkout/success`, where customers are prompted to create a Vaeroex account with the same checkout email.
 
 Configure these Vercel environment variables before testing live checkout:
 
@@ -198,7 +198,7 @@ STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY=
 NEXT_PUBLIC_APP_URL=https://vaeroex.com
 ```
 
-Create one Stripe product named `Operations Intelligence` with a recurring monthly price of `$399`. Use the Stripe price ID for `STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY`.
+Create one Stripe product named `Executive Intelligence` with a recurring monthly price of `$399`. Use the Stripe price ID for `STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY`.
 
 Configure the Stripe webhook endpoint to send subscription events to:
 

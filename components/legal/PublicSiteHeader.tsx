@@ -7,7 +7,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const primaryNavLinks: Array<{ href: Route; label: string }> = [
   { href: "/", label: "Home" },
-  { href: "/operations-intelligence", label: "Operations Intelligence" },
+  { href: "/executive-intelligence", label: "Executive Intelligence" },
   { href: "/pricing", label: "Pricing" },
   { href: "/trust", label: "Trust" }
 ];

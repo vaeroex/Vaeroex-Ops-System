@@ -8,7 +8,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(path.join(root, file))).digest("hex");
 
 const homepage = read("app/page.tsx");
-const operations = read("app/operations-intelligence/page.tsx");
+const operations = read("app/executive-intelligence/page.tsx");
 const pricing = read("app/pricing/page.tsx");
 const about = read("app/about/page.tsx");
 const contact = read("app/contact/page.tsx");
@@ -35,28 +35,28 @@ assert.match(homepage, /Vaeroex Intelligence Systems/, "homepage must identify t
 assert.match(homepage, /VAEROEX · INTELLIGENCE SYSTEMS/, "homepage eyebrow must use the approved company position");
 assert.match(homepage, /Transform business information into executive clarity/, "homepage must open with the approved company-led promise");
 assert.match(homepage, /visibility, awareness, prediction, and executive action/, "homepage must communicate the approved Vaeroex mission");
-assert.match(homepage, /Explore Operations Intelligence/, "homepage must use the approved flagship product action");
-assert.match(homepage, /Flagship product/, "homepage must identify Operations Intelligence as the current flagship product");
-assert.match(homepage, /Operations Intelligence by Vaeroex/, "homepage must separate the current product from the company identity");
+assert.match(homepage, /Explore Executive Intelligence/, "homepage must use the approved flagship product action");
+assert.match(homepage, /Flagship product/, "homepage must identify Executive Intelligence as the current flagship product");
+assert.match(homepage, /Executive Intelligence by Vaeroex/, "homepage must separate the current product from the company identity");
 for (const step of ["Connect Your Business", "Build Trusted Business Understanding", "Transform Information into Executive Intelligence", "Advanced Executive Reasoning", "Executive Clarity"]) {
   assert.match(homepage, new RegExp(step), `homepage How It Works must include ${step}`);
 }
 assert.match(homepage, /MarketingDashboardPreview/, "homepage must retain one believable illustrative product preview");
 assert.doesNotMatch(homepage, /CapabilityIntelligenceDemo|IntelligenceFlowDemo|IntelligenceLoopShowcase|SignalProductionDemo/, "homepage must not restore overlapping feature catalogs and lifecycle demos");
 
-assert.equal((operations.match(/<OperationsIntelligenceEngineDemo/g) || []).length, 1, "Operations Intelligence must render one interactive demo");
-assert.doesNotMatch(operations, /OperationsIntelligenceProductExperience/, "Operations Intelligence must not restore the overlapping second product demo");
-assert.match(operations, /flagship Executive Intelligence platform/, "Operations Intelligence must identify the product category");
+assert.equal((operations.match(/<OperationsIntelligenceEngineDemo/g) || []).length, 1, "Executive Intelligence must render one interactive demo");
+assert.doesNotMatch(operations, /OperationsIntelligenceProductExperience/, "Executive Intelligence must not restore the overlapping second product demo");
+assert.match(operations, /flagship Executive Intelligence platform/, "Executive Intelligence must identify the product category");
 for (const capability of ["Business Health", "Intelligence", "Explain Finding", "Evidence", "Saved Analyses"]) {
-  assert.match(operations, new RegExp(capability), `Operations Intelligence must accurately include ${capability}`);
+  assert.match(operations, new RegExp(capability), `Executive Intelligence must accurately include ${capability}`);
 }
-assert.doesNotMatch(operations, /Generated Outputs|Optional Outputs|Files & Imports|generic forecast/i, "Operations Intelligence must not expose retired product language");
+assert.doesNotMatch(operations, /Generated Outputs|Optional Outputs|Files & Imports|generic forecast/i, "Executive Intelligence must not expose retired product language");
 
 assert.match(plans, /VAEROEX_PLAN_PRICE_LABEL = "\$500\/month"/, "public subscription price must remain $500/month");
 assert.match(pricing, /VAEROEX_PLAN_PRICE_LABEL/, "pricing page must use the authoritative plan price constant");
 assert.doesNotMatch(pricing, /10 Users Included|1 Workspace Included/, "pricing must not return to seat-limit positioning");
 
-for (const label of ["Home", "Operations Intelligence", "Pricing", "Trust", "Company"]) {
+for (const label of ["Home", "Executive Intelligence", "Pricing", "Trust", "Company"]) {
   assert.match(header, new RegExp(label), `public navigation must include ${label}`);
 }
 assert.match(header, /Open navigation menu/, "public header must provide one concise mobile menu control");
@@ -67,7 +67,7 @@ assert.match(footer, /Vaeroex Intelligence Systems/, "footer must use company po
 assert.match(footer, /Vaeroex LLC/, "footer must preserve the legal company name");
 
 assert.match(about, /Vaeroex Intelligence Systems/, "About must remain focused on the company");
-assert.match(about, /Operations Intelligence is the flagship Vaeroex product available today/, "About must identify the current product without naming unreleased products");
+assert.match(about, /Executive Intelligence is the flagship Vaeroex product available today/, "About must identify the current product without naming unreleased products");
 assert.doesNotMatch(about, /consulting agency|operations consulting/, "About must not restore consulting-era positioning");
 assert.match(careers, /not currently listing open positions/i, "Careers must honestly state that no positions are currently listed");
 assert.match(contact, /Vaeroex Intelligence Systems/, "Contact must use the company identity");
@@ -99,6 +99,7 @@ assert.match(futureDomains, /permanentRedirect\("\/about"\)/, "legacy future-dom
 assert.doesNotMatch(futureDomains, /Governance|Industrial Intelligence|Infrastructure Intelligence|Security Intelligence|Organizational Intelligence/, "unreleased product categories must not remain public");
 assert.match(globals, /prefers-reduced-motion: reduce/, "motion must honor reduced-motion preferences");
 assert.match(redirects, /source: "\/network"[^\n]+destination: "\/networking"/, "legacy /network route must resolve to the authoritative Network page");
+assert.match(redirects, /source: "\/operations-intelligence"[^\n]+destination: "\/executive-intelligence"[^\n]+statusCode: 301/, "the previous product URL must permanently redirect to Executive Intelligence");
 
 const publicSources = [homepage, operations, pricing, about, contact, network, careers, help, demo, header, footer, trust, trustContent, seo, plans, savedAnalysisList, savedAnalysisPresentation, legacyReportPresentation].join("\n");
 assert.doesNotMatch(publicSources, /Hourly Consulting|Full Support Retainer|operations consulting agency/i, "current public experience must not expose legacy consulting offers");

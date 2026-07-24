@@ -16,7 +16,7 @@ Vaeroex Ops System is ready for a limited beta after manual testing passes. It i
 
 ## Billing Flow
 
-- Stripe Checkout is now the new-customer subscription path for Operations Intelligence.
+- Stripe Checkout is now the new-customer subscription path for Executive Intelligence.
 - Existing Squarespace and manual subscription records remain supported for legacy and admin workflows.
 - Stripe products, prices, webhooks, portal settings, and live event handling still need production verification.
 - Live Squarespace webhook payloads still need to be verified against real Squarespace order/subscription events.
