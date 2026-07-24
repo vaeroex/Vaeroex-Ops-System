@@ -33,6 +33,7 @@ Module._load = function loadPatched(request, parent, isMain) {
 
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-executive-kpi-analysis-secret";
 const { buildExecutiveKpiAnalysisPackage } = require("../lib/ai/executive-kpi-analysis/context.ts");
+const { EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA } = require("../lib/ai/executive-kpi-analysis/contracts.ts");
 const { validateExecutiveKpiAnalysisOutput } = require("../lib/ai/executive-kpi-analysis/validation.ts");
 const { sealExecutiveKpiAnalysisPackage, openExecutiveKpiAnalysisPackage } = require("../lib/ai/executive-kpi-analysis/token.ts");
 const {
@@ -112,6 +113,8 @@ assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summ
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: "Checkout Wait caused Revenue to decline, which proves the business impact is established." }, analysisPackage).diagnostic?.reasonCode, "unsupported_inference", "causation must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, potential_kpi_relationships: [{ ...validOutput.potential_kpi_relationships[0], status: "Supported correlation" }] }, analysisPackage).diagnostic?.reasonCode, "unsupported_relationship", "unavailable correlation must not be upgraded");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, significant_trends: [validOutput.significant_trends[0]] }, analysisPackage).diagnostic?.reasonCode, "missing_required_signal", "required KPI coverage must be enforced");
+assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, potential_kpi_relationships: [{ ...validOutput.potential_kpi_relationships[0], metric_ordinals: [1, 1] }] }, analysisPackage).diagnostic?.reasonCode, "unknown_signal_id", "duplicate KPI ordinals must remain rejected contextually");
+assert.doesNotMatch(JSON.stringify(EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA), /uniqueItems/, "provider schema must use only supported strict-schema keywords");
 
 const token = sealExecutiveKpiAnalysisPackage({ analysisPackage, workspaceId, userId, nowMs: 1000 });
 assert.equal(openExecutiveKpiAnalysisPackage(token, { workspaceId, userId }, 2000).ok, true);
