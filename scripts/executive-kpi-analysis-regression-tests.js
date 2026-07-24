@@ -123,6 +123,11 @@ assert.equal(validateExecutiveKpiAnalysisOutput({ ...ordinalOutput, executive_su
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} The value will be 999.` }, analysisPackage).diagnostic?.reasonCode, "numeric_integrity_failed", "unsupported numbers must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} Churn Rate also declined.` }, analysisPackage).diagnostic?.reasonCode, "unknown_signal_id", "invented KPI names must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: "Checkout Wait caused Revenue to decline, which proves the business impact is established." }, analysisPackage).diagnostic?.reasonCode, "unsupported_inference", "causation must fail");
+assert.equal(validateExecutiveKpiAnalysisOutput({
+  ...validOutput,
+  executive_summary: "Checkout Wait increased while Revenue declined, creating a visible pattern. The available history does not prove that Checkout Wait caused Revenue to decline.",
+  analysis_limitations: ["The selected history should be treated as an early signal rather than a final conclusion."]
+}, analysisPackage).ok, true, "a plain-language negated causation limitation must remain valid");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, possible_business_drivers: [{ metric_ordinals: [1, 2], statement: "Checkout Wait caused Revenue to decline across the selected period." }] }, analysisPackage).diagnostic?.reasonCode, "unsupported_inference", "business drivers must not assert causation");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, possible_business_drivers: [{ metric_ordinals: [1, 2], statement: "Checkout Wait may be connected to Revenue and is worth investigating." }] }, analysisPackage).ok, true, "bounded conditional business relationships may be described");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, potential_kpi_relationships: [{ ...validOutput.potential_kpi_relationships[0], status: "Supported correlation" }] }, analysisPackage).diagnostic?.reasonCode, "unsupported_relationship", "unavailable correlation must not be upgraded");
