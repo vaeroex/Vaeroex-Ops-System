@@ -93,22 +93,24 @@ assert.notEqual(build({ trends: [trend("Checkout Wait", [3.5, 4.8, 7.1], "lower"
 assert.notEqual(build({ trends: [trend("Checkout Wait", [3.5, 4.8, 6.2], "higher"), trend("Revenue", [7000, 6900, 6800], "higher")] }).fingerprint, analysisPackage.fingerprint, "directionality changes must invalidate cache");
 
 const validOutput = {
-  executive_summary: "Checkout Wait increased while Revenue declined across the selected period, so leadership has an opposing movement to investigate without assuming a cause.",
+  executive_summary: "Checkout Wait increased while Revenue declined, creating a visible pattern that deserves leadership attention. The timing suggests a possible relationship worth investigating.",
   significant_trends: [
-    { metric_ordinals: [1], statement: "Checkout Wait moved upward across the selected period and its explicit direction makes that movement less favorable." },
-    { metric_ordinals: [2], statement: "Revenue moved downward across the selected period and its explicit direction makes that movement less favorable." }
+    { metric_ordinals: [1, 2], statement: "Checkout Wait climbed as Revenue declined, so the selected KPIs tell one opposing business story across the period." }
   ],
   potential_kpi_relationships: [{
     metric_ordinals: [1, 2],
-    status: "Possible relationship",
-    statement: "The measures moved in opposite directions during the same selected period, but the available evidence does not establish why."
+    status: "Pattern worth investigating",
+    statement: "The timing suggests these opposing movements may be connected and should be monitored together."
   }],
-  possible_business_drivers: [{ metric_ordinals: [], statement: "The available evidence does not establish the underlying driver." }],
-  leadership_considerations: ["Leadership should review the underlying business records before making a decision based on this movement alone."],
-  analysis_limitations: ["The comparison does not establish statistical correlation, significance, or causation between the selected measures."]
+  possible_business_drivers: [{ metric_ordinals: [1, 2], statement: "The pattern may point to a shared business condition worth investigating in the underlying records." }],
+  leadership_considerations: ["Leadership should investigate the records behind Checkout Wait first, then monitor whether Revenue changes as the wait trend changes."],
+  analysis_limitations: ["The history is limited, so these movements may be connected but are not enough to confirm correlation or causation."]
 };
 const validResult = validateExecutiveKpiAnalysisOutput(validOutput, analysisPackage);
 assert.equal(validResult.ok, true, `grounded output should pass: ${JSON.stringify(validResult)}`);
+assert.equal(validOutput.significant_trends.length, 1, "a visible pattern may group related KPI trends");
+assert.equal(validOutput.potential_kpi_relationships[0].status, "Pattern worth investigating");
+assert.equal((JSON.stringify(validOutput).match(/correlation or causation/g) || []).length, 1, "limited-data disclosure should appear once");
 const ordinalOutput = JSON.parse(JSON.stringify(validOutput)
   .replaceAll("Checkout Wait", "KPI 1")
   .replaceAll("Revenue", "KPI 2"));
@@ -121,9 +123,24 @@ assert.equal(validateExecutiveKpiAnalysisOutput({ ...ordinalOutput, executive_su
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} The value will be 999.` }, analysisPackage).diagnostic?.reasonCode, "numeric_integrity_failed", "unsupported numbers must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} Churn Rate also declined.` }, analysisPackage).diagnostic?.reasonCode, "unknown_signal_id", "invented KPI names must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: "Checkout Wait caused Revenue to decline, which proves the business impact is established." }, analysisPackage).diagnostic?.reasonCode, "unsupported_inference", "causation must fail");
+assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, possible_business_drivers: [{ metric_ordinals: [1, 2], statement: "Checkout Wait caused Revenue to decline across the selected period." }] }, analysisPackage).diagnostic?.reasonCode, "unsupported_inference", "business drivers must not assert causation");
+assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, possible_business_drivers: [{ metric_ordinals: [1, 2], statement: "Checkout Wait may be connected to Revenue and is worth investigating." }] }, analysisPackage).ok, true, "bounded conditional business relationships may be described");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, potential_kpi_relationships: [{ ...validOutput.potential_kpi_relationships[0], status: "Supported correlation" }] }, analysisPackage).diagnostic?.reasonCode, "unsupported_relationship", "unavailable correlation must not be upgraded");
-assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, significant_trends: [validOutput.significant_trends[0]] }, analysisPackage).diagnostic?.reasonCode, "missing_required_signal", "required KPI coverage must be enforced");
+assert.equal(validateExecutiveKpiAnalysisOutput({
+  ...validOutput,
+  significant_trends: [{ metric_ordinals: [1], statement: "Checkout Wait climbed across the selected period and deserves leadership attention." }]
+}, analysisPackage).diagnostic?.reasonCode, "missing_required_signal", "required KPI coverage must remain enforced");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, potential_kpi_relationships: [{ ...validOutput.potential_kpi_relationships[0], metric_ordinals: [1, 1] }] }, analysisPackage).diagnostic?.reasonCode, "unknown_signal_id", "duplicate KPI ordinals must remain rejected contextually");
+assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} This uses an immutable ordinal.` }, analysisPackage).diagnostic?.reasonCode, "contextual_validation_failed", "technical internal terminology must not reach customers");
+assert.equal(validateExecutiveKpiAnalysisOutput({
+  ...validOutput,
+  potential_kpi_relationships: [{ ...validOutput.potential_kpi_relationships[0], statement: "The measures may be connected, but correlation or causation is not established." }]
+}, analysisPackage).diagnostic?.reasonCode, "contextual_validation_failed", "relationship caveats must not be repeated across sections");
+assert.equal(validateExecutiveKpiAnalysisOutput({
+  ...validOutput,
+  executive_summary: `${validOutput.executive_summary} The history is limited.`,
+  analysis_limitations: ["Limited history means the visible pattern should be treated as an early signal."]
+}, analysisPackage).diagnostic?.reasonCode, "contextual_validation_failed", "limited-data disclosure must not be repeated across sections");
 assert.doesNotMatch(JSON.stringify(EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA), /uniqueItems/, "provider schema must use only supported strict-schema keywords");
 
 const token = sealExecutiveKpiAnalysisPackage({ analysisPackage, workspaceId, userId, nowMs: 1000 });
@@ -147,6 +164,9 @@ const storageSource = read("lib/ai/executive-kpi-analysis/storage.ts");
 assert.match(pageSource, /<OverlayTrendChart trends=\{trends\} mode=\{mode\} \/>/, "the existing chart must remain mounted unchanged");
 assert.doesNotMatch(pageSource, />Comparison summary</, "the old visible comparison summary must be retired");
 assert.match(componentSource, /Generate Executive Analysis/);
+assert.match(componentSource, /Understand the story behind the selected KPIs/);
+assert.doesNotMatch(componentSource, /application-owned/);
+assert.doesNotMatch(componentSource, /deterministic facts/);
 assert.doesNotMatch(componentSource, /useEffect\(/, "page render must not trigger generation");
 assert.match(componentSource, /onClick=\{generate\}/, "generation must require an explicit click");
 assert.match(componentSource, /Validated KPI facts/, "deterministic fallback must remain visible on failure");
