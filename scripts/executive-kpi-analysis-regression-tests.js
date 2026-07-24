@@ -126,6 +126,7 @@ assert.equal(isExecutiveKpiAnalysisEnabled(), true);
 const policy = resolveExecutiveKpiAnalysisGenerationPolicy({ startedAtMs: 1000, structuredOutput: { name: "test", strict: true, schema: {} } });
 assert.equal(policy.providerPolicy.id, EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID);
 assert.deepEqual(policy.providerPolicy.steps.map((step) => step.model), [BUSINESS_HEALTH_GPT56_SOL_MODEL, BUSINESS_HEALTH_GPT56_TERRA_MODEL]);
+assert.equal(policy.providerPolicy.fallbackOn.includes("unknown_signal_id"), true, "unknown KPI references must invoke the qualified Terra fallback");
 process.env.VERCEL_ENV = "production";
 assert.equal(isExecutiveKpiAnalysisEnabled(), false, "generation must remain Preview-only");
 
