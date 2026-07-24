@@ -15,7 +15,10 @@ import {
 import { openExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysis/token";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
-import { isExecutiveKpiAnalysisEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import {
+  executiveKpiAnalysisReleaseChannel,
+  isExecutiveKpiAnalysisEnabled
+} from "@/lib/ai/providers/workflow-provider-policy";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
@@ -60,6 +63,7 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
   if (!isExecutiveKpiAnalysisEnabled()) {
     return { status: "unavailable", artifact: null, message: "Executive KPI Analysis is not enabled in this environment." };
   }
+  const releaseChannel = executiveKpiAnalysisReleaseChannel();
   const supabase = await createSupabaseServerClient();
   if (!supabase) return { status: "unavailable", artifact: null, message: SAFE_FAILURE_MESSAGE };
   const { data: { user } } = await supabase.auth.getUser();
@@ -84,7 +88,12 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
   if (usableMetrics.length < 2) {
     return { status: "insufficient_evidence", artifact: null, message: "Select at least two KPIs with comparable history to generate an executive analysis." };
   }
-  const cached = await findCurrentExecutiveKpiAnalysisArtifact({ supabase, workspaceId, fingerprint: analysisPackage.fingerprint }).catch(() => null);
+  const cached = await findCurrentExecutiveKpiAnalysisArtifact({
+    supabase,
+    workspaceId,
+    fingerprint: analysisPackage.fingerprint,
+    releaseChannel
+  }).catch(() => null);
   if (cached) return { status: "current", artifact: cached, message: null };
 
   const usageLimit = await isUsageLimitReached({
@@ -108,7 +117,12 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
     strict: true
   }).catch(() => null);
   if (!claim?.allowed) {
-    const completed = await findCurrentExecutiveKpiAnalysisArtifact({ supabase, workspaceId, fingerprint: analysisPackage.fingerprint }).catch(() => null);
+    const completed = await findCurrentExecutiveKpiAnalysisArtifact({
+      supabase,
+      workspaceId,
+      fingerprint: analysisPackage.fingerprint,
+      releaseChannel
+    }).catch(() => null);
     return completed
       ? { status: "current", artifact: completed, message: null }
       : { status: "unavailable", artifact: null, message: "This comparison is already being analyzed. Try again shortly." };
@@ -131,6 +145,7 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
         contract_version: analysisPackage.contractVersion,
         validator_version: analysisPackage.validatorVersion,
         fingerprint: analysisPackage.fingerprint,
+        release_channel: releaseChannel,
         metric_count: analysisPackage.facts.metrics.length,
         source_count: analysisPackage.citations.length,
         evidence_classification: "derived_analysis",

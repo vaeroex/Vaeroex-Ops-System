@@ -113,11 +113,13 @@ export function executiveKpiAnalysisArtifactForView(artifact: ExecutiveKpiAnalys
 export async function findCurrentExecutiveKpiAnalysisArtifact({
   supabase,
   workspaceId,
-  fingerprint
+  fingerprint,
+  releaseChannel
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   fingerprint: string;
+  releaseChannel: "production" | "preview" | "development";
 }) {
   const { data, error } = await supabase
     .from("ai_agent_runs")
@@ -131,7 +133,10 @@ export async function findCurrentExecutiveKpiAnalysisArtifact({
     .limit(30);
   if (error) throw new Error("Executive KPI Analysis history is unavailable.");
   const artifact = (data || [])
-    .filter((run) => record(run.input_json).fingerprint === fingerprint)
+    .filter((run) => {
+      const input = record(run.input_json);
+      return input.fingerprint === fingerprint && input.release_channel === releaseChannel;
+    })
     .map((run) => parseExecutiveKpiAnalysisArtifact(run.output_json))
     .find((candidate): candidate is ExecutiveKpiAnalysisArtifact => Boolean(candidate)) || null;
   return artifact ? executiveKpiAnalysisArtifactForView(artifact) : null;

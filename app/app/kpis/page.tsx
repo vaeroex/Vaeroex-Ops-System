@@ -16,7 +16,10 @@ import { buildExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysi
 import type { ExecutiveKpiAnalysisState } from "@/lib/ai/executive-kpi-analysis/contracts";
 import { findCurrentExecutiveKpiAnalysisArtifact } from "@/lib/ai/executive-kpi-analysis/storage";
 import { trySealExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysis/token";
-import { isExecutiveKpiAnalysisEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import {
+  executiveKpiAnalysisReleaseChannel,
+  isExecutiveKpiAnalysisEnabled
+} from "@/lib/ai/providers/workflow-provider-policy";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
@@ -1743,7 +1746,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   let executiveKpiAnalysisState: ExecutiveKpiAnalysisState = {
     status: "unavailable",
     artifact: null,
-    message: "Executive KPI Analysis is available only in the qualified Preview environment."
+    message: "Executive KPI Analysis is not enabled in this environment."
   };
   let executiveKpiAnalysisToken: string | null = null;
   if (activeSection === "compare") {
@@ -1778,12 +1781,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         message: "Select at least two KPIs with comparable history to generate an executive analysis."
       };
     } else if (isExecutiveKpiAnalysisEnabled()) {
+      const releaseChannel = executiveKpiAnalysisReleaseChannel();
       const [{ data: { user } }, cached] = await Promise.all([
         supabase.auth.getUser(),
         findCurrentExecutiveKpiAnalysisArtifact({
           supabase,
           workspaceId,
-          fingerprint: analysisPackage.fingerprint
+          fingerprint: analysisPackage.fingerprint,
+          releaseChannel
         }).catch(() => null)
       ]);
       executiveKpiAnalysisState = cached
