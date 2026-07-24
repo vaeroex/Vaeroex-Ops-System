@@ -24,7 +24,7 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
         additionalProperties: false,
         required: ["metric_ordinals", "statement"],
         properties: {
-          metric_ordinals: { type: "array", minItems: 1, uniqueItems: true, items: { type: "integer", minimum: 1 } },
+          metric_ordinals: { type: "array", minItems: 1, items: { type: "integer", minimum: 1 } },
           statement: { type: "string" }
         }
       }
@@ -38,7 +38,7 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
         additionalProperties: false,
         required: ["metric_ordinals", "status", "statement"],
         properties: {
-          metric_ordinals: { type: "array", minItems: 2, maxItems: 2, uniqueItems: true, items: { type: "integer", minimum: 1 } },
+          metric_ordinals: { type: "array", minItems: 2, maxItems: 2, items: { type: "integer", minimum: 1 } },
           status: {
             type: "string",
             enum: ["Observed movement", "Possible relationship", "Supported correlation", "Strong supported relationship", "No meaningful relationship detected"]
@@ -56,7 +56,7 @@ export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
         additionalProperties: false,
         required: ["metric_ordinals", "statement"],
         properties: {
-          metric_ordinals: { type: "array", uniqueItems: true, items: { type: "integer", minimum: 1 } },
+          metric_ordinals: { type: "array", items: { type: "integer", minimum: 1 } },
           statement: { type: "string" }
         }
       }
