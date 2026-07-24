@@ -6,7 +6,7 @@ Your Vaeroex subscription is active.
 
 ## Body
 
-Next, create your Vaeroex account using the same email you used at checkout. This helps us connect your subscription to your Operations Intelligence workspace.
+Next, create your Vaeroex account using the same email you used at checkout. This helps us connect your subscription to your Executive Intelligence Workspace.
 
 ## Button
 

@@ -14,7 +14,7 @@ export function LegalAcceptanceGate({
       <p className="text-sm font-semibold uppercase tracking-[0.18em] text-vaeroex-blue">Required Review</p>
       <h2 className="mt-2 text-2xl font-semibold tracking-tight">Review Vaeroex policies before continuing.</h2>
       <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-        Operations Intelligence is Vaeroex&apos;s Executive Intelligence platform. Before normal workspace access, please confirm that you understand the customer responsibilities,
+        Executive Intelligence is Vaeroex&apos;s flagship evidence-backed platform. Before normal workspace access, please confirm that you understand the customer responsibilities,
         human-review requirement, and sensitive-data policy.
       </p>
       <div className="mt-4 rounded-lg border border-line bg-slate-50 p-4 text-sm leading-6 text-slate-600">

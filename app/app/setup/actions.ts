@@ -85,7 +85,7 @@ The process is complete when the outcome is documented and leadership can review
 
 function buildVaeroexAuditSummary(companyName: string, mainProblem: string, organizationDescription: string, environmentName: string) {
   return {
-    title: "Vaeroex Operations Intelligence Review",
+    title: "Vaeroex Executive Intelligence Review",
     generated_by: "Vaeroex",
     business_summary: `${companyName} is configured as a ${environmentName} environment. ${
       organizationDescription || "The organization"

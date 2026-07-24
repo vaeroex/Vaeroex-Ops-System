@@ -21,7 +21,7 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
       <PageHeader
         eyebrow="Help Center"
         title="Vaeroex customer education"
-        description="Guides for Operations Intelligence, trust, legal safety, billing, and support."
+        description="Guides for Executive Intelligence, trust, legal safety, billing, and support."
         actions={
           <>
             <Link href="/app/support" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">Contact Support</Link>
@@ -99,7 +99,7 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
       {!query && !selectedCategory ? (
         <div className="space-y-6">
           {helpCategories.map((category) => {
-            const articles = articlesByCategory(category).slice(0, category === "Operations Intelligence" || category === "Executive Intelligence" ? 8 : 4);
+            const articles = articlesByCategory(category).slice(0, category === "Executive Intelligence" ? 8 : 4);
 
             return (
               <SectionCard key={category} title={category} description="Open a guide for plain-English workflows, common mistakes, and next steps.">

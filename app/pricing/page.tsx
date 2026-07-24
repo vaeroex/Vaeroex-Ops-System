@@ -10,8 +10,8 @@ import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emai
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Operations Intelligence Pricing | Vaeroex",
-  description: "Operations Intelligence by Vaeroex is $500 per month for a private workspace with Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses.",
+  title: "Executive Intelligence Pricing | Vaeroex",
+  description: "Vaeroex Executive Intelligence is $500 per month for a private workspace with Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses.",
   path: "/pricing"
 });
 
@@ -47,7 +47,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
   const planCard = (
     <article className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#07111f] shadow-command">
       <div className="border-b border-white/10 p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Operations Intelligence</p>
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Executive Intelligence</p>
         <p className="mt-2 text-xs font-medium text-slate-500">by Vaeroex Intelligence Systems</p>
         <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
           <h2 className="text-2xl font-semibold text-white">One complete workspace</h2>
@@ -92,9 +92,9 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Operations Intelligence by Vaeroex Intelligence Systems"
+        eyebrow="Executive Intelligence by Vaeroex Intelligence Systems"
         title="One subscription for executive clarity."
-        description="Give leadership a private Operations Intelligence workspace with Business Health, prioritized intelligence, focused explanations, trusted Evidence, and Saved Analyses."
+        description="Give leadership a private Executive Intelligence Workspace with Business Health, prioritized intelligence, focused explanations, trusted Evidence, and Saved Analyses."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.billing} className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">Billing questions</a>
         }
@@ -155,11 +155,11 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       </section>
 
       <PublicCtaBand
-        eyebrow="Operations Intelligence by Vaeroex"
-        title="Start with one private Operations Intelligence workspace."
+        eyebrow="Executive Intelligence by Vaeroex"
+        title="Start with one private Executive Intelligence Workspace."
         description="Bring together the evidence leadership already relies on and review what changed, what matters, and what needs attention next."
         primaryHref="/api/stripe/checkout"
-        secondaryHref="/operations-intelligence"
+        secondaryHref="/executive-intelligence"
         secondaryLabel="Explore the product"
       />
       <PublicFooter />

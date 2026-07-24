@@ -39,7 +39,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
           <div className="pointer-events-none absolute inset-y-8 right-0 w-px bg-gradient-to-b from-transparent via-vaeroex-blue/60 to-transparent" />
           <Link href="/" className="relative inline-flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.055] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur">
             <VaeroexLogo variant="full" size="lg" priority />
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Operations Intelligence Platform</span>
+            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-vaeroex-accent">Executive Intelligence</span>
           </Link>
           <div className="relative mt-12 max-w-2xl">
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-vaeroex-accent">Vaeroex Access Terminal</p>
@@ -75,7 +75,7 @@ export function AuthShell({ title, subtitle, children }: AuthShellProps) {
             <div className="mb-5 flex justify-center">
               <VaeroexLogo variant="full" size="hero" priority className="max-w-full" />
             </div>
-            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-vaeroex-blue">Operations Intelligence Platform</p>
+            <p className="text-sm font-semibold uppercase tracking-[0.2em] text-vaeroex-blue">Executive Intelligence</p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight">{title}</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">{subtitle}</p>
           </div>

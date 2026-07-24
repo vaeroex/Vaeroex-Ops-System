@@ -9,7 +9,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Contact Vaeroex Intelligence Systems",
-  description: "Contact Vaeroex Intelligence Systems about Operations Intelligence, product questions, support, billing, or strategic relationships.",
+  description: "Contact Vaeroex Intelligence Systems about Executive Intelligence, product questions, support, billing, or strategic relationships.",
   path: "/contact"
 });
 
@@ -35,7 +35,7 @@ export default async function ContactPage({ searchParams }: ContactPageProps) {
       <PublicPageHero
         eyebrow="Vaeroex Intelligence Systems"
         title="Tell us what you want to understand."
-        description="Use the form for Operations Intelligence questions, a product walkthrough, support, billing, or a strategic conversation. Your request goes to the appropriate Vaeroex contact."
+        description="Use the form for Executive Intelligence questions, a product walkthrough, support, billing, or a strategic conversation. Your request goes to the appropriate Vaeroex contact."
       />
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">

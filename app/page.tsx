@@ -40,7 +40,7 @@ const intelligencePath = [
 const differences = [
   ["Facts first. Reasoning second.", "Deterministic business facts remain separate from the interpretation that explains what they mean together."],
   ["Clarity before automation", "Vaeroex is designed to strengthen leadership judgment, not act as an autonomous operator."],
-  ["One flagship platform, broader systems mission", "Operations Intelligence is available today. Vaeroex is building intelligence systems for clearer decisions over time."]
+  ["One flagship platform, broader systems mission", "Executive Intelligence is available today. Vaeroex is building intelligence systems for clearer decisions over time."]
 ] as const;
 
 function NvidiaInceptionSection() {
@@ -77,8 +77,8 @@ export default function HomePage() {
         description="Vaeroex builds intelligence systems that transform business information into visibility, awareness, prediction, and executive action—helping leaders understand what matters, why it matters, and where to focus next."
         actions={
           <>
-            <Link href="/operations-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-              Explore Operations Intelligence
+            <Link href="/executive-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+              Explore Executive Intelligence
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <a href="/api/stripe/checkout" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
@@ -120,11 +120,11 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-[minmax(0,.72fr)_minmax(0,1.28fr)] lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Flagship product</p>
-            <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-white sm:text-4xl">Operations Intelligence by Vaeroex.</h2>
+            <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-normal text-white sm:text-4xl">Executive Intelligence by Vaeroex.</h2>
             <p className="mt-4 text-base leading-7 text-slate-300">Vaeroex&apos;s flagship Executive Intelligence platform, built to turn trusted business evidence into Business Health, prioritized intelligence, focused explanations, and executive decision support.</p>
             <div className="mt-6 flex flex-wrap gap-3">
-              <Link href="/operations-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                Explore Operations Intelligence
+              <Link href="/executive-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                Explore Executive Intelligence
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
               <Link href="/pricing" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.04] px-5 py-3 text-sm font-semibold text-slate-200 hover:border-cyan-300/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">View pricing</Link>
@@ -217,7 +217,7 @@ export default function HomePage() {
             <Waypoints className="h-5 w-5 text-cyan-200" aria-hidden="true" />
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Long-term company direction</p>
-              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">Vaeroex is building intelligence systems that transform business information into visibility, awareness, prediction, and executive action. Operations Intelligence is the flagship product available today.</p>
+              <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-300">Vaeroex is building intelligence systems that transform business information into visibility, awareness, prediction, and executive action. Executive Intelligence is the flagship product available today.</p>
             </div>
           </div>
         </div>
@@ -226,9 +226,9 @@ export default function HomePage() {
       <PublicCtaBand
         eyebrow="Vaeroex Intelligence Systems"
         title="Turn the information leadership already has into executive clarity."
-        description="Explore how Operations Intelligence connects trusted business information with deterministic intelligence and advanced executive reasoning."
-        primaryHref="/operations-intelligence"
-        primaryLabel="Explore Operations Intelligence"
+        description="Explore how Executive Intelligence connects trusted business information with deterministic intelligence and advanced executive reasoning."
+        primaryHref="/executive-intelligence"
+        primaryLabel="Explore Executive Intelligence"
         secondaryHref="/pricing"
         secondaryLabel="View pricing"
       />

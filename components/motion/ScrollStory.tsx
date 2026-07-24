@@ -6,7 +6,7 @@ const storySteps = [
   ["Scattered Information", "Reports, spreadsheets, customer activity, files, and operational updates live in disconnected places."],
   ["Limited Visibility", "Leaders struggle to understand what is happening across the business."],
   ["Reactive Decisions", "Problems are often discovered late, after opportunities are missed or issues grow."],
-  ["Operations Intelligence", "Vaeroex connects context, performance, risk, and evidence-backed recommendations."],
+  ["Executive Intelligence", "Vaeroex connects context, performance, risk, and evidence-backed recommendations."],
   ["Leadership Clarity", "Insights become clearer briefings, better questions, and stronger decisions."]
 ] as const;
 

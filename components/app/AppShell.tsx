@@ -134,7 +134,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace }: App
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-silver">
                   {activeWorkspace?.name || "Setup required"} · {accessLabel}
                 </p>
-                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Operations Intelligence</h1>
+                <h1 className="mt-1 truncate text-lg font-semibold tracking-wide">Executive Intelligence</h1>
               </div>
             </div>
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">

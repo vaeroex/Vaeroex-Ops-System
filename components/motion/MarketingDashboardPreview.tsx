@@ -4,7 +4,7 @@ const trendPoints = "8,66 42,58 76,61 110,48 144,42 178,36 212,31 246,28";
 
 export function MarketingDashboardPreview() {
   return (
-    <aside className="vaeroex-dashboard-preview overflow-hidden rounded-lg border border-white/15 bg-[#07111f]/95 text-white shadow-command" aria-label="Illustrative Vaeroex Operations Intelligence preview">
+    <aside className="vaeroex-dashboard-preview overflow-hidden rounded-lg border border-white/15 bg-[#07111f]/95 text-white shadow-command" aria-label="Illustrative Vaeroex Executive Intelligence preview">
       <div className="flex flex-col gap-3 border-b border-white/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
         <div>
           <p className="text-[0.68rem] font-semibold uppercase tracking-[0.18em] text-cyan-200">Executive Overview</p>

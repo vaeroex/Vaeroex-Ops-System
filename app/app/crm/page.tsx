@@ -139,7 +139,7 @@ export default async function CrmPage({ searchParams }: CrmPageProps) {
           ) : (
             <div className="rounded-lg border border-dashed border-white/15 bg-white/[0.04] p-4">
               <p className="text-sm font-semibold text-white">No historical customer evidence is stored.</p>
-              <p className="mt-2 text-sm leading-6 text-slate-300">Upload source files or connect external systems when customer activity evidence is needed for Operations Intelligence.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-300">Upload source files or connect external systems when customer activity evidence is needed for Executive Intelligence.</p>
             </div>
           )}
         </div>

@@ -23,8 +23,8 @@ export default function AboutPage() {
         description="Vaeroex transforms business information into visibility, awareness, prediction, and executive action through advanced intelligence systems."
         actions={
           <>
-            <Link href="/operations-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-              Explore Operations Intelligence
+            <Link href="/executive-intelligence" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-vaeroex-blue px-5 py-3 text-sm font-semibold text-white hover:bg-vaeroex-accent hover:text-vaeroex-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+              Explore Executive Intelligence
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
             <Link href="/contact" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">Contact Vaeroex</Link>
@@ -53,9 +53,9 @@ export default function AboutPage() {
         <div className="mx-auto grid max-w-7xl gap-8 lg:grid-cols-2 lg:items-center">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Current product</p>
-            <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-normal sm:text-4xl">Operations Intelligence is the flagship Vaeroex product available today.</h2>
+            <h2 className="mt-3 text-3xl font-semibold leading-tight tracking-normal sm:text-4xl">Executive Intelligence is the flagship Vaeroex product available today.</h2>
             <p className="mt-4 text-base leading-7 text-slate-300">It gives owners, executives, and operations leaders Business Health, prioritized Intelligence, Explain Finding, trusted Evidence, and Saved Analyses in one Executive Intelligence platform.</p>
-            <Link href="/operations-intelligence" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+            <Link href="/executive-intelligence" className="mt-6 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
               See the current product
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
@@ -101,14 +101,14 @@ export default function AboutPage() {
             <span className="shrink-0 text-sm font-semibold text-cyan-200 group-open:hidden">Read more</span>
             <span className="hidden shrink-0 text-sm font-semibold text-cyan-200 group-open:block">Close</span>
           </summary>
-          <p className="mt-4 max-w-4xl border-t border-white/10 pt-4 text-sm leading-6 text-slate-400">Operations Intelligence is the current flagship product. The broader Vaeroex direction is to apply the same evidence-backed, explainable decision-support discipline wherever timely understanding matters, without presenting future direction as a current product promise.</p>
+          <p className="mt-4 max-w-4xl border-t border-white/10 pt-4 text-sm leading-6 text-slate-400">Executive Intelligence is the current flagship product. The broader Vaeroex direction is to apply the same evidence-backed, explainable decision-support discipline wherever timely understanding matters, without presenting future direction as a current product promise.</p>
         </details>
       </section>
 
       <PublicCtaBand
         title="The Advantage of Knowing First."
-        description="See the current Operations Intelligence product, or start a conversation about how Vaeroex can support a clearer leadership review."
-        primaryHref="/operations-intelligence"
+        description="See the current Executive Intelligence product, or start a conversation about how Vaeroex can support a clearer leadership review."
+        primaryHref="/executive-intelligence"
         primaryLabel="Explore the product"
       />
       <PublicFooter />

@@ -16,7 +16,7 @@ export const VAEROEX_PLAN_LIMITS = {
 export const VAEROEX_PLAN_FEATURES = [
   "Private Business Workspace",
   "Business Memory",
-  "Operations Intelligence",
+  "Executive Intelligence",
   "KPI Intelligence",
   "Business Health and View Analysis",
   "Prioritized Intelligence",

@@ -86,6 +86,7 @@ const nextConfig = {
   },
   async redirects() {
     return [
+      { source: "/operations-intelligence", destination: "/executive-intelligence", statusCode: 301 },
       { source: "/hourly-consulting", destination: "/contact", statusCode: 301 },
       { source: "/full-support-retainer", destination: "/pricing", statusCode: 301 },
       { source: "/shop/p/hourly-consulting", destination: "/contact", statusCode: 301 },
