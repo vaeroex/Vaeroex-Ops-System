@@ -11,6 +11,12 @@ import { ManagedRecordList, type ManagedRecordEditField } from "@/components/ope
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
+import { ExecutiveKpiAnalysis } from "@/components/intelligence/ExecutiveKpiAnalysis";
+import { buildExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysis/context";
+import type { ExecutiveKpiAnalysisState } from "@/lib/ai/executive-kpi-analysis/contracts";
+import { findCurrentExecutiveKpiAnalysisArtifact } from "@/lib/ai/executive-kpi-analysis/storage";
+import { trySealExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysis/token";
+import { isExecutiveKpiAnalysisEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
@@ -1225,29 +1231,27 @@ function comparisonNotes(trends: KpiTrend[]) {
 function ComparisonAnalysis({
   trends,
   mode,
-  context
+  context,
+  analysisState,
+  analysisToken,
+  deterministicFallback
 }: {
   trends: KpiTrend[];
   mode: ComparisonMode;
   context: ReturnType<typeof comparisonContext>;
+  analysisState: ExecutiveKpiAnalysisState;
+  analysisToken: string | null;
+  deterministicFallback: readonly string[];
 }) {
-  const notes = comparisonNotes(trends);
-
   return (
     <div className="space-y-4">
       <p className="text-sm font-semibold text-cyan-100">Showing {context.timeframe}</p>
       <OverlayTrendChart trends={trends} mode={mode} />
-      <div className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-        <p className="text-sm font-semibold text-white">Comparison summary</p>
-        <div className="mt-3 space-y-2 text-sm leading-6 text-slate-300">
-          {notes.map((note, index) => (
-            <div key={`${note}-${index}`} className="flex gap-2">
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-vaeroex-blue" />
-              <p>{note}</p>
-            </div>
-          ))}
-        </div>
-      </div>
+      <ExecutiveKpiAnalysis
+        initialState={analysisState}
+        requestToken={analysisToken}
+        deterministicFallback={deterministicFallback}
+      />
     </div>
   );
 }
@@ -1735,6 +1739,68 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         : params?.section === "detail"
           ? "detail"
           : "overview";
+  const deterministicComparisonFallback = comparisonNotes(selectedTrends);
+  let executiveKpiAnalysisState: ExecutiveKpiAnalysisState = {
+    status: "unavailable",
+    artifact: null,
+    message: "Executive KPI Analysis is available only in the qualified Preview environment."
+  };
+  let executiveKpiAnalysisToken: string | null = null;
+  if (activeSection === "compare") {
+    const sourceLabels = new Map(sourceFiles.map((file) => [file.id, file.display_name]));
+    const analysisPackage = buildExecutiveKpiAnalysisPackage({
+      workspaceId,
+      trends: selectedTrends.map((trend) => ({
+        name: trend.name,
+        directionality: explicitKpiDirection(trend.name, allVisibleKpis, kpiSettings),
+        rows: trend.rows.map((row) => ({
+          id: row.id,
+          actualValue: row.actual_value,
+          targetValue: row.target,
+          observedAt: row.metric_date,
+          sourceFileId: row.source_file_id,
+          sourceLabel: row.source_file_id ? sourceLabels.get(row.source_file_id) || null : null
+        }))
+      })),
+      mode: comparisonMode,
+      timeframe: selectedComparisonContext.timeframe,
+      startDate: selectedTimelineRange.startDate,
+      endDate: selectedTimelineRange.endDate,
+      confidenceLabel: selectedComparisonContext.confidenceLabel,
+      confidenceScore: selectedComparisonContext.confidenceScore,
+      limitations: [selectedComparisonContext.dataLimitations]
+    });
+    const usableMetricCount = analysisPackage.facts.metrics.filter((metric) => metric.observationCount >= 2).length;
+    if (usableMetricCount < 2) {
+      executiveKpiAnalysisState = {
+        status: "insufficient_evidence",
+        artifact: null,
+        message: "Select at least two KPIs with comparable history to generate an executive analysis."
+      };
+    } else if (isExecutiveKpiAnalysisEnabled()) {
+      const [{ data: { user } }, cached] = await Promise.all([
+        supabase.auth.getUser(),
+        findCurrentExecutiveKpiAnalysisArtifact({
+          supabase,
+          workspaceId,
+          fingerprint: analysisPackage.fingerprint
+        }).catch(() => null)
+      ]);
+      executiveKpiAnalysisState = cached
+        ? { status: "current", artifact: cached, message: null }
+        : { status: "available", artifact: null, message: null };
+      executiveKpiAnalysisToken = user
+        ? trySealExecutiveKpiAnalysisPackage({ analysisPackage, workspaceId, userId: user.id })
+        : null;
+      if (!user || (!cached && !executiveKpiAnalysisToken)) {
+        executiveKpiAnalysisState = {
+          status: "unavailable",
+          artifact: null,
+          message: user ? "Executive KPI Analysis authorization is temporarily unavailable." : "Sign in again to generate this analysis."
+        };
+      }
+    }
+  }
   const selectedMetricRows = primaryMetric ? getMetricHistoryRows(allVisibleKpis, primaryMetric) : [];
   const selectedMetricActualValues = selectedMetricRows.map((row) => row.actual_value).filter((value): value is number => value !== null);
   const selectedLatestKpi = selectedMetricRows.at(-1);
@@ -2180,7 +2246,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                       : "Select at least two KPIs to compare trend lines."}
                   </p>
                 </div>
-                <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} context={selectedComparisonContext} />
+                <ComparisonAnalysis
+                  trends={selectedTrends}
+                  mode={comparisonMode}
+                  context={selectedComparisonContext}
+                  analysisState={executiveKpiAnalysisState}
+                  analysisToken={executiveKpiAnalysisToken}
+                  deterministicFallback={deterministicComparisonFallback}
+                />
               </div>
             </>
           ) : (
