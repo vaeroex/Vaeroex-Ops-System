@@ -44,6 +44,7 @@ const ASSERTIVE_CAUSATION_PATTERN = /\b(?:caused?\s+(?:by|the|a|an|this|that)|re
 const UNSUPPORTED_RELATIONSHIP_PATTERN = /\b(?:(?:are|is|were|was|show(?:s|ed)?|demonstrate(?:s|d)?|indicate(?:s|d)?)\s+(?:strongly\s+)?(?:correlated|statistically significant)|strong supported relationship|confirmed relationship)\b/i;
 const INVENTED_KPI_PATTERN = /\b[A-Z][A-Za-z&-]+(?:\s+(?!(?:Rate|Revenue|Margin|Sales|Reviews?|Wait|Time|Score|Volume|Cost|Profit|Inventory|Satisfaction|Response|Basket|Flow)\b)[A-Z][A-Za-z&()/-]+){0,3}\s+(?:Rate|Revenue|Margin|Sales|Reviews?|Wait|Time|Score|Volume|Cost|Profit|Inventory|Satisfaction|Response|Basket|Flow)\b/g;
 const PLACEHOLDER_PATTERN = /\b(?:idk|tbd|placeholder|lorem ipsum)\b/i;
+const KPI_ORDINAL_REFERENCE_PATTERN = /\bKPI\s+(\d+)\b/gi;
 const DRIVER_FALLBACK = "The available evidence does not establish the underlying driver.";
 
 function combinedText(output: ExecutiveKpiAnalysisModelOutput) {
@@ -130,6 +131,17 @@ export function validateExecutiveKpiAnalysisOutput(
       observedType: "string"
     });
   }
+  const allowedOrdinals = new Set(context.facts.metrics.map((metric) => metric.ordinal));
+  const proseOrdinals = Array.from(text.matchAll(KPI_ORDINAL_REFERENCE_PATTERN), (match) => Number(match[1]));
+  if (proseOrdinals.some((ordinal) => !allowedOrdinals.has(ordinal))) {
+    return validationFailure("The response referenced a KPI outside the immutable package.", {
+      reasonCode: "unknown_signal_id",
+      stage: "ranked_signal_coverage",
+      expectedField: "$",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
   const knownMetricNames = new Set(context.facts.metrics.map((metric) => metric.name.toLowerCase()));
   const inventedMetricName = Array.from(text.matchAll(INVENTED_KPI_PATTERN), (match) => match[0])
     .find((name) => !knownMetricNames.has(name.toLowerCase()));
@@ -143,7 +155,6 @@ export function validateExecutiveKpiAnalysisOutput(
     });
   }
 
-  const allowedOrdinals = new Set(context.facts.metrics.map((metric) => metric.ordinal));
   const referenced = [
     ...output.significant_trends.map((item) => item.metric_ordinals),
     ...output.potential_kpi_relationships.map((item) => item.metric_ordinals),
