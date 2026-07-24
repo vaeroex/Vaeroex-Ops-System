@@ -34,6 +34,7 @@ Module._load = function loadPatched(request, parent, isMain) {
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-executive-kpi-analysis-secret";
 const { buildExecutiveKpiAnalysisPackage } = require("../lib/ai/executive-kpi-analysis/context.ts");
 const { EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA } = require("../lib/ai/executive-kpi-analysis/contracts.ts");
+const { materializeExecutiveKpiNames } = require("../lib/ai/executive-kpi-analysis/service.ts");
 const { validateExecutiveKpiAnalysisOutput } = require("../lib/ai/executive-kpi-analysis/validation.ts");
 const { sealExecutiveKpiAnalysisPackage, openExecutiveKpiAnalysisPackage } = require("../lib/ai/executive-kpi-analysis/token.ts");
 const {
@@ -108,6 +109,15 @@ const validOutput = {
 };
 const validResult = validateExecutiveKpiAnalysisOutput(validOutput, analysisPackage);
 assert.equal(validResult.ok, true, `grounded output should pass: ${JSON.stringify(validResult)}`);
+const ordinalOutput = JSON.parse(JSON.stringify(validOutput)
+  .replaceAll("Checkout Wait", "KPI 1")
+  .replaceAll("Revenue", "KPI 2"));
+assert.equal(validateExecutiveKpiAnalysisOutput(ordinalOutput, analysisPackage).ok, true, "immutable ordinal wording should validate");
+const materializedOutput = materializeExecutiveKpiNames(ordinalOutput, analysisPackage);
+assert.match(materializedOutput.executive_summary, /Checkout Wait/);
+assert.match(materializedOutput.executive_summary, /Revenue/);
+assert.doesNotMatch(JSON.stringify(materializedOutput), /\bKPI\s+[12]\b/, "application code must restore exact deterministic KPI names");
+assert.equal(validateExecutiveKpiAnalysisOutput({ ...ordinalOutput, executive_summary: `${ordinalOutput.executive_summary} KPI 9 also changed.` }, analysisPackage).diagnostic?.reasonCode, "unknown_signal_id", "unknown prose ordinals must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} The value will be 999.` }, analysisPackage).diagnostic?.reasonCode, "numeric_integrity_failed", "unsupported numbers must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: `${validOutput.executive_summary} Churn Rate also declined.` }, analysisPackage).diagnostic?.reasonCode, "unknown_signal_id", "invented KPI names must fail");
 assert.equal(validateExecutiveKpiAnalysisOutput({ ...validOutput, executive_summary: "Checkout Wait caused Revenue to decline, which proves the business impact is established." }, analysisPackage).diagnostic?.reasonCode, "unsupported_inference", "causation must fail");
