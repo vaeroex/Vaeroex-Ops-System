@@ -53,6 +53,11 @@ export const BUSINESS_HEALTH_GPT56_FALLBACK_REASONS = [
   "numeric_integrity_failure"
 ] as const satisfies readonly AIProviderFallbackReason[];
 
+const EXECUTIVE_KPI_ANALYSIS_GPT56_FALLBACK_REASONS = [
+  ...BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
+  "unknown_signal_id"
+] as const satisfies readonly AIProviderFallbackReason[];
+
 export type BusinessHealthGenerationPolicy = Readonly<{
   providerPolicy: AIProviderRoutingPolicy;
   executionBudget: AIProviderExecutionBudget;
@@ -333,7 +338,7 @@ export function resolveExecutiveKpiAnalysisGenerationPolicy({
   return {
     providerPolicy: {
       id: EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID,
-      fallbackOn: BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
+      fallbackOn: EXECUTIVE_KPI_ANALYSIS_GPT56_FALLBACK_REASONS,
       steps: [
         {
           provider: "openai",
