@@ -62,7 +62,7 @@ const analysisSchema = z.object({
   significant_trends: z.array(z.object({ metric_ordinals: z.array(z.number()), statement: z.string() }).strict()),
   potential_kpi_relationships: z.array(z.object({
     metric_ordinals: z.array(z.number()),
-    status: z.enum(["Observed movement", "Possible relationship", "Supported correlation", "Strong supported relationship", "No meaningful relationship detected"]),
+    status: z.enum(["Pattern worth investigating", "Possible relationship", "Supported correlation", "Strong supported relationship", "No clear relationship detected"]),
     statement: z.string()
   }).strict()),
   possible_business_drivers: z.array(z.object({ metric_ordinals: z.array(z.number()), statement: z.string() }).strict()),
