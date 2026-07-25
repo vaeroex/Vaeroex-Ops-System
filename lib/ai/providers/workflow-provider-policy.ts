@@ -16,6 +16,10 @@ export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
 export const EXECUTIVE_BRIEF_GPT56_POLICY_ID = "executive_brief_preview_gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
+export const BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR = "gpt56_luna_terra_v1" as const;
+export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v1" as const;
+export const BUSINESS_NOTE_EXTRACTION_LUNA_MODEL = "gpt-5.6-luna" as const;
+export const BUSINESS_NOTE_EXTRACTION_TERRA_MODEL = "gpt-5.6-terra" as const;
 
 const BUSINESS_HEALTH_LEGACY_DEADLINE_MS = 26_000;
 const BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS = 10_500;
@@ -33,6 +37,10 @@ const FINDING_EXPLANATION_GPT56_SOL_TIMEOUT_MS = 42_000;
 const FINDING_EXPLANATION_GPT56_TERRA_TIMEOUT_MS = 25_000;
 const FINDING_EXPLANATION_GPT56_SOL_OUTPUT_TOKENS = 3_500;
 const FINDING_EXPLANATION_GPT56_TERRA_OUTPUT_TOKENS = 3_000;
+const BUSINESS_NOTE_EXTRACTION_DEADLINE_MS = 55_000;
+const BUSINESS_NOTE_EXTRACTION_LUNA_TIMEOUT_MS = 24_000;
+const BUSINESS_NOTE_EXTRACTION_TERRA_TIMEOUT_MS = 24_000;
+const BUSINESS_NOTE_EXTRACTION_MAX_OUTPUT_TOKENS = 5_000;
 
 export const BUSINESS_HEALTH_GPT56_FALLBACK_REASONS = [
   "timeout",
@@ -63,6 +71,17 @@ export type ExecutiveBriefGenerationPolicy = Readonly<{
 }>;
 
 export type FindingExplanationGenerationPolicy = ExecutiveBriefGenerationPolicy;
+export type BusinessNoteExtractionGenerationPolicy = ExecutiveBriefGenerationPolicy;
+
+export const BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS = [
+  "timeout",
+  "transport_failure",
+  "empty_response",
+  "malformed_response",
+  "schema_failure",
+  "contextual_validation_failure",
+  "ambiguous_extraction"
+] as const satisfies readonly AIProviderFallbackReason[];
 
 export function isExecutiveBriefPreviewEnabled() {
   return process.env.VERCEL_ENV === "preview"
@@ -71,6 +90,72 @@ export function isExecutiveBriefPreviewEnabled() {
 
 export function isFindingExplanationEnabled() {
   return process.env.VAEROEX_FINDING_EXPLANATION_POLICY === FINDING_EXPLANATION_POLICY_SELECTOR;
+}
+
+export function isBusinessNoteExtractionEnabled() {
+  return process.env.VAEROEX_BUSINESS_NOTES_POLICY === BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR;
+}
+
+export function resolveBusinessNoteExtractionGenerationPolicy({
+  startedAtMs,
+  structuredOutput
+}: {
+  startedAtMs: number;
+  structuredOutput: AIProviderStructuredOutput;
+}): BusinessNoteExtractionGenerationPolicy {
+  if (!isBusinessNoteExtractionEnabled()) {
+    throw new Error("Business Notes extraction is not enabled for this environment.");
+  }
+
+  return {
+    providerPolicy: {
+      id: BUSINESS_NOTE_EXTRACTION_POLICY_ID,
+      fallbackOn: BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS,
+      steps: [
+        {
+          provider: "openai",
+          model: BUSINESS_NOTE_EXTRACTION_LUNA_MODEL,
+          workflowConfiguration: {
+            timeoutMs: BUSINESS_NOTE_EXTRACTION_LUNA_TIMEOUT_MS,
+            maxAttempts: 1,
+            maxOutputTokens: BUSINESS_NOTE_EXTRACTION_MAX_OUTPUT_TOKENS,
+            temperature: null,
+            topP: null,
+            reasoning: { mode: "standard", effort: "low" },
+            structuredOutput,
+            store: false,
+            stream: false
+          }
+        },
+        {
+          provider: "openai",
+          model: BUSINESS_NOTE_EXTRACTION_TERRA_MODEL,
+          minimumRemainingMs: 6_000,
+          workflowConfiguration: {
+            timeoutMs: BUSINESS_NOTE_EXTRACTION_TERRA_TIMEOUT_MS,
+            maxAttempts: 1,
+            maxOutputTokens: BUSINESS_NOTE_EXTRACTION_MAX_OUTPUT_TOKENS,
+            temperature: null,
+            topP: null,
+            reasoning: { mode: "standard", effort: "medium" },
+            structuredOutput,
+            store: false,
+            stream: false
+          }
+        }
+      ]
+    },
+    executionBudget: {
+      deadlineAtMs: startedAtMs + BUSINESS_NOTE_EXTRACTION_DEADLINE_MS,
+      providerTimeoutMs: { openai: BUSINESS_NOTE_EXTRACTION_LUNA_TIMEOUT_MS },
+      minimumAttemptWindowMs: { openai: 6_000 },
+      fallbackReserveMs: BUSINESS_NOTE_EXTRACTION_TERRA_TIMEOUT_MS + 1_000,
+      reserveFallbackForPrimary: true,
+      transitionReserveMs: 1_000
+    },
+    requestTimeoutMs: BUSINESS_NOTE_EXTRACTION_LUNA_TIMEOUT_MS,
+    requestMaxOutputTokens: BUSINESS_NOTE_EXTRACTION_MAX_OUTPUT_TOKENS
+  };
 }
 
 export function buildSynchronousExecutiveProviderPolicy({

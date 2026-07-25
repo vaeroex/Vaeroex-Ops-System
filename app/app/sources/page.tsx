@@ -20,6 +20,9 @@ import { LoadingLink } from "@/components/operations/LoadingLink";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview } from "@/components/evidence/SourceImportReview";
+import { BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
+import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
+import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
 import { shouldClearSourceImportError } from "@/lib/imports/source-import-notices";
 import { getRecordFolders } from "@/lib/records/management";
@@ -55,6 +58,7 @@ type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
+type BusinessNoteRow = Database["public"]["Tables"]["business_notes"]["Row"];
 type JsonRecord = Record<string, unknown>;
 type SourcesTab = "files" | "knowledge" | "archived";
 type SourceDetailSection = "summary" | "findings" | "imported" | "history";
@@ -870,6 +874,7 @@ function knowledgeSourceType(chunk: MemoryChunkRow) {
   const metadata = knowledgeMetadata(chunk);
   const extension = stringValue(metadata.file_extension).toUpperCase();
   if (extension) return extension;
+  if (chunk.source_type === "business_note") return "Business Note";
   return chunk.source_type.replace(/_/g, " ");
 }
 
@@ -923,6 +928,14 @@ function KnowledgeActions({
   archived?: boolean;
 }) {
   const returnPath = archived ? "/app/sources?tab=archived" : "/app/sources?tab=knowledge";
+
+  if (item.source_type === "business_note") {
+    return (
+      <LoadingLink href="/app/sources#business-notes" className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30" loadingLabel="Opening Business Notes...">
+        Review Business Note
+      </LoadingLink>
+    );
+  }
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -1097,8 +1110,9 @@ function LearnedKnowledgeView({
 }
 
 export async function renderSourcesPage(params: SourceSearchParams = {}, options: { sourceDetail?: boolean } = {}) {
-  const { supabase, workspaceId } = await requireWorkspacePage();
+  const { supabase, context, workspaceId } = await requireWorkspacePage();
   const activeTab = options.sourceDetail ? "files" : normalizeSourcesTab(params.tab, params.view);
+  const releaseChannel = businessNoteReleaseChannel();
   const importRowsQuery = options.sourceDetail && params.file
     ? supabase
         .from("file_import_rows")
@@ -1109,7 +1123,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         .order("row_number", { ascending: true })
         .limit(2000)
     : Promise.resolve({ data: [], error: null });
-  const [filesResult, foldersResult, importsResult, importRowsResult, reportsResult, kpisResult, runsResult, memoryResult] = await Promise.all([
+  const [filesResult, foldersResult, importsResult, importRowsResult, reportsResult, kpisResult, runsResult, memoryResult, notesResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
@@ -1129,7 +1143,15 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
       .select("*")
       .eq("workspace_id", workspaceId)
       .order("indexed_at", { ascending: false })
-      .limit(300)
+      .limit(300),
+    supabase
+      .from("business_notes")
+      .select("*")
+      .eq("workspace_id", workspaceId)
+      .eq("release_channel", releaseChannel)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(100)
   ]);
 
   const files = (filesResult.data || []) as FileUploadRow[];
@@ -1140,6 +1162,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const kpis = (kpisResult.data || []) as KpiRow[];
   const runs = (runsResult.data || []) as VaeroexRunRow[];
   const rawMemoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
+  const businessNotes = (notesResult.data || []) as BusinessNoteRow[];
   const activeMemoryChunks = await filterEligibleMemoryRowsByLifecycle({
     supabase,
     workspaceId,
@@ -1158,7 +1181,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     runsByFile.set(fileId, [...(runsByFile.get(fileId) || []), run]);
   });
 
-  const errors = [filesResult.error, foldersResult.error, importsResult.error, importRowsResult.error, reportsResult.error, kpisResult.error, runsResult.error, memoryResult.error].filter(Boolean);
+  const errors = [filesResult.error, foldersResult.error, importsResult.error, importRowsResult.error, reportsResult.error, kpisResult.error, runsResult.error, memoryResult.error, notesResult.error].filter(Boolean);
   const visibleFiles = filteredFiles({
     files,
     status: params.status,
@@ -1183,6 +1206,39 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
       })
     : false;
   const selectedFileActionError = linkedFile && !clearSourceImportError ? actionErrorMessage : null;
+  const canViewBusinessNoteObservability = process.env.VERCEL_ENV === "preview"
+    && ["owner", "admin"].includes(context.membership?.role || "");
+  const completedNoteExtractions = businessNotes.filter((note) => Boolean(note.extracted_at));
+  const successfulNoteExtractions = completedNoteExtractions.filter((note) => note.status !== "extraction_failed");
+  const approvedNotes = businessNotes.filter((note) => note.status === "approved");
+  const average = (values: number[]) => values.length
+    ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length)
+    : 0;
+  const correctionCount = (note: BusinessNoteRow) => {
+    const corrections = isRecord(note.user_corrections_json) ? note.user_corrections_json : {};
+    const count = corrections.correction_count;
+    return typeof count === "number" && Number.isFinite(count) ? count : 0;
+  };
+  const businessNoteObservability: BusinessNotesObservability | null = canViewBusinessNoteObservability
+    ? {
+        extractionCount: completedNoteExtractions.length,
+        primarySuccessRate: completedNoteExtractions.length
+          ? Math.round((successfulNoteExtractions.filter((note) => !note.fallback_used).length / completedNoteExtractions.length) * 100)
+          : 0,
+        fallbackRate: completedNoteExtractions.length
+          ? Math.round((completedNoteExtractions.filter((note) => note.fallback_used).length / completedNoteExtractions.length) * 100)
+          : 0,
+        averageLatencyMs: average(completedNoteExtractions.flatMap((note) => note.latency_ms === null ? [] : [note.latency_ms])),
+        averageTokens: average(completedNoteExtractions.map((note) => note.total_tokens)),
+        averageCostCents: completedNoteExtractions.length
+          ? completedNoteExtractions.reduce((sum, note) => sum + Number(note.estimated_provider_cost_cents || 0), 0) / completedNoteExtractions.length
+          : 0,
+        failureCount: completedNoteExtractions.filter((note) => note.status === "extraction_failed").length,
+        averageCorrections: approvedNotes.length
+          ? approvedNotes.reduce((sum, note) => sum + correctionCount(note), 0) / approvedNotes.length
+          : 0
+      }
+    : null;
 
   if (options.sourceDetail) {
     const activeSection = normalizeSourceDetailSection(params.section);
@@ -1258,6 +1314,14 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         <div className="rounded-lg border border-emerald-400/35 bg-emerald-950/30 p-3 text-sm text-emerald-100">
           {successMessage}
         </div>
+      ) : null}
+
+      {activeTab === "files" ? (
+        <BusinessNotesPanel
+          notes={businessNotes}
+          enabled={isBusinessNoteExtractionEnabled()}
+          observability={businessNoteObservability}
+        />
       ) : null}
 
       <section className="space-y-4">

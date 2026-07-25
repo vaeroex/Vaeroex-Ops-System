@@ -32,7 +32,8 @@ export type AIProviderFallbackReason =
   | "unsupported_relationship"
   | "missing_required_signal"
   | "citation_integrity_failure"
-  | "numeric_integrity_failure";
+  | "numeric_integrity_failure"
+  | "ambiguous_extraction";
 
 export type AIProviderWorkflowConfiguration = Readonly<{
   timeoutMs?: number;
@@ -235,6 +236,7 @@ function requestNumber(
 
 function validationFallbackReason(diagnostic: SafeAIValidationDiagnostic | null): AIProviderFallbackReason | null {
   if (!diagnostic) return null;
+  if (diagnostic.reasonCode === "ambiguous_extraction") return "ambiguous_extraction";
   if (diagnostic.reasonCode === "unsupported_inference") return "unsupported_inference";
   if (diagnostic.reasonCode === "unsupported_relationship") return "unsupported_relationship";
   if (diagnostic.reasonCode === "missing_required_signal") return "missing_required_signal";
