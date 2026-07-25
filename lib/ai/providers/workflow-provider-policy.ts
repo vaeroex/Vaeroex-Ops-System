@@ -16,7 +16,6 @@ export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
 export const EXECUTIVE_BRIEF_GPT56_POLICY_ID = "executive_brief_preview_gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
-export const EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID = "executive_kpi_analysis_gpt56_sol_terra_v1" as const;
 
 const BUSINESS_HEALTH_LEGACY_DEADLINE_MS = 26_000;
 const BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS = 10_500;
@@ -34,10 +33,6 @@ const FINDING_EXPLANATION_GPT56_SOL_TIMEOUT_MS = 42_000;
 const FINDING_EXPLANATION_GPT56_TERRA_TIMEOUT_MS = 25_000;
 const FINDING_EXPLANATION_GPT56_SOL_OUTPUT_TOKENS = 3_500;
 const FINDING_EXPLANATION_GPT56_TERRA_OUTPUT_TOKENS = 3_000;
-const EXECUTIVE_KPI_ANALYSIS_GPT56_DEADLINE_MS = 90_000;
-const EXECUTIVE_KPI_ANALYSIS_GPT56_SOL_TIMEOUT_MS = 48_000;
-const EXECUTIVE_KPI_ANALYSIS_GPT56_TERRA_TIMEOUT_MS = 30_000;
-const EXECUTIVE_KPI_ANALYSIS_GPT56_MAX_OUTPUT_TOKENS = 4_000;
 
 export const BUSINESS_HEALTH_GPT56_FALLBACK_REASONS = [
   "timeout",
@@ -51,11 +46,6 @@ export const BUSINESS_HEALTH_GPT56_FALLBACK_REASONS = [
   "missing_required_signal",
   "citation_integrity_failure",
   "numeric_integrity_failure"
-] as const satisfies readonly AIProviderFallbackReason[];
-
-const EXECUTIVE_KPI_ANALYSIS_GPT56_FALLBACK_REASONS = [
-  ...BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
-  "unknown_signal_id"
 ] as const satisfies readonly AIProviderFallbackReason[];
 
 export type BusinessHealthGenerationPolicy = Readonly<{
@@ -73,7 +63,6 @@ export type ExecutiveBriefGenerationPolicy = Readonly<{
 }>;
 
 export type FindingExplanationGenerationPolicy = ExecutiveBriefGenerationPolicy;
-export type ExecutiveKpiAnalysisGenerationPolicy = ExecutiveBriefGenerationPolicy;
 
 export function isExecutiveBriefPreviewEnabled() {
   return process.env.VERCEL_ENV === "preview"
@@ -82,17 +71,6 @@ export function isExecutiveBriefPreviewEnabled() {
 
 export function isFindingExplanationEnabled() {
   return process.env.VAEROEX_FINDING_EXPLANATION_POLICY === FINDING_EXPLANATION_POLICY_SELECTOR;
-}
-
-export function isExecutiveKpiAnalysisEnabled() {
-  return (process.env.VERCEL_ENV === "preview" || process.env.VERCEL_ENV === "production")
-    && process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
-}
-
-export function executiveKpiAnalysisReleaseChannel(): "production" | "preview" | "development" {
-  if (process.env.VERCEL_ENV === "production") return "production";
-  if (process.env.VERCEL_ENV === "preview") return "preview";
-  return "development";
 }
 
 export function buildSynchronousExecutiveProviderPolicy({
@@ -328,66 +306,5 @@ export function resolveFindingExplanationGenerationPolicy({
     },
     requestTimeoutMs: FINDING_EXPLANATION_GPT56_SOL_TIMEOUT_MS,
     requestMaxOutputTokens: FINDING_EXPLANATION_GPT56_SOL_OUTPUT_TOKENS
-  };
-}
-
-export function resolveExecutiveKpiAnalysisGenerationPolicy({
-  startedAtMs,
-  structuredOutput
-}: {
-  startedAtMs: number;
-  structuredOutput: AIProviderStructuredOutput;
-}): ExecutiveKpiAnalysisGenerationPolicy {
-  if (!isExecutiveKpiAnalysisEnabled()) {
-    throw new Error("Executive KPI Analysis generation is not enabled for this environment.");
-  }
-  return {
-    providerPolicy: {
-      id: EXECUTIVE_KPI_ANALYSIS_GPT56_POLICY_ID,
-      fallbackOn: EXECUTIVE_KPI_ANALYSIS_GPT56_FALLBACK_REASONS,
-      steps: [
-        {
-          provider: "openai",
-          model: BUSINESS_HEALTH_GPT56_SOL_MODEL,
-          workflowConfiguration: {
-            timeoutMs: EXECUTIVE_KPI_ANALYSIS_GPT56_SOL_TIMEOUT_MS,
-            maxAttempts: 1,
-            maxOutputTokens: EXECUTIVE_KPI_ANALYSIS_GPT56_MAX_OUTPUT_TOKENS,
-            temperature: null,
-            topP: null,
-            reasoning: { mode: "standard", effort: "high" },
-            structuredOutput,
-            store: false,
-            stream: false
-          }
-        },
-        {
-          provider: "openai",
-          model: BUSINESS_HEALTH_GPT56_TERRA_MODEL,
-          minimumRemainingMs: 8_000,
-          workflowConfiguration: {
-            timeoutMs: EXECUTIVE_KPI_ANALYSIS_GPT56_TERRA_TIMEOUT_MS,
-            maxAttempts: 1,
-            maxOutputTokens: EXECUTIVE_KPI_ANALYSIS_GPT56_MAX_OUTPUT_TOKENS,
-            temperature: null,
-            topP: null,
-            reasoning: { mode: "standard", effort: "high" },
-            structuredOutput,
-            store: false,
-            stream: false
-          }
-        }
-      ]
-    },
-    executionBudget: {
-      deadlineAtMs: startedAtMs + EXECUTIVE_KPI_ANALYSIS_GPT56_DEADLINE_MS,
-      providerTimeoutMs: { openai: EXECUTIVE_KPI_ANALYSIS_GPT56_SOL_TIMEOUT_MS },
-      minimumAttemptWindowMs: { openai: 8_000 },
-      fallbackReserveMs: EXECUTIVE_KPI_ANALYSIS_GPT56_TERRA_TIMEOUT_MS + 1_000,
-      reserveFallbackForPrimary: true,
-      transitionReserveMs: 1_000
-    },
-    requestTimeoutMs: EXECUTIVE_KPI_ANALYSIS_GPT56_SOL_TIMEOUT_MS,
-    requestMaxOutputTokens: EXECUTIVE_KPI_ANALYSIS_GPT56_MAX_OUTPUT_TOKENS
   };
 }

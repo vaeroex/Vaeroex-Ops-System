@@ -30,7 +30,6 @@ export type AIProviderFallbackReason =
   | "contextual_validation_failure"
   | "unsupported_inference"
   | "unsupported_relationship"
-  | "unknown_signal_id"
   | "missing_required_signal"
   | "citation_integrity_failure"
   | "numeric_integrity_failure";
@@ -238,7 +237,6 @@ function validationFallbackReason(diagnostic: SafeAIValidationDiagnostic | null)
   if (!diagnostic) return null;
   if (diagnostic.reasonCode === "unsupported_inference") return "unsupported_inference";
   if (diagnostic.reasonCode === "unsupported_relationship") return "unsupported_relationship";
-  if (diagnostic.reasonCode === "unknown_signal_id") return "unknown_signal_id";
   if (diagnostic.reasonCode === "missing_required_signal") return "missing_required_signal";
   if (diagnostic.reasonCode === "invalid_citation_id" || diagnostic.stage === "citation_provenance") {
     return "citation_integrity_failure";
