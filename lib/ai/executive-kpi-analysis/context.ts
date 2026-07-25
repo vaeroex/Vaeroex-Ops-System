@@ -83,7 +83,10 @@ function movementRelationship(left: ExecutiveKpiMetricFact, right: ExecutiveKpiM
 function deterministicNote(metric: ExecutiveKpiMetricFact) {
   if (metric.percentageChange === null) return `${metric.name} does not have enough comparable history to calculate percentage movement.`;
   const movement = metric.percentageChange > 0 ? "up" : metric.percentageChange < 0 ? "down" : "flat";
-  return `${metric.name} is ${movement} ${Math.abs(metric.percentageChange)}% across the selected timeframe. Directionality is not interpreted unless that KPI explicitly defines whether higher or lower is better.`;
+  const directionNote = metric.directionality === "neutral_contextual"
+    ? " Whether that movement is favorable depends on how this KPI is configured."
+    : "";
+  return `${metric.name} is ${movement} ${Math.abs(metric.percentageChange)}% across the selected timeframe.${directionNote}`;
 }
 
 export function buildExecutiveKpiAnalysisPackage({
@@ -170,7 +173,7 @@ export function buildExecutiveKpiAnalysisPackage({
     }));
   const boundedLimitations = Array.from(new Set([
     ...limitations,
-    "Statistical correlation, significance, and causation are not established by this comparison.",
+    "The comparison shows timing and movement, but it does not establish that one KPI caused another.",
     metrics.some((metric) => metric.directionality === "neutral_contextual")
       ? "At least one KPI has no explicit favorable direction, so movement is described without labeling it good or bad."
       : ""

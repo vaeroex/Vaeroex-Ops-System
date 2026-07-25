@@ -14,6 +14,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { ExecutiveKpiAnalysis } from "@/components/intelligence/ExecutiveKpiAnalysis";
 import { buildExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysis/context";
 import type { ExecutiveKpiAnalysisState } from "@/lib/ai/executive-kpi-analysis/contracts";
+import { evaluateExecutiveKpiAnalysisReadiness } from "@/lib/ai/executive-kpi-analysis/readiness";
 import { findCurrentExecutiveKpiAnalysisArtifact } from "@/lib/ai/executive-kpi-analysis/storage";
 import { trySealExecutiveKpiAnalysisPackage } from "@/lib/ai/executive-kpi-analysis/token";
 import {
@@ -1226,7 +1227,7 @@ function comparisonNotes(trends: KpiTrend[]) {
     .filter((trend) => trend.changePercent !== null)
     .sort((a, b) => Math.abs(b.changePercent || 0) - Math.abs(a.changePercent || 0))
     .slice(0, 3)
-    .map((trend) => `${trend.name} is ${percentChangeLabel(trend)} across the selected timeframe. Directionality is not interpreted unless that KPI explicitly defines whether higher or lower is better.`);
+    .map((trend) => `${trend.name} is ${percentChangeLabel(trend)} across the selected timeframe.`);
 
   return notes.length ? notes : ["The selected KPIs do not yet have enough comparable history to calculate percentage movement."];
 }
@@ -1746,7 +1747,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   let executiveKpiAnalysisState: ExecutiveKpiAnalysisState = {
     status: "unavailable",
     artifact: null,
-    message: "Executive KPI Analysis is not enabled in this environment."
+    message: "Executive KPI Analysis is not enabled in this environment.",
+    readiness: null
   };
   let executiveKpiAnalysisToken: string | null = null;
   if (activeSection === "compare") {
@@ -1773,12 +1775,13 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       confidenceScore: selectedComparisonContext.confidenceScore,
       limitations: [selectedComparisonContext.dataLimitations]
     });
-    const usableMetricCount = analysisPackage.facts.metrics.filter((metric) => metric.observationCount >= 2).length;
-    if (usableMetricCount < 2) {
+    const readiness = evaluateExecutiveKpiAnalysisReadiness(analysisPackage);
+    if (!readiness.canGenerate) {
       executiveKpiAnalysisState = {
         status: "insufficient_evidence",
         artifact: null,
-        message: "Select at least two KPIs with comparable history to generate an executive analysis."
+        message: null,
+        readiness
       };
     } else if (isExecutiveKpiAnalysisEnabled()) {
       const releaseChannel = executiveKpiAnalysisReleaseChannel();
@@ -1792,8 +1795,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         }).catch(() => null)
       ]);
       executiveKpiAnalysisState = cached
-        ? { status: "current", artifact: cached, message: null }
-        : { status: "available", artifact: null, message: null };
+        ? { status: "current", artifact: cached, message: null, readiness }
+        : { status: "available", artifact: null, message: null, readiness };
       executiveKpiAnalysisToken = user
         ? trySealExecutiveKpiAnalysisPackage({ analysisPackage, workspaceId, userId: user.id })
         : null;
@@ -1801,7 +1804,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         executiveKpiAnalysisState = {
           status: "unavailable",
           artifact: null,
-          message: user ? "Executive KPI Analysis authorization is temporarily unavailable." : "Sign in again to generate this analysis."
+          message: user ? "Executive KPI Analysis authorization is temporarily unavailable." : "Sign in again to generate this analysis.",
+          readiness
         };
       }
     }

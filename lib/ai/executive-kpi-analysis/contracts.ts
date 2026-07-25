@@ -1,5 +1,5 @@
 export const EXECUTIVE_KPI_ANALYSIS_CONTRACT_ID = "executive_kpi_analysis_v1" as const;
-export const EXECUTIVE_KPI_ANALYSIS_CONTRACT_VERSION = "executive_kpi_analysis_v2" as const;
+export const EXECUTIVE_KPI_ANALYSIS_CONTRACT_VERSION = "executive_kpi_analysis_v3" as const;
 export const EXECUTIVE_KPI_ANALYSIS_VALIDATOR_VERSION = "executive_kpi_analysis_validator_v2" as const;
 
 export const EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA = {
@@ -174,8 +174,27 @@ export type ExecutiveKpiAnalysisArtifact = Readonly<{
 
 export type ExecutiveKpiAnalysisViewArtifact = Omit<ExecutiveKpiAnalysisArtifact, "providerAttribution">;
 
+export type ExecutiveKpiAnalysisReadinessCode =
+  | "READY"
+  | "LIMITED"
+  | "NEEDS_MORE_HISTORY"
+  | "INSUFFICIENT_DATE_OVERLAP"
+  | "NO_CLEAR_PATTERN"
+  | "COMPARISON_TOO_BROAD"
+  | "MISSING_DIRECTIONALITY"
+  | "TEMPORARY_PROVIDER_FAILURE";
+
+export type ExecutiveKpiAnalysisReadiness = Readonly<{
+  code: ExecutiveKpiAnalysisReadinessCode;
+  canGenerate: boolean;
+  title: string;
+  explanation: string;
+  nextSteps: readonly string[];
+}>;
+
 export type ExecutiveKpiAnalysisState = Readonly<{
   status: "available" | "current" | "loading" | "failed" | "unavailable" | "insufficient_evidence";
   artifact: ExecutiveKpiAnalysisViewArtifact | null;
   message: string | null;
+  readiness: ExecutiveKpiAnalysisReadiness | null;
 }>;

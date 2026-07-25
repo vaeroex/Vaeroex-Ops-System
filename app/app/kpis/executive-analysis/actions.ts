@@ -9,6 +9,10 @@ import {
   generateExecutiveKpiAnalysis
 } from "@/lib/ai/executive-kpi-analysis/service";
 import {
+  evaluateExecutiveKpiAnalysisReadiness,
+  temporaryExecutiveKpiProviderFailure
+} from "@/lib/ai/executive-kpi-analysis/readiness";
+import {
   executiveKpiAnalysisArtifactForView,
   findCurrentExecutiveKpiAnalysisArtifact
 } from "@/lib/ai/executive-kpi-analysis/storage";
@@ -27,7 +31,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
-const SAFE_FAILURE_MESSAGE = "Executive analysis could not be prepared right now. The validated KPI facts remain available below.";
+const SAFE_FAILURE_MESSAGE = "Executive Analysis is temporarily unavailable. Validated KPI facts remain available below. Please try again shortly.";
 
 function failedUsage(error: unknown, latencyMs: number) {
   const attempts = error instanceof AIProviderExecutionError ? error.attempts : [];
@@ -61,16 +65,16 @@ function failedUsage(error: unknown, latencyMs: number) {
 export async function generateExecutiveKpiAnalysisAction(requestToken: string): Promise<ExecutiveKpiAnalysisState> {
   const startedAt = Date.now();
   if (!isExecutiveKpiAnalysisEnabled()) {
-    return { status: "unavailable", artifact: null, message: "Executive KPI Analysis is not enabled in this environment." };
+    return { status: "unavailable", artifact: null, message: "Executive KPI Analysis is not enabled in this environment.", readiness: null };
   }
   const releaseChannel = executiveKpiAnalysisReleaseChannel();
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return { status: "unavailable", artifact: null, message: SAFE_FAILURE_MESSAGE };
+  if (!supabase) return { status: "unavailable", artifact: null, message: SAFE_FAILURE_MESSAGE, readiness: temporaryExecutiveKpiProviderFailure() };
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { status: "unavailable", artifact: null, message: "Sign in again to generate this analysis." };
+  if (!user) return { status: "unavailable", artifact: null, message: "Sign in again to generate this analysis.", readiness: null };
   const context = await getWorkspaceContext(undefined, { supabase, user });
   if (!context.activeWorkspace || !context.membership || context.membership.status !== "active") {
-    return { status: "unavailable", artifact: null, message: "Workspace access is required." };
+    return { status: "unavailable", artifact: null, message: "Workspace access is required.", readiness: null };
   }
   const workspaceId = context.activeWorkspace.id;
   const opened = openExecutiveKpiAnalysisPackage(requestToken, { workspaceId, userId: user.id });
@@ -80,13 +84,14 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
       artifact: null,
       message: opened.reason === "expired"
         ? "The selected KPI comparison has changed. Refresh the page and try again."
-        : "This KPI comparison could not be authorized. Refresh the page and try again."
+        : "This KPI comparison could not be authorized. Refresh the page and try again.",
+      readiness: null
     };
   }
   const analysisPackage = opened.analysisPackage;
-  const usableMetrics = analysisPackage.facts.metrics.filter((metric) => metric.observationCount >= 2);
-  if (usableMetrics.length < 2) {
-    return { status: "insufficient_evidence", artifact: null, message: "Select at least two KPIs with comparable history to generate an executive analysis." };
+  const readiness = evaluateExecutiveKpiAnalysisReadiness(analysisPackage);
+  if (!readiness.canGenerate) {
+    return { status: "insufficient_evidence", artifact: null, message: null, readiness };
   }
   const cached = await findCurrentExecutiveKpiAnalysisArtifact({
     supabase,
@@ -94,7 +99,7 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
     fingerprint: analysisPackage.fingerprint,
     releaseChannel
   }).catch(() => null);
-  if (cached) return { status: "current", artifact: cached, message: null };
+  if (cached) return { status: "current", artifact: cached, message: null, readiness };
 
   const usageLimit = await isUsageLimitReached({
     supabase,
@@ -103,8 +108,8 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
     workspaceId,
     limit: "ai_runs_this_month"
   });
-  if (!usageLimit.subscription.allowed) return { status: "unavailable", artifact: null, message: "Subscription access is required for Executive KPI Analysis." };
-  if (usageLimit.reached) return { status: "unavailable", artifact: null, message: "This workspace has reached its monthly intelligence usage limit." };
+  if (!usageLimit.subscription.allowed) return { status: "unavailable", artifact: null, message: "Subscription access is required for Executive KPI Analysis.", readiness };
+  if (usageLimit.reached) return { status: "unavailable", artifact: null, message: "This workspace has reached its monthly intelligence usage limit.", readiness };
 
   const claim = await enforceRateLimit({
     action: "executive_kpi_analysis.generate",
@@ -124,16 +129,16 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
       releaseChannel
     }).catch(() => null);
     return completed
-      ? { status: "current", artifact: completed, message: null }
-      : { status: "unavailable", artifact: null, message: "This comparison is already being analyzed. Try again shortly." };
+      ? { status: "current", artifact: completed, message: null, readiness }
+      : { status: "unavailable", artifact: null, message: "This comparison is already being analyzed. Try again shortly.", readiness };
   }
 
   const admin = createSupabaseAdminClient();
-  if (!admin) return { status: "unavailable", artifact: null, message: SAFE_FAILURE_MESSAGE };
+  if (!admin) return { status: "unavailable", artifact: null, message: SAFE_FAILURE_MESSAGE, readiness: temporaryExecutiveKpiProviderFailure() };
   try {
     await enforceAIProviderRateLimits({ userId: user.id, workspaceId, operation: EXECUTIVE_KPI_ANALYSIS_CONTRACT_ID });
   } catch {
-    return { status: "unavailable", artifact: null, message: "Analysis request limits could not be verified. Try again shortly." };
+    return { status: "unavailable", artifact: null, message: "Analysis request limits could not be verified. Try again shortly.", readiness };
   }
   const { data: run, error: insertError } = await admin
     .from("ai_agent_runs")
@@ -157,7 +162,7 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
     })
     .select("id")
     .maybeSingle();
-  if (insertError || !run) return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
+  if (insertError || !run) return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE, readiness: temporaryExecutiveKpiProviderFailure() };
 
   try {
     const generated = await generateExecutiveKpiAnalysis({ supabase, workspaceId, analysisPackage, startedAtMs: startedAt });
@@ -179,7 +184,7 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
       agentType: EXECUTIVE_KPI_ANALYSIS_CONTRACT_ID,
       usage: generated.usage
     });
-    return { status: "current", artifact: executiveKpiAnalysisArtifactForView(generated.artifact), message: null };
+    return { status: "current", artifact: executiveKpiAnalysisArtifactForView(generated.artifact), message: null, readiness };
   } catch (error) {
     await admin.from("ai_agent_runs").update({
       status: "failed",
@@ -193,6 +198,6 @@ export async function generateExecutiveKpiAnalysisAction(requestToken: string): 
       agentType: EXECUTIVE_KPI_ANALYSIS_CONTRACT_ID,
       usage: failedUsage(error, Date.now() - startedAt)
     });
-    return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
+    return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE, readiness: temporaryExecutiveKpiProviderFailure() };
   }
 }

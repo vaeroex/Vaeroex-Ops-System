@@ -35,6 +35,10 @@ process.env.SUPABASE_SERVICE_ROLE_KEY = "local-executive-kpi-analysis-secret";
 const { buildExecutiveKpiAnalysisPackage } = require("../lib/ai/executive-kpi-analysis/context.ts");
 const { EXECUTIVE_KPI_ANALYSIS_JSON_SCHEMA } = require("../lib/ai/executive-kpi-analysis/contracts.ts");
 const { materializeExecutiveKpiNames } = require("../lib/ai/executive-kpi-analysis/service.ts");
+const {
+  evaluateExecutiveKpiAnalysisReadiness,
+  temporaryExecutiveKpiProviderFailure
+} = require("../lib/ai/executive-kpi-analysis/readiness.ts");
 const { validateExecutiveKpiAnalysisOutput } = require("../lib/ai/executive-kpi-analysis/validation.ts");
 const { sealExecutiveKpiAnalysisPackage, openExecutiveKpiAnalysisPackage } = require("../lib/ai/executive-kpi-analysis/token.ts");
 const {
@@ -59,6 +63,20 @@ function trend(name, values, directionality = null, sourceFileId = "33333333-333
       targetValue: null,
       observedAt: `2026-0${index + 1}-15`,
       sourceFileId,
+      sourceLabel: "Retail Performance workbook"
+    }))
+  };
+}
+function datedTrend(name, rows, directionality = null) {
+  return {
+    name,
+    directionality,
+    rows: rows.map(({ actualValue, observedAt }, index) => ({
+      id: `${name.toLowerCase().replace(/\s+/g, "-")}-${index}`,
+      actualValue,
+      targetValue: null,
+      observedAt,
+      sourceFileId: "33333333-3333-4333-8333-333333333333",
       sourceLabel: "Retail Performance workbook"
     }))
   };
@@ -92,6 +110,37 @@ assert.equal(build().fingerprint, analysisPackage.fingerprint, "identical KPI pa
 assert.notEqual(build({ mode: "actual" }).fingerprint, analysisPackage.fingerprint, "mode changes must invalidate cache");
 assert.notEqual(build({ trends: [trend("Checkout Wait", [3.5, 4.8, 7.1], "lower"), trend("Revenue", [7000, 6900, 6800], "higher")] }).fingerprint, analysisPackage.fingerprint, "value changes must invalidate cache");
 assert.notEqual(build({ trends: [trend("Checkout Wait", [3.5, 4.8, 6.2], "higher"), trend("Revenue", [7000, 6900, 6800], "higher")] }).fingerprint, analysisPackage.fingerprint, "directionality changes must invalidate cache");
+
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(build({
+  confidenceScore: 82,
+  trends: [trend("Checkout Wait", [3.5, 4.2, 5.1, 6.2], "lower"), trend("Revenue", [7200, 7100, 6950, 6800], "higher")]
+})).code, "READY", "sufficient shared history and directionality must be ready");
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(analysisPackage).code, "LIMITED", "bounded history or confidence must be disclosed as limited");
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(build({
+  trends: [trend("Checkout Wait", [6.2], "lower"), trend("Revenue", [6800], "higher")]
+})).code, "NEEDS_MORE_HISTORY", "short KPI histories must not invoke a provider");
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(build({
+  trends: [
+    datedTrend("Checkout Wait", [{ actualValue: 4, observedAt: "2026-01-15" }, { actualValue: 6, observedAt: "2026-02-15" }], "lower"),
+    datedTrend("Revenue", [{ actualValue: 7200, observedAt: "2026-03-15" }, { actualValue: 6800, observedAt: "2026-04-15" }], "higher")
+  ]
+})).code, "INSUFFICIENT_DATE_OVERLAP", "non-overlapping reporting periods must fail before provider execution");
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(build({
+  trends: [trend("Checkout Wait", [4, 4, 4], "lower"), trend("Revenue", [7000, 7000, 7000], "higher")]
+})).code, "NO_CLEAR_PATTERN", "flat KPI combinations must complete deterministically without a provider");
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(build({
+  trends: [
+    trend("Checkout Wait", [3, 4, 5], "lower"),
+    trend("Revenue", [7200, 7000, 6800], "higher"),
+    trend("Returns", [4, 5, 6], "lower"),
+    trend("Customer Rating", [4.8, 4.5, 4.2], "higher")
+  ]
+})).code, "COMPARISON_TOO_BROAD", "more than three KPIs must be narrowed before synthesis");
+assert.equal(evaluateExecutiveKpiAnalysisReadiness(build({
+  trends: [trend("Checkout Wait", [3.5, 4.8, 6.2], null), trend("Revenue", [7000, 6900, 6800], "higher")]
+})).code, "MISSING_DIRECTIONALITY", "missing favorable direction must block executive interpretation");
+assert.equal(temporaryExecutiveKpiProviderFailure().code, "TEMPORARY_PROVIDER_FAILURE");
+assert.equal(temporaryExecutiveKpiProviderFailure().canGenerate, false);
 
 const validOutput = {
   executive_summary: "Checkout Wait increased while Revenue declined, creating a visible pattern that deserves leadership attention. The timing suggests a possible relationship worth investigating.",
@@ -174,17 +223,33 @@ assert.equal(executiveKpiAnalysisReleaseChannel(), "development");
 const pageSource = read("app/app/kpis/page.tsx");
 const componentSource = read("components/intelligence/ExecutiveKpiAnalysis.tsx");
 const actionSource = read("app/app/kpis/executive-analysis/actions.ts");
+const promptSource = read("lib/ai/executive-kpi-analysis/service.ts");
 const storageSource = read("lib/ai/executive-kpi-analysis/storage.ts");
 assert.match(pageSource, /<OverlayTrendChart trends=\{trends\} mode=\{mode\} \/>/, "the existing chart must remain mounted unchanged");
 assert.doesNotMatch(pageSource, />Comparison summary</, "the old visible comparison summary must be retired");
 assert.match(componentSource, /Generate Executive Analysis/);
 assert.match(componentSource, /Understand the story behind the selected KPIs/);
+assert.match(componentSource, />What Stands Out</);
+assert.match(componentSource, />Pattern Worth Investigating</);
+assert.match(componentSource, />Leadership Focus</);
+assert.match(componentSource, />Keep In Mind</);
+assert.doesNotMatch(componentSource, />Significant Trends</);
+assert.doesNotMatch(componentSource, />Potential KPI Relationships</);
+assert.doesNotMatch(componentSource, />Leadership Considerations</);
+assert.doesNotMatch(componentSource, />Analysis Limitations</);
+for (const state of ["READY", "LIMITED", "NEEDS_MORE_HISTORY", "INSUFFICIENT_DATE_OVERLAP", "NO_CLEAR_PATTERN", "COMPARISON_TOO_BROAD", "MISSING_DIRECTIONALITY", "TEMPORARY_PROVIDER_FAILURE"]) {
+  assert.match(read("lib/ai/executive-kpi-analysis/readiness.ts"), new RegExp(`"${state}"`), `${state} must have deterministic handling`);
+}
 assert.doesNotMatch(componentSource, /application-owned/);
 assert.doesNotMatch(componentSource, /deterministic facts/);
 assert.doesNotMatch(componentSource, /useEffect\(/, "page render must not trigger generation");
 assert.match(componentSource, /onClick=\{generate\}/, "generation must require an explicit click");
 assert.match(componentSource, /Validated KPI facts/, "deterministic fallback must remain visible on failure");
 assert.match(actionSource, /isExecutiveKpiAnalysisEnabled\(\)/, "the action must fail closed without the approved policy");
+assert.ok(actionSource.indexOf("if (!readiness.canGenerate)") < actionSource.indexOf("generateExecutiveKpiAnalysis({"), "readiness must fail closed before provider execution");
+assert.match(promptSource, /What does this combination of KPIs likely mean for leadership\?/);
+assert.match(promptSource, /prioritize\. State what leadership should investigate first/);
+assert.match(promptSource, /Another possibility is/);
 assert.match(actionSource, /workspaceId,[\s\S]*fingerprint: analysisPackage\.fingerprint,[\s\S]*releaseChannel/, "cache lookup must be workspace, fingerprint, and release-channel scoped");
 assert.match(actionSource, /original_evidence_eligible: false/, "derived analysis must never become original evidence");
 assert.match(storageSource, /\.eq\("workspace_id", workspaceId\)/, "persisted artifact selection must be workspace scoped");

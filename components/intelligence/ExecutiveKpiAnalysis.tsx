@@ -5,6 +5,14 @@ import { useRef, useState, useTransition } from "react";
 import { generateExecutiveKpiAnalysisAction } from "@/app/app/kpis/executive-analysis/actions";
 import type { ExecutiveKpiAnalysisState } from "@/lib/ai/executive-kpi-analysis/contracts";
 
+const TEMPORARY_PROVIDER_FAILURE = {
+  code: "TEMPORARY_PROVIDER_FAILURE" as const,
+  canGenerate: false,
+  title: "Executive Analysis is temporarily unavailable.",
+  explanation: "Validated KPI facts remain available below.",
+  nextSteps: ["Please try again shortly."]
+};
+
 function metricNames(ordinals: readonly number[], state: ExecutiveKpiAnalysisState) {
   const metrics = state.artifact?.facts.metrics || [];
   return ordinals
@@ -50,7 +58,8 @@ export function ExecutiveKpiAnalysis({
         setState({
           status: "failed",
           artifact: null,
-          message: "Executive analysis could not be prepared right now. The validated KPI facts remain available below."
+          message: null,
+          readiness: TEMPORARY_PROVIDER_FAILURE
         });
       } finally {
         requestInFlight.current = false;
@@ -59,7 +68,16 @@ export function ExecutiveKpiAnalysis({
   }
 
   const analysis = state.artifact?.analysis;
-  const showFallback = !analysis && ["failed", "unavailable", "insufficient_evidence"].includes(state.status);
+  const readiness = state.readiness;
+  const canRequestAnalysis = Boolean(requestToken)
+    && (readiness?.canGenerate === true || state.status === "failed");
+  const showReadiness = Boolean(readiness)
+    && state.status !== "loading"
+    && (readiness?.code !== "READY" || !analysis);
+  const showFallback = !analysis && (
+    readiness?.canGenerate === false
+    || ["failed", "unavailable", "insufficient_evidence"].includes(state.status)
+  );
 
   return (
     <section className="rounded-lg border border-white/10 bg-slate-950/35 p-4" aria-labelledby="executive-kpi-analysis-title">
@@ -70,15 +88,19 @@ export function ExecutiveKpiAnalysis({
             Understand the story behind the selected KPIs, including important patterns, possible relationships, and what leadership should investigate next.
           </p>
         </div>
-        {!analysis ? (
+        {!analysis && canRequestAnalysis ? (
           <button
             type="button"
             onClick={generate}
-            disabled={!requestToken || isPending || state.status === "loading"}
+            disabled={isPending || state.status === "loading"}
             className="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/60 disabled:cursor-not-allowed disabled:opacity-55"
           >
             {isPending || state.status === "loading" ? <LoaderCircle aria-hidden="true" className="h-4 w-4 animate-spin" /> : <BarChart3 aria-hidden="true" className="h-4 w-4" />}
-            {isPending || state.status === "loading" ? "Generating analysis" : "Generate Executive Analysis"}
+            {isPending || state.status === "loading"
+              ? "Generating analysis"
+              : state.status === "failed"
+                ? "Try again"
+                : "Generate Executive Analysis"}
           </button>
         ) : null}
       </div>
@@ -93,7 +115,28 @@ export function ExecutiveKpiAnalysis({
         </div>
       ) : null}
 
-      {state.message && state.status !== "loading" ? (
+      {showReadiness && readiness ? (
+        <div
+          className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-950/20 px-4 py-3"
+          data-readiness-state={readiness.code}
+          role={readiness.code === "TEMPORARY_PROVIDER_FAILURE" ? "alert" : "status"}
+        >
+          <p className="text-sm font-semibold text-white">{readiness.title}</p>
+          <p className="mt-1 text-sm leading-6 text-slate-300">{readiness.explanation}</p>
+          {readiness.nextSteps.length ? (
+            <ul className="mt-2 space-y-1 text-sm leading-6 text-slate-300">
+              {readiness.nextSteps.map((step) => (
+                <li key={step} className="flex gap-2">
+                  <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-200" />
+                  <span>{step}</span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </div>
+      ) : null}
+
+      {state.message && state.status !== "loading" && readiness?.code !== "TEMPORARY_PROVIDER_FAILURE" ? (
         <p className="mt-4 rounded-lg border border-amber-300/25 bg-amber-950/25 px-3 py-2 text-sm leading-6 text-amber-100" role={state.status === "failed" ? "alert" : "status"}>
           {state.message}
         </p>
@@ -106,7 +149,7 @@ export function ExecutiveKpiAnalysis({
             <p className="mt-3 text-sm leading-6 text-slate-200">{analysis.executive_summary}</p>
           </div>
           <div className="py-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Significant Trends</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">What Stands Out</h3>
             <div className="mt-3 space-y-3">
               {analysis.significant_trends.map((item, index) => (
                 <div key={`${item.statement}-${index}`}>
@@ -117,7 +160,7 @@ export function ExecutiveKpiAnalysis({
             </div>
           </div>
           <div className="py-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Potential KPI Relationships</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Pattern Worth Investigating</h3>
             <div className="mt-3 space-y-3">
               {analysis.potential_kpi_relationships.map((item, index) => (
                 <div key={`${item.statement}-${index}`}>
@@ -135,11 +178,11 @@ export function ExecutiveKpiAnalysis({
             <AnalysisList items={analysis.possible_business_drivers.map((item) => item.statement)} />
           </div>
           <div className="py-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Leadership Considerations</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Leadership Focus</h3>
             <AnalysisList items={analysis.leadership_considerations} />
           </div>
           <div className="py-5">
-            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Analysis Limitations</h3>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-cyan-100">Keep In Mind</h3>
             <AnalysisList items={analysis.analysis_limitations} />
           </div>
           {state.artifact?.citations.length ? (
