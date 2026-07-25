@@ -332,9 +332,21 @@ async function main() {
   const inventedNumber = validateBusinessNoteExtraction({ ...extraction(), summary: "Revenue was 9000 in June." }, simple);
   assert.equal(inventedNumber.ok, false);
   assert.equal(inventedNumber.diagnostic.reasonCode, "numeric_integrity_failed");
-  const inventedEntity = validateBusinessNoteExtraction({ ...extraction(), departments: ["Finance"] }, simple);
+  const unsupportedClassifications = expectValid(simple, extraction({
+    departments: ["Finance"],
+    topics: ["profitability"]
+  }), "unsupported unquoted classification hints remain reviewable");
+  assert.deepEqual(unsupportedClassifications.departments, []);
+  assert.deepEqual(unsupportedClassifications.topics, []);
+  assert.ok(unsupportedClassifications.missingContext.includes("Review department and topic classifications."));
+  assert.ok(businessNoteReviewWarnings(unsupportedClassifications).some((warning) => warning.code === "additional_context"));
+
+  const inventedEntity = validateBusinessNoteExtraction({
+    ...extraction(),
+    peopleMentioned: [{ name: "Alex", sourceQuote: "Sales reported" }]
+  }, simple);
   assert.equal(inventedEntity.ok, false);
-  assert.equal(inventedEntity.diagnostic.reasonCode, "unsupported_entity");
+  assert.equal(inventedEntity.diagnostic.reasonCode, "unsupported_inference");
 
   const reviewed = applyBusinessNoteReviewCorrections(extraction(), {
     title: "June revenue note",
@@ -431,15 +443,28 @@ async function main() {
     assert.deepEqual(ambiguousReviewRoute.calls, ["gpt-5.6-luna"], "ambiguous but grounded Luna output must remain reviewable");
     assert.equal(ambiguousReviewRun.fallbackUsed, false);
 
-    const sourceGroundingFallbackRoute = await providerRoute({
+    const classificationReviewRoute = await providerRoute({
       originalNote: simple,
       luna: (request) => providerResult(JSON.stringify(extraction({ departments: ["Finance"] })), request.model),
+      terra: (request) => providerResult(acceptedJson, request.model)
+    });
+    const classificationReviewRun = await classificationReviewRoute.run;
+    assert.deepEqual(classificationReviewRoute.calls, ["gpt-5.6-luna"], "unsupported unquoted classification hints must not invoke Terra");
+    assert.deepEqual(classificationReviewRun.output.departments, []);
+    assert.equal(classificationReviewRun.fallbackUsed, false);
+
+    const sourceGroundingFallbackRoute = await providerRoute({
+      originalNote: simple,
+      luna: (request) => providerResult(JSON.stringify(extraction({
+        explicitFacts: [{ statement: "Revenue was 7000 in June.", sourceQuote: "Revenue was $7,000.", confidence: 0.9 }]
+      })), request.model),
       terra: (request) => providerResult(acceptedJson, request.model)
     });
     const sourceGroundingFallbackRun = await sourceGroundingFallbackRoute.run;
     assert.deepEqual(sourceGroundingFallbackRoute.calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
     assert.equal(sourceGroundingFallbackRun.attempts[0].fallbackReason, "source_grounding_failure");
-    assert.equal(sourceGroundingFallbackRun.attempts[0].validationDiagnostic.reasonCode, "unsupported_entity");
+    assert.equal(sourceGroundingFallbackRun.attempts[0].validationDiagnostic.reasonCode, "source_quote_not_found");
+    assert.equal(sourceGroundingFallbackRun.attempts[0].validationDiagnostic.expectedField, "$.explicitFacts.0.sourceQuote");
 
     const numericFallbackRoute = await providerRoute({
       originalNote: simple,

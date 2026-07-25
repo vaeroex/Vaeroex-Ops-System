@@ -24,6 +24,7 @@ Your only task is to identify what information is explicitly present, what kind 
 Do not create findings, calculate or create KPIs, change Business Health, assign final evidence weight, treat opinions as facts, infer causation, invent dates or quantities, invent entities or departments, convert vague language into precise measurements, resolve contradictions, judge leadership, make recommendations, or perform executive analysis.
 Keep contradictory statements separate. Preserve uncertainty. A low-confidence but contract-valid extraction is acceptable and must remain available for user review.
 Opinions, concerns, assumptions, ideas, questions, vague periods, incomplete context, and notes without measurable facts are valid reviewable inputs. Do not refuse extraction merely because the note is uncertain or incomplete. Use null dates, empty entity collections, context_only evidence treatment, low confidence, and missingContext where appropriate.
+Department and topic values are optional classification hints. Include them only when the exact department or topic wording appears in the note; otherwise return an empty array rather than inferring a label.
 Use extractionDisposition "too_ambiguous" when only limited source-grounded classification is possible; this remains a reviewable result. Use "no_business_context" when the note contains no useful business context and return no extracted evidence items. Never invent detail to make an uncertain note appear complete.
 evidenceTreatment is a proposal only; application code makes every final eligibility and weight decision.
 Return exactly one JSON object that satisfies the supplied strict schema. Do not include markdown, citations, internal IDs, hidden reasoning, or commentary.`;
@@ -46,6 +47,7 @@ export function businessNoteProviderAttemptTelemetry(attempt: AIProviderAttempt)
     fallback_reason: attempt.fallbackReason,
     validation_stage: attempt.validationDiagnostic?.stage || null,
     validation_reason_code: attempt.validationDiagnostic?.reasonCode || null,
+    validation_expected_field: attempt.validationDiagnostic?.expectedField || null,
     truncation_detected: attempt.truncationDetected
   };
 }

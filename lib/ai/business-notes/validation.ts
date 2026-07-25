@@ -156,11 +156,23 @@ function canonicalFailure(
   });
 }
 
-function normalizeUncertainClassifications(extraction: BusinessNoteExtraction): BusinessNoteExtraction {
+function normalizeUncertainClassifications(
+  extraction: BusinessNoteExtraction,
+  originalNote: string
+): BusinessNoteExtraction {
   const opinionLikeFacts = extraction.explicitFacts.filter((fact) => (
     SUBJECTIVE_LANGUAGE.test(fact.sourceQuote) || CAUSAL_LANGUAGE.test(fact.sourceQuote)
   ));
-  if (!opinionLikeFacts.length) return extraction;
+  const departments = extraction.departments.filter((department) => (
+    normalized(originalNote).includes(normalized(department))
+  ));
+  const topics = extraction.topics.filter((topic) => (
+    normalized(originalNote).includes(normalized(topic))
+  ));
+  const removedUnquotedClassifications = (
+    departments.length !== extraction.departments.length || topics.length !== extraction.topics.length
+  );
+  if (!opinionLikeFacts.length && !removedUnquotedClassifications) return extraction;
 
   const existing = new Set(extraction.opinionsOrAssumptions.map((item) => `${item.statement}\u0000${item.sourceQuote}`));
   const combinedOpinions = [
@@ -168,14 +180,24 @@ function normalizeUncertainClassifications(extraction: BusinessNoteExtraction): 
     ...opinionLikeFacts.filter((item) => !existing.has(`${item.statement}\u0000${item.sourceQuote}`))
   ];
   const overflow = combinedOpinions.length > 40;
+  const classificationWarning = "Review department and topic classifications.";
+  const missingContext = [
+    ...extraction.missingContext,
+    ...(removedUnquotedClassifications && !extraction.missingContext.includes(classificationWarning)
+      ? [classificationWarning]
+      : []),
+    ...(overflow && !extraction.missingContext.includes("Some subjective statements require manual review.")
+      ? ["Some subjective statements require manual review."]
+      : [])
+  ].slice(0, 30);
 
   return {
     ...extraction,
+    departments,
+    topics,
     explicitFacts: extraction.explicitFacts.filter((fact) => !opinionLikeFacts.includes(fact)),
     opinionsOrAssumptions: combinedOpinions.slice(0, 40),
-    missingContext: overflow && !extraction.missingContext.includes("Some subjective statements require manual review.")
-      ? [...extraction.missingContext, "Some subjective statements require manual review."].slice(0, 30)
-      : extraction.missingContext
+    missingContext
   };
 }
 
@@ -221,7 +243,7 @@ export function validateBusinessNoteExtraction(value: unknown, originalNote: str
     });
   }
 
-  const extraction = normalizeUncertainClassifications(parsed.data);
+  const extraction = normalizeUncertainClassifications(parsed.data, originalNote);
 
   const safety = validateAiGeneratedOutput(extraction as unknown as Json);
   if (!safety.ok) return canonicalFailure("Business Note extraction failed safe-output validation.", "$", "unsafe_generated_output");
@@ -241,16 +263,6 @@ export function validateBusinessNoteExtraction(value: unknown, originalNote: str
     return canonicalFailure("The reporting-period quotation does not exist in the original note.", "$.reportingPeriod.sourceQuote", "source_quote_not_found");
   }
 
-  for (const department of extraction.departments) {
-    if (!normalized(originalNote).includes(normalized(department))) {
-      return canonicalFailure("An extracted department is not explicitly present in the note.", "$.departments", "unsupported_entity");
-    }
-  }
-  for (const topic of extraction.topics) {
-    if (!normalized(originalNote).includes(normalized(topic))) {
-      return canonicalFailure("An extracted topic is not explicitly present in the note.", "$.topics", "unsupported_entity");
-    }
-  }
   for (const entry of listEntries(extraction)) {
     if (!exactQuoteSpan(originalNote, entry.quote)) {
       return canonicalFailure("An extracted item does not retain an exact quotation from the original note.", `$.${entry.path}.sourceQuote`, "source_quote_not_found");
