@@ -1,8 +1,8 @@
 export const BUSINESS_NOTE_EXTRACTION_CONTRACT_ID = "business_note_extraction_v1" as const;
 export const BUSINESS_NOTE_EXTRACTION_SCHEMA_VERSION = "business_note_extraction_v1" as const;
-export const BUSINESS_NOTE_EXTRACTION_VALIDATOR_VERSION = "business_note_extraction_validator_v1" as const;
+export const BUSINESS_NOTE_EXTRACTION_VALIDATOR_VERSION = "business_note_extraction_validator_v2" as const;
 export const BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR = "gpt56_luna_terra_v1" as const;
-export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v1" as const;
+export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v2" as const;
 export const BUSINESS_NOTE_MAX_CHARACTERS = 20_000;
 
 export const BUSINESS_NOTE_TYPES = [
@@ -35,6 +35,17 @@ export type BusinessNoteEvidenceTreatment = (typeof BUSINESS_NOTE_EVIDENCE_TREAT
 export type BusinessNoteExtractionDisposition = (typeof BUSINESS_NOTE_EXTRACTION_DISPOSITIONS)[number];
 export type BusinessNoteReleaseChannel = "production" | "preview" | "development";
 export type BusinessNoteStatus = "draft" | "extracting" | "review_required" | "approved" | "rejected" | "extraction_failed" | "archived";
+export type BusinessNoteReviewWarningCode =
+  | "low_confidence"
+  | "reporting_period_unclear"
+  | "primarily_subjective"
+  | "no_measurable_facts"
+  | "additional_context";
+
+export type BusinessNoteReviewWarning = Readonly<{
+  code: BusinessNoteReviewWarningCode;
+  label: string;
+}>;
 
 export type BusinessNoteQuotedEntity = Readonly<{
   name: string;

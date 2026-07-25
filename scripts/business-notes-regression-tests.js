@@ -42,6 +42,7 @@ const {
 } = require("../lib/ai/business-notes/contracts.ts");
 const {
   applyBusinessNoteReviewCorrections,
+  businessNoteReviewWarnings,
   businessNoteSourceSpans,
   validateBusinessNoteExtraction
 } = require("../lib/ai/business-notes/validation.ts");
@@ -50,6 +51,7 @@ const {
   SupabasePgvectorCandidateRetriever
 } = require("../lib/ai/evidence-index.ts");
 const { AIProviderExecutionError, runStructuredAI } = require("../lib/ai/providers/provider-manager.ts");
+const { AIProviderError } = require("../lib/ai/providers/types.ts");
 const { resolveBusinessNoteExtractionGenerationPolicy } = require("../lib/ai/providers/workflow-provider-policy.ts");
 
 function extraction(overrides = {}) {
@@ -205,10 +207,13 @@ async function main() {
   }), "mixed fact and opinion");
 
   const misclassifiedAssumption = extraction({
+    summary: "The note says the campaign caused revenue.",
     explicitFacts: [{ statement: "The campaign caused revenue.", sourceQuote: "I think the campaign caused it.", confidence: 0.8 }],
     mentionedMetrics: []
   });
-  assert.equal(validateBusinessNoteExtraction(misclassifiedAssumption, mixed).ok, false, "an assumption cannot be accepted as an explicit fact");
+  const normalizedAssumption = expectValid(mixed, misclassifiedAssumption, "opinion-like facts remain reviewable");
+  assert.equal(normalizedAssumption.explicitFacts.length, 0, "subjective language must not remain classified as an explicit fact");
+  assert.equal(normalizedAssumption.opinionsOrAssumptions.length, 1, "subjective language must be preserved for review");
 
   const vaguePeriod = "Sales reported: Revenue was 7000 recently.";
   expectValid(vaguePeriod, extraction({
@@ -307,12 +312,29 @@ async function main() {
 
   const lowConfidence = extraction({ extractionConfidence: 0.05 });
   expectValid(simple, lowConfidence, "low confidence remains reviewable and must not trigger fallback");
-  const ambiguous = validateBusinessNoteExtraction(extraction({ extractionDisposition: "too_ambiguous" }), simple);
-  assert.equal(ambiguous.ok, false);
-  assert.equal(ambiguous.diagnostic.reasonCode, "ambiguous_extraction");
+  const ambiguous = expectValid(simple, extraction({ extractionDisposition: "too_ambiguous", extractionConfidence: 0.1 }), "ambiguous but grounded output remains reviewable");
+  assert.ok(businessNoteReviewWarnings(ambiguous).some((warning) => warning.code === "additional_context"));
+  assert.ok(businessNoteReviewWarnings(lowConfidence).some((warning) => warning.code === "low_confidence"));
+  assert.ok(businessNoteReviewWarnings(expectValid(emotional, extraction({
+    title: "Concern about returns",
+    summary: "The note says returns are getting worse.",
+    noteType: "concern",
+    departments: ["Sales"],
+    topics: ["returns"],
+    explicitFacts: [],
+    opinionsOrAssumptions: [{ statement: "Returns are getting worse.", sourceQuote: "I am frustrated and believe returns are getting worse.", confidence: 0.3 }],
+    mentionedMetrics: [],
+    evidenceTreatment: "context_only",
+    extractionConfidence: 0.3
+  }), "subjective warning fixture")).some((warning) => warning.code === "primarily_subjective"));
   assert.equal(validateBusinessNoteExtraction({ ...extraction(), sourceClassification: "unsupported" }, simple).ok, false);
   assert.equal(validateBusinessNoteExtraction({ ...extraction(), explicitFacts: [{ statement: "Revenue was 7000 in June.", sourceQuote: "", confidence: 0.9 }] }, simple).ok, false);
-  assert.equal(validateBusinessNoteExtraction({ ...extraction(), summary: "Revenue was 9000 in June." }, simple).ok, false);
+  const inventedNumber = validateBusinessNoteExtraction({ ...extraction(), summary: "Revenue was 9000 in June." }, simple);
+  assert.equal(inventedNumber.ok, false);
+  assert.equal(inventedNumber.diagnostic.reasonCode, "numeric_integrity_failed");
+  const inventedEntity = validateBusinessNoteExtraction({ ...extraction(), departments: ["Finance"] }, simple);
+  assert.equal(inventedEntity.ok, false);
+  assert.equal(inventedEntity.diagnostic.reasonCode, "unsupported_entity");
 
   const reviewed = applyBusinessNoteReviewCorrections(extraction(), {
     title: "June revenue note",
@@ -400,14 +422,42 @@ async function main() {
     assert.deepEqual(timeoutFallbackRoute.calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
     assert.equal(timeoutFallbackRun.attempts[0].fallbackReason, "timeout");
 
-    const ambiguousFallbackRoute = await providerRoute({
+    const ambiguousReviewRoute = await providerRoute({
       originalNote: simple,
       luna: (request) => providerResult(JSON.stringify(extraction({ extractionDisposition: "too_ambiguous" })), request.model),
       terra: (request) => providerResult(acceptedJson, request.model)
     });
-    const ambiguousFallbackRun = await ambiguousFallbackRoute.run;
-    assert.deepEqual(ambiguousFallbackRoute.calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
-    assert.equal(ambiguousFallbackRun.attempts[0].fallbackReason, "ambiguous_extraction");
+    const ambiguousReviewRun = await ambiguousReviewRoute.run;
+    assert.deepEqual(ambiguousReviewRoute.calls, ["gpt-5.6-luna"], "ambiguous but grounded Luna output must remain reviewable");
+    assert.equal(ambiguousReviewRun.fallbackUsed, false);
+
+    const sourceGroundingFallbackRoute = await providerRoute({
+      originalNote: simple,
+      luna: (request) => providerResult(JSON.stringify(extraction({ departments: ["Finance"] })), request.model),
+      terra: (request) => providerResult(acceptedJson, request.model)
+    });
+    const sourceGroundingFallbackRun = await sourceGroundingFallbackRoute.run;
+    assert.deepEqual(sourceGroundingFallbackRoute.calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
+    assert.equal(sourceGroundingFallbackRun.attempts[0].fallbackReason, "source_grounding_failure");
+    assert.equal(sourceGroundingFallbackRun.attempts[0].validationDiagnostic.reasonCode, "unsupported_entity");
+
+    const numericFallbackRoute = await providerRoute({
+      originalNote: simple,
+      luna: (request) => providerResult(JSON.stringify(extraction({ summary: "Revenue was 9000 in June." })), request.model),
+      terra: (request) => providerResult(acceptedJson, request.model)
+    });
+    const numericFallbackRun = await numericFallbackRoute.run;
+    assert.equal(numericFallbackRun.attempts[0].fallbackReason, "numeric_integrity_failure");
+    assert.deepEqual(numericFallbackRoute.calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
+
+    const refusalFallbackRoute = await providerRoute({
+      originalNote: simple,
+      luna: () => { throw new AIProviderError("OpenAI declined the request.", "openai", false, undefined, "refusal"); },
+      terra: (request) => providerResult(acceptedJson, request.model)
+    });
+    const refusalFallbackRun = await refusalFallbackRoute.run;
+    assert.deepEqual(refusalFallbackRoute.calls, ["gpt-5.6-luna", "gpt-5.6-terra"]);
+    assert.equal(refusalFallbackRun.attempts[0].fallbackReason, "provider_refusal");
 
     const failedRoute = await providerRoute({
       originalNote: simple,
@@ -428,8 +478,10 @@ async function main() {
   const policy = read("lib/ai/providers/workflow-provider-policy.ts");
   assert.match(policy, /BUSINESS_NOTE_EXTRACTION_LUNA_MODEL = "gpt-5\.6-luna"/);
   assert.match(policy, /BUSINESS_NOTE_EXTRACTION_TERRA_MODEL = "gpt-5\.6-terra"/);
-  assert.match(policy, /BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS[\s\S]*"ambiguous_extraction"/);
-  assert.doesNotMatch(policy.match(/BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS[\s\S]*?\] as const/)?.[0] || "", /low_confidence/);
+  const fallbackPolicy = policy.match(/BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS[\s\S]*?\] as const/)?.[0] || "";
+  assert.match(fallbackPolicy, /"source_grounding_failure"/);
+  assert.match(fallbackPolicy, /"provider_refusal"/);
+  assert.doesNotMatch(fallbackPolicy, /low_confidence|ambiguous_extraction|contextual_validation_failure/);
   const service = read("lib/ai/business-notes/service.ts");
   assert.doesNotMatch(service, /gpt-5\.6-sol/i);
   assert.match(service, /maxRetries: 0/);
@@ -440,6 +492,14 @@ async function main() {
   const panel = read("components/evidence/BusinessNotesPanel.tsx");
   assert.match(panel, /Add Note for Review/);
   assert.match(panel, /Original note/);
+  assert.match(panel, /Review warnings/);
+  assert.match(panel, /do not prevent approval as contextual evidence/);
+  const validation = read("lib/ai/business-notes/validation.ts");
+  assert.match(validation, /Low-confidence extraction/);
+  assert.match(validation, /Reporting period unclear/);
+  assert.match(validation, /Primarily subjective content/);
+  assert.match(validation, /No measurable facts identified/);
+  assert.match(validation, /Additional context may improve usefulness/);
   assert.doesNotMatch(panel, /gpt-5\.6|Luna|Terra/);
 
   const migration = read("supabase/migrations/202607250001_business_notes_evidence.sql");

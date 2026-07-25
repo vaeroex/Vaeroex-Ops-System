@@ -8,7 +8,10 @@ import {
   BUSINESS_NOTE_TYPES,
   type BusinessNoteExtraction
 } from "@/lib/ai/business-notes/contracts";
-import { validateBusinessNoteExtraction } from "@/lib/ai/business-notes/validation";
+import {
+  businessNoteReviewWarnings,
+  validateBusinessNoteExtraction
+} from "@/lib/ai/business-notes/validation";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import type { Database } from "@/lib/supabase/types";
 
@@ -72,6 +75,7 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
   const observationDateFallback = extraction.reportingPeriod.start || extraction.reportingPeriod.end
     ? ""
     : note.user_observation_date || "";
+  const warnings = businessNoteReviewWarnings(extraction);
   return (
     <article className="rounded-lg border border-cyan-300/30 bg-cyan-950/15 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -85,6 +89,15 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
       </div>
       <form action={approveBusinessNoteAction} className="mt-4 space-y-5">
         <input type="hidden" name="note_id" value={note.id} />
+        {warnings.length ? (
+          <div className="rounded-md border border-amber-300/20 bg-amber-950/15 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-amber-100">Review warnings</p>
+            <ul className="mt-2 space-y-1 text-sm text-amber-50/90">
+              {warnings.map((warning) => <li key={warning.code}>- {warning.label}</li>)}
+            </ul>
+            <p className="mt-2 text-xs leading-5 text-amber-100/70">These warnings do not prevent approval as contextual evidence.</p>
+          </div>
+        ) : null}
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm text-slate-200">
             <span className="mb-1 block text-xs font-semibold text-slate-300">Generated title</span>

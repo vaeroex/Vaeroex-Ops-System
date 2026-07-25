@@ -9,11 +9,17 @@ import {
   BUSINESS_NOTE_TYPES,
   type BusinessNoteExtraction,
   type BusinessNoteReviewCorrections,
+  type BusinessNoteReviewWarning,
   type BusinessNoteSourceSpan
 } from "@/lib/ai/business-notes/contracts";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
-import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
+import {
+  validationFailure,
+  validationValueType,
+  type AIValidationReasonCode,
+  type AIValidationStage
+} from "@/lib/ai/validation-diagnostics";
 import type { Json } from "@/lib/supabase/types";
 
 const shortText = z.string().trim().min(1).max(240);
@@ -136,13 +142,69 @@ function listEntries(extraction: BusinessNoteExtraction) {
   ];
 }
 
-function canonicalFailure(reason: string, expectedField = "$"): StructuredOutputValidation<never> {
+function canonicalFailure(
+  reason: string,
+  expectedField = "$",
+  reasonCode: AIValidationReasonCode = "contextual_validation_failed",
+  stage: AIValidationStage = "contextual_validation"
+): StructuredOutputValidation<never> {
   return validationFailure(reason, {
-    reasonCode: "contextual_validation_failed",
-    stage: "contextual_validation",
+    reasonCode,
+    stage,
     expectedField,
     truncationDetected: false
   });
+}
+
+function normalizeUncertainClassifications(extraction: BusinessNoteExtraction): BusinessNoteExtraction {
+  const opinionLikeFacts = extraction.explicitFacts.filter((fact) => (
+    SUBJECTIVE_LANGUAGE.test(fact.sourceQuote) || CAUSAL_LANGUAGE.test(fact.sourceQuote)
+  ));
+  if (!opinionLikeFacts.length) return extraction;
+
+  const existing = new Set(extraction.opinionsOrAssumptions.map((item) => `${item.statement}\u0000${item.sourceQuote}`));
+  const combinedOpinions = [
+    ...extraction.opinionsOrAssumptions,
+    ...opinionLikeFacts.filter((item) => !existing.has(`${item.statement}\u0000${item.sourceQuote}`))
+  ];
+  const overflow = combinedOpinions.length > 40;
+
+  return {
+    ...extraction,
+    explicitFacts: extraction.explicitFacts.filter((fact) => !opinionLikeFacts.includes(fact)),
+    opinionsOrAssumptions: combinedOpinions.slice(0, 40),
+    missingContext: overflow && !extraction.missingContext.includes("Some subjective statements require manual review.")
+      ? [...extraction.missingContext, "Some subjective statements require manual review."].slice(0, 30)
+      : extraction.missingContext
+  };
+}
+
+export function businessNoteReviewWarnings(extraction: BusinessNoteExtraction): BusinessNoteReviewWarning[] {
+  const itemConfidences = [
+    ...extraction.explicitFacts,
+    ...extraction.opinionsOrAssumptions,
+    ...extraction.risks,
+    ...extraction.opportunities,
+    ...extraction.decisions,
+    ...extraction.mentionedMetrics
+  ].map((item) => item.confidence);
+  const warnings: BusinessNoteReviewWarning[] = [];
+  if (extraction.extractionConfidence < 0.7 || itemConfidences.some((value) => value < 0.5)) {
+    warnings.push({ code: "low_confidence", label: "Low-confidence extraction" });
+  }
+  if (extraction.reportingPeriod.inferred || extraction.reportingPeriod.start === null || extraction.reportingPeriod.end === null) {
+    warnings.push({ code: "reporting_period_unclear", label: "Reporting period unclear" });
+  }
+  if (extraction.opinionsOrAssumptions.length > 0 && extraction.explicitFacts.length === 0 && extraction.mentionedMetrics.length === 0) {
+    warnings.push({ code: "primarily_subjective", label: "Primarily subjective content" });
+  }
+  if (extraction.explicitFacts.length === 0 && extraction.mentionedMetrics.length === 0) {
+    warnings.push({ code: "no_measurable_facts", label: "No measurable facts identified" });
+  }
+  if (extraction.missingContext.length > 0 || extraction.extractionDisposition === "too_ambiguous") {
+    warnings.push({ code: "additional_context", label: "Additional context may improve usefulness" });
+  }
+  return warnings;
 }
 
 export function validateBusinessNoteExtraction(value: unknown, originalNote: string): StructuredOutputValidation<BusinessNoteExtraction> {
@@ -159,74 +221,60 @@ export function validateBusinessNoteExtraction(value: unknown, originalNote: str
     });
   }
 
-  const extraction = parsed.data;
-  if (extraction.extractionDisposition === "too_ambiguous") {
-    return validationFailure("The extraction model marked this note as too ambiguous for reliable extraction.", {
-      reasonCode: "ambiguous_extraction",
-      stage: "contextual_validation",
-      expectedField: "$.extractionDisposition",
-      expectedType: "string",
-      observedType: "string",
-      fieldPresent: true,
-      truncationDetected: false
-    });
-  }
+  const extraction = normalizeUncertainClassifications(parsed.data);
 
   const safety = validateAiGeneratedOutput(extraction as unknown as Json);
-  if (!safety.ok) return canonicalFailure("Business Note extraction failed safe-output validation.");
-  if (REASONING_LEAKAGE.test(JSON.stringify(extraction))) return canonicalFailure("Business Note extraction exposed prohibited reasoning language.");
+  if (!safety.ok) return canonicalFailure("Business Note extraction failed safe-output validation.", "$", "unsafe_generated_output");
+  if (REASONING_LEAKAGE.test(JSON.stringify(extraction))) {
+    return canonicalFailure("Business Note extraction exposed prohibited reasoning language.", "$", "reasoning_leakage");
+  }
   if (!dateValue(extraction.reportingPeriod.start) || !dateValue(extraction.reportingPeriod.end)) {
-    return canonicalFailure("Reporting-period values must be valid ISO dates.", "$.reportingPeriod");
+    return canonicalFailure("Reporting-period values must be valid ISO dates.", "$.reportingPeriod", "contextual_inconsistency");
   }
   if (extraction.reportingPeriod.start && extraction.reportingPeriod.end && extraction.reportingPeriod.start > extraction.reportingPeriod.end) {
-    return canonicalFailure("The reporting-period start must not be after its end.", "$.reportingPeriod");
+    return canonicalFailure("The reporting-period start must not be after its end.", "$.reportingPeriod", "contextual_inconsistency");
   }
   if ((extraction.reportingPeriod.start || extraction.reportingPeriod.end) && !extraction.reportingPeriod.sourceQuote) {
-    return canonicalFailure("A reporting period requires an exact source quotation.", "$.reportingPeriod.sourceQuote");
+    return canonicalFailure("A reporting period requires an exact source quotation.", "$.reportingPeriod.sourceQuote", "source_quote_missing");
   }
   if (extraction.reportingPeriod.sourceQuote && !exactQuoteSpan(originalNote, extraction.reportingPeriod.sourceQuote)) {
-    return canonicalFailure("The reporting-period quotation does not exist in the original note.", "$.reportingPeriod.sourceQuote");
+    return canonicalFailure("The reporting-period quotation does not exist in the original note.", "$.reportingPeriod.sourceQuote", "source_quote_not_found");
   }
 
   for (const department of extraction.departments) {
     if (!normalized(originalNote).includes(normalized(department))) {
-      return canonicalFailure("An extracted department is not explicitly present in the note.", "$.departments");
+      return canonicalFailure("An extracted department is not explicitly present in the note.", "$.departments", "unsupported_entity");
     }
   }
   for (const topic of extraction.topics) {
     if (!normalized(originalNote).includes(normalized(topic))) {
-      return canonicalFailure("An extracted topic is not explicitly present in the note.", "$.topics");
-    }
-  }
-  for (const [index, fact] of extraction.explicitFacts.entries()) {
-    if (SUBJECTIVE_LANGUAGE.test(fact.sourceQuote) || CAUSAL_LANGUAGE.test(fact.sourceQuote)) {
-      return canonicalFailure("Opinion or causal language cannot be classified as an explicit fact.", `$.explicitFacts.${index}`);
+      return canonicalFailure("An extracted topic is not explicitly present in the note.", "$.topics", "unsupported_entity");
     }
   }
   for (const entry of listEntries(extraction)) {
     if (!exactQuoteSpan(originalNote, entry.quote)) {
-      return canonicalFailure("An extracted item does not retain an exact quotation from the original note.", `$.${entry.path}.sourceQuote`);
+      return canonicalFailure("An extracted item does not retain an exact quotation from the original note.", `$.${entry.path}.sourceQuote`, "source_quote_not_found");
     }
     if (!statementSupportedByQuote(entry.text, entry.quote)) {
-      return canonicalFailure("An extracted item adds meaning or numbers not supported by its source quotation.", `$.${entry.path}`);
+      return canonicalFailure("An extracted item adds meaning or numbers not supported by its source quotation.", `$.${entry.path}`, "unsupported_inference");
     }
   }
   for (const metric of extraction.mentionedMetrics) {
     if (metric.value !== null) {
       const expected = String(metric.value).replace(/,/g, "");
       if (!numericTokens(metric.sourceQuote).some((token) => token.replace(/[^\d.+-]/g, "") === expected)) {
-        return canonicalFailure("A metric value is not present in its exact source quotation.", "$.mentionedMetrics");
+        return canonicalFailure("A metric value is not present in its exact source quotation.", "$.mentionedMetrics", "numeric_integrity_failed", "numeric_integrity");
       }
     }
   }
   if (numericTokens(extraction.summary).some((number) => !new Set(numericTokens(originalNote)).has(number))) {
-    return canonicalFailure("The extraction summary introduces a quantity not present in the note.", "$.summary");
+    return canonicalFailure("The extraction summary introduces a quantity not present in the note.", "$.summary", "numeric_integrity_failed", "numeric_integrity");
   }
   if (!statementSupportedByQuote(extraction.summary, originalNote)) {
-    return canonicalFailure("The extraction summary adds meaning not supported by the original note.", "$.summary");
+    return canonicalFailure("The extraction summary adds meaning not supported by the original note.", "$.summary", "unsupported_inference");
   }
   if (extraction.extractionDisposition === "no_business_context" && listEntries(extraction).length > 0) {
-    return canonicalFailure("A no-business-context result cannot include extracted evidence items.", "$.extractionDisposition");
+    return canonicalFailure("A no-business-context result cannot include extracted evidence items.", "$.extractionDisposition", "contextual_inconsistency");
   }
 
   return { ok: true, value: extraction };

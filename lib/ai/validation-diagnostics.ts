@@ -30,6 +30,12 @@ export const AI_VALIDATION_REASON_CODES = [
   "numeric_integrity_failed",
   "contextual_validation_failed",
   "ambiguous_extraction",
+  "source_quote_missing",
+  "source_quote_not_found",
+  "unsupported_entity",
+  "contextual_inconsistency",
+  "reasoning_leakage",
+  "unsafe_generated_output",
   "unknown_validation_failure"
 ] as const;
 

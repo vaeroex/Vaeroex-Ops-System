@@ -17,7 +17,7 @@ export const EXECUTIVE_BRIEF_GPT56_POLICY_ID = "executive_brief_preview_gpt56_so
 export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
 export const BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR = "gpt56_luna_terra_v1" as const;
-export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v1" as const;
+export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v2" as const;
 export const BUSINESS_NOTE_EXTRACTION_LUNA_MODEL = "gpt-5.6-luna" as const;
 export const BUSINESS_NOTE_EXTRACTION_TERRA_MODEL = "gpt-5.6-terra" as const;
 
@@ -79,8 +79,10 @@ export const BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS = [
   "empty_response",
   "malformed_response",
   "schema_failure",
-  "contextual_validation_failure",
-  "ambiguous_extraction"
+  "source_grounding_failure",
+  "numeric_integrity_failure",
+  "unsupported_inference",
+  "provider_refusal"
 ] as const satisfies readonly AIProviderFallbackReason[];
 
 export function isExecutiveBriefPreviewEnabled() {

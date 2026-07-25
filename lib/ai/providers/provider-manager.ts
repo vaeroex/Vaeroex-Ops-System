@@ -33,7 +33,9 @@ export type AIProviderFallbackReason =
   | "missing_required_signal"
   | "citation_integrity_failure"
   | "numeric_integrity_failure"
-  | "ambiguous_extraction";
+  | "ambiguous_extraction"
+  | "source_grounding_failure"
+  | "provider_refusal";
 
 export type AIProviderWorkflowConfiguration = Readonly<{
   timeoutMs?: number;
@@ -246,6 +248,14 @@ function validationFallbackReason(diagnostic: SafeAIValidationDiagnostic | null)
   if (diagnostic.reasonCode === "numeric_integrity_failed" || diagnostic.stage === "numeric_integrity") {
     return "numeric_integrity_failure";
   }
+  if (
+    diagnostic.reasonCode === "source_quote_missing"
+    || diagnostic.reasonCode === "source_quote_not_found"
+    || diagnostic.reasonCode === "unsupported_entity"
+    || diagnostic.reasonCode === "contextual_inconsistency"
+  ) {
+    return "source_grounding_failure";
+  }
   if (diagnostic.reasonCode === "contextual_validation_failed" || diagnostic.stage === "contextual_validation") {
     return "contextual_validation_failure";
   }
@@ -257,7 +267,8 @@ function transportFallbackReason(error: unknown): AIProviderFallbackReason | nul
   if (error instanceof AIProviderError) {
     if (error.code === "empty_response") return "empty_response";
     if (error.code === "transport_failure") return "transport_failure";
-    if (error.code === "configuration" || error.code === "refusal" || error.code === "unsupported_input") return null;
+    if (error.code === "refusal") return "provider_refusal";
+    if (error.code === "configuration" || error.code === "unsupported_input") return null;
   }
   const description = `${error instanceof Error ? error.name : ""} ${error instanceof Error ? error.message : ""}`;
   if (/timed out|timeout|aborterror|aborted/i.test(description)) return "timeout";
