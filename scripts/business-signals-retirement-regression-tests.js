@@ -69,11 +69,12 @@ assert.doesNotMatch(help, /\/app\/tasks|Business Signals?/);
 
 const setupActions = read("app/app/setup/actions.ts");
 const setupPage = read("app/app/setup/page.tsx");
-const setupWizard = read("components/setup/SetupWizard.tsx");
+const workspaceCreationForm = read("components/setup/WorkspaceCreationForm.tsx");
 assert.doesNotMatch(setupActions, /\.from\("tasks"\)\.insert|Business Signals?/);
-assert.match(setupActions, /redirect\("\/app\/sources"\)/, "workspace onboarding must continue into the existing Evidence upload flow");
+assert.match(setupActions, /redirect\(`\/app\/sources\?message=/, "workspace onboarding must continue into the existing Evidence upload flow");
 assert.doesNotMatch(setupPage, /Business Signals?|\/app\/tasks/);
-assert.doesNotMatch(setupWizard, /Business Signals?|\/app\/tasks/);
+assert.doesNotMatch(workspaceCreationForm, /Business Signals?|\/app\/tasks/);
+assert.equal(fs.existsSync(path.join(root, "components/setup/SetupWizard.tsx")), false, "the retired questionnaire wizard must not remain");
 
 const demo = read("lib/demo/workspace-demo.ts");
 const seed = read("supabase/seed.sql");

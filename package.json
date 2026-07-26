@@ -40,6 +40,7 @@
     "test:finding-explanation": "node scripts/finding-explanation-regression-tests.js",
     "test:executive-kpi-analysis-retirement": "node scripts/executive-kpi-analysis-retirement-regression-tests.js",
     "test:business-notes": "node scripts/business-notes-regression-tests.js",
+    "test:workspace-agreement": "node scripts/workspace-agreement-regression-tests.js",
     "test:manual-activation": "node scripts/manual-activation-regression-tests.js",
     "test:gpt56-business-health-routing": "node scripts/gpt56-business-health-routing-regression-tests.js",
     "test:nvidia-qualification": "node scripts/nvidia-capability-qualification-regression-tests.js",
@@ -50,11 +51,13 @@
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
   "dependencies": {
+    "@pdf-lib/fontkit": "1.1.1",
     "@supabase/ssr": "0.5.2",
     "@supabase/supabase-js": "2.45.4",
     "lucide-react": "^0.468.0",
     "next": "^15.0.3",
     "openai": "^4.77.0",
+    "pdf-lib": "1.17.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "zod": "^3.24.1"

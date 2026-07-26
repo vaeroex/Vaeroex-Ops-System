@@ -23,7 +23,7 @@ export default async function ProtectedAppLayout({
           <h1 className="mt-2 text-2xl font-semibold">Connect Supabase to continue</h1>
           <p className="mt-3 text-sm leading-6 text-muted">
             Add `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` to your environment before using
-            authentication, workspace creation, or the Vaeroex setup wizard.
+            authentication or workspace creation.
           </p>
         </section>
       </main>
