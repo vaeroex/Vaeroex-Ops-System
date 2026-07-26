@@ -15,6 +15,7 @@ import { DeterministicNoopReranker, runEvidenceRerankerShadow } from "@/lib/ai/e
 import { buildSourceRegistry } from "@/lib/ai/evidence-engine/source-registry";
 import { EvidenceDecisionTrace } from "@/lib/ai/evidence-engine/tracing";
 import { verifyEvidenceManifestCitations } from "@/lib/ai/evidence-engine/citation-verification";
+import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { createAIEmbeddings } from "@/lib/ai/providers/provider-manager";
 import { estimateTokenCount } from "@/lib/ai/usage";
 import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
@@ -26,6 +27,7 @@ type MemoryChunkInsert = Database["public"]["Tables"]["business_memory_chunks"][
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 type MatchMemoryChunk = Database["public"]["Functions"]["match_business_memory_chunks"]["Returns"][number];
 type AiAgentRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
+type BusinessNoteRow = Database["public"]["Tables"]["business_notes"]["Row"];
 
 type JsonRecord = Record<string, unknown>;
 
@@ -518,16 +520,22 @@ function legacyFileAnalysisWithoutRunIsEligible(value: Json) {
 export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryChunk>({
   rows,
   files,
-  runs
+  runs,
+  notes = [],
+  workspaceId
 }: {
   rows: T[];
   files: Array<Pick<FileUploadRow, "id" | "deleted_at" | "archived_at" | "metadata_json">>;
   runs: Array<Pick<AiAgentRunRow, "id" | "status" | "deleted_at" | "archived_at" | "input_json" | "output_json">>;
+  notes?: Array<Pick<BusinessNoteRow, "id" | "workspace_id" | "release_channel" | "status" | "evidence_lifecycle_status" | "deleted_at" | "archived_at">>;
+  workspaceId?: string;
 }) {
   const filesById = new Map(files.map((file) => [file.id, file]));
   const runsById = new Map(runs.map((run) => [run.id, run]));
+  const notesById = new Map(notes.map((note) => [note.id, note]));
 
   return rows.filter((row) => {
+    if (workspaceId && row.workspace_id !== workspaceId) return false;
     if (("deleted_at" in row && row.deleted_at) || ("archived_at" in row && row.archived_at)) return false;
     if (!isBusinessEvidenceEligible(row, { sourceKind: "business_memory" })) return false;
     if (!metadataIsEligible(row.source_metadata)) return false;
@@ -553,6 +561,18 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
     }
 
     if (row.source_type === "business_signal" || row.source_type === "task") return false;
+    if (row.source_type === "business_note") {
+      const note = row.source_id ? notesById.get(row.source_id) : null;
+      if (
+        !note ||
+        note.workspace_id !== row.workspace_id ||
+        note.release_channel !== businessNoteReleaseChannel() ||
+        note.status !== "approved" ||
+        note.evidence_lifecycle_status !== "active" ||
+        note.deleted_at ||
+        note.archived_at
+      ) return false;
+    }
 
     return true;
   });
@@ -578,20 +598,26 @@ export async function filterEligibleMemoryRowsByLifecycle<T extends MemoryChunkR
     const runId = runIdForChunk(row);
     return runId ? [runId] : [];
   })));
-  const [filesResult, runsResult] = await Promise.all([
+  const noteIds = Array.from(new Set(rows.flatMap((row) => row.source_type === "business_note" && row.source_id ? [row.source_id] : [])));
+  const [filesResult, runsResult, notesResult] = await Promise.all([
     fileIds.length
       ? supabase.from("file_uploads").select("id,deleted_at,archived_at,metadata_json").eq("workspace_id", workspaceId).in("id", fileIds)
       : Promise.resolve({ data: [], error: null }),
     runIds.length
       ? supabase.from("ai_agent_runs").select("id,status,deleted_at,archived_at,input_json,output_json").eq("workspace_id", workspaceId).in("id", runIds)
+      : Promise.resolve({ data: [], error: null }),
+    noteIds.length
+      ? supabase.from("business_notes").select("id,workspace_id,release_channel,status,evidence_lifecycle_status,deleted_at,archived_at").eq("workspace_id", workspaceId).in("id", noteIds)
       : Promise.resolve({ data: [], error: null })
   ]);
 
-  if (filesResult.error || runsResult.error) return [];
+  if (filesResult.error || runsResult.error || notesResult.error) return [];
   return filterEligibleMemoryRows({
     rows,
     files: filesResult.data || [],
-    runs: runsResult.data || []
+    runs: runsResult.data || [],
+    notes: notesResult.data || [],
+    workspaceId
   });
 }
 

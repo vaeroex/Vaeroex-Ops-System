@@ -6,6 +6,7 @@ import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
 
@@ -181,7 +182,13 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
     full_name: user.user_metadata?.full_name ?? user.email ?? "Workspace Owner"
   });
 
-  const { data: workspace, error: workspaceError } = await supabase
+  const admin = createSupabaseAdminClient();
+
+  if (!admin) {
+    redirect("/app/setup?error=Trusted%20workspace%20setup%20is%20not%20configured%20for%20this%20environment.");
+  }
+
+  const { data: workspace, error: workspaceError } = await admin
     .from("workspaces")
     .insert({
       name: businessName,
@@ -195,7 +202,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
       subscription_required: true,
       manually_unlocked: subscription.source === "manual"
     })
-    .select("*")
+    .select("id")
     .single();
 
   if (workspaceError || !workspace) {
@@ -204,7 +211,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
 
   const workspaceId = workspace.id;
 
-  const { error: memberError } = await supabase.from("workspace_members").insert({
+  const { error: memberError } = await admin.from("workspace_members").insert({
     workspace_id: workspaceId,
     user_id: user.id,
     role: "owner",
@@ -212,6 +219,7 @@ export async function generateWorkspaceFromSetupAction(formData: FormData) {
   });
 
   if (memberError) {
+    await admin.from("workspaces").delete().eq("id", workspaceId);
     redirect(`/app/setup?error=${encodeURIComponent(memberError.message)}`);
   }
 

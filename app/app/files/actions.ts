@@ -2690,6 +2690,82 @@ export async function manageLearnedKnowledgeAction(formData: FormData) {
   );
 }
 
+export async function bulkManageLearnedKnowledgeAction(input: {
+  ids: string[];
+  action: "approve" | "archive" | "restore" | "delete";
+  typedConfirmation?: string;
+}) {
+  if (!input || !Array.isArray(input.ids)) {
+    return { ok: false, message: "Choose Learned Knowledge to manage." };
+  }
+  const ids = Array.from(new Set(input.ids)).filter((id) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)).slice(0, 100);
+  if (!ids.length || ids.length !== input.ids.length) {
+    return { ok: false, message: "Choose valid Learned Knowledge from the current workspace." };
+  }
+  if (input.action !== "archive" && input.action !== "restore" && input.action !== "delete") {
+    return { ok: false, message: "Learned Knowledge action is not supported." };
+  }
+
+  const { supabase, user, workspaceId, membership } = await requireWorkspace();
+  const { data: candidates, error: candidateError } = await supabase
+    .from("business_memory_chunks")
+    .select("id,archived_at,deleted_at")
+    .eq("workspace_id", workspaceId)
+    .in("id", ids);
+  if (candidateError || candidates?.length !== ids.length) {
+    return { ok: false, message: "One or more Learned Knowledge items are stale or unavailable in this workspace." };
+  }
+  if (input.action === "restore" && !candidates.every((item) => item.archived_at && !item.deleted_at)) {
+    return { ok: false, message: "Only archived Learned Knowledge can be restored." };
+  }
+  if (input.action !== "restore" && candidates.some((item) => item.deleted_at)) {
+    return { ok: false, message: "Deleted Learned Knowledge cannot be changed." };
+  }
+
+  try {
+    await requireToolExecution(
+      { supabase, workspaceId, userId: user.id, userRole: membership.role },
+      {
+        toolName: "bulk_manage_records",
+        args: {
+          recordIds: ids,
+          collection: "learned_knowledge",
+          action: input.action,
+          typedConfirmation: input.typedConfirmation === "DELETE" ? "DELETE" : undefined
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        metadata: { source: "learned_knowledge_bulk_action", requested_count: ids.length } satisfies Json
+      }
+    );
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : "Learned Knowledge action was blocked by Vaeroex security policy." };
+  }
+
+  const now = new Date().toISOString();
+  const update = input.action === "restore"
+    ? { archived_at: null, deleted_at: null, updated_at: now }
+    : input.action === "delete"
+      ? { archived_at: now, deleted_at: now, updated_at: now }
+      : { archived_at: now, updated_at: now };
+  const { data: updated, error } = await supabase
+    .from("business_memory_chunks")
+    .update(update)
+    .eq("workspace_id", workspaceId)
+    .in("id", ids)
+    .select("id");
+  if (error || updated?.length !== ids.length) {
+    return { ok: false, message: "Selected Learned Knowledge could not all be changed safely." };
+  }
+
+  revalidatePath(SOURCES_PATH);
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/reports");
+  const verb = input.action === "delete" ? "deleted" : input.action === "archive" ? "archived" : "restored";
+  return { ok: true, message: `${ids.length} Learned Knowledge item${ids.length === 1 ? "" : "s"} ${verb}.` };
+}
+
 export async function saveFileAnalysisToMemoryAction(formData: FormData) {
   const { supabase, user, workspaceId, membership } = await requireWorkspace();
   const file = await getFileForWorkspace(text(formData, "file_id"), workspaceId);
