@@ -11,16 +11,19 @@ const schema = read("lib/legal/workspace-agreement-schema.ts");
 const record = read("lib/legal/workspace-agreement-record.ts");
 const pdf = read("lib/legal/workspace-agreement-pdf.ts");
 const email = read("lib/email/workspace-agreement.ts");
+const adminEmail = read("lib/email/workspace-agreement-admin.ts");
 const form = read("components/setup/WorkspaceCreationForm.tsx");
 const setupPage = read("app/app/setup/page.tsx");
 const setupAction = read("app/app/setup/actions.ts");
 const migration = read("supabase/migrations/202607250002_workspace_agreements.sql");
+const adminEmailMigration = read("supabase/migrations/20260726205442_workspace_agreement_admin_email_delivery.sql");
 const sources = read("app/app/sources/page.tsx");
 const agreementList = read("components/legal/WorkspaceAgreementList.tsx");
 const customerPage = read("app/app/legal/agreements/[agreementId]/page.tsx");
 const customerPdf = read("app/api/legal/workspace-agreements/[agreementId]/pdf/route.ts");
 const adminPage = read("app/app/admin/workspace-agreements/page.tsx");
 const adminDetail = read("app/app/admin/workspace-agreements/[agreementId]/page.tsx");
+const adminActions = read("app/app/admin/workspace-agreements/actions.ts");
 const adminPdf = read("app/api/admin/workspace-agreements/[agreementId]/pdf/route.ts");
 const nextConfig = read("next.config.mjs");
 
@@ -136,6 +139,41 @@ assert.match(email, /Idempotency-Key.*workspace-agreement-/, "confirmation email
 assert.match(email, /Agreement ID/, "confirmation email must include the agreement ID");
 assert.match(email, /secure link requires sign-in/i, "confirmation email must describe the secure customer link");
 assert.doesNotMatch(email, /immutable_hash|security_audit_events|audit_logs|authenticated_user_id/, "confirmation email must not expose internal audit metadata");
+
+assert.match(setupAction, /deliverWorkspaceAgreementAdminEmail/, "workspace finalization must invoke the separate administrative email workflow");
+const adminEmailDelivery = setupAction.indexOf("deliverWorkspaceAgreementAdminEmail({");
+assert.ok(adminEmailDelivery > transaction, "administrative email delivery must run only after the agreement transaction succeeds");
+assert.doesNotMatch(setupAction.slice(adminEmailDelivery), /setupError\(/, "administrative email failure must not invalidate the signed agreement or workspace");
+for (const field of ["Organization", "Workspace owner", "Workspace owner email", "Agreement ID", "Signed at"]) {
+  assert.match(adminEmail, new RegExp(field), `administrative email must include ${field}`);
+}
+assert.match(adminEmail, /admin@vaeroex\.com/, "administrative agreement email must use the fixed legal recipient");
+assert.match(setupAction + adminActions, /\/app\/admin\/workspace-agreements\//, "administrative email must link to the secure canonical admin record");
+assert.match(adminEmail, /VERCEL_ENV === "production"/, "automatic administrative email must be Production-only");
+assert.match(adminEmail, /AbortSignal\.timeout\(15_000\)/, "the provider attempt must have a bounded deadline");
+assert.doesNotMatch(adminEmail, /for\s*\(|while\s*\(|setInterval|setTimeout/, "administrative email delivery must not create an automatic retry loop");
+assert.doesNotMatch(adminEmail, /attachments?\s*:/i, "administrative email must use the secure link rather than attach the PDF");
+
+assert.match(adminEmailMigration, /create table if not exists public\.workspace_agreement_admin_email_deliveries/, "administrative delivery status must use a separate table");
+for (const status of ["pending", "sent", "failed", "skipped"]) {
+  assert.match(adminEmailMigration, new RegExp(`'${status}'`), `delivery status must support ${status}`);
+}
+for (const field of ["provider_message_id", "failure_reason", "attempt_count", "release_channel", "last_attempt_source"]) {
+  assert.match(adminEmailMigration, new RegExp(field), `delivery status must retain ${field}`);
+}
+assert.match(adminEmailMigration, /enable row level security/, "administrative delivery status must enable RLS");
+assert.match(adminEmailMigration, /revoke all[\s\S]+from public, anon, authenticated/, "administrative delivery status must be server-only");
+assert.match(adminEmailMigration, /grant select, insert, update[\s\S]+to service_role/, "trusted server operations must receive only required delivery privileges");
+assert.doesNotMatch(adminEmailMigration, /grant delete|grant truncate/i, "administrative delivery status must not grant destructive privileges");
+
+assert.match(adminActions, /requireVaeroexAdmin/, "manual administrative resend must require Vaeroex admin authorization");
+assert.match(adminActions, /source: "admin_resend"/, "manual resend must be explicitly attributed");
+assert.match(adminDetail, /delivery\.status === "failed" \|\| delivery\.status === "skipped"/, "manual resend must only appear for failed or skipped delivery");
+assert.match(adminDetail, /Send administrative email/, "authorized administrators must have a manual resend action");
+
+const administrativeDeliverySources = [setupAction, adminEmail, adminActions, adminDetail, adminEmailMigration].join("\n");
+assert.doesNotMatch(administrativeDeliverySources, /from\(["']notifications["']\)|notification-center|unread badge|notification preferences/i, "Workspace Agreement email must not reuse the retired notification architecture");
+assert.match(read("components/legal/WorkspaceAgreementActions.tsx"), /View PDF[\s\S]+Download[\s\S]+Print/, "customer View, Download, and Print actions must remain available");
 
 const sourceFiles = ["app", "components", "lib"].flatMap((directory) => {
   const walk = (current) => fs.readdirSync(path.join(root, current), { withFileTypes: true }).flatMap((entry) => {

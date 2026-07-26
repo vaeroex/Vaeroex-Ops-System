@@ -8,6 +8,7 @@ import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { sendWorkspaceAgreementConfirmation } from "@/lib/email/workspace-agreement";
+import { deliverWorkspaceAgreementAdminEmail } from "@/lib/email/workspace-agreement-admin";
 import { WORKSPACE_AGREEMENT_STORAGE_BUCKET } from "@/lib/legal/workspace-agreement";
 import { generateWorkspaceAgreementPdf } from "@/lib/legal/workspace-agreement-pdf";
 import { buildWorkspaceAgreementSnapshot, hashWorkspaceAgreement } from "@/lib/legal/workspace-agreement-record";
@@ -129,13 +130,27 @@ export async function createWorkspaceWithAgreementAction(formData: FormData) {
   }
 
   const secureAgreementUrl = new URL(`/app/legal/agreements/${agreementId}`, getAppUrl()).toString();
-  const emailResult = await sendWorkspaceAgreementConfirmation({
-    to: parsed.data.ownerBusinessEmail,
-    ownerName: parsed.data.ownerLegalName,
-    organizationName: parsed.data.organizationName,
-    agreementId,
-    secureAgreementUrl
-  });
+  const secureAdminAgreementUrl = new URL(`/app/admin/workspace-agreements/${agreementId}`, getAppUrl()).toString();
+  const [emailResult, adminEmailResult] = await Promise.all([
+    sendWorkspaceAgreementConfirmation({
+      to: parsed.data.ownerBusinessEmail,
+      ownerName: parsed.data.ownerLegalName,
+      organizationName: parsed.data.organizationName,
+      agreementId,
+      secureAgreementUrl
+    }),
+    deliverWorkspaceAgreementAdminEmail({
+      admin,
+      agreementId,
+      workspaceId,
+      organizationName: parsed.data.organizationName,
+      ownerName: parsed.data.ownerLegalName,
+      ownerEmail: parsed.data.ownerBusinessEmail,
+      signedAt,
+      secureAdminAgreementUrl,
+      source: "workspace_finalization"
+    })
+  ]);
 
   const { error: emailAuditError } = await admin.from("security_audit_events").insert({
     workspace_id: workspaceId,
@@ -157,6 +172,28 @@ export async function createWorkspaceWithAgreementAction(formData: FormData) {
     }
   });
   if (emailAuditError) console.warn("Workspace Agreement email status could not be audited.");
+
+  const { error: adminEmailAuditError } = await admin.from("security_audit_events").insert({
+    workspace_id: workspaceId,
+    user_id: user.id,
+    action_name: "workspace_agreement_admin_email",
+    operation_type: "SYSTEM",
+    target_table: "workspace_agreement_admin_email_deliveries",
+    target_record_id: agreementId,
+    initiated_by: "system",
+    required_confirmation: false,
+    confirmation_received: false,
+    allowed: adminEmailResult.status === "sent",
+    reason_blocked: adminEmailResult.status === "failed" ? "admin_email_delivery_failed" : null,
+    request_id: agreementId,
+    model: null,
+    metadata_json: {
+      delivery_status: adminEmailResult.status,
+      attempt_count: adminEmailResult.attemptCount,
+      message_id_recorded: adminEmailResult.status === "sent" && Boolean(adminEmailResult.messageId)
+    }
+  });
+  if (adminEmailAuditError) console.warn("Workspace Agreement administrative email status could not be audited.");
 
   const cookieStore = await cookies();
   cookieStore.set("vaeroex_workspace_id", workspaceId, {

@@ -264,6 +264,44 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      workspace_agreement_admin_email_deliveries: {
+        Row: {
+          id: string;
+          agreement_id: string;
+          workspace_id: string;
+          recipient_email: "admin@vaeroex.com";
+          status: "pending" | "sent" | "failed" | "skipped";
+          provider: "resend";
+          release_channel: "production" | "preview" | "development";
+          provider_message_id: string | null;
+          failure_reason: string | null;
+          attempt_count: number;
+          last_attempt_source: "workspace_finalization" | "admin_resend";
+          last_attempt_at: string | null;
+          sent_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          agreement_id: string;
+          workspace_id: string;
+          recipient_email?: "admin@vaeroex.com";
+          status?: "pending" | "sent" | "failed" | "skipped";
+          provider?: "resend";
+          release_channel: "production" | "preview" | "development";
+          provider_message_id?: string | null;
+          failure_reason?: string | null;
+          attempt_count?: number;
+          last_attempt_source: "workspace_finalization" | "admin_resend";
+          last_attempt_at?: string | null;
+          sent_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workspace_agreement_admin_email_deliveries"]["Insert"]>;
+        Relationships: [];
+      };
       business_intakes: {
         Row: {
           id: string;
