@@ -11,6 +11,14 @@ function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
+type ManualActivationReviewResult = {
+  request_id?: string;
+  request_status?: string;
+  subscription_id?: string | null;
+  workspace_id?: string | null;
+  access_granted?: boolean;
+};
+
 async function requireSubscriptionAdmin() {
   const { admin, user } = await requireVaeroexAdmin("/app/admin/subscriptions");
   return { admin, user };
@@ -162,20 +170,57 @@ export async function reviewActivationRequestAction(formData: FormData) {
   const { admin, user } = await requireSubscriptionAdmin();
   const requestId = text(formData, "request_id");
   const status = text(formData, "status") || "needs_more_info";
+  const allowedStatuses = new Set(["pending", "approved", "denied", "needs_more_info"]);
 
-  const { error } = await admin
-    .from("manual_activation_requests")
-    .update({
-      status,
-      reviewed_by: user.id,
-      reviewed_at: new Date().toISOString()
-    })
-    .eq("id", requestId);
+  if (!requestId || !allowedStatuses.has(status)) {
+    redirect("/app/admin/subscriptions?error=Activation request review is invalid.");
+  }
+
+  const { data, error } = await admin.rpc("review_manual_activation_request", {
+    p_request_id: requestId,
+    p_status: status,
+    p_reviewed_by: user.id,
+    p_plan_slug: VAEROEX_PLAN_SLUG
+  });
 
   if (error) {
     redirect(`/app/admin/subscriptions?error=${encodeURIComponent(error.message)}`);
   }
 
+  const result = (data && typeof data === "object" && !Array.isArray(data)
+    ? data
+    : {}) as ManualActivationReviewResult;
+
+  if (status === "approved" && (!result.access_granted || !result.subscription_id)) {
+    redirect("/app/admin/subscriptions?error=Activation approval did not create an active entitlement.");
+  }
+
+  await logSecurityAuditEvent({
+    supabase: admin,
+    workspaceId: result.workspace_id ?? null,
+    userId: user.id,
+    actionName: status === "approved" ? "admin.approve_manual_activation_request" : "admin.review_manual_activation_request",
+    operationType: "BILLING",
+    targetTable: "manual_activation_requests",
+    targetRecordId: requestId,
+    initiatedBy: "user",
+    requiredConfirmation: status === "approved",
+    confirmationReceived: status === "approved",
+    allowed: true,
+    metadata: {
+      source: "manual_activation_request_review",
+      status,
+      access_granted: result.access_granted === true
+    } satisfies Json
+  });
+
   revalidatePath("/app/admin/subscriptions");
-  redirect("/app/admin/subscriptions?message=Activation request updated.");
+  revalidatePath("/app/account/subscription");
+  revalidatePath("/app/setup");
+  revalidatePath("/billing-required");
+  redirect(
+    status === "approved"
+      ? "/app/admin/subscriptions?message=Activation request approved and access granted."
+      : "/app/admin/subscriptions?message=Activation request updated."
+  );
 }
