@@ -282,6 +282,72 @@ async function main() {
     mentionedMetrics: [{ name: "technician call-outs", value: 3, unit: "people", sourceQuote: "Three technicians called out Friday.", confidence: 0.85 }]
   }), "incident-style note");
 
+  const informalManagerNote = "5 of my staff members were late yesterday friday, 7/24/2026. It caused major backups for my transport teams to ready their ambulances and made us late to 3 transports. now our customer hospital isnt very happy.";
+  const informalManagerExtraction = extraction({
+    title: "Staff lateness disrupted ambulance preparation",
+    summary: "5 staff members were late on 7/24/2026, causing ambulance preparation backups, 3 late transports, and an unhappy customer hospital.",
+    noteType: "incident",
+    sourceClassification: "manager_observation",
+    departments: ["transport teams"],
+    topics: ["staff", "transports", "ambulances"],
+    customersMentioned: [{ name: "customer hospital", sourceQuote: "our customer hospital" }],
+    explicitFacts: [
+      {
+        statement: "Five staff members were late on July 24, 2026.",
+        sourceQuote: "5 of my staff members were late yesterday friday, 7/24/2026.",
+        confidence: 0.95
+      },
+      {
+        statement: "Three transports were late.",
+        sourceQuote: "made us late to 3 transports.",
+        confidence: 0.9
+      }
+    ],
+    opinionsOrAssumptions: [
+      {
+        statement: "Staff lateness caused ambulance preparation backups and three late transports.",
+        sourceQuote: "5 of my staff members were late yesterday friday, 7/24/2026. It caused major backups for my transport teams to ready their ambulances and made us late to 3 transports.",
+        confidence: 0.8
+      },
+      {
+        statement: "The customer hospital was dissatisfied.",
+        sourceQuote: "our customer hospital isnt very happy.",
+        confidence: 0.85
+      }
+    ],
+    risks: [],
+    mentionedMetrics: [
+      { name: "late staff members", value: 5, unit: "people", sourceQuote: "5 of my staff members were late yesterday friday, 7/24/2026.", confidence: 0.95 },
+      { name: "delayed transports", value: 3, unit: "transports", sourceQuote: "made us late to 3 transports.", confidence: 0.9 }
+    ],
+    reportingPeriod: { start: "2026-07-24", end: "2026-07-24", inferred: false, sourceQuote: "7/24/2026" },
+    evidenceTreatment: "context_only",
+    extractionConfidence: 0.86,
+    missingContext: ["The note does not identify the customer hospital by name."]
+  });
+  const validatedInformalManagerNote = expectValid(
+    informalManagerNote,
+    informalManagerExtraction,
+    "informal manager incident remains reviewable"
+  );
+  assert.deepEqual(validatedInformalManagerNote.mentionedMetrics.map((metric) => metric.value), [5, 3]);
+  assert.equal(validatedInformalManagerNote.reportingPeriod.start, "2026-07-24");
+  assert.deepEqual(validatedInformalManagerNote.customersMentioned.map((customer) => customer.name), ["customer hospital"]);
+  assert.equal(validatedInformalManagerNote.risks.length, 0, "the fixture must not create a new risk or finding");
+
+  const inventedCausation = validateBusinessNoteExtraction(extraction({
+    summary: "Staff lateness caused transport delays.",
+    explicitFacts: [],
+    opinionsOrAssumptions: [{
+      statement: "Staff lateness caused transport delays.",
+      sourceQuote: "Five staff members were late and three transports were delayed.",
+      confidence: 0.8
+    }],
+    mentionedMetrics: []
+  }), "Five staff members were late and three transports were delayed.");
+  assert.equal(inventedCausation.ok, false, "generated causation must still fail when the source does not state it");
+  assert.equal(inventedCausation.diagnostic.reasonCode, "unsupported_inference");
+
   const emotional = "Sales note: I am frustrated and believe returns are getting worse.";
   expectValid(emotional, extraction({
     title: "Concern about returns",
@@ -452,6 +518,17 @@ async function main() {
     assert.deepEqual(classificationReviewRoute.calls, ["gpt-5.6-luna"], "unsupported unquoted classification hints must not invoke Terra");
     assert.deepEqual(classificationReviewRun.output.departments, []);
     assert.equal(classificationReviewRun.fallbackUsed, false);
+
+    const informalManagerRoute = await providerRoute({
+      originalNote: informalManagerNote,
+      luna: (request) => providerResult(JSON.stringify(informalManagerExtraction), request.model),
+      terra: (request) => providerResult(JSON.stringify(informalManagerExtraction), request.model)
+    });
+    const informalManagerRun = await informalManagerRoute.run;
+    assert.deepEqual(informalManagerRoute.calls, ["gpt-5.6-luna"], "source-grounded informal manager writing must not invoke Terra");
+    assert.equal(informalManagerRun.fallbackUsed, false);
+    assert.equal(informalManagerRun.output.reportingPeriod.start, "2026-07-24");
+    assert.deepEqual(informalManagerRun.output.mentionedMetrics.map((metric) => metric.value), [5, 3]);
 
     const sourceGroundingFallbackRoute = await providerRoute({
       originalNote: simple,
