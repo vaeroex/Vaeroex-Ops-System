@@ -58,6 +58,12 @@ function securityHeaders() {
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   typedRoutes: true,
+  outputFileTracingIncludes: {
+    "/app/setup": [
+      "./public/fonts/NotoSans-Regular.ttf",
+      "./public/fonts/NotoSans-Bold.ttf"
+    ]
+  },
   experimental: {
     serverActions: {
       bodySizeLimit: "25mb"

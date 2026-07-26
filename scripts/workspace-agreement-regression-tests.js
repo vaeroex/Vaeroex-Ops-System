@@ -22,6 +22,7 @@ const customerPdf = read("app/api/legal/workspace-agreements/[agreementId]/pdf/r
 const adminPage = read("app/app/admin/workspace-agreements/page.tsx");
 const adminDetail = read("app/app/admin/workspace-agreements/[agreementId]/page.tsx");
 const adminPdf = read("app/api/admin/workspace-agreements/[agreementId]/pdf/route.ts");
+const nextConfig = read("next.config.mjs");
 
 assert.equal(exists("components/setup/SetupWizard.tsx"), false, "the multi-step setup wizard must be removed");
 assert.equal(exists("data/workspace-categories.ts"), false, "questionnaire workspace categories must be removed");
@@ -80,6 +81,7 @@ assert.match(pdf, /document\.registerFontkit\(fontkit\)/, "the PDF must register
 assert.match(pdf, /NotoSans-Regular\.ttf/, "the PDF must embed its licensed customer-data font");
 assert.equal(exists("public/fonts/NotoSans-Regular.ttf"), true, "the PDF regular font must be packaged with the application");
 assert.equal(exists("public/fonts/NotoSans-Bold.ttf"), true, "the PDF bold font must be packaged with the application");
+assert.match(nextConfig, /"\/app\/setup"[\s\S]+NotoSans-Regular\.ttf[\s\S]+NotoSans-Bold\.ttf/, "the setup server trace must include both PDF font files");
 assert.match(read("public/fonts/OFL.txt"), /SIL OPEN FONT LICENSE Version 1\.1/, "embedded fonts must retain their license");
 assert.match(pdf, /Workspace Agreement/, "the PDF must identify the legal record");
 assert.match(pdf, /Typed signature/, "the PDF must contain the typed signature");
