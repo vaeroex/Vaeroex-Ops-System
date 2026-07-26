@@ -126,7 +126,7 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
     }
     const message = existing.status === "approved"
       ? "This unchanged Business Note is already approved."
-      : "This unchanged Business Note already has an extraction. Review the existing note below.";
+      : "This unchanged Business Note already has extracted business context. Review the existing note below.";
     redirect(noticeUrl("message", message));
   }
 
@@ -243,11 +243,11 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
       .eq("workspace_id", workspaceId)
       .eq("id", note.id);
     await recordVaeroexAiUsage({ supabase, workspaceId, userId: user.id, agentType: BUSINESS_NOTE_EXTRACTION_CONTRACT_ID, usage });
-    redirect(noticeUrl("error", "This note could not be extracted safely. The original note was preserved, but it was not added to Evidence."));
+    redirect(noticeUrl("error", "Business context could not be extracted safely. The original note was preserved, but it was not added to Evidence."));
   }
 
   revalidatePath("/app/sources");
-  redirect(noticeUrl("message", "Business Note extraction is ready for your review."));
+  redirect(noticeUrl("message", "Business context has been extracted and is ready for evidence review."));
 }
 
 function parsedReviewCorrections(formData: FormData, extraction: BusinessNoteExtraction): BusinessNoteReviewCorrections {
@@ -367,7 +367,7 @@ export async function approveBusinessNoteAction(formData: FormData) {
   revalidatePath("/app/sources");
   revalidatePath("/app/intelligence");
   revalidatePath("/app");
-  redirect(noticeUrl("message", indexed.embeddingWarning || "Business Note approved and added to Evidence as contextual information."));
+  redirect(noticeUrl("message", indexed.embeddingWarning || "Business Note approved to Evidence as contextual information."));
 }
 
 export async function cancelBusinessNoteReviewAction(formData: FormData) {

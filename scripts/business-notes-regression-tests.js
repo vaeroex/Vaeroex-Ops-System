@@ -512,10 +512,15 @@ async function main() {
   assert.match(service, /maxRetries: 0/);
   const actions = read("app/app/sources/business-notes/actions.ts");
   assert.match(actions, /source_text_hash/);
-  assert.match(actions, /This unchanged Business Note already has an extraction/);
+  assert.match(actions, /Business context has been extracted and is ready for evidence review\./);
+  assert.match(actions, /This unchanged Business Note already has extracted business context/);
   assert.match(actions, /indexApprovedBusinessNote/);
   const panel = read("components/evidence/BusinessNotesPanel.tsx");
-  assert.match(panel, /Add Note for Review/);
+  assert.match(panel, /Review &amp; Extract Business Context/);
+  assert.match(panel, /Business Context Review/);
+  assert.match(panel, /Extracting business context\.\.\./);
+  assert.match(panel, /Approve to Evidence/);
+  assert.doesNotMatch(panel, /Analyze Business Note|Add Note for Review|AI Analysis|Note Analysis|Submit to AI|Approve extraction|Extraction review required/);
   assert.match(panel, /Original note/);
   assert.match(panel, /Review warnings/);
   assert.match(panel, /do not prevent approval as contextual evidence/);
