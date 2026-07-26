@@ -33,6 +33,15 @@ export type Database = {
           similarity: number;
         }>;
       };
+      review_manual_activation_request: {
+        Args: {
+          p_request_id: string;
+          p_status: string;
+          p_reviewed_by: string;
+          p_plan_slug?: string;
+        };
+        Returns: Json;
+      };
     };
     Views: Record<string, never>;
     Tables: {
