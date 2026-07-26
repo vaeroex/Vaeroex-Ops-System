@@ -468,6 +468,10 @@ async function main() {
   const eligible = filterEligibleMemoryRows({ rows: [memoryRow()], files: [], runs: [], notes: [noteParent()], workspaceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" });
   assert.equal(eligible.length, 1);
   assert.equal(filterEligibleMemoryRows({ rows: [memoryRow()], files: [], runs: [], notes: [noteParent({ status: "rejected" })] }).length, 0);
+  assert.equal(filterEligibleMemoryRows({ rows: [memoryRow()], files: [], runs: [], notes: [noteParent({ status: "archived", evidence_lifecycle_status: "archived", archived_at: "2026-07-25T01:00:00.000Z" })] }).length, 0, "archived Business Notes must fail closed at the parent lifecycle boundary");
+  assert.equal(filterEligibleMemoryRows({ rows: [memoryRow()], files: [], runs: [], notes: [noteParent({ deleted_at: "2026-07-25T01:00:00.000Z" })] }).length, 0, "deleted Business Notes must fail closed at the parent lifecycle boundary");
+  assert.equal(filterEligibleMemoryRows({ rows: [memoryRow({ archived_at: "2026-07-25T01:00:00.000Z" })], files: [], runs: [], notes: [noteParent()] }).length, 0, "archived Learned Knowledge must be excluded from retrieval");
+  assert.equal(filterEligibleMemoryRows({ rows: [memoryRow({ deleted_at: "2026-07-25T01:00:00.000Z" })], files: [], runs: [], notes: [noteParent()] }).length, 0, "deleted Learned Knowledge must be excluded from retrieval");
   assert.equal(filterEligibleMemoryRows({ rows: [memoryRow()], files: [], runs: [], notes: [noteParent({ release_channel: "production" })] }).length, 0);
   assert.equal(filterEligibleMemoryRows({ rows: [memoryRow({ workspace_id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb" })], files: [], runs: [], notes: [noteParent()], workspaceId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" }).length, 0);
 
@@ -647,6 +651,21 @@ async function main() {
   assert.doesNotMatch(panel, /const failedNotes/);
   assert.match(panel, /Historical Preview diagnostics/);
   assert.match(panel, /does not describe the current Business Context Review/);
+  assert.match(panel, /EvidenceLifecycleCheckbox/);
+  assert.match(panel, /EvidenceLifecycleSelection/);
+  assert.match(panel, /Archived Business Notes/);
+  assert.match(panel, /bulkManageBusinessNotesAction/);
+  const lifecycleSelection = read("components/evidence/EvidenceLifecycleSelection.tsx");
+  assert.match(lifecycleSelection, /Select All/);
+  assert.match(lifecycleSelection, /Clear Selection/);
+  assert.match(lifecycleSelection, /selected/);
+  assert.match(lifecycleSelection, /Approve/);
+  assert.match(lifecycleSelection, /Archive/);
+  assert.match(lifecycleSelection, /Restore/);
+  assert.match(lifecycleSelection, /Delete/);
+  assert.match(lifecycleSelection, /Delete \$\{items\}\?\\n\\nThis removes them from active evidence\. They can no longer influence Executive Intelligence\./);
+  assert.match(lifecycleSelection, /Archive \$\{items\}\?\\n\\nThey will no longer participate in active intelligence but can be restored later\./);
+  assert.match(lifecycleSelection, /typedConfirmation !== "DELETE"/);
   const validation = read("lib/ai/business-notes/validation.ts");
   assert.match(validation, /Low-confidence classification/);
   assert.match(validation, /Reporting period unclear/);
@@ -664,6 +683,20 @@ async function main() {
   assert.match(actionSource, /originalNoteText: "business_notes\.original_note_text"/);
   assert.match(actionSource, /aiExtraction: "business_notes\.extraction_json"/);
   assert.doesNotMatch(actionSource, /original_note_text:\s*.*userAddedContext/);
+  assert.match(actionSource, /export async function bulkManageBusinessNotesAction/);
+  assert.match(actionSource, /toolName: "bulk_manage_records"/);
+  assert.match(actionSource, /status: "archived"/);
+  assert.match(actionSource, /evidence_lifecycle_status: "archived"/);
+  assert.match(actionSource, /source_type", "business_note"/);
+  assert.match(actionSource, /status: "approved", evidence_lifecycle_status: "active", archived_at: null/);
+  const filesActionSource = read("app/app/files/actions.ts");
+  assert.match(filesActionSource, /export async function bulkManageLearnedKnowledgeAction/);
+  assert.match(filesActionSource, /collection: "learned_knowledge"/);
+  assert.match(filesActionSource, /\.in\("id", ids\)/);
+  const sourcesPage = read("app/app/sources/page.tsx");
+  assert.match(sourcesPage, /archived=\{activeTab === "archived"\}/);
+  assert.match(sourcesPage, /bulkManageLearnedKnowledgeAction/);
+  assert.match(sourcesPage, /EvidenceLifecycleCheckbox/);
   assert.doesNotMatch(panel, /gpt-5\.6|Luna|Terra/);
 
   const migration = read("supabase/migrations/202607250001_business_notes_evidence.sql");

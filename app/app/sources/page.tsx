@@ -4,6 +4,7 @@ import { permanentRedirect, redirect } from "next/navigation";
 import {
   analyzeFileAction,
   approveFileAnalysisAction,
+  bulkManageLearnedKnowledgeAction,
   discardFileAnalysisAction,
   manageLearnedKnowledgeAction,
   manageSourceFileAction,
@@ -21,6 +22,7 @@ import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview } from "@/components/evidence/SourceImportReview";
 import { BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
+import { EvidenceLifecycleCheckbox, EvidenceLifecycleSelection } from "@/components/evidence/EvidenceLifecycleSelection";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
@@ -1069,42 +1071,52 @@ function LearnedKnowledgeView({
         </PendingSubmitButton>
       </form>
 
-      <div className="space-y-3">
-        {visibleItems.length ? (
-          visibleItems.map((item) => {
+      {visibleItems.length ? (
+        <EvidenceLifecycleSelection
+          items={visibleItems.map((item) => ({ id: item.id, label: knowledgeStatement(item) }))}
+          singularLabel="Learned Knowledge item"
+          archived={archived}
+          action={bulkManageLearnedKnowledgeAction}
+        >
+          <div className="space-y-3">
+            {visibleItems.map((item) => {
             const sourceFile = sourceFileForKnowledge(item, files);
             const trust = knowledgeTrustStatus(item);
 
             return (
               <article key={item.id} className="rounded-lg border border-white/10 bg-slate-950/35 p-4">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <StatusBadge value={trust} />
-                      <StatusBadge value={knowledgeSourceType(item)} />
-                      {item.archived_at || item.deleted_at ? <StatusBadge value="Inactive" /> : <StatusBadge value="Active" />}
+                <div className="flex items-start gap-3">
+                  <EvidenceLifecycleCheckbox id={item.id} label={knowledgeStatement(item)} />
+                  <div className="flex min-w-0 flex-1 flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <StatusBadge value={trust} />
+                        <StatusBadge value={knowledgeSourceType(item)} />
+                        {item.archived_at || item.deleted_at ? <StatusBadge value="Inactive" /> : <StatusBadge value="Active" />}
+                      </div>
+                      <p className="mt-3 text-sm font-semibold leading-6 text-white">{knowledgeStatement(item)}</p>
+                      <p className="mt-2 text-xs leading-5 text-slate-400">
+                        Source: {sourceFile?.display_name || item.source_title} · Created {formatDateTime(item.created_at)} · Updated {formatDateTime(item.updated_at)}
+                      </p>
                     </div>
-                    <p className="mt-3 text-sm font-semibold leading-6 text-white">{knowledgeStatement(item)}</p>
-                    <p className="mt-2 text-xs leading-5 text-slate-400">
-                      Source: {sourceFile?.display_name || item.source_title} · Created {formatDateTime(item.created_at)} · Updated {formatDateTime(item.updated_at)}
-                    </p>
+                    <KnowledgeActions item={item} sourceFile={sourceFile} archived={archived || Boolean(item.archived_at || item.deleted_at)} />
                   </div>
-                  <KnowledgeActions item={item} sourceFile={sourceFile} archived={archived || Boolean(item.archived_at || item.deleted_at)} />
                 </div>
               </article>
             );
-          })
-        ) : (
-          <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
-            <h3 className="text-lg font-semibold text-white">{archived ? "No archived knowledge." : "No learned knowledge yet."}</h3>
-            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
-              {archived
-                ? "Archived knowledge appears here with restore and delete actions. Deleted knowledge is removed from this view."
-                : "Analyze a trusted source and Vaeroex will add supported findings here automatically when confidence is high or directional."}
-            </p>
+            })}
           </div>
-        )}
-      </div>
+        </EvidenceLifecycleSelection>
+      ) : (
+        <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-8 text-center">
+          <h3 className="text-lg font-semibold text-white">{archived ? "No archived knowledge." : "No learned knowledge yet."}</h3>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">
+            {archived
+              ? "Archived knowledge appears here with restore and delete actions. Deleted knowledge is removed from this view."
+              : "Analyze a trusted source and Vaeroex will add supported findings here automatically when confidence is high or directional."}
+          </p>
+        </div>
+      )}
     </section>
   );
 }
@@ -1316,11 +1328,12 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         </div>
       ) : null}
 
-      {activeTab === "files" ? (
+      {activeTab === "files" || activeTab === "archived" ? (
         <BusinessNotesPanel
           notes={businessNotes}
           enabled={isBusinessNoteExtractionEnabled()}
-          observability={businessNoteObservability}
+          observability={activeTab === "files" ? businessNoteObservability : null}
+          archived={activeTab === "archived"}
         />
       ) : null}
 
@@ -1333,7 +1346,9 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                 ? files.filter((file) => !file.archived_at && !file.deleted_at).length
                 : tab.key === "knowledge"
                   ? memoryChunks.filter((chunk) => !chunk.archived_at && !chunk.deleted_at).length
-                  : files.filter((file) => file.archived_at && !file.deleted_at).length + memoryChunks.filter((chunk) => chunk.archived_at && !chunk.deleted_at).length;
+                  : files.filter((file) => file.archived_at && !file.deleted_at).length
+                    + memoryChunks.filter((chunk) => chunk.archived_at && !chunk.deleted_at).length
+                    + businessNotes.filter((note) => note.archived_at && !note.deleted_at).length;
 
             return (
               <LoadingLink

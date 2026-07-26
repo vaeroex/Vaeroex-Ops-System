@@ -34,6 +34,7 @@ import { estimatedProviderCostCents, recordVaeroexAiUsage, type VaeroexTokenUsag
 import { isUsageLimitReached } from "@/lib/billing/usage-limits";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
+import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -404,4 +405,184 @@ export async function cancelBusinessNoteReviewAction(formData: FormData) {
 
   revalidatePath("/app/sources");
   redirect(noticeUrl("message", "Business Note review cancelled. The note was not added to Evidence."));
+}
+
+export async function bulkManageBusinessNotesAction(input: {
+  ids: string[];
+  action: "approve" | "archive" | "restore" | "delete";
+  typedConfirmation?: string;
+}) {
+  if (!input || !Array.isArray(input.ids)) {
+    return { ok: false, message: "Choose Business Notes to manage." };
+  }
+  const ids = Array.from(new Set(input.ids)).filter((id) => uuidSchema.safeParse(id).success).slice(0, 100);
+  if (!ids.length || ids.length !== input.ids.length) {
+    return { ok: false, message: "Choose valid Business Notes from the current workspace." };
+  }
+  if (!["approve", "archive", "restore", "delete"].includes(input.action)) {
+    return { ok: false, message: "Business Note action is not supported." };
+  }
+
+  const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
+  const releaseChannel = businessNoteReleaseChannel();
+  const { data, error } = await supabase
+    .from("business_notes")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("release_channel", releaseChannel)
+    .in("id", ids)
+    .is("deleted_at", null);
+  const notes = (data || []) as BusinessNoteRow[];
+  if (error || notes.length !== ids.length) {
+    return { ok: false, message: "One or more Business Notes are stale or unavailable in this workspace." };
+  }
+
+  const canManageAll = notes.every((note) => note.author_user_id === user.id || ["owner", "admin", "manager"].includes(membership.role));
+  if (!canManageAll) return { ok: false, message: "You do not have permission to manage every selected Business Note." };
+
+  if (input.action === "approve") {
+    if (!notes.every((note) => note.status === "review_required")) {
+      return { ok: false, message: "Only Business Notes awaiting review can be approved together." };
+    }
+    const validated = notes.map((note) => ({ note, validation: validateBusinessNoteExtraction(note.extraction_json, note.original_note_text) }));
+    if (validated.some(({ validation }) => !validation.ok)) {
+      return { ok: false, message: "One or more saved extractions could not be validated safely." };
+    }
+    const approvedCandidates = validated.flatMap(({ note, validation }) => validation.ok ? [{ note, extraction: validation.value }] : []);
+    if (approvedCandidates.some(({ extraction }) => extraction.extractionDisposition !== "extractable" || extractedItemCount(extraction) === 0)) {
+      return { ok: false, message: "Every selected note must contain at least one source-grounded item before approval." };
+    }
+    const admin = createSupabaseAdminClient();
+    if (!admin) return { ok: false, message: "Business Note approval storage is temporarily unavailable." };
+
+    let approvedCount = 0;
+    for (const { note, extraction } of approvedCandidates) {
+      const indexed = await indexApprovedBusinessNote({
+        supabase: admin,
+        workspaceId,
+        note,
+        extraction,
+        userAddedContext: [],
+        approvedBy: user.id
+      });
+      if (!indexed.indexedChunks || indexed.error) {
+        return { ok: false, message: `${approvedCount} of ${ids.length} Business Notes were approved before indexing stopped safely.` };
+      }
+      const approvedAt = new Date().toISOString();
+      const { error: approvalError } = await admin
+        .from("business_notes")
+        .update({
+          status: "approved",
+          evidence_lifecycle_status: "active",
+          reviewed_extraction_json: extraction as unknown as Json,
+          source_spans_json: businessNoteSourceSpans(extraction, note.original_note_text) as unknown as Json,
+          user_corrections_json: {
+            userCorrections: {
+              title: extraction.title,
+              noteType: extraction.noteType,
+              departments: extraction.departments,
+              topics: extraction.topics,
+              reportingPeriod: extraction.reportingPeriod,
+              removedItemPaths: []
+            },
+            userAddedContext: [],
+            provenance: {
+              originalNoteText: "business_notes.original_note_text",
+              aiExtraction: "business_notes.extraction_json",
+              userCorrections: "business_notes.user_corrections_json.userCorrections",
+              userAddedContext: "business_notes.user_corrections_json.userAddedContext"
+            },
+            correction_count: 0
+          } as unknown as Json,
+          user_reporting_period_start: extraction.reportingPeriod.start,
+          user_reporting_period_end: extraction.reportingPeriod.end,
+          approved_by: user.id,
+          approved_at: approvedAt,
+          failure_reason: null
+        })
+        .eq("workspace_id", workspaceId)
+        .eq("release_channel", releaseChannel)
+        .eq("id", note.id)
+        .eq("status", "review_required");
+      if (approvalError) {
+        return { ok: false, message: `${approvedCount} of ${ids.length} Business Notes were approved before persistence stopped safely.` };
+      }
+      approvedCount += 1;
+    }
+    revalidatePath("/app/sources");
+    revalidatePath("/app/intelligence");
+    revalidatePath("/app");
+    return { ok: true, message: `${approvedCount} Business Note${approvedCount === 1 ? "" : "s"} approved to Evidence.` };
+  }
+
+  try {
+    await requireToolExecution(
+      { supabase, workspaceId, userId: user.id, userRole: membership.role },
+      {
+        toolName: "bulk_manage_records",
+        args: {
+          recordIds: ids,
+          collection: "business_notes",
+          action: input.action,
+          typedConfirmation: input.typedConfirmation === "DELETE" ? "DELETE" : undefined
+        },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        metadata: { source: "business_note_lifecycle", requested_count: ids.length } satisfies Json
+      }
+    );
+  } catch (toolError) {
+    return { ok: false, message: toolError instanceof Error ? toolError.message : "Business Note action was blocked by Vaeroex security policy." };
+  }
+
+  if (input.action === "restore" && !notes.every((note) => note.status === "archived" && note.archived_at)) {
+    return { ok: false, message: "Only archived Business Notes can be restored." };
+  }
+
+  const admin = createSupabaseAdminClient();
+  if (!admin) return { ok: false, message: "Business Note lifecycle storage is temporarily unavailable." };
+  const now = new Date().toISOString();
+  const approvedIds = notes.filter((note) => Boolean(note.approved_at)).map((note) => note.id);
+  const unapprovedIds = notes.filter((note) => !note.approved_at).map((note) => note.id);
+
+  if (input.action === "restore") {
+    const restoreApproved = approvedIds.length
+      ? await admin.from("business_notes").update({ status: "approved", evidence_lifecycle_status: "active", archived_at: null }).eq("workspace_id", workspaceId).eq("release_channel", releaseChannel).in("id", approvedIds)
+      : { error: null };
+    const restoreUnapproved = unapprovedIds.length
+      ? await admin.from("business_notes").update({ status: "review_required", evidence_lifecycle_status: "inactive", archived_at: null }).eq("workspace_id", workspaceId).eq("release_channel", releaseChannel).in("id", unapprovedIds)
+      : { error: null };
+    if (restoreApproved.error || restoreUnapproved.error) return { ok: false, message: "Selected Business Notes could not all be restored." };
+    if (approvedIds.length) {
+      const { error: chunkError } = await admin.from("business_memory_chunks").update({ archived_at: null, deleted_at: null, updated_at: now }).eq("workspace_id", workspaceId).eq("source_type", "business_note").in("source_id", approvedIds);
+      if (chunkError) return { ok: false, message: "Business Notes were restored, but their Learned Knowledge could not be reactivated safely." };
+    }
+  } else {
+    const deleting = input.action === "delete";
+    const { error: noteError } = await admin
+      .from("business_notes")
+      .update({
+        status: "archived",
+        evidence_lifecycle_status: "archived",
+        archived_at: now,
+        deleted_at: deleting ? now : null
+      })
+      .eq("workspace_id", workspaceId)
+      .eq("release_channel", releaseChannel)
+      .in("id", ids);
+    if (noteError) return { ok: false, message: "Selected Business Notes could not all be changed." };
+    const { error: chunkError } = await admin
+      .from("business_memory_chunks")
+      .update({ archived_at: now, deleted_at: deleting ? now : null, updated_at: now })
+      .eq("workspace_id", workspaceId)
+      .eq("source_type", "business_note")
+      .in("source_id", ids);
+    if (chunkError) return { ok: false, message: "Business Notes were made inactive, but their Learned Knowledge cleanup could not be completed." };
+  }
+
+  revalidatePath("/app/sources");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app");
+  const verb = input.action === "delete" ? "deleted" : input.action === "archive" ? "archived" : "restored";
+  return { ok: true, message: `${ids.length} Business Note${ids.length === 1 ? "" : "s"} ${verb}.` };
 }

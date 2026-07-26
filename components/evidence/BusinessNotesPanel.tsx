@@ -1,5 +1,6 @@
 import {
   approveBusinessNoteAction,
+  bulkManageBusinessNotesAction,
   cancelBusinessNoteReviewAction,
   submitBusinessNoteForReviewAction
 } from "@/app/app/sources/business-notes/actions";
@@ -14,6 +15,7 @@ import {
 } from "@/lib/ai/business-notes/validation";
 import { businessNoteAdditionalContextPrompts } from "@/lib/ai/business-notes/review-context";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
+import { EvidenceLifecycleCheckbox, EvidenceLifecycleSelection } from "@/components/evidence/EvidenceLifecycleSelection";
 import type { Database } from "@/lib/supabase/types";
 
 type BusinessNoteRow = Database["public"]["Tables"]["business_notes"]["Row"];
@@ -40,6 +42,17 @@ function dateTime(value: string) {
 function reviewExtraction(note: BusinessNoteRow) {
   const parsed = validateBusinessNoteExtraction(note.extraction_json, note.original_note_text);
   return parsed.ok ? parsed.value : null;
+}
+
+function preferredExtractionJson(note: BusinessNoteRow) {
+  const reviewed = note.reviewed_extraction_json;
+  return reviewed && typeof reviewed === "object" && !Array.isArray(reviewed) && Object.keys(reviewed).length
+    ? reviewed
+    : note.extraction_json;
+}
+
+function businessNoteSelectionLabel(note: BusinessNoteRow) {
+  return reviewExtraction({ ...note, extraction_json: preferredExtractionJson(note) })?.title || "Business Note";
 }
 
 function QuotedItems({
@@ -80,14 +93,17 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
   const additionalContextPrompts = businessNoteAdditionalContextPrompts(extraction);
   return (
     <article className="rounded-lg border border-cyan-300/30 bg-cyan-950/15 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Business Context Review</p>
-          <p className="mt-1 text-xs text-slate-400">Submitted {dateTime(note.created_at)}</p>
+      <div className="flex items-start gap-3">
+        <EvidenceLifecycleCheckbox id={note.id} label={extraction.title} />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Business Context Review</p>
+            <p className="mt-1 text-xs text-slate-400">Submitted {dateTime(note.created_at)}</p>
+          </div>
+          <span className="rounded-full border border-cyan-300/30 bg-cyan-950/40 px-2.5 py-1 text-xs font-semibold text-cyan-100">
+            {Math.round(extraction.extractionConfidence * 100)}% extraction confidence
+          </span>
         </div>
-        <span className="rounded-full border border-cyan-300/30 bg-cyan-950/40 px-2.5 py-1 text-xs font-semibold text-cyan-100">
-          {Math.round(extraction.extractionConfidence * 100)}% extraction confidence
-        </span>
       </div>
       <form action={approveBusinessNoteAction} className="mt-4 space-y-5">
         <input type="hidden" name="note_id" value={note.id} />
@@ -198,29 +214,62 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
   );
 }
 
+function BusinessNoteSummaryCard({ note, archived = false }: { note: BusinessNoteRow; archived?: boolean }) {
+  const extraction = reviewExtraction({
+    ...note,
+    extraction_json: preferredExtractionJson(note)
+  });
+  if (!extraction) return null;
+  return (
+    <article className="rounded-md border border-white/10 bg-slate-950/45 p-3">
+      <div className="flex items-start gap-3">
+        <EvidenceLifecycleCheckbox id={note.id} label={extraction.title} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h4 className="font-semibold text-white">{extraction.title}</h4>
+            <span className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold ${archived ? "border-slate-400/25 bg-slate-900/50 text-slate-300" : "border-emerald-300/25 bg-emerald-950/25 text-emerald-100"}`}>
+              {archived ? "Archived" : "Contextual evidence"}
+            </span>
+          </div>
+          <p className="mt-2 text-sm leading-6 text-slate-300">{extraction.summary}</p>
+          <p className="mt-2 text-xs text-slate-500">
+            {archived ? `Archived ${dateTime(note.archived_at || note.updated_at)}` : `Approved ${dateTime(note.approved_at || note.updated_at)}`} | Quantities remain note-derived until corroborated.
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function BusinessNotesPanel({
   notes,
   enabled,
-  observability
+  observability,
+  archived = false
 }: {
   notes: BusinessNoteRow[];
   enabled: boolean;
   observability?: BusinessNotesObservability | null;
+  archived?: boolean;
 }) {
-  const reviewNotes = notes.filter((note) => note.status === "review_required");
-  const approvedNotes = notes.filter((note) => note.status === "approved");
+  const reviewNotes = archived ? [] : notes.filter((note) => note.status === "review_required" && !note.archived_at && !note.deleted_at);
+  const approvedNotes = archived ? [] : notes.filter((note) => note.status === "approved" && !note.archived_at && !note.deleted_at);
+  const archivedNotes = archived ? notes.filter((note) => note.status === "archived" && note.archived_at && !note.deleted_at) : [];
+  const selectableNotes = archived ? archivedNotes : [...reviewNotes, ...approvedNotes];
   return (
     <section id="business-notes" className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="max-w-3xl">
           <p className="text-xs font-semibold uppercase tracking-wide text-cyan-200">Business Notes</p>
-          <h2 className="mt-1 text-lg font-semibold text-white">Capture business context for review</h2>
-          <p className="mt-2 text-sm leading-6 text-slate-300">Capture observations, meetings, incidents, decisions, concerns, assumptions, and other business context that may not exist in formal reports.</p>
+          <h2 className="mt-1 text-lg font-semibold text-white">{archived ? "Archived Business Notes" : "Capture business context for review"}</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-300">
+            {archived ? "Archived notes remain available for restoration but do not participate in active intelligence." : "Capture observations, meetings, incidents, decisions, concerns, assumptions, and other business context that may not exist in formal reports."}
+          </p>
         </div>
-        <span className="w-fit rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-300">{approvedNotes.length} approved</span>
+        <span className="w-fit rounded-full border border-white/10 bg-white/[0.04] px-2.5 py-1 text-xs font-semibold text-slate-300">{archived ? `${archivedNotes.length} archived` : `${approvedNotes.length} approved`}</span>
       </div>
 
-      <details className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-3" open={!notes.length}>
+      {!archived ? <details className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-3" open={!notes.length}>
         <summary className="cursor-pointer list-none text-sm font-semibold text-cyan-100">Write Business Note</summary>
         <form action={submitBusinessNoteForReviewAction} className="mt-4 space-y-3">
           <label className="block text-sm text-slate-200">
@@ -248,36 +297,40 @@ export function BusinessNotesPanel({
             <p className="rounded-md border border-amber-300/20 bg-amber-950/15 p-3 text-sm text-amber-100">Business context extraction is not enabled in this environment.</p>
           )}
         </form>
-      </details>
+      </details> : null}
 
-      {reviewNotes.length ? <div className="mt-5 space-y-4">{reviewNotes.map((note) => {
-        const extraction = reviewExtraction(note);
-        return extraction ? <ReviewForm key={note.id} note={note} extraction={extraction} /> : null;
-      })}</div> : null}
-
-      {approvedNotes.length ? (
+      {selectableNotes.length ? (
         <div className="mt-5">
-          <h3 className="text-sm font-semibold text-white">Approved Business Notes</h3>
-          <div className="mt-3 grid gap-3 md:grid-cols-2">
-            {approvedNotes.map((note) => {
-              const extraction = reviewExtraction({ ...note, extraction_json: note.reviewed_extraction_json });
-              if (!extraction) return null;
-              return (
-                <article key={note.id} className="rounded-md border border-white/10 bg-slate-950/45 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h4 className="font-semibold text-white">{extraction.title}</h4>
-                    <span className="rounded-full border border-emerald-300/25 bg-emerald-950/25 px-2 py-0.5 text-[11px] font-semibold text-emerald-100">Contextual evidence</span>
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{extraction.summary}</p>
-                  <p className="mt-2 text-xs text-slate-500">Approved {dateTime(note.approved_at || note.updated_at)} | Quantities remain note-derived until corroborated.</p>
-                </article>
-              );
-            })}
-          </div>
+          <EvidenceLifecycleSelection
+            items={selectableNotes.map((note) => ({ id: note.id, label: businessNoteSelectionLabel(note), approvable: note.status === "review_required" }))}
+            singularLabel="Business Note"
+            archived={archived}
+            action={bulkManageBusinessNotesAction}
+          >
+            {reviewNotes.length ? <div className="space-y-4">{reviewNotes.map((note) => {
+              const extraction = reviewExtraction(note);
+              return extraction ? <ReviewForm key={note.id} note={note} extraction={extraction} /> : null;
+            })}</div> : null}
+            {approvedNotes.length ? (
+              <div className={reviewNotes.length ? "mt-5" : ""}>
+                <h3 className="text-sm font-semibold text-white">Approved Business Notes</h3>
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  {approvedNotes.map((note) => <BusinessNoteSummaryCard key={note.id} note={note} />)}
+                </div>
+              </div>
+            ) : null}
+            {archivedNotes.length ? (
+              <div className="grid gap-3 md:grid-cols-2">
+                {archivedNotes.map((note) => <BusinessNoteSummaryCard key={note.id} note={note} archived />)}
+              </div>
+            ) : null}
+          </EvidenceLifecycleSelection>
         </div>
+      ) : archived ? (
+        <div className="mt-5 rounded-lg border border-dashed border-white/15 bg-slate-950/45 p-6 text-center text-sm text-slate-400">No archived Business Notes.</div>
       ) : null}
 
-      {observability ? (
+      {!archived && observability ? (
         <details className="mt-5 rounded-md border border-white/10 bg-slate-950/45 p-3">
           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-300">Preview extraction observability</summary>
           <dl className="mt-3 grid gap-3 text-xs sm:grid-cols-2 lg:grid-cols-4">
