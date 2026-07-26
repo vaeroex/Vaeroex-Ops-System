@@ -76,10 +76,34 @@ const NUMBER_WORDS = new Map([
 ]);
 const REASONING_LEAKAGE = /\b(?:chain of thought|hidden reasoning|internal reasoning|system prompt|developer message)\b/i;
 const SUBJECTIVE_LANGUAGE = /\b(?:i|we)\s+(?:think|believe|assume|suspect|feel|expect)\b|\b(?:probably|possibly|likely|unlikely|seems?|appears?|may|might|could)\b/i;
-const CAUSAL_LANGUAGE = /\b(?:caused?|because of|due to|led to|resulted in|driven by|responsible for)\b/i;
+const CAUSAL_LANGUAGE = /\b(?:caused?|because of|due to|led to|resulted in|driven by|responsible for|contributed to|made)\b/i;
+const INFORMAL_TERM_EQUIVALENTS = new Map([
+  ["employee", "staff"],
+  ["employees", "staff"],
+  ["late", "delay"],
+  ["lateness", "delay"],
+  ["delay", "delay"],
+  ["delayed", "delay"],
+  ["delays", "delay"],
+  ["ready", "prepare"],
+  ["readiness", "prepare"],
+  ["prepare", "prepare"],
+  ["prepared", "prepare"],
+  ["preparing", "prepare"],
+  ["preparation", "prepare"],
+  ["unhappy", "negative_customer_sentiment"],
+  ["dissatisfied", "negative_customer_sentiment"],
+  ["dissatisfaction", "negative_customer_sentiment"],
+  ["displeased", "negative_customer_sentiment"]
+]);
 
 function normalized(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9%$]+/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .toLowerCase()
+    .replace(/\b(?:isn['\u2019]?t|isnt|wasn['\u2019]?t|wasnt)\s+(?:very\s+)?happy\b/g, "negative_customer_sentiment")
+    .replace(/[^a-z0-9%$]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stemTerm(value: string) {
@@ -91,7 +115,10 @@ function stemTerm(value: string) {
 }
 
 function meaningfulTerms(value: string) {
-  return normalized(value).split(" ").filter((term) => term.length > 2 && !STOP_WORDS.has(term)).map(stemTerm);
+  return normalized(value).split(" ").filter((term) => term.length > 2 && !STOP_WORDS.has(term)).map((term) => {
+    const stemmed = stemTerm(term);
+    return INFORMAL_TERM_EQUIVALENTS.get(term) || INFORMAL_TERM_EQUIVALENTS.get(stemmed) || stemmed;
+  });
 }
 
 function dateValue(value: string | null) {
@@ -107,7 +134,7 @@ function exactQuoteSpan(originalNote: string, quote: string) {
 }
 
 function numericTokens(value: string) {
-  const digits = (value.match(NUMBER_PATTERN) || []).map((item) => item.toLowerCase().replace(/,/g, ""));
+  const digits = (value.match(NUMBER_PATTERN) || []).map((item) => item.toLowerCase().replace(/,/g, "").replace(/\.$/, ""));
   const words = normalized(value).split(" ").flatMap((item) => {
     const number = NUMBER_WORDS.get(item);
     return number === undefined ? [] : [number];
@@ -119,6 +146,7 @@ function statementSupportedByQuote(statement: string, quote: string) {
   const statementNumbers = numericTokens(statement);
   const quoteNumbers = new Set(numericTokens(quote));
   if (statementNumbers.some((number) => !quoteNumbers.has(number))) return false;
+  if (CAUSAL_LANGUAGE.test(statement) && !CAUSAL_LANGUAGE.test(quote)) return false;
 
   const statementTerms = meaningfulTerms(statement);
   if (!statementTerms.length) return true;
