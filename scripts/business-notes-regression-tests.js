@@ -47,6 +47,11 @@ const {
   validateBusinessNoteExtraction
 } = require("../lib/ai/business-notes/validation.ts");
 const {
+  businessNoteAdditionalContextPrompts,
+  businessNoteUserAddedContextText,
+  parseBusinessNoteUserAddedContext
+} = require("../lib/ai/business-notes/review-context.ts");
+const {
   filterEligibleMemoryRows,
   SupabasePgvectorCandidateRetriever
 } = require("../lib/ai/evidence-index.ts");
@@ -334,6 +339,11 @@ async function main() {
   assert.equal(validatedInformalManagerNote.reportingPeriod.start, "2026-07-24");
   assert.deepEqual(validatedInformalManagerNote.customersMentioned.map((customer) => customer.name), ["customer hospital"]);
   assert.equal(validatedInformalManagerNote.risks.length, 0, "the fixture must not create a new risk or finding");
+  assert.deepEqual(
+    businessNoteAdditionalContextPrompts(validatedInformalManagerNote),
+    [],
+    "a low-value request for the unnamed customer must not become an enrichment prompt"
+  );
 
   const inventedCausation = validateBusinessNoteExtraction(extraction({
     summary: "Staff lateness caused transport delays.",
@@ -379,9 +389,9 @@ async function main() {
   const lowConfidence = extraction({ extractionConfidence: 0.05 });
   expectValid(simple, lowConfidence, "low confidence remains reviewable and must not trigger fallback");
   const ambiguous = expectValid(simple, extraction({ extractionDisposition: "too_ambiguous", extractionConfidence: 0.1 }), "ambiguous but grounded output remains reviewable");
-  assert.ok(businessNoteReviewWarnings(ambiguous).some((warning) => warning.code === "additional_context"));
+  assert.ok(businessNoteReviewWarnings(ambiguous).some((warning) => warning.code === "reporting_period_unclear"));
   assert.ok(businessNoteReviewWarnings(lowConfidence).some((warning) => warning.code === "low_confidence"));
-  assert.ok(businessNoteReviewWarnings(expectValid(emotional, extraction({
+  assert.equal(businessNoteReviewWarnings(expectValid(emotional, extraction({
     title: "Concern about returns",
     summary: "The note says returns are getting worse.",
     noteType: "concern",
@@ -392,7 +402,7 @@ async function main() {
     mentionedMetrics: [],
     evidenceTreatment: "context_only",
     extractionConfidence: 0.3
-  }), "subjective warning fixture")).some((warning) => warning.code === "primarily_subjective"));
+  }), "subjective warning fixture")).some((warning) => warning.code === "primarily_subjective"), false);
   assert.equal(validateBusinessNoteExtraction({ ...extraction(), sourceClassification: "unsupported" }, simple).ok, false);
   assert.equal(validateBusinessNoteExtraction({ ...extraction(), explicitFacts: [{ statement: "Revenue was 7000 in June.", sourceQuote: "", confidence: 0.9 }] }, simple).ok, false);
   const inventedNumber = validateBusinessNoteExtraction({ ...extraction(), summary: "Revenue was 9000 in June." }, simple);
@@ -405,7 +415,34 @@ async function main() {
   assert.deepEqual(unsupportedClassifications.departments, []);
   assert.deepEqual(unsupportedClassifications.topics, []);
   assert.ok(unsupportedClassifications.missingContext.includes("Review department and topic classifications."));
-  assert.ok(businessNoteReviewWarnings(unsupportedClassifications).some((warning) => warning.code === "additional_context"));
+  assert.ok(businessNoteReviewWarnings(unsupportedClassifications).some((warning) => warning.code === "department_needs_confirmation"));
+
+  const promptFixture = extraction({
+    reportingPeriod: { start: null, end: null, inferred: false, sourceQuote: null },
+    missingContext: [
+      "The reporting date is not specified.",
+      "The approximate delay duration is not specified.",
+      "The department responsible for the delay is unclear.",
+      "The incident location is not specified."
+    ]
+  });
+  assert.deepEqual(
+    businessNoteAdditionalContextPrompts(promptFixture).map((prompt) => prompt.key),
+    ["reporting_period", "delay_duration", "department"],
+    "only the three highest-value enrichment prompts should appear"
+  );
+  const blankContext = parseBusinessNoteUserAddedContext(new FormData(), promptFixture);
+  assert.deepEqual(blankContext, [], "optional enrichment must permit approval with every field blank");
+  const contextForm = new FormData();
+  contextForm.set("additional_context_delay_duration", "About 45 minutes");
+  contextForm.set("additional_context_department", "Transport operations");
+  contextForm.set("additional_context_organization_name", "Should be ignored");
+  const userAddedContext = parseBusinessNoteUserAddedContext(contextForm, promptFixture);
+  assert.deepEqual(userAddedContext.map((item) => item.field), ["delay_duration", "department"]);
+  assert.ok(userAddedContext.every((item) => item.provenance === "supplied_during_review"));
+  assert.ok(userAddedContext.every((item) => item.userProvided && !item.partOfOriginalNoteQuotation));
+  assert.ok(userAddedContext.every((item) => item.evidenceTreatment === "contextual_metadata"));
+  assert.match(businessNoteUserAddedContextText(userAddedContext).join("\n"), /not part of the original note quotation; unverified/);
 
   const inventedEntity = validateBusinessNoteExtraction({
     ...extraction(),
@@ -420,7 +457,8 @@ async function main() {
     departments: ["Sales"],
     topics: ["Revenue"],
     reportingPeriod: { start: "2026-06-01", end: "2026-06-30" },
-    removedItemPaths: ["mentionedMetrics.0"]
+    removedItemPaths: ["mentionedMetrics.0"],
+    userAddedContext: []
   });
   assert.equal(reviewed.title, "June revenue note");
   assert.equal(reviewed.mentionedMetrics.length, 0);
@@ -601,12 +639,31 @@ async function main() {
   assert.match(panel, /Original note/);
   assert.match(panel, /Review warnings/);
   assert.match(panel, /do not prevent approval as contextual evidence/);
+  assert.match(panel, /Business context extracted successfully\./);
+  assert.match(panel, /Review the information below before approving it as contextual evidence\./);
+  assert.match(panel, /Additional Context \(Optional\)/);
+  assert.match(panel, /Add any details you know to improve future evidence quality\. These fields are optional and do not prevent approval\./);
+  assert.doesNotMatch(panel, />Missing context</i);
+  assert.doesNotMatch(panel, /const failedNotes/);
+  assert.match(panel, /Historical Preview diagnostics/);
+  assert.match(panel, /does not describe the current Business Context Review/);
   const validation = read("lib/ai/business-notes/validation.ts");
-  assert.match(validation, /Low-confidence extraction/);
+  assert.match(validation, /Low-confidence classification/);
   assert.match(validation, /Reporting period unclear/);
-  assert.match(validation, /Primarily subjective content/);
-  assert.match(validation, /No measurable facts identified/);
-  assert.match(validation, /Additional context may improve usefulness/);
+  assert.match(validation, /Department needs confirmation/);
+  assert.doesNotMatch(validation, /Additional context may improve usefulness/);
+  const reviewContext = read("lib/ai/business-notes/review-context.ts");
+  assert.match(reviewContext, /slice\(0, MAX_PROMPTS\)/);
+  assert.match(reviewContext, /LOW_VALUE_IDENTITY_REQUEST/);
+  const indexing = read("lib/ai/business-notes/indexing.ts");
+  assert.match(indexing, /user_added_context/);
+  assert.match(indexing, /user_added_context_verified: false/);
+  assert.match(indexing, /user_added_context_original_quote: false/);
+  const actionSource = read("app/app/sources/business-notes/actions.ts");
+  assert.match(actionSource, /userAddedContext: corrections\.userAddedContext/);
+  assert.match(actionSource, /originalNoteText: "business_notes\.original_note_text"/);
+  assert.match(actionSource, /aiExtraction: "business_notes\.extraction_json"/);
+  assert.doesNotMatch(actionSource, /original_note_text:\s*.*userAddedContext/);
   assert.doesNotMatch(panel, /gpt-5\.6|Luna|Terra/);
 
   const migration = read("supabase/migrations/202607250001_business_notes_evidence.sql");

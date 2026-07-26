@@ -12,6 +12,7 @@ import {
   type BusinessNoteReviewWarning,
   type BusinessNoteSourceSpan
 } from "@/lib/ai/business-notes/contracts";
+import { businessNoteAdditionalContextPrompts } from "@/lib/ai/business-notes/review-context";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
 import {
@@ -239,20 +240,15 @@ export function businessNoteReviewWarnings(extraction: BusinessNoteExtraction): 
     ...extraction.mentionedMetrics
   ].map((item) => item.confidence);
   const warnings: BusinessNoteReviewWarning[] = [];
+  const prompts = businessNoteAdditionalContextPrompts(extraction);
   if (extraction.extractionConfidence < 0.7 || itemConfidences.some((value) => value < 0.5)) {
-    warnings.push({ code: "low_confidence", label: "Low-confidence extraction" });
+    warnings.push({ code: "low_confidence", label: "Low-confidence classification" });
   }
-  if (extraction.reportingPeriod.inferred || extraction.reportingPeriod.start === null || extraction.reportingPeriod.end === null) {
+  if (prompts.some((prompt) => prompt.key === "reporting_period")) {
     warnings.push({ code: "reporting_period_unclear", label: "Reporting period unclear" });
   }
-  if (extraction.opinionsOrAssumptions.length > 0 && extraction.explicitFacts.length === 0 && extraction.mentionedMetrics.length === 0) {
-    warnings.push({ code: "primarily_subjective", label: "Primarily subjective content" });
-  }
-  if (extraction.explicitFacts.length === 0 && extraction.mentionedMetrics.length === 0) {
-    warnings.push({ code: "no_measurable_facts", label: "No measurable facts identified" });
-  }
-  if (extraction.missingContext.length > 0 || extraction.extractionDisposition === "too_ambiguous") {
-    warnings.push({ code: "additional_context", label: "Additional context may improve usefulness" });
+  if (prompts.some((prompt) => prompt.key === "department")) {
+    warnings.push({ code: "department_needs_confirmation", label: "Department needs confirmation" });
   }
   return warnings;
 }

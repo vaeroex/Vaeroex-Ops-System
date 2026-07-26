@@ -38,9 +38,7 @@ export type BusinessNoteStatus = "draft" | "extracting" | "review_required" | "a
 export type BusinessNoteReviewWarningCode =
   | "low_confidence"
   | "reporting_period_unclear"
-  | "primarily_subjective"
-  | "no_measurable_facts"
-  | "additional_context";
+  | "department_needs_confirmation";
 
 export type BusinessNoteReviewWarning = Readonly<{
   code: BusinessNoteReviewWarningCode;
@@ -109,6 +107,34 @@ export type BusinessNoteSourceSpan = Readonly<{
   end: number;
 }>;
 
+export const BUSINESS_NOTE_ADDITIONAL_CONTEXT_KEYS = [
+  "reporting_period",
+  "delay_duration",
+  "department",
+  "location",
+  "relevant_team",
+  "organization_name",
+  "incident_identifier"
+] as const;
+
+export type BusinessNoteAdditionalContextKey = (typeof BUSINESS_NOTE_ADDITIONAL_CONTEXT_KEYS)[number];
+
+export type BusinessNoteAdditionalContextPrompt = Readonly<{
+  key: BusinessNoteAdditionalContextKey;
+  label: string;
+  placeholder: string;
+}>;
+
+export type BusinessNoteUserAddedContext = Readonly<{
+  field: BusinessNoteAdditionalContextKey;
+  label: string;
+  value: string;
+  provenance: "supplied_during_review";
+  userProvided: true;
+  partOfOriginalNoteQuotation: false;
+  evidenceTreatment: "contextual_metadata";
+}>;
+
 export type BusinessNoteReviewCorrections = Readonly<{
   title: string;
   noteType: BusinessNoteType;
@@ -116,6 +142,7 @@ export type BusinessNoteReviewCorrections = Readonly<{
   topics: readonly string[];
   reportingPeriod: Readonly<{ start: string | null; end: string | null }>;
   removedItemPaths: readonly string[];
+  userAddedContext: readonly BusinessNoteUserAddedContext[];
 }>;
 
 const quotedEntitySchema = {

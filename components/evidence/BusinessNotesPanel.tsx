@@ -12,6 +12,7 @@ import {
   businessNoteReviewWarnings,
   validateBusinessNoteExtraction
 } from "@/lib/ai/business-notes/validation";
+import { businessNoteAdditionalContextPrompts } from "@/lib/ai/business-notes/review-context";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import type { Database } from "@/lib/supabase/types";
 
@@ -76,6 +77,7 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
     ? ""
     : note.user_observation_date || "";
   const warnings = businessNoteReviewWarnings(extraction);
+  const additionalContextPrompts = businessNoteAdditionalContextPrompts(extraction);
   return (
     <article className="rounded-lg border border-cyan-300/30 bg-cyan-950/15 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -97,7 +99,12 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
             </ul>
             <p className="mt-2 text-xs leading-5 text-amber-100/70">These warnings do not prevent approval as contextual evidence.</p>
           </div>
-        ) : null}
+        ) : (
+          <div className="rounded-md border border-emerald-300/20 bg-emerald-950/15 p-3">
+            <p className="text-sm font-semibold text-emerald-100">Business context extracted successfully.</p>
+            <p className="mt-1 text-xs leading-5 text-emerald-100/75">Review the information below before approving it as contextual evidence.</p>
+          </div>
+        )}
         <div className="grid gap-4 md:grid-cols-2">
           <label className="text-sm text-slate-200">
             <span className="mb-1 block text-xs font-semibold text-slate-300">Generated title</span>
@@ -152,10 +159,23 @@ function ReviewForm({ note, extraction }: { note: BusinessNoteRow; extraction: B
           <QuotedItems title="Vendors mentioned" collection="vendorsMentioned" items={extraction.vendorsMentioned.map((item) => ({ text: item.name, sourceQuote: item.sourceQuote }))} />
           <QuotedItems title="Projects mentioned" collection="projectsMentioned" items={extraction.projectsMentioned.map((item) => ({ text: item.name, sourceQuote: item.sourceQuote }))} />
         </div>
-        {extraction.missingContext.length ? (
-          <div className="rounded-md border border-amber-300/20 bg-amber-950/15 p-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-amber-100">Missing context</p>
-            <ul className="mt-2 space-y-1 text-sm text-amber-50/90">{extraction.missingContext.map((item) => <li key={item}>- {item}</li>)}</ul>
+        {additionalContextPrompts.length ? (
+          <div className="rounded-md border border-white/10 bg-slate-950/45 p-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-300">Additional Context (Optional)</p>
+            <p className="mt-1 text-xs leading-5 text-slate-400">Add any details you know to improve future evidence quality. These fields are optional and do not prevent approval.</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              {additionalContextPrompts.map((prompt) => (
+                <label key={prompt.key} className="text-sm text-slate-200">
+                  <span className="mb-1 block text-xs font-semibold text-slate-300">{prompt.label}</span>
+                  <input
+                    name={`additional_context_${prompt.key}`}
+                    maxLength={240}
+                    placeholder={prompt.placeholder}
+                    className="min-h-11 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300"
+                  />
+                </label>
+              ))}
+            </div>
           </div>
         ) : null}
         <details className="rounded-md border border-white/10 bg-slate-950/45 p-3">
@@ -189,7 +209,6 @@ export function BusinessNotesPanel({
 }) {
   const reviewNotes = notes.filter((note) => note.status === "review_required");
   const approvedNotes = notes.filter((note) => note.status === "approved");
-  const failedNotes = notes.filter((note) => note.status === "extraction_failed");
   return (
     <section id="business-notes" className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -258,13 +277,6 @@ export function BusinessNotesPanel({
         </div>
       ) : null}
 
-      {failedNotes.length ? (
-        <div className="mt-5 rounded-md border border-red-300/20 bg-red-950/15 p-3">
-          <p className="text-sm font-semibold text-red-100">{failedNotes.length} note extraction{failedNotes.length === 1 ? "" : "s"} could not be completed safely.</p>
-          <p className="mt-1 text-xs leading-5 text-red-100/75">The original notes were preserved and none were added to active Evidence.</p>
-        </div>
-      ) : null}
-
       {observability ? (
         <details className="mt-5 rounded-md border border-white/10 bg-slate-950/45 p-3">
           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-wide text-slate-300">Preview extraction observability</summary>
@@ -278,6 +290,14 @@ export function BusinessNotesPanel({
             <div><dt className="text-slate-500">Average corrections</dt><dd className="mt-1 text-slate-100">{observability.averageCorrections.toFixed(1)}</dd></div>
             <div><dt className="text-slate-500">Measured extractions</dt><dd className="mt-1 text-slate-100">{observability.extractionCount}</dd></div>
           </dl>
+          {observability.failureCount ? (
+            <div className="mt-4 border-t border-white/10 pt-3">
+              <p className="text-xs font-semibold text-slate-300">Historical Preview diagnostics</p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {observability.failureCount} earlier note extraction{observability.failureCount === 1 ? "" : "s"} could not be completed safely. This history does not describe the current Business Context Review.
+              </p>
+            </div>
+          ) : null}
         </details>
       ) : null}
     </section>

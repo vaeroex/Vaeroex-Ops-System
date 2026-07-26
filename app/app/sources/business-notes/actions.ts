@@ -17,6 +17,7 @@ import {
 } from "@/lib/ai/business-notes/contracts";
 import { indexApprovedBusinessNote } from "@/lib/ai/business-notes/indexing";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
+import { parseBusinessNoteUserAddedContext } from "@/lib/ai/business-notes/review-context";
 import {
   businessNoteProviderAttemptTelemetry,
   generateBusinessNoteExtraction
@@ -267,7 +268,8 @@ function parsedReviewCorrections(formData: FormData, extraction: BusinessNoteExt
     departments: listValue(rawText(formData, "departments"), 20),
     topics: listValue(rawText(formData, "topics"), 30),
     reportingPeriod: { start: start || null, end: end || null },
-    removedItemPaths
+    removedItemPaths,
+    userAddedContext: parseBusinessNoteUserAddedContext(formData, extraction)
   };
 }
 
@@ -337,6 +339,7 @@ export async function approveBusinessNoteAction(formData: FormData) {
     workspaceId,
     note,
     extraction: reviewed,
+    userAddedContext: corrections.userAddedContext,
     approvedBy: user.id
   });
   if (!indexed.indexedChunks || indexed.error) redirect(noticeUrl("error", "This Business Note could not be added to Evidence safely."));
@@ -350,7 +353,21 @@ export async function approveBusinessNoteAction(formData: FormData) {
       reviewed_extraction_json: reviewed as unknown as Json,
       source_spans_json: businessNoteSourceSpans(reviewed, note.original_note_text) as unknown as Json,
       user_corrections_json: {
-        ...corrections,
+        userCorrections: {
+          title: corrections.title,
+          noteType: corrections.noteType,
+          departments: corrections.departments,
+          topics: corrections.topics,
+          reportingPeriod: corrections.reportingPeriod,
+          removedItemPaths: corrections.removedItemPaths
+        },
+        userAddedContext: corrections.userAddedContext,
+        provenance: {
+          originalNoteText: "business_notes.original_note_text",
+          aiExtraction: "business_notes.extraction_json",
+          userCorrections: "business_notes.user_corrections_json.userCorrections",
+          userAddedContext: "business_notes.user_corrections_json.userAddedContext"
+        },
         correction_count: correctionCount(validation.value, corrections)
       } as unknown as Json,
       user_reporting_period_start: corrections.reportingPeriod.start,

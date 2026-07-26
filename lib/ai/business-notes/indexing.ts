@@ -2,7 +2,8 @@ import "server-only";
 
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BusinessNoteExtraction } from "@/lib/ai/business-notes/contracts";
+import type { BusinessNoteExtraction, BusinessNoteUserAddedContext } from "@/lib/ai/business-notes/contracts";
+import { businessNoteUserAddedContextText } from "@/lib/ai/business-notes/review-context";
 import { chunkEvidenceText } from "@/lib/ai/evidence-index";
 import { createAIEmbeddings } from "@/lib/ai/providers/provider-manager";
 import { estimateTokenCount } from "@/lib/ai/usage";
@@ -21,7 +22,10 @@ function periodLabel(extraction: BusinessNoteExtraction) {
   return start || end || "Not specified";
 }
 
-function approvedContextText(extraction: BusinessNoteExtraction) {
+function approvedContextText(
+  extraction: BusinessNoteExtraction,
+  userAddedContext: readonly BusinessNoteUserAddedContext[]
+) {
   const lines = [
     `Business Note: ${extraction.title}`,
     `Note type: ${extraction.noteType.replace(/_/g, " ")}`,
@@ -48,6 +52,7 @@ function approvedContextText(extraction: BusinessNoteExtraction) {
     text: `${item.name}: ${item.value === null ? "value not specified" : item.value}${item.unit ? ` ${item.unit}` : ""}`,
     quote: item.sourceQuote
   })));
+  lines.push(...businessNoteUserAddedContextText(userAddedContext));
 
   return lines.join("\n\n");
 }
@@ -62,12 +67,14 @@ export async function indexApprovedBusinessNote({
   workspaceId,
   note,
   extraction,
+  userAddedContext,
   approvedBy
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
   note: BusinessNoteRow;
   extraction: BusinessNoteExtraction;
+  userAddedContext: readonly BusinessNoteUserAddedContext[];
   approvedBy: string;
 }) {
   if (note.workspace_id !== workspaceId || note.deleted_at || note.archived_at || note.status !== "review_required") {
@@ -77,7 +84,7 @@ export async function indexApprovedBusinessNote({
     return { indexedChunks: 0, error: "This note does not contain approved business context to add to Evidence." };
   }
 
-  const contextualText = approvedContextText(extraction);
+  const contextualText = approvedContextText(extraction, userAddedContext);
   const chunks = chunkEvidenceText(contextualText);
   if (!chunks.length) return { indexedChunks: 0, error: "No approved Business Note context was available to index." };
 
@@ -118,6 +125,17 @@ export async function indexApprovedBusinessNote({
       topics: [...extraction.topics],
       reporting_period_start: extraction.reportingPeriod.start,
       reporting_period_end: extraction.reportingPeriod.end,
+      user_added_context: userAddedContext.map((item) => ({
+        field: item.field,
+        label: item.label,
+        value: item.value,
+        provenance: item.provenance,
+        user_provided: item.userProvided,
+        part_of_original_note_quotation: item.partOfOriginalNoteQuotation,
+        evidence_treatment: item.evidenceTreatment
+      })),
+      user_added_context_verified: false,
+      user_added_context_original_quote: false,
       approved_by: approvedBy,
       indexing_method: embedding.embeddings[index] ? "openai_embedding" : "text_only",
       embedding_error_code: embedding.error ? "embedding_unavailable" : null,
