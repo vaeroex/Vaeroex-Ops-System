@@ -75,6 +75,20 @@ check(
   "Resetting a demo workspace requires internal access."
 );
 
+const setupActions = read("app/app/setup/actions.ts");
+const trustedWorkspaceInsert = setupActions.indexOf('admin\n    .from("workspaces")');
+const trustedMembershipInsert = setupActions.indexOf('admin.from("workspace_members").insert');
+const clientScopedBootstrapOperations = setupActions.indexOf("const operations = [");
+check(setupActions.includes('import { createSupabaseAdminClient } from "@/lib/supabase/admin"'), "Workspace setup uses the existing trusted server client.");
+check(trustedWorkspaceInsert >= 0, "Workspace setup creates the workspace through the trusted server path.");
+check(trustedMembershipInsert > trustedWorkspaceInsert, "Workspace setup establishes owner membership after creating the workspace.");
+check(
+  clientScopedBootstrapOperations > trustedMembershipInsert,
+  "Workspace setup establishes membership before authenticated client writes that require workspace RLS access."
+);
+check(!setupActions.includes('supabase\n    .from("workspaces")'), "Workspace setup does not bootstrap a workspace through the RLS-scoped client.");
+check(!setupActions.includes('supabase.from("workspace_members").insert'), "Workspace setup does not bootstrap membership through the RLS-scoped client.");
+
 const onboarding = read("components/app/OnboardingChecklist.tsx");
 check(!onboarding.includes("explore a separate demo workspace"), "Customer onboarding no longer suggests demo workspace access.");
 check(!onboarding.includes("Want to see Vaeroex with data?"), "Customer onboarding no longer renders a demo callout.");
