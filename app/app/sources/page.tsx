@@ -11,6 +11,7 @@ import {
   uploadFileAction
 } from "@/app/app/files/actions";
 import { LegalSafetyNotice } from "@/components/legal/LegalSafetyNotice";
+import { WorkspaceAgreementList } from "@/components/legal/WorkspaceAgreementList";
 import { AnalysisProgressSubmit } from "@/components/operations/AnalysisProgressSubmit";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
@@ -61,8 +62,9 @@ type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 type BusinessNoteRow = Database["public"]["Tables"]["business_notes"]["Row"];
+type WorkspaceAgreementRow = Database["public"]["Tables"]["workspace_agreements"]["Row"];
 type JsonRecord = Record<string, unknown>;
-type SourcesTab = "files" | "knowledge" | "archived";
+type SourcesTab = "files" | "knowledge" | "archived" | "legal";
 type SourceDetailSection = "summary" | "findings" | "imported" | "history";
 
 const ANALYSIS_PROGRESS_STEPS = ["Reading file", "Extracting key information", "Identifying business signals", "Checking KPI/import opportunities", "Saving analysis", "Done"];
@@ -70,6 +72,7 @@ const UPLOAD_PROGRESS_STEPS = ["Uploading file", "Saving securely", "Preparing s
 const sourceTabs: Array<{ key: SourcesTab; label: string; href: Route }> = [
   { key: "files", label: "Active Sources", href: "/app/sources" },
   { key: "knowledge", label: "Learned Knowledge", href: "/app/sources?tab=knowledge" },
+  { key: "legal", label: "Legal & Agreements", href: "/app/sources?tab=legal" },
   { key: "archived", label: "Archived", href: "/app/sources?tab=archived" }
 ];
 
@@ -93,6 +96,7 @@ function stringValue(value: unknown, fallback = "") {
 
 function normalizeSourcesTab(tab?: string | null, legacyView?: string | null): SourcesTab {
   if (tab === "knowledge" || tab === "learned") return "knowledge";
+  if (tab === "legal" || tab === "agreements") return "legal";
   if (tab === "archived" || legacyView === "hidden") return "archived";
   return "files";
 }
@@ -1135,7 +1139,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         .order("row_number", { ascending: true })
         .limit(2000)
     : Promise.resolve({ data: [], error: null });
-  const [filesResult, foldersResult, importsResult, importRowsResult, reportsResult, kpisResult, runsResult, memoryResult, notesResult] = await Promise.all([
+  const [filesResult, foldersResult, importsResult, importRowsResult, reportsResult, kpisResult, runsResult, memoryResult, notesResult, agreementsResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
@@ -1163,7 +1167,14 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
       .eq("release_channel", releaseChannel)
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
-      .limit(100)
+      .limit(100),
+    activeTab === "legal"
+      ? supabase
+        .from("workspace_agreements")
+        .select("*")
+        .eq("workspace_id", workspaceId)
+        .order("signed_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null })
   ]);
 
   const files = (filesResult.data || []) as FileUploadRow[];
@@ -1175,6 +1186,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const runs = (runsResult.data || []) as VaeroexRunRow[];
   const rawMemoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
   const businessNotes = (notesResult.data || []) as BusinessNoteRow[];
+  const workspaceAgreements = (agreementsResult.data || []) as WorkspaceAgreementRow[];
   const activeMemoryChunks = await filterEligibleMemoryRowsByLifecycle({
     supabase,
     workspaceId,
@@ -1193,7 +1205,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     runsByFile.set(fileId, [...(runsByFile.get(fileId) || []), run]);
   });
 
-  const errors = [filesResult.error, foldersResult.error, importsResult.error, importRowsResult.error, reportsResult.error, kpisResult.error, runsResult.error, memoryResult.error, notesResult.error].filter(Boolean);
+  const errors = [filesResult.error, foldersResult.error, importsResult.error, importRowsResult.error, reportsResult.error, kpisResult.error, runsResult.error, memoryResult.error, notesResult.error, agreementsResult.error].filter(Boolean);
   const visibleFiles = filteredFiles({
     files,
     status: params.status,
@@ -1302,11 +1314,11 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold tracking-normal text-white">Evidence</h1>
-            <p className="mt-1 text-sm leading-6 text-slate-300">Upload, analyze, and organize the information Vaeroex can use.</p>
+            <p className="mt-1 text-sm leading-6 text-slate-300">{activeTab === "legal" ? "View immutable legal records retained for this workspace." : "Upload, analyze, and organize the information Vaeroex can use."}</p>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <p className="max-w-sm text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>
-            <UploadSourceDrawer folders={folders} compact />
+            {activeTab === "legal" ? null : <p className="max-w-sm text-xs leading-5 text-slate-400">Reports, spreadsheets, SOPs, notes, and operational files.</p>}
+            {activeTab === "legal" ? null : <UploadSourceDrawer folders={folders} compact />}
           </div>
         </div>
         <div className="mt-3">
@@ -1346,6 +1358,8 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                 ? files.filter((file) => !file.archived_at && !file.deleted_at).length
                 : tab.key === "knowledge"
                   ? memoryChunks.filter((chunk) => !chunk.archived_at && !chunk.deleted_at).length
+                  : tab.key === "legal"
+                    ? (active ? workspaceAgreements.length : null)
                   : files.filter((file) => file.archived_at && !file.deleted_at).length
                     + memoryChunks.filter((chunk) => chunk.archived_at && !chunk.deleted_at).length
                     + businessNotes.filter((note) => note.archived_at && !note.deleted_at).length;
@@ -1358,7 +1372,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
                 loadingLabel={`Loading ${tab.label.toLowerCase()}...`}
               >
                 <span>{tab.label}</span>
-                <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px]">{count}</span>
+                {count === null ? null : <span className="rounded-full border border-white/15 bg-white/10 px-2 py-0.5 text-[11px]">{count}</span>}
               </LoadingLink>
             );
           })}
@@ -1389,7 +1403,9 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
           </div>
         ) : null}
 
-        {activeTab === "knowledge" ? (
+        {activeTab === "legal" ? (
+          <WorkspaceAgreementList agreements={workspaceAgreements} />
+        ) : activeTab === "knowledge" ? (
           <LearnedKnowledgeView items={memoryChunks} files={files} params={params} />
         ) : activeTab === "archived" ? (
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">

@@ -89,6 +89,7 @@ for (const helper of requiredSecurityHelpers) {
 }
 
 const tenantTables = [
+  "workspace_agreements",
   "business_intakes",
   "workflow_maps",
   "forms",

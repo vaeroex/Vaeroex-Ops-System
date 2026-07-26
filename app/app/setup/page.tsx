@@ -1,8 +1,6 @@
-import { SetupWizard } from "@/components/setup/SetupWizard";
-import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
+import { WorkspaceCreationForm } from "@/components/setup/WorkspaceCreationForm";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { workspaceSetupCategories } from "@/data/workspace-categories";
 import { redirect } from "next/navigation";
 
 type SetupPageProps = {
@@ -14,6 +12,8 @@ type SetupPageProps = {
 export default async function SetupPage({ searchParams }: SetupPageProps) {
   const params = await searchParams;
   const supabase = await createSupabaseServerClient();
+  let ownerName = "";
+  let ownerEmail = "";
 
   if (supabase) {
     const {
@@ -21,6 +21,8 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
     } = await supabase.auth.getUser();
 
     if (user) {
+      ownerName = String(user.user_metadata?.full_name || "").trim();
+      ownerEmail = user.email || "";
       const status = await getSubscriptionStatus({
         supabase,
         userId: user.id,
@@ -34,17 +36,15 @@ export default async function SetupPage({ searchParams }: SetupPageProps) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-5xl space-y-6">
       <section className="rounded-lg border border-line bg-white p-6 shadow-panel">
-        <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Setup wizard</p>
-        <h2 className="mt-2 text-2xl font-semibold">Create your Vaeroex workspace</h2>
+        <p className="text-sm font-semibold uppercase tracking-wide text-vaeroex-blue">Executive Intelligence Workspace</p>
+        <h1 className="mt-2 text-2xl font-semibold">Create your Vaeroex workspace</h1>
         <p className="mt-3 max-w-3xl text-sm leading-6 text-muted">
-          Answer a few setup questions and choose the type of operational environment Vaeroex will analyze. This helps configure initial
-          dashboards, terminology, source context, and intelligence settings. You can adjust this later.
+          Add the organization and accountable owner, review the Workspace Agreement, and sign electronically. Business context is added later through Evidence and Business Notes.
         </p>
       </section>
-      <ComplianceNotice />
-      <SetupWizard categories={workspaceSetupCategories} error={params?.error} />
+      <WorkspaceCreationForm defaultOwnerName={ownerName} defaultOwnerEmail={ownerEmail} error={params?.error} />
     </div>
   );
 }

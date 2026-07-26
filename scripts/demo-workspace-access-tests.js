@@ -76,15 +76,17 @@ check(
 );
 
 const setupActions = read("app/app/setup/actions.ts");
-const trustedWorkspaceInsert = setupActions.indexOf('admin\n    .from("workspaces")');
-const trustedMembershipInsert = setupActions.indexOf('admin.from("workspace_members").insert');
-const clientScopedBootstrapOperations = setupActions.indexOf("const operations = [");
+const workspaceAgreementMigration = read("supabase/migrations/202607250002_workspace_agreements.sql");
+const trustedWorkspaceInsert = workspaceAgreementMigration.indexOf("insert into public.workspaces");
+const trustedMembershipInsert = workspaceAgreementMigration.indexOf("insert into public.workspace_members");
+const agreementInsert = workspaceAgreementMigration.indexOf("insert into public.workspace_agreements");
 check(setupActions.includes('import { createSupabaseAdminClient } from "@/lib/supabase/admin"'), "Workspace setup uses the existing trusted server client.");
+check(setupActions.includes('admin.rpc("create_workspace_with_signed_agreement"'), "Workspace setup invokes the trusted transactional bootstrap function.");
 check(trustedWorkspaceInsert >= 0, "Workspace setup creates the workspace through the trusted server path.");
 check(trustedMembershipInsert > trustedWorkspaceInsert, "Workspace setup establishes owner membership after creating the workspace.");
 check(
-  clientScopedBootstrapOperations > trustedMembershipInsert,
-  "Workspace setup establishes membership before authenticated client writes that require workspace RLS access."
+  agreementInsert > trustedMembershipInsert,
+  "Workspace setup establishes membership before creating the workspace-scoped agreement record."
 );
 check(!setupActions.includes('supabase\n    .from("workspaces")'), "Workspace setup does not bootstrap a workspace through the RLS-scoped client.");
 check(!setupActions.includes('supabase.from("workspace_members").insert'), "Workspace setup does not bootstrap membership through the RLS-scoped client.");
