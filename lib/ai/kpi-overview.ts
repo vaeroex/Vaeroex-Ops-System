@@ -7,7 +7,7 @@ import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { runStructuredAI } from "@/lib/ai/providers/provider-manager";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
-import { applyKpiSettingsToRows, kpiSemantics, normalizeKpiName, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { applyKpiSettingsToRows, kpiSemantics, kpiSettingForName, normalizeKpiName, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
 import { evaluateKpiPerformance, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -30,6 +30,7 @@ export type KpiOverviewIntent = {
 
 export type KpiOverviewMetric = {
   name: string;
+  definition: string | null;
   category: string | null;
   latestValue: number | null;
   target: number | null;
@@ -231,10 +232,12 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
         target: row.target
       }));
       const semantics = kpiSemantics(name, settings);
+      const setting = kpiSettingForName(settings, name);
       const evaluation = evaluateKpiPerformance({ observations: [...rowsByDate].reverse(), semantics, target });
 
       return {
         name,
+        definition: setting?.definition?.trim() || null,
         category: latest?.category ?? null,
         latestValue,
         target,
@@ -431,6 +434,7 @@ function compactPromptContext(summary: KpiOverviewSummary) {
     limitations: summary.limitations,
     kpis: summary.metrics.map((metric) => ({
       name: metric.name,
+      definition: metric.definition,
       latest_value: metric.latestValue,
       target: metric.target,
       status: metric.status,
