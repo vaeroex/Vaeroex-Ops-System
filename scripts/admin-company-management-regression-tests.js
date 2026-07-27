@@ -29,6 +29,9 @@ const manualActivation = read("components/admin/AdminManualActivationForm.tsx");
 const requestReview = read("components/admin/AdminActivationRequestReview.tsx");
 const lifecycleActions = read("components/admin/AdminWorkspaceLifecycleActions.tsx");
 const eventDetails = read("components/admin/AdminSubscriptionEventDetails.tsx");
+const appShell = read("components/app/AppShell.tsx");
+const adminNav = read("components/admin/AdminNav.tsx");
+const appNavigation = read("components/app/AppNavigation.tsx");
 const globals = read("app/globals.css");
 
 for (const [name, source] of [
@@ -97,6 +100,30 @@ for (const tab of ["overview", "workspace", "subscription", "agreement"]) {
   assert.match(tabs, new RegExp(`value: "${tab}"`), `company detail must include the ${tab} tab`);
   assert.match(companyDetail, new RegExp(`tab === "${tab}"`), `company detail must render the ${tab} content`);
 }
+for (const [href, label] of [
+  ["/app/admin", "Admin Dashboard"],
+  ["/app/admin/customers", "Customers"],
+  ["/app/admin/ai-usage", "Vaeroex Usage"],
+  ["/app/admin/support-requests", "Support Requests"],
+  ["/app/admin/audit-logs", "Audit Logs"]
+]) {
+  const linkPattern = new RegExp(`href: "${href}"[\\s\\S]+?label: "${label}"`);
+  assert.match(appShell, linkPattern, `${label} must remain in the persistent Admin navigation`);
+  assert.match(adminNav, linkPattern, `${label} must remain in the Admin page navigation`);
+}
+for (const href of ["/app/admin/workspaces", "/app/admin/workspace-agreements", "/app/admin/subscriptions"]) {
+  assert.doesNotMatch(appShell, new RegExp(`href: "${href}"`), `${href} must be retired from the persistent Admin navigation`);
+  assert.doesNotMatch(adminNav, new RegExp(`href: "${href}"`), `${href} must be retired from the Admin page navigation`);
+}
+for (const route of [
+  "app/app/admin/workspaces/page.tsx",
+  "app/app/admin/subscriptions/page.tsx",
+  "app/app/admin/workspace-agreements/page.tsx",
+  "app/app/admin/workspace-agreements/[agreementId]/page.tsx"
+]) {
+  assert.equal(exists(route), true, `${route} must remain available as a standalone deep route`);
+}
+assert.match(appNavigation, /href === "\/app" \|\| href === "\/app\/admin"/, "Admin Dashboard must use exact active-path matching");
 assert.match(companyDetail, /WorkspaceAgreementActions[\s\S]+agreementId=\{agreement\.id\} admin/, "company detail must reuse secure agreement PDF actions");
 assert.match(companyDetail, /\/app\/admin\/workspace-agreements\/\$\{agreement\.id\}/, "company detail must preserve the existing agreement route");
 assert.match(companyDetail, /No agreement/, "company detail must expose the no-agreement state");
