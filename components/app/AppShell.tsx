@@ -8,7 +8,6 @@ import { ThemeControls } from "@/components/app/ThemeControls";
 import { ToastRegion } from "@/components/app/ToastRegion";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
-import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
 import { legalLinks } from "@/lib/legal/content";
 import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
@@ -52,6 +51,7 @@ type AppShellProps = {
   workspaces: Workspace[];
   activeWorkspace: Workspace | null;
   membership: WorkspaceMember | null;
+  isVaeroexAdmin: boolean;
 };
 
 function workspaceAccessLabel(workspace: Workspace | null) {
@@ -69,8 +69,8 @@ function workspaceStatusTone(label: string) {
   return "border-red-300/30 bg-red-400/15 text-red-100";
 }
 
-export function AppShell({ children, profile, workspaces, activeWorkspace }: AppShellProps) {
-  const navSections = isVaeroexAdminEmail(profile?.email) ? [...baseNavSections, adminNavSection] : baseNavSections;
+export function AppShell({ children, profile, workspaces, activeWorkspace, isVaeroexAdmin }: AppShellProps) {
+  const navSections = isVaeroexAdmin ? [...baseNavSections, adminNavSection] : baseNavSections;
   const accessLabel = workspaceAccessLabel(activeWorkspace);
   const isDemoWorkspace = activeWorkspace?.subscription_status === "demo";
   const workspaceDisplayName = isDemoWorkspace ? "Demo Workspace" : activeWorkspace?.name || "Setup required";

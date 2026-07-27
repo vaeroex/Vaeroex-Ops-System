@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/components/app/AppShell";
 import { LegalAcceptanceGate } from "@/components/legal/LegalAcceptanceGate";
-import { isVaeroexAdminEmail } from "@/lib/admin/admin-emails";
+import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { hasAcceptedLatestLegalPolicies } from "@/lib/legal/acceptance";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -40,7 +40,7 @@ export default async function ProtectedAppLayout({
 
   const cookieStore = await cookies();
   const context = await getWorkspaceContext(cookieStore.get("vaeroex_workspace_id")?.value);
-  const isVaeroexAdmin = isVaeroexAdminEmail(user.email ?? context.profile?.email);
+  const isVaeroexAdmin = isVaeroexAdminUser(user);
   const acceptedLatestPolicies = isVaeroexAdmin ? true : await hasAcceptedLatestLegalPolicies(supabase, user.id);
 
   return (
@@ -49,6 +49,7 @@ export default async function ProtectedAppLayout({
       workspaces={context.workspaces}
       activeWorkspace={context.activeWorkspace}
       membership={context.membership}
+      isVaeroexAdmin={isVaeroexAdmin}
     >
       {acceptedLatestPolicies ? (
         children

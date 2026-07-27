@@ -164,15 +164,33 @@ check(storageMigration.includes("public.can_edit_operations"), "Storage delete p
 const adminLayout = read("app/app/admin/layout.tsx");
 check(adminLayout.includes("requireVaeroexAdmin"), "Admin layout must require Vaeroex admin access server-side.");
 
+const protectedAppLayout = read("app/app/layout.tsx");
+const adminNavigationShell = read("components/app/AppShell.tsx");
+check(
+  protectedAppLayout.includes("isVaeroexAdminUser(user)") && protectedAppLayout.includes("isVaeroexAdmin={isVaeroexAdmin}"),
+  "Protected app layout must derive Admin navigation access from the verified Auth user."
+);
+check(
+  adminNavigationShell.includes("isVaeroexAdmin: boolean") && !adminNavigationShell.includes("isVaeroexAdminEmail(profile?.email)"),
+  "Admin navigation must not trust mutable profile email data."
+);
+
 const adminActions = [
   "app/app/admin/subscriptions/actions.ts",
   "app/app/admin/support-requests/actions.ts",
-  "app/app/admin/workspaces/actions.ts"
+  "app/app/admin/workspaces/actions.ts",
+  "app/app/admin/workspace-agreements/actions.ts"
 ];
 
 for (const file of adminActions) {
   check(read(file).includes("requireVaeroexAdmin"), `${file} must call requireVaeroexAdmin.`);
 }
+
+const adminAgreementPdfRoute = read("app/api/admin/workspace-agreements/[agreementId]/pdf/route.ts");
+check(
+  adminAgreementPdfRoute.includes("getVaeroexAdminAccess") && adminAgreementPdfRoute.includes('status: 404'),
+  "Admin agreement PDF route must authorize server-side and conceal resources from unauthorized requests."
+);
 
 const customerPages = [
   "app/app/page.tsx",
