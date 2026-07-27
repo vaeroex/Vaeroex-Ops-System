@@ -84,7 +84,7 @@ export default async function AdminWorkspaceAgreementsPage({
                 <p className="truncate">Agreement {agreement.id}</p>
                 <p className="truncate">Workspace {agreement.workspace_id}</p>
               </div>
-              <Link href={`/app/admin/workspace-agreements/${agreement.id}` as Route} className="inline-flex min-h-11 items-center justify-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-vaeroex-blue hover:text-vaeroex-blue">View</Link>
+              <Link href={`/app/admin/workspace-agreements/${agreement.id}` as Route} className="inline-flex min-h-11 items-center justify-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-vaeroex-blue hover:text-vaeroex-blue">View agreement</Link>
             </article>
           ))}
           {!rows.length ? <p className="py-8 text-center text-sm text-muted">No Workspace Agreements match this search.</p> : null}

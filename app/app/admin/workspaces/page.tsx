@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { updateWorkspaceAccessAction } from "@/app/app/admin/workspaces/actions";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
@@ -50,13 +52,14 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
   const { data: workspaces } = await workspacesQuery.order("created_at", { ascending: false }).limit(40);
   const workspaceRows = (workspaces || []) as WorkspaceRow[];
   const workspaceIds = workspaceRows.map((workspace) => workspace.id);
-  const [kpiRows, leadRows, fileRows, vaeroexRows, reportRows] = workspaceIds.length
+  const [kpiRows, leadRows, fileRows, vaeroexRows, reportRows, agreementRows] = workspaceIds.length
     ? await Promise.all([
         access.admin.from("kpis").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("crm_leads").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("file_uploads").select("workspace_id").in("workspace_id", workspaceIds),
         access.admin.from("ai_agent_runs").select("workspace_id").in("workspace_id", workspaceIds),
-        access.admin.from("reports").select("workspace_id").in("workspace_id", workspaceIds)
+        access.admin.from("reports").select("workspace_id").in("workspace_id", workspaceIds),
+        access.admin.from("workspace_agreements").select("id,workspace_id").in("workspace_id", workspaceIds)
       ])
     : [];
   const kpiCounts = countByWorkspace(kpiRows?.data || []);
@@ -64,6 +67,9 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
   const fileCounts = countByWorkspace(fileRows?.data || []);
   const vaeroexCounts = countByWorkspace(vaeroexRows?.data || []);
   const reportCounts = countByWorkspace(reportRows?.data || []);
+  const agreementIdsByWorkspace = Object.fromEntries(
+    (agreementRows?.data || []).map((agreement) => [agreement.workspace_id, agreement.id])
+  );
 
   return (
     <div className="space-y-6">
@@ -90,6 +96,7 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
       <SectionCard title="Workspace access">
         <div className="space-y-4">
           {workspaceRows.length ? workspaceRows.map((workspace) => {
+            const agreementId = agreementIdsByWorkspace[workspace.id];
             const completed = [
               Boolean(workspace.primary_contact_email || workspace.size),
               Boolean(workspace.industry),
@@ -110,6 +117,20 @@ export default async function AdminWorkspacesPage({ searchParams }: AdminWorkspa
                   <p className="mt-1 text-sm text-muted">{workspace.primary_contact_email || "No contact email"} · {workspace.industry || "No industry"}</p>
                   <p className="mt-2 break-all text-xs text-muted">{workspace.id}</p>
                   <p className="mt-2 text-xs text-muted">Last login: not tracked yet</p>
+                  <div className="mt-3">
+                    {agreementId ? (
+                      <Link
+                        href={`/app/admin/workspace-agreements/${agreementId}` as Route}
+                        className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-vaeroex-blue hover:text-vaeroex-blue"
+                      >
+                        View agreement
+                      </Link>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500">
+                        {agreementRows?.error ? "Agreement unavailable" : "No agreement"}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge value={customerStatus(workspace)} />
