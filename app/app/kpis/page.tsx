@@ -1,7 +1,14 @@
 import type { Route } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { createKpiAction, updateKpiSettingAction, updateKpiValueAction } from "@/app/app/operations/actions";
+import {
+  acceptKpiSemanticSuggestionAction,
+  createKpiAction,
+  requestKpiSemanticSuggestionAction,
+  updateKpiSettingAction,
+  updateKpiValueAction
+} from "@/app/app/operations/actions";
+import { KpiPerformanceMeaningFields } from "@/components/kpis/KpiPerformanceMeaningFields";
 import { ShareRecordPanel, type TeamPersonOption } from "@/components/accountability/AccountabilityForms";
 import { CreateDrawer } from "@/components/operations/CreateDrawer";
 import { EmptyState } from "@/components/operations/EmptyState";
@@ -38,9 +45,11 @@ import {
   type KpiSettingRow
 } from "@/lib/kpis/settings";
 import {
+  deterministicKpiSemantics,
   directionLabel,
   evaluateKpiPerformance,
   recommendKpiTarget,
+  validateKpiSemanticSelection,
   type KpiDesiredDirection,
   type KpiSemantics,
   type KpiTargetRecommendation as CanonicalKpiTargetRecommendation
@@ -1469,14 +1478,91 @@ function KpiChartSettingsForm({
 }) {
   const selectedColor = setting?.color ?? "#10B981";
   const lowContrastColor = kpiColorMayBeLowContrast(selectedColor);
+  const fallback = deterministicKpiSemantics(metricName);
+  const proposedDirection = (setting?.desired_direction ?? "unknown") as KpiDesiredDirection;
+  const isUnconfirmed = !setting?.classification_confirmed;
+  const isLunaSuggestion = setting?.classification_source === "luna" && isUnconfirmed;
+  const confidence = setting?.classification_confidence ?? null;
+  const suggestionSelection = setting ? validateKpiSemanticSelection({
+    desiredDirection: setting.desired_direction as KpiDesiredDirection,
+    targetBehavior: setting.target_behavior as Parameters<typeof validateKpiSemanticSelection>[0]["targetBehavior"],
+    idealValue: setting.ideal_value,
+    idealRangeMin: setting.ideal_range_min,
+    idealRangeMax: setting.ideal_range_max
+  }) : null;
+  const canAcceptSuggestion = Boolean(
+    isLunaSuggestion
+    && confidence !== null
+    && confidence >= 0.92
+    && proposedDirection !== "unknown"
+    && suggestionSelection?.ok
+  );
+  const confidenceLabel = confidence === null ? "Not available" : confidence >= 0.92 ? "High" : confidence >= 0.7 ? "Medium" : "Low";
 
   return (
-    <form action={updateKpiSettingAction} className="grid gap-3 rounded-lg border border-white/10 bg-slate-950/35 p-3 sm:grid-cols-2">
+    <div className="space-y-3">
+      {isUnconfirmed ? (
+        <section className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4">
+          {isLunaSuggestion ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Suggested performance direction</p>
+                <p className="mt-1 text-base font-semibold text-white">{directionLabel(proposedDirection)}</p>
+              </div>
+              <dl className="grid gap-3 text-xs leading-5 sm:grid-cols-[120px_1fr]">
+                <div>
+                  <dt className="font-semibold text-slate-400">Confidence</dt>
+                  <dd className="text-slate-100">{confidenceLabel}</dd>
+                </div>
+                <div>
+                  <dt className="font-semibold text-slate-400">Reason</dt>
+                  <dd className="text-slate-100">{setting?.classification_rationale || "No rationale was provided."}</dd>
+                </div>
+              </dl>
+              <div className="flex flex-wrap items-center gap-2">
+                {canAcceptSuggestion ? (
+                  <form action={acceptKpiSemanticSuggestionAction}>
+                    <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+                    <input type="hidden" name="kpi_name" value={metricName} />
+                    <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
+                      Accept suggestion
+                    </button>
+                  </form>
+                ) : null}
+                <a href="#kpi-performance-meaning" className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40">
+                  Change manually
+                </a>
+                <span className="text-xs text-slate-400">Leave unconfirmed by closing Chart Settings without saving.</span>
+              </div>
+              {!canAcceptSuggestion ? (
+                <p className="text-xs leading-5 text-slate-400">This suggestion remains advisory. Review and confirm the fields manually if they are correct.</p>
+              ) : null}
+            </div>
+          ) : (
+            <form action={requestKpiSemanticSuggestionAction} className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
+              <input type="hidden" name="kpi_name" value={metricName} />
+              <div>
+                <p className="text-sm font-semibold text-white">Performance direction is not confirmed.</p>
+                <p className="mt-1 text-xs leading-5 text-slate-400">Request one Luna suggestion, then accept it or set the direction manually.</p>
+              </div>
+              <button className="min-h-10 shrink-0 rounded-lg border border-cyan-300/35 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-950/40">
+                Request suggestion
+              </button>
+            </form>
+          )}
+        </section>
+      ) : (
+        <p className="rounded-lg border border-emerald-400/25 bg-emerald-950/20 p-3 text-xs font-semibold text-emerald-100">
+          Confirmed performance direction: {directionLabel(proposedDirection)}
+        </p>
+      )}
+
+      <form action={updateKpiSettingAction} className="grid gap-3 rounded-lg border border-white/10 bg-slate-950/35 p-3 sm:grid-cols-2">
       <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
       <input type="hidden" name="kpi_name" value={metricName} />
       <input type="hidden" name="weight" value={setting?.weight ?? 1} />
       <input type="hidden" name="category" value={setting?.category ?? latest?.category ?? ""} />
-      <input type="hidden" name="definition" value={setting?.definition ?? ""} />
       <input type="hidden" name="sort_order" value={setting?.sort_order ?? 0} />
       <input type="hidden" name="unit_type" value={setting?.unit_type ?? ""} />
       <input type="hidden" name="is_visible" value={(setting?.is_visible ?? true) ? "true" : "false"} />
@@ -1561,12 +1647,26 @@ function KpiChartSettingsForm({
           This color may be difficult to see in the current theme.
         </p>
       ) : null}
+      <KpiPerformanceMeaningFields
+        initialDirection={proposedDirection}
+        initialIdealValue={setting?.ideal_value ?? null}
+        initialRangeMin={setting?.ideal_range_min ?? null}
+        initialRangeMax={setting?.ideal_range_max ?? null}
+        definition={setting?.definition ?? ""}
+        canonicalName={setting?.canonical_name ?? fallback.canonicalName}
+        displayName={setting?.display_name ?? metricName}
+        semanticUnit={setting?.semantic_unit ?? fallback.unit ?? ""}
+        aggregationBasis={setting?.aggregation_basis ?? ""}
+        periodBasis={setting?.period_basis ?? ""}
+        metricRole={(setting?.metric_role ?? fallback.metricRole) as "actual" | "target" | "benchmark" | "unknown"}
+      />
       <div className="sm:col-span-2">
         <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
-          Save chart settings
+          Save chart and performance settings
         </button>
       </div>
-    </form>
+      </form>
+    </div>
   );
 }
 
