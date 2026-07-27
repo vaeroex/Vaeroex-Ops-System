@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
+import { classifyAndPersistKpiSemantics } from "@/lib/ai/kpi-semantics/service";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
+import { KPI_DESIRED_DIRECTIONS, KPI_SEMANTIC_VERSION, KPI_TARGET_BEHAVIORS } from "@/lib/kpis/semantics";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -278,7 +280,7 @@ export async function runChecklistAction(formData: FormData) {
 
 export async function createKpiAction(formData: FormData) {
   const path = "/app/kpis";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const name = text(formData, "name");
   const category = text(formData, "category");
   const owner = text(formData, "owner");
@@ -306,6 +308,10 @@ export async function createKpiAction(formData: FormData) {
 
   if (error) {
     redirectWithError(path, error.message);
+  }
+
+  if (membership.role === "owner" || membership.role === "admin") {
+    await classifyAndPersistKpiSemantics({ supabase, workspaceId, userId: user.id, label: name, category, definition: notes || null });
   }
 
   revalidatePath(path);
@@ -375,6 +381,10 @@ export async function updateKpiAction(formData: FormData) {
 
   if (!data) {
     redirectWithError(path, "KPI not found, or you do not have permission to edit it.");
+  }
+
+  if (membership.role === "owner" || membership.role === "admin") {
+    await classifyAndPersistKpiSemantics({ supabase, workspaceId, userId: user.id, label: name, category, definition: notes || null });
   }
 
   revalidatePath(path);
@@ -463,6 +473,17 @@ export async function updateKpiSettingAction(formData: FormData) {
   const xAxisLabel = text(formData, "x_axis_label");
   const yAxisLabel = text(formData, "y_axis_label");
   const preferredChartType = text(formData, "preferred_chart_type") || "line";
+  const canonicalName = text(formData, "canonical_name");
+  const displayName = text(formData, "display_name");
+  const desiredDirection = text(formData, "desired_direction") || "unknown";
+  const targetBehavior = text(formData, "target_behavior") || "unknown";
+  const semanticUnit = text(formData, "semantic_unit");
+  const aggregationBasis = text(formData, "aggregation_basis");
+  const periodBasis = text(formData, "period_basis");
+  const metricRole = text(formData, "metric_role") || "actual";
+  const idealValue = optionalNumber(path, "Ideal value", text(formData, "ideal_value"));
+  const idealRangeMin = optionalNumber(path, "Ideal range minimum", text(formData, "ideal_range_min"));
+  const idealRangeMax = optionalNumber(path, "Ideal range maximum", text(formData, "ideal_range_max"));
   const color = approvedKpiColor(text(formData, "color"));
   const target = optionalNumber(path, "Target", text(formData, "target"));
   const weight = optionalNumber(path, "Weight", text(formData, "weight")) ?? 1;
@@ -476,6 +497,11 @@ export async function updateKpiSettingAction(formData: FormData) {
   validateLength(path, "Value format", valueFormat, 80);
   validateLength(path, "X-axis label", xAxisLabel, 80);
   validateLength(path, "Y-axis label", yAxisLabel, 80);
+  validateLength(path, "Canonical name", canonicalName, 160);
+  validateLength(path, "Display name", displayName, 160);
+  validateLength(path, "Semantic unit", semanticUnit, 80);
+  validateLength(path, "Aggregation basis", aggregationBasis, 120);
+  validateLength(path, "Period basis", periodBasis, 120);
 
   if (!KPI_COLOR_PALETTE.some((item) => item.value === color)) {
     redirectWithError(path, "Choose an approved KPI color.");
@@ -487,6 +513,18 @@ export async function updateKpiSettingAction(formData: FormData) {
 
   if (!["line", "bar", "mixed"].includes(preferredChartType)) {
     redirectWithError(path, "Choose line, bar, or mixed as the chart type.");
+  }
+  if (!KPI_DESIRED_DIRECTIONS.includes(desiredDirection as (typeof KPI_DESIRED_DIRECTIONS)[number])) {
+    redirectWithError(path, "Choose a supported KPI direction.");
+  }
+  if (!KPI_TARGET_BEHAVIORS.includes(targetBehavior as (typeof KPI_TARGET_BEHAVIORS)[number])) {
+    redirectWithError(path, "Choose a supported target behavior.");
+  }
+  if (!["actual", "target", "benchmark", "unknown"].includes(metricRole)) {
+    redirectWithError(path, "Choose a supported metric role.");
+  }
+  if (idealRangeMin !== null && idealRangeMax !== null && idealRangeMin > idealRangeMax) {
+    redirectWithError(path, "Ideal range minimum cannot exceed the maximum.");
   }
 
   try {
@@ -531,6 +569,23 @@ export async function updateKpiSettingAction(formData: FormData) {
       x_axis_label: xAxisLabel || null,
       y_axis_label: yAxisLabel || null,
       preferred_chart_type: preferredChartType,
+      canonical_name: canonicalName || null,
+      display_name: displayName || kpiName,
+      original_source_label: kpiName,
+      semantic_unit: semanticUnit || null,
+      aggregation_basis: aggregationBasis || null,
+      period_basis: periodBasis || null,
+      desired_direction: desiredDirection,
+      target_behavior: targetBehavior,
+      ideal_value: idealValue,
+      ideal_range_min: idealRangeMin,
+      ideal_range_max: idealRangeMax,
+      metric_role: metricRole,
+      classification_source: "user",
+      classification_confidence: 1,
+      classification_version: KPI_SEMANTIC_VERSION,
+      classification_rationale: "Confirmed in KPI settings by an authorized workspace administrator.",
+      classification_confirmed: true,
       created_by: user.id
     },
     { onConflict: "workspace_id,kpi_name" }

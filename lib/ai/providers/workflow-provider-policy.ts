@@ -20,6 +20,9 @@ export const BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR = "gpt56_luna_terra_v1" as
 export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v2" as const;
 export const BUSINESS_NOTE_EXTRACTION_LUNA_MODEL = "gpt-5.6-luna" as const;
 export const BUSINESS_NOTE_EXTRACTION_TERRA_MODEL = "gpt-5.6-terra" as const;
+export const KPI_SEMANTIC_CLASSIFICATION_POLICY_SELECTOR = "gpt56_luna_v1" as const;
+export const KPI_SEMANTIC_CLASSIFICATION_POLICY_ID = "kpi_semantic_classification_gpt56_luna_v1" as const;
+export const KPI_SEMANTIC_CLASSIFICATION_LUNA_MODEL = "gpt-5.6-luna" as const;
 
 const BUSINESS_HEALTH_LEGACY_DEADLINE_MS = 26_000;
 const BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS = 10_500;
@@ -96,6 +99,10 @@ export function isFindingExplanationEnabled() {
 
 export function isBusinessNoteExtractionEnabled() {
   return process.env.VAEROEX_BUSINESS_NOTES_POLICY === BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR;
+}
+
+export function isKpiSemanticClassificationEnabled() {
+  return process.env.VAEROEX_KPI_SEMANTICS_POLICY === KPI_SEMANTIC_CLASSIFICATION_POLICY_SELECTOR;
 }
 
 export function resolveBusinessNoteExtractionGenerationPolicy({

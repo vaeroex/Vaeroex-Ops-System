@@ -29,6 +29,7 @@ import {
   kpiDefinition,
   kpiDisplayUnit,
   kpiSettingForName,
+  kpiSemantics,
   kpiWeight,
   kpiXAxisLabel,
   kpiYAxisLabel,
@@ -36,6 +37,14 @@ import {
   sortKpiRowsBySettings,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
+import {
+  directionLabel,
+  evaluateKpiPerformance,
+  recommendKpiTarget,
+  type KpiDesiredDirection,
+  type KpiSemantics,
+  type KpiTargetRecommendation as CanonicalKpiTargetRecommendation
+} from "@/lib/kpis/semantics";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 import type { Database } from "@/lib/supabase/types";
@@ -63,7 +72,7 @@ type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type KpiTone = "green" | "yellow" | "red" | "neutral";
-type KpiDirection = "higher" | "lower" | "exact" | null;
+type KpiDirection = KpiDesiredDirection;
 type ComparisonMode = "actual" | "percent" | "normalized";
 type KpiStatusFilter = "all" | "on-track" | "behind-target" | "missing-data" | "updated-this-month";
 type KpiTargetRecommendation = {
@@ -120,37 +129,21 @@ function findLatestMetric(kpis: KpiRow[], keywords: string[]) {
 }
 
 function explicitKpiDirection(name: string, rows: KpiRow[], settings: KpiSettingRow[]): KpiDirection {
-  const setting = kpiSettingForName(settings, name);
-  const text = [setting?.definition, ...rows.filter((row) => row.name === name).map((row) => row.notes)]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  const higher = /\b(higher|more) is better\b|\bincrease is (?:favorable|preferred)\b|\btarget is at least\b|\bminimum target\b/.test(text);
-  const lower = /\b(lower|less|fewer) is better\b|\bdecrease is (?:favorable|preferred)\b|\btarget is (?:under|below|at most)\b|\bmaximum target\b/.test(text);
-  const exact = /\bexact target (?:is )?preferred\b|\btarget must be exact\b/.test(text);
-
-  if ([higher, lower, exact].filter(Boolean).length !== 1) return null;
-  if (higher) return "higher";
-  if (lower) return "lower";
-  return "exact";
+  void rows;
+  return kpiSemantics(name, settings).desiredDirection;
 }
 
-function metricTone(actual: number | null, target: number | null, direction: KpiDirection = null): KpiTone {
-  if (actual === null || target === null || !direction) {
+function metricTone(actual: number | null, target: number | null, direction: KpiDirection = "unknown", resolvedSemantics?: KpiSemantics): KpiTone {
+  if (actual === null || direction === "unknown" || (target === null && direction !== "target_range")) {
     return "neutral";
   }
 
-  if (direction === "exact") {
-    if (actual === target) return "green";
-    const tolerance = Math.max(Math.abs(target) * 0.1, 1);
-    return Math.abs(actual - target) <= tolerance ? "yellow" : "red";
-  }
-
-  const favorable = direction === "higher" ? actual >= target : actual <= target;
-  if (favorable) return "green";
-
-  const tolerance = Math.max(Math.abs(target) * 0.1, 1);
-  return Math.abs(actual - target) <= tolerance ? "yellow" : "red";
+  const semantics = resolvedSemantics || { ...kpiSemantics("Unknown KPI", []), desiredDirection: direction };
+  const status = evaluateKpiPerformance({ observations: [{ actual_value: actual }], semantics, target }).targetStatus;
+  if (status === "achieved" || status === "within_range") return "green";
+  if (status === "moving_toward_target") return "yellow";
+  if (status === "below_required_minimum" || status === "above_acceptable_maximum" || status === "moving_away_from_target") return "red";
+  return "neutral";
 }
 
 function statusLabel(tone: KpiTone) {
@@ -160,11 +153,11 @@ function statusLabel(tone: KpiTone) {
   return "Direction not set";
 }
 
-function kpiStatusText(row: KpiRow, direction: KpiDirection) {
+function kpiStatusText(row: KpiRow, direction: KpiDirection, semantics?: KpiSemantics) {
   if (row.actual_value === null) return "Missing Data";
-  if (row.target === null) return "Target not set";
-  if (!direction) return "Direction not set";
-  return statusLabel(metricTone(row.actual_value, row.target, direction));
+  if (row.target === null && direction !== "target_range") return "Target not set";
+  if (direction === "unknown") return "Direction not set";
+  return statusLabel(metricTone(row.actual_value, row.target, direction, semantics));
 }
 
 function statusForTone(tone: KpiTone): SemanticStatus {
@@ -253,61 +246,26 @@ function monthSpan(rows: KpiRow[]) {
   return Math.max(1, (last.getUTCFullYear() - first.getUTCFullYear()) * 12 + last.getUTCMonth() - first.getUTCMonth() + 1);
 }
 
-function standardDeviation(values: number[]) {
-  const avg = average(values);
-  if (avg === null || values.length < 2) return 0;
-  const variance = average(values.map((value) => (value - avg) ** 2)) ?? 0;
-  return Math.sqrt(variance);
-}
-
-function recommendedTargetForMetric(metricName: string, rows: KpiRow[]): KpiTargetRecommendation {
+function recommendedTargetForMetric(metricName: string, rows: KpiRow[], settings: KpiSettingRow[]): KpiTargetRecommendation {
   const valueRows = rows
-    .filter((row) => row.name === metricName && row.actual_value !== null)
+    .filter((row) => lower(row.name) === lower(metricName) && row.actual_value !== null)
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`));
-  const values = valueRows.map((row) => row.actual_value as number);
-  const count = values.length;
-
-  if (count <= 2) {
-    return {
-      value: null,
-      confidence: "Unavailable",
-      reason: "Not enough history to recommend a reliable target.",
-      dataUsed: `${count} KPI value${count === 1 ? "" : "s"} available`,
-      dateRange: valueRows.length ? `${valueRows[0].metric_date} to ${valueRows[valueRows.length - 1].metric_date}` : "No dated history",
-      limitation: "Vaeroex needs at least 3 data points for a low-confidence suggestion and more history for stronger guidance.",
-      outliers: "Outlier review needs more values."
-    };
-  }
-
-  const avg = average(values) ?? values[count - 1];
-  const recentValues = values.slice(-Math.min(3, values.length));
-  const recentAvg = average(recentValues) ?? avg;
-  const deviation = standardDeviation(values);
-  const outlierCount = values.filter((value) => Math.abs(value - avg) > deviation * 2 && deviation > 0).length;
-  const cleanValues = outlierCount && count >= 6 ? values.filter((value) => Math.abs(value - avg) <= deviation * 2) : values;
-  const cleanRecentAvg = average(cleanValues.slice(-Math.min(3, cleanValues.length))) ?? recentAvg;
-  const first = cleanValues[0] ?? values[0];
-  const last = cleanValues[cleanValues.length - 1] ?? values[count - 1];
-  const trendRatio = first !== 0 ? (last - first) / Math.abs(first) : 0;
   const historyMonths = monthSpan(valueRows);
-  const confidence: KpiTargetRecommendation["confidence"] = count >= 12 || historyMonths >= 6 ? "Higher" : count >= 6 ? "Medium" : "Low";
-  const directionalFactor = trendRatio > 0.12 ? 1.04 : trendRatio < -0.12 ? 0.98 : 1.02;
-  const suggested = Math.max(0, cleanRecentAvg * directionalFactor);
-  const rounded = Math.abs(suggested) >= 1000 ? Math.round(suggested / 100) * 100 : Math.round(suggested * 100) / 100;
+  const recommendation: CanonicalKpiTargetRecommendation = recommendKpiTarget({
+    observations: valueRows,
+    semantics: kpiSemantics(metricName, settings)
+  });
 
   return {
-    value: rounded,
-    confidence,
-    reason: `Based on your historical ${metricName} data, recent performance is ${trendRatio > 0.08 ? "improving" : trendRatio < -0.08 ? "declining" : "relatively steady"}. Vaeroex keeps this suggestion conservative and does not overwrite your manual target.`,
-    dataUsed: `${count} KPI value${count === 1 ? "" : "s"} across ${historyMonths} month${historyMonths === 1 ? "" : "s"}`,
-    dateRange: `${valueRows[0].metric_date} to ${valueRows[valueRows.length - 1].metric_date}`,
-    limitation:
-      confidence === "Low"
-        ? "Limited confidence because fewer than 6 data points are available."
-        : confidence === "Medium"
-          ? "Medium confidence because the history is useful but still limited for seasonality."
-          : "Higher confidence based on available workspace history, not an industry benchmark.",
-    outliers: outlierCount ? `${outlierCount} possible outlier${outlierCount === 1 ? "" : "s"} detected and softened in the suggestion.` : "No major outliers detected."
+    value: recommendation.value,
+    confidence: recommendation.confidence,
+    reason: recommendation.reason,
+    dataUsed: `${recommendation.dataUsed}${historyMonths ? ` across ${historyMonths} month${historyMonths === 1 ? "" : "s"}` : ""}`,
+    dateRange: valueRows.length ? `${valueRows[0].metric_date} to ${valueRows[valueRows.length - 1].metric_date}` : "No dated history",
+    limitation: recommendation.limitation,
+    outliers: recommendation.outliers
+      ? `${recommendation.outliers} possible outlier${recommendation.outliers === 1 ? "" : "s"} detected and softened in the suggestion.`
+      : "No major outliers detected."
   };
 }
 
@@ -479,12 +437,13 @@ function KpiTile({
   index: number;
 }) {
   const direction = explicitKpiDirection(kpi.name, rows, settings);
-  const tone = metricTone(kpi.actual_value, kpi.target, direction);
+  const semantics = kpiSemantics(kpi.name, settings);
+  const tone = metricTone(kpi.actual_value, kpi.target, direction, semantics);
   const semanticStatus = kpiStatus({
     tone,
     hasCurrentValue: kpi.actual_value !== null,
-    hasTarget: kpi.target !== null,
-    hasDirection: Boolean(direction)
+    hasTarget: kpi.target !== null || semantics.desiredDirection === "target_range",
+    hasDirection: direction !== "unknown"
   });
   const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
   const difference = kpi.actual_value !== null && kpi.target !== null
@@ -500,7 +459,7 @@ function KpiTile({
             <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
         </div>
-        <KpiStatusBadge label={kpiStatusText(kpi, direction)} status={semanticStatus} />
+        <KpiStatusBadge label={kpiStatusText(kpi, direction, semantics)} status={semanticStatus} />
       </div>
       <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
@@ -509,8 +468,8 @@ function KpiTile({
           {kpi.target === null ? "Not set" : formatSettingValue(kpi.target, kpi.name, settings)}
         </p>
         <p>
-          <span className="block text-slate-500">{direction ? "Trend" : "Difference"}</span>
-          {direction ? trendLabelForRows(rows, direction) : difference}
+          <span className="block text-slate-500">{direction !== "unknown" ? "Performance effect" : "Difference"}</span>
+          {direction !== "unknown" ? trendLabelForRows(rows, semantics, kpi.target) : difference}
         </p>
         <p>
           <span className="block text-slate-500">Last updated</span>
@@ -614,7 +573,7 @@ function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter, rows: KpiRow[
   if (filter === "all") return true;
   if (filter === "updated-this-month") return updatedThisMonth(row);
 
-  const tone = metricTone(row.actual_value, row.target, explicitKpiDirection(row.name, rows, settings));
+  const tone = metricTone(row.actual_value, row.target, explicitKpiDirection(row.name, rows, settings), kpiSemantics(row.name, settings));
   if (filter === "on-track") return tone === "green";
   if (filter === "behind-target") return tone === "red" || tone === "yellow";
   return row.actual_value === null || !updatedThisMonth(row);
@@ -764,14 +723,14 @@ function timeframeDisplay(range: { label: string; startDate: string; endDate: st
 
 function getTrendRows(kpis: KpiRow[], metricName: string) {
   return kpis
-    .filter((kpi) => kpi.name === metricName)
+    .filter((kpi) => lower(kpi.name) === lower(metricName))
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`))
     .slice(-24);
 }
 
 function getMetricHistoryRows(kpis: KpiRow[], metricName: string) {
   return kpis
-    .filter((kpi) => kpi.name === metricName)
+    .filter((kpi) => lower(kpi.name) === lower(metricName))
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`));
 }
 
@@ -781,23 +740,13 @@ function latestRowsByMetric(rows: KpiRow[], names: string[]) {
     .filter((row): row is KpiRow => Boolean(row));
 }
 
-function trendLabelForRows(rows: KpiRow[], direction: KpiDirection = null) {
-  const values = rows.filter((row) => row.actual_value !== null);
-  const latest = values.at(-1);
-  const previous = values.at(-2);
-
-  if (!latest || !previous || latest.actual_value === null || previous.actual_value === null) {
-    return "Not enough history";
-  }
-
-  const delta = latest.actual_value - previous.actual_value;
-  const threshold = Math.max(1, Math.abs(previous.actual_value) * 0.02);
-
-  if (Math.abs(delta) <= threshold) return "No meaningful change";
-  if (!direction || direction === "exact") return delta > 0 ? "Increased" : "Decreased";
-
-  const improving = direction === "higher" ? delta > 0 : delta < 0;
-  return improving ? "Improving" : "Declining";
+function trendLabelForRows(rows: KpiRow[], semantics: KpiSemantics, target: number | null = null) {
+  const evaluation = evaluateKpiPerformance({ observations: rows, semantics, target });
+  if (evaluation.rawMovement === "insufficient_data") return "Not enough history";
+  if (evaluation.latestPerformanceEffect === "favorable") return "Favorable";
+  if (evaluation.latestPerformanceEffect === "unfavorable") return "Unfavorable";
+  if (evaluation.latestPerformanceEffect === "neutral") return "No meaningful change";
+  return evaluation.rawMovement === "increased" ? "Increased" : "Decreased";
 }
 
 function updatedThisMonth(row: KpiRow) {
@@ -866,15 +815,15 @@ function trendDeltaLabel(latest: KpiRow | undefined, previous: KpiRow | undefine
   return `${direction} ${absolute}${percent}`;
 }
 
-function targetHitRate(rows: KpiRow[], direction: KpiDirection) {
-  if (!direction) return "Direction needed";
-  const rowsWithTargets = rows.filter((row) => row.actual_value !== null && row.target !== null);
+function targetHitRate(rows: KpiRow[], semantics: KpiSemantics) {
+  if (semantics.desiredDirection === "unknown") return "Direction needed";
+  const rowsWithTargets = rows.filter((row) => row.actual_value !== null && (row.target !== null || semantics.desiredDirection === "target_range"));
 
   if (!rowsWithTargets.length) {
     return "No targets";
   }
 
-  const onTarget = rowsWithTargets.filter((row) => metricTone(row.actual_value, row.target, direction) === "green").length;
+  const onTarget = rowsWithTargets.filter((row) => metricTone(row.actual_value, row.target, semantics.desiredDirection, semantics) === "green").length;
   return `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`;
 }
 
@@ -1683,6 +1632,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     periodLabel: "KPIs",
     range: { startDate: today, endDate: today, previousStartDate: today, previousEndDate: today },
     kpis,
+    kpiSettings,
     issues: issueResult.data || [],
     assets: [],
     checklists: [],
@@ -1703,7 +1653,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const latestKpiRows = latestRowsByMetric(allVisibleKpis, metricNames);
-  const kpiTone = (kpi: KpiRow) => metricTone(kpi.actual_value, kpi.target, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings));
+  const kpiTone = (kpi: KpiRow) => metricTone(kpi.actual_value, kpi.target, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings), kpiSemantics(kpi.name, kpiSettings));
   const behindTargetCount = latestKpiRows.filter((kpi) => ["red", "yellow"].includes(kpiTone(kpi))).length;
   const onTrackCount = latestKpiRows.filter((kpi) => kpiTone(kpi) === "green").length;
   const missingOrStaleCount = metricNames.filter((name) => {
@@ -1740,8 +1690,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedLatestKpi = selectedMetricRows.at(-1);
   const selectedSourceFile = selectedLatestKpi?.source_file_id ? sourceFiles.find((file) => file.id === selectedLatestKpi.source_file_id) : null;
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
-  const selectedKpiDirection = primaryMetric ? explicitKpiDirection(primaryMetric, allVisibleKpis, kpiSettings) : null;
-  const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis) : null;
+  const selectedKpiDirection = primaryMetric ? explicitKpiDirection(primaryMetric, allVisibleKpis, kpiSettings) : "unknown";
+  const selectedKpiSemantics = primaryMetric ? kpiSemantics(primaryMetric, kpiSettings) : kpiSemantics("Unknown KPI", []);
+  const selectedKpiEvaluation = primaryMetric
+    ? evaluateKpiPerformance({
+        observations: selectedMetricRows,
+        semantics: selectedKpiSemantics,
+        target: selectedLatestKpi?.target ?? selectedKpiSetting?.target ?? null
+      })
+    : null;
+  const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis, kpiSettings) : null;
   const undoMetricName = params?.target_applied === "true" ? params.undo_kpi : undefined;
   const undoSetting = undoMetricName ? kpiSettingForName(kpiSettings, undoMetricName) : undefined;
   const undoLatestKpi = undoMetricName ? getMetricHistoryRows(allVisibleKpis, undoMetricName).at(-1) : undefined;
@@ -1753,7 +1711,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       id: kpi.id,
       title: kpi.name,
       type: "KPI",
-      status: kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings)),
+      status: kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings), kpiSemantics(kpi.name, kpiSettings)),
       owner: kpi.owner || "Unassigned",
       category: kpi.category || "General",
       createdAt: kpi.created_at,
@@ -1781,7 +1739,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <div className="space-y-4 text-sm leading-6 text-muted">
           <p>{kpi.notes || "No notes."}</p>
           <p>
-            <span className="font-semibold text-ink">Current status:</span> {kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings))}
+            <span className="font-semibold text-ink">Current status:</span> {kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings), kpiSemantics(kpi.name, kpiSettings))}
           </p>
           <ShareRecordPanel
             sourceType="kpi"
@@ -1924,12 +1882,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <h2 className="mt-2 text-xl font-semibold text-white">{primaryMetric}</h2>
                     <p className="mt-1 text-sm leading-6 text-slate-400">{kpiDefinition(primaryMetric, kpiSettings) || "No definition set yet."}</p>
                   </div>
-                  {selectedKpiDirection ? (() => {
-                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null, selectedKpiDirection);
+                  {selectedKpiDirection !== "unknown" ? (() => {
+                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null, selectedKpiDirection, selectedKpiSemantics);
                     return <KpiStatusBadge label={statusLabel(tone)} status={kpiStatus({
                       tone,
                       hasCurrentValue: selectedLatestKpi?.actual_value !== null && selectedLatestKpi?.actual_value !== undefined,
-                      hasTarget: selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined,
+                      hasTarget: (selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined) || selectedKpiDirection === "target_range",
                       hasDirection: true
                     })} />;
                   })() : null}
@@ -1946,9 +1904,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     detail={selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined ? "Current target setting" : selectedKpiSetting?.target !== null && selectedKpiSetting?.target !== undefined ? "Current target setting" : "No target set"}
                   />
                   <TrendSummaryCard
-                    label="Trend"
-                    value={trendLabelForRows(selectedMetricRows, selectedKpiDirection)}
-                    detail="Latest movement from history"
+                    label="Latest performance effect"
+                    value={trendLabelForRows(selectedMetricRows, selectedKpiSemantics, selectedLatestKpi?.target ?? selectedKpiSetting?.target ?? null)}
+                    detail={`${directionLabel(selectedKpiDirection)}; based on the latest two values`}
                   />
                 </div>
                 <div className="mt-3 grid gap-3 sm:grid-cols-3">
@@ -1959,8 +1917,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                   <TrendSummaryCard
                     label="Target Hit Rate"
-                    value={targetHitRate(selectedMetricRows, selectedKpiDirection)}
-                    detail={selectedKpiDirection ? "Share of history meeting the explicit target direction" : "Set direction in the KPI definition to interpret target performance"}
+                    value={targetHitRate(selectedMetricRows, selectedKpiSemantics)}
+                    detail={selectedKpiDirection !== "unknown" ? "Share of history meeting the confirmed target direction" : "Confirm direction in KPI settings to interpret target performance"}
                   />
                   <TrendSummaryCard
                     label="Records"
@@ -1975,11 +1933,16 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   <p className="text-sm font-semibold text-white">Vaeroex summary</p>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     {selectedLatestKpi
-                      ? selectedKpiDirection
-                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedLatestKpi.target, selectedKpiDirection)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
+                      ? selectedKpiDirection !== "unknown"
+                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedLatestKpi.target, selectedKpiDirection, selectedKpiSemantics)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
                         : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)} against a target of ${formatSettingValue(selectedLatestKpi.target, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
                       : "Add a current value to unlock status, trend, and target guidance."}
                   </p>
+                  {selectedKpiEvaluation ? (
+                    <p className="mt-2 text-xs leading-5 text-slate-400">
+                      Latest movement: {selectedKpiEvaluation.rawMovement.replace(/_/g, " ")}. Selected-range trend: {selectedKpiEvaluation.selectedRangeTrend.replace(/_/g, " ")}.
+                    </p>
+                  ) : null}
                 </div>
               </div>
               <div className="space-y-4">

@@ -36,10 +36,12 @@ import {
   applyKpiSettingsToRows,
   getConfiguredMetricNames,
   kpiColor,
+  kpiSemantics,
   kpiWeight,
   sortKpiRowsBySettings,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
+import { evaluateKpiPerformance, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -87,6 +89,9 @@ type MetricTrend = {
   previous: number | null;
   change: number | null;
   changePercent: number | null;
+  performanceEffect: KpiPerformanceEvaluation["latestPerformanceEffect"];
+  selectedRangeTrend: KpiPerformanceEvaluation["selectedRangeTrend"];
+  rawMovement: KpiPerformanceEvaluation["rawMovement"];
 };
 type DashboardAlert = {
   id: string;
@@ -296,13 +301,13 @@ function metricNames(kpis: KpiRow[]) {
 
 function rowsForMetric(kpis: KpiRow[], name: string) {
   return kpis
-    .filter((kpi) => kpi.name === name && kpi.actual_value !== null)
+    .filter((kpi) => lower(kpi.name) === lower(name) && kpi.actual_value !== null)
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`));
 }
 
 function aggregateKpi(rows: KpiRow[], name: string, startDate: string, endDate: string) {
   const values = rows
-    .filter((row) => row.name === name && inDateRange(row.metric_date, startDate, endDate) && row.actual_value !== null)
+    .filter((row) => lower(row.name) === lower(name) && inDateRange(row.metric_date, startDate, endDate) && row.actual_value !== null)
     .map((row) => row.actual_value as number);
 
   if (!values.length) {
@@ -319,6 +324,16 @@ function buildMetricTrend(kpis: KpiRow[], name: string, range: DateRange, settin
   const previous = aggregateKpi(kpis, name, range.previousStartDate, range.previousEndDate);
   const change = current !== null && previous !== null ? current - previous : null;
   const changePercent = change !== null && previous !== null && previous !== 0 ? (change / Math.abs(previous)) * 100 : null;
+  const semantics = kpiSemantics(name, settings);
+  const selectedRows = rowsForMetric(kpis, name).filter((row) => inDateRange(row.metric_date, range.startDate, range.endDate));
+  const periodEvaluation = evaluateKpiPerformance({
+    observations: [
+      { actual_value: previous },
+      { actual_value: current }
+    ],
+    semantics
+  });
+  const selectedEvaluation = evaluateKpiPerformance({ observations: selectedRows, semantics });
 
   return {
     name,
@@ -328,7 +343,10 @@ function buildMetricTrend(kpis: KpiRow[], name: string, range: DateRange, settin
     current,
     previous,
     change,
-    changePercent
+    changePercent,
+    performanceEffect: periodEvaluation.latestPerformanceEffect,
+    selectedRangeTrend: selectedEvaluation.selectedRangeTrend,
+    rawMovement: periodEvaluation.rawMovement
   };
 }
 
@@ -566,8 +584,9 @@ function latestKpisByName(kpis: KpiRow[]) {
   const latest = new Map<string, KpiRow>();
 
   for (const row of kpis) {
-    if (!latest.has(row.name)) {
-      latest.set(row.name, row);
+    const key = lower(row.name).trim();
+    if (!latest.has(key)) {
+      latest.set(key, row);
     }
   }
 
@@ -594,8 +613,8 @@ function buildSmartAlerts({
       ? {
           id: "kpis-below-target",
           severity: "High",
-          title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} below target`,
-          why: "Below-target metrics should be reviewed against eligible evidence, customer activity, and open risks.",
+          title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} outside target`,
+          why: "Metrics outside their direction-aware target should be reviewed against eligible evidence and open risks.",
           action: "Review KPIs",
           href: "/app/kpis"
         }
@@ -1465,22 +1484,22 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     return groups;
   }, {});
   const positiveTrends = comparisonTrends
-    .filter((trend) => (trend.change ?? 0) > 0)
+    .filter((trend) => trend.performanceEffect === "favorable")
     .sort((a, b) => (b.changePercent ?? 0) * b.weight - (a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const negativeTrends = comparisonTrends
-    .filter((trend) => (trend.change ?? 0) < 0)
+    .filter((trend) => trend.performanceEffect === "unfavorable")
     .sort((a, b) => Math.abs(b.changePercent ?? 0) * b.weight - Math.abs(a.changePercent ?? 0) * a.weight)
     .slice(0, 4);
   const risks = [
     openIssues.length ? `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} remain unresolved.` : "",
     checklistFailures.length ? `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"} failed or need review.` : "",
     pendingImports.length ? `${pendingImports.length} extracted file import${pendingImports.length === 1 ? "" : "s"} are waiting for mapping review.` : "",
-    negativeTrends[0] ? `${negativeTrends[0].name} is down ${numberFormatter.format(Math.abs(negativeTrends[0].changePercent || 0))}% vs the previous period.` : ""
+    negativeTrends[0] ? `${negativeTrends[0].name} moved ${negativeTrends[0].rawMovement}, an unfavorable change of ${numberFormatter.format(Math.abs(negativeTrends[0].changePercent || 0))}% vs the previous period.` : ""
   ].filter(Boolean);
   const opportunities = [
     leadsCreated.length ? `${leadsCreated.length} customer activity record${leadsCreated.length === 1 ? "" : "s"} can be reviewed for response quality or conversion.` : "",
-    positiveTrends[0] ? `${positiveTrends[0].name} is showing the strongest improvement this period.` : "",
+    positiveTrends[0] ? `${positiveTrends[0].name} shows the strongest favorable movement this period.` : "",
     recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex review.` : "",
     operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
@@ -1488,13 +1507,17 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
     checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
-    negativeTrends.length ? "Review declining KPIs against recent imports, customer activity evidence, and open issues." : "",
+    negativeTrends.length ? "Review unfavorably moving KPIs against recent imports, customer activity evidence, and open issues." : "",
     !kpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
     !crmLeads.length ? "Connect or import customer activity evidence when available." : "",
     !reports.length ? "Save a completed leadership analysis when it should remain available for later review." : ""
   ].filter(Boolean);
   const latestKpiRows = latestKpisByName(kpis);
-  const belowTargetKpis = latestKpiRows.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
+  const belowTargetKpis = latestKpiRows.filter((kpi) => {
+    if (kpi.target === null || kpi.actual_value === null) return false;
+    const evaluation = evaluateKpiPerformance({ observations: [kpi], semantics: kpiSemantics(kpi.name, kpiSettings), target: kpi.target });
+    return ["below_required_minimum", "above_acceptable_maximum", "moving_away_from_target"].includes(evaluation.targetStatus);
+  });
   const crmLeadsWithoutFollowup = crmLeads.filter((lead) => !isConvertedStatus(lead.status) && (!lead.last_activity_at || isOlderThan(lead.last_activity_at, 30)));
   const staleSops = sops.filter((sop) => isOlderThan(sop.updated_at || sop.created_at, 90));
   const oldIssues = openIssues.filter((issue) => isOlderThan(issue.created_at, 14));
@@ -1568,8 +1591,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       id: `trend-risk-${trend.name}`,
       title: trend.name,
       source: "KPI trend",
-      status: "Declining",
-      context: `${trend.name} is down ${numberFormatter.format(Math.abs(trend.changePercent || 0))}% vs the previous period. Leadership weight: ${numberFormatter.format(trend.weight)}/10.`,
+      status: "Unfavorable",
+      context: `${trend.name} ${trend.rawMovement} ${numberFormatter.format(Math.abs(trend.changePercent || 0))}% vs the previous period, which is unfavorable for this KPI. Leadership weight: ${numberFormatter.format(trend.weight)}/10.`,
       href: "/app/kpis" as Route
     }))
   ].slice(0, 3);
@@ -1586,8 +1609,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       id: `trend-opportunity-${trend.name}`,
       title: trend.name,
       source: "KPI trend",
-      status: "Improving",
-      context: `${trend.name} improved ${percentLabel(trend.changePercent)} compared with the previous period. Leadership weight: ${numberFormatter.format(trend.weight)}/10.`,
+      status: "Favorable",
+      context: `${trend.name} ${trend.rawMovement} ${percentLabel(trend.changePercent)} compared with the previous period, which is favorable for this KPI. Leadership weight: ${numberFormatter.format(trend.weight)}/10.`,
       href: "/app/kpis" as Route
     })),
     ...recentImports.slice(0, 3).map((item) => ({
@@ -1643,7 +1666,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: `action-negative-trend-${negativeTrends[0].name}`,
           title: `Review ${negativeTrends[0].name}`,
           source: "KPI trend",
-          status: "Declining",
+          status: "Unfavorable",
           context: "Compare this KPI against recent customer activity evidence, imports, and open issues.",
           href: "/app/kpis" as Route
         }
@@ -1730,6 +1753,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     periodLabel: period,
     range,
     kpis,
+    kpiSettings,
     issues,
     checklists,
     checklistRuns,
@@ -2153,7 +2177,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
           <DashboardAccordion
             title="KPIs"
-            summary={`${primaryTrends.length} primary KPI trend${primaryTrends.length === 1 ? "" : "s"} shown for ${period.toLowerCase()}. ${positiveTrends.length} improving, ${negativeTrends.length} declining.`}
+            summary={`${primaryTrends.length} primary KPI trend${primaryTrends.length === 1 ? "" : "s"} shown for ${period.toLowerCase()}. ${positiveTrends.length} favorable, ${negativeTrends.length} unfavorable.`}
           >
       <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
         {primaryTrends.map((trend) => (

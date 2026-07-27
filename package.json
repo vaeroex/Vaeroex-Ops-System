@@ -41,6 +41,7 @@
     "test:executive-kpi-analysis-retirement": "node scripts/executive-kpi-analysis-retirement-regression-tests.js",
     "test:business-notes": "node scripts/business-notes-regression-tests.js",
     "test:workspace-agreement": "node scripts/workspace-agreement-regression-tests.js",
+    "test:kpi-semantics": "node scripts/kpi-semantics-regression-tests.js",
     "test:manual-activation": "node scripts/manual-activation-regression-tests.js",
     "test:admin-company-management": "node scripts/admin-company-management-regression-tests.js",
     "test:gpt56-business-health-routing": "node scripts/gpt56-business-health-routing-regression-tests.js",

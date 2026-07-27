@@ -1,5 +1,7 @@
 import type { Route } from "next";
 import type { Database } from "@/lib/supabase/types";
+import { kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
+import { evaluateKpiPerformance } from "@/lib/kpis/semantics";
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
@@ -32,6 +34,7 @@ export type PrestigeInput = {
   periodLabel: string;
   range: PrestigeDateRange;
   kpis: KpiRow[];
+  kpiSettings?: KpiSettingRow[];
   issues: IssueRow[];
   assets: AssetRow[];
   checklists: ChecklistRow[];
@@ -190,7 +193,6 @@ export type PrestigeIntelligence = {
 
 const currencyFormatter = new Intl.NumberFormat("en-US", { currency: "USD", maximumFractionDigits: 0, style: "currency" });
 const numberFormatter = new Intl.NumberFormat("en-US", { maximumFractionDigits: 1 });
-const lowerIsBetterWords = ["response", "overdue", "open issue", "complaint", "cost", "delay", "missed"];
 const departments = ["Operations", "Sales", "Customer Service", "Field Operations", "Admin", "Finance", "HR", "Warehouse"];
 
 function lower(value: string | null | undefined) {
@@ -236,21 +238,24 @@ function isProposalLead(lead: CrmLeadRow) {
   return status.includes("proposal") || status.includes("quote") || status.includes("estimate");
 }
 
-function isLowerBetterMetric(name: string) {
-  return lowerIsBetterWords.some((word) => lower(name).includes(word));
-}
-
-function metricOnTarget(kpi: KpiRow) {
+function metricOnTarget(kpi: KpiRow, settings: KpiSettingRow[] = []) {
   if (kpi.actual_value === null || kpi.target === null) return null;
-  return isLowerBetterMetric(`${kpi.name} ${kpi.category || ""}`) ? kpi.actual_value <= kpi.target : kpi.actual_value >= kpi.target;
+  const status = evaluateKpiPerformance({
+    observations: [kpi],
+    semantics: kpiSemantics(kpi.name, settings),
+    target: kpi.target
+  }).targetStatus;
+  if (status === "direction_unknown" || status === "no_target") return null;
+  return status === "achieved" || status === "within_range";
 }
 
 function latestKpis(kpis: KpiRow[]) {
   const latest = new Map<string, KpiRow>();
 
   for (const row of kpis) {
-    if (!latest.has(row.name)) {
-      latest.set(row.name, row);
+    const key = lower(row.name).trim();
+    if (!latest.has(key)) {
+      latest.set(key, row);
     }
   }
 
@@ -279,10 +284,11 @@ function completionRate(rows: ChecklistRunRow[]) {
   return (completed / rows.length) * 100;
 }
 
-function kpiTargetRate(kpis: KpiRow[]) {
+function kpiTargetRate(kpis: KpiRow[], settings: KpiSettingRow[] = []) {
   const rows = latestKpis(kpis).filter((row) => row.actual_value !== null && row.target !== null);
   if (!rows.length) return null;
-  return (rows.filter((row) => metricOnTarget(row)).length / rows.length) * 100;
+  const classified = rows.map((row) => metricOnTarget(row, settings)).filter((value): value is boolean => value !== null);
+  return classified.length ? (classified.filter(Boolean).length / classified.length) * 100 : null;
 }
 
 function scoreFromBoolean(good: boolean, goodScore = 92, badScore = 58) {
@@ -417,13 +423,13 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const responseTime = findKpi(input.kpis, ["response"]);
   const checklistCompletion = findKpi(input.kpis, ["checklist completion"]);
   const sopReview = findKpi(input.kpis, ["sop review"]);
-  const targetRate = kpiTargetRate(input.kpis);
+  const targetRate = kpiTargetRate(input.kpis, input.kpiSettings);
   const checkRate = checklistCompletion?.actual_value ?? completionRate(input.checklistRuns);
   const leadsWithoutFollowUp = input.crmLeads.filter((lead) => !isConvertedLead(lead) && !lead.last_activity_at);
   const processScore = scoreFromRate(sopReview?.actual_value ?? null, input.sops.length ? 72 : 55);
-  const customerScore = satisfaction?.actual_value ?? (responseTime && metricOnTarget(responseTime) === false ? 62 : input.crmLeads.length ? 76 : 55);
+  const customerScore = satisfaction?.actual_value ?? (responseTime && metricOnTarget(responseTime, input.kpiSettings) === false ? 62 : input.crmLeads.length ? 76 : 55);
   const operationsScore = clampScore(88 - openIssues.length * 3 + Math.max(0, (checkRate ?? 80) - 85) / 2);
-  const salesScore = clampScore((revenue && metricOnTarget(revenue) ? 88 : 66) + (conversion && metricOnTarget(conversion) ? 8 : -8) - leadsWithoutFollowUp.length * 3);
+  const salesScore = clampScore((revenue && metricOnTarget(revenue, input.kpiSettings) ? 88 : 66) + (conversion && metricOnTarget(conversion, input.kpiSettings) ? 8 : -8) - leadsWithoutFollowUp.length * 3);
   const sourceVisibilityScore = clampScore(90 + Math.min(10, input.assignments.filter((item) => lower(item.status) === "done").length * 2));
   const teamScore = clampScore(70 + input.people.filter((person) => person.role_title && person.department).length * 4);
   const categories = [
@@ -439,8 +445,8 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       name: "Sales Health",
       score: salesScore,
       explanation: `${revenue ? `Revenue is ${formatMetric(revenue.actual_value, revenue.name)} against target ${formatMetric(revenue.target, revenue.name)}.` : "Revenue KPI is missing."} ${conversion ? `Conversion is ${formatMetric(conversion.actual_value, conversion.name)}.` : ""}`,
-      improved: revenue && metricOnTarget(revenue) ? "Revenue is at or above target." : "Customer activity evidence is available for response-quality review.",
-      declined: conversion && metricOnTarget(conversion) === false ? "Conversion is below target." : leadsWithoutFollowUp.length ? "Some customer records show response gaps." : "No major sales decline is visible.",
+      improved: revenue && metricOnTarget(revenue, input.kpiSettings) ? "Revenue is meeting its direction-aware target." : "Customer activity evidence is available for response-quality review.",
+      declined: conversion && metricOnTarget(conversion, input.kpiSettings) === false ? "Conversion is outside its target." : leadsWithoutFollowUp.length ? "Some customer records show response gaps." : "No major sales decline is visible.",
       nextAction: leadsWithoutFollowUp.length ? "Review customer activity evidence as a leadership issue." : "Review conversion against recent customer activity evidence."
     }),
     healthCategory({
@@ -455,9 +461,9 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
       name: "Customer Experience Health",
       score: customerScore,
       explanation: `${satisfaction ? `Satisfaction is ${formatMetric(satisfaction.actual_value, satisfaction.name)}.` : "Customer satisfaction is not fully tracked."} ${responseTime ? `Response time is ${formatMetric(responseTime.actual_value, responseTime.name)}.` : ""}`,
-      improved: satisfaction && metricOnTarget(satisfaction) ? "Customer satisfaction is at or above target." : "Customer signals are available for review.",
-      declined: responseTime && metricOnTarget(responseTime) === false ? "Response time is above target." : "No major customer experience decline is visible.",
-      nextAction: responseTime && metricOnTarget(responseTime) === false ? "Review the response-time workflow as a leadership issue." : "Keep tracking satisfaction and response time."
+      improved: satisfaction && metricOnTarget(satisfaction, input.kpiSettings) ? "Customer satisfaction is meeting its target." : "Customer signals are available for review.",
+      declined: responseTime && metricOnTarget(responseTime, input.kpiSettings) === false ? "Response time is outside its maximum target." : "No major customer experience decline is visible.",
+      nextAction: responseTime && metricOnTarget(responseTime, input.kpiSettings) === false ? "Review the response-time workflow as a leadership issue." : "Keep tracking satisfaction and response time."
     }),
     healthCategory({
       name: "Process Health",
@@ -504,7 +510,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
   const revenue = findKpi(input.kpis, ["revenue", "sales"]);
   const priorities: PrestigeAction[] = [];
 
-  if (conversion && metricOnTarget(conversion) === false) {
+  if (conversion && metricOnTarget(conversion, input.kpiSettings) === false) {
     priorities.push(action({
       id: "conversion-decline",
       title: "Review customer conversion decline",
@@ -519,7 +525,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
     }));
   }
 
-  if (revenue && metricOnTarget(revenue) === false) {
+  if (revenue && metricOnTarget(revenue, input.kpiSettings) === false) {
     priorities.push(action({
       id: "revenue-below-target",
       title: "Stabilize revenue below target",
@@ -534,7 +540,7 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
     }));
   }
 
-  if (responseTime && metricOnTarget(responseTime) === false) {
+  if (responseTime && metricOnTarget(responseTime, input.kpiSettings) === false) {
     priorities.push(action({
       id: "response-time-risk",
       title: "Reduce response-time risk",
@@ -629,7 +635,7 @@ function buildProfitLeaks(input: PrestigeInput) {
     });
   }
 
-  if (conversion && metricOnTarget(conversion) === false) {
+  if (conversion && metricOnTarget(conversion, input.kpiSettings) === false) {
     leaks.push({
       ...action({
         id: "low-conversion",
@@ -648,7 +654,7 @@ function buildProfitLeaks(input: PrestigeInput) {
     });
   }
 
-  if (revenue && metricOnTarget(revenue) === false) {
+  if (revenue && metricOnTarget(revenue, input.kpiSettings) === false) {
     leaks.push({
       ...action({
         id: "revenue-target",
@@ -691,7 +697,7 @@ function buildProfitLeaks(input: PrestigeInput) {
 
 function buildMemoryTimeline(input: PrestigeInput, focus: PrestigeAction[]) {
   const moments: MemoryMoment[] = [];
-  const latestBelowTarget = latestKpis(input.kpis).filter((row) => metricOnTarget(row) === false).slice(0, 5);
+  const latestBelowTarget = latestKpis(input.kpis).filter((row) => metricOnTarget(row, input.kpiSettings) === false).slice(0, 5);
 
   for (const kpi of latestBelowTarget) {
     moments.push({
@@ -840,7 +846,8 @@ function buildDepartmentScorecards(input: PrestigeInput) {
     const pastDueReviewItems = openReviewItems.filter((assignment) => Boolean(assignment.due_date && assignment.due_date < todayDate()));
     const openIssues = input.issues.filter((issue) => isOpenIssue(issue) && (issue.assigned_department === department || issue.issue_type === department));
     const kpiRows = latestKpis(input.kpis).filter((kpi) => kpi.category === department || kpi.owner === department);
-    const onTarget = kpiRows.length ? kpiRows.filter((kpi) => metricOnTarget(kpi)).length / kpiRows.length : null;
+    const classifiedKpis = kpiRows.map((kpi) => metricOnTarget(kpi, input.kpiSettings)).filter((value): value is boolean => value !== null);
+    const onTarget = classifiedKpis.length ? classifiedKpis.filter(Boolean).length / classifiedKpis.length : null;
     const checkRows = input.checklistRuns.filter((run) => run.assigned_department === department || run.assigned_role === department);
     const checkRate = completionRate(checkRows);
     const score = clampScore(88 - pastDueReviewItems.length * 7 - openIssues.length * 5 + (onTarget !== null ? onTarget * 10 : 0) + ((checkRate ?? 80) - 80) / 3);
@@ -899,7 +906,7 @@ function buildBenchmarkMode(input: PrestigeInput) {
   return [
     {
       title: "Customer response activity should be visible within 24 hours",
-      status: responseTime ? (metricOnTarget(responseTime) ? "On track" : "Needs attention") : "Missing data",
+      status: responseTime ? (metricOnTarget(responseTime, input.kpiSettings) === null ? "Missing data" : metricOnTarget(responseTime, input.kpiSettings) ? "On track" : "Needs attention") : "Missing data",
       evidence: responseTime ? `${responseTime.name}: ${formatMetric(responseTime.actual_value, responseTime.name)}` : "No response-time KPI found.",
       recommendedAction: "Review response-time evidence and delayed records as a leadership issue."
     },
