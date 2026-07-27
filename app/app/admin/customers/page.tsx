@@ -1,3 +1,5 @@
+import Link from "next/link";
+import type { Route } from "next";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
@@ -40,6 +42,13 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
     subscriptionsQuery.order("created_at", { ascending: false }).limit(40),
     workspacesQuery.order("created_at", { ascending: false }).limit(20)
   ]);
+  const workspaceIds = (workspaces || []).map((workspace) => workspace.id);
+  const agreementRows = workspaceIds.length
+    ? await access.admin.from("workspace_agreements").select("id,workspace_id").in("workspace_id", workspaceIds)
+    : null;
+  const agreementIdsByWorkspace = Object.fromEntries(
+    (agreementRows?.data || []).map((agreement) => [agreement.workspace_id, agreement.id])
+  );
 
   return (
     <div className="space-y-6">
@@ -103,13 +112,30 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
 
       <SectionCard title="Workspaces by customer email">
         <div className="space-y-3">
-          {workspaces?.length ? workspaces.map((workspace) => (
+          {workspaces?.length ? workspaces.map((workspace) => {
+            const agreementId = agreementIdsByWorkspace[workspace.id];
+
+            return (
             <article key={workspace.id} className="rounded-lg border border-line p-4">
               <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                   <p className="font-semibold">{workspace.name}</p>
                   <p className="mt-1 text-sm text-muted">{workspace.primary_contact_email || "No contact email"}</p>
                   <p className="mt-2 break-all text-xs text-muted">{workspace.id}</p>
+                  <div className="mt-3">
+                    {agreementId ? (
+                      <Link
+                        href={`/app/admin/workspace-agreements/${agreementId}` as Route}
+                        className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-vaeroex-blue hover:text-vaeroex-blue"
+                      >
+                        View agreement
+                      </Link>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500">
+                        {agreementRows?.error ? "Agreement unavailable" : "No agreement"}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <StatusBadge value={workspace.subscription_status} />
@@ -117,7 +143,8 @@ export default async function AdminCustomersPage({ searchParams }: AdminCustomer
                 </div>
               </div>
             </article>
-          )) : (
+            );
+          }) : (
             <EmptyState title="No workspaces found" description="No workspace contact email matched the current search." />
           )}
         </div>
