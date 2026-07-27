@@ -74,8 +74,62 @@ export type Database = {
         };
         Returns: Json;
       };
+      transition_workspace_admin_lifecycle: {
+        Args: {
+          p_workspace_id: string;
+          p_actor_id: string;
+          p_action: "archive" | "restore";
+        };
+        Returns: Json;
+      };
     };
-    Views: Record<string, never>;
+    Views: {
+      admin_company_directory_v1: {
+        Row: {
+          workspace_id: string;
+          company_name: string;
+          company_name_sort: string;
+          primary_contact_name: string | null;
+          primary_contact_email: string | null;
+          industry: string | null;
+          size: string | null;
+          created_by: string | null;
+          workspace_subscription_status: string;
+          workspace_plan_slug: string | null;
+          subscription_required: boolean;
+          trial_ends_at: string | null;
+          manually_unlocked: boolean;
+          workspace_created_at: string;
+          workspace_updated_at: string;
+          archived_at: string | null;
+          archived_by: string | null;
+          restored_at: string | null;
+          restored_by: string | null;
+          agreement_id: string | null;
+          agreement_signed_at: string | null;
+          agreement_status: "missing" | "signed";
+          subscription_id: string | null;
+          subscription_status: string;
+          subscription_plan_slug: string | null;
+          billing_provider: string | null;
+          subscription_updated_at: string | null;
+          lifecycle_status: "active" | "pending_activation" | "inactive" | "archived";
+          legacy_access_kind: "demo" | "trial" | null;
+        };
+        Relationships: [];
+      };
+      admin_unlinked_customer_records_v1: {
+        Row: {
+          record_type: "profile" | "subscription" | "activation_request";
+          record_id: string;
+          display_name: string;
+          contact_email: string | null;
+          status: string;
+          created_at: string;
+        };
+        Relationships: [];
+      };
+    };
     Tables: {
       profiles: {
         Row: {
@@ -138,6 +192,28 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["workspaces"]["Insert"]>;
+        Relationships: [];
+      };
+      workspace_admin_lifecycle: {
+        Row: {
+          workspace_id: string;
+          archived_at: string | null;
+          archived_by: string | null;
+          restored_at: string | null;
+          restored_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          archived_at?: string | null;
+          archived_by?: string | null;
+          restored_at?: string | null;
+          restored_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["workspace_admin_lifecycle"]["Insert"]>;
         Relationships: [];
       };
       workspace_members: {
