@@ -18,6 +18,9 @@ const actionRedirect = read("lib/admin/action-redirect.ts");
 const migration = read("supabase/migrations/202607270001_admin_workspace_lifecycle.sql");
 const filters = read("components/admin/AdminCompanyFilters.tsx");
 const companyTable = read("components/admin/AdminCompanyTable.tsx");
+const workspaceFilters = read("components/admin/AdminWorkspaceFilters.tsx");
+const workspaceTable = read("components/admin/AdminWorkspaceQueueTable.tsx");
+const workspacePagination = read("components/admin/AdminWorkspacePagination.tsx");
 const tabs = read("components/admin/AdminCompanyTabs.tsx");
 const lifecycleBadge = read("components/admin/AdminLifecycleBadge.tsx");
 const workspaceForm = read("components/admin/AdminWorkspaceAccessForm.tsx");
@@ -26,6 +29,7 @@ const manualActivation = read("components/admin/AdminManualActivationForm.tsx");
 const requestReview = read("components/admin/AdminActivationRequestReview.tsx");
 const lifecycleActions = read("components/admin/AdminWorkspaceLifecycleActions.tsx");
 const eventDetails = read("components/admin/AdminSubscriptionEventDetails.tsx");
+const globals = read("app/globals.css");
 
 for (const [name, source] of [
   ["Overview", overview],
@@ -60,6 +64,12 @@ assert.match(companyDirectory, /filters\.lifecycle === "current"[\s\S]+\.neq\("l
 assert.match(companyDirectory, /\.eq\("subscription_status", filters\.subscription\)/, "subscription filtering must execute server-side");
 assert.match(companyDirectory, /\.eq\("agreement_status", filters\.agreement\)/, "agreement filtering must execute server-side");
 assert.match(companyDirectory, /\.order\("company_name_sort"[\s\S]+\.order\("workspace_id"/, "default company ordering must be stable by company and workspace ID");
+assert.match(companyDirectory, /view: workspaceViews\.has\(view\)[\s\S]+: "attention"/, "workspace filtering must default to Needs attention");
+assert.match(companyDirectory, /filters\.view === "attention"[\s\S]+\.eq\("attention_required", true\)/, "the default workspace queue must filter exceptions server-side");
+for (const lifecycle of ["pending_activation", "inactive", "archived"]) {
+  assert.match(companyDirectory, new RegExp(`filters\\.view[\\s\\S]+\\.eq\\(\"lifecycle_status\", filters\\.view\\)`), `${lifecycle} must use the explicit lifecycle view filter`);
+}
+assert.match(companyDirectory, /filters\.view === "all"[\s\S]+All workspaces is intentional/, "All workspaces must remain an explicit operational view");
 
 for (const label of ["Company or contact", "Lifecycle", "Subscription", "Agreement", "Sort"]) {
   assert.match(filters, new RegExp(label), `company filters must expose ${label}`);
@@ -68,7 +78,17 @@ for (const column of ["Company", "Primary contact", "Lifecycle", "Subscription",
   assert.match(companyTable, new RegExp(`>${column}<`), `company directory must expose the ${column} column`);
 }
 assert.match(companyTable, /company\.company_name/, "company name must remain the primary visible identity");
-assert.doesNotMatch(companyTable + workspaces, /Last login/, "Admin surfaces must not claim to display an unavailable last-login value");
+for (const label of ["Needs attention", "Pending activation", "Inactive", "Archived", "All workspaces"]) {
+  assert.match(workspaceFilters, new RegExp(label), `workspace operations must expose the ${label} filter`);
+}
+for (const column of ["Workspace", "Operational attention", "Access state", "Agreement", "Last update", "Manage"]) {
+  assert.match(workspaceTable, new RegExp(`>${column}<`), `workspace operations must expose the ${column} column`);
+}
+assert.match(workspaces, /loadAdminWorkspacePage/, "Workspaces must use its dedicated operational queue loader");
+assert.match(workspaces, /Normal active companies remain in Customers/, "Workspaces must explain its exception-queue responsibility");
+assert.doesNotMatch(workspaces, /AdminCompanyTable|AdminCompanyFilters|AdminPagination/, "Workspaces must not render a second general company directory");
+assert.match(workspacePagination, /filters\.view !== "attention"/, "workspace pagination must preserve the intentional queue filter");
+assert.doesNotMatch(companyTable + workspaceTable + workspaces, /Last login/, "Admin surfaces must not claim to display an unavailable last-login value");
 assert.match(customers, /admin_unlinked_customer_records_v1/, "unlinked profiles, subscriptions, and activation requests must remain visible");
 assert.match(customers, /Unlinked customer records/, "unlinked records must be clearly separated from company rows");
 assert.match(migration, /from public\.manual_activation_requests as request;?[\s\S]+not exists \([\s\S]+public\.workspaces[\s\S]+primary_contact_email[\s\S]+not exists \([\s\S]+public\.customer_subscriptions[\s\S]+workspace_id is not null/, "linked activation requests must not be mislabeled as unlinked customer records");
@@ -130,6 +150,10 @@ assert.match(transition, /'changed', false/g, "repeated archive and restore requ
 assert.doesNotMatch(transition, /update public\.workspaces|update public\.customer_subscriptions|delete from/, "archive and restore must not mutate access, billing, or historical records");
 assert.match(migration, /revoke all on function public\.transition_workspace_admin_lifecycle[\s\S]+from public, anon, authenticated, service_role/, "transition execution must start denied");
 assert.match(migration, /grant execute on function public\.transition_workspace_admin_lifecycle[\s\S]+to service_role/, "only service role may invoke the lifecycle transition");
+assert.match(migration, /end as attention_required/, "the company view must expose a deterministic operational-attention flag");
+assert.match(migration, /lifecycle_status in \('pending_activation', 'inactive'\)/, "pending and inactive workspaces must enter the attention queue");
+assert.match(migration, /agreement_status = 'missing'/, "missing agreements must enter the attention queue");
+assert.match(migration, /manually_unlocked = true/, "manual unlocks must remain visible as operational exceptions");
 
 for (const view of ["admin_company_directory_v1", "admin_unlinked_customer_records_v1"]) {
   assert.match(migration, new RegExp(`create or replace view public\\.${view}[\\s\\S]+security_invoker = true`), `${view} must execute with caller privileges`);
@@ -141,5 +165,21 @@ for (const [state, tone] of [["active", "emerald"], ["pending_activation", "ambe
   assert.match(lifecycleBadge, new RegExp(`${state}: "[^"]*${tone}`), `${state} must retain its approved visual distinction`);
 }
 assert.doesNotMatch(filters, /<option value="(?:trial|demo)"/, "trial and demo must not become intended lifecycle filters");
+
+for (const tableSource of [companyTable, workspaceTable, subscriptions]) {
+  assert.match(tableSource, /vaeroex-admin-data-row/, "Customers, Workspaces, and Subscriptions must share the accessible Admin row states");
+  assert.doesNotMatch(tableSource, /hover:bg-slate-50\/80/, "Admin tables must not retain the unreadable bright hover treatment");
+}
+for (const selector of [
+  ".vaeroex-admin-data-row:hover",
+  ".vaeroex-admin-data-row:focus-within",
+  ".vaeroex-admin-data-row[aria-selected=\"true\"]",
+  ".vaeroex-admin-data-row[data-active=\"true\"]",
+  ".vaeroex-admin-data-row[aria-disabled=\"true\"]",
+  ".pulsar .vaeroex-app-shell .vaeroex-admin-data-row:hover"
+]) {
+  assert.ok(globals.includes(selector), `Admin row styling must define ${selector}`);
+}
+assert.match(globals, /focus-within[\s\S]+outline: 2px solid/, "keyboard focus must use a visible outline in addition to color");
 
 process.stdout.write("Admin company-management regressions passed.\n");

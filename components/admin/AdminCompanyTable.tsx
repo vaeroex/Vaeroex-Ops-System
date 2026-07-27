@@ -32,9 +32,9 @@ export function AdminCompanyTable({ rows, emptyDescription }: { rows: AdminCompa
             const detailHref = `/app/admin/customers/${company.workspace_id}` as Route;
 
             return (
-              <tr key={company.workspace_id} data-company-row={company.workspace_id} className="align-top hover:bg-slate-50/80">
+              <tr key={company.workspace_id} data-company-row={company.workspace_id} className="vaeroex-admin-data-row align-top">
                 <td className="px-4 py-4">
-                  <Link href={detailHref} className="font-semibold text-ink hover:text-vaeroex-blue">{company.company_name}</Link>
+                  <Link href={detailHref} className="font-semibold text-ink hover:text-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55">{company.company_name}</Link>
                   <p className="mt-1 text-xs text-muted">{company.industry || "Industry not set"}</p>
                   {company.legacy_access_kind ? <p className="mt-2 text-xs font-medium text-slate-500">Legacy {company.legacy_access_kind} compatibility</p> : null}
                 </td>
@@ -49,7 +49,7 @@ export function AdminCompanyTable({ rows, emptyDescription }: { rows: AdminCompa
                 </td>
                 <td className="px-4 py-4">
                   {company.agreement_id ? (
-                    <Link href={`/app/admin/workspace-agreements/${company.agreement_id}` as Route} className="font-semibold text-vaeroex-blue hover:underline">View agreement</Link>
+                    <Link href={`/app/admin/workspace-agreements/${company.agreement_id}` as Route} className="font-semibold text-vaeroex-blue hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55">View agreement</Link>
                   ) : <span className="font-medium text-slate-500">No agreement</span>}
                 </td>
                 <td className="px-4 py-4 text-xs leading-5 text-muted">{formatAdminDate(company.workspace_updated_at)}</td>
@@ -61,7 +61,7 @@ export function AdminCompanyTable({ rows, emptyDescription }: { rows: AdminCompa
                   ) : <span className="text-xs text-slate-500">None</span>}
                 </td>
                 <td className="px-4 py-4 text-right">
-                  <Link href={detailHref} className="inline-flex min-h-10 items-center justify-center rounded-md border border-line px-3 py-2 font-semibold text-ink hover:border-vaeroex-blue hover:text-vaeroex-blue">
+                  <Link href={detailHref} className="inline-flex min-h-10 items-center justify-center rounded-md border border-line px-3 py-2 font-semibold text-ink hover:border-vaeroex-blue hover:text-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55">
                     Manage
                   </Link>
                 </td>

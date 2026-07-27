@@ -140,7 +140,7 @@ export default async function AdminSubscriptionsPage({
                 {subscriptions.map((subscription) => {
                   const companyName = subscription.workspace_id ? companyNames.get(subscription.workspace_id) : null;
                   return (
-                    <tr key={subscription.id} className="align-top hover:bg-slate-50/80">
+                    <tr key={subscription.id} className="vaeroex-admin-data-row align-top">
                       <td className="px-4 py-4 font-semibold text-ink">{companyName || subscription.customer_name || "Unlinked subscription"}</td>
                       <td className="px-4 py-4"><p>{subscription.customer_email}</p><p className="mt-1 text-xs text-muted">{displayPlanName(subscription.plan_slug)}</p></td>
                       <td className="px-4 py-4"><StatusBadge value={subscription.status} /></td>
@@ -149,10 +149,10 @@ export default async function AdminSubscriptionsPage({
                       <td className="px-4 py-4 text-xs text-muted">{formatAdminDate(subscription.updated_at)}</td>
                       <td className="px-4 py-4 text-right">
                         {subscription.workspace_id ? (
-                          <Link href={`/app/admin/customers/${subscription.workspace_id}?tab=subscription` as Route} className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 font-semibold text-ink hover:border-vaeroex-blue">Manage</Link>
+                          <Link href={`/app/admin/customers/${subscription.workspace_id}?tab=subscription` as Route} className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 font-semibold text-ink hover:border-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55">Manage</Link>
                         ) : (
                           <details className="text-left">
-                            <summary className="cursor-pointer font-semibold text-vaeroex-blue">Update</summary>
+                            <summary className="cursor-pointer font-semibold text-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-accent/55">Update</summary>
                             <div className="mt-3 min-w-[700px] rounded-md border border-line bg-white p-3 shadow-panel">
                               <AdminSubscriptionEditor subscription={subscription} returnTo="/app/admin/subscriptions" />
                             </div>

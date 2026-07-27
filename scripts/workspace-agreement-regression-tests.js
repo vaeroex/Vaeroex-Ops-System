@@ -29,6 +29,7 @@ const appShell = read("components/app/AppShell.tsx");
 const adminWorkspaces = read("app/app/admin/workspaces/page.tsx");
 const adminCustomers = read("app/app/admin/customers/page.tsx");
 const adminCompanyTable = read("components/admin/AdminCompanyTable.tsx");
+const adminWorkspaceTable = read("components/admin/AdminWorkspaceQueueTable.tsx");
 const adminCompanyDetail = read("app/app/admin/customers/[workspaceId]/page.tsx");
 const nextConfig = read("next.config.mjs");
 
@@ -138,12 +139,12 @@ assert.match(adminPage, /Agreement, workspace, organization, or owner email/, "a
 assert.match(adminPage, /type="date"/, "admin search must support signed date");
 assert.match(adminPage, />View agreement<\/Link>/, "every agreement list row must expose a clear detail action");
 assert.match(appShell, /href: "\/app\/admin\/workspace-agreements", label: "Workspace Agreements"/, "the persistent Admin navigation must expose Workspace Agreements");
-assert.match(adminWorkspaces, /AdminCompanyTable/, "the workspace index must use the shared company rows with agreement status");
+assert.match(adminWorkspaces, /AdminWorkspaceQueueTable/, "the workspace exception queue must retain agreement status");
 assert.match(adminCustomers, /AdminCompanyTable/, "the customer directory must use the shared company rows with agreement status");
 assert.match(adminCompanyDetail, /from\("workspace_agreements"\)\.select\("\*"\)/, "company detail must load the retained agreement record");
-assert.match(adminCompanyTable + adminCompanyDetail, /\/app\/admin\/workspace-agreements\/\$\{(?:company\.agreement_id|agreement\.id)\}/, "Admin company surfaces must link to the existing secure detail page");
-assert.match(adminCompanyTable + adminCompanyDetail, /View agreement/, "Admin company surfaces must expose a visible agreement action");
-assert.match(adminCompanyTable + adminCompanyDetail, /No agreement/, "Admin company surfaces must explicitly identify workspaces without an agreement");
+assert.match(adminCompanyTable + adminWorkspaceTable + adminCompanyDetail, /\/app\/admin\/workspace-agreements\/\$\{(?:(?:company|workspace)\.agreement_id|agreement\.id)\}/, "Admin company surfaces must link to the existing secure detail page");
+assert.match(adminCompanyTable + adminWorkspaceTable + adminCompanyDetail, /View agreement/, "Admin company surfaces must expose a visible agreement action");
+assert.match(adminCompanyTable + adminWorkspaceTable + adminCompanyDetail, /No agreement/, "Admin company surfaces must explicitly identify workspaces without an agreement");
 assert.match(adminDetail, /hashWorkspaceAgreement\(parsed\.data\) !== agreement\.immutable_hash/, "admin rendering must verify immutable snapshot integrity");
 assert.match(adminPdf, /getVaeroexAdminAccess/, "admin PDF retrieval must require Vaeroex admin authorization");
 assert.match(adminPdf, /createHash\("sha256"\)/, "admin PDF downloads must verify persisted bytes");

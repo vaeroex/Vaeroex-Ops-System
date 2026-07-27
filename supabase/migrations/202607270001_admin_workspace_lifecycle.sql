@@ -209,6 +209,7 @@ grant execute on function public.transition_workspace_admin_lifecycle(uuid, uuid
 create or replace view public.admin_company_directory_v1
 with (security_invoker = true)
 as
+with company_directory as (
 select
   workspace.id as workspace_id,
   workspace.name as company_name,
@@ -298,7 +299,24 @@ left join lateral (
   where subscription.workspace_id = workspace.id
   order by subscription.updated_at desc, subscription.created_at desc, subscription.id
   limit 1
-) as current_subscription on true;
+) as current_subscription on true
+)
+select
+  company_directory.*,
+  case
+    when company_directory.lifecycle_status = 'archived' then false
+    else (
+      company_directory.lifecycle_status in ('pending_activation', 'inactive')
+      or company_directory.agreement_status = 'missing'
+      or nullif(btrim(company_directory.primary_contact_email), '') is null
+      or company_directory.manually_unlocked = true
+      or (
+        company_directory.subscription_id is not null
+        and company_directory.workspace_subscription_status is distinct from company_directory.subscription_status
+      )
+    )
+  end as attention_required
+from company_directory;
 
 revoke all privileges on table public.admin_company_directory_v1
   from public, anon, authenticated, service_role;

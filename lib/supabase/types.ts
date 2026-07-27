@@ -115,6 +115,7 @@ export type Database = {
           subscription_updated_at: string | null;
           lifecycle_status: "active" | "pending_activation" | "inactive" | "archived";
           legacy_access_kind: "demo" | "trial" | null;
+          attention_required: boolean;
         };
         Relationships: [];
       };
