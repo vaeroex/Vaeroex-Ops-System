@@ -37,6 +37,7 @@ import {
   type WorksheetType
 } from "@/lib/imports/worksheet-types";
 import { approvedKpiColor } from "@/lib/kpis/settings";
+import { deterministicKpiSemantics, KPI_SEMANTIC_VERSION } from "@/lib/kpis/semantics";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
@@ -911,6 +912,19 @@ async function upsertImportedKpiSettings({
   userId: string;
   interpretation: KpiImportInterpretation;
 }): Promise<boolean> {
+  const { data: existingSettings, error: existingSettingsError } = await supabase
+    .from("kpi_settings")
+    .select("*")
+    .eq("workspace_id", workspaceId);
+
+  if (existingSettingsError) {
+    if (/row-level security|permission denied|not authorized|not allowed/i.test(existingSettingsError.message)) return false;
+    throw new Error(existingSettingsError.message);
+  }
+
+  const persistedSettingsByName = new Map(
+    (existingSettings || []).map((setting) => [setting.kpi_name.trim().toLowerCase(), setting])
+  );
   const settingsByName = new Map<
     string,
     {
@@ -925,17 +939,37 @@ async function upsertImportedKpiSettings({
       y_axis_label: string | null;
       color: string;
       preferred_chart_type: KpiImportChartType;
+      canonical_name: string | null;
+      display_name: string | null;
+      original_source_label: string | null;
+      semantic_unit: string | null;
+      semantic_scale: number;
+      desired_direction: string;
+      target_behavior: string;
+      ideal_value: number | null;
+      metric_role: string;
+      classification_source: string;
+      classification_confidence: number | null;
+      classification_version: string;
+      classification_rationale: string | null;
       created_by: string;
     }
   >();
 
   for (const row of rows) {
-    const existing = settingsByName.get(row.record.name);
+    const settingsKey = row.record.name.trim().toLowerCase();
+    const existing = settingsByName.get(settingsKey);
 
     if (!existing) {
-      settingsByName.set(row.record.name, {
+      const semantics = deterministicKpiSemantics(row.record.name);
+      const persistedSetting = persistedSettingsByName.get(settingsKey);
+      const preservePersistedSemantics = Boolean(
+        persistedSetting?.classification_confirmed
+        || (persistedSetting?.classification_source === "luna" && (persistedSetting.classification_confidence || 0) >= 0.92)
+      );
+      settingsByName.set(settingsKey, {
         workspace_id: workspaceId,
-        kpi_name: row.record.name,
+        kpi_name: persistedSetting?.kpi_name || row.record.name,
         category: row.record.category || "Imported",
         target: row.record.target,
         unit_type: interpretation.unit_type,
@@ -945,6 +979,19 @@ async function upsertImportedKpiSettings({
         y_axis_label: interpretation.y_axis_label,
         color: interpretation.color,
         preferred_chart_type: interpretation.preferred_chart_type,
+        canonical_name: preservePersistedSemantics ? persistedSetting?.canonical_name ?? null : semantics.canonicalName,
+        display_name: preservePersistedSemantics ? persistedSetting?.display_name ?? null : semantics.displayName,
+        original_source_label: preservePersistedSemantics ? persistedSetting?.original_source_label ?? null : semantics.originalSourceLabel,
+        semantic_unit: preservePersistedSemantics ? persistedSetting?.semantic_unit ?? null : semantics.unit,
+        semantic_scale: preservePersistedSemantics ? persistedSetting?.semantic_scale ?? 1 : semantics.scale,
+        desired_direction: preservePersistedSemantics ? persistedSetting?.desired_direction ?? "unknown" : semantics.desiredDirection,
+        target_behavior: preservePersistedSemantics ? persistedSetting?.target_behavior ?? "unknown" : semantics.targetBehavior,
+        ideal_value: preservePersistedSemantics ? persistedSetting?.ideal_value ?? null : semantics.idealValue,
+        metric_role: preservePersistedSemantics ? persistedSetting?.metric_role ?? "actual" : semantics.metricRole,
+        classification_source: preservePersistedSemantics ? persistedSetting?.classification_source ?? "unknown" : semantics.classificationSource,
+        classification_confidence: preservePersistedSemantics ? persistedSetting?.classification_confidence ?? null : semantics.classificationConfidence,
+        classification_version: preservePersistedSemantics ? persistedSetting?.classification_version ?? KPI_SEMANTIC_VERSION : KPI_SEMANTIC_VERSION,
+        classification_rationale: preservePersistedSemantics ? persistedSetting?.classification_rationale ?? null : semantics.rationale,
         created_by: userId
       });
       continue;

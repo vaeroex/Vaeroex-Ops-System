@@ -13,6 +13,7 @@ import {
   KPI_COLOR_PALETTE,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
+import { deterministicKpiSemantics, directionLabel, potentialKpiDuplicateGroups } from "@/lib/kpis/semantics";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -47,8 +48,9 @@ function latestByMetric(rows: KpiRow[]) {
   const latest = new Map<string, KpiRow>();
 
   for (const row of rows) {
-    if (!latest.has(row.name)) {
-      latest.set(row.name, row);
+    const key = row.name.trim().toLowerCase();
+    if (!latest.has(key)) {
+      latest.set(key, row);
     }
   }
 
@@ -56,11 +58,15 @@ function latestByMetric(rows: KpiRow[]) {
 }
 
 function metricNames(rows: KpiRow[], settings: KpiSettingRow[]) {
-  const names = new Set<string>(getConfiguredMetricNames(rows, settings, true));
+  const names = new Map<string, string>();
 
-  settings.forEach((setting) => names.add(setting.kpi_name));
+  getConfiguredMetricNames(rows, settings, true).forEach((name) => names.set(name.trim().toLowerCase(), name));
+  settings.forEach((setting) => {
+    const normalized = setting.kpi_name.trim().toLowerCase();
+    if (normalized && !names.has(normalized)) names.set(normalized, setting.kpi_name);
+  });
 
-  return [...names].sort((a, b) => a.localeCompare(b));
+  return [...names.values()].sort((a, b) => a.localeCompare(b));
 }
 
 function KpiSettingCard({
@@ -87,6 +93,15 @@ function KpiSettingCard({
   const xAxisLabel = setting?.x_axis_label ?? "Date";
   const yAxisLabel = setting?.y_axis_label ?? metric;
   const preferredChartType = setting?.preferred_chart_type ?? "line";
+  const semanticFallback = deterministicKpiSemantics(metric);
+  const canonicalName = setting?.canonical_name ?? semanticFallback.canonicalName;
+  const displayName = setting?.display_name ?? metric;
+  const desiredDirection = setting?.desired_direction !== "unknown" ? setting?.desired_direction : semanticFallback.desiredDirection;
+  const targetBehavior = setting?.target_behavior !== "unknown" ? setting?.target_behavior : semanticFallback.targetBehavior;
+  const semanticUnit = setting?.semantic_unit ?? semanticFallback.unit ?? "";
+  const aggregationBasis = setting?.aggregation_basis ?? "";
+  const periodBasis = setting?.period_basis ?? "";
+  const metricRole = setting?.metric_role ?? semanticFallback.metricRole;
   const lowContrastWarning = kpiColorMayBeLowContrast(color);
 
   return (
@@ -115,6 +130,7 @@ function KpiSettingCard({
         <form action={updateKpiSettingAction} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="return_path" value="/app/kpis/settings" />
           <input type="hidden" name="kpi_name" value={metric} />
+          <input type="hidden" name="semantic_update" value="true" />
           <label className="block text-sm font-medium">
             Target
             <input
@@ -145,6 +161,66 @@ function KpiSettingCard({
               className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent"
             />
           </label>
+          <label className="block text-sm font-medium">
+            Display name
+            <input name="display_name" defaultValue={displayName} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+          </label>
+          <label className="block text-sm font-medium">
+            Canonical identity
+            <input name="canonical_name" defaultValue={canonicalName} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+          </label>
+          <label className="block text-sm font-medium">
+            Desired direction
+            <select name="desired_direction" defaultValue={desiredDirection} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent">
+              <option value="unknown">Direction confirmation needed</option>
+              <option value="maximize">Higher is better</option>
+              <option value="minimize">Lower is better</option>
+              <option value="target_range">Target range</option>
+              <option value="exact_target">Exact target</option>
+              <option value="maintain">Maintain stability</option>
+            </select>
+            <span className="mt-1 block text-xs text-slate-400">{directionLabel(desiredDirection as Parameters<typeof directionLabel>[0])}</span>
+          </label>
+          <label className="block text-sm font-medium">
+            Target behavior
+            <select name="target_behavior" defaultValue={targetBehavior} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent">
+              <option value="unknown">Unknown</option>
+              <option value="minimum_goal">Minimum goal</option>
+              <option value="maximum_limit">Maximum acceptable limit</option>
+              <option value="acceptable_range">Acceptable range</option>
+              <option value="exact_threshold">Exact threshold</option>
+              <option value="stability_goal">Stability goal</option>
+            </select>
+          </label>
+          <label className="block text-sm font-medium">
+            Semantic unit
+            <input name="semantic_unit" defaultValue={semanticUnit} placeholder="currency, percent, minutes, count" className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+          </label>
+          <label className="block text-sm font-medium">
+            Metric role
+            <select name="metric_role" defaultValue={metricRole} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent">
+              <option value="actual">Actual measurement</option>
+              <option value="target">Target series</option>
+              <option value="benchmark">Benchmark</option>
+              <option value="unknown">Needs confirmation</option>
+            </select>
+          </label>
+          <label className="block text-sm font-medium">
+            Aggregation basis
+            <input name="aggregation_basis" defaultValue={aggregationBasis} placeholder="sum, average, latest, rate" className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+          </label>
+          <label className="block text-sm font-medium">
+            Reporting cadence
+            <input name="period_basis" defaultValue={periodBasis} placeholder="daily, weekly, monthly" className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+          </label>
+          <label className="block text-sm font-medium">
+            Theoretical ideal or exact value
+            <input name="ideal_value" type="number" step="any" defaultValue={formatNumber(setting?.ideal_value ?? semanticFallback.idealValue)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+          </label>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm font-medium">Ideal range minimum<input name="ideal_range_min" type="number" step="any" defaultValue={formatNumber(setting?.ideal_range_min)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" /></label>
+            <label className="block text-sm font-medium">Ideal range maximum<input name="ideal_range_max" type="number" step="any" defaultValue={formatNumber(setting?.ideal_range_max)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" /></label>
+          </div>
           <label className="block text-sm font-medium">
             Sort order
             <input
@@ -301,6 +377,7 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
   const settings = (settingsResult.data || []) as KpiSettingRow[];
   const latest = latestByMetric(kpis);
   const names = metricNames(kpis, settings);
+  const duplicateGroups = potentialKpiDuplicateGroups(names, settings);
 
   return (
     <div className="space-y-6">
@@ -328,6 +405,17 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
       <ErrorNotice message={params?.error || kpiResult.error?.message || settingsResult.error?.message || sourceParentResult.error?.message} />
       <SuccessNotice message={params?.message} />
 
+      {duplicateGroups.length ? (
+        <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 p-4 text-sm leading-6 text-amber-100">
+          <p className="font-semibold">Potential KPI aliases need review</p>
+          {duplicateGroups.map((group) => (
+            <p key={`${group.canonicalName}-${group.labels.join("-")}`} className="mt-1">
+              {group.labels.join(", ")}{group.requiresScaleReview ? " use different scales and will remain separate until confirmed." : " may be aliases; no history was merged."}
+            </p>
+          ))}
+        </div>
+      ) : null}
+
       {!canManage ? (
         <div className="rounded-lg border border-amber-400/35 bg-amber-950/30 p-3 text-sm leading-6 text-amber-100">
           KPI settings are read-only for your role. Ask a workspace owner or admin to change targets, weights, colors, definitions, or visibility.
@@ -350,7 +438,7 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
               key={metric}
               metric={metric}
               setting={kpiSettingForName(settings, metric)}
-              latest={latest.get(metric)}
+              latest={latest.get(metric.trim().toLowerCase())}
               canManage={canManage}
             />
           ))}

@@ -4,8 +4,21 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
+import {
+  classifyAndPersistKpiSemantics,
+  KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE
+} from "@/lib/ai/kpi-semantics/service";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
+import {
+  deterministicKpiSemantics,
+  KPI_DESIRED_DIRECTIONS,
+  KPI_SEMANTIC_VERSION,
+  KPI_TARGET_BEHAVIORS,
+  validateKpiSemanticSelection,
+  type KpiDesiredDirection,
+  type KpiTargetBehavior
+} from "@/lib/kpis/semantics";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -138,6 +151,12 @@ async function requireWorkspace(path: string) {
     workspaceId: context.activeWorkspace.id,
     membership: context.membership
   };
+}
+
+function requireKpiSettingsAdministrator(path: string, role: string) {
+  if (role !== "owner" && role !== "admin") {
+    redirectWithError(path, "Only workspace owners and administrators can change KPI settings.");
+  }
 }
 
 function formSchemaFromLines(fieldLines: string): Json {
@@ -278,7 +297,7 @@ export async function runChecklistAction(formData: FormData) {
 
 export async function createKpiAction(formData: FormData) {
   const path = "/app/kpis";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
   const name = text(formData, "name");
   const category = text(formData, "category");
   const owner = text(formData, "owner");
@@ -306,6 +325,10 @@ export async function createKpiAction(formData: FormData) {
 
   if (error) {
     redirectWithError(path, error.message);
+  }
+
+  if (membership.role === "owner" || membership.role === "admin") {
+    await classifyAndPersistKpiSemantics({ supabase, workspaceId, userId: user.id, label: name, category, definition: notes || null });
   }
 
   revalidatePath(path);
@@ -375,6 +398,10 @@ export async function updateKpiAction(formData: FormData) {
 
   if (!data) {
     redirectWithError(path, "KPI not found, or you do not have permission to edit it.");
+  }
+
+  if (membership.role === "owner" || membership.role === "admin") {
+    await classifyAndPersistKpiSemantics({ supabase, workspaceId, userId: user.id, label: name, category, definition: notes || null });
   }
 
   revalidatePath(path);
@@ -454,6 +481,7 @@ export async function updateKpiValueAction(formData: FormData) {
 export async function updateKpiSettingAction(formData: FormData) {
   const path = returnPath(formData, "/app/kpis/settings");
   const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
+  requireKpiSettingsAdministrator(path, membership.role);
   const kpiName = text(formData, "kpi_name");
   const category = text(formData, "category");
   const definition = text(formData, "definition");
@@ -463,6 +491,18 @@ export async function updateKpiSettingAction(formData: FormData) {
   const xAxisLabel = text(formData, "x_axis_label");
   const yAxisLabel = text(formData, "y_axis_label");
   const preferredChartType = text(formData, "preferred_chart_type") || "line";
+  const canonicalName = text(formData, "canonical_name");
+  const displayName = text(formData, "display_name");
+  const desiredDirection = text(formData, "desired_direction") || "unknown";
+  const targetBehavior = text(formData, "target_behavior") || "unknown";
+  const semanticUnit = text(formData, "semantic_unit");
+  const aggregationBasis = text(formData, "aggregation_basis");
+  const periodBasis = text(formData, "period_basis");
+  const metricRole = text(formData, "metric_role") || "actual";
+  const idealValue = optionalNumber(path, "Ideal value", text(formData, "ideal_value"));
+  const idealRangeMin = optionalNumber(path, "Ideal range minimum", text(formData, "ideal_range_min"));
+  const idealRangeMax = optionalNumber(path, "Ideal range maximum", text(formData, "ideal_range_max"));
+  const semanticUpdate = bool(formData, "semantic_update");
   const color = approvedKpiColor(text(formData, "color"));
   const target = optionalNumber(path, "Target", text(formData, "target"));
   const weight = optionalNumber(path, "Weight", text(formData, "weight")) ?? 1;
@@ -476,6 +516,11 @@ export async function updateKpiSettingAction(formData: FormData) {
   validateLength(path, "Value format", valueFormat, 80);
   validateLength(path, "X-axis label", xAxisLabel, 80);
   validateLength(path, "Y-axis label", yAxisLabel, 80);
+  validateLength(path, "Canonical name", canonicalName, 160);
+  validateLength(path, "Display name", displayName, 160);
+  validateLength(path, "Semantic unit", semanticUnit, 80);
+  validateLength(path, "Aggregation basis", aggregationBasis, 120);
+  validateLength(path, "Period basis", periodBasis, 120);
 
   if (!KPI_COLOR_PALETTE.some((item) => item.value === color)) {
     redirectWithError(path, "Choose an approved KPI color.");
@@ -487,6 +532,121 @@ export async function updateKpiSettingAction(formData: FormData) {
 
   if (!["line", "bar", "mixed"].includes(preferredChartType)) {
     redirectWithError(path, "Choose line, bar, or mixed as the chart type.");
+  }
+  if (!KPI_DESIRED_DIRECTIONS.includes(desiredDirection as (typeof KPI_DESIRED_DIRECTIONS)[number])) {
+    redirectWithError(path, "Choose a supported KPI direction.");
+  }
+  if (!KPI_TARGET_BEHAVIORS.includes(targetBehavior as (typeof KPI_TARGET_BEHAVIORS)[number])) {
+    redirectWithError(path, "Choose a supported target behavior.");
+  }
+  if (!["actual", "target", "benchmark", "unknown"].includes(metricRole)) {
+    redirectWithError(path, "Choose a supported metric role.");
+  }
+  if (idealRangeMin !== null && idealRangeMax !== null && idealRangeMin > idealRangeMax) {
+    redirectWithError(path, "Ideal range minimum cannot exceed the maximum.");
+  }
+
+  const existingResult = await supabase
+    .from("kpi_settings")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("kpi_name", kpiName)
+    .limit(1)
+    .maybeSingle();
+  if (existingResult.error) {
+    redirectWithError(path, existingResult.error.message);
+  }
+  const existing = existingResult.data;
+  const deterministic = deterministicKpiSemantics(kpiName);
+
+  let semanticValues = existing
+    ? {
+        canonical_name: existing.canonical_name,
+        display_name: existing.display_name,
+        original_source_label: existing.original_source_label,
+        semantic_unit: existing.semantic_unit,
+        aggregation_basis: existing.aggregation_basis,
+        period_basis: existing.period_basis,
+        desired_direction: existing.desired_direction,
+        target_behavior: existing.target_behavior,
+        ideal_value: existing.ideal_value,
+        ideal_range_min: existing.ideal_range_min,
+        ideal_range_max: existing.ideal_range_max,
+        metric_role: existing.metric_role,
+        classification_source: existing.classification_source,
+        classification_confidence: existing.classification_confidence,
+        classification_version: existing.classification_version,
+        classification_rationale: existing.classification_rationale,
+        classification_confirmed: existing.classification_confirmed
+      }
+    : {
+        canonical_name: deterministic.canonicalName,
+        display_name: deterministic.displayName,
+        original_source_label: deterministic.originalSourceLabel,
+        semantic_unit: deterministic.unit,
+        aggregation_basis: null,
+        period_basis: null,
+        desired_direction: deterministic.desiredDirection,
+        target_behavior: deterministic.targetBehavior,
+        ideal_value: deterministic.idealValue,
+        ideal_range_min: deterministic.idealRangeMin,
+        ideal_range_max: deterministic.idealRangeMax,
+        metric_role: deterministic.metricRole,
+        classification_source: deterministic.classificationSource,
+        classification_confidence: deterministic.classificationConfidence,
+        classification_version: KPI_SEMANTIC_VERSION,
+        classification_rationale: deterministic.rationale,
+        classification_confirmed: false
+      };
+
+  if (semanticUpdate) {
+    const selection = validateKpiSemanticSelection({
+      desiredDirection: desiredDirection as KpiDesiredDirection,
+      targetBehavior: targetBehavior as KpiTargetBehavior,
+      idealValue,
+      idealRangeMin,
+      idealRangeMax
+    });
+    if (!selection.ok) redirectWithError(path, selection.reason);
+
+    const unchangedConfirmedSelection = Boolean(
+      existing?.classification_confirmed
+      && existing.desired_direction === desiredDirection
+      && existing.target_behavior === targetBehavior
+      && existing.ideal_value === idealValue
+      && existing.ideal_range_min === idealRangeMin
+      && existing.ideal_range_max === idealRangeMax
+      && (existing.canonical_name || "") === canonicalName
+      && (existing.display_name || kpiName) === (displayName || kpiName)
+      && (existing.semantic_unit || "") === semanticUnit
+      && (existing.aggregation_basis || "") === aggregationBasis
+      && (existing.period_basis || "") === periodBasis
+      && existing.metric_role === metricRole
+    );
+
+    semanticValues = {
+      canonical_name: canonicalName || deterministic.canonicalName,
+      display_name: displayName || kpiName,
+      original_source_label: kpiName,
+      semantic_unit: semanticUnit || null,
+      aggregation_basis: aggregationBasis || null,
+      period_basis: periodBasis || null,
+      desired_direction: desiredDirection as KpiDesiredDirection,
+      target_behavior: targetBehavior as KpiTargetBehavior,
+      ideal_value: idealValue,
+      ideal_range_min: idealRangeMin,
+      ideal_range_max: idealRangeMax,
+      metric_role: metricRole as "actual" | "target" | "benchmark" | "unknown",
+      classification_source: unchangedConfirmedSelection ? existing!.classification_source : "user",
+      classification_confidence: unchangedConfirmedSelection ? existing!.classification_confidence : desiredDirection === "unknown" ? null : 1,
+      classification_version: unchangedConfirmedSelection ? existing!.classification_version : KPI_SEMANTIC_VERSION,
+      classification_rationale: unchangedConfirmedSelection
+        ? existing!.classification_rationale
+        : desiredDirection === "unknown"
+          ? "Left unconfirmed by an authorized workspace administrator."
+          : "Confirmed manually in KPI performance settings by an authorized workspace administrator.",
+      classification_confirmed: unchangedConfirmedSelection ? true : desiredDirection !== "unknown"
+    };
   }
 
   try {
@@ -531,6 +691,7 @@ export async function updateKpiSettingAction(formData: FormData) {
       x_axis_label: xAxisLabel || null,
       y_axis_label: yAxisLabel || null,
       preferred_chart_type: preferredChartType,
+      ...semanticValues,
       created_by: user.id
     },
     { onConflict: "workspace_id,kpi_name" }
@@ -557,6 +718,144 @@ export async function updateKpiSettingAction(formData: FormData) {
   }
 
   redirectWithMessage(path, "KPI settings updated.");
+}
+
+export async function requestKpiSemanticSuggestionAction(formData: FormData) {
+  const path = returnPath(formData, "/app/kpis");
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
+  requireKpiSettingsAdministrator(path, membership.role);
+  const kpiName = text(formData, "kpi_name");
+  requireValue(path, "KPI name", kpiName);
+
+  const [settingResult, kpiResult] = await Promise.all([
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).eq("kpi_name", kpiName).limit(1).maybeSingle(),
+    supabase
+      .from("kpis")
+      .select("category")
+      .eq("workspace_id", workspaceId)
+      .eq("name", kpiName)
+      .is("archived_at", null)
+      .is("deleted_at", null)
+      .order("metric_date", { ascending: false })
+      .limit(1)
+      .maybeSingle()
+  ]);
+  if (settingResult.error || kpiResult.error) {
+    redirectWithError(path, settingResult.error?.message || kpiResult.error?.message || "KPI context could not be loaded.");
+  }
+  if (!settingResult.data && !kpiResult.data) {
+    redirectWithError(path, "KPI not found, or you do not have permission to review it.");
+  }
+
+  try {
+    await requireToolExecution(
+      { supabase, workspaceId, userId: user.id, userRole: membership.role },
+      {
+        toolName: "update_kpi_settings",
+        args: { kpiName },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: settingResult.data?.id || null,
+        metadata: { source: "kpi_semantic_suggestion_request" } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "KPI semantic review was blocked by Vaeroex security policy.");
+  }
+
+  const result = await classifyAndPersistKpiSemantics({
+    supabase,
+    workspaceId,
+    userId: user.id,
+    label: kpiName,
+    category: settingResult.data?.category || kpiResult.data?.category || null,
+    definition: settingResult.data?.definition || null,
+    requestLuna: true
+  });
+  if (result.status === "failed" || result.status === "disabled") {
+    redirectWithError(path, result.status === "disabled" ? result.reason : "A KPI direction suggestion could not be prepared safely.");
+  }
+
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/kpis/settings");
+  redirectWithMessage(
+    path,
+    result.status === "already_confirmed"
+      ? "KPI direction is already confirmed."
+      : result.status === "existing_suggestion"
+        ? "The existing Luna suggestion is ready for review."
+        : "Luna suggestion is ready for review."
+  );
+}
+
+export async function acceptKpiSemanticSuggestionAction(formData: FormData) {
+  const path = returnPath(formData, "/app/kpis");
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
+  requireKpiSettingsAdministrator(path, membership.role);
+  const kpiName = text(formData, "kpi_name");
+  requireValue(path, "KPI name", kpiName);
+
+  const settingResult = await supabase
+    .from("kpi_settings")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .eq("kpi_name", kpiName)
+    .limit(1)
+    .maybeSingle();
+  const setting = settingResult.data;
+  if (settingResult.error || !setting) {
+    redirectWithError(path, settingResult.error?.message || "The KPI suggestion is no longer available.");
+  }
+  if (setting.classification_source !== "luna" || setting.classification_confirmed) {
+    redirectWithError(path, "Only a current unconfirmed Luna suggestion can be accepted.");
+  }
+  if ((setting.classification_confidence ?? 0) < KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE || setting.desired_direction === "unknown") {
+    redirectWithError(path, "This suggestion needs manual confirmation instead of one-click acceptance.");
+  }
+  const selection = validateKpiSemanticSelection({
+    desiredDirection: setting.desired_direction as KpiDesiredDirection,
+    targetBehavior: setting.target_behavior as KpiTargetBehavior,
+    idealValue: setting.ideal_value,
+    idealRangeMin: setting.ideal_range_min,
+    idealRangeMax: setting.ideal_range_max
+  });
+  if (!selection.ok) redirectWithError(path, selection.reason);
+
+  try {
+    await requireToolExecution(
+      { supabase, workspaceId, userId: user.id, userRole: membership.role },
+      {
+        toolName: "update_kpi_settings",
+        args: { kpiName },
+        initiatedBy: "user",
+        confirmationReceived: true,
+        targetRecordId: setting.id,
+        metadata: { source: "kpi_semantic_suggestion_acceptance" } satisfies Json
+      }
+    );
+  } catch (error) {
+    redirectWithError(path, error instanceof Error ? error.message : "KPI semantic confirmation was blocked by Vaeroex security policy.");
+  }
+
+  const accepted = await supabase
+    .from("kpi_settings")
+    .update({ classification_confirmed: true })
+    .eq("id", setting.id)
+    .eq("workspace_id", workspaceId)
+    .eq("classification_source", "luna")
+    .eq("classification_confirmed", false)
+    .select("id")
+    .maybeSingle();
+  if (accepted.error || !accepted.data) {
+    redirectWithError(path, accepted.error?.message || "The KPI suggestion changed before it could be accepted.");
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/kpis/settings");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/reports");
+  redirectWithMessage(path, "KPI performance direction confirmed.");
 }
 
 export async function deleteKpiAction(formData: FormData) {

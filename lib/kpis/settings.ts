@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/types";
+import { resolveKpiSemantics } from "@/lib/kpis/semantics";
 
 export type KpiSettingRow = Database["public"]["Tables"]["kpi_settings"]["Row"];
 
@@ -34,6 +35,10 @@ export function kpiSettingsByName(settings: KpiSettingRow[]) {
 
 export function kpiSettingForName(settings: KpiSettingRow[], name: string | null | undefined) {
   return kpiSettingsByName(settings).get(normalizeKpiName(name));
+}
+
+export function kpiSemantics(name: string, settings: KpiSettingRow[]) {
+  return resolveKpiSemantics(name, kpiSettingForName(settings, name));
 }
 
 export function kpiColor(name: string, settings: KpiSettingRow[], fallbackIndex = 0): string {
@@ -90,7 +95,12 @@ export function kpiColorMayBeLowContrast(value: string | null | undefined) {
 }
 
 export function getConfiguredMetricNames<T extends { name: string }>(rows: T[], settings: KpiSettingRow[], includeHidden = false) {
-  const names = Array.from(new Set(rows.map((row) => row.name).filter(Boolean)));
+  const namesByNormalizedLabel = new Map<string, string>();
+  for (const row of rows) {
+    const normalized = normalizeKpiName(row.name);
+    if (normalized && !namesByNormalizedLabel.has(normalized)) namesByNormalizedLabel.set(normalized, row.name);
+  }
+  const names = [...namesByNormalizedLabel.values()];
 
   return names
     .filter((name) => includeHidden || isKpiVisible(name, settings))

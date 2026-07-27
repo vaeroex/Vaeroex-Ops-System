@@ -1,0 +1,222 @@
+const assert = require("assert");
+const fs = require("fs");
+const Module = require("module");
+const path = require("path");
+const ts = require("typescript");
+
+const root = path.resolve(__dirname, "..");
+
+function loadTypescriptModule(relativePath) {
+  const file = path.join(root, relativePath);
+  const source = fs.readFileSync(file, "utf8");
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
+    fileName: file
+  }).outputText;
+  const loaded = new Module(file, module);
+  loaded.filename = file;
+  loaded.paths = module.paths;
+  loaded._compile(output, file);
+  return loaded.exports;
+}
+
+const semantics = loadTypescriptModule("lib/kpis/semantics.ts");
+
+function configured(label, direction, extras = {}) {
+  return {
+    ...semantics.deterministicKpiSemantics(label),
+    desiredDirection: direction,
+    targetBehavior: "unknown",
+    ...extras
+  };
+}
+
+function evaluate(values, semantic, target = null) {
+  return semantics.evaluateKpiPerformance({
+    observations: values.map((actual_value) => ({ actual_value })),
+    semantics: semantic,
+    target
+  });
+}
+
+assert.equal(evaluate([10, 12], configured("Sales", "maximize")).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([12, 10], configured("Sales", "maximize")).latestPerformanceEffect, "unfavorable");
+assert.equal(evaluate([10, 12], configured("Defects", "minimize")).latestPerformanceEffect, "unfavorable");
+assert.equal(evaluate([12, 10], configured("Defects", "minimize")).latestPerformanceEffect, "favorable");
+
+const oneStar = semantics.deterministicKpiSemantics("1-Star Reviews");
+assert.equal(oneStar.desiredDirection, "minimize");
+assert.equal(oneStar.idealValue, 0);
+
+const targetRange = configured("Staff Utilization", "target_range", { idealRangeMin: 70, idealRangeMax: 85 });
+assert.equal(evaluate([60, 75], targetRange).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([75, 92], targetRange).latestPerformanceEffect, "unfavorable");
+assert.equal(evaluate([75], targetRange).targetStatus, "within_range");
+
+const exact = configured("Inventory variance", "exact_target");
+assert.equal(evaluate([20, 12], exact, 10).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([20, 12], exact, 10).targetStatus, "moving_toward_target");
+
+const unknown = semantics.deterministicKpiSemantics("Staff Utilization");
+assert.equal(unknown.desiredDirection, "unknown");
+assert.equal(evaluate([70, 80], unknown, 85).latestPerformanceEffect, "indeterminate");
+assert.equal(evaluate([70, 80], unknown, 85).targetStatus, "direction_unknown");
+
+function semanticSetting(overrides = {}) {
+  return {
+    canonical_name: "one_star_reviews",
+    display_name: "1-Star Reviews",
+    original_source_label: "1-Star Reviews",
+    semantic_unit: "count",
+    semantic_scale: 1,
+    aggregation_basis: null,
+    period_basis: null,
+    desired_direction: "minimize",
+    target_behavior: "maximum_limit",
+    ideal_value: 0,
+    ideal_range_min: null,
+    ideal_range_max: null,
+    metric_role: "actual",
+    definition: null,
+    classification_source: "luna",
+    classification_confidence: 0.97,
+    classification_confirmed: false,
+    classification_rationale: "Lower one-star review counts generally indicate fewer severe customer complaints.",
+    ...overrides
+  };
+}
+
+const advisoryLuna = semantics.resolveKpiSemantics("1-Star Reviews", semanticSetting());
+assert.equal(advisoryLuna.desiredDirection, "unknown", "An unconfirmed Luna proposal must remain advisory.");
+assert.equal(advisoryLuna.classificationConfidence, 0.97, "Advisory confidence remains visible for review.");
+const confirmedLuna = semantics.resolveKpiSemantics("1-Star Reviews", semanticSetting({ classification_confirmed: true }));
+assert.equal(confirmedLuna.desiredDirection, "minimize");
+assert.equal(evaluate([42, 37], confirmedLuna, 21).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([21, 25, 29, 34, 42, 37], confirmedLuna, 21).selectedRangeTrend, "unfavorable");
+
+assert.deepEqual(semantics.validateKpiSemanticSelection({
+  desiredDirection: "target_range",
+  targetBehavior: "acceptable_range",
+  idealValue: null,
+  idealRangeMin: 70,
+  idealRangeMax: 85
+}), { ok: true });
+assert.equal(semantics.validateKpiSemanticSelection({
+  desiredDirection: "target_range",
+  targetBehavior: "acceptable_range",
+  idealValue: null,
+  idealRangeMin: 90,
+  idealRangeMax: 80
+}).ok, false);
+assert.equal(semantics.validateKpiSemanticSelection({
+  desiredDirection: "exact_target",
+  targetBehavior: "exact_threshold",
+  idealValue: null,
+  idealRangeMin: null,
+  idealRangeMax: null
+}).ok, false);
+assert.equal(semantics.validateKpiSemanticSelection({
+  desiredDirection: "unknown",
+  targetBehavior: "unknown",
+  idealValue: 0,
+  idealRangeMin: null,
+  idealRangeMax: null
+}).ok, false);
+
+const recentRecovery = evaluate([10, 20, 15], configured("Wait time", "minimize"));
+assert.equal(recentRecovery.latestPerformanceEffect, "favorable");
+assert.equal(recentRecovery.selectedRangeTrend, "unfavorable");
+const recentPullback = evaluate([10, 20, 15], configured("Revenue", "maximize"));
+assert.equal(recentPullback.latestPerformanceEffect, "unfavorable");
+assert.equal(recentPullback.selectedRangeTrend, "favorable");
+
+const minimizeRecommendation = semantics.recommendKpiTarget({
+  observations: [10, 9, 8, 8].map((actual_value) => ({ actual_value })),
+  semantics: oneStar
+});
+assert.ok(minimizeRecommendation.value <= 8, "Minimize recommendation must not exceed the latest value.");
+assert.ok(minimizeRecommendation.value >= 0, "Theoretical ideal zero must remain a floor, not force a negative target.");
+
+const maximizeRecommendation = semantics.recommendKpiTarget({
+  observations: [100, 105, 110, 108].map((actual_value) => ({ actual_value })),
+  semantics: semantics.deterministicKpiSemantics("Revenue")
+});
+assert.ok(maximizeRecommendation.value >= 108, "Maximize recommendation must not be below the latest value.");
+assert.equal(semantics.recommendKpiTarget({ observations: [1, 2, 3].map((actual_value) => ({ actual_value })), semantics: unknown }).value, null);
+
+const revenue = semantics.deterministicKpiSemantics("Revenue");
+const lowercaseRevenue = semantics.deterministicKpiSemantics("revenue");
+const millionRevenue = semantics.deterministicKpiSemantics("Revenue ($M)");
+const targetRevenue = semantics.deterministicKpiSemantics("Target Revenue");
+assert.equal(revenue.canonicalName, lowercaseRevenue.canonicalName);
+assert.equal(millionRevenue.canonicalName, revenue.canonicalName);
+assert.equal(millionRevenue.scale, 1_000_000);
+assert.equal(targetRevenue.metricRole, "target");
+assert.notEqual(targetRevenue.canonicalName, revenue.canonicalName);
+
+const duplicateGroups = semantics.potentialKpiDuplicateGroups(["Revenue", "revenue", "Revenue ($M)", "Target Revenue"], []);
+assert.equal(duplicateGroups.length, 1);
+assert.equal(duplicateGroups[0].requiresScaleReview, true);
+assert.ok(!duplicateGroups[0].labels.includes("Target Revenue"));
+
+const operationsActions = fs.readFileSync(path.join(root, "app/app/operations/actions.ts"), "utf8");
+const fileActions = fs.readFileSync(path.join(root, "app/app/files/actions.ts"), "utf8");
+const lifecycleService = fs.readFileSync(path.join(root, "lib/ai/kpi-semantics/service.ts"), "utf8");
+const classificationContract = fs.readFileSync(path.join(root, "lib/ai/kpi-semantics/contracts.ts"), "utf8");
+const kpiPage = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8");
+const performanceFields = fs.readFileSync(path.join(root, "components/kpis/KpiPerformanceMeaningFields.tsx"), "utf8");
+const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
+const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
+const prestige = fs.readFileSync(path.join(root, "lib/intelligence/prestige.ts"), "utf8");
+const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607270002_kpi_semantic_direction.sql"), "utf8");
+
+assert.match(operationsActions, /classifyAndPersistKpiSemantics/);
+assert.doesNotMatch(lifecycleService, /gpt-5\.6-sol/i);
+assert.match(lifecycleService, /KPI_SEMANTIC_CLASSIFICATION_LUNA_MODEL/);
+assert.match(lifecycleService, /ACCEPTANCE_CONFIDENCE = 0\.92/);
+assert.match(lifecycleService, /classification_confirmed/);
+assert.match(lifecycleService, /requestLuna = false/);
+assert.match(lifecycleService, /requestLuna \? "explicit_user_request" : "kpi_lifecycle"/);
+assert.match(lifecycleService, /status: "suggested"/);
+assert.match(lifecycleService, /status: "existing_suggestion"/);
+assert.doesNotMatch(lifecycleService, /proposal\.confidence >= KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE[^\n]+\? proposal : null/);
+assert.match(lifecycleService, /\.eq\("workspace_id", workspaceId\)/);
+assert.match(classificationContract, /targetBehaviorForDirection/);
+assert.match(overview, /evaluateKpiPerformance/);
+assert.match(kpiOverview, /definition: setting\?\.definition\?\.trim\(\) \|\| null/);
+assert.match(kpiOverview, /desired_direction: metric\.desiredDirection/);
+assert.match(prestige, /evaluateKpiPerformance/);
+assert.match(migration, /alter table public\.kpi_settings/);
+assert.doesNotMatch(migration, /\b(delete from|update public\.kpis|drop table|truncate)\b/i);
+assert.doesNotMatch(lifecycleService, /\.from\("kpis"\)\.update/);
+assert.doesNotMatch(lifecycleService, /\btarget\s*:/, "Classification must not write a KPI target.");
+assert.match(operationsActions, /target_change_context/);
+assert.match(operationsActions, /Previous target restored\./);
+assert.match(operationsActions, /export async function requestKpiSemanticSuggestionAction/);
+assert.match(operationsActions, /export async function acceptKpiSemanticSuggestionAction/);
+assert.match(operationsActions, /requireKpiSettingsAdministrator/);
+assert.match(operationsActions, /source: "kpi_semantic_suggestion_request"/);
+assert.match(operationsActions, /source: "kpi_semantic_suggestion_acceptance"/);
+assert.match(operationsActions, /\.eq\("classification_source", "luna"\)/);
+assert.match(operationsActions, /\.eq\("classification_confirmed", false\)/);
+const acceptAction = operationsActions.slice(
+  operationsActions.indexOf("export async function acceptKpiSemanticSuggestionAction"),
+  operationsActions.indexOf("export async function deleteKpiAction")
+);
+assert.doesNotMatch(acceptAction, /\btarget\s*:/, "Suggestion acceptance must not overwrite the manual target.");
+assert.match(kpiPage, /Performance direction is not confirmed\./);
+assert.match(kpiPage, /Accept suggestion/);
+assert.match(kpiPage, /Change manually/);
+assert.match(kpiPage, /Leave unconfirmed/);
+assert.doesNotMatch(kpiPage, /classifyAndPersistKpiSemantics/, "KPI rendering must not invoke Luna.");
+for (const label of ["Performance meaning", "Higher is better", "Lower is better", "Target range", "Exact target", "Maintain stability", "Not determined", "KPI definition"]) {
+  assert.match(performanceFields, new RegExp(label));
+}
+for (const visualField of ["target", "display_unit", "x_axis_label", "y_axis_label", "value_format", "preferred_chart_type", "color"]) {
+  assert.match(kpiPage, new RegExp(`name=\\"${visualField}\\"`), `${visualField} must remain in Chart Settings.`);
+}
+assert.match(fileActions, /persistedSetting\?\.classification_confirmed/);
+assert.match(fileActions, /persistedSetting\?\.classification_source === "luna"/);
+assert.match(fileActions, /persistedSetting\?\.kpi_name \|\| row\.record\.name/);
+
+console.log("KPI semantic direction regressions passed.");

@@ -7,7 +7,8 @@ import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { runStructuredAI } from "@/lib/ai/providers/provider-manager";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
-import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { applyKpiSettingsToRows, kpiSemantics, kpiSettingForName, normalizeKpiName, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { evaluateKpiPerformance, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -29,11 +30,17 @@ export type KpiOverviewIntent = {
 
 export type KpiOverviewMetric = {
   name: string;
+  definition: string | null;
   category: string | null;
   latestValue: number | null;
   target: number | null;
-  status: "on_track" | "near_target" | "needs_attention" | "missing_target" | "missing_value";
-  trend: "improving" | "declining" | "steady" | "not_enough_history";
+  status: "on_track" | "near_target" | "needs_attention" | "missing_target" | "missing_value" | "direction_unknown";
+  trend: "improving" | "declining" | "steady" | "not_enough_history" | "direction_unknown";
+  desiredDirection: string;
+  rawMovement: KpiPerformanceEvaluation["rawMovement"];
+  latestPerformanceEffect: KpiPerformanceEvaluation["latestPerformanceEffect"];
+  selectedRangeTrend: KpiPerformanceEvaluation["selectedRangeTrend"];
+  targetStatus: KpiPerformanceEvaluation["targetStatus"];
   reportingPeriod: string;
   lastUpdated: string;
   freshness: "current" | "stale" | "old";
@@ -117,12 +124,6 @@ function isTimeoutLike(error: unknown) {
   return /timed out|timeout|aborterror|aborted/i.test(`${error instanceof Error ? error.name : ""} ${error instanceof Error ? error.message : ""}`);
 }
 
-function isLowerBetterMetric(name: string) {
-  return /response|reply|resolution|time|duration|cost|expense|spend|burn|churn|complaint|defect|error|incident|issue|backlog|overdue|late|risk|downtime|waste/i.test(
-    name
-  );
-}
-
 function formatMetricValue(value: number | null, metricName = "") {
   if (value === null) return "not recorded";
   const formatter = new Intl.NumberFormat("en-US", {
@@ -137,34 +138,21 @@ function formatMetricValue(value: number | null, metricName = "") {
   return formatted;
 }
 
-function statusForMetric(metricName: string, actual: number | null, target: number | null): KpiOverviewMetric["status"] {
+function statusForEvaluation(actual: number | null, target: number | null, evaluation: KpiPerformanceEvaluation): KpiOverviewMetric["status"] {
   if (actual === null) return "missing_value";
   if (target === null) return "missing_target";
-
-  const lowerBetter = isLowerBetterMetric(metricName);
-  const onTrack = lowerBetter ? actual <= target : actual >= target;
-  const nearTarget = lowerBetter ? actual <= target * 1.1 : actual >= target * 0.9;
-
-  if (onTrack) return "on_track";
-  if (nearTarget) return "near_target";
+  if (evaluation.targetStatus === "direction_unknown") return "direction_unknown";
+  if (evaluation.targetStatus === "achieved" || evaluation.targetStatus === "within_range") return "on_track";
+  if (evaluation.targetStatus === "moving_toward_target") return "near_target";
   return "needs_attention";
 }
 
-function trendForRows(metricName: string, rows: KpiRow[]): KpiOverviewMetric["trend"] {
-  const values = rows.filter((row) => row.actual_value !== null);
-  const latest = values[0]?.actual_value;
-  const previous = values[1]?.actual_value;
-
-  if (latest === null || latest === undefined || previous === null || previous === undefined) {
-    return "not_enough_history";
-  }
-
-  const lowerBetter = isLowerBetterMetric(metricName);
-  const rawDelta = lowerBetter ? previous - latest : latest - previous;
-  const ratio = previous !== 0 ? rawDelta / Math.abs(previous) : rawDelta;
-
-  if (Math.abs(ratio) < 0.03) return "steady";
-  return ratio > 0 ? "improving" : "declining";
+function trendForEvaluation(evaluation: KpiPerformanceEvaluation): KpiOverviewMetric["trend"] {
+  if (evaluation.rawMovement === "insufficient_data") return "not_enough_history";
+  if (evaluation.latestPerformanceEffect === "favorable") return "improving";
+  if (evaluation.latestPerformanceEffect === "unfavorable") return "declining";
+  if (evaluation.latestPerformanceEffect === "neutral") return "steady";
+  return "direction_unknown";
 }
 
 function freshnessForDate(metricDate: string): KpiOverviewMetric["freshness"] {
@@ -224,15 +212,17 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
   for (const row of adjustedRows) {
     const name = row.name.trim();
     if (!name) continue;
-    const existing = groups.get(name) || [];
+    const groupKey = normalizeKpiName(name);
+    const existing = groups.get(groupKey) || [];
     existing.push(row);
-    groups.set(name, existing);
+    groups.set(groupKey, existing);
   }
 
   const metrics = Array.from(groups.entries())
-    .map(([name, metricRows]) => {
+    .map(([, metricRows]) => {
       const rowsByDate = [...metricRows].sort((a, b) => `${b.metric_date}-${b.created_at}`.localeCompare(`${a.metric_date}-${a.created_at}`));
       const latest = rowsByDate[0];
+      const name = latest?.name || "KPI";
       const metricDate = dateOnly(latest?.metric_date);
       const target = latest?.target ?? null;
       const latestValue = latest?.actual_value ?? null;
@@ -241,14 +231,23 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
         actualValue: row.actual_value,
         target: row.target
       }));
+      const semantics = kpiSemantics(name, settings);
+      const setting = kpiSettingForName(settings, name);
+      const evaluation = evaluateKpiPerformance({ observations: [...rowsByDate].reverse(), semantics, target });
 
       return {
         name,
+        definition: setting?.definition?.trim() || null,
         category: latest?.category ?? null,
         latestValue,
         target,
-        status: statusForMetric(name, latestValue, target),
-        trend: trendForRows(name, rowsByDate),
+        status: statusForEvaluation(latestValue, target, evaluation),
+        trend: trendForEvaluation(evaluation),
+        desiredDirection: semantics.desiredDirection,
+        rawMovement: evaluation.rawMovement,
+        latestPerformanceEffect: evaluation.latestPerformanceEffect,
+        selectedRangeTrend: evaluation.selectedRangeTrend,
+        targetStatus: evaluation.targetStatus,
         reportingPeriod: metricDate || "Not dated",
         lastUpdated: dateOnly(latest?.updated_at) || metricDate || dateOnly(latest?.created_at) || "Not recorded",
         freshness: freshnessForDate(metricDate),
@@ -271,7 +270,8 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
     !metrics.length ? "No structured KPI records were found." : "",
     counts.missingTargets ? `${counts.missingTargets} KPI${counts.missingTargets === 1 ? "" : "s"} do not have targets.` : "",
     counts.insufficientHistory ? `${counts.insufficientHistory} KPI${counts.insufficientHistory === 1 ? "" : "s"} need more dated history for trend confidence.` : "",
-    counts.stale ? `${counts.stale} KPI${counts.stale === 1 ? " has" : "s have"} stale or old reporting periods.` : ""
+    counts.stale ? `${counts.stale} KPI${counts.stale === 1 ? " has" : "s have"} stale or old reporting periods.` : "",
+    metrics.some((metric) => metric.status === "direction_unknown") ? "One or more KPIs need direction confirmation before performance can be classified." : ""
   ].filter(Boolean);
   const evidenceUsed = [
     metrics.length ? `Structured KPI records: ${activeRows.length}` : "",
@@ -361,6 +361,7 @@ export function buildDeterministicKpiOverviewOutput(
   const attentionMetrics = summary.metrics.filter((metric) => metric.status === "needs_attention" || metric.status === "missing_value");
   const positiveMetrics = summary.metrics.filter((metric) => metric.status === "on_track" || metric.status === "near_target");
   const trendGaps = summary.metrics.filter((metric) => metric.trend === "not_enough_history");
+  const directionGaps = summary.metrics.filter((metric) => metric.status === "direction_unknown");
   const fallbackPrefix = options.fallbackReason
     ? "I found your current KPI results, but the deeper analysis took longer than expected. "
     : "";
@@ -372,6 +373,8 @@ export function buildDeterministicKpiOverviewOutput(
     directAnswer = `Your KPIs are mixed: ${positiveMetrics.length} look on or near target, and ${attentionMetrics.length} need attention, led by ${compactMetricList(attentionMetrics.slice(0, 3))}.`;
   } else if (attentionMetrics.length) {
     directAnswer = `The KPI picture needs attention: ${attentionMetrics.length} visible metric${attentionMetrics.length === 1 ? "" : "s"} are below target or missing usable values.`;
+  } else if (directionGaps.length) {
+    directAnswer = `${directionGaps.length} KPI${directionGaps.length === 1 ? " needs" : "s need"} direction confirmation before Vaeroex can classify performance.`;
   } else if (summary.counts.missingTargets) {
     directAnswer = `Your KPI values are visible, but missing targets make the performance read directional rather than definitive.`;
   } else {
@@ -381,11 +384,14 @@ export function buildDeterministicKpiOverviewOutput(
   const uncertainty = [
     trendGaps.length ? `${trendGaps.length} KPI${trendGaps.length === 1 ? " has" : "s have"} limited history.` : "",
     summary.counts.stale ? `${summary.counts.stale} KPI${summary.counts.stale === 1 ? " is" : "s are"} stale.` : "",
-    summary.counts.missingTargets ? `${summary.counts.missingTargets} KPI${summary.counts.missingTargets === 1 ? " is" : "s are"} missing targets.` : ""
+    summary.counts.missingTargets ? `${summary.counts.missingTargets} KPI${summary.counts.missingTargets === 1 ? " is" : "s are"} missing targets.` : "",
+    directionGaps.length ? `${directionGaps.length} KPI${directionGaps.length === 1 ? " needs" : "s need"} direction confirmation.` : ""
   ].filter(Boolean);
   const nextReview = attentionMetrics[0]
     ? `Leadership should look first at ${attentionMetrics[0].name} and confirm whether the target, latest value, and reporting period still reflect the business reality.`
-    : summary.counts.missingTargets
+    : directionGaps.length
+      ? "Leadership should confirm KPI direction before treating target or trend language as favorable or unfavorable."
+      : summary.counts.missingTargets
       ? "Leadership should confirm targets for the visible KPIs before treating the performance read as definitive."
       : "Leadership should keep adding dated KPI values so trend confidence continues improving.";
   const responseMarkdown = [
@@ -428,10 +434,16 @@ function compactPromptContext(summary: KpiOverviewSummary) {
     limitations: summary.limitations,
     kpis: summary.metrics.map((metric) => ({
       name: metric.name,
+      definition: metric.definition,
       latest_value: metric.latestValue,
       target: metric.target,
       status: metric.status,
       trend: metric.trend,
+      desired_direction: metric.desiredDirection,
+      raw_movement: metric.rawMovement,
+      latest_performance_effect: metric.latestPerformanceEffect,
+      selected_range_trend: metric.selectedRangeTrend,
+      target_status: metric.targetStatus,
       reporting_period: metric.reportingPeriod,
       freshness: metric.freshness,
       history_count: metric.historyCount,
