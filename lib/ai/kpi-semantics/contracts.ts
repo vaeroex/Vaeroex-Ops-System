@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { KPI_DESIRED_DIRECTIONS, KPI_TARGET_BEHAVIORS } from "@/lib/kpis/semantics";
+import { KPI_DESIRED_DIRECTIONS, KPI_TARGET_BEHAVIORS, targetBehaviorForDirection } from "@/lib/kpis/semantics";
 
 export const KPI_SEMANTIC_CLASSIFICATION_CONTRACT_ID = "kpi_semantic_classification_v1" as const;
 
@@ -55,6 +55,9 @@ export function validateKpiSemanticClassification(value: unknown, sourceLabel: s
   }
   if (!targetLikeLabel && proposal.metricRole === "target" && !/target|goal|budget|benchmark/i.test(sourceLabel)) {
     return { ok: false as const, reason: "The proposed target role is not supported by the source label." };
+  }
+  if (proposal.targetBehavior !== targetBehaviorForDirection(proposal.desiredDirection)) {
+    return { ok: false as const, reason: "The proposed target behavior does not match the proposed direction." };
   }
   return { ok: true as const, value: proposal };
 }
