@@ -29,6 +29,53 @@ export type KpiSemantics = {
 
 const KPI_CLASSIFICATION_SOURCES = ["user", "deterministic", "luna", "migration", "unknown"] as const;
 
+export const KPI_TARGET_BEHAVIOR_BY_DIRECTION: Record<KpiDesiredDirection, KpiTargetBehavior> = {
+  maximize: "minimum_goal",
+  minimize: "maximum_limit",
+  target_range: "acceptable_range",
+  exact_target: "exact_threshold",
+  maintain: "stability_goal",
+  unknown: "unknown"
+};
+
+export function targetBehaviorForDirection(direction: KpiDesiredDirection) {
+  return KPI_TARGET_BEHAVIOR_BY_DIRECTION[direction];
+}
+
+export function validateKpiSemanticSelection({
+  desiredDirection,
+  targetBehavior,
+  idealValue,
+  idealRangeMin,
+  idealRangeMax
+}: {
+  desiredDirection: KpiDesiredDirection;
+  targetBehavior: KpiTargetBehavior;
+  idealValue: number | null;
+  idealRangeMin: number | null;
+  idealRangeMax: number | null;
+}) {
+  if (targetBehavior !== targetBehaviorForDirection(desiredDirection)) {
+    return { ok: false as const, reason: "Target behavior does not match the selected performance direction." };
+  }
+  if (desiredDirection === "target_range") {
+    if (idealRangeMin === null || idealRangeMax === null) {
+      return { ok: false as const, reason: "Target range requires both an acceptable minimum and maximum." };
+    }
+    if (idealRangeMin > idealRangeMax) {
+      return { ok: false as const, reason: "Acceptable minimum cannot exceed the acceptable maximum." };
+    }
+  }
+  if (desiredDirection === "exact_target" && idealValue === null) {
+    return { ok: false as const, reason: "Exact target requires an exact desired value." };
+  }
+  if (desiredDirection === "unknown" && (idealValue !== null || idealRangeMin !== null || idealRangeMax !== null)) {
+    return { ok: false as const, reason: "An unresolved KPI direction cannot define a theoretical ideal or acceptable range." };
+  }
+
+  return { ok: true as const };
+}
+
 export type KpiPerformanceEvaluation = {
   rawMovement: "increased" | "decreased" | "unchanged" | "insufficient_data";
   latestPerformanceEffect: "favorable" | "unfavorable" | "neutral" | "indeterminate";
@@ -249,7 +296,10 @@ export function resolveKpiSemantics(label: string, setting?: KpiSettingRow | nul
     : "unknown";
   const legacyDirection = storedDirection === "unknown" ? legacyDefinitionDirection(setting.definition) : "unknown";
   const resolvedStoredDirection = storedDirection !== "unknown" ? storedDirection : legacyDirection;
-  const hasTrustedStoredClassification = resolvedStoredDirection !== "unknown" || setting.classification_confirmed;
+  const hasTrustedStoredClassification = resolvedStoredDirection !== "unknown" && (setting.classification_confirmed || legacyDirection !== "unknown");
+  const storedClassificationSource = KPI_CLASSIFICATION_SOURCES.includes(setting.classification_source as KpiSemantics["classificationSource"])
+    ? setting.classification_source as KpiSemantics["classificationSource"]
+    : fallback.classificationSource;
 
   return {
     canonicalName: setting.canonical_name?.trim() || fallback.canonicalName,
@@ -257,7 +307,7 @@ export function resolveKpiSemantics(label: string, setting?: KpiSettingRow | nul
     originalSourceLabel: setting.original_source_label?.trim() || fallback.originalSourceLabel,
     unit: setting.semantic_unit || fallback.unit,
     scale: safeNumber(setting.semantic_scale, fallback.scale) || 1,
-    desiredDirection: hasTrustedStoredClassification ? resolvedStoredDirection : fallback.desiredDirection,
+    desiredDirection: hasTrustedStoredClassification ? resolvedStoredDirection : "unknown",
     targetBehavior: hasTrustedStoredClassification && setting.target_behavior !== "unknown" && KPI_TARGET_BEHAVIORS.includes(setting.target_behavior as KpiTargetBehavior)
       ? (setting.target_behavior as KpiTargetBehavior)
       : legacyDirection === "maximize"
@@ -266,17 +316,15 @@ export function resolveKpiSemantics(label: string, setting?: KpiSettingRow | nul
           ? "maximum_limit"
           : legacyDirection === "exact_target"
             ? "exact_threshold"
-            : fallback.targetBehavior,
-    idealValue: safeNumber(setting.ideal_value, fallback.idealValue),
-    idealRangeMin: safeNumber(setting.ideal_range_min, fallback.idealRangeMin),
-    idealRangeMax: safeNumber(setting.ideal_range_max, fallback.idealRangeMax),
+            : "unknown",
+    idealValue: hasTrustedStoredClassification ? safeNumber(setting.ideal_value, fallback.idealValue) : null,
+    idealRangeMin: hasTrustedStoredClassification ? safeNumber(setting.ideal_range_min, fallback.idealRangeMin) : null,
+    idealRangeMax: hasTrustedStoredClassification ? safeNumber(setting.ideal_range_max, fallback.idealRangeMax) : null,
     metricRole: setting.metric_role === "target" || setting.metric_role === "benchmark" || setting.metric_role === "unknown"
       ? setting.metric_role
       : fallback.metricRole,
-    classificationSource: hasTrustedStoredClassification && KPI_CLASSIFICATION_SOURCES.includes(setting.classification_source as KpiSemantics["classificationSource"])
-      ? (legacyDirection !== "unknown" && setting.classification_source === "unknown" ? "user" : setting.classification_source as KpiSemantics["classificationSource"])
-      : fallback.classificationSource,
-    classificationConfidence: hasTrustedStoredClassification ? safeNumber(setting.classification_confidence) : fallback.classificationConfidence,
+    classificationSource: legacyDirection !== "unknown" && setting.classification_source === "unknown" ? "user" : storedClassificationSource,
+    classificationConfidence: safeNumber(setting.classification_confidence, fallback.classificationConfidence),
     classificationConfirmed: setting.classification_confirmed || legacyDirection !== "unknown",
     rationale: legacyDirection !== "unknown" ? "Preserved from an explicit legacy KPI definition." : hasTrustedStoredClassification ? setting.classification_rationale : fallback.rationale
   };
