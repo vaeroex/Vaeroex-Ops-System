@@ -130,6 +130,7 @@ function KpiSettingCard({
         <form action={updateKpiSettingAction} className="grid gap-4 lg:grid-cols-2">
           <input type="hidden" name="return_path" value="/app/kpis/settings" />
           <input type="hidden" name="kpi_name" value={metric} />
+          <input type="hidden" name="semantic_update" value="true" />
           <label className="block text-sm font-medium">
             Target
             <input
