@@ -2,14 +2,11 @@ import Link from "next/link";
 import type { Route } from "next";
 
 const adminLinks: { href: Route; label: string }[] = [
-  { href: "/app/admin", label: "Overview" },
+  { href: "/app/admin", label: "Admin Dashboard" },
   { href: "/app/admin/customers", label: "Customers" },
-  { href: "/app/admin/workspaces", label: "Workspaces" },
-  { href: "/app/admin/workspace-agreements", label: "Workspace agreements" },
-  { href: "/app/admin/subscriptions", label: "Subscriptions" },
-  { href: "/app/admin/ai-usage", label: "Vaeroex usage" },
-  { href: "/app/admin/support-requests", label: "Support requests" },
-  { href: "/app/admin/audit-logs", label: "Audit logs" }
+  { href: "/app/admin/ai-usage", label: "Vaeroex Usage" },
+  { href: "/app/admin/support-requests", label: "Support Requests" },
+  { href: "/app/admin/audit-logs", label: "Audit Logs" }
 ];
 
 export function AdminNav() {

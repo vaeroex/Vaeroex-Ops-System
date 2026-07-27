@@ -36,9 +36,6 @@ const adminNavSection = {
   items: [
     { href: "/app/admin", label: "Admin Dashboard" },
     { href: "/app/admin/customers", label: "Customers" },
-    { href: "/app/admin/workspaces", label: "Workspaces" },
-    { href: "/app/admin/workspace-agreements", label: "Workspace Agreements" },
-    { href: "/app/admin/subscriptions", label: "Subscriptions" },
     { href: "/app/admin/ai-usage", label: "Vaeroex Usage" },
     { href: "/app/admin/support-requests", label: "Support Requests" },
     { href: "/app/admin/audit-logs", label: "Audit Logs" }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { getAdminActionReturnPath, withAdminActionNotice } from "@/lib/admin/action-redirect";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
@@ -19,20 +20,21 @@ type ManualActivationReviewResult = {
   access_granted?: boolean;
 };
 
-async function requireSubscriptionAdmin() {
-  const { admin, user } = await requireVaeroexAdmin("/app/admin/subscriptions");
+async function requireSubscriptionAdmin(returnTo: string) {
+  const { admin, user } = await requireVaeroexAdmin(returnTo);
   return { admin, user };
 }
 
 export async function createManualSubscriptionAction(formData: FormData) {
-  const { admin, user } = await requireSubscriptionAdmin();
+  const returnTo = getAdminActionReturnPath(formData, "/app/admin/subscriptions");
+  const { admin, user } = await requireSubscriptionAdmin(returnTo);
   const email = text(formData, "customer_email").toLowerCase();
   const planSlug = normalizePlanSlug(text(formData, "plan_slug")) || VAEROEX_PLAN_SLUG;
   const status = text(formData, "status") || "active";
   const workspaceId = text(formData, "workspace_id") || null;
 
   if (!email) {
-    redirect("/app/admin/subscriptions?error=Customer email is required.");
+    redirect(withAdminActionNotice(returnTo, "error", "Customer email is required."));
   }
 
   const { data: profile } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
@@ -65,7 +67,7 @@ export async function createManualSubscriptionAction(formData: FormData) {
     : await admin.from("customer_subscriptions").insert(payload);
 
   if (result.error) {
-    redirect(`/app/admin/subscriptions?error=${encodeURIComponent(result.error.message)}`);
+    redirect(withAdminActionNotice(returnTo, "error", result.error.message));
   }
 
   if (effectiveWorkspaceId) {
@@ -100,17 +102,20 @@ export async function createManualSubscriptionAction(formData: FormData) {
   });
 
   revalidatePath("/app/admin/subscriptions");
-  redirect("/app/admin/subscriptions?message=Manual activation saved.");
+  revalidatePath("/app/admin/customers");
+  if (effectiveWorkspaceId) revalidatePath(`/app/admin/customers/${effectiveWorkspaceId}`);
+  redirect(withAdminActionNotice(returnTo, "message", "Manual activation saved."));
 }
 
 export async function updateSubscriptionAction(formData: FormData) {
-  const { admin, user } = await requireSubscriptionAdmin();
+  const returnTo = getAdminActionReturnPath(formData, "/app/admin/subscriptions");
+  const { admin, user } = await requireSubscriptionAdmin(returnTo);
   const id = text(formData, "subscription_id");
   const status = text(formData, "status") || "manual_review";
   const planSlug = normalizePlanSlug(text(formData, "plan_slug")) || VAEROEX_PLAN_SLUG;
 
   if (!id) {
-    redirect("/app/admin/subscriptions?error=Subscription is required.");
+    redirect(withAdminActionNotice(returnTo, "error", "Subscription is required."));
   }
 
   const { data: existing } = await admin
@@ -129,7 +134,7 @@ export async function updateSubscriptionAction(formData: FormData) {
     .eq("id", id);
 
   if (error) {
-    redirect(`/app/admin/subscriptions?error=${encodeURIComponent(error.message)}`);
+    redirect(withAdminActionNotice(returnTo, "error", error.message));
   }
 
   if (existing?.workspace_id) {
@@ -163,17 +168,20 @@ export async function updateSubscriptionAction(formData: FormData) {
   });
 
   revalidatePath("/app/admin/subscriptions");
-  redirect("/app/admin/subscriptions?message=Subscription updated.");
+  revalidatePath("/app/admin/customers");
+  if (existing?.workspace_id) revalidatePath(`/app/admin/customers/${existing.workspace_id}`);
+  redirect(withAdminActionNotice(returnTo, "message", "Subscription updated."));
 }
 
 export async function reviewActivationRequestAction(formData: FormData) {
-  const { admin, user } = await requireSubscriptionAdmin();
+  const returnTo = getAdminActionReturnPath(formData, "/app/admin/subscriptions");
+  const { admin, user } = await requireSubscriptionAdmin(returnTo);
   const requestId = text(formData, "request_id");
   const status = text(formData, "status") || "needs_more_info";
   const allowedStatuses = new Set(["pending", "approved", "denied", "needs_more_info"]);
 
   if (!requestId || !allowedStatuses.has(status)) {
-    redirect("/app/admin/subscriptions?error=Activation request review is invalid.");
+    redirect(withAdminActionNotice(returnTo, "error", "Activation request review is invalid."));
   }
 
   const { data, error } = await admin.rpc("review_manual_activation_request", {
@@ -184,7 +192,7 @@ export async function reviewActivationRequestAction(formData: FormData) {
   });
 
   if (error) {
-    redirect(`/app/admin/subscriptions?error=${encodeURIComponent(error.message)}`);
+    redirect(withAdminActionNotice(returnTo, "error", error.message));
   }
 
   const result = (data && typeof data === "object" && !Array.isArray(data)
@@ -192,7 +200,7 @@ export async function reviewActivationRequestAction(formData: FormData) {
     : {}) as ManualActivationReviewResult;
 
   if (status === "approved" && (!result.access_granted || !result.subscription_id)) {
-    redirect("/app/admin/subscriptions?error=Activation approval did not create an active entitlement.");
+    redirect(withAdminActionNotice(returnTo, "error", "Activation approval did not create an active entitlement."));
   }
 
   await logSecurityAuditEvent({
@@ -215,12 +223,16 @@ export async function reviewActivationRequestAction(formData: FormData) {
   });
 
   revalidatePath("/app/admin/subscriptions");
+  revalidatePath("/app/admin/customers");
+  if (result.workspace_id) revalidatePath(`/app/admin/customers/${result.workspace_id}`);
   revalidatePath("/app/account/subscription");
   revalidatePath("/app/setup");
   revalidatePath("/billing-required");
-  redirect(
+  redirect(withAdminActionNotice(
+    returnTo,
+    "message",
     status === "approved"
-      ? "/app/admin/subscriptions?message=Activation request approved and access granted."
-      : "/app/admin/subscriptions?message=Activation request updated."
-  );
+      ? "Activation request approved and access granted."
+      : "Activation request updated."
+  ));
 }

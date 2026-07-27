@@ -164,6 +164,30 @@ check(storageMigration.includes("public.can_edit_operations"), "Storage delete p
 const adminLayout = read("app/app/admin/layout.tsx");
 check(adminLayout.includes("requireVaeroexAdmin"), "Admin layout must require Vaeroex admin access server-side.");
 
+const redesignedAdminPages = [
+  "app/app/admin/page.tsx",
+  "app/app/admin/customers/page.tsx",
+  "app/app/admin/customers/[workspaceId]/page.tsx",
+  "app/app/admin/workspaces/page.tsx",
+  "app/app/admin/subscriptions/page.tsx"
+];
+for (const file of redesignedAdminPages) {
+  check(read(file).includes('requireVaeroexAdmin("/app")'), `${file} must authorize before every Admin lookup.`);
+}
+
+const adminLifecycleMigration = read("supabase/migrations/202607270001_admin_workspace_lifecycle.sql");
+check(adminLifecycleMigration.includes("alter table public.workspace_admin_lifecycle enable row level security"), "Admin lifecycle storage must enable RLS.");
+check(adminLifecycleMigration.includes("from public, anon, authenticated, service_role"), "Admin lifecycle privileges must start denied for exposed roles.");
+check(adminLifecycleMigration.includes("grant select, insert, update on table public.workspace_admin_lifecycle"), "Admin lifecycle service access must be least privilege.");
+check(!/grant\s+(delete|truncate|references|trigger)[\s\S]+workspace_admin_lifecycle/i.test(adminLifecycleMigration), "Admin lifecycle storage must not grant destructive privileges.");
+check(adminLifecycleMigration.includes("security invoker") && adminLifecycleMigration.includes("set search_path = ''"), "Admin lifecycle transitions and views must preserve caller security with a fixed search path.");
+check(adminLifecycleMigration.includes("for update"), "Admin lifecycle transitions must lock records before changing state.");
+check(adminLifecycleMigration.includes("to service_role") && adminLifecycleMigration.includes("from public, anon, authenticated, service_role"), "Admin lifecycle RPC and views must remain service-role-only.");
+
+const adminLifecycleActions = read("app/app/admin/workspaces/actions.ts");
+check(adminLifecycleActions.includes('rpc("transition_workspace_admin_lifecycle"'), "Workspace archive and restore must use the atomic lifecycle RPC.");
+check(adminLifecycleActions.includes("requireVaeroexAdmin") && adminLifecycleActions.includes("logSecurityAuditEvent"), "Workspace lifecycle actions must authorize and audit server-side.");
+
 const protectedAppLayout = read("app/app/layout.tsx");
 const adminNavigationShell = read("components/app/AppShell.tsx");
 check(

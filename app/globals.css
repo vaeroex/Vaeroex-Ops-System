@@ -94,6 +94,35 @@ button.bg-vaeroex-blue:hover {
   color: #0b1f4d;
 }
 
+.vaeroex-admin-data-row {
+  background-color: transparent;
+  box-shadow: inset 3px 0 0 transparent;
+}
+
+.vaeroex-admin-data-row:hover {
+  background-color: rgba(37, 99, 235, 0.06);
+}
+
+.vaeroex-admin-data-row:focus-within {
+  background-color: rgba(37, 99, 235, 0.09);
+  outline: 2px solid #38bdf8;
+  outline-offset: -2px;
+}
+
+.vaeroex-admin-data-row[aria-selected="true"],
+.vaeroex-admin-data-row[data-selected="true"],
+.vaeroex-admin-data-row[data-active="true"] {
+  background-color: rgba(37, 99, 235, 0.1);
+  box-shadow: inset 3px 0 0 #2563eb;
+  font-weight: 600;
+}
+
+.vaeroex-admin-data-row[aria-disabled="true"],
+.vaeroex-admin-data-row[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
 .vaeroex-public-hero {
   background:
     radial-gradient(circle at 16% 12%, rgba(37, 99, 235, 0.24), transparent 31%),
@@ -182,6 +211,22 @@ button.bg-vaeroex-blue:hover {
 .pulsar .vaeroex-app-shell button:hover,
 .pulsar .vaeroex-app-shell summary:hover {
   color: #f8fafc;
+}
+
+.pulsar .vaeroex-app-shell .vaeroex-admin-data-row:hover {
+  background-color: rgba(8, 47, 73, 0.58);
+}
+
+.pulsar .vaeroex-app-shell .vaeroex-admin-data-row:focus-within {
+  background-color: rgba(12, 74, 110, 0.62);
+  outline-color: #38bdf8;
+}
+
+.pulsar .vaeroex-app-shell .vaeroex-admin-data-row[aria-selected="true"],
+.pulsar .vaeroex-app-shell .vaeroex-admin-data-row[data-selected="true"],
+.pulsar .vaeroex-app-shell .vaeroex-admin-data-row[data-active="true"] {
+  background-color: rgba(12, 74, 110, 0.72);
+  box-shadow: inset 3px 0 0 #38bdf8;
 }
 
 .pulsar .vaeroex-app-shell .hover\:bg-blue-950\/5:hover,

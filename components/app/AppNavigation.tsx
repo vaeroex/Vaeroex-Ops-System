@@ -22,8 +22,8 @@ type AppNavigationProps = {
 };
 
 function isActivePath(pathname: string, href: string) {
-  if (href === "/app") {
-    return pathname === "/app";
+  if (href === "/app" || href === "/app/admin") {
+    return pathname === href;
   }
 
   return pathname === href || pathname.startsWith(`${href}/`);

@@ -26,8 +26,12 @@ const adminDetail = read("app/app/admin/workspace-agreements/[agreementId]/page.
 const adminActions = read("app/app/admin/workspace-agreements/actions.ts");
 const adminPdf = read("app/api/admin/workspace-agreements/[agreementId]/pdf/route.ts");
 const appShell = read("components/app/AppShell.tsx");
+const adminNav = read("components/admin/AdminNav.tsx");
 const adminWorkspaces = read("app/app/admin/workspaces/page.tsx");
 const adminCustomers = read("app/app/admin/customers/page.tsx");
+const adminCompanyTable = read("components/admin/AdminCompanyTable.tsx");
+const adminWorkspaceTable = read("components/admin/AdminWorkspaceQueueTable.tsx");
+const adminCompanyDetail = read("app/app/admin/customers/[workspaceId]/page.tsx");
 const nextConfig = read("next.config.mjs");
 
 assert.equal(exists("components/setup/SetupWizard.tsx"), false, "the multi-step setup wizard must be removed");
@@ -135,13 +139,13 @@ assert.match(customerPdf, /Cache-Control": "private, no-store/, "legal PDF respo
 assert.match(adminPage, /Agreement, workspace, organization, or owner email/, "admin search must cover required agreement identifiers");
 assert.match(adminPage, /type="date"/, "admin search must support signed date");
 assert.match(adminPage, />View agreement<\/Link>/, "every agreement list row must expose a clear detail action");
-assert.match(appShell, /href: "\/app\/admin\/workspace-agreements", label: "Workspace Agreements"/, "the persistent Admin navigation must expose Workspace Agreements");
-for (const [source, surface] of [[adminWorkspaces, "workspace"], [adminCustomers, "customer workspace"]]) {
-  assert.match(source, /from\("workspace_agreements"\)\.select\("id,workspace_id"\)/, `${surface} cards must load retained agreement identities`);
-  assert.match(source, /\/app\/admin\/workspace-agreements\/\$\{agreementId\}/, `${surface} cards must link to the existing secure detail page`);
-  assert.match(source, /View agreement/, `${surface} cards must expose a visible agreement action`);
-  assert.match(source, /No agreement/, `${surface} cards must explicitly identify workspaces without an agreement`);
-}
+assert.doesNotMatch(appShell + adminNav, /href: "\/app\/admin\/workspace-agreements"/, "Workspace Agreements must be managed from customer records instead of primary Admin navigation");
+assert.match(adminWorkspaces, /AdminWorkspaceQueueTable/, "the workspace exception queue must retain agreement status");
+assert.match(adminCustomers, /AdminCompanyTable/, "the customer directory must use the shared company rows with agreement status");
+assert.match(adminCompanyDetail, /from\("workspace_agreements"\)\.select\("\*"\)/, "company detail must load the retained agreement record");
+assert.match(adminCompanyTable + adminWorkspaceTable + adminCompanyDetail, /\/app\/admin\/workspace-agreements\/\$\{(?:(?:company|workspace)\.agreement_id|agreement\.id)\}/, "Admin company surfaces must link to the existing secure detail page");
+assert.match(adminCompanyTable + adminWorkspaceTable + adminCompanyDetail, /View agreement/, "Admin company surfaces must expose a visible agreement action");
+assert.match(adminCompanyTable + adminWorkspaceTable + adminCompanyDetail, /No agreement/, "Admin company surfaces must explicitly identify workspaces without an agreement");
 assert.match(adminDetail, /hashWorkspaceAgreement\(parsed\.data\) !== agreement\.immutable_hash/, "admin rendering must verify immutable snapshot integrity");
 assert.match(adminPdf, /getVaeroexAdminAccess/, "admin PDF retrieval must require Vaeroex admin authorization");
 assert.match(adminPdf, /createHash\("sha256"\)/, "admin PDF downloads must verify persisted bytes");
@@ -202,6 +206,7 @@ const allowedReferenceRoots = [
   "app/app/admin/workspace-agreements/",
   "app/app/admin/workspaces/page.tsx",
   "app/app/admin/customers/page.tsx",
+  "app/app/admin/customers/[workspaceId]/page.tsx",
   "app/api/legal/workspace-agreements/",
   "app/api/admin/workspace-agreements/",
   "components/legal/WorkspaceAgreementList.tsx",
