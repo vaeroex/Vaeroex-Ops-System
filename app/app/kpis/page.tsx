@@ -41,6 +41,7 @@ import {
   kpiXAxisLabel,
   kpiYAxisLabel,
   kpiValueFormat,
+  resolveSelectedKpiNames,
   sortKpiRowsBySettings,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
@@ -529,24 +530,6 @@ function average(values: number[]) {
   }
 
   return values.reduce((sum, value) => sum + value, 0) / values.length;
-}
-
-function paramValues(value: string | string[] | undefined) {
-  if (!value) {
-    return [];
-  }
-
-  return Array.isArray(value) ? value : [value];
-}
-
-function getSelectedMetrics(value: string | string[] | undefined, metricNames: string[]) {
-  const selected = paramValues(value).filter((metric) => metricNames.includes(metric));
-
-  if (selected.length) {
-    return Array.from(new Set(selected));
-  }
-
-  return metricNames.slice(0, Math.min(metricNames.length, 3));
 }
 
 function isKpiTimeline(value: string | undefined): value is KpiTimeline {
@@ -1755,7 +1738,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, INITIAL_KPI_CARD_COUNT);
   const canToggleTileExpansion = filteredLatestKpiRows.length > INITIAL_KPI_CARD_COUNT;
   const filterCount = activeStatusFilter === "all" ? metricNames.length : filteredLatestKpiRows.length;
-  const selectedMetrics = getSelectedMetrics(params?.metric, metricNames);
+  const selectedMetrics = resolveSelectedKpiNames(params?.metric, metricNames);
   const primaryMetric = selectedMetrics[0] || "";
   const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
   const hasComparison = selectedMetrics.length > 1;
