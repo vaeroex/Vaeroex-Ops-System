@@ -96,6 +96,19 @@ export type KpiPerformanceEvaluation = {
   changePercent: number | null;
 };
 
+export type KpiTargetStatus = KpiPerformanceEvaluation["targetStatus"];
+
+export function isKpiTargetMet(status: KpiTargetStatus) {
+  return status === "achieved" || status === "within_range";
+}
+
+export function isKpiTargetMiss(status: KpiTargetStatus) {
+  return status === "above_acceptable_maximum"
+    || status === "below_required_minimum"
+    || status === "moving_toward_target"
+    || status === "moving_away_from_target";
+}
+
 export type KpiTargetRecommendation = {
   value: number | null;
   range: { min: number; max: number } | null;
@@ -342,6 +355,39 @@ function distanceToRange(value: number, min: number, max: number) {
   return 0;
 }
 
+export function effectiveKpiTarget(semantics: KpiSemantics, target: number | null = null) {
+  if (target !== null) return target;
+  if (semantics.desiredDirection === "exact_target" || semantics.desiredDirection === "maintain") {
+    return semantics.idealValue;
+  }
+  return null;
+}
+
+export function kpiTargetGapRatio({
+  value,
+  semantics,
+  target = null
+}: {
+  value: number | null;
+  semantics: KpiSemantics;
+  target?: number | null;
+}) {
+  if (value === null || semantics.desiredDirection === "unknown") return null;
+
+  if (semantics.desiredDirection === "target_range") {
+    if (semantics.idealRangeMin === null || semantics.idealRangeMax === null) return null;
+    const reference = value < semantics.idealRangeMin ? semantics.idealRangeMin : value > semantics.idealRangeMax ? semantics.idealRangeMax : null;
+    if (reference === null) return 0;
+    const gap = Math.abs(value - reference);
+    return reference === 0 ? (gap === 0 ? 0 : Number.POSITIVE_INFINITY) : gap / Math.abs(reference);
+  }
+
+  const evaluationTarget = effectiveKpiTarget(semantics, target);
+  if (evaluationTarget === null) return null;
+  const gap = Math.abs(value - evaluationTarget);
+  return evaluationTarget === 0 ? (gap === 0 ? 0 : Number.POSITIVE_INFINITY) : gap / Math.abs(evaluationTarget);
+}
+
 function effectBetween(previous: number, current: number, semantics: KpiSemantics, target: number | null) {
   const raw = movement(previous, current);
   if (raw === "unchanged") return "neutral" as const;
@@ -377,6 +423,7 @@ export function evaluateKpiPerformance({
   semantics: KpiSemantics;
   target?: number | null;
 }): KpiPerformanceEvaluation {
+  const evaluationTarget = effectiveKpiTarget(semantics, target);
   const values = observations.map((item) => item.actual_value).filter((value): value is number => value !== null && Number.isFinite(value));
   const latestValue = values.at(-1) ?? null;
   const previousValue = values.at(-2) ?? null;
@@ -384,13 +431,13 @@ export function evaluateKpiPerformance({
   const rawMovement = latestValue === null || previousValue === null ? "insufficient_data" : movement(previousValue, latestValue);
   const latestPerformanceEffect = latestValue === null || previousValue === null
     ? "indeterminate"
-    : effectBetween(previousValue, latestValue, semantics, target);
+    : effectBetween(previousValue, latestValue, semantics, evaluationTarget);
 
   let selectedRangeTrend: KpiPerformanceEvaluation["selectedRangeTrend"] = "insufficient_data";
   if (latestValue !== null && rangeStartValue !== null && values.length >= 2) {
-    const overall = effectBetween(rangeStartValue, latestValue, semantics, target);
+    const overall = effectBetween(rangeStartValue, latestValue, semantics, evaluationTarget);
     if (overall === "neutral") {
-      const intervalEffects = values.slice(1).map((value, index) => effectBetween(values[index], value, semantics, target));
+      const intervalEffects = values.slice(1).map((value, index) => effectBetween(values[index], value, semantics, evaluationTarget));
       const favorable = intervalEffects.filter((value) => value === "favorable").length;
       const unfavorable = intervalEffects.filter((value) => value === "unfavorable").length;
       selectedRangeTrend = favorable && unfavorable ? "mixed" : "stable";
@@ -410,12 +457,12 @@ export function evaluateKpiPerformance({
       : latestValue > semantics.idealRangeMax
         ? "above_acceptable_maximum"
         : "below_required_minimum";
-  } else if (target !== null && latestValue !== null) {
-    if (semantics.desiredDirection === "maximize") targetStatus = latestValue >= target ? "achieved" : "below_required_minimum";
-    else if (semantics.desiredDirection === "minimize") targetStatus = latestValue <= target ? "achieved" : "above_acceptable_maximum";
+  } else if (evaluationTarget !== null && latestValue !== null) {
+    if (semantics.desiredDirection === "maximize") targetStatus = latestValue >= evaluationTarget ? "achieved" : "below_required_minimum";
+    else if (semantics.desiredDirection === "minimize") targetStatus = latestValue <= evaluationTarget ? "achieved" : "above_acceptable_maximum";
     else if (semantics.desiredDirection === "exact_target" || semantics.desiredDirection === "maintain") {
-      const tolerance = Math.max(Math.abs(target) * 0.02, 0.000001);
-      targetStatus = Math.abs(latestValue - target) <= tolerance
+      const tolerance = Math.max(Math.abs(evaluationTarget) * 0.02, 0.000001);
+      targetStatus = Math.abs(latestValue - evaluationTarget) <= tolerance
         ? "achieved"
         : latestPerformanceEffect === "favorable"
           ? "moving_toward_target"

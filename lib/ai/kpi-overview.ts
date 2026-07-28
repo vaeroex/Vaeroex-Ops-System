@@ -140,10 +140,10 @@ function formatMetricValue(value: number | null, metricName = "") {
 
 function statusForEvaluation(actual: number | null, target: number | null, evaluation: KpiPerformanceEvaluation): KpiOverviewMetric["status"] {
   if (actual === null) return "missing_value";
-  if (target === null) return "missing_target";
-  if (evaluation.targetStatus === "direction_unknown") return "direction_unknown";
+  if (evaluation.targetStatus === "direction_unknown") return target === null ? "missing_target" : "direction_unknown";
   if (evaluation.targetStatus === "achieved" || evaluation.targetStatus === "within_range") return "on_track";
   if (evaluation.targetStatus === "moving_toward_target") return "near_target";
+  if (evaluation.targetStatus === "no_target") return "missing_target";
   return "needs_attention";
 }
 
@@ -277,7 +277,11 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
     metrics.length ? `Structured KPI records: ${activeRows.length}` : "",
     metrics.length ? `Current KPI names reviewed: ${metrics.length}` : "",
     ...metrics.slice(0, 6).map((metric) => {
-      const target = metric.target === null ? "no target" : `target ${formatMetricValue(metric.target, metric.name)}`;
+      const target = metric.target === null
+        ? metric.targetStatus === "no_target" || metric.targetStatus === "direction_unknown"
+          ? "no target"
+          : "semantic target configured"
+        : `target ${formatMetricValue(metric.target, metric.name)}`;
       return `${metric.name}: ${formatMetricValue(metric.latestValue, metric.name)} vs ${target}; ${metric.status.replace(/_/g, " ")}; ${metric.trend.replace(/_/g, " ")}; ${metric.reportingPeriod}`;
     })
   ].filter(Boolean);
@@ -372,7 +376,7 @@ export function buildDeterministicKpiOverviewOutput(
   } else if (attentionMetrics.length && positiveMetrics.length) {
     directAnswer = `Your KPIs are mixed: ${positiveMetrics.length} look on or near target, and ${attentionMetrics.length} need attention, led by ${compactMetricList(attentionMetrics.slice(0, 3))}.`;
   } else if (attentionMetrics.length) {
-    directAnswer = `The KPI picture needs attention: ${attentionMetrics.length} visible metric${attentionMetrics.length === 1 ? "" : "s"} are below target or missing usable values.`;
+    directAnswer = `The KPI picture needs attention: ${attentionMetrics.length} visible metric${attentionMetrics.length === 1 ? "" : "s"} are outside target or missing usable values.`;
   } else if (directionGaps.length) {
     directAnswer = `${directionGaps.length} KPI${directionGaps.length === 1 ? " needs" : "s need"} direction confirmation before Vaeroex can classify performance.`;
   } else if (summary.counts.missingTargets) {

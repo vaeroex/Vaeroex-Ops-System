@@ -40,6 +40,39 @@ function kpi(overrides = {}) {
   };
 }
 
+function kpiSetting(name, direction, overrides = {}) {
+  const behavior = {
+    maximize: "minimum_goal",
+    minimize: "maximum_limit",
+    target_range: "acceptable_range",
+    exact_target: "exact_threshold",
+    maintain: "stability_goal",
+    unknown: "unknown"
+  }[direction];
+  return {
+    id: `setting-${name}`,
+    kpi_name: name,
+    canonical_name: name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+    display_name: name,
+    original_source_label: name,
+    semantic_unit: null,
+    semantic_scale: 1,
+    desired_direction: direction,
+    target_behavior: behavior,
+    ideal_value: null,
+    ideal_range_min: null,
+    ideal_range_max: null,
+    metric_role: "actual",
+    classification_source: "user",
+    classification_confidence: 1,
+    classification_confirmed: direction !== "unknown",
+    classification_rationale: "Confirmed regression fixture semantics.",
+    definition: null,
+    target: null,
+    ...overrides
+  };
+}
+
 function issue(overrides = {}) {
   return {
     id: "issue-1", title: "Follow-up completion needs review", description: "Several follow-up records need review.", issue_type: "Operations", severity: "Medium", status: "Open", root_cause: null, recommended_fix: null, created_at: "2026-07-10T00:00:00Z", updated_at: "2026-07-10T00:00:00Z", archived_at: null, deleted_at: null,
@@ -150,7 +183,15 @@ const retailMetrics = [
   ...[28.8, 31.2, 34.5, 37.1, 39.4, 42.0, 44.3, 46.2].map((margin, index) => operationalRow("Store Performance", index + 2, { Store: `Store ${index + 1}`, "Gross Margin %": margin, "Overtime Hours": 20 + index * 10 }))
 ];
 const retailChunks = ["Monthly Sales", "Inventory", "Orders", "Customer Feedback", "Supplier Invoices", "Store Performance"].map(memoryChunk);
-const retailInsights = buildOperationalEvidenceInsights({ kpis: retailKpis, operationalMetrics: retailMetrics, memoryChunks: retailChunks, files: [retailFile], imports: [retailImport] });
+const retailKpiSettings = [
+  kpiSetting("Revenue", "maximize"),
+  kpiSetting("Transactions", "maximize"),
+  kpiSetting("Gross Margin %", "maximize"),
+  kpiSetting("Returns %", "minimize"),
+  kpiSetting("Inventory Value", "minimize"),
+  kpiSetting("Online Sales", "maximize")
+];
+const retailInsights = buildOperationalEvidenceInsights({ kpis: retailKpis, kpiSettings: retailKpiSettings, operationalMetrics: retailMetrics, memoryChunks: retailChunks, files: [retailFile], imports: [retailImport] });
 assert.equal(retailInsights.length, 6, "retail evidence is capped at six prioritized findings");
 for (const title of [
   "Margin and returns are moving in the wrong direction",
@@ -175,6 +216,7 @@ assert.ok(onlineFinding.supportingRecords.some((record) => record.recordType ===
 assert.equal(buildOperationalEvidenceInsights({ memoryChunks: retailChunks, files: [retailFile], imports: [retailImport] }).length, 0, "memory chunks cannot independently create findings");
 const withInactiveMetric = buildOperationalEvidenceInsights({
   kpis: retailKpis,
+  kpiSettings: retailKpiSettings,
   operationalMetrics: [
     ...retailMetrics,
     operationalRow("Orders", 99, { Order: "ARCHIVED", Status: "Delayed" }, { archived_at: "2026-07-14T02:00:00Z" }),
@@ -186,15 +228,98 @@ const withInactiveMetric = buildOperationalEvidenceInsights({
 });
 assert.match(withInactiveMetric.find((insight) => insight.title === "Customer and order exceptions require attention").summary, /12 delayed orders/, "inactive operational rows are excluded before counting");
 assert.equal(buildOperationalEvidenceInsights({ kpis: retailKpis, operationalMetrics: retailMetrics, files: [{ ...retailFile, archived_at: "2026-07-14T02:00:00Z" }], imports: [retailImport] }).length, 0, "parent-ineligible operational evidence is excluded");
-const returnsOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]), files: [retailFile], imports: [retailImport] });
+const unclassifiedReturns = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]), files: [retailFile], imports: [retailImport] });
+assert.equal(unclassifiedReturns.length, 0, "unconfirmed returns semantics fail closed instead of inventing an adverse direction");
+const returnsOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]), kpiSettings: [kpiSetting("Returns %", "minimize")], files: [retailFile], imports: [retailImport] });
 assert.equal(returnsOnly[0]?.title, "Returns increased across the available periods", "an approved returns direction creates a bounded adverse trend without another metric");
-const marginOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Gross Margin %", [48.2, 47.4, 46.5, 45.6, 44.7, 43.7]), files: [retailFile], imports: [retailImport] });
+const oppositeReturns = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]), kpiSettings: [kpiSetting("Returns %", "maximize")], files: [retailFile], imports: [retailImport] });
+assert.equal(oppositeReturns.length, 0, "raw increases cannot create a risk when the confirmed semantics classify the movement as favorable");
+const marginOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Gross Margin %", [48.2, 47.4, 46.5, 45.6, 44.7, 43.7]), kpiSettings: [kpiSetting("Gross Margin %", "maximize")], files: [retailFile], imports: [retailImport] });
 assert.equal(marginOnly[0]?.title, "Gross margin declined across the available periods", "an approved margin direction creates a bounded adverse trend without another metric");
 const unfamiliarOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Mystery Index", [10, 20, 30, 40, 50, 60]), files: [retailFile], imports: [retailImport] });
 assert.equal(unfamiliarOnly.length, 0, "unfamiliar metrics do not receive invented direction or targets");
 const belowTargetOnly = buildIntelligenceLayer({ kpis: importedKpi("Revenue", [1185000, 1170000, 1150000, 1130000, 1110000, 1095000], { target: 1200000 }), files: [retailFile], imports: [retailImport] });
 assert.equal(belowTargetOnly.topRisk, undefined, "8.75% below target does not cross the existing 10% risk threshold");
 assert.equal(belowTargetOnly.insights.some((insight) => insight.type === "Forecast"), false, "forecast readiness does not create generic finding cards");
+
+const semanticSop = {
+  id: "semantic-sop",
+  title: "Current operating procedure",
+  created_at: "2026-07-01T00:00:00Z",
+  updated_at: "2026-07-01T00:00:00Z",
+  archived_at: null,
+  deleted_at: null
+};
+function semanticHealth(name, values, setting, target = null) {
+  return buildIntelligenceLayer({
+    kpis: importedKpi(name, values, { target }),
+    kpiSettings: [setting],
+    files: [retailFile],
+    imports: [retailImport],
+    sops: [semanticSop]
+  });
+}
+
+const maximizeRisk = semanticHealth("Revenue", [8, 8, 8, 8, 8, 8], kpiSetting("Revenue", "maximize"), 10);
+const minimizeRisk = semanticHealth("Average Checkout Wait", [12, 12, 12, 12, 12, 12], kpiSetting("Average Checkout Wait", "minimize"), 10);
+assert.equal(maximizeRisk.businessHealth.score, 28, "the existing Business Health formula remains unchanged for a material maximize-target miss");
+assert.equal(minimizeRisk.businessHealth.score, maximizeRisk.businessHealth.score, "an equivalent minimize-target miss receives the same unchanged Business Health penalty");
+assert.match(minimizeRisk.topRisk?.title || "", /above target/, "lower-is-better KPIs create risks when they exceed their maximum target");
+assert.equal(minimizeRisk.topRecommendation?.id, minimizeRisk.topRisk?.id, "direction-aware KPI risks continue to drive deterministic priorities");
+assert.equal(minimizeRisk.topOpportunity, undefined, "a worse lower-is-better result cannot become an opportunity");
+
+const maximizeOpportunity = semanticHealth("Revenue", [12, 12, 12, 12, 12, 12], kpiSetting("Revenue", "maximize"), 10);
+const minimizeOpportunity = semanticHealth("Average Checkout Wait", [8, 8, 8, 8, 8, 8], kpiSetting("Average Checkout Wait", "minimize"), 10);
+assert.equal(maximizeOpportunity.businessHealth.score, 44, "maximize target achievement keeps the existing opportunity contribution");
+assert.equal(minimizeOpportunity.businessHealth.score, maximizeOpportunity.businessHealth.score, "minimize target achievement uses the same unchanged opportunity contribution");
+assert.match(minimizeOpportunity.topOpportunity?.title || "", /on or below target/, "lower-is-better target achievement is described directionally");
+assert.match(minimizeRisk.topRisk?.fingerprint || "", /performance-gap/, "a lower-is-better target miss keeps the canonical risk fingerprint");
+assert.match(minimizeOpportunity.topOpportunity?.fingerprint || "", /positive-performance/, "a lower-is-better target achievement keeps the canonical opportunity fingerprint");
+
+const rangeSetting = kpiSetting("Staff Utilization", "target_range", { ideal_range_min: 70, ideal_range_max: 85 });
+const rangeRisk = semanticHealth("Staff Utilization", [96, 96, 96, 96, 96, 96], rangeSetting);
+const rangeOpportunity = semanticHealth("Staff Utilization", [80, 80, 80, 80, 80, 80], rangeSetting);
+assert.match(rangeRisk.topRisk?.title || "", /above acceptable range/, "target-range KPIs use their confirmed upper bound");
+assert.match(rangeOpportunity.topOpportunity?.title || "", /within its target range/, "target-range KPIs use their confirmed acceptable interval");
+
+const exactSetting = kpiSetting("Inventory Variance", "exact_target", { ideal_value: 10 });
+const exactRisk = semanticHealth("Inventory Variance", [12, 12, 12, 12, 12, 12], exactSetting);
+const exactOpportunity = semanticHealth("Inventory Variance", [10, 10, 10, 10, 10, 10], exactSetting);
+assert.match(exactRisk.topRisk?.title || "", /outside target/, "exact-target KPIs use the confirmed semantic ideal without a row target");
+assert.match(exactOpportunity.topOpportunity?.title || "", /on target/, "exact-target achievement creates the existing bounded opportunity");
+
+const maintainSetting = kpiSetting("Staffing Coverage", "maintain", { ideal_value: 10 });
+const maintainRisk = semanticHealth("Staffing Coverage", [12, 12, 12, 12, 12, 12], maintainSetting);
+const maintainOpportunity = semanticHealth("Staffing Coverage", [10, 10, 10, 10, 10, 10], maintainSetting);
+assert.match(maintainRisk.topRisk?.title || "", /outside target/, "maintain KPIs use the confirmed stability value");
+assert.match(maintainOpportunity.topOpportunity?.title || "", /on target/, "maintain KPIs create opportunities only at the stability target");
+
+for (const [direction, risk, opportunity] of [
+  ["maximize", maximizeRisk, maximizeOpportunity],
+  ["minimize", minimizeRisk, minimizeOpportunity],
+  ["target range", rangeRisk, rangeOpportunity],
+  ["exact target", exactRisk, exactOpportunity],
+  ["maintain", maintainRisk, maintainOpportunity]
+]) {
+  assert.equal(risk.businessHealth.score, 28, `${direction} target misses preserve the existing Business Health risk penalty`);
+  assert.equal(opportunity.businessHealth.score, 44, `${direction} target achievements preserve the existing Business Health opportunity bonus`);
+  assert.equal(risk.topRecommendation?.id, risk.topRisk?.id, `${direction} target misses feed the existing deterministic priority selection`);
+}
+
+const unknownSemantics = semanticHealth("Mystery Index", [2, 2, 2, 2, 2, 2], kpiSetting("Mystery Index", "unknown"), 10);
+assert.equal(unknownSemantics.businessHealth.score, 40, "unknown semantics do not add directional risk or opportunity terms to Business Health");
+assert.equal(unknownSemantics.topRisk, undefined, "unknown semantics cannot create a directional risk finding");
+assert.equal(unknownSemantics.topOpportunity, undefined, "unknown semantics cannot create a directional opportunity finding");
+assert.equal(unknownSemantics.topRecommendation, undefined, "unknown semantics cannot create a directional priority");
+const advisorySemantics = semanticHealth(
+  "Average Checkout Wait",
+  [12, 12, 12, 12, 12, 12],
+  kpiSetting("Average Checkout Wait", "minimize", { classification_source: "luna", classification_confirmed: false }),
+  10
+);
+assert.equal(advisorySemantics.topRisk, undefined, "unconfirmed Luna semantics remain advisory and cannot create directional findings");
+assert.equal(advisorySemantics.topOpportunity, undefined, "unconfirmed Luna semantics cannot create directional opportunities");
+
 const deterministicLatest = buildIntelligenceLayer({
   kpis: [
     kpi({ id: "older", name: "Revenue", actual_value: 80, target: 100, metric_date: "2026-07-10", updated_at: "2026-07-10T01:00:00Z" }),
@@ -275,6 +400,9 @@ const saveActionSource = fs.readFileSync(path.join(root, "app/app/reports/saved-
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const appNavigationSource = fs.readFileSync(path.join(root, "components/app/AppNavigation.tsx"), "utf8");
 const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
+const intelligenceLayerSource = fs.readFileSync(path.join(root, "lib/intelligence/layer.ts"), "utf8");
+const operationalEvidenceSource = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
+const scheduledReportSource = fs.readFileSync(path.join(root, "lib/reports/scheduled-generator.ts"), "utf8");
 assert.match(inboxSource, /label: "Summary".*label: "Evidence".*label: "Analysis"/s, "selected findings may expose one bounded analysis view when authorized");
 assert.doesNotMatch(inboxSource, /label: "Understand"|label: "Executive Brief"/, "overlapping finding tabs must be removed");
 assert.match(inboxSource, /Explain Finding/, "risk findings expose one bounded investigation action");
@@ -307,6 +435,13 @@ assert.match(savedReportSource, /SavedAnalysisRenderer/, "saved analyses must re
 assert.match(appNavigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested Intelligence and Reports routes must keep their sidebar section active");
 assert.doesNotMatch(intelligencePageSource, /Forecast Summary/, "weak forecast readiness is not promoted into the executive summary");
 assert.match(intelligencePageSource, /from\("operational_metrics"\)/, "Intelligence loads bounded operational evidence");
+assert.match(intelligencePageSource, /from\("kpi_settings"\)/, "Intelligence loads canonical KPI semantics with its KPI evidence");
 assert.match(intelligencePageSource, /filterEligibleMemoryRowsByLifecycle/, "Intelligence validates memory parent lifecycle before citation use");
+assert.doesNotMatch(intelligenceLayerSource, /actual_value\s*[<>]=?\s*[^\n]*target/, "the canonical Intelligence Layer cannot reintroduce higher-is-better target comparisons");
+assert.match(intelligenceLayerSource, /evaluateKpiPerformance/, "Business Health findings must use the canonical KPI performance evaluator");
+assert.match(intelligenceLayerSource, /isKpiTargetMiss/, "Business Health risk inputs must use canonical target status");
+assert.match(operationalEvidenceSource, /selectedRangeTrend === "unfavorable"/, "operational KPI risks must require a canonical unfavorable trend");
+assert.match(operationalEvidenceSource, /selectedRangeTrend === "favorable"/, "operational KPI opportunities must require a canonical favorable trend");
+assert.doesNotMatch(scheduledReportSource, /actual_value\s*[<>]=?\s*[^\n]*target/, "retired scheduled-report code cannot retain a conflicting target comparison");
 
 process.stdout.write("Intelligence experience regressions passed.\n");

@@ -56,6 +56,21 @@ assert.equal(evaluate([75], targetRange).targetStatus, "within_range");
 const exact = configured("Inventory variance", "exact_target");
 assert.equal(evaluate([20, 12], exact, 10).latestPerformanceEffect, "favorable");
 assert.equal(evaluate([20, 12], exact, 10).targetStatus, "moving_toward_target");
+const exactWithSemanticIdeal = configured("Inventory variance", "exact_target", { idealValue: 10 });
+assert.equal(evaluate([20, 10], exactWithSemanticIdeal).targetStatus, "achieved", "exact targets use the confirmed semantic ideal when no row target exists");
+
+const maintain = configured("Staffing coverage", "maintain", { idealValue: 12 });
+assert.equal(evaluate([12, 15], maintain).latestPerformanceEffect, "unfavorable");
+assert.equal(evaluate([15, 12], maintain).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([12], maintain).targetStatus, "achieved", "maintain semantics use the confirmed stability value");
+
+assert.equal(semantics.isKpiTargetMet("within_range"), true);
+assert.equal(semantics.isKpiTargetMet("achieved"), true);
+assert.equal(semantics.isKpiTargetMiss("above_acceptable_maximum"), true);
+assert.equal(semantics.isKpiTargetMiss("moving_toward_target"), true, "an improving exact-target KPI remains outside target until achieved");
+assert.equal(semantics.isKpiTargetMiss("direction_unknown"), false);
+assert.ok(semantics.kpiTargetGapRatio({ value: 12, semantics: configured("Wait", "minimize"), target: 10 }) > 0.1);
+assert.equal(semantics.kpiTargetGapRatio({ value: 80, semantics: targetRange }), 0);
 
 const unknown = semantics.deterministicKpiSemantics("Staff Utilization");
 assert.equal(unknown.desiredDirection, "unknown");
