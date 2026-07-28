@@ -207,6 +207,26 @@ export function assertIntelligenceSnapshotV1Invariants(snapshot: IntelligenceSna
 
   if (snapshot.businessHealth.state === "available") {
     check(snapshot.businessHealth.value.score >= 0 && snapshot.businessHealth.value.score <= 100, "Business Health score is out of bounds");
+    if (snapshot.businessHealth.value.components.state === "available") {
+      const components = snapshot.businessHealth.value.components.value;
+      const impactFindingIds = components.driverImpacts.map((impact) => impact.findingId);
+      check(new Set(impactFindingIds).size === impactFindingIds.length, "Business Health driver impacts must reference unique findings");
+      for (const impact of components.driverImpacts) {
+        check(findingIds.has(impact.findingId), `Business Health driver impact references missing finding ${impact.findingId}`);
+        check(
+          (impact.kind === "risk" && impact.scoreImpact < 0) || (impact.kind === "opportunity" && impact.scoreImpact > 0),
+          `Business Health driver impact ${impact.findingId} has an invalid sign`
+        );
+      }
+      check(
+        Math.abs(components.driverImpacts.filter((impact) => impact.kind === "risk").reduce((sum, impact) => sum + impact.scoreImpact, 0)) === components.riskPenalty,
+        "Business Health driver impacts disagree with the authoritative risk penalty"
+      );
+      check(
+        components.driverImpacts.filter((impact) => impact.kind === "opportunity").reduce((sum, impact) => sum + impact.scoreImpact, 0) === components.opportunityAdjustment,
+        "Business Health driver impacts disagree with the authoritative opportunity adjustment"
+      );
+    }
   }
   if (snapshot.dataQuality.state === "available") {
     check(snapshot.dataQuality.value.score >= 0 && snapshot.dataQuality.value.score <= 100, "data-quality score is out of bounds");

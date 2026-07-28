@@ -24,6 +24,10 @@ import {
 import type { BusinessHealthSnapshotRow } from "@/lib/intelligence/business-health-history";
 import type { ExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
 import type { IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
+import {
+  businessHealthDriverStableKey,
+  type BusinessHealthExplanationProjectionV1
+} from "@/lib/intelligence/snapshot/v1/projections";
 
 const MAX_DRIVERS = 4;
 const MAX_RECORDS_PER_DRIVER = 2;
@@ -66,39 +70,51 @@ function confidenceCeiling(
 }
 
 function weightedInsights(intelligence: IntelligenceLayerResult) {
-  const riskKinds = new Set(["Risk", "Bottleneck", "Anomaly"]);
-  const risks = intelligence.insights.filter((insight) => riskKinds.has(insight.type));
-  const opportunities = intelligence.insights.filter((insight) => insight.type === "Opportunity");
-  const weighted: WeightedInsight[] = [];
-  let remainingRiskPenalty = 45;
-
-  for (const insight of risks) {
-    const rawPenalty = insight.priority === "High" ? 12 : insight.priority === "Medium" ? 6 : 0;
-    const appliedPenalty = Math.min(rawPenalty, remainingRiskPenalty);
-    remainingRiskPenalty -= appliedPenalty;
-    if (!appliedPenalty) continue;
-    weighted.push({
+  const insightById = new Map(intelligence.insights.map((insight) => [insight.id, insight]));
+  return intelligence.businessHealth.components.driverImpacts.map((impact) => {
+    const insight = insightById.get(impact.findingId);
+    if (!insight) throw new Error(`Business Health component references missing finding ${impact.findingId}.`);
+    return {
       insight,
-      kind: "risk",
-      scoreImpact: -appliedPenalty,
-      stableKey: evidenceEngineHash({ kind: "risk", fingerprint: insight.fingerprint || insight.id })
-    });
-  }
+      ...impact,
+      stableKey: businessHealthDriverStableKey(impact.kind, insight.fingerprint || insight.id)
+    };
+  });
+}
 
-  let remainingOpportunityAdjustment = 15;
-  for (const insight of opportunities) {
-    const appliedAdjustment = Math.min(4, remainingOpportunityAdjustment);
-    remainingOpportunityAdjustment -= appliedAdjustment;
-    if (!appliedAdjustment) continue;
-    weighted.push({
-      insight,
-      kind: "opportunity",
-      scoreImpact: appliedAdjustment,
-      stableKey: evidenceEngineHash({ kind: "opportunity", fingerprint: insight.fingerprint || insight.id })
-    });
-  }
-
-  return weighted;
+function weightedProjection(
+  projection: BusinessHealthExplanationProjectionV1,
+  intelligence: IntelligenceLayerResult
+) {
+  const evidenceByFindingId = new Map(intelligence.insights.map((insight) => [insight.id, insight]));
+  return projection.drivers.map((driver) => {
+    const evidenceSource = evidenceByFindingId.get(driver.finding.id);
+    if (!evidenceSource || evidenceSource.fingerprint !== driver.finding.fingerprint) {
+      throw new Error(`Business Health projection evidence cannot resolve finding ${driver.finding.id}.`);
+    }
+    return {
+      kind: driver.kind,
+      scoreImpact: driver.scoreImpact,
+      stableKey: driver.stableKey,
+      insight: {
+        ...evidenceSource,
+        id: driver.finding.id,
+        type: driver.finding.type,
+        title: driver.finding.title,
+        summary: driver.finding.summary,
+        why: driver.finding.why,
+        impact: driver.finding.impact,
+        recommendedAction: driver.finding.recommendedAction,
+        confidence: driver.finding.confidence,
+        priority: driver.finding.priority,
+        lastUpdated: driver.finding.lastUpdated,
+        affectedArea: driver.finding.affectedArea,
+        timePeriod: driver.finding.timePeriod,
+        limitation: driver.finding.limitation,
+        fingerprint: driver.finding.fingerprint
+      }
+    };
+  });
 }
 
 function selectDrivers(weighted: WeightedInsight[]) {
@@ -243,23 +259,35 @@ function sourceLabelForCitation(
   };
 }
 
-export function buildBusinessHealthExplanationPackage({
+function healthStatusLabel(status: IntelligenceLayerResult["businessHealth"]["status"]) {
+  if (status === "Strong") return "Healthy";
+  if (status === "Watch") return "Watch";
+  if (status === "At Risk") return "Critical";
+  return "Limited evidence";
+}
+
+export type BusinessHealthExplanationEvidenceContext = Readonly<{
+  candidates: readonly EvidenceCandidate[];
+  sourceRegistry: ReturnType<typeof buildSourceRegistry>;
+  manifest: BusinessHealthExplanationPackage["manifest"];
+  citationIdsByDriver: ReadonlyMap<string, readonly number[]>;
+  sourceLabelByCandidateId: ReadonlyMap<string, string>;
+  freshness: ReturnType<typeof evidenceFreshness>;
+  independentSourceCount: number;
+}>;
+
+export function buildBusinessHealthExplanationEvidenceContext({
   workspaceId,
   intelligence,
-  homepage,
-  snapshots,
   sourceLabelsByKey = {},
-  now = new Date()
+  now
 }: {
   workspaceId: string;
   intelligence: IntelligenceLayerResult;
-  homepage: ExecutiveHomepageModel;
-  snapshots: readonly BusinessHealthSnapshotRow[];
   sourceLabelsByKey?: Readonly<Record<string, string>>;
-  now?: Date;
-}): BusinessHealthExplanationPackage {
-  const weighted = weightedInsights(intelligence);
-  const selected = selectDrivers(weighted);
+  now: Date;
+}): BusinessHealthExplanationEvidenceContext {
+  const selected = selectDrivers(weightedInsights(intelligence));
   const candidateDriverKeys = new Map<string, Set<string>>();
   const candidateById = new Map<string, EvidenceCandidate>();
   const sourceLabelByCandidateId = new Map<string, string>();
@@ -295,7 +323,7 @@ export function buildBusinessHealthExplanationPackage({
     rerankerVersion: "deterministic_noop_reranker_v1",
     signalPlannerVersion: "business_health_driver_planner_v1"
   });
-  const citationIdsByDriver = new Map<string, number[]>();
+  const citationIdsByDriver = new Map<string, readonly number[]>();
   for (const entry of manifest.evidence) {
     const driverKeys = candidateDriverKeys.get(entry.candidateId);
     if (!driverKeys) continue;
@@ -303,6 +331,55 @@ export function buildBusinessHealthExplanationPackage({
       citationIdsByDriver.set(driverKey, [...(citationIdsByDriver.get(driverKey) || []), entry.citationId]);
     }
   }
+  const independentSourceCount = new Set(
+    sourceRegistry.entries
+      .filter((entry) => entry.evidenceRole === "original")
+      .map((entry) => entry.independentSourceKey)
+      .filter(Boolean)
+  ).size;
+
+  return {
+    candidates,
+    sourceRegistry,
+    manifest,
+    citationIdsByDriver,
+    sourceLabelByCandidateId,
+    freshness: evidenceFreshness(candidates, now),
+    independentSourceCount
+  };
+}
+
+export function buildBusinessHealthExplanationPackage({
+  workspaceId,
+  intelligence,
+  homepage,
+  snapshots,
+  sourceLabelsByKey = {},
+  now = new Date(),
+  projection,
+  evidenceContext
+}: {
+  workspaceId: string;
+  intelligence: IntelligenceLayerResult;
+  homepage: ExecutiveHomepageModel;
+  snapshots: readonly BusinessHealthSnapshotRow[];
+  sourceLabelsByKey?: Readonly<Record<string, string>>;
+  now?: Date;
+  projection?: BusinessHealthExplanationProjectionV1;
+  evidenceContext?: BusinessHealthExplanationEvidenceContext;
+}): BusinessHealthExplanationPackage {
+  if (projection && projection.workspaceId !== workspaceId) {
+    throw new Error("Business Health projection belongs to another workspace.");
+  }
+  const weighted = projection ? weightedProjection(projection, intelligence) : weightedInsights(intelligence);
+  const selected = projection ? weighted : selectDrivers(weighted);
+  const evidence = evidenceContext || buildBusinessHealthExplanationEvidenceContext({
+    workspaceId,
+    intelligence,
+    sourceLabelsByKey,
+    now
+  });
+  const { candidates, sourceRegistry, manifest, citationIdsByDriver, sourceLabelByCandidateId } = evidence;
   const drivers: BusinessHealthExplanationDriver[] = selected.map((driver) => ({
     kind: driver.kind,
     label: compactText(driver.insight.title, 180),
@@ -331,8 +408,36 @@ export function buildBusinessHealthExplanationPackage({
       excerpt: entry.excerpt,
       recordedAt: entry.recordedAt
     }));
-  const freshness = evidenceFreshness(candidates, now);
-  const available = homepage.health.available && drivers.length > 0 && requiredCitationIds.length > 0;
+  const freshness = evidence.freshness;
+  const projectedHealth = projection?.businessHealth.state === "available" ? projection.businessHealth.value : null;
+  const projectedComponents = projectedHealth?.components.state === "available" ? projectedHealth.components.value : null;
+  const authoritativeHealth = projectedHealth || {
+    score: intelligence.businessHealth.score,
+    status: intelligence.businessHealth.status,
+    trajectory: intelligence.businessHealth.trend,
+    confidence: intelligence.dataQuality.confidence,
+    components: { state: "available" as const, value: intelligence.businessHealth.components }
+  };
+  const authoritativeComponents = projectedComponents || intelligence.businessHealth.components;
+  if (projection) {
+    if (!projectedHealth || !projectedComponents || projection.dataQuality.state !== "available") {
+      throw new Error("Business Health projection is missing authoritative explanation fields.");
+    }
+    if (
+      homepage.health.score !== projectedHealth.score
+      || homepage.health.status !== healthStatusLabel(projectedHealth.status)
+      || homepage.health.confidence !== projectedHealth.confidence
+      || (homepage.health.trend !== null && homepage.health.trend !== projectedHealth.trajectory)
+    ) {
+      throw new Error("Business Health presentation disagrees with the scoped IntelligenceSnapshotV1 projection.");
+    }
+    const projectedCitationIds = new Set(projection.citations.map((citation) => citation.id));
+    const expectedCitationIds = manifest.evidence.map((entry) => `manifest:${manifest.manifestId}:citation:${entry.citationId}`);
+    if (expectedCitationIds.some((citationId) => !projectedCitationIds.has(citationId))) {
+      throw new Error("Business Health projection is missing evidence-manifest citations.");
+    }
+  }
+  const available = homepage.health.available && Boolean(projectedHealth || intelligence.businessHealth.available) && drivers.length > 0 && requiredCitationIds.length > 0;
   const submode = selectSubmode({
     available,
     status: homepage.health.status,
@@ -340,21 +445,12 @@ export function buildBusinessHealthExplanationPackage({
     trendDelta: homepage.health.trendDelta,
     stale: freshness.stale
   });
-  const riskPenalty = Math.abs(weighted.filter((item) => item.kind === "risk").reduce((sum, item) => sum + item.scoreImpact, 0));
-  const opportunityAdjustment = weighted.filter((item) => item.kind === "opportunity").reduce((sum, item) => sum + item.scoreImpact, 0);
-  const expectedScore = Math.max(10, Math.min(100, intelligence.dataQuality.score - riskPenalty + opportunityAdjustment));
-  if (homepage.health.available && homepage.health.score !== expectedScore) {
-    throw new Error("The Business Health explanation package does not match the authoritative score calculation.");
-  }
-  const independentSourceCount = new Set(
-    sourceRegistry.entries
-      .filter((entry) => entry.evidenceRole === "original")
-      .map((entry) => entry.independentSourceKey)
-      .filter(Boolean)
-  ).size;
+  const riskPenalty = authoritativeComponents.riskPenalty;
+  const opportunityAdjustment = authoritativeComponents.opportunityAdjustment;
+  const independentSourceCount = evidence.independentSourceCount;
   const limitations = uniqueStrings([
     ...drivers.map((driver) => driver.limitation),
-    intelligence.dataQuality.reason,
+    projection?.limitations.find((limitation) => limitation.code === "data_quality_reason")?.message || intelligence.dataQuality.reason,
     freshness.stale ? "The newest supporting evidence is older than 45 days." : null,
     snapshots.length < 2 ? "A reliable score trajectory requires at least two stored Business Health reviews." : null
   ]);
@@ -363,15 +459,15 @@ export function buildBusinessHealthExplanationPackage({
     : `${homepage.health.trendDelta > 0 ? "Up" : homepage.health.trendDelta < 0 ? "Down" : "Unchanged"} ${Math.abs(homepage.health.trendDelta)} point${Math.abs(homepage.health.trendDelta) === 1 ? "" : "s"} since the previous stored review.`;
   const facts: BusinessHealthExplanationFacts = {
     available,
-    score: available ? homepage.health.score : null,
+    score: available ? authoritativeHealth.score : null,
     status: available ? homepage.health.status : "Limited evidence",
     trajectory: available ? homepage.health.trend : null,
     comparison,
     comparisonDelta: homepage.health.trendDelta,
-    dataQualityBase: intelligence.dataQuality.score,
+    dataQualityBase: authoritativeComponents.dataQualityBase,
     riskPenalty,
     opportunityAdjustment,
-    confidence: confidenceCeiling(homepage.health.confidence, independentSourceCount),
+    confidence: confidenceCeiling(authoritativeHealth.confidence, independentSourceCount),
     freshness: freshness.freshness,
     latestEvidenceAt: freshness.latestEvidenceAt,
     deterministicSummary: homepage.health.summary,

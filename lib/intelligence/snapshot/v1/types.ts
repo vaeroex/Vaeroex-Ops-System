@@ -15,6 +15,7 @@ import type {
   BusinessIntelligenceCoverageResult
 } from "@/lib/intelligence/coverage";
 import type {
+  BusinessHealthDriverImpact,
   IntelligenceConfidence,
   IntelligenceInsightType,
   IntelligenceLayerResult
@@ -277,6 +278,7 @@ export type IntelligenceSnapshotV1 = Readonly<{
       dataQualityBase: number;
       riskPenalty: number;
       opportunityAdjustment: number;
+      driverImpacts: readonly BusinessHealthDriverImpact[];
     }>>;
   }>>;
   dataQuality: SnapshotState<Readonly<{

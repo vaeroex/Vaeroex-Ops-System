@@ -46,7 +46,7 @@ Every producer is wrapped in `IntelligenceProducerEnvelopeV1` with `workspaceId`
 
 ## Current Consumer Map
 
-No live consumer reads `IntelligenceSnapshotV1` in this foundation. Executive Overview, Intelligence, KPI pages, Business Health, Explain Finding, People/Prestige, Reports, Saved Analyses, and generation services continue using their existing paths unchanged.
+Business Health explanation is the first live consumer. Its authorized Executive Overview composition boundary builds `IntelligenceSnapshotV1`, selects the bounded Business Health explanation projection, and preserves the existing explanation package and generation service. Intelligence, KPI pages, Explain Finding, People/Prestige, Reports, Saved Analyses, and every other generation service continue using their existing paths unchanged.
 
 The module defines unconnected pure projections for later staged migration:
 
@@ -233,7 +233,7 @@ It is deeply frozen with the snapshot but is not nested inside it, is not eviden
 
 Differences are classified as exact match, presentation only, ordering only, missing producer field, adapter defect, legacy duplicate, genuine deterministic disagreement, or unavailable for comparison. Blocking and fatal differences remain explicit; the comparator never chooses a winner and its report never enters the snapshot.
 
-The current fixture reports one non-blocking `missing_producer_field`: the Intelligence Layer exposes the authoritative Business Health score but not the internal score components. The adapter marks components unavailable and does not recreate them.
+The authoritative Intelligence Layer now exposes its already-calculated Business Health score components and bounded driver impacts. The adapter copies those values without recreating the formula, and the fixture requires exact component parity.
 
 ## Staged Migration
 
@@ -256,4 +256,4 @@ No database change is required. This foundation creates no table, migration, cac
 - Payload and provider context growth remain bounded.
 - Missing producer fields stay visible instead of being guessed.
 - Producer semantic fingerprints become a required caller contract.
-- No customer-visible behavior changes until a later consumer migration is separately approved.
+- Business Health explanation is the only approved live consumer migration; its customer-visible contract and presentation remain unchanged.

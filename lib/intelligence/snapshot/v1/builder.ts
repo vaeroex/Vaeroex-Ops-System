@@ -58,7 +58,7 @@ export type BuildIntelligenceSnapshotV1Input = Readonly<{
   generatedAt: string;
   versions: IntelligenceSnapshotVersionsV1;
   intelligenceLayer: IntelligenceProducerEnvelopeV1<IntelligenceLayerProducerOutputV1>;
-  kpis: IntelligenceProducerEnvelopeV1<KpiProducerOutputV1>;
+  kpis?: IntelligenceProducerEnvelopeV1<KpiProducerOutputV1>;
   coverage?: IntelligenceProducerEnvelopeV1<CoverageProducerOutputV1>;
   evidenceManifests?: IntelligenceProducerEnvelopeV1<EvidenceManifestProducerOutputV1>;
 }>;
@@ -119,15 +119,17 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
     workspaceId: input.workspaceId,
     asOf: input.asOf
   });
-  for (const metric of input.kpis.output) {
-    if (metric.workspaceId !== input.workspaceId) throw new Error(`KPI ${metric.id} belongs to another workspace.`);
+  if (input.kpis) {
+    for (const metric of input.kpis.output) {
+      if (metric.workspaceId !== input.workspaceId) throw new Error(`KPI ${metric.id} belongs to another workspace.`);
+    }
+    assertEnvelope({
+      envelope: input.kpis,
+      expectedProducerId: KPI_DETERMINISTIC_PRODUCER_ID,
+      workspaceId: input.workspaceId,
+      asOf: input.asOf
+    });
   }
-  assertEnvelope({
-    envelope: input.kpis,
-    expectedProducerId: KPI_DETERMINISTIC_PRODUCER_ID,
-    workspaceId: input.workspaceId,
-    asOf: input.asOf
-  });
   if (input.coverage) {
     assertEnvelope({ envelope: input.coverage, expectedProducerId: COVERAGE_PRODUCER_ID, workspaceId: input.workspaceId, asOf: input.asOf });
   }
@@ -154,7 +156,7 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
     lineageVersion: input.versions.policies.lineage,
     output: input.intelligenceLayer.output
   });
-  const kpis = adaptKpiProducerOutputV1(input.kpis.output);
+  const kpis = input.kpis ? adaptKpiProducerOutputV1(input.kpis.output) : [];
   const coverage: SnapshotState<CoverageSnapshotV1> = input.coverage
     ? adaptCoverageProducerOutputV1(input.coverage.output)
     : unavailable("unavailable", "missing_producer");
@@ -165,6 +167,12 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
 
   const limitations: SnapshotLimitationV1[] = [
     ...layer.limitations,
+    ...(!input.kpis ? [{
+      code: "kpi_producer_not_supplied",
+      scope: "kpi" as const,
+      severity: "information" as const,
+      message: "KPI producer output was not required by this scoped snapshot consumer."
+    }] : []),
     ...(!input.coverage ? [{
       code: "coverage_producer_not_supplied",
       scope: "coverage" as const,
@@ -174,7 +182,7 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
   ];
   const provenance = [
     producerReceipt(input.intelligenceLayer),
-    producerReceipt(input.kpis),
+    ...(input.kpis ? [producerReceipt(input.kpis)] : []),
     ...(input.coverage ? [producerReceipt(input.coverage)] : []),
     ...(input.evidenceManifests ? [producerReceipt(input.evidenceManifests)] : [])
   ];

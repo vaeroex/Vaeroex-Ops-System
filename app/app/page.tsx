@@ -15,7 +15,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
-import { buildBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/context";
+import { buildBusinessHealthExplanationFromSnapshotV1 } from "@/lib/ai/business-health-explanation/snapshot-context";
 import { loadBusinessHealthAnalysisState } from "@/lib/ai/business-health-explanation/storage";
 import { trySealBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
 import { buildExecutiveBriefPackage } from "@/lib/ai/executive-brief/context";
@@ -1876,13 +1876,17 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       return source ? [[`import:${item.id}`, source.display_name] as const] : [];
     })
   ]);
-  const businessHealthAnalysisPackage = buildBusinessHealthExplanationPackage({
+  const businessHealthExplanationAsOf = new Date().toISOString();
+  const businessHealthExplanationSnapshot = buildBusinessHealthExplanationFromSnapshotV1({
     workspaceId,
     intelligence: intelligenceLayer,
     homepage: executiveHomepageModel,
     snapshots: businessHealthSnapshotResult.snapshots,
-    sourceLabelsByKey: executiveSourceLabelsByKey
+    coverage: businessIntelligenceCoverage,
+    sourceLabelsByKey: executiveSourceLabelsByKey,
+    asOf: businessHealthExplanationAsOf
   });
+  const businessHealthAnalysisPackage = businessHealthExplanationSnapshot.analysisPackage;
   const businessHealthAnalysisToken = user && dashboardMode === "Executive View"
     ? trySealBusinessHealthExplanationPackage({
         analysisPackage: businessHealthAnalysisPackage,

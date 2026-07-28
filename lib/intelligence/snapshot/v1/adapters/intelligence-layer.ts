@@ -110,10 +110,10 @@ export function adaptIntelligenceLayerProducerOutputV1({
     forecastFindingIds: findings.filter((finding) => finding.type === "Forecast").map((finding) => finding.id)
   };
   const limitations: SnapshotLimitationV1[] = [{
-    code: "business_health_components_not_exposed",
-    scope: "business_health",
+    code: "data_quality_reason",
+    scope: "data_quality",
     severity: "information",
-    message: "The authoritative Intelligence Layer does not yet expose score components; the snapshot does not recreate them."
+    message: output.dataQuality.reason
   }];
   const forecast: ForecastReadinessSnapshotV1 = {
     state: output.forecastReadiness.state,
@@ -133,7 +133,12 @@ export function adaptIntelligenceLayerProducerOutputV1({
         status: output.businessHealth.status,
         trajectory: output.businessHealth.trend,
         confidence: output.dataQuality.confidence,
-        components: unavailable("unavailable", "missing_producer_field")
+        components: available({
+          dataQualityBase: output.businessHealth.components.dataQualityBase,
+          riskPenalty: output.businessHealth.components.riskPenalty,
+          opportunityAdjustment: output.businessHealth.components.opportunityAdjustment,
+          driverImpacts: output.businessHealth.components.driverImpacts.map((impact) => ({ ...impact }))
+        })
       })
       : unavailable("insufficient_data", "insufficient_original_evidence");
 

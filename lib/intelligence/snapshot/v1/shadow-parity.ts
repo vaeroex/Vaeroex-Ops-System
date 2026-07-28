@@ -120,13 +120,21 @@ export function compareIntelligenceSnapshotV1({
     if (!same(expectedHealth, actualHealth)) {
       differences.push(difference("businessHealth", "genuine_deterministic_disagreement", "blocking", expectedHealth, actualHealth));
     }
-    differences.push(difference(
-      "businessHealth.components",
-      "missing_producer_field",
-      "warning",
-      undefined,
-      snapshot.businessHealth.state === "available" ? snapshot.businessHealth.value.components : undefined
-    ));
+    const expectedComponents = intelligenceLayer.businessHealth.available && intelligenceLayer.businessHealth.status !== "Insufficient Data"
+      ? { state: "available" as const, value: intelligenceLayer.businessHealth.components }
+      : undefined;
+    const actualComponents = snapshot.businessHealth.state === "available"
+      ? snapshot.businessHealth.value.components
+      : undefined;
+    if (!same(expectedComponents, actualComponents)) {
+      differences.push(difference(
+        "businessHealth.components",
+        "adapter_defect",
+        "blocking",
+        expectedComponents,
+        actualComponents
+      ));
+    }
 
     if (!same(adaptedLayer.dataQuality, snapshot.dataQuality)) {
       differences.push(difference(

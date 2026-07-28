@@ -49,7 +49,7 @@ export function businessHealthProviderAttemptTelemetry(attempt: AIProviderAttemp
   };
 }
 
-function modelInput(analysisPackage: BusinessHealthExplanationPackage) {
+export function businessHealthProviderRequestPayload(analysisPackage: BusinessHealthExplanationPackage) {
   const citations = new Map(analysisPackage.citations.map((citation) => [citation.citationId, citation]));
   return {
     contract: analysisPackage.contractId,
@@ -117,7 +117,7 @@ export async function generateBusinessHealthExplanation({
   });
   const policy = generationPolicy.providerPolicy;
   const primary = policy.steps[0];
-  const content = JSON.stringify(modelInput(analysisPackage));
+  const content = JSON.stringify(businessHealthProviderRequestPayload(analysisPackage));
   const estimatedRequestTokens = estimateTokenCount(`${SYSTEM_PROMPT}\n${content}`);
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);

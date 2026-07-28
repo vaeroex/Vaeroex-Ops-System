@@ -244,7 +244,12 @@ export const intelligenceSnapshotV1Schema: z.ZodType<IntelligenceSnapshotV1> = z
     components: snapshotStateSchema(z.object({
       dataQualityBase: finiteNumber.min(0).max(100),
       riskPenalty: finiteNumber.min(0),
-      opportunityAdjustment: finiteNumber.min(0)
+      opportunityAdjustment: finiteNumber.min(0),
+      driverImpacts: z.array(z.object({
+        findingId: boundedLabel,
+        kind: z.enum(["risk", "opportunity"]),
+        scoreImpact: finiteNumber
+      }).strict()).max(INTELLIGENCE_SNAPSHOT_LIMITS.findings)
     }).strict())
   }).strict()),
   dataQuality: snapshotStateSchema(z.object({
