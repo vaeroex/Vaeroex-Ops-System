@@ -104,6 +104,16 @@ function packagesMatch(left: BusinessHealthExplanationPackage, right: BusinessHe
   return canonicalSnapshotJson(left) === canonicalSnapshotJson(right);
 }
 
+function projectionFallbackReason(error: unknown) {
+  const message = error instanceof Error ? error.message : "";
+  if (message.includes("projection evidence cannot resolve finding")) return "finding_evidence_mismatch";
+  if (message.includes("missing authoritative explanation fields")) return "missing_authoritative_fields";
+  if (message.includes("presentation disagrees")) return "presentation_disagreement";
+  if (message.includes("missing evidence-manifest citations")) return "missing_manifest_citations";
+  if (message.includes("evidence citations could not be verified")) return "citation_verification_failed";
+  return "package_construction_failed";
+}
+
 export function buildBusinessHealthExplanationFromSnapshotV1({
   workspaceId,
   intelligence,
@@ -220,7 +230,8 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
       level: "error",
       component: "business-health-explanation",
       event: "snapshot_v1_projection_fallback",
-      classification: parity.classification
+      classification: parity.classification,
+      reasonCode: projectionFallbackReason(error)
     }));
     return { analysisPackage: legacyPackage, snapshot: build.snapshot, projection, receipt: build.receipt, parity };
   }
