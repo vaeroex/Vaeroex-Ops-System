@@ -1,7 +1,7 @@
 import type { Route } from "next";
 import type { Database } from "@/lib/supabase/types";
 import { kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
-import { evaluateKpiPerformance } from "@/lib/kpis/semantics";
+import { evaluateKpiPerformance, resolveKpiTargetReference } from "@/lib/kpis/semantics";
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
@@ -249,6 +249,10 @@ function metricOnTarget(kpi: KpiRow, settings: KpiSettingRow[] = []) {
   return status === "achieved" || status === "within_range";
 }
 
+function metricHasTarget(kpi: KpiRow, settings: KpiSettingRow[] = []) {
+  return resolveKpiTargetReference(kpiSemantics(kpi.name, settings), kpi.target).kind !== "none";
+}
+
 function latestKpis(kpis: KpiRow[]) {
   const latest = new Map<string, KpiRow>();
 
@@ -276,6 +280,13 @@ function formatMetric(value: number | null | undefined, label: string) {
   if (normalized.includes("rate") || normalized.includes("completion") || normalized.includes("satisfaction")) return `${numberFormatter.format(value)}%`;
   if (normalized.includes("time")) return `${numberFormatter.format(value)} hours`;
   return numberFormatter.format(value);
+}
+
+function formatKpiTarget(kpi: KpiRow, settings: KpiSettingRow[] = []) {
+  const reference = resolveKpiTargetReference(kpiSemantics(kpi.name, settings), kpi.target);
+  if (reference.kind === "none") return "missing";
+  if (reference.kind === "range") return `${formatMetric(reference.min, kpi.name)} to ${formatMetric(reference.max, kpi.name)}`;
+  return formatMetric(reference.value, kpi.name);
 }
 
 function completionRate(rows: ChecklistRunRow[]) {
@@ -360,7 +371,7 @@ function buildDataQuality(input: PrestigeInput) {
         severity: "High" as const
       })),
     ...latest
-      .filter((kpi) => kpi.target === null)
+      .filter((kpi) => !metricHasTarget(kpi, input.kpiSettings))
       .slice(0, 4)
       .map((kpi) => ({
         id: `kpi-${kpi.id}`,
@@ -429,7 +440,11 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const processScore = scoreFromRate(sopReview?.actual_value ?? null, input.sops.length ? 72 : 55);
   const customerScore = satisfaction?.actual_value ?? (responseTime && metricOnTarget(responseTime, input.kpiSettings) === false ? 62 : input.crmLeads.length ? 76 : 55);
   const operationsScore = clampScore(88 - openIssues.length * 3 + Math.max(0, (checkRate ?? 80) - 85) / 2);
-  const salesScore = clampScore((revenue && metricOnTarget(revenue, input.kpiSettings) ? 88 : 66) + (conversion && metricOnTarget(conversion, input.kpiSettings) ? 8 : -8) - leadsWithoutFollowUp.length * 3);
+  const revenueStatus = revenue ? metricOnTarget(revenue, input.kpiSettings) : null;
+  const conversionStatus = conversion ? metricOnTarget(conversion, input.kpiSettings) : null;
+  const revenueScore = !revenue ? 66 : revenueStatus === true ? 88 : revenueStatus === false ? 66 : 77;
+  const conversionAdjustment = !conversion ? -8 : conversionStatus === true ? 8 : conversionStatus === false ? -8 : 0;
+  const salesScore = clampScore(revenueScore + conversionAdjustment - leadsWithoutFollowUp.length * 3);
   const sourceVisibilityScore = clampScore(90 + Math.min(10, input.assignments.filter((item) => lower(item.status) === "done").length * 2));
   const teamScore = clampScore(70 + input.people.filter((person) => person.role_title && person.department).length * 4);
   const categories = [
@@ -444,7 +459,7 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Sales Health",
       score: salesScore,
-      explanation: `${revenue ? `Revenue is ${formatMetric(revenue.actual_value, revenue.name)} against target ${formatMetric(revenue.target, revenue.name)}.` : "Revenue KPI is missing."} ${conversion ? `Conversion is ${formatMetric(conversion.actual_value, conversion.name)}.` : ""}`,
+      explanation: `${revenue ? `Revenue is ${formatMetric(revenue.actual_value, revenue.name)} against target ${formatKpiTarget(revenue, input.kpiSettings)}.` : "Revenue KPI is missing."} ${conversion ? `Conversion is ${formatMetric(conversion.actual_value, conversion.name)}.` : ""}`,
       improved: revenue && metricOnTarget(revenue, input.kpiSettings) ? "Revenue is meeting its direction-aware target." : "Customer activity evidence is available for response-quality review.",
       declined: conversion && metricOnTarget(conversion, input.kpiSettings) === false ? "Conversion is outside its target." : leadsWithoutFollowUp.length ? "Some customer records show response gaps." : "No major sales decline is visible.",
       nextAction: leadsWithoutFollowUp.length ? "Review customer activity evidence as a leadership issue." : "Review conversion against recent customer activity evidence."
@@ -513,9 +528,9 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
   if (conversion && metricOnTarget(conversion, input.kpiSettings) === false) {
     priorities.push(action({
       id: "conversion-decline",
-      title: "Review customer conversion decline",
+      title: "Review customer conversion outside target",
       why: "Sales Health is at risk when customer activity evidence exists but conversion misses target.",
-      evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatMetric(conversion.target, conversion.name)}.`,
+      evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatKpiTarget(conversion, input.kpiSettings)}.`,
       owner: "Leadership Review",
       dueDate: addDays(todayDate(), 3),
       action: "Review conversion quality and customer activity evidence with leadership.",
@@ -528,9 +543,9 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
   if (revenue && metricOnTarget(revenue, input.kpiSettings) === false) {
     priorities.push(action({
       id: "revenue-below-target",
-      title: "Stabilize revenue below target",
-      why: "Revenue below target needs a fast review of customer activity, conversion quality, and operational delivery.",
-      evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatMetric(revenue.target, revenue.name)}.`,
+      title: "Review revenue outside target",
+      why: "Revenue outside its confirmed target needs a fast review of customer activity, conversion quality, and operational delivery.",
+      evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatKpiTarget(revenue, input.kpiSettings)}.`,
       owner: "Owner",
       dueDate: addDays(todayDate(), 4),
       action: "Generate a revenue recovery report for leadership review.",
@@ -543,9 +558,9 @@ function buildFocusPriorities(input: PrestigeInput, dataQuality: ReturnType<type
   if (responseTime && metricOnTarget(responseTime, input.kpiSettings) === false) {
     priorities.push(action({
       id: "response-time-risk",
-      title: "Reduce response-time risk",
-      why: "Slow response time can hurt conversion, customer satisfaction, and complaint volume.",
-      evidence: `${responseTime.name}: ${formatMetric(responseTime.actual_value, responseTime.name)} vs target ${formatMetric(responseTime.target, responseTime.name)}.`,
+      title: "Review response-time performance outside target",
+      why: "Response-time performance outside its confirmed target can affect conversion, customer satisfaction, and complaint volume.",
+      evidence: `${responseTime.name}: ${formatMetric(responseTime.actual_value, responseTime.name)} vs target ${formatKpiTarget(responseTime, input.kpiSettings)}.`,
       owner: "Customer Service Manager",
       dueDate: addDays(todayDate(), 2),
       action: "Review the response process and escalation SOP as a leadership issue.",
@@ -639,9 +654,9 @@ function buildProfitLeaks(input: PrestigeInput) {
     leaks.push({
       ...action({
         id: "low-conversion",
-        title: "Conversion rate is below operating standard",
-        why: "Low conversion can offset healthy customer activity and weaken revenue momentum.",
-        evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatMetric(conversion.target, conversion.name)}.`,
+        title: "Conversion rate is outside its operating target",
+        why: "Conversion outside its confirmed target can offset healthy customer activity and weaken revenue momentum.",
+        evidence: `${conversion.name}: ${formatMetric(conversion.actual_value, conversion.name)} vs target ${formatKpiTarget(conversion, input.kpiSettings)}.`,
         owner: "Owner",
         dueDate: addDays(todayDate(), 5),
         action: "Generate a conversion review report and inspect response quality.",
@@ -658,9 +673,9 @@ function buildProfitLeaks(input: PrestigeInput) {
     leaks.push({
       ...action({
         id: "revenue-target",
-        title: "Revenue is below target",
-        why: "Revenue below target may reflect customer activity gaps, delivery constraints, or pricing/volume problems.",
-        evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatMetric(revenue.target, revenue.name)}.`,
+        title: "Revenue is outside target",
+        why: "Revenue outside its confirmed target may reflect customer activity gaps, delivery constraints, or pricing/volume problems.",
+        evidence: `${revenue.name}: ${formatMetric(revenue.actual_value, revenue.name)} vs target ${formatKpiTarget(revenue, input.kpiSettings)}.`,
         owner: "Owner",
         dueDate: addDays(todayDate(), 4),
         action: "Prepare a revenue recovery package for leadership review.",
@@ -704,7 +719,7 @@ function buildMemoryTimeline(input: PrestigeInput, focus: PrestigeAction[]) {
       id: `kpi-${kpi.id}`,
       month: monthLabel(kpi.metric_date),
       title: `${kpi.name} missed target`,
-      whatHappened: `${kpi.name} recorded ${formatMetric(kpi.actual_value, kpi.name)} against target ${formatMetric(kpi.target, kpi.name)}.`,
+      whatHappened: `${kpi.name} recorded ${formatMetric(kpi.actual_value, kpi.name)} against target ${formatKpiTarget(kpi, input.kpiSettings)}.`,
       cause: kpi.notes || "Likely connected to workload, response activity, process, or data quality changes.",
       actionTaken: focus[0]?.action || "Review related source records and decide whether a focused investigation is needed.",
       outcome: "Outcome will be clearer after the next KPI update.",
@@ -936,8 +951,8 @@ function buildBenchmarkMode(input: PrestigeInput) {
     },
     {
       title: "KPIs should have targets",
-      status: latest.some((kpi) => kpi.target === null) ? "Needs attention" : latest.length ? "On track" : "Missing data",
-      evidence: `${latest.filter((kpi) => kpi.target === null).length} current KPI${latest.length === 1 ? "" : "s"} lack targets.`,
+      status: latest.some((kpi) => !metricHasTarget(kpi, input.kpiSettings)) ? "Needs attention" : latest.length ? "On track" : "Missing data",
+      evidence: `${latest.filter((kpi) => !metricHasTarget(kpi, input.kpiSettings)).length} current KPI${latest.length === 1 ? "" : "s"} lack targets.`,
       recommendedAction: "Review KPI definitions and targets with leadership."
     }
   ] satisfies BenchmarkItem[];
@@ -996,7 +1011,7 @@ function buildReviewPackage(input: PrestigeInput, health: ReturnType<typeof buil
     },
     {
       title: "KPI and Revenue Signals",
-      lines: latestKpis(input.kpis).slice(0, 6).map((kpi) => `${kpi.name}: ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}`)
+      lines: latestKpis(input.kpis).slice(0, 6).map((kpi) => `${kpi.name}: ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatKpiTarget(kpi, input.kpiSettings)}`)
     },
     {
       title: "Operational Risks",
@@ -1034,8 +1049,19 @@ function buildDecisionSummary(input: PrestigeInput) {
     if (decision.outcome_summary) return `${decision.title}: ${decision.outcome_summary}`;
     if (relatedKpis.length >= 2) {
       const [latest, previous] = relatedKpis;
-      const improved = latest.actual_value !== null && previous.actual_value !== null ? latest.actual_value >= previous.actual_value : null;
-      return `${decision.title}: ${decision.related_kpi} ${improved ? "appears to have improved" : "needs another review"} since the decision.`;
+      const effect = evaluateKpiPerformance({
+        observations: [previous, latest],
+        semantics: kpiSemantics(decision.related_kpi || latest.name, input.kpiSettings || []),
+        target: latest.target
+      }).latestPerformanceEffect;
+      const outcome = effect === "favorable"
+        ? "appears to have improved"
+        : effect === "unfavorable"
+          ? "appears to have worsened"
+          : effect === "neutral"
+            ? "appears stable"
+            : "cannot be interpreted until its performance direction is confirmed";
+      return `${decision.title}: ${decision.related_kpi} ${outcome} since the decision.`;
     }
     return `${decision.title}: outcome review pending.`;
   });

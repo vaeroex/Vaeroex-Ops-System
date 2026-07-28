@@ -39,10 +39,10 @@ function evaluate(values, semantic, target = null) {
   });
 }
 
-assert.equal(evaluate([10, 12], configured("Sales", "maximize")).latestPerformanceEffect, "favorable");
-assert.equal(evaluate([12, 10], configured("Sales", "maximize")).latestPerformanceEffect, "unfavorable");
-assert.equal(evaluate([10, 12], configured("Defects", "minimize")).latestPerformanceEffect, "unfavorable");
-assert.equal(evaluate([12, 10], configured("Defects", "minimize")).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([10, 12], configured("Sales", "maximize")).latestPerformanceEffect, "favorable", "Executive Overview receives favorable performance for a maximize KPI increase");
+assert.equal(evaluate([12, 10], configured("Sales", "maximize")).latestPerformanceEffect, "unfavorable", "Executive Overview receives unfavorable performance for a maximize KPI decrease");
+assert.equal(evaluate([10, 12], configured("Defects", "minimize")).latestPerformanceEffect, "unfavorable", "Executive Overview receives unfavorable performance for a minimize KPI increase");
+assert.equal(evaluate([12, 10], configured("Defects", "minimize")).latestPerformanceEffect, "favorable", "Executive Overview receives favorable performance for a minimize KPI decrease");
 
 const oneStar = semantics.deterministicKpiSemantics("1-Star Reviews");
 assert.equal(oneStar.desiredDirection, "minimize");
@@ -66,6 +66,15 @@ const maintain = configured("Staffing coverage", "maintain", { idealValue: 12 })
 assert.equal(evaluate([12, 15], maintain).latestPerformanceEffect, "unfavorable");
 assert.equal(evaluate([15, 12], maintain).latestPerformanceEffect, "favorable");
 assert.equal(evaluate([12], maintain).targetStatus, "achieved", "maintain semantics use the confirmed stability value");
+
+const maximizeWithSemanticIdeal = configured("Revenue", "maximize", { idealValue: 100 });
+const minimizeWithSemanticIdeal = configured("Checkout wait", "minimize", { idealValue: 5 });
+assert.equal(evaluate([110], maximizeWithSemanticIdeal).targetStatus, "achieved", "maximize semantics recognize a confirmed semantic ideal without a row target");
+assert.equal(evaluate([4], minimizeWithSemanticIdeal).targetStatus, "achieved", "minimize semantics recognize a confirmed semantic ideal without a row target");
+assert.deepEqual(semantics.resolveKpiTargetReference(maximizeWithSemanticIdeal), { kind: "scalar", value: 100, source: "semantic" });
+assert.deepEqual(semantics.resolveKpiTargetReference(maximizeWithSemanticIdeal, 120), { kind: "scalar", value: 120, source: "manual" }, "manual targets remain authoritative");
+assert.deepEqual(semantics.resolveKpiTargetReference(targetRange), { kind: "range", min: 70, max: 85, source: "semantic" });
+assert.deepEqual(semantics.resolveKpiTargetReference(configured("Unknown", "unknown", { idealValue: 10 })), { kind: "none" }, "unknown semantics fail closed even when an ideal value is present");
 
 assert.equal(semantics.isKpiTargetMet("within_range"), true);
 assert.equal(semantics.isKpiTargetMet("achieved"), true);
@@ -201,6 +210,9 @@ const performanceFields = fs.readFileSync(path.join(root, "components/kpis/KpiPe
 const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
 const prestige = fs.readFileSync(path.join(root, "lib/intelligence/prestige.ts"), "utf8");
+const peoplePage = fs.readFileSync(path.join(root, "app/app/people/page.tsx"), "utf8");
+const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
+const dormantReports = fs.readFileSync(path.join(root, "app/app/reports/actions.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607270002_kpi_semantic_direction.sql"), "utf8");
 
 assert.match(operationsActions, /classifyAndPersistKpiSemantics/);
@@ -216,9 +228,19 @@ assert.doesNotMatch(lifecycleService, /proposal\.confidence >= KPI_SEMANTIC_ACCE
 assert.match(lifecycleService, /\.eq\("workspace_id", workspaceId\)/);
 assert.match(classificationContract, /targetBehaviorForDirection/);
 assert.match(overview, /evaluateKpiPerformance/);
+assert.match(overview, /trendTone\(trend\.performanceEffect\)/, "Executive Overview colors KPI movement by canonical performance effect");
+assert.doesNotMatch(overview, /trendTone\(trend\.change/, "raw movement cannot drive Executive Overview performance color");
 assert.match(kpiOverview, /definition: setting\?\.definition\?\.trim\(\) \|\| null/);
 assert.match(kpiOverview, /desired_direction: metric\.desiredDirection/);
 assert.match(prestige, /evaluateKpiPerformance/);
+assert.match(prestige, /resolveKpiTargetReference/);
+assert.doesNotMatch(prestige, /latest\.actual_value\s*>=\s*previous\.actual_value/);
+assert.match(peoplePage, /from\("kpi_settings"\)/, "People loads canonical KPI settings for shared intelligence output");
+assert.match(peoplePage, /kpiSettings: kpiSettingsResult\.data \|\| \[\]/);
+assert.match(operationalEvidence, /Math\.abs\(revenue\.changePercent \?\? 0\) >= 5/, "operational thresholds measure magnitude after canonical direction is known");
+assert.match(dormantReports, /performanceEffect === "favorable"/);
+assert.match(dormantReports, /performanceEffect === "unfavorable"/);
+assert.doesNotMatch(dormantReports, /is improving fastest|is declining most/);
 assert.match(migration, /alter table public\.kpi_settings/);
 assert.doesNotMatch(migration, /\b(delete from|update public\.kpis|drop table|truncate)\b/i);
 assert.doesNotMatch(lifecycleService, /\.from\("kpis"\)\.update/);
@@ -247,6 +269,9 @@ assert.doesNotMatch(kpiPage, /function ManualTargetForm/, "Recommended Target mu
 assert.match(kpiPage, /Current manual target/);
 assert.match(kpiPage, /Edit manual targets in Chart Settings\./);
 assert.match(kpiPage, /const selectedManualTarget = selectedKpiSetting\?\.target \?\? selectedLatestKpi\?\.target \?\? null/);
+assert.match(kpiPage, /resolveKpiTargetReference/);
+assert.match(kpiPage, /isKpiTargetMet\(evaluateKpiPerformance/);
+assert.doesNotMatch(kpiPage, /target === null && direction !== "target_range"/, "semantic targets cannot be treated as missing by direction-specific UI logic");
 assert.match(operationsActions, /target,\n\s+weight,/, "Manual targets must persist through the kpi_settings upsert.");
 assert.doesNotMatch(kpiPage, /classifyAndPersistKpiSemantics/, "KPI rendering must not invoke Luna.");
 for (const label of ["Performance meaning", "Higher is better", "Lower is better", "Target range", "Exact target", "Maintain stability", "Not determined", "KPI definition"]) {

@@ -48,10 +48,13 @@ import {
   deterministicKpiSemantics,
   directionLabel,
   evaluateKpiPerformance,
+  isKpiTargetMet,
   recommendKpiTarget,
+  resolveKpiTargetReference,
   validateKpiSemanticSelection,
   type KpiDesiredDirection,
   type KpiSemantics,
+  type KpiTargetReference,
   type KpiTargetRecommendation as CanonicalKpiTargetRecommendation
 } from "@/lib/kpis/semantics";
 import { getRecordFolders, managedValues, shortPreview } from "@/lib/records/management";
@@ -142,12 +145,9 @@ function explicitKpiDirection(name: string, rows: KpiRow[], settings: KpiSetting
   return kpiSemantics(name, settings).desiredDirection;
 }
 
-function metricTone(actual: number | null, target: number | null, direction: KpiDirection = "unknown", resolvedSemantics?: KpiSemantics): KpiTone {
-  if (actual === null || direction === "unknown" || (target === null && direction !== "target_range")) {
-    return "neutral";
-  }
+function metricTone(actual: number | null, target: number | null, semantics: KpiSemantics): KpiTone {
+  if (actual === null || semantics.desiredDirection === "unknown") return "neutral";
 
-  const semantics = resolvedSemantics || { ...kpiSemantics("Unknown KPI", []), desiredDirection: direction };
   const status = evaluateKpiPerformance({ observations: [{ actual_value: actual }], semantics, target }).targetStatus;
   if (status === "achieved" || status === "within_range") return "green";
   if (status === "moving_toward_target") return "yellow";
@@ -162,11 +162,11 @@ function statusLabel(tone: KpiTone) {
   return "Direction not set";
 }
 
-function kpiStatusText(row: KpiRow, direction: KpiDirection, semantics?: KpiSemantics) {
+function kpiStatusText(row: KpiRow, semantics: KpiSemantics) {
   if (row.actual_value === null) return "Missing Data";
-  if (row.target === null && direction !== "target_range") return "Target not set";
-  if (direction === "unknown") return "Direction not set";
-  return statusLabel(metricTone(row.actual_value, row.target, direction, semantics));
+  if (semantics.desiredDirection === "unknown") return "Direction not set";
+  if (resolveKpiTargetReference(semantics, row.target).kind === "none") return "Target not set";
+  return statusLabel(metricTone(row.actual_value, row.target, semantics));
 }
 
 function statusForTone(tone: KpiTone): SemanticStatus {
@@ -208,24 +208,6 @@ function formatNumericValue(value: number | null | undefined, label: string, fal
   return numberFormatter.format(value);
 }
 
-function formatTarget(kpi: KpiRow | undefined) {
-  if (!kpi || kpi.target === null) {
-    return "No target set";
-  }
-
-  const label = `${lower(kpi.name)} ${lower(kpi.category)}`;
-
-  if (label.includes("revenue") || label.includes("sales")) {
-    return `Target ${currencyFormatter.format(kpi.target)}`;
-  }
-
-  if (label.includes("conversion") || label.includes("rate")) {
-    return `Target ${numberFormatter.format(kpi.target)}%`;
-  }
-
-  return `Target ${numberFormatter.format(kpi.target)}`;
-}
-
 function formatSettingValue(value: number | null | undefined, metricName: string, settings: KpiSettingRow[], fallback = "Not set") {
   if (value === null || value === undefined) {
     return fallback;
@@ -243,6 +225,14 @@ function formatSettingValue(value: number | null | undefined, metricName: string
   }
 
   return `${numberFormatter.format(value)}${unit && !["$", "%"].includes(unit) ? ` ${unit}` : ""}`;
+}
+
+function formatTargetReference(reference: KpiTargetReference, metricName: string, settings: KpiSettingRow[], fallback = "Not set") {
+  if (reference.kind === "none") return fallback;
+  if (reference.kind === "range") {
+    return `${formatSettingValue(reference.min, metricName, settings)} to ${formatSettingValue(reference.max, metricName, settings)}`;
+  }
+  return formatSettingValue(reference.value, metricName, settings);
 }
 
 function monthSpan(rows: KpiRow[]) {
@@ -447,16 +437,17 @@ function KpiTile({
 }) {
   const direction = explicitKpiDirection(kpi.name, rows, settings);
   const semantics = kpiSemantics(kpi.name, settings);
-  const tone = metricTone(kpi.actual_value, kpi.target, direction, semantics);
+  const targetReference = resolveKpiTargetReference(semantics, kpi.target);
+  const tone = metricTone(kpi.actual_value, kpi.target, semantics);
   const semanticStatus = kpiStatus({
     tone,
     hasCurrentValue: kpi.actual_value !== null,
-    hasTarget: kpi.target !== null || semantics.desiredDirection === "target_range",
+    hasTarget: targetReference.kind !== "none",
     hasDirection: direction !== "unknown"
   });
   const href = `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail#kpi-detail` as Route;
-  const difference = kpi.actual_value !== null && kpi.target !== null
-    ? formatNumericValue(kpi.actual_value - kpi.target, kpi.name)
+  const difference = kpi.actual_value !== null && targetReference.kind === "scalar"
+    ? formatNumericValue(kpi.actual_value - targetReference.value, kpi.name)
     : "Not available";
 
   return (
@@ -468,13 +459,13 @@ function KpiTile({
             <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
         </div>
-        <KpiStatusBadge label={kpiStatusText(kpi, direction, semantics)} status={semanticStatus} />
+        <KpiStatusBadge label={kpiStatusText(kpi, semantics)} status={semanticStatus} />
       </div>
       <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
         <p>
           <span className="block text-slate-500">Target</span>
-          {kpi.target === null ? "Not set" : formatSettingValue(kpi.target, kpi.name, settings)}
+          {formatTargetReference(targetReference, kpi.name, settings)}
         </p>
         <p>
           <span className="block text-slate-500">{direction !== "unknown" ? "Performance effect" : "Difference"}</span>
@@ -582,7 +573,7 @@ function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter, rows: KpiRow[
   if (filter === "all") return true;
   if (filter === "updated-this-month") return updatedThisMonth(row);
 
-  const tone = metricTone(row.actual_value, row.target, explicitKpiDirection(row.name, rows, settings), kpiSemantics(row.name, settings));
+  const tone = metricTone(row.actual_value, row.target, kpiSemantics(row.name, settings));
   if (filter === "on-track") return tone === "green";
   if (filter === "behind-target") return tone === "red" || tone === "yellow";
   return row.actual_value === null || !updatedThisMonth(row);
@@ -826,13 +817,17 @@ function trendDeltaLabel(latest: KpiRow | undefined, previous: KpiRow | undefine
 
 function targetHitRate(rows: KpiRow[], semantics: KpiSemantics) {
   if (semantics.desiredDirection === "unknown") return "Direction needed";
-  const rowsWithTargets = rows.filter((row) => row.actual_value !== null && (row.target !== null || semantics.desiredDirection === "target_range"));
+  const rowsWithTargets = rows.filter(
+    (row) => row.actual_value !== null && resolveKpiTargetReference(semantics, row.target).kind !== "none"
+  );
 
   if (!rowsWithTargets.length) {
     return "No targets";
   }
 
-  const onTarget = rowsWithTargets.filter((row) => metricTone(row.actual_value, row.target, semantics.desiredDirection, semantics) === "green").length;
+  const onTarget = rowsWithTargets.filter((row) =>
+    isKpiTargetMet(evaluateKpiPerformance({ observations: [row], semantics, target: row.target }).targetStatus)
+  ).length;
   return `${numberFormatter.format((onTarget / rowsWithTargets.length) * 100)}%`;
 }
 
@@ -862,9 +857,14 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
   const paddingX = 44;
   const paddingTop = 28;
   const paddingBottom = 44;
-  const values = chartRows.flatMap((row) =>
-    row.target === null || row.target === undefined ? [row.actual_value as number] : [row.actual_value as number, row.target]
-  );
+  const semantics = kpiSemantics(metricName, settings);
+  const targetReferences = chartRows.map((row) => resolveKpiTargetReference(semantics, row.target));
+  const values = chartRows.flatMap((row, index) => {
+    const reference = targetReferences[index];
+    if (reference.kind === "scalar") return [row.actual_value as number, reference.value];
+    if (reference.kind === "range") return [row.actual_value as number, reference.min, reference.max];
+    return [row.actual_value as number];
+  });
   const minValue = Math.min(...values);
   const maxValue = Math.max(...values);
   const range = maxValue - minValue || 1;
@@ -873,11 +873,13 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
   const xFor = (index: number) => paddingX + (index / Math.max(chartRows.length - 1, 1)) * plotWidth;
   const yFor = (value: number) => paddingTop + (1 - (value - minValue) / range) * plotHeight;
   const actualPoints = chartRows.map((row, index) => `${xFor(index)},${yFor(row.actual_value as number)}`).join(" ");
-  const targetRows = chartRows.filter((row) => row.target !== null);
-  const targetPoints = chartRows
-    .map((row, index) => (row.target === null ? null : `${xFor(index)},${yFor(row.target)}`))
+  const scalarTargetPoints = targetReferences
+    .map((reference, index) => (reference.kind === "scalar" ? `${xFor(index)},${yFor(reference.value)}` : null))
     .filter(Boolean)
     .join(" ");
+  const scalarTargetCount = targetReferences.filter((reference) => reference.kind === "scalar").length;
+  const rangeTarget = targetReferences.find((reference): reference is Extract<KpiTargetReference, { kind: "range" }> => reference.kind === "range");
+  const hasTargetReference = scalarTargetCount > 0 || Boolean(rangeTarget);
   const firstDate = chartRows[0]?.metric_date;
   const lastDate = chartRows[chartRows.length - 1]?.metric_date;
   const axisX = kpiXAxisLabel(metricName, settings);
@@ -896,7 +898,7 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
             <span className="h-2 w-5 rounded-full bg-vaeroex-blue" />
             Actual
           </span>
-          {targetRows.length ? (
+          {hasTargetReference ? (
             <span className="inline-flex items-center gap-2">
               <span className="h-0.5 w-5 border-t-2 border-dashed border-amber-500" />
               Target
@@ -916,8 +918,14 @@ function TrendChart({ rows, metricName, settings }: { rows: KpiRow[]; metricName
           <text x="8" y={paddingTop + plotHeight} className="fill-slate-400 text-[11px]">
             {numberFormatter.format(minValue)}
           </text>
-          {targetRows.length >= 2 ? (
-            <polyline fill="none" points={targetPoints} stroke="#f59e0b" strokeDasharray="8 7" strokeLinecap="round" strokeWidth="3" />
+          {scalarTargetCount >= 2 ? (
+            <polyline fill="none" points={scalarTargetPoints} stroke="#f59e0b" strokeDasharray="8 7" strokeLinecap="round" strokeWidth="3" />
+          ) : null}
+          {rangeTarget ? (
+            <>
+              <line x1={paddingX} x2={width - paddingX} y1={yFor(rangeTarget.min)} y2={yFor(rangeTarget.min)} stroke="#f59e0b" strokeDasharray="8 7" strokeWidth="2" />
+              <line x1={paddingX} x2={width - paddingX} y1={yFor(rangeTarget.max)} y2={yFor(rangeTarget.max)} stroke="#f59e0b" strokeDasharray="8 7" strokeWidth="2" />
+            </>
           ) : null}
           <polyline fill="none" points={actualPoints} stroke={chartColor} strokeLinecap="round" strokeLinejoin="round" strokeWidth="4" />
           {chartRows.map((row, index) => (
@@ -1734,7 +1742,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
 
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const latestKpiRows = latestRowsByMetric(allVisibleKpis, metricNames);
-  const kpiTone = (kpi: KpiRow) => metricTone(kpi.actual_value, kpi.target, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings), kpiSemantics(kpi.name, kpiSettings));
+  const kpiTone = (kpi: KpiRow) => metricTone(kpi.actual_value, kpi.target, kpiSemantics(kpi.name, kpiSettings));
   const behindTargetCount = latestKpiRows.filter((kpi) => ["red", "yellow"].includes(kpiTone(kpi))).length;
   const onTrackCount = latestKpiRows.filter((kpi) => kpiTone(kpi) === "green").length;
   const missingOrStaleCount = metricNames.filter((name) => {
@@ -1774,6 +1782,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedKpiDirection = primaryMetric ? explicitKpiDirection(primaryMetric, allVisibleKpis, kpiSettings) : "unknown";
   const selectedKpiSemantics = primaryMetric ? kpiSemantics(primaryMetric, kpiSettings) : kpiSemantics("Unknown KPI", []);
   const selectedManualTarget = selectedKpiSetting?.target ?? selectedLatestKpi?.target ?? null;
+  const selectedTargetReference = resolveKpiTargetReference(selectedKpiSemantics, selectedManualTarget);
   const selectedKpiEvaluation = primaryMetric
     ? evaluateKpiPerformance({
         observations: selectedMetricRows,
@@ -1788,12 +1797,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const managedKpis = filteredKpis.map((kpi) => {
     const management = managedValues(kpi);
     const kpiShares = shares.filter((share) => share.source_id === kpi.id);
+    const semantics = kpiSemantics(kpi.name, kpiSettings);
+    const targetReference = resolveKpiTargetReference(semantics, kpi.target);
 
     return {
       id: kpi.id,
       title: kpi.name,
       type: "KPI",
-      status: kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings), kpiSemantics(kpi.name, kpiSettings)),
+      status: kpiStatusText(kpi, semantics),
       owner: kpi.owner || "Unassigned",
       category: kpi.category || "General",
       createdAt: kpi.created_at,
@@ -1805,7 +1816,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       meta: [
         { label: "Date", value: kpi.metric_date },
         { label: "Actual", value: formatNumericValue(kpi.actual_value, kpi.name) },
-        { label: "Target", value: kpi.target === null ? "No target" : formatNumericValue(kpi.target, kpi.name) },
+        { label: "Target", value: formatTargetReference(targetReference, kpi.name, kpiSettings, "No target") },
         { label: "Source", value: kpi.source || "Manual" },
         { label: "Shares", value: kpiShares.length ? `${kpiShares.length} share record${kpiShares.length === 1 ? "" : "s"}` : "Not shared" }
       ],
@@ -1821,7 +1832,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
         <div className="space-y-4 text-sm leading-6 text-muted">
           <p>{kpi.notes || "No notes."}</p>
           <p>
-            <span className="font-semibold text-ink">Current status:</span> {kpiStatusText(kpi, explicitKpiDirection(kpi.name, allVisibleKpis, kpiSettings), kpiSemantics(kpi.name, kpiSettings))}
+            <span className="font-semibold text-ink">Current status:</span> {kpiStatusText(kpi, semantics)}
           </p>
           <ShareRecordPanel
             sourceType="kpi"
@@ -1965,11 +1976,11 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <p className="mt-1 text-sm leading-6 text-slate-400">{kpiDefinition(primaryMetric, kpiSettings) || "No definition set yet."}</p>
                   </div>
                   {selectedKpiDirection !== "unknown" ? (() => {
-                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedManualTarget, selectedKpiDirection, selectedKpiSemantics);
-                    return <KpiStatusBadge label={statusLabel(tone)} status={kpiStatus({
+                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedManualTarget, selectedKpiSemantics);
+                    return <KpiStatusBadge label={selectedLatestKpi ? kpiStatusText(selectedLatestKpi, selectedKpiSemantics) : statusLabel(tone)} status={kpiStatus({
                       tone,
                       hasCurrentValue: selectedLatestKpi?.actual_value !== null && selectedLatestKpi?.actual_value !== undefined,
-                      hasTarget: selectedManualTarget !== null || selectedKpiDirection === "target_range",
+                      hasTarget: selectedTargetReference.kind !== "none",
                       hasDirection: true
                     })} />;
                   })() : null}
@@ -1982,8 +1993,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                   <TrendSummaryCard
                     label="Target"
-                    value={formatSettingValue(selectedManualTarget, primaryMetric, kpiSettings)}
-                    detail={selectedManualTarget !== null ? "Current target setting" : "No target set"}
+                    value={formatTargetReference(selectedTargetReference, primaryMetric, kpiSettings)}
+                    detail={selectedTargetReference.kind === "none" ? "No target set" : selectedTargetReference.source === "manual" ? "Current manual target" : "Confirmed semantic target"}
                   />
                   <TrendSummaryCard
                     label="Latest performance effect"
@@ -2016,8 +2027,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     {selectedLatestKpi
                       ? selectedKpiDirection !== "unknown"
-                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedManualTarget, selectedKpiDirection, selectedKpiSemantics)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
-                        : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)} against a target of ${formatSettingValue(selectedManualTarget, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
+                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedManualTarget, selectedKpiSemantics)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
+                        : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
                       : "Add a current value to unlock status, trend, and target guidance."}
                   </p>
                   {selectedKpiEvaluation ? (

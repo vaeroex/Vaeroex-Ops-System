@@ -23,6 +23,7 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
 const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operational-evidence.ts");
+const { buildPrestigeIntelligence } = require("../lib/intelligence/prestige.ts");
 const { buildGeneratedOutput, fallbackGeneratedOutputSource } = require("../lib/intelligence/generated-output.ts");
 const {
   buildEvidenceGroups,
@@ -234,6 +235,10 @@ const returnsOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Return
 assert.equal(returnsOnly[0]?.title, "Returns increased across the available periods", "an approved returns direction creates a bounded adverse trend without another metric");
 const oppositeReturns = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [4.1, 4.6, 5.1, 5.7, 6.4, 7.1]), kpiSettings: [kpiSetting("Returns %", "maximize")], files: [retailFile], imports: [retailImport] });
 assert.equal(oppositeReturns.length, 0, "raw increases cannot create a risk when the confirmed semantics classify the movement as favorable");
+const invertedReturnsRisk = buildOperationalEvidenceInsights({ kpis: importedKpi("Returns %", [7.1, 6.4, 5.7, 5.1, 4.6, 4.1]), kpiSettings: [kpiSetting("Returns %", "maximize")], files: [retailFile], imports: [retailImport] });
+assert.equal(invertedReturnsRisk[0]?.title, "Returns declined across the available periods", "canonical adverse effect creates a risk even when the raw direction is downward");
+const invertedOnlineOpportunity = buildOperationalEvidenceInsights({ kpis: importedKpi("Online Sales", [54500, 52000, 49000, 46500, 44000, 42000]), kpiSettings: [kpiSetting("Online Sales", "minimize")], files: [retailFile], imports: [retailImport] });
+assert.equal(invertedOnlineOpportunity[0]?.title, "Online sales are declining", "canonical favorable effect creates an opportunity even when the raw direction is downward");
 const marginOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Gross Margin %", [48.2, 47.4, 46.5, 45.6, 44.7, 43.7]), kpiSettings: [kpiSetting("Gross Margin %", "maximize")], files: [retailFile], imports: [retailImport] });
 assert.equal(marginOnly[0]?.title, "Gross margin declined across the available periods", "an approved margin direction creates a bounded adverse trend without another metric");
 const unfamiliarOnly = buildOperationalEvidenceInsights({ kpis: importedKpi("Mystery Index", [10, 20, 30, 40, 50, 60]), files: [retailFile], imports: [retailImport] });
@@ -319,6 +324,52 @@ const advisorySemantics = semanticHealth(
 );
 assert.equal(advisorySemantics.topRisk, undefined, "unconfirmed Luna semantics remain advisory and cannot create directional findings");
 assert.equal(advisorySemantics.topOpportunity, undefined, "unconfirmed Luna semantics cannot create directional opportunities");
+
+function prestigeFixture(kpis, kpiSettings, decisions = []) {
+  const date = "2026-07-28";
+  return buildPrestigeIntelligence({
+    workspaceName: "Semantic fixture",
+    isDemoWorkspace: false,
+    periodLabel: "Current",
+    range: { startDate: date, endDate: date, previousStartDate: date, previousEndDate: date },
+    kpis,
+    kpiSettings,
+    issues: [], assets: [], checklists: [], checklistRuns: [], sops: [], files: [], imports: [], crmLeads: [], reports: [], vaeroexRuns: [], operationalMetrics: [], assignments: [], shares: [], people: [], decisions, recommendationOutcomes: []
+  });
+}
+
+const prestigeSemanticTarget = prestigeFixture(
+  [kpi({ name: "Revenue", actual_value: 12, target: null })],
+  [kpiSetting("Revenue", "maximize", { ideal_value: 10 })]
+);
+assert.equal(prestigeSemanticTarget.businessHealth.categories.find((category) => category.name === "Sales Health")?.score, 80, "Prestige recognizes a semantic ideal as a valid maximize target");
+assert.equal(prestigeSemanticTarget.dataQuality.gaps.some((gap) => /Revenue has no target/.test(gap.title)), false, "semantic targets do not create false data gaps");
+const prestigeUnknown = prestigeFixture(
+  [kpi({ name: "Revenue", actual_value: 12, target: 10 })],
+  [kpiSetting("Revenue", "unknown")]
+);
+assert.equal(prestigeUnknown.businessHealth.categories.find((category) => category.name === "Sales Health")?.score, 69, "unknown KPI semantics receive the formula's neutral contribution instead of a directional penalty");
+assert.equal(prestigeUnknown.focusPriorities.some((priority) => priority.id === "revenue-below-target"), false, "unknown KPI semantics cannot create a directional Prestige priority");
+
+const decision = {
+  id: "decision-1",
+  title: "Review checkout staffing",
+  related_kpi: "Average Checkout Wait",
+  outcome_summary: null,
+  review_date: null,
+  status: "open",
+  created_at: "2026-07-01T00:00:00Z",
+  updated_at: "2026-07-01T00:00:00Z"
+};
+const prestigeDecision = prestigeFixture(
+  [
+    kpi({ id: "wait-latest", name: "Average Checkout Wait", actual_value: 6, target: 5, metric_date: "2026-07-20" }),
+    kpi({ id: "wait-previous", name: "Average Checkout Wait", actual_value: 8, target: 5, metric_date: "2026-07-10" })
+  ],
+  [kpiSetting("Average Checkout Wait", "minimize", { target: 5 })],
+  [decision]
+);
+assert.match(prestigeDecision.decisions.outcomeNotes[0], /appears to have improved/, "Prestige decision outcomes interpret lower-is-better movement canonically");
 
 const deterministicLatest = buildIntelligenceLayer({
   kpis: [

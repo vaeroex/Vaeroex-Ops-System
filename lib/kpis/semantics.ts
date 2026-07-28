@@ -98,6 +98,11 @@ export type KpiPerformanceEvaluation = {
 
 export type KpiTargetStatus = KpiPerformanceEvaluation["targetStatus"];
 
+export type KpiTargetReference =
+  | { kind: "scalar"; value: number; source: "manual" | "semantic" }
+  | { kind: "range"; min: number; max: number; source: "semantic" }
+  | { kind: "none" };
+
 export function isKpiTargetMet(status: KpiTargetStatus) {
   return status === "achieved" || status === "within_range";
 }
@@ -364,10 +369,20 @@ function distanceToRange(value: number, min: number, max: number) {
 
 export function effectiveKpiTarget(semantics: KpiSemantics, target: number | null = null) {
   if (target !== null) return target;
-  if (semantics.desiredDirection === "exact_target" || semantics.desiredDirection === "maintain") {
-    return semantics.idealValue;
+  if (semantics.desiredDirection === "unknown" || semantics.desiredDirection === "target_range") return null;
+  return semantics.idealValue;
+}
+
+export function resolveKpiTargetReference(semantics: KpiSemantics, target: number | null = null): KpiTargetReference {
+  if (semantics.desiredDirection === "target_range") {
+    return semantics.idealRangeMin !== null && semantics.idealRangeMax !== null
+      ? { kind: "range", min: semantics.idealRangeMin, max: semantics.idealRangeMax, source: "semantic" }
+      : { kind: "none" };
   }
-  return null;
+
+  const value = effectiveKpiTarget(semantics, target);
+  if (value === null) return { kind: "none" };
+  return { kind: "scalar", value, source: target === null ? "semantic" : "manual" };
 }
 
 export function kpiTargetGapRatio({

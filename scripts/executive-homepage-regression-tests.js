@@ -242,9 +242,9 @@ assert.doesNotMatch(sourcesPageSource, /processing_status \|\| ""\) === "process
 assert.match(sourcesPageSource, /hasCompletedAnalysis[\s\S]*if \(hasCompletedAnalysis\) return "Needs Review";/, "completed analysis must remain visible after processing finishes");
 assert.match(sourcesPageSource, /tab\.key !== "knowledge"[\s\S]*memoryChunks\.some/, "zero-count Learned Knowledge must be hidden");
 assert.match(kpiPageSource, /kpiSemantics\(name, settings\)\.desiredDirection/, "KPI directionality must come from validated semantic metadata");
-assert.match(kpiPageSource, /actual === null \|\| direction === "unknown" \|\| \(target === null && direction !== "target_range"\)/, "KPI status must remain neutral without confirmed direction while allowing configured target ranges");
-assert.match(kpiPageSource, /if \(row\.target === null && direction !== "target_range"\) return "Target not set"/, "neutral KPIs must use neutral target language while configured ranges remain evaluable");
-assert.match(kpiPageSource, /if \(direction === "unknown"\) return "Direction not set"/, "KPIs without a confirmed direction must remain neutral");
+assert.match(kpiPageSource, /actual === null \|\| semantics\.desiredDirection === "unknown"/, "KPI status must remain neutral without confirmed semantics");
+assert.match(kpiPageSource, /resolveKpiTargetReference\(semantics, row\.target\)\.kind === "none"/, "target availability must include canonical semantic targets and ranges");
+assert.match(kpiPageSource, /if \(semantics\.desiredDirection === "unknown"\) return "Direction not set"/, "KPIs without a confirmed direction must remain neutral");
 assert.match(kpiPageSource, /!\(key === "status" && value === "all"\)/, "the KPI URL builder must preserve show=all while omitting the default status");
 assert.match(kpiPageSource, /showAllTiles \? filteredLatestKpiRows : filteredLatestKpiRows\.slice\(0, INITIAL_KPI_CARD_COUNT\)/, "expanded KPI rendering must use the full filtered result set");
 assert.match(kpiPageSource, /showAllTiles \? "Show fewer KPIs" : `Show all \$\{filteredLatestKpiRows\.length\} KPIs`/, "the KPI expansion control must expose both expanded and collapsed labels");
