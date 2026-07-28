@@ -4,7 +4,7 @@ import type { IntelligenceEvidenceRecord, IntelligenceInsight } from "@/lib/inte
 import { compareKpiRowsNewest, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
-import { evaluateKpiPerformance } from "@/lib/kpis/semantics";
+import { evaluateKpiPerformance, resolveKpiTargetReference } from "@/lib/kpis/semantics";
 
 type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 type KpiRow = TableRow<"kpis">;
@@ -120,6 +120,12 @@ function formatPercent(value: number | null) {
   return value === null ? "not available" : `${numberFormatter.format(Math.abs(value))}%`;
 }
 
+function movementTerms(trend: Trend) {
+  if (trend.latestValue > trend.firstValue) return { past: "increased", continuous: "increasing", noun: "increase" } as const;
+  if (trend.latestValue < trend.firstValue) return { past: "declined", continuous: "declining", noun: "decline" } as const;
+  return { past: "remained stable", continuous: "stable", noun: "stable movement" } as const;
+}
+
 function countWithShare(count: number, total: number, label: string, trailing = "") {
   const share = total ? Math.round((count / total) * 100) : 0;
   return `${count} ${label}${count === 1 ? "" : "s"}${trailing} (${share}% of ${total})`;
@@ -188,18 +194,25 @@ function operationalRecord(row: OperationalMetricRow, support: string, value: st
   };
 }
 
-function kpiRecord(row: KpiRow, support: string): IntelligenceEvidenceRecord {
+function kpiRecord(row: KpiRow, support: string, settings: KpiSettingRow[]): IntelligenceEvidenceRecord {
   const raw = asRecord(row.raw_data_json);
   const worksheet = worksheetForRaw(raw);
   const rowNumber = rowNumberForRaw(raw);
   const sourceKey = sourceKeyFor(row) || `manual-kpi:${normalizeKpiName(row.name)}`;
+
+  const reference = resolveKpiTargetReference(kpiSemantics(row.name, settings), row.target);
+  const targetText = reference.kind === "scalar"
+    ? ` · Target ${formatMetric(reference.value, row.name)}`
+    : reference.kind === "range"
+      ? ` · Target range ${formatMetric(reference.min, row.name)} to ${formatMetric(reference.max, row.name)}`
+      : "";
 
   return {
     id: `kpi:${row.id}`,
     title: rowNumber ? `${row.name} · ${worksheet} row ${rowNumber}` : row.name,
     recordType: "Imported KPI measurement",
     date: row.metric_date,
-    value: `Actual ${formatMetric(row.actual_value ?? 0, row.name)}${row.target === null ? "" : ` · Target ${formatMetric(row.target, row.name)}`}`,
+    value: `Actual ${formatMetric(row.actual_value ?? 0, row.name)}${targetText}`,
     support,
     href: sourceHref(row.source_file_id),
     classification: "Original",
@@ -269,14 +282,15 @@ function semanticTrend(trend: Trend | null, settings: KpiSettingRow[]) {
   });
 }
 
-function trendRecords(trend: Trend, direction: string) {
+function trendRecords(trend: Trend, direction: string, settings: KpiSettingRow[]) {
   return trend.rows.map((row, index) => kpiRecord(
     row,
     index === 0
       ? `This is the first value in the ${trend.rows.length}-period comparison.`
       : index === trend.rows.length - 1
         ? `This is the latest value and confirms the ${direction}.`
-        : "This measurement establishes the intervening direction."
+        : "This measurement establishes the intervening direction.",
+    settings
   ));
 }
 
@@ -331,23 +345,25 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
   const transactionsTrend = semanticTrend(transactions, kpiSettings);
   const inventoryTrend = semanticTrend(inventoryValue, kpiSettings);
   const onlineSalesTrend = semanticTrend(onlineSales, kpiSettings);
-  const returnsAdverse = returns && returnsTrend?.selectedRangeTrend === "unfavorable" && returns.latestValue - returns.firstValue >= 1 && returns.consistency >= 0.6;
-  const marginAdverse = margin && marginTrend?.selectedRangeTrend === "unfavorable" && margin.firstValue - margin.latestValue >= 1 && margin.consistency >= 0.6;
-  const revenueAdverse = revenue && revenueTrend?.selectedRangeTrend === "unfavorable" && (revenue.changePercent ?? 0) <= -5 && revenue.consistency >= 0.6;
-  const transactionsAdverse = transactions && transactionsTrend?.selectedRangeTrend === "unfavorable" && (transactions.changePercent ?? 0) <= -5 && transactions.consistency >= 0.6;
-  const inventoryRising = inventoryValue && inventoryTrend?.selectedRangeTrend === "unfavorable" && (inventoryValue.changePercent ?? 0) >= 10 && inventoryValue.consistency >= 0.6;
-  const onlineRising = onlineSales && onlineSalesTrend?.selectedRangeTrend === "favorable" && (onlineSales.changePercent ?? 0) >= 10 && onlineSales.consistency >= 0.6;
+  const returnsAdverse = returns && returnsTrend?.selectedRangeTrend === "unfavorable" && Math.abs(returns.latestValue - returns.firstValue) >= 1 && returns.consistency >= 0.6;
+  const marginAdverse = margin && marginTrend?.selectedRangeTrend === "unfavorable" && Math.abs(margin.latestValue - margin.firstValue) >= 1 && margin.consistency >= 0.6;
+  const revenueAdverse = revenue && revenueTrend?.selectedRangeTrend === "unfavorable" && Math.abs(revenue.changePercent ?? 0) >= 5 && revenue.consistency >= 0.6;
+  const transactionsAdverse = transactions && transactionsTrend?.selectedRangeTrend === "unfavorable" && Math.abs(transactions.changePercent ?? 0) >= 5 && transactions.consistency >= 0.6;
+  const inventoryRising = inventoryValue && inventoryTrend?.selectedRangeTrend === "unfavorable" && Math.abs(inventoryValue.changePercent ?? 0) >= 10 && inventoryValue.consistency >= 0.6;
+  const onlineRising = onlineSales && onlineSalesTrend?.selectedRangeTrend === "favorable" && Math.abs(onlineSales.changePercent ?? 0) >= 10 && onlineSales.consistency >= 0.6;
   const workbookSheet = [...group.kpis.map((row) => worksheetForRaw(asRecord(row.raw_data_json)))].filter(Boolean);
 
   if (returnsAdverse && marginAdverse && aligned(returns, margin)) {
+    const marginMovement = movementTerms(margin);
+    const returnsMovement = movementTerms(returns);
     drafts.push({
       kind: "margin-returns",
       id: `operational-margin-returns-${group.sourceKey}`,
       type: "Risk",
       title: "Margin and returns are moving in the wrong direction",
-      summary: `Gross margin declined from ${formatMetric(margin.firstValue, margin.name)} to ${formatMetric(margin.latestValue, margin.name)}, while returns increased from ${formatMetric(returns.firstValue, returns.name)} to ${formatMetric(returns.latestValue, returns.name)} across ${margin.rows.length} periods.`,
+      summary: `Gross margin ${marginMovement.past} from ${formatMetric(margin.firstValue, margin.name)} to ${formatMetric(margin.latestValue, margin.name)}, while returns ${returnsMovement.past} from ${formatMetric(returns.firstValue, returns.name)} to ${formatMetric(returns.latestValue, returns.name)} across ${margin.rows.length} periods.`,
       why: "The two metrics moved adversely over the same dated period.",
-      impact: "Lower margin and higher returns can place pressure on profitability, but this evidence does not quantify that impact.",
+      impact: "The confirmed adverse movement can place pressure on profitability, but this evidence does not quantify that impact.",
       recommendedAction: "Review return reasons and margin performance by product or location.",
       evidence: [`Gross margin change: ${formatMetric(margin.firstValue, margin.name)} to ${formatMetric(margin.latestValue, margin.name)}`, `Returns change: ${formatMetric(returns.firstValue, returns.name)} to ${formatMetric(returns.latestValue, returns.name)}`],
       contradictoryEvidence: [],
@@ -360,18 +376,19 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
       limitation: "The workbook shows co-movement, not causation.",
       fingerprint: "operational:margin-returns",
       worksheets: workbookSheet,
-      supportingRecords: [...trendRecords(margin, "decline"), ...trendRecords(returns, "increase")]
+      supportingRecords: [...trendRecords(margin, marginMovement.noun, kpiSettings), ...trendRecords(returns, returnsMovement.noun, kpiSettings)]
     });
   }
 
   if (returnsAdverse && !marginAdverse) {
+    const movement = movementTerms(returns);
     drafts.push({
       kind: "returns-increase",
       id: `operational-returns-increase-${group.sourceKey}`,
       type: "Risk",
-      title: "Returns increased across the available periods",
-      summary: `Returns increased from ${formatMetric(returns.firstValue, returns.name)} to ${formatMetric(returns.latestValue, returns.name)} across ${returns.rows.length} periods.`,
-      why: "A higher returns rate is an approved adverse direction and the dated values moved consistently upward.",
+      title: `Returns ${movement.past} across the available periods`,
+      summary: `Returns ${movement.past} from ${formatMetric(returns.firstValue, returns.name)} to ${formatMetric(returns.latestValue, returns.name)} across ${returns.rows.length} periods.`,
+      why: "The confirmed KPI semantics classify the dated movement as adverse.",
       impact: "The evidence establishes a worsening returns trend but not its cause or financial impact.",
       recommendedAction: "Review return reasons by product, channel, or location.",
       evidence: [`Returns change: ${formatMetric(returns.firstValue, returns.name)} to ${formatMetric(returns.latestValue, returns.name)}`],
@@ -385,18 +402,19 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
       limitation: "The history establishes direction, not cause.",
       fingerprint: "operational:returns-increase",
       worksheets: workbookSheet,
-      supportingRecords: trendRecords(returns, "increase")
+      supportingRecords: trendRecords(returns, movement.noun, kpiSettings)
     });
   }
 
   if (marginAdverse && !returnsAdverse) {
+    const movement = movementTerms(margin);
     drafts.push({
       kind: "margin-decline",
       id: `operational-margin-decline-${group.sourceKey}`,
       type: "Risk",
-      title: "Gross margin declined across the available periods",
-      summary: `Gross margin declined from ${formatMetric(margin.firstValue, margin.name)} to ${formatMetric(margin.latestValue, margin.name)} across ${margin.rows.length} periods.`,
-      why: "A lower gross margin is an approved adverse direction and the dated values moved consistently downward.",
+      title: `Gross margin ${movement.past} across the available periods`,
+      summary: `Gross margin ${movement.past} from ${formatMetric(margin.firstValue, margin.name)} to ${formatMetric(margin.latestValue, margin.name)} across ${margin.rows.length} periods.`,
+      why: "The confirmed KPI semantics classify the dated movement as adverse.",
       impact: "The evidence establishes margin compression but not its cause or total financial impact.",
       recommendedAction: "Review margin movement by product, channel, or location.",
       evidence: [`Gross margin change: ${formatMetric(margin.firstValue, margin.name)} to ${formatMetric(margin.latestValue, margin.name)}`],
@@ -410,7 +428,7 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
       limitation: "The history establishes direction, not cause.",
       fingerprint: "operational:margin-decline",
       worksheets: workbookSheet,
-      supportingRecords: trendRecords(margin, "decline")
+      supportingRecords: trendRecords(margin, movement.noun, kpiSettings)
     });
   }
 
@@ -423,17 +441,19 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
   });
   const salesDeclines = [revenueAdverse ? revenue : null, transactionsAdverse ? transactions : null].filter((trend): trend is Trend => Boolean(trend));
   if (inventoryRising && salesDeclines.length && salesDeclines.every((trend) => aligned(inventoryValue, trend))) {
-    const salesText = salesDeclines.map((trend) => `${trend.name.toLowerCase()} declined ${formatPercent(trend.changePercent)}`).join(" and ");
+    const inventoryMovement = movementTerms(inventoryValue);
+    const salesText = salesDeclines.map((trend) => `${trend.name.toLowerCase()} ${movementTerms(trend).past} ${formatPercent(trend.changePercent)}`).join(" and ");
+    const defaultMovement = inventoryMovement.past === "increased" && salesDeclines.every((trend) => movementTerms(trend).past === "declined");
     drafts.push({
       kind: "inventory-sales",
       id: `operational-inventory-sales-${group.sourceKey}`,
       type: "Risk",
-      title: "Inventory increased while sales activity declined",
-      summary: `Inventory value rose from ${formatMetric(inventoryValue.firstValue, inventoryValue.name)} to ${formatMetric(inventoryValue.latestValue, inventoryValue.name)} while ${salesText}.${belowReorder.length ? ` ${countWithShare(belowReorder.length, inventoryRows.length, "inventory item", " below reorder level")}.` : ""}`,
-      why: "Inventory and sales activity moved in opposite directions over aligned periods.",
+      title: defaultMovement ? "Inventory increased while sales activity declined" : "Inventory and sales activity moved adversely",
+      summary: `Inventory value ${inventoryMovement.past} from ${formatMetric(inventoryValue.firstValue, inventoryValue.name)} to ${formatMetric(inventoryValue.latestValue, inventoryValue.name)} while ${salesText}.${belowReorder.length ? ` ${countWithShare(belowReorder.length, inventoryRows.length, "inventory item", " below reorder level")}.` : ""}`,
+      why: "Inventory and sales activity both moved adversely over aligned periods.",
       impact: "The records show inventory accumulation alongside specific replenishment exceptions; they do not establish the cause.",
       recommendedAction: "Review accumulated inventory separately from items requiring replenishment.",
-      evidence: [`Inventory value increased ${formatPercent(inventoryValue.changePercent)}`, ...salesDeclines.map((trend) => `${trend.name} changed ${numberFormatter.format(trend.changePercent || 0)}%`), `Below reorder level: ${belowReorder.length}`],
+      evidence: [`Inventory value ${inventoryMovement.past} ${formatPercent(inventoryValue.changePercent)}`, ...salesDeclines.map((trend) => `${trend.name} changed ${numberFormatter.format(trend.changePercent || 0)}%`), `Below reorder level: ${belowReorder.length}`],
       contradictoryEvidence: [],
       missingEvidence: ["Category-level inventory value", "Confirmed demand and purchasing causes"],
       sourceHref: sourceHref(group.sourceFileId),
@@ -441,12 +461,12 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
       lastUpdated: latestDate([...inventoryValue.rows, ...salesDeclines.flatMap((trend) => trend.rows), ...belowReorder]),
       affectedArea: "Inventory and sales",
       timePeriod: periodLabel(inventoryValue.first.metric_date, inventoryValue.latest.metric_date),
-      limitation: "The aligned movements are correlated observations and do not prove that declining sales caused inventory growth.",
+      limitation: "The aligned movements are correlated observations and do not prove that one movement caused the other.",
       fingerprint: "operational:inventory-sales",
       worksheets: [...workbookSheet, ...belowReorder.map((row) => worksheetForRaw(asRecord(row.raw_data_json)))],
       supportingRecords: [
-        ...trendRecords(inventoryValue, "increase"),
-        ...salesDeclines.flatMap((trend) => trendRecords(trend, "decline")),
+        ...trendRecords(inventoryValue, inventoryMovement.noun, kpiSettings),
+        ...salesDeclines.flatMap((trend) => trendRecords(trend, movementTerms(trend).noun, kpiSettings)),
         ...belowReorder.map((row) => {
           const raw = asRecord(row.raw_data_json);
           return operationalRecord(row, "On-hand inventory is below the recorded reorder point.", `${textValue(raw, ["SKU", "Item"]) || row.metric_name}: ${numberValue(raw, ["On Hand"]) ?? "not set"} on hand vs ${numberValue(raw, ["Reorder Point"]) ?? "not set"} reorder point`);
@@ -573,16 +593,17 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
   }
 
   if (onlineRising) {
+    const movement = movementTerms(onlineSales);
     drafts.push({
       kind: "online-sales-growth",
       id: `operational-online-sales-${group.sourceKey}`,
       type: "Opportunity",
-      title: "Online sales are increasing",
-      summary: `Online sales increased from ${formatMetric(onlineSales.firstValue, onlineSales.name)} to ${formatMetric(onlineSales.latestValue, onlineSales.name)} across ${onlineSales.rows.length} periods.`,
+      title: movement.continuous === "increasing" ? "Online sales are increasing" : `Online sales are ${movement.continuous}`,
+      summary: `Online sales ${movement.past} from ${formatMetric(onlineSales.firstValue, onlineSales.name)} to ${formatMetric(onlineSales.latestValue, onlineSales.name)} across ${onlineSales.rows.length} periods.`,
       why: "The imported KPI history shows a sustained positive directional movement.",
       impact: "The trend is worth reviewing, but the evidence does not establish profitability, attribution, or future growth.",
       recommendedAction: "Review whether online growth is profitable and whether fulfillment capacity is keeping pace.",
-      evidence: [`Online sales increased ${formatPercent(onlineSales.changePercent)}`, `Periods: ${onlineSales.rows.length}`],
+      evidence: [`Online sales ${movement.past} ${formatPercent(onlineSales.changePercent)}`, `Periods: ${onlineSales.rows.length}`],
       contradictoryEvidence: [],
       missingEvidence: ["Channel profitability", "Attribution and fulfillment capacity"],
       sourceHref: sourceHref(group.sourceFileId),
@@ -590,10 +611,10 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
       lastUpdated: latestDate(onlineSales.rows),
       affectedArea: "Online sales",
       timePeriod: periodLabel(onlineSales.first.metric_date, onlineSales.latest.metric_date),
-      limitation: "The trend does not prove why online sales increased or whether the increase is profitable.",
+      limitation: "The trend does not prove why online sales moved or whether the movement is profitable.",
       fingerprint: "operational:online-sales-growth",
       worksheets: workbookSheet,
-      supportingRecords: trendRecords(onlineSales, "increase")
+      supportingRecords: trendRecords(onlineSales, movement.noun, kpiSettings)
     });
   }
 
@@ -631,13 +652,14 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
   }
 
   if (!returnsAdverse && !marginAdverse && revenueAdverse && !inventoryRising) {
+    const movement = movementTerms(revenue);
     drafts.push({
       kind: "revenue-decline",
       id: `operational-revenue-decline-${group.sourceKey}`,
       type: "Risk",
-      title: "Revenue declined across the available periods",
-      summary: `Revenue declined from ${formatMetric(revenue.firstValue, revenue.name)} to ${formatMetric(revenue.latestValue, revenue.name)} across ${revenue.rows.length} periods.`,
-      why: "The imported values show a material directional decline.",
+      title: `Revenue ${movement.past} across the available periods`,
+      summary: `Revenue ${movement.past} from ${formatMetric(revenue.firstValue, revenue.name)} to ${formatMetric(revenue.latestValue, revenue.name)} across ${revenue.rows.length} periods.`,
+      why: "The imported values show a material adverse movement under the confirmed KPI semantics.",
       impact: "The trend requires context before it can be tied to a cause or financial outcome.",
       recommendedAction: "Review revenue movement against transactions, margin, and channel mix.",
       evidence: [`Revenue changed ${numberFormatter.format(revenue.changePercent || 0)}%`],
@@ -651,7 +673,7 @@ function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
       limitation: "The history establishes direction, not cause.",
       fingerprint: "operational:revenue-decline",
       worksheets: workbookSheet,
-      supportingRecords: trendRecords(revenue, "decline")
+      supportingRecords: trendRecords(revenue, movement.noun, kpiSettings)
     });
   }
 

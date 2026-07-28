@@ -283,9 +283,10 @@ function percentLabel(value: number | null) {
   return `${value > 0 ? "+" : ""}${numberFormatter.format(value)}%`;
 }
 
-function trendTone(change: number | null) {
-  if (change === null || change === 0) return "border-line bg-white text-ink";
-  return change > 0 ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-700";
+function trendTone(effect: KpiPerformanceEvaluation["latestPerformanceEffect"]) {
+  if (effect === "favorable") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (effect === "unfavorable") return "border-red-200 bg-red-50 text-red-700";
+  return "border-line bg-white text-ink";
 }
 
 function latestMetric(kpis: KpiRow[], keywords: string[]) {
@@ -417,7 +418,7 @@ function KpiCard({ trend }: { trend: MetricTrend }) {
       label={trend.name}
       value={formatMetricValue(trend.current, trend.name)}
       detail={`${percentLabel(trend.changePercent)} vs previous period`}
-      tone={trendTone(trend.change)}
+      tone={trendTone(trend.performanceEffect)}
     />
   );
 }

@@ -13,7 +13,13 @@ import {
   KPI_COLOR_PALETTE,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
-import { deterministicKpiSemantics, directionLabel, potentialKpiDuplicateGroups } from "@/lib/kpis/semantics";
+import {
+  directionLabel,
+  potentialKpiDuplicateGroups,
+  resolveKpiSemantics,
+  resolveKpiTargetReference,
+  type KpiTargetReference
+} from "@/lib/kpis/semantics";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -42,6 +48,12 @@ function formatNumber(value: number | null | undefined) {
   }
 
   return String(value);
+}
+
+function formatTargetReference(reference: KpiTargetReference) {
+  if (reference.kind === "scalar") return String(reference.value);
+  if (reference.kind === "range") return `${reference.min} to ${reference.max}`;
+  return "not set";
 }
 
 function latestByMetric(rows: KpiRow[]) {
@@ -93,15 +105,16 @@ function KpiSettingCard({
   const xAxisLabel = setting?.x_axis_label ?? "Date";
   const yAxisLabel = setting?.y_axis_label ?? metric;
   const preferredChartType = setting?.preferred_chart_type ?? "line";
-  const semanticFallback = deterministicKpiSemantics(metric);
-  const canonicalName = setting?.canonical_name ?? semanticFallback.canonicalName;
-  const displayName = setting?.display_name ?? metric;
-  const desiredDirection = setting?.desired_direction !== "unknown" ? setting?.desired_direction : semanticFallback.desiredDirection;
-  const targetBehavior = setting?.target_behavior !== "unknown" ? setting?.target_behavior : semanticFallback.targetBehavior;
-  const semanticUnit = setting?.semantic_unit ?? semanticFallback.unit ?? "";
+  const semantics = resolveKpiSemantics(metric, setting);
+  const targetReference = resolveKpiTargetReference(semantics, target);
+  const canonicalName = semantics.canonicalName;
+  const displayName = semantics.displayName || metric;
+  const desiredDirection = semantics.desiredDirection;
+  const targetBehavior = semantics.targetBehavior;
+  const semanticUnit = semantics.unit ?? "";
   const aggregationBasis = setting?.aggregation_basis ?? "";
   const periodBasis = setting?.period_basis ?? "";
-  const metricRole = setting?.metric_role ?? semanticFallback.metricRole;
+  const metricRole = semantics.metricRole;
   const lowContrastWarning = kpiColorMayBeLowContrast(color);
 
   return (
@@ -117,7 +130,7 @@ function KpiSettingCard({
               {definition || "No definition set yet."}
             </p>
           </div>
-          <span className="text-xs text-slate-300">Target <span className="font-semibold text-white">{target === null ? "not set" : target}</span></span>
+          <span className="text-xs text-slate-300">Target <span className="font-semibold text-white">{formatTargetReference(targetReference)}</span></span>
           <span className="text-xs text-slate-300">Weight <span className="font-semibold text-white">{weight}/10</span></span>
           <span className="text-xs text-slate-300">{category || "General"}</span>
           <span className={`w-fit rounded-full border px-2.5 py-1 text-xs font-semibold ${isVisible ? "border-emerald-400/35 bg-emerald-950/30 text-emerald-100" : "border-slate-600/40 bg-slate-950/50 text-slate-300"}`}>
@@ -215,11 +228,11 @@ function KpiSettingCard({
           </label>
           <label className="block text-sm font-medium">
             Theoretical ideal or exact value
-            <input name="ideal_value" type="number" step="any" defaultValue={formatNumber(setting?.ideal_value ?? semanticFallback.idealValue)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
+            <input name="ideal_value" type="number" step="any" defaultValue={formatNumber(semantics.idealValue)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" />
           </label>
           <div className="grid gap-3 sm:grid-cols-2">
-            <label className="block text-sm font-medium">Ideal range minimum<input name="ideal_range_min" type="number" step="any" defaultValue={formatNumber(setting?.ideal_range_min)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" /></label>
-            <label className="block text-sm font-medium">Ideal range maximum<input name="ideal_range_max" type="number" step="any" defaultValue={formatNumber(setting?.ideal_range_max)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" /></label>
+            <label className="block text-sm font-medium">Ideal range minimum<input name="ideal_range_min" type="number" step="any" defaultValue={formatNumber(semantics.idealRangeMin)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" /></label>
+            <label className="block text-sm font-medium">Ideal range maximum<input name="ideal_range_max" type="number" step="any" defaultValue={formatNumber(semantics.idealRangeMax)} className="mt-2 w-full rounded-lg border border-white/10 bg-slate-950/60 px-3 py-2 text-slate-100 outline-none focus:border-vaeroex-accent" /></label>
           </div>
           <label className="block text-sm font-medium">
             Sort order

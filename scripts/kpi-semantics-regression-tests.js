@@ -6,7 +6,7 @@ const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
 
-function loadTypescriptModule(relativePath) {
+function loadTypescriptModule(relativePath, mocks = {}) {
   const file = path.join(root, relativePath);
   const source = fs.readFileSync(file, "utf8");
   const output = ts.transpileModule(source, {
@@ -16,11 +16,16 @@ function loadTypescriptModule(relativePath) {
   const loaded = new Module(file, module);
   loaded.filename = file;
   loaded.paths = module.paths;
+  const originalRequire = loaded.require.bind(loaded);
+  loaded.require = (request) => Object.prototype.hasOwnProperty.call(mocks, request) ? mocks[request] : originalRequire(request);
   loaded._compile(output, file);
   return loaded.exports;
 }
 
 const semantics = loadTypescriptModule("lib/kpis/semantics.ts");
+const settings = loadTypescriptModule("lib/kpis/settings.ts", {
+  "@/lib/kpis/semantics": semantics
+});
 
 function configured(label, direction, extras = {}) {
   return {
@@ -39,10 +44,10 @@ function evaluate(values, semantic, target = null) {
   });
 }
 
-assert.equal(evaluate([10, 12], configured("Sales", "maximize")).latestPerformanceEffect, "favorable");
-assert.equal(evaluate([12, 10], configured("Sales", "maximize")).latestPerformanceEffect, "unfavorable");
-assert.equal(evaluate([10, 12], configured("Defects", "minimize")).latestPerformanceEffect, "unfavorable");
-assert.equal(evaluate([12, 10], configured("Defects", "minimize")).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([10, 12], configured("Sales", "maximize")).latestPerformanceEffect, "favorable", "Executive Overview receives favorable performance for a maximize KPI increase");
+assert.equal(evaluate([12, 10], configured("Sales", "maximize")).latestPerformanceEffect, "unfavorable", "Executive Overview receives unfavorable performance for a maximize KPI decrease");
+assert.equal(evaluate([10, 12], configured("Defects", "minimize")).latestPerformanceEffect, "unfavorable", "Executive Overview receives unfavorable performance for a minimize KPI increase");
+assert.equal(evaluate([12, 10], configured("Defects", "minimize")).latestPerformanceEffect, "favorable", "Executive Overview receives favorable performance for a minimize KPI decrease");
 
 const oneStar = semantics.deterministicKpiSemantics("1-Star Reviews");
 assert.equal(oneStar.desiredDirection, "minimize");
@@ -66,6 +71,15 @@ const maintain = configured("Staffing coverage", "maintain", { idealValue: 12 })
 assert.equal(evaluate([12, 15], maintain).latestPerformanceEffect, "unfavorable");
 assert.equal(evaluate([15, 12], maintain).latestPerformanceEffect, "favorable");
 assert.equal(evaluate([12], maintain).targetStatus, "achieved", "maintain semantics use the confirmed stability value");
+
+const maximizeWithSemanticIdeal = configured("Revenue", "maximize", { idealValue: 100 });
+const minimizeWithSemanticIdeal = configured("Checkout wait", "minimize", { idealValue: 5 });
+assert.equal(evaluate([110], maximizeWithSemanticIdeal).targetStatus, "achieved", "maximize semantics recognize a confirmed semantic ideal without a row target");
+assert.equal(evaluate([4], minimizeWithSemanticIdeal).targetStatus, "achieved", "minimize semantics recognize a confirmed semantic ideal without a row target");
+assert.deepEqual(semantics.resolveKpiTargetReference(maximizeWithSemanticIdeal), { kind: "scalar", value: 100, source: "semantic" });
+assert.deepEqual(semantics.resolveKpiTargetReference(maximizeWithSemanticIdeal, 120), { kind: "scalar", value: 120, source: "manual" }, "manual targets remain authoritative");
+assert.deepEqual(semantics.resolveKpiTargetReference(targetRange), { kind: "range", min: 70, max: 85, source: "semantic" });
+assert.deepEqual(semantics.resolveKpiTargetReference(configured("Unknown", "unknown", { idealValue: 10 })), { kind: "none" }, "unknown semantics fail closed even when an ideal value is present");
 
 assert.equal(semantics.isKpiTargetMet("within_range"), true);
 assert.equal(semantics.isKpiTargetMet("achieved"), true);
@@ -192,6 +206,49 @@ assert.equal(duplicateGroups.length, 1);
 assert.equal(duplicateGroups[0].requiresScaleReview, true);
 assert.ok(!duplicateGroups[0].labels.includes("Target Revenue"));
 
+const navigationMetricNames = ["1-Star Reviews", "Average Checkout Wait", "revenue", "Revenue ($M)", "Target Revenue"];
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue", navigationMetricNames),
+  ["Revenue"],
+  "Clicking Revenue must preserve the URL spelling while resolving its normalized KPI identity."
+);
+assert.deepEqual(settings.resolveSelectedKpiNames("1-Star Reviews", navigationMetricNames), ["1-Star Reviews"]);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue", [...navigationMetricNames].reverse()),
+  ["Revenue"],
+  "Revenue selection must not depend on KPI array order."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue ($M)", navigationMetricNames),
+  ["Revenue ($M)"],
+  "A scaled Revenue label must retain its exact detail identity."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames(["Revenue", "revenue", "Revenue ($M)"], navigationMetricNames),
+  ["Revenue", "Revenue ($M)"],
+  "Case aliases must not create duplicate selections or resolve to an unrelated KPI."
+);
+assert.deepEqual(
+  ["Revenue", "1-Star Reviews", "Revenue"].map((metric) => settings.resolveSelectedKpiNames(metric, navigationMetricNames)[0]),
+  ["Revenue", "1-Star Reviews", "Revenue"],
+  "Back and forward navigation must resolve each URL independently."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue", navigationMetricNames),
+  settings.resolveSelectedKpiNames("Revenue", navigationMetricNames),
+  "Refreshing a Revenue detail URL must preserve Revenue."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames(undefined, navigationMetricNames),
+  navigationMetricNames.slice(0, 3),
+  "A missing metric parameter may use the safe default selection."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Unknown KPI", navigationMetricNames),
+  [],
+  "An explicit unresolved metric must fail closed instead of selecting the first KPI."
+);
+
 const operationsActions = fs.readFileSync(path.join(root, "app/app/operations/actions.ts"), "utf8");
 const fileActions = fs.readFileSync(path.join(root, "app/app/files/actions.ts"), "utf8");
 const lifecycleService = fs.readFileSync(path.join(root, "lib/ai/kpi-semantics/service.ts"), "utf8");
@@ -200,7 +257,11 @@ const kpiPage = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8"
 const performanceFields = fs.readFileSync(path.join(root, "components/kpis/KpiPerformanceMeaningFields.tsx"), "utf8");
 const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
+const kpiSettingsPage = fs.readFileSync(path.join(root, "app/app/kpis/settings/page.tsx"), "utf8");
 const prestige = fs.readFileSync(path.join(root, "lib/intelligence/prestige.ts"), "utf8");
+const peoplePage = fs.readFileSync(path.join(root, "app/app/people/page.tsx"), "utf8");
+const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
+const dormantReports = fs.readFileSync(path.join(root, "app/app/reports/actions.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607270002_kpi_semantic_direction.sql"), "utf8");
 
 assert.match(operationsActions, /classifyAndPersistKpiSemantics/);
@@ -216,9 +277,25 @@ assert.doesNotMatch(lifecycleService, /proposal\.confidence >= KPI_SEMANTIC_ACCE
 assert.match(lifecycleService, /\.eq\("workspace_id", workspaceId\)/);
 assert.match(classificationContract, /targetBehaviorForDirection/);
 assert.match(overview, /evaluateKpiPerformance/);
+assert.match(overview, /trendTone\(trend\.performanceEffect\)/, "Executive Overview colors KPI movement by canonical performance effect");
+assert.doesNotMatch(overview, /trendTone\(trend\.change/, "raw movement cannot drive Executive Overview performance color");
 assert.match(kpiOverview, /definition: setting\?\.definition\?\.trim\(\) \|\| null/);
 assert.match(kpiOverview, /desired_direction: metric\.desiredDirection/);
+assert.match(kpiSettingsPage, /resolveKpiSemantics\(metric, setting\)/, "KPI Settings renders the canonical resolved semantic state");
+assert.match(kpiSettingsPage, /resolveKpiTargetReference\(semantics, target\)/, "KPI Settings recognizes canonical semantic targets and ranges");
+assert.doesNotMatch(kpiSettingsPage, /setting\?\.desired_direction !== "unknown"/, "KPI Settings must not maintain a second nullable direction resolver");
+assert.match(kpiSettingsPage, /defaultValue=\{formatNumber\(target\)\}/, "the target editor remains manual-target-only");
 assert.match(prestige, /evaluateKpiPerformance/);
+assert.match(prestige, /resolveKpiTargetReference/);
+assert.doesNotMatch(prestige, /latest\.actual_value\s*>=\s*previous\.actual_value/);
+assert.match(peoplePage, /from\("kpi_settings"\)/, "People loads canonical KPI settings for shared intelligence output");
+assert.match(peoplePage, /order\("sort_order", \{ ascending: true \}\)\.order\("weight", \{ ascending: false \}\)/, "People orders KPI settings by columns owned by kpi_settings");
+assert.doesNotMatch(peoplePage, /from\("kpi_settings"\)[^\n]+order\("metric_name"/, "People must not order KPI settings by the operational-metrics column metric_name");
+assert.match(peoplePage, /kpiSettings: kpiSettingsResult\.data \|\| \[\]/);
+assert.match(operationalEvidence, /Math\.abs\(revenue\.changePercent \?\? 0\) >= 5/, "operational thresholds measure magnitude after canonical direction is known");
+assert.match(dormantReports, /performanceEffect === "favorable"/);
+assert.match(dormantReports, /performanceEffect === "unfavorable"/);
+assert.doesNotMatch(dormantReports, /is improving fastest|is declining most/);
 assert.match(migration, /alter table public\.kpi_settings/);
 assert.doesNotMatch(migration, /\b(delete from|update public\.kpis|drop table|truncate)\b/i);
 assert.doesNotMatch(lifecycleService, /\.from\("kpis"\)\.update/);
@@ -247,6 +324,11 @@ assert.doesNotMatch(kpiPage, /function ManualTargetForm/, "Recommended Target mu
 assert.match(kpiPage, /Current manual target/);
 assert.match(kpiPage, /Edit manual targets in Chart Settings\./);
 assert.match(kpiPage, /const selectedManualTarget = selectedKpiSetting\?\.target \?\? selectedLatestKpi\?\.target \?\? null/);
+assert.match(kpiPage, /resolveSelectedKpiNames\(params\?\.metric, metricNames\)/, "KPI Detail must resolve URL selection through normalized KPI identity.");
+assert.doesNotMatch(kpiPage, /function getSelectedMetrics/, "KPI Detail must not retain the case-sensitive first-item fallback.");
+assert.match(kpiPage, /resolveKpiTargetReference/);
+assert.match(kpiPage, /isKpiTargetMet\(evaluateKpiPerformance/);
+assert.doesNotMatch(kpiPage, /target === null && direction !== "target_range"/, "semantic targets cannot be treated as missing by direction-specific UI logic");
 assert.match(operationsActions, /target,\n\s+weight,/, "Manual targets must persist through the kpi_settings upsert.");
 assert.doesNotMatch(kpiPage, /classifyAndPersistKpiSemantics/, "KPI rendering must not invoke Luna.");
 for (const label of ["Performance meaning", "Higher is better", "Lower is better", "Target range", "Exact target", "Maintain stability", "Not determined", "KPI definition"]) {

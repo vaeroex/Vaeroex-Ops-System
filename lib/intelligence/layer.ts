@@ -213,19 +213,20 @@ function evidenceRecord({
   return { id, title, recordType, date, value, support, href, sourceKey, classification, groupHint };
 }
 
-function kpiEvidenceRecord(kpi: KpiRow, support: string): IntelligenceEvidenceRecord {
+function kpiEvidenceRecord(kpi: KpiRow, semantics: KpiSemantics, support: string): IntelligenceEvidenceRecord {
   const sourceKey = kpi.source_file_id
     ? `source-file:${kpi.source_file_id}`
     : kpi.import_id
       ? `import:${kpi.import_id}`
       : `manual-kpi:${normalizeKpiName(kpi.name)}`;
 
+  const reference = targetReference(kpi, semantics);
   return evidenceRecord({
     id: `kpi:${kpi.id}`,
     title: kpi.name,
     recordType: "KPI record",
     date: kpi.metric_date,
-    value: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${kpi.target === null ? "" : ` · Target ${formatMetric(kpi.target, kpi.name)}`}`,
+    value: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${reference ? ` · ${reference[0].toUpperCase()}${reference.slice(1)}` : ""}`,
     support,
     href: `/app/kpis?metric=${encodeURIComponent(kpi.name)}&section=detail`,
     classification: recordClassification(kpi),
@@ -511,7 +512,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         `Historical records: ${history}`
       ];
       const supportingRecords = kpiHistory.slice(0, 4).map((row, index) =>
-        kpiEvidenceRecord(row, index === 0 ? `The latest recorded value is ${condition}.` : "This prior value establishes the recent KPI history.")
+        kpiEvidenceRecord(row, semantics, index === 0 ? `The latest recorded value is ${condition}.` : "This prior value establishes the recent KPI history.")
       );
       const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
       const limitation = history < 3
@@ -592,7 +593,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       const condition = targetSuccessLabel(semantics);
       const reference = targetReference(kpi, semantics);
       const supportingRecords = kpiHistory.slice(0, 4).map((row, index) =>
-        kpiEvidenceRecord(row, index === 0 ? `The latest value is ${condition}.` : "This prior value establishes the recent KPI history.")
+        kpiEvidenceRecord(row, semantics, index === 0 ? `The latest value is ${condition}.` : "This prior value establishes the recent KPI history.")
       );
       const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
 

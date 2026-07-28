@@ -24,6 +24,32 @@ export function normalizeKpiName(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
 }
 
+export function resolveSelectedKpiNames(
+  value: string | string[] | undefined,
+  metricNames: string[],
+  fallbackCount = 3
+) {
+  const requested = (Array.isArray(value) ? value : value ? [value] : [])
+    .map((name) => name.trim())
+    .filter(Boolean);
+
+  if (!requested.length) {
+    return metricNames.slice(0, Math.min(metricNames.length, fallbackCount));
+  }
+
+  const availableIdentities = new Set(metricNames.map(normalizeKpiName));
+  const selectedByIdentity = new Map<string, string>();
+
+  for (const name of requested) {
+    const identity = normalizeKpiName(name);
+    if (availableIdentities.has(identity) && !selectedByIdentity.has(identity)) {
+      selectedByIdentity.set(identity, name);
+    }
+  }
+
+  return [...selectedByIdentity.values()];
+}
+
 export function approvedKpiColor(value: string | null | undefined): string {
   const match = KPI_COLOR_PALETTE.find((color) => color.value === value);
   return match?.value || DEFAULT_KPI_COLOR;

@@ -5,7 +5,8 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { applyKpiSettingsToRows, kpiSemantics, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { evaluateKpiPerformance, resolveKpiTargetReference } from "@/lib/kpis/semantics";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys, sanitizeBusinessEvidenceText } from "@/lib/intelligence/evidence-eligibility";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
@@ -294,6 +295,13 @@ function formatKpiNumber(value: number) {
   return reportNumberFormatter.format(value);
 }
 
+function formatKpiTargetValue(kpi: KpiRow, settings: KpiSettingRow[]) {
+  const reference = resolveKpiTargetReference(kpiSemantics(kpi.name, settings), kpi.target);
+  if (reference.kind === "none") return null;
+  if (reference.kind === "range") return `${formatKpiNumber(reference.min)} to ${formatKpiNumber(reference.max)}`;
+  return formatKpiNumber(reference.value);
+}
+
 function groupKpisByName(kpis: KpiRow[]) {
   return kpis.reduce<Record<string, KpiRow[]>>((groups, kpi) => {
     groups[kpi.name] = groups[kpi.name] || [];
@@ -302,7 +310,7 @@ function groupKpisByName(kpis: KpiRow[]) {
   }, {});
 }
 
-function kpiMovementRows(kpis: KpiRow[], endDate: string) {
+function kpiMovementRows(kpis: KpiRow[], endDate: string, settings: KpiSettingRow[]) {
   return Object.entries(groupKpisByName(kpis))
     .map(([name, rows]) => {
       const values = rows
@@ -321,6 +329,11 @@ function kpiMovementRows(kpis: KpiRow[], endDate: string) {
           ? ((latestValue - firstValue) / Math.abs(firstValue)) * 100
           : null;
       const volatility = deltas.length ? deltas.reduce((sum, value) => sum + value, 0) / deltas.length : null;
+      const performanceEffect = evaluateKpiPerformance({
+        observations: values,
+        semantics: kpiSemantics(name, settings),
+        target: latest?.target ?? null
+      }).selectedRangeTrend;
 
       return {
         name,
@@ -330,25 +343,26 @@ function kpiMovementRows(kpis: KpiRow[], endDate: string) {
         count: values.length,
         change,
         changePercent,
-        volatility
+        volatility,
+        performanceEffect
       };
     })
     .filter((trend) => trend.count >= 2 && trend.latest);
 }
 
-function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
-  const trends = kpiMovementRows(kpis, range.endDate);
+function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange, settings: KpiSettingRow[]) {
+  const trends = kpiMovementRows(kpis, range.endDate, settings);
 
   if (!trends.length) {
     return [];
   }
 
   const improving = [...trends]
-    .filter((trend) => trend.changePercent !== null)
-    .sort((a, b) => (b.changePercent ?? 0) - (a.changePercent ?? 0))[0];
+    .filter((trend) => trend.changePercent !== null && trend.performanceEffect === "favorable")
+    .sort((a, b) => Math.abs(b.changePercent ?? 0) - Math.abs(a.changePercent ?? 0))[0];
   const declining = [...trends]
-    .filter((trend) => (trend.changePercent ?? 0) < 0)
-    .sort((a, b) => (a.changePercent ?? 0) - (b.changePercent ?? 0))[0];
+    .filter((trend) => trend.changePercent !== null && trend.performanceEffect === "unfavorable")
+    .sort((a, b) => Math.abs(b.changePercent ?? 0) - Math.abs(a.changePercent ?? 0))[0];
   const volatile = [...trends]
     .filter((trend) => trend.volatility !== null)
     .sort((a, b) => (b.volatility ?? 0) - (a.volatility ?? 0))[0];
@@ -356,10 +370,10 @@ function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
   const customerActivity = trends.find((trend) => normalizeCategory(trend.name).includes("lead") || normalizeCategory(trend.name).includes("customer"));
   const observations = [
     improving && improving.changePercent !== null
-      ? `${improving.name} is improving fastest at ${formatKpiNumber(improving.changePercent)}% across its latest ${improving.count} entries.`
+      ? `${improving.name} has the strongest favorable performance movement; its raw value changed ${formatKpiNumber(improving.changePercent)}% across its latest ${improving.count} entries.`
       : "",
     declining && declining.changePercent !== null
-      ? `${declining.name} is declining most at ${formatKpiNumber(Math.abs(declining.changePercent))}%.`
+      ? `${declining.name} has the strongest unfavorable performance movement; its raw value changed ${formatKpiNumber(declining.changePercent)}%.`
       : "",
     volatile && volatile.volatility !== null
       ? `${volatile.name} is the most volatile, averaging ${formatKpiNumber(volatile.volatility)} points of movement between entries.`
@@ -367,14 +381,15 @@ function buildKpiTrendObservations(kpis: KpiRow[], range: DateRange) {
   ].filter(Boolean);
 
   if (revenue && customerActivity && revenue.change !== null && customerActivity.change !== null) {
-    if (customerActivity.change > 0 && revenue.change < 0) {
-      observations.push("Customer activity is rising while revenue is falling, which may point to conversion, pricing, response quality, or sales-process issues.");
-    } else if (customerActivity.change < 0 && revenue.change > 0) {
-      observations.push("Revenue is rising while customer activity is falling, which may mean higher-value work is offsetting weaker activity volume.");
-    } else if (customerActivity.change > 0 && revenue.change > 0) {
-      observations.push("Customer activity and revenue are both rising, which suggests activity volume and sales results are currently aligned.");
-    } else if (customerActivity.change < 0 && revenue.change < 0) {
-      observations.push("Customer activity and revenue are both falling, which should be reviewed before the next management meeting.");
+    if (customerActivity.performanceEffect === "favorable" && revenue.performanceEffect === "favorable") {
+      observations.push("Customer activity and revenue both moved favorably under their confirmed KPI semantics.");
+    } else if (customerActivity.performanceEffect === "unfavorable" && revenue.performanceEffect === "unfavorable") {
+      observations.push("Customer activity and revenue both moved unfavorably under their confirmed KPI semantics and should be reviewed.");
+    } else if (
+      [customerActivity.performanceEffect, revenue.performanceEffect].every((effect) => effect === "favorable" || effect === "unfavorable")
+      && customerActivity.performanceEffect !== revenue.performanceEffect
+    ) {
+      observations.push("Customer activity and revenue moved in different confirmed performance directions and should be reviewed together.");
     }
   }
 
@@ -591,7 +606,7 @@ async function fetchReportSource(
   const formSubmissions = submissionRows.filter((submission) => inIsoRange(submission.created_at, range));
   const flaggedAssets = assetRows.filter((asset) => asset.status !== "Ready");
   const recordedKpis = kpiRows.filter((kpi) => kpi.metric_date >= range.startDate && kpi.metric_date <= range.endDate);
-  const kpiTrendObservations = buildKpiTrendObservations(kpiRows, range);
+  const kpiTrendObservations = buildKpiTrendObservations(kpiRows, range, kpiSettingRows);
   const uploadedFiles = fileRows.filter((file) => inIsoRange(file.created_at, range));
   const importedFiles = fileRows.filter((file) => file.import_status === "imported" && inIsoRange(file.updated_at || file.created_at, range));
   const completedImports = fileImportRows.filter((item) => item.status === "completed" && inIsoRange(item.imported_at || item.created_at, range));
@@ -649,7 +664,10 @@ async function fetchReportSource(
       flagged_assets: flaggedAssets.slice(0, 8).map((asset) => `${asset.asset_name}${asset.status ? ` (${asset.status})` : ""}`),
       kpis_recorded: recordedKpis
         .slice(0, 8)
-        .map((kpi) => `${kpi.name}: ${kpi.actual_value ?? "not set"}${kpi.target !== null ? ` vs target ${kpi.target}` : ""}`),
+        .map((kpi) => {
+          const target = formatKpiTargetValue(kpi, kpiSettingRows);
+          return `${kpi.name}: ${kpi.actual_value ?? "not set"}${target ? ` vs target ${target}` : ""}`;
+        }),
       kpi_trend_observations: kpiTrendObservations,
       uploaded_files: uploadedFiles
         .slice(0, 8)
