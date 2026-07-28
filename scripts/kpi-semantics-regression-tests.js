@@ -209,6 +209,7 @@ const kpiPage = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8"
 const performanceFields = fs.readFileSync(path.join(root, "components/kpis/KpiPerformanceMeaningFields.tsx"), "utf8");
 const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
+const kpiSettingsPage = fs.readFileSync(path.join(root, "app/app/kpis/settings/page.tsx"), "utf8");
 const prestige = fs.readFileSync(path.join(root, "lib/intelligence/prestige.ts"), "utf8");
 const peoplePage = fs.readFileSync(path.join(root, "app/app/people/page.tsx"), "utf8");
 const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
@@ -232,6 +233,10 @@ assert.match(overview, /trendTone\(trend\.performanceEffect\)/, "Executive Overv
 assert.doesNotMatch(overview, /trendTone\(trend\.change/, "raw movement cannot drive Executive Overview performance color");
 assert.match(kpiOverview, /definition: setting\?\.definition\?\.trim\(\) \|\| null/);
 assert.match(kpiOverview, /desired_direction: metric\.desiredDirection/);
+assert.match(kpiSettingsPage, /resolveKpiSemantics\(metric, setting\)/, "KPI Settings renders the canonical resolved semantic state");
+assert.match(kpiSettingsPage, /resolveKpiTargetReference\(semantics, target\)/, "KPI Settings recognizes canonical semantic targets and ranges");
+assert.doesNotMatch(kpiSettingsPage, /setting\?\.desired_direction !== "unknown"/, "KPI Settings must not maintain a second nullable direction resolver");
+assert.match(kpiSettingsPage, /defaultValue=\{formatNumber\(target\)\}/, "the target editor remains manual-target-only");
 assert.match(prestige, /evaluateKpiPerformance/);
 assert.match(prestige, /resolveKpiTargetReference/);
 assert.doesNotMatch(prestige, /latest\.actual_value\s*>=\s*previous\.actual_value/);
