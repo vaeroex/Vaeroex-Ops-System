@@ -674,7 +674,7 @@ export async function updateKpiSettingAction(formData: FormData) {
     redirectWithError(path, error instanceof Error ? error.message : "KPI settings update was blocked by Vaeroex security policy.");
   }
 
-  const { error } = await supabase.from("kpi_settings").upsert(
+  const { data: persistedSetting, error } = await supabase.from("kpi_settings").upsert(
     {
       workspace_id: workspaceId,
       kpi_name: kpiName,
@@ -695,10 +695,21 @@ export async function updateKpiSettingAction(formData: FormData) {
       created_by: user.id
     },
     { onConflict: "workspace_id,kpi_name" }
-  );
+  )
+    .select("id,workspace_id,kpi_name,target")
+    .single();
 
   if (error) {
     redirectWithError(path, error.message);
+  }
+
+  if (
+    !persistedSetting
+    || persistedSetting.workspace_id !== workspaceId
+    || persistedSetting.kpi_name !== kpiName
+    || persistedSetting.target !== target
+  ) {
+    redirectWithError(path, "KPI settings could not be verified after saving.");
   }
 
   revalidatePath("/app");
