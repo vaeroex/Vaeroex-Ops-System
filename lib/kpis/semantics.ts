@@ -310,6 +310,11 @@ export function resolveKpiSemantics(label: string, setting?: KpiSettingRow | nul
   const legacyDirection = storedDirection === "unknown" ? legacyDefinitionDirection(setting.definition) : "unknown";
   const resolvedStoredDirection = storedDirection !== "unknown" ? storedDirection : legacyDirection;
   const hasTrustedStoredClassification = resolvedStoredDirection !== "unknown" && (setting.classification_confirmed || legacyDirection !== "unknown");
+  const usesDeterministicFallback = !hasTrustedStoredClassification
+    && fallback.desiredDirection !== "unknown"
+    && fallback.classificationSource === "deterministic"
+    && setting.classification_source !== "luna"
+    && setting.classification_source !== "user";
   const storedClassificationSource = KPI_CLASSIFICATION_SOURCES.includes(setting.classification_source as KpiSemantics["classificationSource"])
     ? setting.classification_source as KpiSemantics["classificationSource"]
     : fallback.classificationSource;
@@ -320,9 +325,11 @@ export function resolveKpiSemantics(label: string, setting?: KpiSettingRow | nul
     originalSourceLabel: setting.original_source_label?.trim() || fallback.originalSourceLabel,
     unit: setting.semantic_unit || fallback.unit,
     scale: safeNumber(setting.semantic_scale, fallback.scale) || 1,
-    desiredDirection: hasTrustedStoredClassification ? resolvedStoredDirection : "unknown",
+    desiredDirection: hasTrustedStoredClassification ? resolvedStoredDirection : usesDeterministicFallback ? fallback.desiredDirection : "unknown",
     targetBehavior: hasTrustedStoredClassification && setting.target_behavior !== "unknown" && KPI_TARGET_BEHAVIORS.includes(setting.target_behavior as KpiTargetBehavior)
       ? (setting.target_behavior as KpiTargetBehavior)
+      : usesDeterministicFallback
+        ? fallback.targetBehavior
       : legacyDirection === "maximize"
         ? "minimum_goal"
         : legacyDirection === "minimize"
@@ -330,9 +337,9 @@ export function resolveKpiSemantics(label: string, setting?: KpiSettingRow | nul
           : legacyDirection === "exact_target"
             ? "exact_threshold"
             : "unknown",
-    idealValue: hasTrustedStoredClassification ? safeNumber(setting.ideal_value, fallback.idealValue) : null,
-    idealRangeMin: hasTrustedStoredClassification ? safeNumber(setting.ideal_range_min, fallback.idealRangeMin) : null,
-    idealRangeMax: hasTrustedStoredClassification ? safeNumber(setting.ideal_range_max, fallback.idealRangeMax) : null,
+    idealValue: hasTrustedStoredClassification || usesDeterministicFallback ? safeNumber(setting.ideal_value, fallback.idealValue) : null,
+    idealRangeMin: hasTrustedStoredClassification || usesDeterministicFallback ? safeNumber(setting.ideal_range_min, fallback.idealRangeMin) : null,
+    idealRangeMax: hasTrustedStoredClassification || usesDeterministicFallback ? safeNumber(setting.ideal_range_max, fallback.idealRangeMax) : null,
     metricRole: setting.metric_role === "target" || setting.metric_role === "benchmark" || setting.metric_role === "unknown"
       ? setting.metric_role
       : fallback.metricRole,

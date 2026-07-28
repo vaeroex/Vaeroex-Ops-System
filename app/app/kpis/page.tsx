@@ -1247,41 +1247,6 @@ function KpiSettingHiddenFields({
   );
 }
 
-function ManualTargetForm({
-  metricName,
-  setting,
-  latest
-}: {
-  metricName: string;
-  setting: KpiSettingRow | undefined;
-  latest: KpiRow | undefined;
-}) {
-  return (
-    <form action={updateKpiSettingAction} className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
-      <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
-      <KpiSettingHiddenFields metricName={metricName} setting={setting} latest={latest} includeTarget={false} />
-      <label className="block text-xs font-semibold uppercase tracking-wide text-slate-400">
-        Manual target
-        <input
-          name="target"
-          type="number"
-          step="0.01"
-          defaultValue={setting?.target ?? latest?.target ?? ""}
-          className="mt-2 min-h-11 w-full rounded-lg border border-white/10 bg-slate-950/70 px-3 py-2 text-sm normal-case tracking-normal text-slate-100 outline-none focus:border-vaeroex-accent"
-        />
-      </label>
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button className="min-h-10 rounded-lg bg-vaeroex-blue px-3 py-2 text-xs font-semibold text-white hover:bg-blue-950/70 hover:ring-1 hover:ring-vaeroex-accent/45">
-          Save target
-        </button>
-        <Link href={(`/app/kpis?metric=${encodeURIComponent(metricName)}&section=detail#kpi-detail`) as Route} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40 hover:text-vaeroex-accent">
-          Cancel
-        </Link>
-      </div>
-    </form>
-  );
-}
-
 function KpiTargetRecommendationPanel({
   metricName,
   recommendation,
@@ -1293,15 +1258,21 @@ function KpiTargetRecommendationPanel({
   setting: KpiSettingRow | undefined;
   latest: KpiRow | undefined;
 }) {
+  const currentManualTarget = setting?.target ?? latest?.target ?? null;
+  const currentTargetDisplay = currentManualTarget === null ? "Not set" : numberFormatter.format(currentManualTarget);
+
   if (recommendation.value === null) {
     return (
       <div className="space-y-3 rounded-lg border border-amber-400/35 bg-amber-950/25 p-4 text-sm leading-6 text-amber-100">
         <div>
-          <p className="font-semibold">Not enough history to recommend a reliable target.</p>
+          <p className="font-semibold">{recommendation.reason}</p>
           <p className="mt-2">{recommendation.limitation}</p>
-          <p className="mt-2">Suggested next data: upload 6-12 months of KPI history or prior monthly reports.</p>
         </div>
-        <ManualTargetForm metricName={metricName} setting={setting} latest={latest} />
+        <div className="rounded-lg border border-white/10 bg-slate-950/35 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Current manual target</p>
+          <p className="mt-1 font-semibold text-white">{currentTargetDisplay}</p>
+          <p className="mt-1 text-xs text-slate-400">Edit manual targets in Chart Settings.</p>
+        </div>
       </div>
     );
   }
@@ -1336,7 +1307,11 @@ function KpiTargetRecommendationPanel({
           <dd className="mt-1 text-slate-300">{recommendation.outliers}</dd>
         </div>
       </dl>
-      <ManualTargetForm metricName={metricName} setting={setting} latest={latest} />
+      <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Current manual target</p>
+        <p className="mt-1 font-semibold text-white">{currentTargetDisplay}</p>
+        <p className="mt-1 text-xs text-slate-400">Edit manual targets in Chart Settings.</p>
+      </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <form action={updateKpiSettingAction}>
           <input type="hidden" name="return_path" value={kpiDetailReturnPath(metricName)} />
@@ -1479,8 +1454,10 @@ function KpiChartSettingsForm({
   const selectedColor = setting?.color ?? "#10B981";
   const lowContrastColor = kpiColorMayBeLowContrast(selectedColor);
   const fallback = deterministicKpiSemantics(metricName);
-  const proposedDirection = (setting?.desired_direction ?? "unknown") as KpiDesiredDirection;
-  const isUnconfirmed = !setting?.classification_confirmed;
+  const resolvedSemantics = kpiSemantics(metricName, setting ? [setting] : []);
+  const proposedDirection = (setting?.desired_direction ?? fallback.desiredDirection) as KpiDesiredDirection;
+  const hasActiveDeterministicDirection = resolvedSemantics.desiredDirection !== "unknown" && resolvedSemantics.classificationSource === "deterministic";
+  const isUnconfirmed = resolvedSemantics.desiredDirection === "unknown";
   const isLunaSuggestion = setting?.classification_source === "luna" && isUnconfirmed;
   const confidence = setting?.classification_confidence ?? null;
   const suggestionSelection = setting ? validateKpiSemanticSelection({
@@ -1501,7 +1478,11 @@ function KpiChartSettingsForm({
 
   return (
     <div className="space-y-3">
-      {isUnconfirmed ? (
+      {hasActiveDeterministicDirection ? (
+        <p className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-3 text-xs font-semibold text-cyan-100">
+          Deterministic performance direction: {directionLabel(resolvedSemantics.desiredDirection)}. Confirm or override it in Performance meaning below.
+        </p>
+      ) : isUnconfirmed ? (
         <section className="rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4">
           {isLunaSuggestion ? (
             <div className="space-y-3">
@@ -1554,7 +1535,7 @@ function KpiChartSettingsForm({
         </section>
       ) : (
         <p className="rounded-lg border border-emerald-400/25 bg-emerald-950/20 p-3 text-xs font-semibold text-emerald-100">
-          Confirmed performance direction: {directionLabel(proposedDirection)}
+          Confirmed performance direction: {directionLabel(resolvedSemantics.desiredDirection)}
         </p>
       )}
 
@@ -1792,11 +1773,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
   const selectedKpiDirection = primaryMetric ? explicitKpiDirection(primaryMetric, allVisibleKpis, kpiSettings) : "unknown";
   const selectedKpiSemantics = primaryMetric ? kpiSemantics(primaryMetric, kpiSettings) : kpiSemantics("Unknown KPI", []);
+  const selectedManualTarget = selectedKpiSetting?.target ?? selectedLatestKpi?.target ?? null;
   const selectedKpiEvaluation = primaryMetric
     ? evaluateKpiPerformance({
         observations: selectedMetricRows,
         semantics: selectedKpiSemantics,
-        target: selectedLatestKpi?.target ?? selectedKpiSetting?.target ?? null
+        target: selectedManualTarget
       })
     : null;
   const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis, kpiSettings) : null;
@@ -1983,11 +1965,11 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <p className="mt-1 text-sm leading-6 text-slate-400">{kpiDefinition(primaryMetric, kpiSettings) || "No definition set yet."}</p>
                   </div>
                   {selectedKpiDirection !== "unknown" ? (() => {
-                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedLatestKpi?.target ?? null, selectedKpiDirection, selectedKpiSemantics);
+                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedManualTarget, selectedKpiDirection, selectedKpiSemantics);
                     return <KpiStatusBadge label={statusLabel(tone)} status={kpiStatus({
                       tone,
                       hasCurrentValue: selectedLatestKpi?.actual_value !== null && selectedLatestKpi?.actual_value !== undefined,
-                      hasTarget: (selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined) || selectedKpiDirection === "target_range",
+                      hasTarget: selectedManualTarget !== null || selectedKpiDirection === "target_range",
                       hasDirection: true
                     })} />;
                   })() : null}
@@ -2000,12 +1982,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                   <TrendSummaryCard
                     label="Target"
-                    value={formatSettingValue(selectedLatestKpi?.target ?? selectedKpiSetting?.target, primaryMetric, kpiSettings)}
-                    detail={selectedLatestKpi?.target !== null && selectedLatestKpi?.target !== undefined ? "Current target setting" : selectedKpiSetting?.target !== null && selectedKpiSetting?.target !== undefined ? "Current target setting" : "No target set"}
+                    value={formatSettingValue(selectedManualTarget, primaryMetric, kpiSettings)}
+                    detail={selectedManualTarget !== null ? "Current target setting" : "No target set"}
                   />
                   <TrendSummaryCard
                     label="Latest performance effect"
-                    value={trendLabelForRows(selectedMetricRows, selectedKpiSemantics, selectedLatestKpi?.target ?? selectedKpiSetting?.target ?? null)}
+                    value={trendLabelForRows(selectedMetricRows, selectedKpiSemantics, selectedManualTarget)}
                     detail={`${directionLabel(selectedKpiDirection)}; based on the latest two values`}
                   />
                 </div>
@@ -2034,8 +2016,8 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     {selectedLatestKpi
                       ? selectedKpiDirection !== "unknown"
-                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedLatestKpi.target, selectedKpiDirection, selectedKpiSemantics)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
-                        : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)} against a target of ${formatSettingValue(selectedLatestKpi.target, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
+                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedManualTarget, selectedKpiDirection, selectedKpiSemantics)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
+                        : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)} against a target of ${formatSettingValue(selectedManualTarget, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
                       : "Add a current value to unlock status, trend, and target guidance."}
                   </p>
                   {selectedKpiEvaluation ? (
