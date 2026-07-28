@@ -6,7 +6,7 @@ const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
 
-function loadTypescriptModule(relativePath) {
+function loadTypescriptModule(relativePath, mocks = {}) {
   const file = path.join(root, relativePath);
   const source = fs.readFileSync(file, "utf8");
   const output = ts.transpileModule(source, {
@@ -16,11 +16,16 @@ function loadTypescriptModule(relativePath) {
   const loaded = new Module(file, module);
   loaded.filename = file;
   loaded.paths = module.paths;
+  const originalRequire = loaded.require.bind(loaded);
+  loaded.require = (request) => Object.prototype.hasOwnProperty.call(mocks, request) ? mocks[request] : originalRequire(request);
   loaded._compile(output, file);
   return loaded.exports;
 }
 
 const semantics = loadTypescriptModule("lib/kpis/semantics.ts");
+const settings = loadTypescriptModule("lib/kpis/settings.ts", {
+  "@/lib/kpis/semantics": semantics
+});
 
 function configured(label, direction, extras = {}) {
   return {
@@ -201,6 +206,49 @@ assert.equal(duplicateGroups.length, 1);
 assert.equal(duplicateGroups[0].requiresScaleReview, true);
 assert.ok(!duplicateGroups[0].labels.includes("Target Revenue"));
 
+const navigationMetricNames = ["1-Star Reviews", "Average Checkout Wait", "revenue", "Revenue ($M)", "Target Revenue"];
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue", navigationMetricNames),
+  ["Revenue"],
+  "Clicking Revenue must preserve the URL spelling while resolving its normalized KPI identity."
+);
+assert.deepEqual(settings.resolveSelectedKpiNames("1-Star Reviews", navigationMetricNames), ["1-Star Reviews"]);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue", [...navigationMetricNames].reverse()),
+  ["Revenue"],
+  "Revenue selection must not depend on KPI array order."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue ($M)", navigationMetricNames),
+  ["Revenue ($M)"],
+  "A scaled Revenue label must retain its exact detail identity."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames(["Revenue", "revenue", "Revenue ($M)"], navigationMetricNames),
+  ["Revenue", "Revenue ($M)"],
+  "Case aliases must not create duplicate selections or resolve to an unrelated KPI."
+);
+assert.deepEqual(
+  ["Revenue", "1-Star Reviews", "Revenue"].map((metric) => settings.resolveSelectedKpiNames(metric, navigationMetricNames)[0]),
+  ["Revenue", "1-Star Reviews", "Revenue"],
+  "Back and forward navigation must resolve each URL independently."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Revenue", navigationMetricNames),
+  settings.resolveSelectedKpiNames("Revenue", navigationMetricNames),
+  "Refreshing a Revenue detail URL must preserve Revenue."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames(undefined, navigationMetricNames),
+  navigationMetricNames.slice(0, 3),
+  "A missing metric parameter may use the safe default selection."
+);
+assert.deepEqual(
+  settings.resolveSelectedKpiNames("Unknown KPI", navigationMetricNames),
+  [],
+  "An explicit unresolved metric must fail closed instead of selecting the first KPI."
+);
+
 const operationsActions = fs.readFileSync(path.join(root, "app/app/operations/actions.ts"), "utf8");
 const fileActions = fs.readFileSync(path.join(root, "app/app/files/actions.ts"), "utf8");
 const lifecycleService = fs.readFileSync(path.join(root, "lib/ai/kpi-semantics/service.ts"), "utf8");
@@ -276,6 +324,8 @@ assert.doesNotMatch(kpiPage, /function ManualTargetForm/, "Recommended Target mu
 assert.match(kpiPage, /Current manual target/);
 assert.match(kpiPage, /Edit manual targets in Chart Settings\./);
 assert.match(kpiPage, /const selectedManualTarget = selectedKpiSetting\?\.target \?\? selectedLatestKpi\?\.target \?\? null/);
+assert.match(kpiPage, /resolveSelectedKpiNames\(params\?\.metric, metricNames\)/, "KPI Detail must resolve URL selection through normalized KPI identity.");
+assert.doesNotMatch(kpiPage, /function getSelectedMetrics/, "KPI Detail must not retain the case-sensitive first-item fallback.");
 assert.match(kpiPage, /resolveKpiTargetReference/);
 assert.match(kpiPage, /isKpiTargetMet\(evaluateKpiPerformance/);
 assert.doesNotMatch(kpiPage, /target === null && direction !== "target_range"/, "semantic targets cannot be treated as missing by direction-specific UI logic");
