@@ -16,6 +16,12 @@ function contextualRecord(recordType: string, sourceKey: string) {
   return /business note|business memory/i.test(recordType) || /^(?:business-note|business-memory):/i.test(sourceKey);
 }
 
+function canonicalEvidenceRecordType(recordId: string, recordType: string) {
+  return recordId.startsWith("kpi:") && ["KPI record", "Imported KPI measurement"].includes(recordType)
+    ? "KPI record"
+    : recordType;
+}
+
 function recordAuthority(classification: "Original" | "Manual" | "Derived", recordType: string, sourceKey: string): EvidenceAuthorityRoleV1 {
   if (contextualRecord(recordType, sourceKey)) return "supporting_context";
   return classification === "Derived" ? "derived" : "original";
@@ -43,7 +49,7 @@ export function adaptIntelligenceLayerProducerOutputV1({
         id,
         workspaceId,
         recordId: record.id,
-        recordType: record.recordType,
+        recordType: canonicalEvidenceRecordType(record.id, record.recordType),
         sourceType: record.classification === "Manual" ? "manual" : "intelligence_layer_source",
         sourceKeyHash: snapshotHash(record.sourceKey),
         sourceIds: [record.id],

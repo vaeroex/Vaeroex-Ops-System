@@ -203,6 +203,23 @@ const foreignRegistry = clone(baseInput);
 foreignRegistry.evidenceManifests.output[0].sourceRegistry.workspaceId = "workspace-foreign";
 assert.throws(() => build(foreignRegistry), /foreign source registry/);
 
+const sharedKpiEvidence = clone(baseInput);
+sharedKpiEvidence.intelligenceLayer.output.insights[1].supportingRecords[0] = {
+  ...sharedKpiEvidence.intelligenceLayer.output.insights[0].supportingRecords[0],
+  recordType: "Imported KPI measurement"
+};
+const sharedKpiSnapshot = build(sharedKpiEvidence).snapshot;
+assert.equal(
+  sharedKpiSnapshot.evidence.references.filter((reference) => reference.id === "intelligence-layer:kpi:checkout-wait-latest").length,
+  1,
+  "the same physical KPI row may support multiple findings without creating conflicting evidence identity"
+);
+assert.equal(
+  sharedKpiSnapshot.evidence.references.find((reference) => reference.id === "intelligence-layer:kpi:checkout-wait-latest")?.recordType,
+  "KPI record",
+  "KPI evidence identity must not depend on finding-specific presentation labels"
+);
+
 const unsupportedVersion = clone(baseInput);
 unsupportedVersion.kpis.producerVersion = "kpi_semantics_v0";
 assert.throws(() => build(unsupportedVersion), /Unsupported canonical_kpi_semantics producer version/);
