@@ -738,6 +738,32 @@ function runLightweightKpiOverviewTests() {
   assert.equal(settingsAwareSummary.metrics[0]?.target, 120, "workspace KPI settings should override row targets");
   assert.equal(settingsAwareSummary.metrics[0]?.category, "Executive", "workspace KPI settings should preserve configured category");
 
+  const rangeSummary = buildKpiOverviewSummary(
+    [{ ...makeKpi("Staff Utilization", "2026-07-01", 80), target: null }],
+    [makeKpiSetting("Staff Utilization", {
+      desired_direction: "target_range",
+      target_behavior: "acceptable_range",
+      ideal_range_min: 70,
+      ideal_range_max: 85,
+      classification_source: "user",
+      classification_confirmed: true
+    })]
+  );
+  assert.equal(rangeSummary.metrics[0]?.status, "on_track", "configured target ranges must not be misclassified as missing scalar targets");
+  assert.equal(rangeSummary.counts.missingTargets, 0, "semantic target ranges satisfy deterministic KPI target evaluation");
+
+  const exactSummary = buildKpiOverviewSummary(
+    [{ ...makeKpi("Inventory Variance", "2026-07-01", 10), target: null }],
+    [makeKpiSetting("Inventory Variance", {
+      desired_direction: "exact_target",
+      target_behavior: "exact_threshold",
+      ideal_value: 10,
+      classification_source: "user",
+      classification_confirmed: true
+    })]
+  );
+  assert.equal(exactSummary.metrics[0]?.status, "on_track", "confirmed exact semantic targets must be evaluated without a duplicate row target");
+
   const timeoutFallbackOutput = buildDeterministicKpiOverviewOutput(severalSummary, { fallbackReason: "OpenAI timeout" });
   assert.match(String(timeoutFallbackOutput.direct_answer), /deeper analysis took longer than expected/i, "OpenAI timeout should still return a useful KPI overview");
 

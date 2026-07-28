@@ -21,9 +21,10 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [issuesResult, kpisResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
+    supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
@@ -42,6 +43,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const errors = [
     issuesResult.error,
     kpisResult.error,
+    kpiSettingsResult.error,
     filesResult.error,
     reportsResult.error,
     runsResult.error,
@@ -92,6 +94,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   }
   const operationalInsights = buildOperationalEvidenceInsights({
     kpis: eligibleKpis,
+    kpiSettings: kpiSettingsResult.data || [],
     operationalMetrics: eligibleOperationalMetrics,
     memoryChunks: eligibleMemoryChunks,
     files: filesResult.data || [],
@@ -102,6 +105,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     workspace: context.activeWorkspace,
     issues: issuesResult.data || [],
     kpis: eligibleKpis,
+    kpiSettings: kpiSettingsResult.data || [],
     files: filesResult.data || [],
     reports: reportsResult.data || [],
     vaeroexRuns: eligibleRuns,

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { applyKpiSettingsToRows, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { applyKpiSettingsToRows, kpiSemantics, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { evaluateKpiPerformance, isKpiTargetMiss } from "@/lib/kpis/semantics";
 import { categoryConfig, categoryLabel, type ReportSubscriptionCategory } from "@/lib/reports/subscriptions";
 import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
@@ -121,7 +122,11 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
   const openIssues = issueRows.filter((issue) => !["Closed", "Resolved"].includes(issue.status || ""));
   const checklistExceptions = checklistRows.filter((run) => !["Done", "Complete"].includes(run.status || "") && inRange(run.created_at, start, end));
   const currentKpis = kpiRows.filter((kpi) => kpi.metric_date >= dateOnly(start) && kpi.metric_date <= dateOnly(end));
-  const belowTargetKpis = currentKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target);
+  const targetMissKpis = currentKpis.filter((kpi) => {
+    if (kpi.actual_value === null) return false;
+    const evaluation = evaluateKpiPerformance({ observations: [kpi], semantics: kpiSemantics(kpi.name, kpiSettingRows), target: kpi.target });
+    return isKpiTargetMiss(evaluation.targetStatus);
+  });
   const newLeads = crmRows.filter((lead) => inRange(lead.created_at, start, end));
   const openAssignments = assignmentRows.filter((assignment) => !["Done", "Dismissed"].includes(assignment.status || ""));
   const uploadedFiles = fileRows.filter((file) => inRange(file.created_at, start, end));
@@ -140,7 +145,7 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
       open_issues: openIssues.length,
       checklist_exceptions: checklistExceptions.length,
       kpis_recorded: currentKpis.length,
-      below_target_kpis: belowTargetKpis.length,
+      target_miss_kpis: targetMissKpis.length,
       crm_leads: newLeads.length,
       open_assignments: openAssignments.length,
       uploaded_files: uploadedFiles.length
@@ -148,7 +153,7 @@ async function buildScheduledReportSource(supabase: AdminSupabase, workspaceId: 
     items: {
       open_issues: openIssues.slice(0, 8).map((issue) => `${issue.title}${issue.severity ? ` (${issue.severity})` : ""}`),
       checklist_exceptions: checklistExceptions.slice(0, 8).map((run) => run.notes || `Checklist run ${run.id.slice(0, 8)} needs review`),
-      below_target_kpis: belowTargetKpis.slice(0, 8).map((kpi) => `${kpi.name}: ${kpi.actual_value} vs target ${kpi.target}`),
+      target_miss_kpis: targetMissKpis.slice(0, 8).map((kpi) => `${kpi.name}: ${kpi.actual_value} is outside its configured target`),
       crm_leads: newLeads.slice(0, 8).map((lead) => `${lead.lead_name}${lead.company ? ` at ${lead.company}` : ""}${lead.status ? ` (${lead.status})` : ""}`),
       open_assignments: openAssignments.slice(0, 8).map((assignment) => assignment.title),
       uploaded_files: uploadedFiles.slice(0, 8).map((file) => `${file.display_name} (${file.import_status.replace(/_/g, " ")})`)
@@ -172,11 +177,11 @@ function reportBody({
   const title = categoryLabel(category);
   const risks = [
     source.counts.open_issues ? `${source.counts.open_issues} open issue${source.counts.open_issues === 1 ? "" : "s"} are still unresolved.` : "",
-    source.counts.below_target_kpis ? `${source.counts.below_target_kpis} KPI${source.counts.below_target_kpis === 1 ? "" : "s"} are below target.` : "",
+    source.counts.target_miss_kpis ? `${source.counts.target_miss_kpis} KPI${source.counts.target_miss_kpis === 1 ? "" : "s"} are outside target.` : "",
     source.counts.checklist_exceptions ? `${source.counts.checklist_exceptions} checklist run${source.counts.checklist_exceptions === 1 ? "" : "s"} need review.` : ""
   ].filter(Boolean);
   const actions = [
-    source.counts.below_target_kpis ? "Review below-target KPIs and decide whether leadership needs an improvement plan for each key metric." : "",
+    source.counts.target_miss_kpis ? "Review KPIs outside target and decide whether leadership needs an improvement plan for each key metric." : "",
     source.counts.open_issues ? "Review the most important unresolved issues with leadership." : "",
     source.counts.uploaded_files ? "Review recent uploads and approve any mappings that should feed KPI history." : ""
   ].filter(Boolean);
@@ -196,7 +201,7 @@ ${list(risks, "No urgent risks were detected for this scheduled report.")}
 ${list(source.items.open_issues, "No open issues were found.")}
 
 ## KPI Signals
-${list(source.items.below_target_kpis, "No below-target KPIs were found for this period.")}
+${list(source.items.target_miss_kpis, "No KPIs outside target were found for this period.")}
 
 ## Customer Activity Evidence
 ${list(source.items.crm_leads, "No new customer activity evidence was found in this period.")}

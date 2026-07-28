@@ -3,6 +3,16 @@ import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from 
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
+import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
+import {
+  effectiveKpiTarget,
+  evaluateKpiPerformance,
+  isKpiTargetMet,
+  isKpiTargetMiss,
+  kpiTargetGapRatio,
+  type KpiPerformanceEvaluation,
+  type KpiSemantics
+} from "@/lib/kpis/semantics";
 
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
@@ -112,6 +122,7 @@ export type IntelligenceLayerInput = {
     size?: string | null;
   } | null;
   kpis?: KpiRow[];
+  kpiSettings?: KpiSettingRow[];
   issues?: IssueRow[];
   files?: FileUploadRow[];
   reports?: ReportRow[];
@@ -235,19 +246,21 @@ function canonicalTopic(value: string) {
   return normalized.replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 64) || "general";
 }
 
-function canonicalCondition(value: string) {
+function canonicalCondition(value: string, typeGroup: string) {
   const normalized = lower(value);
-  if (/below target|dropped|declin|fell|missed target/.test(normalized)) return "performance-gap";
+  if (/dropped|declin|fell|missed target/.test(normalized) || (typeGroup === "risk" && /below target/.test(normalized))) return "performance-gap";
+  if (typeGroup === "risk" && /above target|outside target|(?:above|below) acceptable range/.test(normalized)) return "performance-gap";
   if (/unclear|missing|not documented|limited context/.test(normalized)) return "missing-context";
   if (/stale|older than/.test(normalized)) return "stale";
   if (/above target|meets|exceeds|improv/.test(normalized)) return "positive-performance";
+  if (typeGroup === "opportunity" && /on target|on or (?:above|below) target|within (?:its )?target range/.test(normalized)) return "positive-performance";
   return "review";
 }
 
 function findingFingerprint(insight: Pick<IntelligenceInsight, "type" | "title" | "summary" | "affectedArea" | "timePeriod">) {
   const typeGroup = ["Risk", "Bottleneck", "Anomaly"].includes(insight.type) ? "risk" : insight.type.toLowerCase();
   const topic = canonicalTopic(`${insight.affectedArea} ${insight.title}`);
-  const condition = canonicalCondition(`${insight.title} ${insight.summary}`);
+  const condition = canonicalCondition(`${insight.title} ${insight.summary}`, typeGroup);
   const normalizedPeriod = /^\d{4}-\d{2}/.test(insight.timePeriod) ? insight.timePeriod.slice(0, 7) : lower(insight.timePeriod) || "current";
   return `${typeGroup}:${topic}:${condition}:${normalizedPeriod}`;
 }
@@ -315,11 +328,65 @@ function latestDate(values: Array<string | null | undefined>) {
   return values.filter(Boolean).sort().at(-1) || new Date().toISOString();
 }
 
+const MATERIAL_TARGET_GAP_RATIO = 0.1;
+
+type EvaluatedKpiTarget = {
+  kpi: KpiRow;
+  semantics: KpiSemantics;
+  evaluation: KpiPerformanceEvaluation;
+  history: KpiRow[];
+  gapRatio: number | null;
+};
+
+function targetReference(kpi: KpiRow, semantics: KpiSemantics) {
+  if (semantics.desiredDirection === "target_range" && semantics.idealRangeMin !== null && semantics.idealRangeMax !== null) {
+    return `acceptable range ${formatMetric(semantics.idealRangeMin, kpi.name)} to ${formatMetric(semantics.idealRangeMax, kpi.name)}`;
+  }
+  const target = effectiveKpiTarget(semantics, kpi.target);
+  return target === null ? null : `target ${formatMetric(target, kpi.name)}`;
+}
+
+function targetMissLabel(status: KpiPerformanceEvaluation["targetStatus"], semantics: KpiSemantics) {
+  if (status === "below_required_minimum") return semantics.desiredDirection === "target_range" ? "below acceptable range" : "below target";
+  if (status === "above_acceptable_maximum") return semantics.desiredDirection === "target_range" ? "above acceptable range" : "above target";
+  return "outside target";
+}
+
+function targetSuccessLabel(semantics: KpiSemantics) {
+  if (semantics.desiredDirection === "maximize") return "on or above target";
+  if (semantics.desiredDirection === "minimize") return "on or below target";
+  if (semantics.desiredDirection === "target_range") return "within its target range";
+  return "on target";
+}
+
+function evaluateKpiTarget(kpi: KpiRow, history: KpiRow[], settings: KpiSettingRow[]): EvaluatedKpiTarget {
+  const semantics = kpiSemantics(kpi.name, settings);
+  const evaluation = evaluateKpiPerformance({ observations: [...history].reverse(), semantics, target: kpi.target });
+  return {
+    kpi,
+    semantics,
+    evaluation,
+    history,
+    gapRatio: kpiTargetGapRatio({ value: kpi.actual_value, semantics, target: kpi.target })
+  };
+}
+
+function isMaterialTargetMiss(row: KpiRow, semantics: KpiSemantics) {
+  const evaluation = evaluateKpiPerformance({ observations: [row], semantics, target: row.target });
+  const gapRatio = kpiTargetGapRatio({ value: row.actual_value, semantics, target: row.target });
+  return isKpiTargetMiss(evaluation.targetStatus) && gapRatio !== null && gapRatio > MATERIAL_TARGET_GAP_RATIO;
+}
+
 export function buildIntelligenceLayer(input: IntelligenceLayerInput): IntelligenceLayerResult {
   const workspace = input.workspace || null;
   const files = filterOriginalBusinessEvidence(input.files);
   const parentEligibility = buildSourceParentEligibility({ files, imports: input.imports || [] });
-  const kpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility);
+  const kpiSettings = input.kpiSettings || [];
+  const kpis = applyKpiSettingsToRows(
+    filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility),
+    kpiSettings,
+    { includeHidden: true }
+  );
   const issues = filterOriginalBusinessEvidence(input.issues);
   // Reports are derived outputs. They remain reviewable, but never become
   // original evidence for new health, coverage, risk, or recommendation logic.
@@ -342,8 +409,11 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const historyCounts = kpiHistoryCounts(kpis);
   const historyByName = kpiHistoryByName(kpis);
   const forecastEligibility = buildKpiForecastEligibility(kpis);
-  const belowTargetKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value < kpi.target * 0.9);
-  const improvingKpis = latestKpis.filter((kpi) => kpi.target !== null && kpi.actual_value !== null && kpi.actual_value >= kpi.target);
+  const evaluatedKpis = latestKpis.map((kpi) => evaluateKpiTarget(kpi, historyByName.get(normalizeKpiName(kpi.name)) || [kpi], kpiSettings));
+  const materialTargetMisses = evaluatedKpis.filter(({ evaluation, gapRatio }) =>
+    isKpiTargetMiss(evaluation.targetStatus) && gapRatio !== null && gapRatio > MATERIAL_TARGET_GAP_RATIO
+  );
+  const targetAchievements = evaluatedKpis.filter(({ evaluation }) => isKpiTargetMet(evaluation.targetStatus));
   const pendingImports = imports.filter((item) => ["extracted", "needs_review"].includes(lower(item.status)));
   const staleSops = sops.filter((sop) => {
     const date = new Date(sop.updated_at || sop.created_at);
@@ -429,15 +499,19 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         fingerprint: ""
       };
     }),
-    ...belowTargetKpis.slice(0, 4).map((kpi) => {
+    ...materialTargetMisses.slice(0, 4).map(({ kpi, semantics, evaluation, history: kpiHistory }) => {
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;
-      const belowTargetPeriods = (historyByName.get(key) || [kpi]).filter(
-        (row) => row.target !== null && row.actual_value !== null && row.actual_value < row.target * 0.9
-      ).length;
-      const evidence = [`Actual: ${formatMetric(kpi.actual_value, kpi.name)}`, `Target: ${formatMetric(kpi.target, kpi.name)}`, `Historical records: ${history}`];
-      const supportingRecords = (historyByName.get(key) || [kpi]).slice(0, 4).map((row, index) =>
-        kpiEvidenceRecord(row, index === 0 ? "The latest recorded value is below the current target." : "This prior value establishes the recent KPI history.")
+      const targetMissPeriods = kpiHistory.filter((row) => isMaterialTargetMiss(row, semantics)).length;
+      const condition = targetMissLabel(evaluation.targetStatus, semantics);
+      const reference = targetReference(kpi, semantics);
+      const evidence = [
+        `Actual: ${formatMetric(kpi.actual_value, kpi.name)}`,
+        reference ? `${reference[0].toUpperCase()}${reference.slice(1)}` : "Target reference unavailable",
+        `Historical records: ${history}`
+      ];
+      const supportingRecords = kpiHistory.slice(0, 4).map((row, index) =>
+        kpiEvidenceRecord(row, index === 0 ? `The latest recorded value is ${condition}.` : "This prior value establishes the recent KPI history.")
       );
       const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
       const limitation = history < 3
@@ -447,9 +521,9 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       return {
         id: `kpi-risk-${kpi.id}`,
         type: "Risk" as const,
-        title: belowTargetPeriods >= 2 ? `${kpi.name} remained below target for ${belowTargetPeriods} periods` : `${kpi.name} is below target`,
-        summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
-        why: "The latest recorded value is below the current target.",
+        title: targetMissPeriods >= 2 ? `${kpi.name} remained ${condition} for ${targetMissPeriods} periods` : `${kpi.name} is ${condition}`,
+        summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${reference ? ` vs ${reference}` : ""}.`,
+        why: `The latest recorded value is ${condition} under the canonical KPI semantics.`,
         impact: "The gap needs context before it can be tied to a cause or business impact.",
         recommendedAction: "Decide whether leadership should investigate the cause now or continue monitoring the next reporting period.",
         confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",
@@ -512,20 +586,22 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         fingerprint: ""
       };
     }),
-    ...improvingKpis.slice(0, 3).map((kpi) => {
+    ...targetAchievements.slice(0, 3).map(({ kpi, semantics, history: kpiHistory }) => {
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;
-      const supportingRecords = (historyByName.get(key) || [kpi]).slice(0, 4).map((row, index) =>
-        kpiEvidenceRecord(row, index === 0 ? "The latest value meets or exceeds the current target." : "This prior value establishes the recent KPI history.")
+      const condition = targetSuccessLabel(semantics);
+      const reference = targetReference(kpi, semantics);
+      const supportingRecords = kpiHistory.slice(0, 4).map((row, index) =>
+        kpiEvidenceRecord(row, index === 0 ? `The latest value is ${condition}.` : "This prior value establishes the recent KPI history.")
       );
       const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
 
       return {
         id: `kpi-opportunity-${kpi.id}`,
         type: "Opportunity" as const,
-        title: `${kpi.name} is on or above target`,
-        summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)} vs target ${formatMetric(kpi.target, kpi.name)}.`,
-        why: "The latest recorded value meets or exceeds the current target.",
+        title: `${kpi.name} is ${condition}`,
+        summary: `Actual ${formatMetric(kpi.actual_value, kpi.name)}${reference ? ` vs ${reference}` : ""}.`,
+        why: `The latest recorded value is ${condition} under the canonical KPI semantics.`,
         impact: "The result may be worth preserving, but the current records do not establish its cause.",
         recommendedAction: "Decide whether the practice behind this result is clear enough to preserve or requires a focused review.",
         confidence: history >= 3 && independentSourceCount >= 2 ? "High" : "Medium",

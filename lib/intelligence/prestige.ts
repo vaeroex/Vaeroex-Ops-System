@@ -239,7 +239,7 @@ function isProposalLead(lead: CrmLeadRow) {
 }
 
 function metricOnTarget(kpi: KpiRow, settings: KpiSettingRow[] = []) {
-  if (kpi.actual_value === null || kpi.target === null) return null;
+  if (kpi.actual_value === null) return null;
   const status = evaluateKpiPerformance({
     observations: [kpi],
     semantics: kpiSemantics(kpi.name, settings),
@@ -285,7 +285,7 @@ function completionRate(rows: ChecklistRunRow[]) {
 }
 
 function kpiTargetRate(kpis: KpiRow[], settings: KpiSettingRow[] = []) {
-  const rows = latestKpis(kpis).filter((row) => row.actual_value !== null && row.target !== null);
+  const rows = latestKpis(kpis).filter((row) => row.actual_value !== null);
   if (!rows.length) return null;
   const classified = rows.map((row) => metricOnTarget(row, settings)).filter((value): value is boolean => value !== null);
   return classified.length ? (classified.filter(Boolean).length / classified.length) * 100 : null;

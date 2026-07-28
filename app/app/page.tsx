@@ -41,7 +41,7 @@ import {
   sortKpiRowsBySettings,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
-import { evaluateKpiPerformance, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
+import { effectiveKpiTarget, evaluateKpiPerformance, isKpiTargetMiss, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -594,14 +594,14 @@ function latestKpisByName(kpis: KpiRow[]) {
 }
 
 function buildSmartAlerts({
-  belowTargetKpis,
+  targetMissKpis,
   crmLeadsWithoutFollowup,
   staleSops,
   oldIssues,
   unanalyzedFiles,
   checklistsWithoutRecentRuns
 }: {
-  belowTargetKpis: KpiRow[];
+  targetMissKpis: KpiRow[];
   crmLeadsWithoutFollowup: CrmLeadRow[];
   staleSops: SopRow[];
   oldIssues: IssueRow[];
@@ -609,11 +609,11 @@ function buildSmartAlerts({
   checklistsWithoutRecentRuns: ChecklistRow[];
 }) {
   return [
-    belowTargetKpis.length
+    targetMissKpis.length
       ? {
           id: "kpis-below-target",
           severity: "High",
-          title: `${belowTargetKpis.length} KPI${belowTargetKpis.length === 1 ? "" : "s"} outside target`,
+          title: `${targetMissKpis.length} KPI${targetMissKpis.length === 1 ? "" : "s"} outside target`,
           why: "Metrics outside their direction-aware target should be reviewed against eligible evidence and open risks.",
           action: "Review KPIs",
           href: "/app/kpis"
@@ -670,6 +670,15 @@ function buildSmartAlerts({
         }
       : null
   ].filter(Boolean) as DashboardAlert[];
+}
+
+function dashboardKpiTargetReference(kpi: KpiRow, settings: KpiSettingRow[]) {
+  const semantics = kpiSemantics(kpi.name, settings);
+  if (semantics.desiredDirection === "target_range" && semantics.idealRangeMin !== null && semantics.idealRangeMax !== null) {
+    return `acceptable range ${formatMetricValue(semantics.idealRangeMin, kpi.name)} to ${formatMetricValue(semantics.idealRangeMax, kpi.name)}`;
+  }
+  const target = effectiveKpiTarget(semantics, kpi.target);
+  return target === null ? "target unavailable" : `target ${formatMetricValue(target, kpi.name)}`;
 }
 
 function DashboardAccordion({
@@ -1513,10 +1522,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     !reports.length ? "Save a completed leadership analysis when it should remain available for later review." : ""
   ].filter(Boolean);
   const latestKpiRows = latestKpisByName(kpis);
-  const belowTargetKpis = latestKpiRows.filter((kpi) => {
-    if (kpi.target === null || kpi.actual_value === null) return false;
+  const targetMissKpis = latestKpiRows.filter((kpi) => {
+    if (kpi.actual_value === null) return false;
     const evaluation = evaluateKpiPerformance({ observations: [kpi], semantics: kpiSemantics(kpi.name, kpiSettings), target: kpi.target });
-    return ["below_required_minimum", "above_acceptable_maximum", "moving_away_from_target"].includes(evaluation.targetStatus);
+    return isKpiTargetMiss(evaluation.targetStatus);
   });
   const crmLeadsWithoutFollowup = crmLeads.filter((lead) => !isConvertedStatus(lead.status) && (!lead.last_activity_at || isOlderThan(lead.last_activity_at, 30)));
   const staleSops = sops.filter((sop) => isOlderThan(sop.updated_at || sop.created_at, 90));
@@ -1525,7 +1534,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const recentRunChecklistIds = new Set(checklistRuns.filter((run) => inIsoRange(run.created_at, range.start, range.end)).map((run) => run.checklist_id));
   const checklistsWithoutRecentRuns = checklists.filter((checklist) => !recentRunChecklistIds.has(checklist.id));
   const baseSmartAlerts = buildSmartAlerts({
-    belowTargetKpis,
+    targetMissKpis,
     crmLeadsWithoutFollowup,
     staleSops,
     oldIssues,
@@ -1563,12 +1572,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       context: issue.recommended_fix || `Status: ${issue.status || "Open"}`,
       href: "/app/issues" as Route
     })),
-    ...belowTargetKpis.slice(0, 3).map((kpi) => ({
+    ...targetMissKpis.slice(0, 3).map((kpi) => ({
       id: `kpi-${kpi.id}`,
       title: kpi.name,
       source: "KPI risk",
-      status: "Below target",
-      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs target ${formatMetricValue(kpi.target, kpi.name)}. Leadership weight: ${numberFormatter.format(kpiWeight(kpi.name, kpiSettings))}/10.`,
+      status: "Outside target",
+      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs ${dashboardKpiTargetReference(kpi, kpiSettings)}. Leadership weight: ${numberFormatter.format(kpiWeight(kpi.name, kpiSettings))}/10.`,
       href: "/app/kpis" as Route
     })),
     ...checklistFailures.slice(0, 3).map((run) => ({
@@ -1773,6 +1782,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   });
   const operationalInsights = buildOperationalEvidenceInsights({
     kpis,
+    kpiSettings,
     operationalMetrics,
     memoryChunks,
     files,
@@ -1781,6 +1791,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const intelligenceLayer = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
     kpis,
+    kpiSettings,
     issues,
     files,
     reports,

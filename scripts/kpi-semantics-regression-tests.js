@@ -47,6 +47,9 @@ assert.equal(evaluate([12, 10], configured("Defects", "minimize")).latestPerform
 const oneStar = semantics.deterministicKpiSemantics("1-Star Reviews");
 assert.equal(oneStar.desiredDirection, "minimize");
 assert.equal(oneStar.idealValue, 0);
+const activeDeterministicOneStar = semantics.resolveKpiSemantics("1-Star Reviews");
+assert.equal(activeDeterministicOneStar.desiredDirection, "minimize");
+assert.equal(activeDeterministicOneStar.classificationConfirmed, false);
 
 const targetRange = configured("Staff Utilization", "target_range", { idealRangeMin: 70, idealRangeMax: 85 });
 assert.equal(evaluate([60, 75], targetRange).latestPerformanceEffect, "favorable");
@@ -56,6 +59,21 @@ assert.equal(evaluate([75], targetRange).targetStatus, "within_range");
 const exact = configured("Inventory variance", "exact_target");
 assert.equal(evaluate([20, 12], exact, 10).latestPerformanceEffect, "favorable");
 assert.equal(evaluate([20, 12], exact, 10).targetStatus, "moving_toward_target");
+const exactWithSemanticIdeal = configured("Inventory variance", "exact_target", { idealValue: 10 });
+assert.equal(evaluate([20, 10], exactWithSemanticIdeal).targetStatus, "achieved", "exact targets use the confirmed semantic ideal when no row target exists");
+
+const maintain = configured("Staffing coverage", "maintain", { idealValue: 12 });
+assert.equal(evaluate([12, 15], maintain).latestPerformanceEffect, "unfavorable");
+assert.equal(evaluate([15, 12], maintain).latestPerformanceEffect, "favorable");
+assert.equal(evaluate([12], maintain).targetStatus, "achieved", "maintain semantics use the confirmed stability value");
+
+assert.equal(semantics.isKpiTargetMet("within_range"), true);
+assert.equal(semantics.isKpiTargetMet("achieved"), true);
+assert.equal(semantics.isKpiTargetMiss("above_acceptable_maximum"), true);
+assert.equal(semantics.isKpiTargetMiss("moving_toward_target"), true, "an improving exact-target KPI remains outside target until achieved");
+assert.equal(semantics.isKpiTargetMiss("direction_unknown"), false);
+assert.ok(semantics.kpiTargetGapRatio({ value: 12, semantics: configured("Wait", "minimize"), target: 10 }) > 0.1);
+assert.equal(semantics.kpiTargetGapRatio({ value: 80, semantics: targetRange }), 0);
 
 const unknown = semantics.deterministicKpiSemantics("Staff Utilization");
 assert.equal(unknown.desiredDirection, "unknown");
@@ -89,6 +107,21 @@ function semanticSetting(overrides = {}) {
 const advisoryLuna = semantics.resolveKpiSemantics("1-Star Reviews", semanticSetting());
 assert.equal(advisoryLuna.desiredDirection, "unknown", "An unconfirmed Luna proposal must remain advisory.");
 assert.equal(advisoryLuna.classificationConfidence, 0.97, "Advisory confidence remains visible for review.");
+const targetOnlyDeterministicSetting = semantics.resolveKpiSemantics("1-Star Reviews", semanticSetting({
+  desired_direction: "minimize",
+  classification_source: "deterministic",
+  classification_confidence: 1,
+  classification_confirmed: false
+}));
+assert.equal(targetOnlyDeterministicSetting.desiredDirection, "minimize", "Saving a manual target must not discard an active deterministic semantic mapping.");
+const explicitlyUnconfirmedUserSetting = semantics.resolveKpiSemantics("1-Star Reviews", semanticSetting({
+  desired_direction: "unknown",
+  target_behavior: "unknown",
+  classification_source: "user",
+  classification_confidence: null,
+  classification_confirmed: false
+}));
+assert.equal(explicitlyUnconfirmedUserSetting.desiredDirection, "unknown", "An explicit user decision to leave semantics unknown must fail closed.");
 const confirmedLuna = semantics.resolveKpiSemantics("1-Star Reviews", semanticSetting({ classification_confirmed: true }));
 assert.equal(confirmedLuna.desiredDirection, "minimize");
 assert.equal(evaluate([42, 37], confirmedLuna, 21).latestPerformanceEffect, "favorable");
@@ -205,9 +238,16 @@ const acceptAction = operationsActions.slice(
 );
 assert.doesNotMatch(acceptAction, /\btarget\s*:/, "Suggestion acceptance must not overwrite the manual target.");
 assert.match(kpiPage, /Performance direction is not confirmed\./);
+assert.match(kpiPage, /Deterministic performance direction:/);
+assert.match(kpiPage, /const resolvedSemantics = kpiSemantics\(metricName, setting \? \[setting\] : \[\]\)/);
 assert.match(kpiPage, /Accept suggestion/);
 assert.match(kpiPage, /Change manually/);
 assert.match(kpiPage, /Leave unconfirmed/);
+assert.doesNotMatch(kpiPage, /function ManualTargetForm/, "Recommended Target must not contain a second manual target editor.");
+assert.match(kpiPage, /Current manual target/);
+assert.match(kpiPage, /Edit manual targets in Chart Settings\./);
+assert.match(kpiPage, /const selectedManualTarget = selectedKpiSetting\?\.target \?\? selectedLatestKpi\?\.target \?\? null/);
+assert.match(operationsActions, /target,\n\s+weight,/, "Manual targets must persist through the kpi_settings upsert.");
 assert.doesNotMatch(kpiPage, /classifyAndPersistKpiSemantics/, "KPI rendering must not invoke Luna.");
 for (const label of ["Performance meaning", "Higher is better", "Lower is better", "Target range", "Exact target", "Maintain stability", "Not determined", "KPI definition"]) {
   assert.match(performanceFields, new RegExp(label));

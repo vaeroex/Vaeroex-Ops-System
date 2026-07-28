@@ -3,6 +3,8 @@ import { filterBusinessEvidence, filterOriginalBusinessEvidence } from "@/lib/in
 import type { IntelligenceEvidenceRecord, IntelligenceInsight } from "@/lib/intelligence/layer";
 import { compareKpiRowsNewest, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
+import { evaluateKpiPerformance } from "@/lib/kpis/semantics";
 
 type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 type KpiRow = TableRow<"kpis">;
@@ -258,6 +260,15 @@ function aligned(...trends: Array<Trend | null>) {
   return available.length === trends.length && new Set(available.map((trend) => trend.first.metric_date)).size === 1 && new Set(available.map((trend) => trend.latest.metric_date)).size === 1;
 }
 
+function semanticTrend(trend: Trend | null, settings: KpiSettingRow[]) {
+  if (!trend) return null;
+  return evaluateKpiPerformance({
+    observations: trend.rows,
+    semantics: kpiSemantics(trend.name, settings),
+    target: trend.latest.target
+  });
+}
+
 function trendRecords(trend: Trend, direction: string) {
   return trend.rows.map((row, index) => kpiRecord(
     row,
@@ -305,7 +316,7 @@ function worksheetRows(rows: OperationalMetricRow[], pattern: RegExp) {
   return rows.filter((row) => pattern.test(worksheetForRaw(asRecord(row.raw_data_json)).toLowerCase()));
 }
 
-function candidateDrafts(group: SourceGroup) {
+function candidateDrafts(group: SourceGroup, kpiSettings: KpiSettingRow[]) {
   const drafts: CandidateDraft[] = [];
   const rows = uniqueMetricRows(group.metrics);
   const returns = seriesFor(group.kpis, /^(returns?|return rate|returns rate)( %| percentage)?$/);
@@ -314,12 +325,18 @@ function candidateDrafts(group: SourceGroup) {
   const transactions = seriesFor(group.kpis, /^transactions?$/);
   const inventoryValue = seriesFor(group.kpis, /^inventory value$/);
   const onlineSales = seriesFor(group.kpis, /^online sales$/);
-  const returnsAdverse = returns && returns.latestValue - returns.firstValue >= 1 && returns.consistency >= 0.6;
-  const marginAdverse = margin && margin.firstValue - margin.latestValue >= 1 && margin.consistency >= 0.6;
-  const revenueAdverse = revenue && (revenue.changePercent ?? 0) <= -5 && revenue.consistency >= 0.6;
-  const transactionsAdverse = transactions && (transactions.changePercent ?? 0) <= -5 && transactions.consistency >= 0.6;
-  const inventoryRising = inventoryValue && (inventoryValue.changePercent ?? 0) >= 10 && inventoryValue.consistency >= 0.6;
-  const onlineRising = onlineSales && (onlineSales.changePercent ?? 0) >= 10 && onlineSales.consistency >= 0.6;
+  const returnsTrend = semanticTrend(returns, kpiSettings);
+  const marginTrend = semanticTrend(margin, kpiSettings);
+  const revenueTrend = semanticTrend(revenue, kpiSettings);
+  const transactionsTrend = semanticTrend(transactions, kpiSettings);
+  const inventoryTrend = semanticTrend(inventoryValue, kpiSettings);
+  const onlineSalesTrend = semanticTrend(onlineSales, kpiSettings);
+  const returnsAdverse = returns && returnsTrend?.selectedRangeTrend === "unfavorable" && returns.latestValue - returns.firstValue >= 1 && returns.consistency >= 0.6;
+  const marginAdverse = margin && marginTrend?.selectedRangeTrend === "unfavorable" && margin.firstValue - margin.latestValue >= 1 && margin.consistency >= 0.6;
+  const revenueAdverse = revenue && revenueTrend?.selectedRangeTrend === "unfavorable" && (revenue.changePercent ?? 0) <= -5 && revenue.consistency >= 0.6;
+  const transactionsAdverse = transactions && transactionsTrend?.selectedRangeTrend === "unfavorable" && (transactions.changePercent ?? 0) <= -5 && transactions.consistency >= 0.6;
+  const inventoryRising = inventoryValue && inventoryTrend?.selectedRangeTrend === "unfavorable" && (inventoryValue.changePercent ?? 0) >= 10 && inventoryValue.consistency >= 0.6;
+  const onlineRising = onlineSales && onlineSalesTrend?.selectedRangeTrend === "favorable" && (onlineSales.changePercent ?? 0) >= 10 && onlineSales.consistency >= 0.6;
   const workbookSheet = [...group.kpis.map((row) => worksheetForRaw(asRecord(row.raw_data_json)))].filter(Boolean);
 
   if (returnsAdverse && marginAdverse && aligned(returns, margin)) {
@@ -649,12 +666,14 @@ function candidateSort(a: IntelligenceInsight, b: IntelligenceInsight) {
 
 export function buildOperationalEvidenceInsights({
   kpis = [],
+  kpiSettings = [],
   operationalMetrics = [],
   memoryChunks = [],
   files = [],
   imports = []
 }: {
   kpis?: KpiRow[];
+  kpiSettings?: KpiSettingRow[];
   operationalMetrics?: OperationalMetricRow[];
   memoryChunks?: MemoryChunkRow[];
   files?: FileUploadRow[];
@@ -663,8 +682,12 @@ export function buildOperationalEvidenceInsights({
   const activeFiles = filterOriginalBusinessEvidence(files);
   const activeImports = filterOriginalBusinessEvidence(imports).filter((item) => activeFiles.some((file) => file.id === item.file_upload_id));
   const parentEligibility = buildSourceParentEligibility({ files: activeFiles, imports: activeImports });
-  const eligibleKpis = filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpis), parentEligibility)
-    .filter((row) => Boolean(row.source_file_id || row.import_id) && importedProvenanceIsEligible(row.raw_data_json));
+  const eligibleKpis = applyKpiSettingsToRows(
+    filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpis), parentEligibility)
+      .filter((row) => Boolean(row.source_file_id || row.import_id) && importedProvenanceIsEligible(row.raw_data_json)),
+    kpiSettings,
+    { includeHidden: true }
+  );
   const eligibleMetrics = filterBySourceParentEligibility(filterOriginalBusinessEvidence(operationalMetrics), parentEligibility)
     .filter((row) => Boolean(row.source_file_id || row.import_id) && importedProvenanceIsEligible(row.raw_data_json));
   const eligibleChunks = filterBySourceParentEligibility(
@@ -701,7 +724,7 @@ export function buildOperationalEvidenceInsights({
   }
 
   return Array.from(groups.values())
-    .flatMap((group) => candidateDrafts(group).map((draft) => completeCandidate(group, draft)))
+    .flatMap((group) => candidateDrafts(group, kpiSettings).map((draft) => completeCandidate(group, draft)))
     .sort(candidateSort)
     .slice(0, MAX_OPERATIONAL_FINDINGS);
 }
