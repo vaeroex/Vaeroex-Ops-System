@@ -9,14 +9,14 @@ const workspaceId = "preview-workspace";
 const userId = "preview-owner";
 const kpiName = "Average Checkout Wait";
 const revalidatedPaths = [];
-let submittedPayload = null;
+const submittedPayloads = [];
 
 const persistedRows = [{
   id: "setting-checkout-wait",
   workspace_id: workspaceId,
   kpi_name: kpiName,
   category: "Operations",
-  target: 5.5,
+  target: null,
   weight: 1,
   definition: "Average customer checkout wait.",
   color: "#10B981",
@@ -34,17 +34,17 @@ const persistedRows = [{
   semantic_unit: "minutes",
   aggregation_basis: null,
   period_basis: null,
-  desired_direction: "minimize",
-  target_behavior: "maximum_limit",
+  desired_direction: "unknown",
+  target_behavior: "unknown",
   ideal_value: null,
   ideal_range_min: null,
   ideal_range_max: null,
   metric_role: "actual",
   classification_source: "user",
-  classification_confidence: 1,
+  classification_confidence: null,
   classification_version: "kpi_semantics_v1",
-  classification_rationale: "Confirmed by the workspace owner.",
-  classification_confirmed: true,
+  classification_rationale: "Direction has not been confirmed.",
+  classification_confirmed: false,
   created_by: userId
 }];
 
@@ -69,7 +69,7 @@ const supabase = {
     return {
       select: () => settingsQuery(),
       upsert(payload, options) {
-        submittedPayload = payload;
+        submittedPayloads.push(payload);
         assert.deepEqual(options, { onConflict: "workspace_id,kpi_name" });
         const index = persistedRows.findIndex((row) => row.workspace_id === payload.workspace_id && row.kpi_name === payload.kpi_name);
         const saved = { ...(index >= 0 ? persistedRows[index] : { id: "new-setting" }), ...payload };
@@ -157,46 +157,128 @@ const actions = loadTypescriptModule("app/app/operations/actions.ts", {
   }
 });
 
-const formData = new FormData();
-for (const [key, value] of Object.entries({
-  return_path: "/app/kpis?metric=Average%20Checkout%20Wait&section=detail",
-  kpi_name: kpiName, category: "Operations", target: "4", weight: "1",
-  definition: "Average customer checkout wait.", color: "#10B981", is_visible: "true", sort_order: "0",
-  unit_type: "minutes", display_unit: "minutes", value_format: "decimal", x_axis_label: "Date", y_axis_label: "Minutes",
-  preferred_chart_type: "line", semantic_update: "true", canonical_name: "average_checkout_wait", display_name: kpiName,
-  semantic_unit: "minutes", aggregation_basis: "", period_basis: "", desired_direction: "minimize",
-  target_behavior: "maximum_limit", ideal_value: "", ideal_range_min: "", ideal_range_max: "", metric_role: "actual"
-})) formData.set(key, value);
+function formDataFor(overrides = {}) {
+  const formData = new FormData();
+  const fields = {
+    return_path: "/app/kpis?metric=Average%20Checkout%20Wait&section=detail",
+    kpi_name: kpiName,
+    category: "Operations",
+    target: "",
+    weight: "1",
+    definition: "Average customer checkout wait.",
+    color: "#10B981",
+    is_visible: "true",
+    sort_order: "0",
+    unit_type: "minutes",
+    display_unit: "minutes",
+    value_format: "decimal",
+    x_axis_label: "Date",
+    y_axis_label: "Minutes",
+    preferred_chart_type: "line",
+    semantic_update: "true",
+    canonical_name: "average_checkout_wait",
+    display_name: kpiName,
+    semantic_unit: "minutes",
+    aggregation_basis: "",
+    period_basis: "",
+    desired_direction: "unknown",
+    target_behavior: "unknown",
+    ideal_value: "",
+    ideal_range_min: "",
+    ideal_range_max: "",
+    metric_role: "actual",
+    ...overrides
+  };
+  for (const [key, value] of Object.entries(fields)) {
+    if (value !== undefined) formData.set(key, value);
+  }
+  return formData;
+}
 
-(async () => {
-  let redirectLocation = "";
+async function submit(formData) {
   try {
     await actions.updateKpiSettingAction(formData);
   } catch (error) {
-    redirectLocation = error.location || "";
+    return error.location || "";
   }
+  assert.fail("The server action should complete through its redirect contract.");
+}
 
-  assert.match(redirectLocation, /message=KPI\+settings\+updated\./);
-  assert.equal(submittedPayload.target, 4, "The real server action must submit numeric target 4.");
-  assert.equal(submittedPayload.workspace_id, workspaceId);
-  assert.equal(submittedPayload.kpi_name, kpiName);
+function persistedSetting() {
+  return persistedRows.find((row) => row.workspace_id === workspaceId && row.kpi_name === kpiName);
+}
 
-  const persisted = persistedRows.find((row) => row.workspace_id === workspaceId && row.kpi_name === kpiName);
-  assert.equal(persisted.target, 4, "Reloading persistence must return target 4.");
-  assert.equal(persistedRows.filter((row) => row.workspace_id === workspaceId && row.kpi_name === kpiName).length, 1, "Saving must not create a duplicate settings row.");
+function assertSingleCanonicalRow() {
+  assert.equal(
+    persistedRows.filter((row) => row.workspace_id === workspaceId && row.kpi_name === kpiName).length,
+    1,
+    "Every write path must reuse the workspace_id,kpi_name conflict key."
+  );
+}
+
+(async () => {
+  const targetRedirect = await submit(formDataFor({ target: "4" }));
+  assert.match(targetRedirect, /message=KPI\+settings\+updated\./);
+  assert.equal(submittedPayloads[0].target, 4, "The target save must submit numeric target 4.");
+  assert.equal(submittedPayloads[0].workspace_id, workspaceId);
+  assert.equal(submittedPayloads[0].kpi_name, kpiName);
+  assert.equal(persistedSetting().target, 4, "Reloading persistence after the target save must return target 4.");
+  assert.equal(persistedSetting().desired_direction, "unknown", "Saving a target must not invent directional meaning.");
+  assert.equal(persistedSetting().classification_confirmed, false, "Unknown semantics must remain fail-closed.");
+  assertSingleCanonicalRow();
+
+  const directionRedirect = await submit(formDataFor({
+    target: "4",
+    desired_direction: "minimize",
+    target_behavior: "maximum_limit"
+  }));
+  assert.match(directionRedirect, /message=KPI\+settings\+updated\./);
+  assert.equal(submittedPayloads[1].target, 4, "Confirming direction must preserve the manual target.");
+  assert.equal(submittedPayloads[1].desired_direction, "minimize", "The direction save must submit lower-is-better semantics.");
+  assert.equal(persistedSetting().target, 4, "Reloading after direction confirmation must still return target 4.");
+  assert.equal(persistedSetting().desired_direction, "minimize", "Reloading persistence must return the confirmed direction.");
+  assert.equal(persistedSetting().target_behavior, "maximum_limit");
+  assert.equal(persistedSetting().classification_confirmed, true);
+  assertSingleCanonicalRow();
+
+  const recommendationRedirect = await submit(formDataFor({
+    target: "3.75",
+    semantic_update: undefined,
+    desired_direction: undefined,
+    target_behavior: undefined,
+    canonical_name: undefined,
+    display_name: undefined,
+    semantic_unit: undefined,
+    aggregation_basis: undefined,
+    period_basis: undefined,
+    ideal_value: undefined,
+    ideal_range_min: undefined,
+    ideal_range_max: undefined,
+    metric_role: undefined,
+    target_change_context: "recommended",
+    previous_target: "4"
+  }));
+  assert.match(recommendationRedirect, /message=Recommended\+target\+applied\./);
+  assert.match(recommendationRedirect, /target_applied=true/);
+  assert.equal(submittedPayloads[2].target, 3.75, "Applying the recommendation must update the canonical target field.");
+  assert.equal(submittedPayloads[2].desired_direction, "minimize", "Applying a recommendation must preserve confirmed semantics.");
+  assert.equal(persistedSetting().target, 3.75, "Reloading persistence must return the recommended target.");
+  assert.equal(persistedSetting().desired_direction, "minimize");
+  assertSingleCanonicalRow();
 
   const settings = loadTypescriptModule("lib/kpis/settings.ts", {
     "@/lib/kpis/semantics": { resolveKpiSemantics: () => semanticDefaults }
   });
+  const persisted = persistedSetting();
   const rebuiltRows = settings.applyKpiSettingsToRows([{ name: kpiName, target: null, category: "Operations" }], persistedRows);
-  assert.equal(settings.kpiSettingForName(persistedRows, kpiName).target, 4, "The page loader identity lookup must resolve the row written by the action.");
-  assert.equal(settings.configuredKpiTarget(kpiName, persistedRows), 4, "KPI detail must read the persisted target.");
-  assert.equal(rebuiltRows[0].target, 4, "KPI Overview must rebuild the KPI with target 4.");
+  assert.equal(settings.kpiSettingForName(persistedRows, kpiName).id, persisted.id, "The page loader must resolve the exact row written by every action.");
+  assert.equal(settings.configuredKpiTarget(kpiName, persistedRows), 3.75, "KPI detail must read the persisted recommended target.");
+  assert.equal(rebuiltRows[0].target, 3.75, "KPI Overview must rebuild the KPI with the same target.");
   for (const expectedPath of ["/app", "/app/kpis", "/app/kpis/settings", "/app/reports"]) {
     assert.ok(revalidatedPaths.includes(expectedPath), `The action must revalidate ${expectedPath}.`);
   }
 
-  console.log("KPI target persistence integration passed.");
+  console.log("KPI target, direction, and recommendation persistence integration passed.");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;
