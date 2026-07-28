@@ -236,6 +236,8 @@ assert.match(prestige, /evaluateKpiPerformance/);
 assert.match(prestige, /resolveKpiTargetReference/);
 assert.doesNotMatch(prestige, /latest\.actual_value\s*>=\s*previous\.actual_value/);
 assert.match(peoplePage, /from\("kpi_settings"\)/, "People loads canonical KPI settings for shared intelligence output");
+assert.match(peoplePage, /order\("sort_order", \{ ascending: true \}\)\.order\("weight", \{ ascending: false \}\)/, "People orders KPI settings by columns owned by kpi_settings");
+assert.doesNotMatch(peoplePage, /from\("kpi_settings"\)[^\n]+order\("metric_name"/, "People must not order KPI settings by the operational-metrics column metric_name");
 assert.match(peoplePage, /kpiSettings: kpiSettingsResult\.data \|\| \[\]/);
 assert.match(operationalEvidence, /Math\.abs\(revenue\.changePercent \?\? 0\) >= 5/, "operational thresholds measure magnitude after canonical direction is known");
 assert.match(dormantReports, /performanceEffect === "favorable"/);
