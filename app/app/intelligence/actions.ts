@@ -4,9 +4,9 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
+import { isDemoWorkspaceRecord } from "@/lib/workspaces/demo-compatibility";
 
 function text(formData: FormData, key: string) {
   const value = formData.get(key);

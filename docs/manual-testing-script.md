@@ -1,6 +1,6 @@
 # Manual Testing Script
 
-Use this script on a real deployed preview or production-like environment. Run it once with seed/demo data and once with a clean customer account.
+Use this script on a real deployed Preview or production-like environment with controlled non-Production test data and a clean customer account.
 
 ## Prerequisites
 
@@ -269,7 +269,7 @@ Result:
 3. Confirm subscription and workspace statuses match expected access state.
 
 Expected result:
-- Active/manual/demo access is allowed.
+- Active, trialing, or manually unlocked access is allowed.
 - Canceled/expired/past_due access is blocked unless manually unlocked.
 
 Result:
@@ -355,8 +355,7 @@ Result:
 1. Set subscription to `active`; confirm app access.
 2. Set subscription to `past_due`; confirm blocked access.
 3. Set subscription to `canceled`; confirm blocked access.
-4. Set workspace to `demo`; confirm demo access.
-5. Set manual unlock; confirm access.
+4. Set manual unlock; confirm access.
 
 Expected result:
 - Gating matches access rules exactly.
@@ -406,12 +405,11 @@ Result:
 3. Add all environment variables to Preview and Production.
 4. Redeploy after any environment variable changes.
 5. Apply Supabase migrations.
-6. Optionally seed a disposable demo database.
-7. Add custom domain in Vercel.
-8. Configure DNS record recommended by Vercel.
-9. Confirm SSL certificate provisions.
-10. Update `NEXT_PUBLIC_APP_URL`, Supabase Auth redirect URLs, and Squarespace thank-you links.
-11. Re-run customer and admin flows on the custom domain.
+6. Add custom domain in Vercel.
+7. Configure DNS record recommended by Vercel.
+8. Confirm SSL certificate provisions.
+9. Update `NEXT_PUBLIC_APP_URL`, Supabase Auth redirect URLs, and Squarespace thank-you links.
+10. Re-run customer and admin flows on the custom domain.
 
 Expected result:
 - Preview and Production deployments work.

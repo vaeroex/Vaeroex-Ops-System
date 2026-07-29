@@ -28,7 +28,6 @@ Phase 1 is complete in this scaffold:
 - `AGENTS.md`
 - Main Vaeroex system prompt
 - Supabase migration with schema and RLS policies
-- Demo seed data
 - Industry template data
 - Environment example
 - README draft
@@ -71,7 +70,6 @@ Phase 4 is now implemented in the scaffold:
 
 Phase 5 is now implemented in the scaffold:
 
-- Enriched demo seed data across all core modules
 - App-wide compliance notice plus stronger setup and Vaeroex notices
 - Toast notifications from server-action redirects
 - Confirmation prompts before workspace generation, Vaeroex saves, and submission/issue task conversion
@@ -206,7 +204,7 @@ Configure the Stripe webhook endpoint to send subscription events to:
 https://vaeroex.com/api/stripe/webhook
 ```
 
-The webhook updates `customer_subscriptions` with Stripe customer, subscription, price, period, cancel-at-period-end, and status fields. `active` and `trialing` allow access. `past_due`, `unpaid`, `canceled`, `incomplete`, and `expired` are blocked unless admin, manual, or demo access applies.
+The webhook updates `customer_subscriptions` with Stripe customer, subscription, price, period, cancel-at-period-end, and status fields. `active` and `trialing` allow access. `past_due`, `unpaid`, `canceled`, `incomplete`, and `expired` are blocked unless admin or manual access applies. Historical demo-status records retain compatibility access but cannot be newly assigned.
 
 Customers can open the Stripe customer portal from `/app/account/subscription` when their subscription has a Stripe customer ID.
 
@@ -216,7 +214,7 @@ Manual activations can still be created in `/app/admin/subscriptions` for verifi
 
 The Vaeroex app handles account login, workspace creation, product access, usage limits, and subscription status checks. Customers should create their Vaeroex app account with the same email address they used at checkout so the app can match their purchase to `customer_subscriptions`.
 
-Customers without active, demo, or manually unlocked access are sent to `/billing-required`.
+Customers without active, trialing, or manually unlocked access are sent to `/billing-required`.
 
 ## Internal Admin And Support
 
@@ -247,22 +245,10 @@ Customers can submit support requests from `/support` or `/app/support`. The req
 supabase db push
 ```
 
-4. Seed demo data:
-
-```bash
-supabase db reset
-```
-
 The initial migration is:
 
 ```text
 supabase/migrations/202606170001_phase_1_schema_rls.sql
-```
-
-The demo seed file is:
-
-```text
-supabase/seed.sql
 ```
 
 ## Database and RLS
@@ -307,44 +293,7 @@ The selected NVIDIA model is text-only in this integration. Image and direct-fil
 
 Uploaded source evidence continues to use `OPENAI_EMBEDDING_MODEL` so existing workspace-private pgvector indexes retain their dimensions. `VAEROEX_MAX_EVIDENCE_CHUNKS` controls how many evidence chunks Vaeroex may use per answer. Optional provider cost-rate variables let the admin usage dashboard estimate cost from recorded input/output tokens, retries, and fallback attempts.
 
-Provider calls enforce user and workspace limits through the existing server-side rate-limit store. Monthly usage continues to be recorded in `ai_usage`. The admin-only `POST /api/health/openai` smoke path remains disabled unless `VAEROEX_AI_SMOKE_TEST_ENABLED=true`; it accepts a demo workspace ID, verifies the signed-in admin can read that demo workspace, exercises bounded Business Memory retrieval and generation, and records usage without returning or logging evidence content.
-
-## Seed Data
-
-Demo workspaces:
-
-- Pacific Field Services
-- Harbor Construction Co.
-- Metro EMS Ops - Non Patient
-- Elite Auto Detail
-- Summit Fitness Studio
-
-Each seeded workspace includes:
-
-- 5 follow-ups
-- 5 issues
-- 3 forms
-- 3 form submissions
-- 3 checklists
-- 4 checklist runs
-- 3 SOPs
-- 5 assets
-- 2 asset checks
-- 5 people
-- 1 weekly report
-- 4 Vaeroex results
-- Demo subscription access on the Vaeroex plan
-- 1 support request
-
-## Demo Credentials
-
-The seed creates a demo profile record and demo workspace memberships:
-
-```text
-demo@vaeroex.local
-```
-
-Supabase Auth users are separate from seeded profile rows. For a hosted demo, create a Supabase Auth user with this email or use the setup wizard to create a real account and workspace.
+Provider calls enforce user and workspace limits through the existing server-side rate-limit store. Monthly usage continues to be recorded in `ai_usage`.
 
 ## Compliance Notice
 
@@ -360,12 +309,11 @@ Add this notice anywhere users enter operational information, especially setup, 
 - Main Vaeroex prompt file
 - Supabase schema for workspaces, members, intake, workflows, forms, submissions, checklists, checklist runs, follow-ups, issues, assets, asset checks, people, SOPs, reports, Vaeroex runs, notifications, and audit logs
 - RLS policies for tenant separation and role-aware access
-- Demo seed data
 - Industry starter template data
 - Phase 3 dashboard and workspace module MVP screens
 - Tenant-scoped data access for dashboard, forms, submissions, checklists, checklist runs, follow-ups, issues, assets, asset checks, people, SOPs, and reports
 - Phase 4 Vaeroex Hub, OpenAI wrapper, workspace snapshot, run storage, and confirmation save flow
-- Phase 5 polish pass with demo data, loading/error/empty states, toast notifications, confirmations, validation, compliance notices, acceptance review, and Vercel instructions
+- Phase 5 polish pass with loading/error/empty states, toast notifications, confirmations, validation, compliance notices, acceptance review, and Vercel instructions
 - Phase 6 subscription access with Stripe checkout, manual activation, usage limits, account subscription status, admin review tools, pricing links, and setup docs
 - Phase 7 internal admin and support tools with customer search, workspace access controls, subscription controls, Vaeroex usage review, support queue, audit log review, and support request forms
 
@@ -466,12 +414,6 @@ https://vaeroex.com/auth/callback
 
 ```bash
 supabase db push
-```
-
-For a disposable demo database, load the demo seed with:
-
-```bash
-supabase db reset
 ```
 
 7. Deploy from Vercel. After deployment, test signup, setup, dashboard, operations modules, Ask Vaeroex, and confirmed saves from Vaeroex results.

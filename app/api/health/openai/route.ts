@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
-import { runAIProviderSmokeTest } from "@/lib/ai/provider-smoke-test";
 import { getVaeroexAIRuntimeStatus } from "@/lib/ai/vaeroex-client";
-import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export const runtime = "nodejs";
@@ -114,37 +112,4 @@ export async function GET() {
       headers: { "Cache-Control": "no-store" }
     }
   );
-}
-
-export async function POST(request: Request) {
-  const checkedAt = new Date().toISOString();
-  const authorization = await requireAdmin();
-  if (authorization.response) return authorization.response;
-
-  try {
-    const body = (await request.json().catch(() => ({}))) as { workspaceId?: unknown };
-    const workspaceId = typeof body.workspaceId === "string" ? body.workspaceId.trim() : "";
-    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(workspaceId)) {
-      return NextResponse.json({ ok: false, error: "A valid demo workspace ID is required.", checkedAt }, { status: 400 });
-    }
-    const { data: workspace, error } = await authorization.supabase
-      .from("workspaces")
-      .select("id,name,subscription_status")
-      .eq("id", workspaceId)
-      .maybeSingle();
-    if (error || !workspace || !isDemoWorkspaceRecord(workspace)) {
-      return NextResponse.json({ ok: false, error: "The smoke test is limited to an authorized demo workspace.", checkedAt }, { status: 403 });
-    }
-    const result = await runAIProviderSmokeTest({
-      supabase: authorization.supabase,
-      workspaceId,
-      userId: authorization.user.id
-    });
-    return NextResponse.json({ ...result, checkedAt }, { headers: { "Cache-Control": "no-store" } });
-  } catch (error) {
-    return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "AI provider smoke test failed.", checkedAt },
-      { status: 503, headers: { "Cache-Control": "no-store" } }
-    );
-  }
 }

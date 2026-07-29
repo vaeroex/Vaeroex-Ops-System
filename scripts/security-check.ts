@@ -57,7 +57,6 @@ const expectedDocs = [
   "docs/security/rls-audit.md",
   "docs/security/secrets-audit.md",
   "docs/security/storage-audit.md",
-  "docs/security/demo-isolation-audit.md",
   "docs/security/admin-access-audit.md",
   "docs/security/manual-security-test-plan.md",
   "docs/security/permission-matrix.md",
@@ -354,11 +353,6 @@ const fileActions = read("app/app/files/actions.ts");
 check(fileActions.includes("getFileForWorkspace") && fileActions.includes('.eq("workspace_id", workspaceId)'), "File actions must read files through workspace-scoped lookup.");
 check(fileActions.includes("storagePath = `${workspaceId}/"), "Uploaded file storage paths must start with workspaceId.");
 
-const demoActions = read("app/app/demo/actions.ts");
-check(demoActions.includes("subscription_status: \"demo\""), "Demo workspace creation must mark workspaces as demo.");
-check(demoActions.includes("ensureDemoWorkspacePopulated"), "Demo workspace actions must populate isolated demo data.");
-check(demoActions.includes("isVaeroexAdminUser"), "Demo reset/fresh actions must require Vaeroex admin access.");
-
 const supportActions = read("app/support/actions.ts");
 check(supportActions.includes(".from(\"workspace_members\")") && supportActions.includes(".eq(\"user_id\", user.id)"), "Support requests must validate workspace membership before storing workspace_id.");
 check(supportActions.includes("support.create_request") && supportActions.includes("logSecurityAuditEvent"), "Support/contact request creation must write security audit events.");
@@ -459,8 +453,6 @@ check(!exists("app/app/sources/actions.ts"), "Unused generated-insight mutation 
 
 const stripeWebhook = read("app/api/stripe/webhook/route.ts");
 check(stripeWebhook.includes("logSecurityAuditEvent") && stripeWebhook.includes("stripe."), "Stripe webhook processing must write security audit events.");
-const demoAdminActions = read("app/app/demo/actions.ts");
-check(demoAdminActions.includes("admin.reset_demo_workspace") && demoAdminActions.includes("admin.create_fresh_demo_workspace"), "Admin demo reset/create actions must write security audit events.");
 const adminWorkspaceActions = read("app/app/admin/workspaces/actions.ts");
 check(adminWorkspaceActions.includes("admin.update_workspace_access"), "Admin workspace access updates must write security audit events.");
 const adminSubscriptionActions = read("app/app/admin/subscriptions/actions.ts");

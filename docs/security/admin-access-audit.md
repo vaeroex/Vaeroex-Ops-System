@@ -23,7 +23,6 @@ Invalid admin grants:
 | Global support tickets | Admin support routes are inside guarded admin layout | SAFE |
 | Global AI usage | Admin usage route is inside guarded admin layout | SAFE |
 | OpenAI health endpoint | Requires authenticated Vaeroex admin | SAFE |
-| Demo fresh/reset controls | Require Vaeroex admin user | SAFE |
 
 Manual direct URL test:
 

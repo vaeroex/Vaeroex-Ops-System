@@ -52,7 +52,6 @@ const intelligenceActions = read("app/app/intelligence/actions.ts");
 const search = read("app/api/search/route.ts");
 const help = read("lib/help/content.ts");
 const billing = read("lib/billing/plans.ts");
-const demo = read("lib/demo/workspace-demo.ts");
 const projections = read("lib/intelligence/snapshot/v1/projections.ts");
 const databaseTypes = read("lib/supabase/types.ts");
 const activeRecommendationReaders = [
@@ -97,9 +96,6 @@ assert.doesNotMatch(billing, /Profit Leak Detector/);
 assert.equal(fs.existsSync(path.join(root, "app/app/kpis/profit-leakage/page.tsx")), true, "the independent Profit Leakage route must remain");
 assert.equal(fs.existsSync(path.join(root, "lib/intelligence/profit-leakage.ts")), true, "the independent Profit Leakage calculator must remain");
 
-assert.match(demo, /seedLeadershipDecisionExamples/);
-assert.doesNotMatch(demo, /seedPrestigeIntelligenceExamples|prestige_demo/);
-assert.doesNotMatch(demo, /from\("vaeroex_recommendation_outcomes"\)\.insert/, "new demo data must not seed retired recommendations");
 assert.doesNotMatch(projections, /PeoplePrestigeProjectionV1|projectPeoplePrestigeV1/);
 
 assert.match(databaseTypes, /business_decisions:\s*\{/);

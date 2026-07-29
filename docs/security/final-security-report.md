@@ -1,5 +1,7 @@
 # Final Security Report
 
+> Update, July 29, 2026: the internal seeded-demo create/reset runtime was retired. The original demo-generation findings below are historical; only non-mutating compatibility for existing demo-status records remains.
+
 ## Summary
 
 Status: SAFE for beta testing after production migrations and manual route checks are confirmed.
@@ -15,7 +17,6 @@ This phase added reusable server-side security helpers, central admin route prot
 - Tenant-owned migrations enable RLS and define workspace membership policies.
 - File storage uses a private `workspace-files` bucket with workspace-prefixed object paths.
 - Service role and OpenAI runtime clients are server-only.
-- Demo workspace records are generated under demo workspace IDs.
 
 ## Needs Review
 
@@ -50,9 +51,9 @@ Public auth/marketing/support routes, customer `/app` modules, admin routes, sub
 
 `workspace-files` is private in migrations and protected with workspace-membership policies on object path prefix.
 
-## Demo Isolation Result
+## Historical Demo Compatibility Result
 
-SAFE. Demo workspace generation writes records under the demo workspace ID. Dashboard/module reads are scoped to the active workspace.
+SAFE. Existing demo-status records remain workspace-scoped and visible only through the retained authorization boundary. No current runtime creates, resets, repopulates, or rewrites demo records.
 
 ## Admin Isolation Result
 

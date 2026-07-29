@@ -763,8 +763,7 @@ function runLegacyCrmLanguageTests() {
     "lib/ai/prompts/vaeroex-system-prompt.ts",
     "app/app/page.tsx",
     "app/app/agents/page.tsx",
-    "app/app/files/actions.ts",
-    "lib/demo/workspace-demo.ts"
+    "app/app/files/actions.ts"
   ];
   const publicExperienceFiles = [
     "components/motion/OperationsIntelligenceEngineDemo.tsx",

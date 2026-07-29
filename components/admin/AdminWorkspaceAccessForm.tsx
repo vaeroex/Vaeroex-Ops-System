@@ -3,7 +3,7 @@ import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton
 import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import type { Database } from "@/lib/supabase/types";
 
-const statuses = ["active", "trialing", "past_due", "canceled", "expired", "manual_review", "demo"];
+const statuses = ["active", "trialing", "past_due", "canceled", "expired", "manual_review"];
 const plans = ["", VAEROEX_PLAN_SLUG];
 type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
 

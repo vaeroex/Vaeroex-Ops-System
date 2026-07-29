@@ -15,7 +15,6 @@ type BusinessHealthTrendChartProps = {
   currentScore?: number;
   currentStatus?: string;
   currentTrend?: string;
-  isDemoWorkspace?: boolean;
   errorMessage?: string | null;
   loading?: boolean;
 };

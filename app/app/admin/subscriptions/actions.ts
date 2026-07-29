@@ -8,6 +8,17 @@ import { normalizePlanSlug, VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
+const assignableSubscriptionStatuses = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+  "incomplete",
+  "canceled",
+  "expired",
+  "manual_review"
+]);
+
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
@@ -35,6 +46,10 @@ export async function createManualSubscriptionAction(formData: FormData) {
 
   if (!email) {
     redirect(withAdminActionNotice(returnTo, "error", "Customer email is required."));
+  }
+
+  if (!assignableSubscriptionStatuses.has(status)) {
+    redirect(withAdminActionNotice(returnTo, "error", "Subscription status cannot be assigned."));
   }
 
   const { data: profile } = await admin.from("profiles").select("id").eq("email", email).maybeSingle();
@@ -116,6 +131,10 @@ export async function updateSubscriptionAction(formData: FormData) {
 
   if (!id) {
     redirect(withAdminActionNotice(returnTo, "error", "Subscription is required."));
+  }
+
+  if (!assignableSubscriptionStatuses.has(status)) {
+    redirect(withAdminActionNotice(returnTo, "error", "Subscription status cannot be assigned."));
   }
 
   const { data: existing } = await admin

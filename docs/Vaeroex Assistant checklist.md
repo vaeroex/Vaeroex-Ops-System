@@ -48,7 +48,7 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
   - Status: Source verified; needs live admin test.
 
 - [ ] Customer creates workspace.
-  - Expected: Active/manual/demo customer can open `/app/setup` and create a workspace.
+  - Expected: Active, trialing, or manually unlocked customers can open `/app/setup` and create a workspace.
   - Status: Source verified; needs live test.
 
 - [ ] Customer completes setup.
@@ -120,7 +120,7 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
   - Status: Source verified; needs public form test.
 
 - [ ] Subscription gating.
-  - Expected: Missing, canceled, expired, and past-due access is blocked from full modules; active, trialing, demo, and manual unlock access is allowed.
+  - Expected: Missing, canceled, expired, and past-due access is blocked from full modules; active, trialing, and manual unlock access is allowed.
   - Status: Source verified; needs live account test.
 
 - [ ] API key safety.
@@ -148,10 +148,6 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
 - [ ] Supabase migrations documented.
   - Expected: Run `supabase db push` against the production project and confirm all four migrations apply.
   - Status: Source documented; needs live Supabase test.
-
-- [ ] Seed data works.
-  - Expected: `supabase db reset` loads demo workspaces, demo subscriptions, module records, Vaeroex results, and support requests in a disposable database.
-  - Status: Source verified; needs live Supabase test.
 
 - [ ] Vercel deployment instructions work.
   - Expected: Vercel project uses `pnpm install` and `pnpm build`; environment variables are configured for Production and Preview; redeploy after env changes.

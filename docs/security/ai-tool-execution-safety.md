@@ -56,7 +56,6 @@ The migration `supabase/migrations/202607080002_ai_tool_execution_security.sql` 
 | Record management archive/delete | UPDATE/DELETE | No | Yes | UI confirmation | Yes | Yes | No | Existing server actions | Module logs vary | Safe, user-driven |
 | Scheduled reports and notifications | CREATE_RECORD / UPDATE_RECORD | No | System cron | N/A | Yes | Mostly service role cron path | Yes, tightly scoped route | Server-controlled schedule payload | Scheduled run logs | Needs ongoing service-role monitoring |
 | Admin subscription/workspace/support actions | ADMIN / BILLING | No | Admin only | Admin UI action | Server checks admin status | Service role bypasses RLS by design | Yes | Server-controlled admin actions | Module logs vary | Dangerous if exposed; currently admin-gated |
-| Demo workspace reset/populate | DELETE/CREATE demo records | No | Vaeroex admin only | Admin UI action | Demo workspace only | Service role path | Yes | Server-controlled demo dataset | Module logs vary | Dangerous if exposed; currently admin-gated |
 | Raw SQL execution from model | SYSTEM | No | No | Not allowed | N/A | N/A | N/A | Blocked by design | Blocked if requested through gateway | Block immediately |
 
 ## Prompt Injection Defenses
@@ -139,7 +138,6 @@ Current service-role paths found:
 - Stripe webhook subscription processing
 - scheduled report cron processing
 - Vaeroex admin subscription/support/workspace controls
-- demo workspace reset/population
 - support request creation where needed
 - manual activation request route
 

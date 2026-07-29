@@ -9,7 +9,7 @@ Phase 6 originally added Squarespace subscription access for Vaeroex Ops System.
 - App seeds and migrates to the single Vaeroex plan.
 - App can manually activate a customer through `/app/admin/subscriptions`.
 - App can block users without active subscriptions through `requireActiveSubscription` and setup/action gates.
-- App can allow demo workspaces, manually unlocked workspaces, active workspaces, and valid trials.
+- App allows active workspaces, valid trials, and manually unlocked workspaces. Historical demo-status records retain compatibility access but cannot be newly assigned.
 - App has `/billing-required` with the required subscription message and purchase/manual activation actions.
 - App has `/app/account/subscription` with subscription status, plan, access state, and usage.
 - App has `/app/admin/subscriptions` with search, manual activation, status changes, Vaeroex plan assignment, notes, activation request review, event review, and raw payload display.

@@ -49,9 +49,6 @@ for (const file of coreFiles) {
   assert.doesNotMatch(source, /Run checklists?|Review (?:failed )?checklists?/i, `${file} must not emit a Checklist action`);
 }
 
-const demoCounts = read("lib/demo/workspace-demo.ts").match(/export async function getDemoWorkspaceCounts[\s\S]*?\n}\n/)?.[0] || "";
-assert.doesNotMatch(demoCounts, /from\("checklists"\)|checklists:\s*countValue/, "Executive Overview demo counts must not query or expose Checklist configuration");
-
 for (const route of ["app/app/checklists/page.tsx", "app/app/checklist-runs/page.tsx"]) {
   const source = read(route);
   assert.match(source, /await requireWorkspacePage\(\)/, `${route} must authorize the workspace before redirecting`);
