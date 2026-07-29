@@ -37,7 +37,7 @@ Use the Vaeroex product for the complete Executive Intelligence experience:
 - Vaeroex decision support
 - Business Health Score
 - Business Memory
-- Profit Leak Detector
+- Profit Leakage Review
 - Executive Briefings
 - Role-Based Briefings
 - Weekly Reviews

@@ -201,21 +201,6 @@ export function projectFindingExplanationV1(snapshot: IntelligenceSnapshotV1, fi
   };
 }
 
-export type PeoplePrestigeProjectionV1 = ProjectionHeaderV1 & Readonly<{
-  authoritativeBusinessHealth: IntelligenceSnapshotV1["businessHealth"];
-  priorityFindingIds: readonly string[];
-  legacyPrestigeAuthorityAllowed: false;
-}>;
-
-export function projectPeoplePrestigeV1(snapshot: IntelligenceSnapshotV1): PeoplePrestigeProjectionV1 {
-  return {
-    ...header(snapshot),
-    authoritativeBusinessHealth: snapshot.businessHealth,
-    priorityFindingIds: snapshot.priorities.map((priority) => priority.findingId),
-    legacyPrestigeAuthorityAllowed: false
-  };
-}
-
 export type ExecutiveReasoningProjectionV1 = ProjectionHeaderV1 & Readonly<{
   businessHealth: IntelligenceSnapshotV1["businessHealth"];
   kpis: readonly KpiSnapshotV1[];

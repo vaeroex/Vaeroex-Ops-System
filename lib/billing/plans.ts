@@ -30,7 +30,7 @@ export const VAEROEX_PLAN_FEATURES = [
   "Leadership decision support",
   "Executive Visibility Dashboard",
   "Business Health Score",
-  "Profit Leak Detector",
+  "Profit Leakage Review",
   "Security Features",
   "Help Center"
 ] as const;

@@ -9,6 +9,7 @@ const exists = (file) => fs.existsSync(path.join(root, file));
 const page = read("app/app/kpis/page.tsx");
 const providerPolicy = read("lib/ai/providers/workflow-provider-policy.ts");
 const providerManager = read("lib/ai/providers/provider-manager.ts");
+const kpiSettings = read("lib/kpis/settings.ts");
 const packageJson = read("package.json");
 const customerSource = [page, providerPolicy, providerManager].join("\n");
 
@@ -26,7 +27,7 @@ assert.equal(exists("scripts/executive-kpi-analysis-regression-tests.js"), false
 
 assert.match(page, /<OverlayTrendChart trends=\{trends\} mode=\{mode\} \/>/);
 assert.match(page, />Validated KPI facts</);
-assert.match(page, /const notes = comparisonNotes\(trends\)/);
+assert.match(page, /const notes = comparisonNotes\(trends, deterministicStates\)/, "KPI facts must use the bounded canonical comparison state");
 assert.match(page, /Directionality is not interpreted unless that KPI explicitly defines whether higher or lower is better/);
 assert.match(page, /type ComparisonMode = "actual" \| "percent" \| "normalized"/);
 assert.match(page, /value === "actual" \|\| value === "percent" \|\| value === "normalized"/);
@@ -34,7 +35,8 @@ assert.match(page, /params\?\.timeline/);
 assert.match(page, /params\?\.metric/);
 assert.match(page, /params\?\.mode/);
 assert.match(page, /params\?\.section === "compare"/);
-assert.match(page, /return Array\.from\(new Set\(selected\)\)/, "all unique selected KPI query values must remain supported");
+assert.match(kpiSettings, /const selectedByIdentity = new Map<string, string>\(\)/, "selected KPI query values must resolve by canonical identity");
+assert.match(kpiSettings, /return \[\.\.\.selectedByIdentity\.values\(\)\]/, "all unique selected KPI query values must remain supported");
 assert.match(page, /Select at least two KPIs with two or more dated values to compare trend lines/);
 assert.match(page, /aria-label="Multi-KPI comparison trend chart"/);
 

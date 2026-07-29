@@ -159,7 +159,7 @@ assert.match(coverage, /activeFormIds\.has\(submission\.form_id\)/, "form submis
 assert.match(coverage, /activeCrmLeadIds\.has\(history\.lead_id\)/, "customer history requires active eligible customer evidence");
 assert.match(coverage, /activeSourceFileIds\.has\(item\.file_upload_id\)/, "imports require an active Source parent");
 assert.match(intelligenceLayer, /activeFormIds\.has\(submission\.form_id\)/, "Intelligence submissions require an active form parent");
-assert.match(homepage, /reports: \[\]/, "derived reports must not influence the legacy Business Health calculation");
+assert.match(homepage, /const intelligenceLayer = buildIntelligenceLayer\(/, "Executive Overview must delegate Business Health to the canonical layer that excludes derived reports");
 assert.doesNotMatch(boundedContext, /context\.reports[\s\S]{0,500}body_markdown:/, "saved report conclusions must not feed new Ask reasoning");
 assert.match(boundedContext, /Saved report conclusions are not reused as current business evidence/, "Ask must explain the derived-report evidence boundary");
 assert.doesNotMatch(searchRoute, /sourceType: `Derived report[\s\S]{0,180}truncate\(report\.body_markdown\)/, "Search navigation must not surface stale report conclusions as current evidence");

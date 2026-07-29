@@ -389,7 +389,7 @@ assert.match(kpiPage, /projectKpiCompareV1/);
 assert.match(kpiPage, /metricNames\.length > INTELLIGENCE_SNAPSHOT_LIMITS\.kpis/);
 assert.match(kpiPage, /snapshot_v1_consumer_left_on_legacy/, "out-of-contract KPI cardinality must remain wholly on legacy");
 assert.match(read("app/app/people/page.tsx"), /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app"\)/, "The retired People route remains authenticated and redirects to Overview");
-assert.doesNotMatch(read("app/app/people/page.tsx"), /IntelligenceSnapshotV1|projectPeoplePrestigeV1/, "The retired People route must not become a snapshot consumer");
+assert.doesNotMatch(read("app/app/people/page.tsx"), /IntelligenceSnapshotV1/, "The retired People route must not become a snapshot consumer");
 assert.match(read("app/api/search/route.ts"), /buildBoundedWorkspaceContext/, "Executive reasoning remains on its legacy bounded context until V1 can prove exact provider parity");
 assert.match(read("lib/ai/kpi-overview.ts"), /recent_values: metric\.history/, "raw conversational KPI context remains legacy because V1 omits per-point targets");
 assert.match(read("docs/architecture/adr-004-final-snapshot-consumer-migration.md"), /cannot prove exact parity/);

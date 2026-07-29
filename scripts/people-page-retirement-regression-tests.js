@@ -18,7 +18,6 @@ const kpisPage = read("app/app/kpis/page.tsx");
 const overviewPage = read("app/app/page.tsx");
 const workspaceContext = read("lib/workspaces/current.ts");
 const adminAccess = read("lib/admin/admin-emails.ts");
-const prestige = read("lib/intelligence/prestige.ts");
 const databaseTypes = read("lib/supabase/types.ts");
 
 assert.match(peoplePage, /await requireWorkspacePage\(\)/, "People retirement redirect must preserve authenticated workspace authorization");
@@ -49,9 +48,8 @@ assert.match(kpisPage, /from\("people"\)[\s\S]*ShareRecordPanel/, "KPI Records m
 assert.match(overviewPage, /from\("people"\)/, "Executive Overview must preserve optional people-context reads");
 assert.match(overviewPage, /from\("operational_assignments"\)/, "Executive Overview must preserve assignment history reads");
 assert.match(overviewPage, /from\("record_shares"\)/, "Executive Overview must preserve sharing history reads");
-assert.match(overviewPage, /buildPrestigeIntelligence/, "Executive Overview must preserve its Prestige consumer");
-assert.match(kpisPage, /buildPrestigeIntelligence/, "KPI Records must preserve its Prestige consumer");
-assert.match(prestige, /input\.people/, "Prestige must preserve optional people-context reads");
+assert.doesNotMatch(overviewPage, /buildPrestigeIntelligence/, "Executive Overview must not require the retired People-adjacent intelligence producer");
+assert.doesNotMatch(kpisPage, /buildPrestigeIntelligence/, "KPI Records must not require the retired People-adjacent intelligence producer");
 
 assert.match(workspaceContext, /from\("workspace_members"\)/, "Workspace selection must remain membership-based");
 assert.doesNotMatch(workspaceContext, /from\("people"\)/, "Workspace selection must remain independent from People records");

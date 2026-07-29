@@ -41,7 +41,7 @@ Status labels: SAFE means RLS and policies exist in migrations. NEEDS REVIEW mea
 | `customer_subscriptions` | Nullable | Yes | Own/workspace subscriptions | Workspace managers | Workspace managers | No normal delete policy | Admin updates use service role | SAFE |
 | `subscription_events` | Nullable | Yes | Workspace managers | Server/admin only | Server/admin only | Server/admin only | Webhook/admin event log | SAFE |
 | `ai_usage` | Yes | Yes | Workspace members | Workspace members | No normal update policy | No normal delete policy | Usage records | SAFE |
-| `business_decisions` | Yes | Yes | Workspace members | Workspace managers | Workspace managers | Workspace managers | Prestige operations decisions | SAFE |
+| `business_decisions` | Yes | Yes | Workspace members | Workspace managers | Workspace managers | Workspace managers | Leadership Decision Journal | SAFE |
 | `vaeroex_recommendation_outcomes` | Yes | Yes | Workspace members | Workspace managers | Workspace managers | Workspace managers | Recommendation outcome tracking | SAFE |
 
 Production verification still required:

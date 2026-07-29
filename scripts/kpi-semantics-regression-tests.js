@@ -258,7 +258,6 @@ const performanceFields = fs.readFileSync(path.join(root, "components/kpis/KpiPe
 const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
 const kpiSettingsPage = fs.readFileSync(path.join(root, "app/app/kpis/settings/page.tsx"), "utf8");
-const prestige = fs.readFileSync(path.join(root, "lib/intelligence/prestige.ts"), "utf8");
 const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
 const dormantReports = fs.readFileSync(path.join(root, "app/app/reports/actions.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607270002_kpi_semantic_direction.sql"), "utf8");
@@ -284,9 +283,6 @@ assert.match(kpiSettingsPage, /resolveKpiSemantics\(metric, setting\)/, "KPI Set
 assert.match(kpiSettingsPage, /resolveKpiTargetReference\(semantics, target\)/, "KPI Settings recognizes canonical semantic targets and ranges");
 assert.doesNotMatch(kpiSettingsPage, /setting\?\.desired_direction !== "unknown"/, "KPI Settings must not maintain a second nullable direction resolver");
 assert.match(kpiSettingsPage, /defaultValue=\{formatNumber\(target\)\}/, "the target editor remains manual-target-only");
-assert.match(prestige, /evaluateKpiPerformance/);
-assert.match(prestige, /resolveKpiTargetReference/);
-assert.doesNotMatch(prestige, /latest\.actual_value\s*>=\s*previous\.actual_value/);
 assert.match(operationalEvidence, /Math\.abs\(revenue\.changePercent \?\? 0\) >= 5/, "operational thresholds measure magnitude after canonical direction is known");
 assert.match(dormantReports, /performanceEffect === "favorable"/);
 assert.match(dormantReports, /performanceEffect === "unfavorable"/);

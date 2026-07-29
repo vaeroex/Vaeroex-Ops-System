@@ -17,8 +17,6 @@ const activeRuntimeFiles = [
   "components/accountability/AccountabilityForms.tsx",
   "components/app/AppNavigation.tsx",
   "components/app/AppShell.tsx",
-  "components/intelligence/PrestigeOperationsPanel.tsx",
-  "lib/intelligence/prestige.ts",
   "lib/reports/scheduled-generator.ts"
 ];
 
@@ -62,9 +60,7 @@ assert.match(accountabilityForms, /export function AssignmentPanel/, "assignment
 assert.doesNotMatch(accountabilityForms, /KpiAlertRulePanel|Add KPI alert|Create KPI alert/);
 
 const intelligenceActions = read("app/app/intelligence/actions.ts");
-const prestigePanel = read("components/intelligence/PrestigeOperationsPanel.tsx");
-assert.doesNotMatch(intelligenceActions, /createKpiAlertFromPrestigeAction/);
-assert.doesNotMatch(prestigePanel, /createKpiAlertFromPrestigeAction|Add KPI alert|showAlert/);
+assert.doesNotMatch(intelligenceActions, /createKpiAlert.*Action/);
 
 const scheduledGenerator = read("lib/reports/scheduled-generator.ts");
 assert.doesNotMatch(scheduledGenerator, /scheduled_report_ready|last_notified_at|\.from\("notifications"\)/);

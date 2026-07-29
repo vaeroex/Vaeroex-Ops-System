@@ -48,8 +48,7 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     recentCrmLeads,
     recentCrmLeadHistory,
     recentOperationalMetrics,
-    recentDecisions,
-    recentRecommendationOutcomes
+    recentDecisions
   ] = await Promise.all([
     supabase.from("workspaces").select("id,name,industry,size,created_at").eq("id", workspaceId).maybeSingle(),
     supabase
@@ -193,14 +192,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     supabase
       .from("business_decisions")
       .select("id,title,reason,expected_outcome,actual_outcome,owner,status,related_kpi,review_date,created_at")
-      .eq("workspace_id", workspaceId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .order("created_at", { ascending: false })
-      .limit(20),
-    supabase
-      .from("vaeroex_recommendation_outcomes")
-      .select("id,title,source_type,source_id,decision,status,owner,outcome_summary,review_date,created_at")
       .eq("workspace_id", workspaceId)
       .is("deleted_at", null)
       .is("archived_at", null)
@@ -412,6 +403,6 @@ export async function buildWorkspaceSnapshot(supabase: SupabaseClient<Database>,
     crm_lead_history: recentCustomerHistoryRows,
     operational_metrics: recentOperationalMetricRows,
     business_decisions: recentDecisions.data ?? [],
-    recommendation_outcomes: recentRecommendationOutcomes.data ?? []
+    recommendation_outcomes: []
   };
 }

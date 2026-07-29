@@ -42,13 +42,13 @@ Ordering differences are allowed only for the Intelligence inbox, where the exis
 
 `buildBoundedWorkspaceContext`, `buildExecutiveReasoningContext`, and the lightweight conversational KPI overview remain legacy. Their provider payloads require raw source excerpts, table history, definitions, category labels, per-observation targets, reports, files, Business Memory matches, source manifests, and query-specific retrieval results. V1 intentionally does not retain those fields. Rebuilding them in a snapshot adapter would broaden the contract, change provider payload meaning, or create a second evidence-retrieval system. These paths therefore cannot prove exact parity in this migration.
 
-### Prestige
+### Retired parallel intelligence
 
-Prestige remains an active presentation and operational-readiness dependency on Executive Overview and KPI pages. It supplies operational actions, profit-leak presentation, benchmarks, memory timeline values, and data-quality presentation that are not represented by V1. It is not treated as canonical authority by the new adapters, and it is not migrated or removed here.
+At the time of this migration, Prestige remained outside V1. ADR-005 subsequently retires that parallel producer and its presentation instead of broadening V1 to preserve legacy diagnostics.
 
 ### People
 
-The People page is explicitly excluded. Its page-local Prestige composition remains until the page is retired in a dedicated PR. Shared people and assignment data used by Checklists, Checklist Runs, sharing, authorization, and other active workflows is not People-page-only code and must remain.
+The People page was explicitly excluded and was later retired in its dedicated product PR. Shared people and assignment data remains independent compatibility infrastructure.
 
 ### Other exclusions
 
@@ -66,4 +66,4 @@ The People page is explicitly excluded. Its page-local Prestige composition rema
 
 ## Follow-up
 
-A later cleanup PR may remove legacy consumer assembly only after Production qualification. People retirement and any future redesign of raw executive-reasoning context are separate product and architecture changes.
+A later cleanup PR may remove unrelated legacy consumer assembly only after Production qualification. Raw executive-reasoning context remains a separate architecture decision.

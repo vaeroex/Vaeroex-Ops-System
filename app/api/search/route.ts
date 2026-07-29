@@ -60,7 +60,6 @@ type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Ro
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
-type RecommendationRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 
@@ -330,7 +329,6 @@ export async function GET(request: Request) {
     rawCrmLeads,
     sops,
     decisions,
-    recommendations,
     learnedKnowledgeCandidates,
     vaeroexRuns
   ] = await Promise.all([
@@ -427,18 +425,6 @@ export async function GET(request: Request) {
         .is("deleted_at", null)
         .is("archived_at", null)
         .or(orFilter(["title", "reason", "expected_outcome", "related_kpi", "owner", "status", "outcome_summary"], words))
-        .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
-    scopedResults<RecommendationRow>(
-      includesDomain("decisions", "priorities", "risks"),
-      () => supabase
-        .from("vaeroex_recommendation_outcomes")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .or(orFilter(["title", "source_type", "source_title", "evidence", "related_module", "related_kpi", "expected_outcome", "owner", "priority", "status", "outcome_summary"], words))
         .order("updated_at", { ascending: false })
         .limit(6)
     ),
@@ -625,16 +611,8 @@ export async function GET(request: Request) {
         title: decision.title,
         sourceType: "Decision Journal",
         preview: truncate(decision.reason || decision.expected_outcome || decision.outcome_summary),
-        href: "/app?view=Intelligence%20View",
+        href: "/app?view=Intelligence%20View#decision-journal",
         meta: compact([decision.status, decision.owner, decision.related_kpi])
-      })),
-      ...recommendations.map((recommendation) => ({
-        id: recommendation.id,
-        title: recommendation.title,
-        sourceType: "Recommendation",
-        preview: truncate(recommendation.evidence || recommendation.expected_outcome || recommendation.outcome_summary),
-        href: sourceHref(recommendation.source_type, recommendation.source_title || recommendation.title),
-        meta: compact([recommendation.status, recommendation.priority, recommendation.related_module])
       }))
     ].slice(0, 6)
   );

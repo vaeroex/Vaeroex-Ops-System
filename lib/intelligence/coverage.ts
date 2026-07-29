@@ -100,7 +100,6 @@ export type BusinessIntelligenceCoverageInput = {
   operationalMetrics?: TableRow<"operational_metrics">[];
   assets?: TableRow<"assets">[];
   decisions?: TableRow<"business_decisions">[];
-  recommendationOutcomes?: TableRow<"vaeroex_recommendation_outcomes">[];
   memoryChunks?: TableRow<"business_memory_chunks">[];
 };
 
@@ -429,8 +428,7 @@ function makeConfidenceOverTime(input: BusinessIntelligenceCoverageInput) {
 export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCoverageInput): BusinessIntelligenceCoverageResult {
   const derivedFindingCount =
     excludeChecklistDerivedRecords(filterBusinessEvidence(input.vaeroexRuns || [], { sourceKind: "platform_run" })).length +
-    excludeChecklistDerivedRecords(filterBusinessEvidence(input.decisions || [])).length +
-    excludeChecklistDerivedRecords(filterBusinessEvidence(input.recommendationOutcomes || [])).length;
+    excludeChecklistDerivedRecords(filterBusinessEvidence(input.decisions || [])).length;
   const activeFiles = activeRows(input.files || []);
   const activeSourceFileIds = new Set(activeFiles.map((file) => file.id));
   const activeImports = (input.imports || []).filter((item) => activeSourceFileIds.has(item.file_upload_id));
@@ -457,8 +455,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     vaeroexRuns: [],
     operationalMetrics: excludeChecklistDerivedMetrics(filterBySourceParentEligibility(activeRows(input.operationalMetrics || []), parentEligibility)),
     assets: activeRows(input.assets || []),
-    decisions: [],
-    recommendationOutcomes: []
+    decisions: []
   };
   const revenueKeywords = ["revenue", "sales", "income", "booking", "invoice", "receivable", "arpu", "arr", "mrr"];
   const financialKeywords = ["financial", "expense", "cost", "profit", "margin", "cash", "payroll", "budget", "p&l", "loss", "invoice", "revenue"];
@@ -540,7 +537,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     buildItem({ id: "staffing", sources: staffingSources }),
     buildItem({ id: "issues_risks", sources: riskSources }),
     buildItem({ id: "historical_trends", sources: historicalSources }),
-    buildItem({ id: "business_memory", sources: businessMemorySources, outcomes: activeRows(input.decisions || []).length + activeRows(input.recommendationOutcomes || []).length })
+    buildItem({ id: "business_memory", sources: businessMemorySources, outcomes: activeRows(input.decisions || []).length })
   ];
   const overallCoverage = Math.round(categories.reduce((sum, item) => sum + item.coverage, 0) / categories.length);
   const allOriginalEvidence = uniqueSources([

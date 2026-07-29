@@ -53,8 +53,9 @@ assert.match(inbox, /findingPriorityStatus\(insight\.priority\)/, "finding urgen
 assert.match(healthPanel, /businessHealthStatus\(factsForDisplay\.status\)/, "Business Health analysis must use the shared state semantics without changing its content model");
 
 assert.match(kpis, /function metricTone\(/, "KPI scoring classification must remain in its existing deterministic function");
-assert.match(kpis, /actual === null \|\| target === null \|\| !direction/, "KPI status must remain neutral without an explicit target and direction");
-assert.match(kpis, /kpiStatus\(\{[\s\S]*hasCurrentValue: kpi\.actual_value !== null[\s\S]*hasTarget: kpi\.target !== null[\s\S]*hasDirection: Boolean\(direction\)/, "KPI rendering must derive semantic treatment from the existing facts only");
+assert.match(kpis, /actual === null \|\| semantics\.desiredDirection === "unknown"/, "KPI status must remain neutral when canonical semantics are unknown");
+assert.match(kpis, /resolveKpiTargetReference\(semantics, row\.target\)\.kind === "none"/, "KPI status must fail closed when canonical semantics provide no target reference");
+assert.match(kpis, /kpiStatus\(\{[\s\S]*hasCurrentValue: kpi\.actual_value !== null[\s\S]*hasTarget: targetReference\.kind !== "none"[\s\S]*hasDirection: direction !== "unknown"/, "KPI rendering must derive semantic treatment from the canonical deterministic state");
 assert.match(homepageModel, /priority: insight\.priority/, "Executive homepage priority must preserve the existing intelligence priority");
 assert.doesNotMatch(homepageModel, /PositiveSignal/, "The homepage model must not create a new positive-signal classification");
 

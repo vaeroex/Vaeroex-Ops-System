@@ -138,7 +138,7 @@ export const helpArticles: HelpArticle[] = [
     ["executive-dashboard", "Executive Dashboard", "A leadership view of business health, signals, risks, and recommended actions.", "/app"],
     ["business-health-score", "Business Health Score", "A directional score built from available workspace signals.", "/app"],
     ["business-memory", "Business Memory", "Relevant historical context from imports, decisions, recommendations, and outcomes.", "/app"],
-    ["profit-leak-detector", "Profit Leak Detector", "A review of revenue and opportunity leakage signals.", "/app"],
+    ["profit-leak-detector", "Profit Leakage Review", "A KPI-based review of supported revenue leakage indicators.", "/app/kpis/profit-leakage"],
     ["focus-on", "What Should Leadership Review?", "A prioritized list of evidence-backed topics to review.", "/app"],
     ["reports", "Saved Analyses", "A workspace-scoped library of completed analyses your team explicitly saved.", "/app/reports"],
     ["kpis", "KPIs", "Time-series metrics with targets, trend context, and evidence.", "/app/kpis"],
@@ -177,7 +177,7 @@ export const helpArticles: HelpArticle[] = [
     ["insight-to-action", "How does Vaeroex support action?", "Vaeroex turns supported findings into clear leadership considerations while keeping final decisions under human control."],
     ["turn-into-records", "Saving analyses", "Users can review completed Business Health or Finding Explanation analyses before preserving them in Saved Analyses."],
     ["health-score-general", "How Business Health Score is calculated generally", "The score is directional and based on available KPI, customer activity, issue, organization, and source evidence."],
-    ["profit-leak-general", "How Profit Leak Detector works generally", "Vaeroex looks for revenue and opportunity signals such as stalled customer activity, missed targets, response delays, and weak source evidence."],
+    ["profit-leak-general", "How Profit Leakage Review works", "The KPI review uses available revenue, target, and operating-cost values to show supported leakage indicators and visible limitations."],
     ["business-memory-general", "How Business Memory works", "Vaeroex uses prior imports, decisions, source analyses, and outcomes as historical context."],
     ["focus-priorities", "How \"What Should I Focus On?\" works", "Vaeroex prioritizes visible evidence, risk, urgency, and business impact."],
     ["risk-detection", "How risk detection works", "Risk signals are directional indicators from open issues, overdue work, missed targets, stale procedures, and weak data."]
@@ -341,7 +341,7 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
     what: "Customer activity evidence helps Vaeroex understand revenue, conversion, response speed, and opportunity signals.",
     workflow: ["Add customer activity evidence", "Review status", "Review conversion", "Compare against revenue"],
     mistakes: ["Stale customer status", "Missing source", "Treating one customer sample as complete history"],
-    related: ["Profit Leak Detector", "KPIs", "Saved Analyses"]
+    related: ["Profit Leakage Review", "KPIs", "Saved Analyses"]
   },
   analysis: {
     what: "Use Intelligence for structured analysis and Search to locate workspace records.",

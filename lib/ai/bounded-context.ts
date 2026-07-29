@@ -296,18 +296,10 @@ export async function buildFocusedExplanationContext({
       }
     }
   } else if (isUuid(contextId) && (contextType.includes("risk") || contextType.includes("opportunity") || contextType.includes("intelligence"))) {
-    const [{ data: issue }, { data: recommendation }] = await Promise.all([
+    const [{ data: issue }] = await Promise.all([
       supabase
         .from("issues")
         .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,created_at,updated_at")
-        .eq("workspace_id", workspaceId)
-        .eq("id", contextId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .maybeSingle(),
-      supabase
-        .from("vaeroex_recommendation_outcomes")
-        .select("id,title,source_type,source_id,source_title,evidence,related_module,related_kpi,expected_outcome,priority,status,outcome_summary,created_at,updated_at")
         .eq("workspace_id", workspaceId)
         .eq("id", contextId)
         .is("deleted_at", null)
@@ -316,7 +308,6 @@ export async function buildFocusedExplanationContext({
     ]);
 
     if (issue && isOriginalBusinessEvidence(issue)) verifiedRecords.push(issue);
-    if (recommendation) verifiedRecords.push(recommendation);
   }
 
   const workspaceSnapshot = {
@@ -423,36 +414,21 @@ export async function buildBoundedWorkspaceContext({
 
   if (domainSet.has("risks") || domainSet.has("priorities") || domainSet.has("decisions")) {
     loaders.push(
-      Promise.all([
-        safeRows(
-          "Risk records",
-          supabase
-            .from("issues")
-            .select("id,title,description,issue_type,severity,status,root_cause,created_at,updated_at,archived_at,deleted_at")
-            .eq("workspace_id", workspaceId)
-            .is("deleted_at", null)
-            .is("archived_at", null)
-            .order("updated_at", { ascending: false })
-            .limit(24),
-          limitations
-        ),
-        safeRows(
-          "Recommendation records",
-          supabase
-            .from("vaeroex_recommendation_outcomes")
-            .select("id,title,source_type,source_id,source_title,evidence,related_module,related_kpi,expected_outcome,priority,status,outcome_summary,created_at,updated_at")
-            .eq("workspace_id", workspaceId)
-            .is("deleted_at", null)
-            .is("archived_at", null)
-            .order("updated_at", { ascending: false })
-            .limit(8),
-          limitations
-        )
-      ]).then(([issues, recommendations]) => {
+      safeRows(
+        "Risk records",
+        supabase
+          .from("issues")
+          .select("id,title,description,issue_type,severity,status,root_cause,created_at,updated_at,archived_at,deleted_at")
+          .eq("workspace_id", workspaceId)
+          .is("deleted_at", null)
+          .is("archived_at", null)
+          .order("updated_at", { ascending: false })
+          .limit(24),
+        limitations
+      ).then((issues) => {
         const eligibleIssues = filterOriginalBusinessEvidence(issues).slice(0, 8);
-        const eligibleRecommendations = filterBusinessEvidence(recommendations);
-        context.risk_and_priority_evidence = { issues: eligibleIssues, recommendations: eligibleRecommendations };
-        structuredEvidenceCount += eligibleIssues.length + eligibleRecommendations.length;
+        context.risk_and_priority_evidence = { issues: eligibleIssues, recommendations: [] };
+        structuredEvidenceCount += eligibleIssues.length;
         if (domainSet.has("risks")) loadedDomainSet.add("risks");
         if (domainSet.has("priorities")) loadedDomainSet.add("priorities");
         if (domainSet.has("decisions")) loadedDomainSet.add("decisions");
