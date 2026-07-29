@@ -52,6 +52,10 @@ const {
   parseBusinessNoteUserAddedContext
 } = require("../lib/ai/business-notes/review-context.ts");
 const {
+  BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS,
+  businessNoteInputGuidance
+} = require("../lib/ai/business-notes/input-guidance.ts");
+const {
   filterEligibleMemoryRows,
   SupabasePgvectorCandidateRetriever
 } = require("../lib/ai/evidence-index.ts");
@@ -635,6 +639,8 @@ async function main() {
   assert.match(actions, /This unchanged Business Note already has extracted business context/);
   assert.match(actions, /indexApprovedBusinessNote/);
   const panel = read("components/evidence/BusinessNotesPanel.tsx");
+  const composer = read("components/evidence/BusinessNoteComposer.tsx");
+  const inputGuidance = read("lib/ai/business-notes/input-guidance.ts");
   assert.match(panel, /Review &amp; Extract Business Context/);
   assert.match(panel, /Business Context Review/);
   assert.match(panel, /Extracting business context\.\.\./);
@@ -655,6 +661,28 @@ async function main() {
   assert.match(panel, /EvidenceLifecycleSelection/);
   assert.match(panel, /Archived Business Notes/);
   assert.match(panel, /bulkManageBusinessNotesAction/);
+  assert.match(panel, /BusinessNoteComposer disabled=\{!enabled\}/);
+  assert.match(composer, /Business Notes are for important business observations, decisions, temporary conditions, incidents, assumptions, and executive context that may not appear in formal reports\./);
+  assert.match(composer, /For best results, keep notes focused on a single business event or topic\./);
+  assert.match(composer, /Recommended length:/);
+  assert.match(composer, /BUSINESS_NOTE_RECOMMENDED_MIN_CHARACTERS/);
+  assert.match(composer, /BUSINESS_NOTE_RECOMMENDED_MAX_CHARACTERS/);
+  assert.match(composer, /onChange=\{\(event\) => setCharacterCount\(event\.currentTarget\.value\.length\)\}/);
+  assert.match(composer, /aria-live="polite"/);
+  assert.match(composer, /This is a large Business Note and may take longer to analyze\./);
+  assert.match(composer, /consider uploading it as a document instead\./);
+  assert.match(composer, /maxLength=\{BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS\}/);
+  assert.match(inputGuidance, /BUSINESS_NOTE_LARGE_WARNING_CHARACTERS = 5_000/);
+  assert.match(inputGuidance, /BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS = 10_000/);
+  assert.match(inputGuidance, /characterCount >= BUSINESS_NOTE_LARGE_WARNING_CHARACTERS/);
+  assert.match(inputGuidance, /characterCount > BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS/);
+  assert.equal(BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS, 10000);
+  assert.equal(businessNoteInputGuidance(4999).showLargeNoteWarning, false);
+  assert.equal(businessNoteInputGuidance(5000).showLargeNoteWarning, true);
+  assert.equal(businessNoteInputGuidance(10000).exceedsMaximum, false);
+  assert.equal(businessNoteInputGuidance(10001).exceedsMaximum, true);
+  assert.match(actions, /originalNote\.length > BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS/);
+  assert.match(actions, /redirect\(noticeUrl\("error", BUSINESS_NOTE_MAX_LENGTH_MESSAGE\)\)/);
   const lifecycleSelection = read("components/evidence/EvidenceLifecycleSelection.tsx");
   assert.match(lifecycleSelection, /Select All/);
   assert.match(lifecycleSelection, /Clear Selection/);

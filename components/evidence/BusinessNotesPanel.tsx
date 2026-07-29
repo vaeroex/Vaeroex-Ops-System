@@ -5,7 +5,6 @@ import {
   submitBusinessNoteForReviewAction
 } from "@/app/app/sources/business-notes/actions";
 import {
-  BUSINESS_NOTE_MAX_CHARACTERS,
   BUSINESS_NOTE_TYPES,
   type BusinessNoteExtraction
 } from "@/lib/ai/business-notes/contracts";
@@ -15,6 +14,7 @@ import {
 } from "@/lib/ai/business-notes/validation";
 import { businessNoteAdditionalContextPrompts } from "@/lib/ai/business-notes/review-context";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
+import { BusinessNoteComposer } from "@/components/evidence/BusinessNoteComposer";
 import { EvidenceLifecycleCheckbox, EvidenceLifecycleSelection } from "@/components/evidence/EvidenceLifecycleSelection";
 import type { Database } from "@/lib/supabase/types";
 
@@ -272,18 +272,7 @@ export function BusinessNotesPanel({
       {!archived ? <details className="mt-4 rounded-lg border border-cyan-300/20 bg-cyan-950/10 p-3" open={!notes.length}>
         <summary className="cursor-pointer list-none text-sm font-semibold text-cyan-100">Write Business Note</summary>
         <form action={submitBusinessNoteForReviewAction} className="mt-4 space-y-3">
-          <label className="block text-sm text-slate-200">
-            <span className="mb-1 block text-xs font-semibold text-slate-300">Business Note</span>
-            <textarea
-              name="note_text"
-              required
-              maxLength={BUSINESS_NOTE_MAX_CHARACTERS}
-              rows={8}
-              disabled={!enabled}
-              placeholder="Write or paste the observation exactly as it was recorded..."
-              className="w-full resize-y rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-sm leading-6 text-slate-100 outline-none placeholder:text-slate-500 focus:border-cyan-300 disabled:cursor-not-allowed disabled:opacity-60"
-            />
-          </label>
+          <BusinessNoteComposer disabled={!enabled} />
           <label className="block max-w-xs text-sm text-slate-200">
             <span className="mb-1 block text-xs font-semibold text-slate-300">Observation date (optional)</span>
             <input type="date" name="observation_date" disabled={!enabled} className="min-h-11 w-full rounded-md border border-white/10 bg-slate-950/70 px-3 py-2 text-slate-100 outline-none focus:border-cyan-300 disabled:opacity-60" />
