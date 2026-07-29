@@ -385,7 +385,7 @@ export function PrestigeOperationsPanel({
 
         <IntelligenceAccordion
           title="Profit Leak Detector"
-          description="Revenue and opportunity leakage signals from customer activity evidence, KPIs, source-system activity, issues, checklists, SOPs, and files."
+          description="Revenue and opportunity leakage signals from customer activity evidence, KPIs, source-system activity, issues, SOPs, and files."
           summary={`${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`}
         >
           <div className="mb-4">

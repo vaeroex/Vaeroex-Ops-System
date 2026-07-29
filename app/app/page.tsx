@@ -25,6 +25,7 @@ import { isExecutiveBriefPreviewEnabled } from "@/lib/ai/providers/workflow-prov
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
+import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepage";
@@ -56,8 +57,6 @@ type DashboardPeriod = "Daily" | "Weekly" | "Monthly" | "Quarterly" | "Yearly" |
 type DashboardMode = "Executive View" | "Operations View" | "Intelligence View";
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
-type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
-type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
@@ -359,11 +358,6 @@ function isConvertedStatus(status: string | null | undefined) {
   return normalized.includes("converted") || normalized.includes("won") || normalized.includes("customer") || normalized.includes("closed");
 }
 
-function isChecklistFailure(run: ChecklistRunRow) {
-  const normalized = lower(run.status);
-  return normalized && normalized !== "complete" && normalized !== "completed" && normalized !== "done";
-}
-
 function isOpenIssue(issue: IssueRow) {
   const deletedAt = (issue as IssueRow & { deleted_at?: string | null }).deleted_at;
   return lower(issue.status) !== "closed" && lower(issue.status) !== "resolved" && !deletedAt;
@@ -602,15 +596,13 @@ function buildSmartAlerts({
   crmLeadsWithoutFollowup,
   staleSops,
   oldIssues,
-  unanalyzedFiles,
-  checklistsWithoutRecentRuns
+  unanalyzedFiles
 }: {
   targetMissKpis: KpiRow[];
   crmLeadsWithoutFollowup: CrmLeadRow[];
   staleSops: SopRow[];
   oldIssues: IssueRow[];
   unanalyzedFiles: FileUploadRow[];
-  checklistsWithoutRecentRuns: ChecklistRow[];
 }) {
   return [
     targetMissKpis.length
@@ -661,16 +653,6 @@ function buildSmartAlerts({
           why: "Uploaded files should either feed historical memory or produce clear findings for reports.",
           action: "Review files",
           href: "/app/sources"
-        }
-      : null,
-    checklistsWithoutRecentRuns.length
-      ? {
-          id: "checklist-runs",
-          severity: "Medium",
-          title: `${checklistsWithoutRecentRuns.length} checklist${checklistsWithoutRecentRuns.length === 1 ? "" : "s"} have no recent run`,
-          why: "Checklists only improve intelligence when they are actually completed and reviewed.",
-          action: "Run checklists",
-          href: "/app/checklists"
         }
       : null
   ].filter(Boolean) as DashboardAlert[];
@@ -875,7 +857,7 @@ function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeInt
       evidence: benchmark?.evidence || `${intelligence.benchmarkMode.length} operating benchmark${intelligence.benchmarkMode.length === 1 ? "" : "s"} available.`,
       reasoning: "Vaeroex compares this workspace against default operating standards, not anonymous customer data.",
       confidence: benchmark?.status === "Missing data" ? "Low" : "Medium",
-      action: benchmark?.recommendedAction || "Use benchmark gaps to decide which KPI, checklist, or evidence area needs stronger structure."
+      action: benchmark?.recommendedAction || "Use benchmark gaps to decide which KPI or evidence area needs stronger structure."
     }
   ];
 
@@ -1201,7 +1183,6 @@ function DemoWorkspaceBanner({
     files: number;
     fileAnalyses: number;
     assets: number;
-    checklists: number;
     alerts: number;
     insights: number;
   };
@@ -1223,7 +1204,6 @@ function DemoWorkspaceBanner({
     ["Files", counts.files],
     ["File analyses", counts.fileAnalyses],
     ["Assets", counts.assets],
-    ["Checklists", counts.checklists],
     ["Alerts", counts.alerts],
     ["Vaeroex insights", counts.insights]
   ];
@@ -1236,7 +1216,7 @@ function DemoWorkspaceBanner({
           <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6">
             Demo Workspace &mdash; executive intelligence sample data from January to current month. No real emails are sent.
-            It includes YTD KPI movement, customer activity evidence, weak-month alerts, reports, issues, SOPs, checklist history, files, decisions, and Vaeroex insights.
+            It includes YTD KPI movement, customer activity evidence, weak-month alerts, reports, issues, SOPs, files, decisions, and Vaeroex insights.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -1254,19 +1234,19 @@ function DemoWorkspaceBanner({
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">March dip</p>
           <p className="mt-2 text-xs leading-5">
-            Revenue fell below target while response time increased, conversion dropped, and checklist completion missed the mark.
+            Revenue fell below target while response time increased, conversion dropped, and open issues rose.
           </p>
         </article>
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">April and May recovery</p>
           <p className="mt-2 text-xs leading-5">
-            SOP review, checklist review, and customer activity visibility helped the business recover from the weak month.
+            SOP review and customer activity visibility helped the business recover from the weak month.
           </p>
         </article>
         <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
           <p className="text-sm font-semibold">Current month signals</p>
           <p className="mt-2 text-xs leading-5">
-            Revenue is healthy, but response time, conversion, open issues, and checklist completion still need leadership attention.
+            Revenue is healthy, but response time, conversion, and open issues still need leadership attention.
           </p>
         </article>
       </div>
@@ -1313,8 +1293,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiResult,
     kpiSettingsResult,
     issueResult,
-    checklistResult,
-    checklistRunResult,
     sopResult,
     fileResult,
     importResult,
@@ -1340,8 +1318,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       .limit(500),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("checklists").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
-    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(200),
@@ -1380,11 +1356,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     filterBusinessEvidence(sortKpiRowsBySettings(applyKpiSettingsToRows(rawKpis, kpiSettings), kpiSettings) as KpiRow[]),
     sourceParentEligibility
   );
-  const issues = filterBusinessEvidence((issueResult.data || []) as IssueRow[]);
-  const checklists = filterBusinessEvidence((checklistResult.data || []) as ChecklistRow[]);
-  const activeChecklistIds = new Set(checklists.map((checklist) => checklist.id));
-  const checklistRuns = filterBusinessEvidence((checklistRunResult.data || []) as ChecklistRunRow[])
-    .filter((run) => activeChecklistIds.has(run.checklist_id));
+  const intelligenceKpis = excludeChecklistDerivedMetrics(kpis);
+  const intelligenceKpiSettings = excludeChecklistDerivedMetrics(kpiSettings);
+  const issues = excludeChecklistDerivedRecords(filterBusinessEvidence((issueResult.data || []) as IssueRow[]));
   const sops = filterBusinessEvidence((sopResult.data || []) as SopRow[]);
   const files = filterBusinessEvidence((fileResult.data || []) as FileUploadRow[]);
   const activeFileIds = new Set(files.map((file) => file.id));
@@ -1397,8 +1371,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .filter((history) => activeCustomerEvidenceIds.has(history.lead_id));
   const reports = filterBusinessEvidence((reportResult.data || []) as ReportRow[]);
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
-  const businessEvidenceRuns = filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" });
+  const businessEvidenceRuns = excludeChecklistDerivedRecords(filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" }));
   const operationalMetrics = filterBySourceParentEligibility(filterBusinessEvidence(rawOperationalMetrics), sourceParentEligibility);
+  const intelligenceOperationalMetrics = excludeChecklistDerivedMetrics(operationalMetrics);
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
   const shares = (shareResult.data || []) as ShareRow[];
   const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
@@ -1419,8 +1394,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiResult.error,
     kpiSettingsResult.error,
     issueResult.error,
-    checklistResult.error,
-    checklistRunResult.error,
     sopResult.error,
     fileResult.error,
     importResult.error,
@@ -1443,8 +1416,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiResult.error,
     kpiSettingsResult.error,
     issueResult.error,
-    checklistResult.error,
-    checklistRunResult.error,
     sopResult.error,
     fileResult.error,
     importResult.error,
@@ -1463,23 +1434,22 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   ].filter(Boolean);
   const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
 
-  const names = getConfiguredMetricNames(kpis, kpiSettings);
-  const revenueMetric = latestMetric(kpis, ["revenue", "sales"])?.name || names.find((name) => lower(name).includes("revenue")) || "Revenue";
-  const leadsMetric = latestMetric(kpis, ["lead", "customer"])?.name || names.find((name) => lower(name).includes("lead") || lower(name).includes("customer")) || "Customer Activity";
+  const names = getConfiguredMetricNames(intelligenceKpis, intelligenceKpiSettings);
+  const revenueMetric = latestMetric(intelligenceKpis, ["revenue", "sales"])?.name || names.find((name) => lower(name).includes("revenue")) || "Revenue";
+  const leadsMetric = latestMetric(intelligenceKpis, ["lead", "customer"])?.name || names.find((name) => lower(name).includes("lead") || lower(name).includes("customer")) || "Customer Activity";
   const customMetric =
     names.find((name) => name !== revenueMetric && name !== leadsMetric && !lower(name).includes("conversion")) ||
-    operationalMetrics[0]?.metric_name ||
+    intelligenceOperationalMetrics[0]?.metric_name ||
     "Custom KPI";
   const primaryTrends = [revenueMetric, leadsMetric, customMetric]
     .filter((name, index, array) => array.indexOf(name) === index)
-    .map((name, index) => buildMetricTrend(kpis, name, range, kpiSettings, index));
+    .map((name, index) => buildMetricTrend(intelligenceKpis, name, range, intelligenceKpiSettings, index));
   const weeklyRange = rangeForPeriod("Weekly");
   const weeklyTrends = [revenueMetric, leadsMetric, customMetric]
     .filter((name, index, array) => array.indexOf(name) === index)
-    .map((name, index) => buildMetricTrend(kpis, name, weeklyRange, kpiSettings, index));
-  const comparisonTrends = names.slice(0, 6).map((name, index) => buildMetricTrend(kpis, name, range, kpiSettings, index));
+    .map((name, index) => buildMetricTrend(intelligenceKpis, name, weeklyRange, intelligenceKpiSettings, index));
+  const comparisonTrends = names.slice(0, 6).map((name, index) => buildMetricTrend(intelligenceKpis, name, range, intelligenceKpiSettings, index));
   const openIssues = issues.filter(isOpenIssue);
-  const checklistFailures = checklistRuns.filter((run) => isChecklistFailure(run) && inIsoRange(run.created_at, range.start, range.end));
   const sopUpdates = sops.filter((sop) => inIsoRange(sop.updated_at || sop.created_at, range.start, range.end));
   const recentFiles = files.filter((file) => inIsoRange(file.created_at, range.start, range.end));
   const fileAnalyses = files.filter((file) => Boolean(file.analysis_summary)).slice(0, 6);
@@ -1506,7 +1476,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     .slice(0, 4);
   const risks = [
     openIssues.length ? `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} remain unresolved.` : "",
-    checklistFailures.length ? `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"} failed or need review.` : "",
     pendingImports.length ? `${pendingImports.length} extracted file import${pendingImports.length === 1 ? "" : "s"} are waiting for mapping review.` : "",
     negativeTrends[0] ? `${negativeTrends[0].name} moved ${negativeTrends[0].rawMovement}, an unfavorable change of ${numberFormatter.format(Math.abs(negativeTrends[0].changePercent || 0))}% vs the previous period.` : ""
   ].filter(Boolean);
@@ -1514,36 +1483,32 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     leadsCreated.length ? `${leadsCreated.length} customer activity record${leadsCreated.length === 1 ? "" : "s"} can be reviewed for response quality or conversion.` : "",
     positiveTrends[0] ? `${positiveTrends[0].name} shows the strongest favorable movement this period.` : "",
     recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex review.` : "",
-    operationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
+    intelligenceOperationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
     openIssues.length ? "Sort open issues by severity and review unresolved items with leadership." : "",
-    checklistFailures.length ? "Review failed checklist runs and update the process or escalation rule." : "",
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
     negativeTrends.length ? "Review unfavorably moving KPIs against recent imports, customer activity evidence, and open issues." : "",
-    !kpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
+    !intelligenceKpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
     !crmLeads.length ? "Connect or import customer activity evidence when available." : "",
     !reports.length ? "Save a completed leadership analysis when it should remain available for later review." : ""
   ].filter(Boolean);
-  const latestKpiRows = latestKpisByName(kpis);
+  const latestKpiRows = latestKpisByName(intelligenceKpis);
   const targetMissKpis = latestKpiRows.filter((kpi) => {
     if (kpi.actual_value === null) return false;
-    const evaluation = evaluateKpiPerformance({ observations: [kpi], semantics: kpiSemantics(kpi.name, kpiSettings), target: kpi.target });
+    const evaluation = evaluateKpiPerformance({ observations: [kpi], semantics: kpiSemantics(kpi.name, intelligenceKpiSettings), target: kpi.target });
     return isKpiTargetMiss(evaluation.targetStatus);
   });
   const crmLeadsWithoutFollowup = crmLeads.filter((lead) => !isConvertedStatus(lead.status) && (!lead.last_activity_at || isOlderThan(lead.last_activity_at, 30)));
   const staleSops = sops.filter((sop) => isOlderThan(sop.updated_at || sop.created_at, 90));
   const oldIssues = openIssues.filter((issue) => isOlderThan(issue.created_at, 14));
   const unanalyzedFiles = files.filter((file) => !file.analysis_summary && !file.archived_at && !file.deleted_at);
-  const recentRunChecklistIds = new Set(checklistRuns.filter((run) => inIsoRange(run.created_at, range.start, range.end)).map((run) => run.checklist_id));
-  const checklistsWithoutRecentRuns = checklists.filter((checklist) => !recentRunChecklistIds.has(checklist.id));
   const baseSmartAlerts = buildSmartAlerts({
     targetMissKpis,
     crmLeadsWithoutFollowup,
     staleSops,
     oldIssues,
-    unanalyzedFiles,
-    checklistsWithoutRecentRuns
+    unanalyzedFiles
   });
   const demoStoryAlerts: DashboardAlert[] = isViewingDemoWorkspace
     ? [
@@ -1551,7 +1516,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: "demo-march-dip",
           severity: "High",
           title: "March performance dip detected",
-          why: "Revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and checklist completion fell to 78%.",
+          why: "Revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and open issues increased.",
           action: "Review March report",
           href: "/app/reports"
         },
@@ -1559,7 +1524,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           id: "demo-current-month-mixed",
           severity: "Medium",
           title: "Current month has mixed signals",
-          why: "Revenue is above target, but conversion, response time, open issues, and checklist completion still need leadership review.",
+          why: "Revenue is above target, but conversion, response time, and open issues still need leadership review.",
           action: "Review executive intelligence",
           href: "/app/intelligence"
         }
@@ -1581,16 +1546,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       title: kpi.name,
       source: "KPI risk",
       status: "Outside target",
-      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs ${dashboardKpiTargetReference(kpi, kpiSettings)}. Leadership weight: ${numberFormatter.format(kpiWeight(kpi.name, kpiSettings))}/10.`,
+      context: `Actual ${formatMetricValue(kpi.actual_value, kpi.name)} vs ${dashboardKpiTargetReference(kpi, intelligenceKpiSettings)}. Leadership weight: ${numberFormatter.format(kpiWeight(kpi.name, intelligenceKpiSettings))}/10.`,
       href: "/app/kpis" as Route
-    })),
-    ...checklistFailures.slice(0, 3).map((run) => ({
-      id: `checklist-${run.id}`,
-      title: run.notes || `Checklist run ${run.id.slice(0, 8)}`,
-      source: "Checklist",
-      status: run.status,
-      context: `Run recorded ${new Date(run.created_at).toLocaleDateString()}. Review the checklist result and escalation rule.`,
-      href: "/app/checklists" as Route
     })),
     ...pendingImports.slice(0, 3).map((item) => ({
       id: `import-${item.id}`,
@@ -1654,16 +1611,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           href: "/app/issues" as Route
         }
       : null,
-    checklistFailures.length
-      ? {
-          id: "action-checklists",
-          title: "Review failed checklist runs",
-          source: `${checklistFailures.length} checklist run${checklistFailures.length === 1 ? "" : "s"}`,
-          status: checklistFailures[0]?.status || "Needs review",
-          context: "Review the process, evidence, or escalation pattern if the failure repeats.",
-          href: "/app/checklists" as Route
-        }
-      : null,
     pendingImports.length
       ? {
           id: "action-pending-imports",
@@ -1716,8 +1663,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       : null
   ].filter(Boolean).slice(0, 3) as DashboardSignal[];
   const demoCounts = {
-    kpis: demoWorkspaceCounts?.kpis ?? kpis.length,
-    operationalMetrics: demoWorkspaceCounts?.operationalMetrics ?? operationalMetrics.length,
+    kpis: intelligenceKpis.length,
+    operationalMetrics: intelligenceOperationalMetrics.length,
     crm: demoWorkspaceCounts?.crmLeads ?? crmLeads.length,
     issues: demoWorkspaceCounts?.issues ?? openIssues.length,
     reports: demoWorkspaceCounts?.reports ?? reports.length,
@@ -1725,11 +1672,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     files: demoWorkspaceCounts?.files ?? files.length,
     fileAnalyses: demoWorkspaceCounts?.fileAnalyses ?? fileAnalyses.length,
     assets: demoWorkspaceCounts?.assets ?? 0,
-    checklists: demoWorkspaceCounts?.checklists ?? checklists.length,
     alerts: smartAlerts.length,
     insights: demoWorkspaceCounts?.vaeroexInsights ?? businessEvidenceRuns.length
   };
-  const hasWorkspaceData = Boolean(kpis.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || checklistRuns.length || operationalMetrics.length);
+  const hasWorkspaceData = Boolean(intelligenceKpis.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || intelligenceOperationalMetrics.length);
   const todayDate = dateOnly(new Date());
   const dueWindowEndDate = dateOnly(addDays(new Date(), 14));
   const peopleById = new Map(people.map((person) => [person.id, person]));
@@ -1765,11 +1711,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     isDemoWorkspace: isViewingDemoWorkspace,
     periodLabel: period,
     range,
-    kpis,
-    kpiSettings,
+    kpis: intelligenceKpis,
+    kpiSettings: intelligenceKpiSettings,
     issues,
-    checklists,
-    checklistRuns,
     sops,
     files,
     imports,
@@ -1777,7 +1721,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     crmLeads,
     reports: [],
     vaeroexRuns: businessEvidenceRuns,
-    operationalMetrics,
+    operationalMetrics: intelligenceOperationalMetrics,
     assignments,
     shares,
     people,
@@ -1785,17 +1729,17 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     recommendationOutcomes
   });
   const operationalInsights = buildOperationalEvidenceInsights({
-    kpis,
-    kpiSettings,
-    operationalMetrics,
+    kpis: intelligenceKpis,
+    kpiSettings: intelligenceKpiSettings,
+    operationalMetrics: intelligenceOperationalMetrics,
     memoryChunks,
     files,
     imports
   });
   const intelligenceLayer = buildIntelligenceLayer({
     workspace: context.activeWorkspace,
-    kpis,
-    kpiSettings,
+    kpis: intelligenceKpis,
+    kpiSettings: intelligenceKpiSettings,
     issues,
     files,
     reports,
@@ -1819,7 +1763,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       dataQualityScore: intelligenceLayer.dataQuality.score,
       memorySignalCount: businessHealthMemorySignals,
       sourceSummary: {
-        kpis: kpis.length,
+        kpis: intelligenceKpis.length,
         reports: 0,
         files: files.length,
         issues: issues.length,
@@ -1838,10 +1782,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     trend: snapshot.trend
   }));
   const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
-    kpis,
+    kpis: intelligenceKpis,
     issues,
-    checklists,
-    checklistRuns,
     files,
     imports,
     sops,
@@ -1849,7 +1791,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     crmHistory,
     reports,
     vaeroexRuns: businessEvidenceRuns,
-    operationalMetrics,
+    operationalMetrics: intelligenceOperationalMetrics,
     assets,
     people,
     decisions,
@@ -1857,7 +1799,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     memoryChunks
   });
   const latestEvidenceUpdate = [
-    ...kpis.map((row) => row.updated_at || row.created_at),
+    ...intelligenceKpis.map((row) => row.updated_at || row.created_at),
     ...issues.map((row) => row.updated_at || row.created_at),
     ...files.map((row) => row.updated_at || row.created_at),
     ...reports.map((row) => row.updated_at || row.created_at),
@@ -1964,7 +1906,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     dashboardMode === "Executive View"
       ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next executive recommendation."
       : dashboardMode === "Operations View"
-        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, issues, checklists, source visibility, customer activity evidence, and reports.`
+        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, issues, source visibility, customer activity evidence, and reports.`
         : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and executive recommendations.`;
 
   return (
@@ -2277,10 +2219,10 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Issues and checklists"
-            summary={`${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} and ${checklistFailures.length} checklist failure${checklistFailures.length === 1 ? "" : "s"} in this period.`}
+            title="Issues"
+            summary={`${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} in this period.`}
           >
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section>
         <SectionCard title="Issues" description="Open risks and process breakdowns.">
           <SimpleList
             items={openIssues.slice(0, 6)}
@@ -2292,22 +2234,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
                   <StatusBadge value={issue.severity} />
                 </div>
                 <p className="mt-1 text-xs leading-5 text-muted">{issue.recommended_fix || issue.status}</p>
-              </div>
-            )}
-          />
-        </SectionCard>
-
-        <SectionCard title="Checklist failures" description="Recent runs that did not finish cleanly.">
-          <SimpleList
-            items={checklistFailures.slice(0, 6)}
-            empty="No checklist failures in this period."
-            render={(run: ChecklistRunRow) => (
-              <div key={run.id} className="rounded-lg border border-line p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold">{run.notes || `Checklist run ${run.id.slice(0, 8)}`}</p>
-                  <StatusBadge value={run.status} />
-                </div>
-                <p className="mt-1 text-xs text-muted">{new Date(run.created_at).toLocaleDateString()}</p>
               </div>
             )}
           />

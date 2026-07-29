@@ -334,7 +334,7 @@ function prestigeFixture(kpis, kpiSettings, decisions = []) {
     range: { startDate: date, endDate: date, previousStartDate: date, previousEndDate: date },
     kpis,
     kpiSettings,
-    issues: [], assets: [], checklists: [], checklistRuns: [], sops: [], files: [], imports: [], crmLeads: [], reports: [], vaeroexRuns: [], operationalMetrics: [], assignments: [], shares: [], people: [], decisions, recommendationOutcomes: []
+    issues: [], assets: [], sops: [], files: [], imports: [], crmLeads: [], reports: [], vaeroexRuns: [], operationalMetrics: [], assignments: [], shares: [], people: [], decisions, recommendationOutcomes: []
   });
 }
 

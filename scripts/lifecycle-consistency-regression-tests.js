@@ -154,7 +154,7 @@ for (const source of [searchRoute, boundedContext, reportActions, scheduledRepor
 assert.match(recordActions, /update_source_file_lifecycle/, "generic Source lifecycle controls must update parent and learned evidence together");
 assert.match(intelligenceLayer, /const reports: ReportRow\[\] = \[\]/, "derived reports must not become original evidence in Intelligence");
 assert.match(coverage, /reports: \[\]/, "derived reports must not increase coverage");
-assert.match(coverage, /activeChecklistIds\.has\(run\.checklist_id\)/, "checklist runs require an active checklist parent");
+assert.doesNotMatch(coverage, /checklists|checklistRuns|activeChecklistIds/, "retired Checklist inputs cannot affect active intelligence coverage");
 assert.match(coverage, /activeFormIds\.has\(submission\.form_id\)/, "form submissions require an active form parent");
 assert.match(coverage, /activeCrmLeadIds\.has\(history\.lead_id\)/, "customer history requires active eligible customer evidence");
 assert.match(coverage, /activeSourceFileIds\.has\(item\.file_upload_id\)/, "imports require an active Source parent");

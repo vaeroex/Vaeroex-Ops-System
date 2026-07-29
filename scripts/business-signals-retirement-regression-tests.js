@@ -108,16 +108,13 @@ const taskFreeInput = {
   kpis: [
     { id: "k1", name: "Revenue", actual_value: 80_000, target: 100_000, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Sales" },
     { id: "k2", name: "Conversion Rate", actual_value: 5, target: 10, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Sales" },
-    { id: "k3", name: "Customer Satisfaction", actual_value: 82, target: 85, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Customer" },
-    { id: "k4", name: "Checklist Completion Rate", actual_value: 90, target: 95, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Operations" }
+    { id: "k3", name: "Customer Satisfaction", actual_value: 82, target: 85, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Customer" }
   ],
   issues: [
     { id: "i1", title: "Open issue 1", status: "Open", severity: "High", created_at: "2026-07-01", assigned_to: null, assigned_person_id: null, assigned_role: null, assigned_department: null },
     { id: "i2", title: "Open issue 2", status: "Open", severity: "Medium", created_at: "2026-07-01", assigned_to: "Owner" }
   ],
   assets: [],
-  checklists: [{ id: "c1", created_at: "2026-07-01" }],
-  checklistRuns: [{ id: "cr1", checklist_id: "c1", status: "Complete", created_at: "2026-07-01" }],
   sops: [{ id: "s1", title: "SOP", created_at: "2026-07-01", updated_at: "2026-07-01" }],
   files: [
     { id: "f1", display_name: "Workbook.xlsx", analysis_summary: "Validated facts", created_at: "2026-07-01", deleted_at: null, archived_at: null },
@@ -143,7 +140,7 @@ const taskFreeInput = {
 
 const taskFreeResult = buildPrestigeIntelligence(taskFreeInput);
 const sourceVisibility = taskFreeResult.businessHealth.categories.find((category) => category.name === "Source Visibility");
-assert.equal(taskFreeResult.businessHealth.score, 78, "identical non-task evidence must preserve the pre-retirement Business Health score");
+assert.equal(taskFreeResult.businessHealth.score, 77, "identical non-task and non-Checklist evidence must preserve the corrected Business Health score");
 assert.equal(sourceVisibility?.score, 92, "Source Visibility must preserve the pre-retirement task-free baseline");
 assert.equal(taskFreeResult.businessHealth.dataQualityWarning, null, "complete task-free inputs must retain the previous missing-data behavior");
 
