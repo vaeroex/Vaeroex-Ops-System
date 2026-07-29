@@ -117,8 +117,7 @@ export const helpArticles: HelpArticle[] = [
     ["first-report", "Saving your first analysis", "Preserve a completed Business Health analysis or Finding Explanation for later review.", "/app/reports"],
     ["first-follow-up", "Uploading your first Evidence source", "Add current business information through the existing Evidence upload flow.", "/app/sources"],
     ["first-sop", "Creating your first SOP", "Document the process that should happen the same way each time.", "/app/sops"],
-    ["report-subscriptions", "Understanding Saved Analyses", "Saved Analyses contains only completed intelligence your team explicitly chose to preserve.", "/app/reports"],
-    ["leadership-team", "How to use Vaeroex as a leadership team", "Use Saved Analyses, roles, and reviews to run a clearer management rhythm.", "/app/people"]
+    ["report-subscriptions", "Understanding Saved Analyses", "Saved Analyses contains only completed intelligence your team explicitly chose to preserve.", "/app/reports"]
   ].map(([id, title, summary, href]) =>
     article({
       id,
@@ -149,8 +148,6 @@ export const helpArticles: HelpArticle[] = [
     ["issues", "Issues", "A place to log risks, problems, root causes, and recommended fixes.", "/app/issues"],
     ["checklists", "Checklists", "Repeatable review lists for recurring work and quality checks.", "/app/checklists"],
     ["assets", "Assets", "Tracked equipment, tools, locations, readiness, and status checks.", "/app/assets"],
-    ["people", "Organization Context", "People, roles, and departments used as context for intelligence and evidence.", "/app/people"],
-    ["team-roles", "Workspace Roles", "Workspace access roles that control what users can view or manage.", "/app/people"],
     ["report-sharing", "Saved Analysis Review", "Preserve completed analysis context in workspace history.", "/app/reports"],
     ["report-scheduling", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
     ["vaeroex-ai", "Executive Intelligence", "Review prioritized findings and focused explanations grounded in current workspace evidence.", "/app/intelligence"]
