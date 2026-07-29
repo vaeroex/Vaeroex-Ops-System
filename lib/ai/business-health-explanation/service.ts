@@ -7,6 +7,7 @@ import {
   type BusinessHealthExplanationPackage
 } from "@/lib/ai/business-health-explanation/contracts";
 import { validateBusinessHealthExplanationOutput } from "@/lib/ai/business-health-explanation/validation";
+import { businessNoteContextForProvider } from "@/lib/ai/business-notes/reasoning-context";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { runStructuredAI, type AIProviderAttempt } from "@/lib/ai/providers/provider-manager";
@@ -24,6 +25,13 @@ Return exactly one JSON object with these fields:
 - why_it_matters: why the current combination deserves leadership awareness without inventing impact
 - leadership_consideration: the bounded review focus supported by the supplied facts
 - provisional_hypothesis: null unless the application explicitly authorizes a hypothesis`;
+
+const CONTEXT_PROMPT = `The application also supplies a separate reported_context collection. It contains validated but unverified Business Note claims and user-supplied context, not business facts or original evidence. Use it only when it is clearly relevant, attribute it explicitly to the Business Note or its author, and use cautious language such as "may help explain." Never use it to change or contradict deterministic facts.
+If reported context conflicts with deterministic facts, state that the note and the evidence disagree. Do not reconcile the conflict; deterministic facts remain authoritative. Future or upcoming context cannot explain a current or past result.`;
+
+export function businessHealthExplanationSystemPrompt(analysisPackage: BusinessHealthExplanationPackage) {
+  return analysisPackage.contextualEvidence?.length ? `${SYSTEM_PROMPT}\n${CONTEXT_PROMPT}` : SYSTEM_PROMPT;
+}
 
 export function businessHealthProviderAttemptTelemetry(attempt: AIProviderAttempt) {
   return {
@@ -51,6 +59,7 @@ export function businessHealthProviderAttemptTelemetry(attempt: AIProviderAttemp
 
 export function businessHealthProviderRequestPayload(analysisPackage: BusinessHealthExplanationPackage) {
   const citations = new Map(analysisPackage.citations.map((citation) => [citation.citationId, citation]));
+  const hasContext = Boolean(analysisPackage.contextualEvidence?.length);
   return {
     contract: analysisPackage.contractId,
     submode: analysisPackage.submode,
@@ -80,18 +89,24 @@ export function businessHealthProviderRequestPayload(analysisPackage: BusinessHe
         }] : [];
       })
     })),
+    ...(hasContext ? { reported_context: businessNoteContextForProvider(analysisPackage.contextualEvidence || []) } : {}),
     application_owned: {
       confidence: analysisPackage.facts.confidence,
       limitations: analysisPackage.facts.limitations,
       citations_attached_after_validation: true,
-      hypothesis_allowed: analysisPackage.hypothesisAllowed
+      hypothesis_allowed: analysisPackage.hypothesisAllowed,
+      ...(hasContext ? { context_authority: analysisPackage.contextAuthority } : {})
     },
     output_rules: {
       json_only: true,
       cite_nothing: true,
       copy_no_internal_ids: true,
       provisional_hypothesis: null,
-      required_driver_count: Math.min(3, analysisPackage.facts.drivers.length)
+      required_driver_count: Math.min(3, analysisPackage.facts.drivers.length),
+      ...(hasContext ? {
+        reported_context_must_be_attributed: true,
+        deterministic_facts_win_conflicts: true
+      } : {})
     }
   };
 }
@@ -118,7 +133,8 @@ export async function generateBusinessHealthExplanation({
   const policy = generationPolicy.providerPolicy;
   const primary = policy.steps[0];
   const content = JSON.stringify(businessHealthProviderRequestPayload(analysisPackage));
-  const estimatedRequestTokens = estimateTokenCount(`${SYSTEM_PROMPT}\n${content}`);
+  const systemPrompt = businessHealthExplanationSystemPrompt(analysisPackage);
+  const estimatedRequestTokens = estimateTokenCount(`${systemPrompt}\n${content}`);
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);
   const generation = await runStructuredAI({
@@ -126,7 +142,7 @@ export async function generateBusinessHealthExplanation({
     primaryModel: primary.model,
     fallbackModel: resolveVaeroexModel("cross_business_reasoning", "openai"),
     providerPolicy: policy,
-    systemPrompt: SYSTEM_PROMPT,
+    systemPrompt,
     userContent: [{ type: "text", text: content }],
     temperature: 0.1,
     generationMode: "interactive_executive",

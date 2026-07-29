@@ -1,5 +1,6 @@
 import type {
   CitationReferenceV1,
+  ContextualEvidenceSnapshotV1,
   CoverageCategorySnapshotV1,
   EvidenceReferenceV1,
   FindingSnapshotV1,
@@ -103,6 +104,17 @@ export function orderLimitations(values: readonly SnapshotLimitationV1[]) {
   return [...values].sort((left, right) =>
     left.code.localeCompare(right.code) || left.scope.localeCompare(right.scope) || left.message.localeCompare(right.message)
   );
+}
+
+export function orderContextualEvidence(values: readonly ContextualEvidenceSnapshotV1[]) {
+  return [...values].map((record) => ({
+    ...record,
+    departments: [...record.departments].sort(),
+    topics: [...record.topics].sort(),
+    entities: [...record.entities].sort((left, right) => left.id.localeCompare(right.id)),
+    statements: [...record.statements].sort((left, right) => left.id.localeCompare(right.id)),
+    userAddedContext: [...record.userAddedContext].sort((left, right) => left.field.localeCompare(right.field))
+  })).sort((left, right) => right.approvedAt.localeCompare(left.approvedAt) || left.id.localeCompare(right.id));
 }
 
 export function orderProvenance(values: readonly ProducerReceiptV1[]) {

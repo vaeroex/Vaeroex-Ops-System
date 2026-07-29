@@ -5,13 +5,15 @@ import type { BusinessIntelligenceCoverageResult } from "@/lib/intelligence/cove
 import type { IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildIntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/builder";
 import { snapshotHash } from "@/lib/intelligence/snapshot/v1/canonical";
-import type { KpiProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/types";
+import type { ContextualEvidenceProducerOutputV1, KpiProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/types";
 import {
   COVERAGE_PRODUCER_ID,
   COVERAGE_PRODUCER_VERSION,
   DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1,
   EVIDENCE_MANIFEST_PRODUCER_ID,
   EVIDENCE_MANIFEST_PRODUCER_VERSION,
+  CONTEXTUAL_EVIDENCE_PRODUCER_ID,
+  CONTEXTUAL_EVIDENCE_PRODUCER_VERSION,
   INTELLIGENCE_LAYER_PRODUCER_ID,
   INTELLIGENCE_LAYER_PRODUCER_VERSION,
   KPI_DETERMINISTIC_PRODUCER_ID,
@@ -105,12 +107,29 @@ function kpiSemanticInput(kpis: KpiProducerOutputV1) {
   }));
 }
 
+function contextualEvidenceSemanticInput(contextualEvidence: ContextualEvidenceProducerOutputV1) {
+  return {
+    releaseChannel: contextualEvidence.releaseChannel,
+    records: [...contextualEvidence.records]
+      .sort((left, right) => left.id.localeCompare(right.id))
+      .map((record) => ({
+        ...record,
+        departments: [...record.departments].sort(),
+        topics: [...record.topics].sort(),
+        entities: [...record.entities].sort((left, right) => left.id.localeCompare(right.id)),
+        statements: [...record.statements].sort((left, right) => left.id.localeCompare(right.id)),
+        userAddedContext: [...record.userAddedContext].sort((left, right) => left.field.localeCompare(right.field))
+      }))
+  };
+}
+
 export function buildIntelligenceSnapshotFromProducersV1({
   workspaceId,
   asOf,
   intelligence,
   coverage,
   evidenceManifests,
+  contextualEvidence,
   kpis
 }: {
   workspaceId: string;
@@ -118,6 +137,7 @@ export function buildIntelligenceSnapshotFromProducersV1({
   intelligence?: IntelligenceLayerResult;
   coverage?: BusinessIntelligenceCoverageResult;
   evidenceManifests?: readonly EvidenceManifest[];
+  contextualEvidence?: ContextualEvidenceProducerOutputV1;
   kpis?: KpiProducerOutputV1;
 }) {
   if (!Number.isFinite(Date.parse(asOf))) throw new Error("IntelligenceSnapshotV1 asOf must be a valid timestamp.");
@@ -160,6 +180,16 @@ export function buildIntelligenceSnapshotFromProducersV1({
             : evidenceManifests.map(manifestSemanticInput)
         ),
         output: evidenceManifests
+      }
+    } : {}),
+    ...(contextualEvidence ? {
+      contextualEvidence: {
+        producerId: CONTEXTUAL_EVIDENCE_PRODUCER_ID,
+        producerVersion: CONTEXTUAL_EVIDENCE_PRODUCER_VERSION,
+        workspaceId,
+        asOf,
+        semanticInputFingerprint: snapshotHash(contextualEvidenceSemanticInput(contextualEvidence)),
+        output: contextualEvidence
       }
     } : {}),
     ...(kpis ? {

@@ -12,6 +12,7 @@ import type { IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { canonicalSnapshotJson } from "@/lib/intelligence/snapshot/v1/canonical";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import { projectBusinessHealthExplanationV1 } from "@/lib/intelligence/snapshot/v1/projections";
+import type { ContextualEvidenceProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/types";
 
 export type BusinessHealthExplanationSnapshotParity = Readonly<{
   status: "exact" | "fallback";
@@ -21,7 +22,11 @@ export type BusinessHealthExplanationSnapshotParity = Readonly<{
 }>;
 
 function packagesMatch(left: BusinessHealthExplanationPackage, right: BusinessHealthExplanationPackage) {
-  return canonicalSnapshotJson(left) === canonicalSnapshotJson(right);
+  const deterministicPackage = (value: BusinessHealthExplanationPackage) => {
+    const { fingerprint: _fingerprint, contextualEvidence: _contextualEvidence, contextAuthority: _contextAuthority, ...deterministic } = value;
+    return deterministic;
+  };
+  return canonicalSnapshotJson(deterministicPackage(left)) === canonicalSnapshotJson(deterministicPackage(right));
 }
 
 function projectionFallbackReason(error: unknown) {
@@ -40,6 +45,7 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
   homepage,
   snapshots,
   coverage,
+  contextualEvidence,
   sourceLabelsByKey = {},
   asOf
 }: {
@@ -48,6 +54,7 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
   homepage: ExecutiveHomepageModel;
   snapshots: readonly BusinessHealthSnapshotRow[];
   coverage: BusinessIntelligenceCoverageResult;
+  contextualEvidence?: ContextualEvidenceProducerOutputV1;
   sourceLabelsByKey?: Readonly<Record<string, string>>;
   asOf: string;
 }) {
@@ -65,7 +72,8 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
     asOf,
     intelligence,
     coverage,
-    evidenceManifests: [manifest]
+    evidenceManifests: [manifest],
+    contextualEvidence
   });
   const projection = projectBusinessHealthExplanationV1(build.snapshot);
 

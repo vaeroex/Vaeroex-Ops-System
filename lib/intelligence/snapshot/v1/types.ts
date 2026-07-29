@@ -25,6 +25,13 @@ import type {
   SupportedProducerId,
   SupportedProducerVersion
 } from "@/lib/intelligence/snapshot/v1/versions";
+import type {
+  BusinessNoteContextApplicabilityV1,
+  BusinessNoteContextEntityV1,
+  BusinessNoteContextRecordV1,
+  BusinessNoteContextStatementV1
+} from "@/lib/ai/business-notes/contextual-contract";
+import type { BusinessNoteReleaseChannel, BusinessNoteUserAddedContext } from "@/lib/ai/business-notes/contracts";
 
 export type SnapshotUnavailableState =
   | "unavailable"
@@ -253,6 +260,35 @@ export type ProducerReceiptV1 = Readonly<{
   semanticInputFingerprint: string;
 }>;
 
+export type ContextualEvidenceSnapshotV1 = Readonly<{
+  contractVersion: "business_note_context_record_v1";
+  snapshotAdapterVersion: "business_note_context_snapshot_adapter_v1";
+  id: string;
+  workspaceId: string;
+  releaseChannel: BusinessNoteReleaseChannel;
+  sourceNoteId: string;
+  sourceVersion: number;
+  sourceTextHash: string;
+  authorityRole: "supporting_context";
+  originalEvidenceEligible: false;
+  lifecycle: "active";
+  validationState: "approved_review";
+  title: string;
+  summary: string;
+  noteType: BusinessNoteContextRecordV1["noteType"];
+  sourceClassification: BusinessNoteContextRecordV1["sourceClassification"];
+  departments: readonly string[];
+  topics: readonly string[];
+  entities: readonly BusinessNoteContextEntityV1[];
+  statements: readonly BusinessNoteContextStatementV1[];
+  userAddedContext: readonly BusinessNoteUserAddedContext[];
+  applicability: BusinessNoteContextApplicabilityV1;
+  extractionConfidence: number;
+  approvedAt: string;
+  observedAt: string | null;
+  provenance: BusinessNoteContextRecordV1["provenance"];
+}>;
+
 export type IntelligenceSnapshotV1 = Readonly<{
   contract: Readonly<{
     id: "intelligence_snapshot_v1";
@@ -299,6 +335,7 @@ export type IntelligenceSnapshotV1 = Readonly<{
     citations: readonly CitationReferenceV1[];
     sourceRegistryVersions: readonly EvidenceManifest["sourceRegistry"]["version"][];
   }>;
+  contextualEvidence?: readonly ContextualEvidenceSnapshotV1[];
   limitations: readonly SnapshotLimitationV1[];
   provenance: readonly ProducerReceiptV1[];
 }>;
@@ -338,6 +375,10 @@ export type IntelligenceSnapshotBuildResultV1 = Readonly<{
 export type IntelligenceLayerProducerOutputV1 = IntelligenceLayerResult;
 export type CoverageProducerOutputV1 = BusinessIntelligenceCoverageResult;
 export type EvidenceManifestProducerOutputV1 = readonly EvidenceManifest[];
+export type ContextualEvidenceProducerOutputV1 = Readonly<{
+  releaseChannel: BusinessNoteReleaseChannel;
+  records: readonly BusinessNoteContextRecordV1[];
+}>;
 
 export type KpiProducerMetricV1 = Readonly<{
   id: string;

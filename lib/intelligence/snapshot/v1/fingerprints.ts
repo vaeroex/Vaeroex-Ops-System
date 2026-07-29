@@ -75,6 +75,7 @@ export function semanticSnapshotFingerprintPayload(snapshot: IntelligenceSnapsho
     findingIndex: snapshot.findingIndex,
     priorities: snapshot.priorities,
     evidence: snapshot.evidence,
+    ...(snapshot.contextualEvidence ? { contextualEvidence: snapshot.contextualEvidence } : {}),
     limitations: snapshot.limitations.map(({ code, scope, severity }) => ({ code, scope, severity })),
     provenance: snapshot.provenance.map(({ producerId, producerVersion, workspaceId, asOf, semanticInputFingerprint }) => ({
       producerId,

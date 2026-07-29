@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview } from "@/components/evidence/SourceImportReview";
 import { BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
 import { EvidenceLifecycleCheckbox, EvidenceLifecycleSelection } from "@/components/evidence/EvidenceLifecycleSelection";
+import { collapseBusinessNoteKnowledgeRows } from "@/lib/ai/business-notes/knowledge-projection";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
@@ -908,7 +909,7 @@ function filterKnowledgeItems({
   const normalizedQuery = (query || "").trim().toLowerCase();
   const normalizedSourceType = (sourceType || "").trim().toLowerCase();
 
-  return chunks
+  const matchingChunks = chunks
     .filter((chunk) => (archivedOnly ? Boolean(chunk.archived_at && !chunk.deleted_at) : !chunk.archived_at && !chunk.deleted_at))
     .filter((chunk) => !trust || knowledgeTrustStatus(chunk) === trust)
     .filter((chunk) => !normalizedSourceType || knowledgeSourceType(chunk).toLowerCase() === normalizedSourceType)
@@ -917,7 +918,9 @@ function filterKnowledgeItems({
       const file = sourceFileForKnowledge(chunk, files);
       return [knowledgeStatement(chunk), chunk.source_title, chunk.source_excerpt, file?.display_name, file?.original_name, knowledgeSourceType(chunk)]
         .some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
-    })
+    });
+
+  return collapseBusinessNoteKnowledgeRows(matchingChunks)
     .sort((a, b) => {
       if (sort === "oldest") return a.indexed_at.localeCompare(b.indexed_at);
       return b.indexed_at.localeCompare(a.indexed_at);
@@ -1196,6 +1199,9 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     ...activeMemoryChunks,
     ...rawMemoryChunks.filter((chunk) => chunk.archived_at && !chunk.deleted_at)
   ];
+  const activeKnowledgeRows = collapseBusinessNoteKnowledgeRows(
+    memoryChunks.filter((chunk) => !chunk.archived_at && !chunk.deleted_at)
+  );
   const accessByFileId = await createFileAccessLinkMap(supabase, options.sourceDetail && params.file ? files.filter((file) => file.id === params.file) : []);
   const runsByFile = new Map<string, VaeroexRunRow[]>();
 
@@ -1351,13 +1357,13 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
 
       <section className="space-y-4">
         <nav className="vaeroex-mobile-safe-scroll flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-[#08111f] p-2 shadow-sm" aria-label="Sources views">
-          {sourceTabs.filter((tab) => tab.key !== "knowledge" || activeTab === "knowledge" || memoryChunks.some((chunk) => !chunk.archived_at && !chunk.deleted_at)).map((tab) => {
+          {sourceTabs.filter((tab) => tab.key !== "knowledge" || activeTab === "knowledge" || activeKnowledgeRows.length > 0).map((tab) => {
             const active = activeTab === tab.key;
             const count =
               tab.key === "files"
                 ? files.filter((file) => !file.archived_at && !file.deleted_at).length
                 : tab.key === "knowledge"
-                  ? memoryChunks.filter((chunk) => !chunk.archived_at && !chunk.deleted_at).length
+                  ? activeKnowledgeRows.length
                   : tab.key === "legal"
                     ? (active ? workspaceAgreements.length : null)
                   : files.filter((file) => file.archived_at && !file.deleted_at).length

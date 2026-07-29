@@ -15,6 +15,8 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
+import { loadApprovedBusinessNoteContextV1 } from "@/lib/ai/business-notes/contextual-evidence";
+import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { buildBusinessHealthExplanationFromSnapshotV1 } from "@/lib/ai/business-health-explanation/snapshot-context";
 import { loadBusinessHealthAnalysisState } from "@/lib/ai/business-health-explanation/storage";
 import { trySealBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
@@ -1686,12 +1688,33 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       return source ? [[`import:${item.id}`, source.display_name] as const] : [];
     })
   ]);
+  const businessNoteContextReleaseChannel = businessNoteReleaseChannel();
+  const businessNoteContext = await loadApprovedBusinessNoteContextV1({
+    supabase,
+    workspaceId,
+    releaseChannel: businessNoteContextReleaseChannel,
+    asOf: businessHealthExplanationAsOf
+  });
+  if (businessNoteContext.error) {
+    console.error(JSON.stringify({
+      level: "error",
+      component: "business-health-explanation",
+      event: "business_note_context_load_failed",
+      reason: businessNoteContext.error.message
+    }));
+  }
   const businessHealthExplanationSnapshot = buildBusinessHealthExplanationFromSnapshotV1({
     workspaceId,
     intelligence: intelligenceLayer,
     homepage: executiveHomepageModel,
     snapshots: businessHealthSnapshotResult.snapshots,
     coverage: businessIntelligenceCoverage,
+    ...(businessNoteContext.records.length ? {
+      contextualEvidence: {
+        releaseChannel: businessNoteContextReleaseChannel,
+        records: businessNoteContext.records
+      }
+    } : {}),
     sourceLabelsByKey: executiveSourceLabelsByKey,
     asOf: businessHealthExplanationAsOf
   });

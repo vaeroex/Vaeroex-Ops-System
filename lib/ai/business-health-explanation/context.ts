@@ -474,6 +474,7 @@ export function buildBusinessHealthExplanationPackage({
     drivers,
     limitations
   };
+  const contextualEvidence = projection?.contextualEvidence || [];
   const fingerprint = evidenceEngineHash({
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
@@ -517,7 +518,13 @@ export function buildBusinessHealthExplanationPackage({
         lifecycleState: candidate.eligibility.lifecycleState,
         eligibilityDecisionVersion: candidate.eligibility.decisionVersion
       }))
-      .sort((left, right) => left.candidateId.localeCompare(right.candidateId))
+      .sort((left, right) => left.candidateId.localeCompare(right.candidateId)),
+    ...(contextualEvidence.length ? {
+      contextualEvidence: {
+        authority: projection?.contextAuthority,
+        records: contextualEvidence
+      }
+    } : {})
   });
 
   return {
@@ -530,6 +537,10 @@ export function buildBusinessHealthExplanationPackage({
     manifest,
     requiredCitationIds,
     citations,
-    hypothesisAllowed: false
+    hypothesisAllowed: false,
+    ...(contextualEvidence.length ? {
+      contextualEvidence,
+      contextAuthority: projection?.contextAuthority
+    } : {})
   };
 }

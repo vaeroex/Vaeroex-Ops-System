@@ -5,6 +5,10 @@ import type {
   FindingExplanationModelOutput,
   FindingExplanationPackage
 } from "@/lib/ai/finding-explanation/contracts";
+import {
+  contextualEvidenceGroundingText,
+  unattributedContextField
+} from "@/lib/ai/business-notes/reasoning-context";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
@@ -139,7 +143,11 @@ export function validateFindingExplanationOutput(
     });
   }
 
-  const approvedNumbers = new Set(numericClaims(JSON.stringify(context.facts)).map(normalizeNumber));
+  const deterministicFactText = JSON.stringify(context.facts);
+  const approvedNumbers = new Set(numericClaims(JSON.stringify({
+    facts: deterministicFactText,
+    reportedContext: contextualEvidenceGroundingText(context.contextualEvidence || [])
+  })).map(normalizeNumber));
   const unsupportedNumber = numericClaims(text).find((claim) => !approvedNumbers.has(normalizeNumber(claim)));
   if (unsupportedNumber) {
     return validationFailure("The response introduced a number outside the approved facts.", {
@@ -150,10 +158,24 @@ export function validateFindingExplanationOutput(
       observedType: "string"
     });
   }
+  const unattributedContext = unattributedContextField({
+    outputFields: Object.fromEntries(OUTPUT_FIELDS.map((field) => [field, output[field]])),
+    deterministicText: deterministicFactText,
+    contextualEvidence: context.contextualEvidence || []
+  });
+  if (unattributedContext) {
+    return validationFailure("Business Note context must remain explicitly attributed as unverified reported context.", {
+      reasonCode: "unsupported_inference",
+      stage: "contextual_validation",
+      expectedField: unattributedContext,
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
 
   const groundingChecks: Array<[keyof FindingExplanationModelOutput, string]> = [
     ["what_happened", `${context.facts.title} ${context.facts.approvedDevelopment}`],
-    ["why_evidence_suggests", context.facts.approvedEvidenceBasis],
+    ["why_evidence_suggests", `${context.facts.approvedEvidenceBasis} ${contextualEvidenceGroundingText(context.contextualEvidence || [])}`],
     ["why_leadership_should_care", context.facts.approvedLeadershipRelevance],
     ["investigate_next", context.facts.approvedInvestigationNext],
     ["what_evidence_does_not_prove", context.facts.approvedLimitations.join(" ")]

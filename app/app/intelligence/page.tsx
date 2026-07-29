@@ -2,6 +2,8 @@ import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceS
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
+import { loadApprovedBusinessNoteContextV1 } from "@/lib/ai/business-notes/contextual-evidence";
+import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/context";
 import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
@@ -122,13 +124,34 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     operationalInsights
   });
   const snapshotAsOf = new Date().toISOString();
+  const businessNoteContextReleaseChannel = businessNoteReleaseChannel();
+  const businessNoteContext = await loadApprovedBusinessNoteContextV1({
+    supabase,
+    workspaceId,
+    releaseChannel: businessNoteContextReleaseChannel,
+    asOf: snapshotAsOf
+  });
+  if (businessNoteContext.error) {
+    console.error(JSON.stringify({
+      level: "error",
+      component: "finding-explanation",
+      event: "business_note_context_load_failed",
+      reason: businessNoteContext.error.message
+    }));
+  }
   let intelligenceSnapshot: IntelligenceSnapshotV1 | null = null;
   let displayedInsights = intelligence.insights;
   try {
     const snapshotBuild = buildIntelligenceSnapshotFromProducersV1({
       workspaceId,
       asOf: snapshotAsOf,
-      intelligence
+      intelligence,
+      ...(businessNoteContext.records.length ? {
+        contextualEvidence: {
+          releaseChannel: businessNoteContextReleaseChannel,
+          records: businessNoteContext.records
+        }
+      } : {})
     });
     intelligenceSnapshot = snapshotBuild.snapshot;
     const inbox = buildIntelligenceInboxFromSnapshotV1({

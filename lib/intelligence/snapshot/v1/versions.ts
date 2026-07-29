@@ -22,18 +22,22 @@ export const COVERAGE_PRODUCER_ID = "business_intelligence_coverage" as const;
 export const COVERAGE_PRODUCER_VERSION = "business_intelligence_coverage_v1" as const;
 export const EVIDENCE_MANIFEST_PRODUCER_ID = "evidence_engine_manifest" as const;
 export const EVIDENCE_MANIFEST_PRODUCER_VERSION = "evidence_manifest_v1" as const;
+export const CONTEXTUAL_EVIDENCE_PRODUCER_ID = "validated_business_note_context" as const;
+export const CONTEXTUAL_EVIDENCE_PRODUCER_VERSION = "business_note_context_record_v1" as const;
 
 export const INTELLIGENCE_LAYER_ADAPTER_VERSION = "intelligence_layer_snapshot_adapter_v1" as const;
 export const KPI_SNAPSHOT_ADAPTER_VERSION = "canonical_kpi_snapshot_adapter_v1" as const;
 export const COVERAGE_SNAPSHOT_ADAPTER_VERSION = "coverage_snapshot_adapter_v1" as const;
 export const EVIDENCE_SNAPSHOT_ADAPTER_VERSION = "evidence_manifest_snapshot_adapter_v1" as const;
+export const CONTEXTUAL_EVIDENCE_SNAPSHOT_ADAPTER_VERSION = "business_note_context_snapshot_adapter_v1" as const;
 export const SHADOW_PARITY_VERSION = "intelligence_snapshot_shadow_parity_v1" as const;
 
 export const SUPPORTED_PRODUCER_VERSIONS = Object.freeze({
   [INTELLIGENCE_LAYER_PRODUCER_ID]: INTELLIGENCE_LAYER_PRODUCER_VERSION,
   [KPI_DETERMINISTIC_PRODUCER_ID]: KPI_DETERMINISTIC_PRODUCER_VERSION,
   [COVERAGE_PRODUCER_ID]: COVERAGE_PRODUCER_VERSION,
-  [EVIDENCE_MANIFEST_PRODUCER_ID]: EVIDENCE_MANIFEST_PRODUCER_VERSION
+  [EVIDENCE_MANIFEST_PRODUCER_ID]: EVIDENCE_MANIFEST_PRODUCER_VERSION,
+  [CONTEXTUAL_EVIDENCE_PRODUCER_ID]: CONTEXTUAL_EVIDENCE_PRODUCER_VERSION
 });
 
 export const INTELLIGENCE_SNAPSHOT_LIMITS = Object.freeze({
@@ -54,7 +58,17 @@ export const INTELLIGENCE_SNAPSHOT_LIMITS = Object.freeze({
   executiveReasoningKpis: 12,
   executiveReasoningFindings: 12,
   executiveReasoningEvidenceReferences: 24,
-  executiveReasoningLimitations: 12
+  executiveReasoningLimitations: 12,
+  contextualEvidenceRecords: 24,
+  contextualStatementsPerRecord: 12,
+  contextualEntitiesPerRecord: 12,
+  contextualUserFieldsPerRecord: 3,
+  projectedContextRecords: 4,
+  projectedContextStatementsPerRecord: 4,
+  projectedContextEntitiesPerRecord: 2,
+  projectedContextSummaryCharacters: 360,
+  projectedContextStatementCharacters: 320,
+  projectedContextQuoteExcerptCharacters: 320
 });
 
 export type SupportedProducerId = keyof typeof SUPPORTED_PRODUCER_VERSIONS;

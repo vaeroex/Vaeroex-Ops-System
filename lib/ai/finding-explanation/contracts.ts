@@ -1,4 +1,8 @@
 import type { EvidenceManifest } from "@/lib/ai/evidence-engine/contracts";
+import type {
+  ContextualEvidenceAuthorityV1,
+  ProjectedContextualEvidenceV1
+} from "@/lib/intelligence/snapshot/v1/projections";
 
 export const FINDING_EXPLANATION_CONTRACT_ID = "finding_explanation_v1" as const;
 export const FINDING_EXPLANATION_CONTRACT_VERSION = "finding_explanation_v1" as const;
@@ -65,6 +69,8 @@ export type FindingExplanationPackage = Readonly<{
   manifest: EvidenceManifest;
   requiredCitationIds: readonly number[];
   citations: readonly FindingExplanationCitationView[];
+  contextualEvidence?: readonly ProjectedContextualEvidenceV1[];
+  contextAuthority?: ContextualEvidenceAuthorityV1;
 }>;
 
 export type FindingExplanationArtifact = Readonly<{

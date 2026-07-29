@@ -10,11 +10,14 @@ import {
   BUSINESS_NOTE_EXTRACTION_POLICY_ID,
   BUSINESS_NOTE_EXTRACTION_SCHEMA_VERSION,
   BUSINESS_NOTE_EXTRACTION_VALIDATOR_VERSION,
-  BUSINESS_NOTE_MAX_CHARACTERS,
   BUSINESS_NOTE_TYPES,
   type BusinessNoteExtraction,
   type BusinessNoteReviewCorrections
 } from "@/lib/ai/business-notes/contracts";
+import {
+  BUSINESS_NOTE_MAX_LENGTH_MESSAGE,
+  BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS
+} from "@/lib/ai/business-notes/input-guidance";
 import { indexApprovedBusinessNote } from "@/lib/ai/business-notes/indexing";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { parseBusinessNoteUserAddedContext } from "@/lib/ai/business-notes/review-context";
@@ -97,8 +100,8 @@ export async function submitBusinessNoteForReviewAction(formData: FormData) {
   const originalNote = rawText(formData, "note_text");
   const observationDate = trimmedText(formData, "observation_date");
   if (!originalNote.trim()) redirect(noticeUrl("error", "Write or paste a Business Note before submitting it for review."));
-  if (originalNote.length > BUSINESS_NOTE_MAX_CHARACTERS) {
-    redirect(noticeUrl("error", `Direct Business Notes are limited to ${BUSINESS_NOTE_MAX_CHARACTERS.toLocaleString()} characters. Upload the document through Evidence instead.`));
+  if (originalNote.length > BUSINESS_NOTE_SUBMISSION_MAX_CHARACTERS) {
+    redirect(noticeUrl("error", BUSINESS_NOTE_MAX_LENGTH_MESSAGE));
   }
   if (!dateSchema.safeParse(observationDate).success) redirect(noticeUrl("error", "The observation date is invalid."));
   if (!isBusinessNoteExtractionEnabled()) {

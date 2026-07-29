@@ -2,6 +2,11 @@ import { z } from "zod";
 import { SOURCE_REGISTRY_VERSION } from "@/lib/ai/evidence-engine/contracts";
 import { KPI_DESIRED_DIRECTIONS, KPI_TARGET_BEHAVIORS } from "@/lib/kpis/semantics";
 import {
+  BUSINESS_NOTE_ADDITIONAL_CONTEXT_KEYS,
+  BUSINESS_NOTE_SOURCE_CLASSIFICATIONS,
+  BUSINESS_NOTE_TYPES
+} from "@/lib/ai/business-notes/contracts";
+import {
   DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1,
   INTELLIGENCE_SNAPSHOT_LIMITS
 } from "@/lib/intelligence/snapshot/v1/versions";
@@ -200,6 +205,71 @@ const coverage = z.object({
   }).strict()
 }).strict();
 
+const contextualEvidence = z.object({
+  contractVersion: z.literal("business_note_context_record_v1"),
+  snapshotAdapterVersion: z.literal("business_note_context_snapshot_adapter_v1"),
+  id: boundedLabel,
+  workspaceId: boundedLabel,
+  releaseChannel: z.enum(["production", "preview", "development"]),
+  sourceNoteId: boundedLabel,
+  sourceVersion: z.number().int().positive(),
+  sourceTextHash: z.string().regex(/^[a-f0-9]{64}$/),
+  authorityRole: z.literal("supporting_context"),
+  originalEvidenceEligible: z.literal(false),
+  lifecycle: z.literal("active"),
+  validationState: z.literal("approved_review"),
+  title: z.string().min(1).max(160),
+  summary: z.string().min(1).max(800),
+  noteType: z.enum(BUSINESS_NOTE_TYPES),
+  sourceClassification: z.enum(BUSINESS_NOTE_SOURCE_CLASSIFICATIONS),
+  departments: z.array(boundedLabel).max(12),
+  topics: z.array(boundedLabel).max(20),
+  entities: z.array(z.object({
+    id: boundedLabel,
+    kind: z.enum(["person", "customer", "vendor", "project"]),
+    name: boundedLabel,
+    sourceQuote: boundedText,
+    provenance: z.literal("original_note_extraction")
+  }).strict()).max(INTELLIGENCE_SNAPSHOT_LIMITS.contextualEntitiesPerRecord),
+  statements: z.array(z.object({
+    id: boundedLabel,
+    kind: z.enum(["reported_fact", "opinion_or_assumption", "reported_risk", "reported_opportunity", "reported_decision", "reported_metric"]),
+    text: z.string().min(1).max(600),
+    sourceQuote: boundedText,
+    confidence: finiteNumber.min(0).max(1),
+    provenance: z.literal("original_note_extraction")
+  }).strict()).max(INTELLIGENCE_SNAPSHOT_LIMITS.contextualStatementsPerRecord),
+  userAddedContext: z.array(z.object({
+    field: z.enum(BUSINESS_NOTE_ADDITIONAL_CONTEXT_KEYS),
+    label: boundedLabel,
+    value: boundedLabel,
+    provenance: z.literal("supplied_during_review"),
+    userProvided: z.literal(true),
+    partOfOriginalNoteQuotation: z.literal(false),
+    evidenceTreatment: z.literal("contextual_metadata")
+  }).strict()).max(INTELLIGENCE_SNAPSHOT_LIMITS.contextualUserFieldsPerRecord),
+  applicability: z.object({
+    start: dateValue.nullable(),
+    end: dateValue.nullable(),
+    source: z.enum(["user_review", "validated_extraction", "undated"]),
+    temporalStatus: z.enum(["applicable", "upcoming", "undated"])
+  }).strict(),
+  extractionConfidence: finiteNumber.min(0).max(1),
+  approvedAt: timestampValue,
+  observedAt: dateValue.nullable(),
+  provenance: z.object({
+    version: z.literal("business_note_context_provenance_v1"),
+    extractionVersion: boundedLabel,
+    validatorVersion: boundedLabel,
+    policyVersion: boundedLabel,
+    providerName: boundedLabel.nullable(),
+    modelUsed: boundedLabel.nullable(),
+    fallbackUsed: z.boolean(),
+    reviewedExtractionHash: fingerprint,
+    userContextProvenance: z.literal("separate_review_context")
+  }).strict()
+}).strict();
+
 const versions = z.object({
   calculations: z.object({
     kpiSemantics: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.kpiSemantics),
@@ -284,6 +354,7 @@ export const intelligenceSnapshotV1Schema: z.ZodType<IntelligenceSnapshotV1> = z
     }).strict()).max(INTELLIGENCE_SNAPSHOT_LIMITS.citations),
     sourceRegistryVersions: z.array(z.literal(SOURCE_REGISTRY_VERSION)).max(INTELLIGENCE_SNAPSHOT_LIMITS.sourceRegistryVersions)
   }).strict(),
+  contextualEvidence: z.array(contextualEvidence).max(INTELLIGENCE_SNAPSHOT_LIMITS.contextualEvidenceRecords).optional(),
   limitations: z.array(z.object({
     code: boundedLabel,
     scope: z.enum(["snapshot", "business_health", "data_quality", "forecast", "coverage", "kpi", "finding", "evidence"]),
@@ -291,12 +362,12 @@ export const intelligenceSnapshotV1Schema: z.ZodType<IntelligenceSnapshotV1> = z
     message: boundedText
   }).strict()).max(INTELLIGENCE_SNAPSHOT_LIMITS.limitations),
   provenance: z.array(z.object({
-    producerId: z.enum(["intelligence_layer", "canonical_kpi_semantics", "business_intelligence_coverage", "evidence_engine_manifest"]),
-    producerVersion: z.enum(["intelligence_layer_v1", "kpi_semantics_v1", "business_intelligence_coverage_v1", "evidence_manifest_v1"]),
+    producerId: z.enum(["intelligence_layer", "canonical_kpi_semantics", "business_intelligence_coverage", "evidence_engine_manifest", "validated_business_note_context"]),
+    producerVersion: z.enum(["intelligence_layer_v1", "kpi_semantics_v1", "business_intelligence_coverage_v1", "evidence_manifest_v1", "business_note_context_record_v1"]),
     workspaceId: boundedLabel,
     asOf: timestampValue,
     semanticInputFingerprint: fingerprint
-  }).strict()).max(4)
+  }).strict()).max(5)
 }).strict();
 
 export const intelligenceSnapshotBuildReceiptV1Schema: z.ZodType<IntelligenceSnapshotBuildReceiptV1> = z.object({

@@ -1,6 +1,7 @@
 import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { INTELLIGENCE_SNAPSHOT_LIMITS } from "@/lib/intelligence/snapshot/v1/versions";
 import type {
+  ContextualEvidenceSnapshotV1,
   EvidenceReferenceV1,
   FindingSnapshotV1,
   IntelligenceSnapshotV1,
@@ -9,6 +10,12 @@ import type {
   SnapshotLimitationV1,
   SnapshotState
 } from "@/lib/intelligence/snapshot/v1/types";
+
+const CONTEXT_STOP_WORDS = new Set([
+  "about", "after", "again", "against", "been", "before", "business", "current", "during", "evidence",
+  "finding", "from", "into", "leadership", "more", "note", "reported", "should", "that", "their", "these",
+  "this", "those", "through", "under", "what", "when", "where", "which", "while", "with", "without"
+]);
 
 type ProjectionHeaderV1 = Readonly<{
   contractVersion: "1.0.0";
@@ -29,6 +36,123 @@ function header(snapshot: IntelligenceSnapshotV1): ProjectionHeaderV1 {
 function findingByPriority(snapshot: IntelligenceSnapshotV1, role: PrioritySnapshotV1["role"]) {
   const findingId = snapshot.priorities.find((priority) => priority.role === role)?.findingId;
   return findingId ? snapshot.findings.find((finding) => finding.id === findingId) || null : null;
+}
+
+function contextTerms(value: string) {
+  return new Set(value
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((term) => term.length >= 4 && !CONTEXT_STOP_WORDS.has(term)));
+}
+
+function contextualEvidenceText(record: ContextualEvidenceSnapshotV1) {
+  return [
+    record.title,
+    record.summary,
+    ...record.departments,
+    ...record.topics,
+    ...record.entities.flatMap((entity) => [entity.kind, entity.name]),
+    ...record.statements.flatMap((statement) => [statement.kind, statement.text]),
+    ...record.userAddedContext.flatMap((item) => [item.label, item.value])
+  ].join(" ");
+}
+
+function compactContextText(value: string, maximum: number) {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maximum) return normalized;
+  return `${normalized.slice(0, Math.max(1, maximum - 3)).trim()}...`;
+}
+
+export type ProjectedContextualEvidenceV1 = Readonly<{
+  contextRef: string;
+  contextVersion: ContextualEvidenceSnapshotV1["contractVersion"];
+  sourceVersion: number;
+  sourceTextHash: string;
+  validationState: ContextualEvidenceSnapshotV1["validationState"];
+  title: string;
+  summary: string;
+  noteType: ContextualEvidenceSnapshotV1["noteType"];
+  sourceClassification: ContextualEvidenceSnapshotV1["sourceClassification"];
+  departments: readonly string[];
+  topics: readonly string[];
+  entities: readonly Readonly<{
+    kind: ContextualEvidenceSnapshotV1["entities"][number]["kind"];
+    name: string;
+    sourceQuoteExcerpt: string;
+  }>[];
+  statements: readonly Readonly<{
+    kind: ContextualEvidenceSnapshotV1["statements"][number]["kind"];
+    text: string;
+    sourceQuoteExcerpt: string;
+    confidence: number;
+  }>[];
+  userAddedContext: ContextualEvidenceSnapshotV1["userAddedContext"];
+  applicability: ContextualEvidenceSnapshotV1["applicability"];
+  extractionConfidence: number;
+  approvedAt: string;
+  observedAt: string | null;
+  provenance: ContextualEvidenceSnapshotV1["provenance"];
+}>;
+
+export type ContextualEvidenceAuthorityV1 = Readonly<{
+  role: "supporting_context";
+  deterministicIntelligenceWins: true;
+  originalEvidenceEligible: false;
+  automaticReconciliation: false;
+}>;
+
+const CONTEXTUAL_EVIDENCE_AUTHORITY_V1: ContextualEvidenceAuthorityV1 = {
+  role: "supporting_context",
+  deterministicIntelligenceWins: true,
+  originalEvidenceEligible: false,
+  automaticReconciliation: false
+};
+
+function projectRelevantContext(snapshot: IntelligenceSnapshotV1, subject: string) {
+  const subjectTerms = contextTerms(subject);
+  const scored = (snapshot.contextualEvidence || []).flatMap((record) => {
+    const recordText = contextualEvidenceText(record);
+    const recordTerms = contextTerms(recordText);
+    const exactMatches = [...subjectTerms].filter((term) => recordTerms.has(term)).length;
+    const relevance = exactMatches * 4;
+    return relevance > 0 ? [{ record, relevance }] : [];
+  }).sort((left, right) =>
+    right.relevance - left.relevance
+    || right.record.approvedAt.localeCompare(left.record.approvedAt)
+    || left.record.id.localeCompare(right.record.id)
+  );
+
+  return scored.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextRecords).map(({ record }) => ({
+    contextRef: record.id,
+    contextVersion: record.contractVersion,
+    sourceVersion: record.sourceVersion,
+    sourceTextHash: record.sourceTextHash,
+    validationState: record.validationState,
+    title: record.title,
+    summary: compactContextText(record.summary, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextSummaryCharacters),
+    noteType: record.noteType,
+    sourceClassification: record.sourceClassification,
+    departments: record.departments,
+    topics: record.topics,
+    entities: record.entities.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextEntitiesPerRecord).map((entity) => ({
+      kind: entity.kind,
+      name: entity.name,
+      sourceQuoteExcerpt: compactContextText(entity.sourceQuote, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextQuoteExcerptCharacters)
+    })),
+    statements: record.statements.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextStatementsPerRecord).map((statement) => ({
+      kind: statement.kind,
+      text: compactContextText(statement.text, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextStatementCharacters),
+      sourceQuoteExcerpt: compactContextText(statement.sourceQuote, INTELLIGENCE_SNAPSHOT_LIMITS.projectedContextQuoteExcerptCharacters),
+      confidence: statement.confidence
+    })),
+    userAddedContext: record.userAddedContext,
+    applicability: record.applicability,
+    extractionConfidence: record.extractionConfidence,
+    approvedAt: record.approvedAt,
+    observedAt: record.observedAt,
+    provenance: record.provenance
+  })) satisfies ProjectedContextualEvidenceV1[];
 }
 
 export type ExecutiveOverviewProjectionV1 = ProjectionHeaderV1 & Readonly<{
@@ -126,6 +250,8 @@ export type BusinessHealthExplanationProjectionV1 = ProjectionHeaderV1 & Readonl
   evidenceReferences: readonly EvidenceReferenceV1[];
   citations: IntelligenceSnapshotV1["evidence"]["citations"];
   limitations: readonly SnapshotLimitationV1[];
+  contextualEvidence: readonly ProjectedContextualEvidenceV1[];
+  contextAuthority: ContextualEvidenceAuthorityV1;
 }>;
 
 export function businessHealthDriverStableKey(kind: "risk" | "opportunity", findingFingerprint: string) {
@@ -167,6 +293,15 @@ export function projectBusinessHealthExplanationV1(snapshot: IntelligenceSnapsho
       .slice(0, 24 - citationEvidenceReferences.length)
   ];
   const projectedEvidenceIds = new Set(evidenceReferences.map((reference) => reference.id));
+  const contextualSubject = drivers.flatMap((driver) => [
+    driver.finding.title,
+    driver.finding.summary,
+    driver.finding.why,
+    driver.finding.impact,
+    driver.finding.recommendedAction,
+    driver.finding.affectedArea,
+    driver.finding.timePeriod
+  ]).join(" ");
   return {
     ...header(snapshot),
     businessHealth: snapshot.businessHealth,
@@ -175,13 +310,17 @@ export function projectBusinessHealthExplanationV1(snapshot: IntelligenceSnapsho
     priorities: snapshot.priorities,
     evidenceReferences,
     citations: snapshot.evidence.citations.filter((citation) => projectedEvidenceIds.has(citation.evidenceReferenceId)).slice(0, 24),
-    limitations: snapshot.limitations.filter((limitation) => limitation.scope === "business_health" || limitation.scope === "data_quality")
+    limitations: snapshot.limitations.filter((limitation) => limitation.scope === "business_health" || limitation.scope === "data_quality"),
+    contextualEvidence: projectRelevantContext(snapshot, contextualSubject),
+    contextAuthority: CONTEXTUAL_EVIDENCE_AUTHORITY_V1
   };
 }
 
 export type FindingExplanationProjectionV1 = ProjectionHeaderV1 & Readonly<{
   finding: SnapshotState<FindingSnapshotV1>;
   evidenceReferences: readonly EvidenceReferenceV1[];
+  contextualEvidence: readonly ProjectedContextualEvidenceV1[];
+  contextAuthority: ContextualEvidenceAuthorityV1;
 }>;
 
 export function projectFindingExplanationV1(snapshot: IntelligenceSnapshotV1, findingId: string): FindingExplanationProjectionV1 {
@@ -190,14 +329,28 @@ export function projectFindingExplanationV1(snapshot: IntelligenceSnapshotV1, fi
     return {
       ...header(snapshot),
       finding: { state: "unavailable", reason: { code: "source_not_available" } },
-      evidenceReferences: []
+      evidenceReferences: [],
+      contextualEvidence: [],
+      contextAuthority: CONTEXTUAL_EVIDENCE_AUTHORITY_V1
     };
   }
   const evidenceIds = new Set(finding.deterministicDependencies.evidenceReferenceIds);
+  const contextualSubject = [
+    finding.title,
+    finding.summary,
+    finding.why,
+    finding.impact,
+    finding.recommendedAction,
+    finding.limitation,
+    finding.affectedArea,
+    finding.timePeriod
+  ].join(" ");
   return {
     ...header(snapshot),
     finding: { state: "available", value: finding },
-    evidenceReferences: snapshot.evidence.references.filter((reference) => evidenceIds.has(reference.id)).slice(0, 24)
+    evidenceReferences: snapshot.evidence.references.filter((reference) => evidenceIds.has(reference.id)).slice(0, 24),
+    contextualEvidence: projectRelevantContext(snapshot, contextualSubject),
+    contextAuthority: CONTEXTUAL_EVIDENCE_AUTHORITY_V1
   };
 }
 

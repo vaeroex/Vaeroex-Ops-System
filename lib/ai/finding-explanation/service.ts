@@ -8,6 +8,7 @@ import {
   type FindingExplanationPackage
 } from "@/lib/ai/finding-explanation/contracts";
 import { validateFindingExplanationOutput } from "@/lib/ai/finding-explanation/validation";
+import { businessNoteContextForProvider } from "@/lib/ai/business-notes/reasoning-context";
 import { getAIProviderRetrySettings } from "@/lib/ai/provider-resilience";
 import { runStructuredAI, type AIProviderAttempt } from "@/lib/ai/providers/provider-manager";
 import {
@@ -26,6 +27,15 @@ Do not create facts, numbers, causes, relationships, impacts, urgency, forecasts
 When discussing a possible explanation, use cautious language such as "may reflect" or "is consistent with". Never state causation as established.
 Do not include markdown, citation numbers, hidden reasoning, or internal identifiers.
 Return exactly one JSON object with what_happened, why_evidence_suggests, why_leadership_should_care, investigate_next, and what_evidence_does_not_prove.`;
+
+const FINDING_CONTEXT_PROMPT = `The application also supplies separate reported_context from validated Business Notes. It is unverified supporting context, not original evidence or a deterministic fact. Use it only in why_evidence_suggests when clearly relevant, attribute it explicitly to the Business Note or its author, and use cautious language such as "may help explain." Never let it change the finding, priority, confidence, citations, or approved investigation boundary.
+If reported context conflicts with the deterministic finding or evidence, state that the note and the evidence disagree. Do not reconcile the conflict; deterministic facts remain authoritative. Future or upcoming context cannot explain a current or past result.`;
+
+export function findingExplanationSystemPrompt(analysisPackage: FindingExplanationPackage) {
+  return analysisPackage.contextualEvidence?.length
+    ? `${FINDING_EXPLANATION_SYSTEM_PROMPT}\n${FINDING_CONTEXT_PROMPT}`
+    : FINDING_EXPLANATION_SYSTEM_PROMPT;
+}
 
 export function findingExplanationProviderAttemptTelemetry(attempt: AIProviderAttempt) {
   return {
@@ -51,6 +61,7 @@ export function findingExplanationProviderAttemptTelemetry(attempt: AIProviderAt
 }
 
 export function findingExplanationModelInput(analysisPackage: FindingExplanationPackage) {
+  const hasContext = Boolean(analysisPackage.contextualEvidence?.length);
   return {
     contract: analysisPackage.contractId,
     finding: {
@@ -72,11 +83,17 @@ export function findingExplanationModelInput(analysisPackage: FindingExplanation
       observed_at: citation.recordedAt,
       excerpt: citation.excerpt
     })),
+    ...(hasContext ? { reported_context: businessNoteContextForProvider(analysisPackage.contextualEvidence || []) } : {}),
     application_owned_controls: {
       citations_attached_after_validation: true,
       provider_must_not_generate_citations: true,
       facts_and_ranking_are_immutable: true,
-      no_freeform_follow_up: true
+      no_freeform_follow_up: true,
+      ...(hasContext ? {
+        context_authority: analysisPackage.contextAuthority,
+        reported_context_must_be_attributed: true,
+        deterministic_facts_win_conflicts: true
+      } : {})
     }
   };
 }
@@ -99,7 +116,8 @@ export async function generateFindingExplanation({
   const policy = generationPolicy.providerPolicy;
   const primary = policy.steps[0];
   const content = JSON.stringify(findingExplanationModelInput(analysisPackage));
-  const estimatedRequestTokens = estimateTokenCount(`${FINDING_EXPLANATION_SYSTEM_PROMPT}\n${content}`);
+  const systemPrompt = findingExplanationSystemPrompt(analysisPackage);
+  const estimatedRequestTokens = estimateTokenCount(`${systemPrompt}\n${content}`);
   await assertWorkspaceTokenBudget({ supabase, workspaceId, estimatedRequestTokens });
   const baseSettings = getAIProviderRetrySettings(primary.provider);
   const generation = await runStructuredAI({
@@ -107,7 +125,7 @@ export async function generateFindingExplanation({
     primaryModel: primary.model,
     fallbackModel: BUSINESS_HEALTH_GPT56_TERRA_MODEL,
     providerPolicy: policy,
-    systemPrompt: FINDING_EXPLANATION_SYSTEM_PROMPT,
+    systemPrompt,
     userContent: [{ type: "text", text: content }],
     generationMode: "interactive_executive",
     maxOutputTokens: generationPolicy.requestMaxOutputTokens,
