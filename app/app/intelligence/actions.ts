@@ -5,9 +5,7 @@ import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
 import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
-import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 function text(formData: FormData, key: string) {
@@ -102,70 +100,4 @@ export async function createBusinessDecisionAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/reports");
   redirectWithMessage(path, "Decision logged. Vaeroex will include it in future reviews.");
-}
-
-export async function dismissPrestigeRecommendationAction(formData: FormData) {
-  const path = returnPath(formData);
-  const { supabase, user, workspace, workspaceId } = await requireWorkspace(path);
-  requireLiveWorkspace(path, workspace);
-  const title = text(formData, "title");
-
-  requireTitle(path, title);
-
-  const { error } = await supabase.from("vaeroex_recommendation_outcomes").insert({
-    workspace_id: workspaceId,
-    title,
-    source_type: text(formData, "source_type") || "prestige_intelligence",
-    source_title: nullableText(formData, "source_title"),
-    evidence: nullableText(formData, "evidence"),
-    related_module: nullableText(formData, "related_module"),
-    owner: nullableText(formData, "owner"),
-    priority: text(formData, "priority") || "Medium",
-    status: "dismissed",
-    outcome_summary: nullableText(formData, "outcome_summary") || "Dismissed by user during Vaeroex review.",
-    metadata_json: { dismissed_from: path } satisfies Json,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath("/app");
-  redirectWithMessage(path, "Recommendation dismissed.");
-}
-
-export async function createBusinessReviewPackageAction(formData: FormData) {
-  const path = returnPath(formData);
-  if (legacyReportGenerationDisabled()) {
-    redirectWithError(path, "Business Review Package generation is no longer available. Save completed analyses from their live views instead.");
-  }
-  const { supabase, user, workspace, workspaceId } = await requireWorkspace(path);
-  requireLiveWorkspace(path, workspace);
-  const title = text(formData, "title") || "Business Review Package";
-  const body = text(formData, "body_markdown");
-
-  requireTitle(path, title);
-
-  const { error } = await supabase.from("reports").insert({
-    workspace_id: workspaceId,
-    report_type: text(formData, "report_type") || "Business Review Package",
-    title,
-    date_range_start: nullableText(formData, "date_range_start"),
-    date_range_end: nullableText(formData, "date_range_end"),
-    body_markdown: body,
-    source_data_json: {
-      generated_from: "operations_intelligence",
-      package_type: text(formData, "package_type") || "Leadership Review"
-    } satisfies Json,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath("/app/reports");
-  revalidatePath("/app");
-  redirectWithMessage(path, "Business Review Package saved to Reports.");
 }

@@ -8,7 +8,7 @@ import {
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import { ExecutiveHomepage } from "@/components/intelligence/ExecutiveHomepage";
-import { PrestigeOperationsPanel } from "@/components/intelligence/PrestigeOperationsPanel";
+import { LeadershipDecisionJournal } from "@/components/intelligence/LeadershipDecisionJournal";
 import { EmptyState } from "@/components/operations/EmptyState";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -32,7 +32,6 @@ import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepa
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
-import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import { buildExecutiveHomepageFromSnapshotV1 } from "@/lib/intelligence/snapshot/v1/consumers/executive-overview";
 import { projectExecutiveOverviewV1 } from "@/lib/intelligence/snapshot/v1/projections";
@@ -70,7 +69,6 @@ type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Ro
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type BusinessDecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
-type RecommendationOutcomeRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 type BusinessMemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 type DateRange = {
   start: Date;
@@ -765,131 +763,6 @@ function signalRecommendedAction(item: DashboardSignal, tone: "risk" | "opportun
   return "Review the executive recommendation and decide what leadership should examine next.";
 }
 
-function EvidenceDisclosure({
-  evidence,
-  why,
-  action,
-  compact = false
-}: {
-  evidence: string;
-  why: string;
-  action: string;
-  compact?: boolean;
-}) {
-  return (
-    <details className={`mt-3 rounded-lg border border-white/10 bg-slate-950/35 ${compact ? "p-3" : "p-4"}`}>
-      <summary className="cursor-pointer text-xs font-semibold text-vaeroex-accent">View evidence and confidence</summary>
-      <dl className="mt-3 grid gap-2 text-xs leading-5 text-slate-300">
-        <div>
-          <dt className="font-semibold text-slate-100">Data used</dt>
-          <dd className="mt-1">{evidence}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-100">Why Vaeroex surfaced it</dt>
-          <dd className="mt-1">{why}</dd>
-        </div>
-        <div>
-          <dt className="font-semibold text-slate-100">Executive recommendation</dt>
-          <dd className="mt-1">{action}</dd>
-        </div>
-      </dl>
-    </details>
-  );
-}
-
-function confidenceForPriority(priority: string | undefined) {
-  if (priority === "Urgent" || priority === "High") return "High";
-  if (priority === "Medium") return "Medium";
-  return "Low";
-}
-
-function IntelligencePriorityTools({ intelligence }: { intelligence: PrestigeIntelligence }) {
-  const recommendation = intelligence.recommendationTracking.approvalQueue[0];
-  const profitLeak = intelligence.profitLeaks[0];
-  const memory = intelligence.memoryTimeline[0];
-  const risk = intelligence.riskSimulation[0];
-  const decision = intelligence.decisions.reviewDue[0] || intelligence.decisions.recent[0];
-  const benchmark = intelligence.benchmarkMode[0];
-  const tools = [
-    {
-      title: "Recommendation Queue",
-      href: recommendation?.href || ("/app/intelligence" as Route),
-      evidence: recommendation?.evidence || `${intelligence.recommendationTracking.approvalQueue.length} recommendation${intelligence.recommendationTracking.approvalQueue.length === 1 ? "" : "s"} waiting for review.`,
-      reasoning: recommendation?.why || "Vaeroex produces recommendations for human review; execution stays in the systems and teams the business already uses.",
-      confidence: confidenceForPriority(recommendation?.priority),
-      action: recommendation?.action || "Review the queue and choose which recommendation deserves leadership attention next."
-    },
-    {
-      title: "Profit Leak Detector",
-      href: profitLeak?.href || ("/app/sources" as Route),
-      evidence: profitLeak?.evidence || `${intelligence.profitLeaks.length} profit leak signal${intelligence.profitLeaks.length === 1 ? "" : "s"} detected.`,
-      reasoning: profitLeak?.why || "Vaeroex looks for missed revenue, stalled customer response, unresolved issues, and incomplete evidence.",
-      confidence: confidenceForPriority(profitLeak?.priority),
-      action: profitLeak?.action || "Review customer activity, KPI, and issue evidence for avoidable leakage before the next leadership review."
-    },
-    {
-      title: "Business Memory",
-      href: memory?.href || ("/app/reports" as Route),
-      evidence: memory?.whatHappened || `${intelligence.memoryTimeline.length} memory record${intelligence.memoryTimeline.length === 1 ? "" : "s"} stored.`,
-      reasoning: memory?.cause || "Vaeroex uses prior Saved Analyses, decisions, imports, and outcomes to explain why current signals matter.",
-      confidence: memory ? "Medium" : "Low",
-      action: memory?.actionTaken || "Log decisions and outcomes so future intelligence can compare what changed."
-    },
-    {
-      title: "Risk Simulation",
-      href: risk?.href || ("/app/issues" as Route),
-      evidence: risk?.evidence || `${intelligence.riskSimulation.length} forward-looking risk scenario${intelligence.riskSimulation.length === 1 ? "" : "s"} generated.`,
-      reasoning: risk?.why || "Vaeroex projects unresolved signals forward so leaders can decide before the issue becomes normal.",
-      confidence: confidenceForPriority(risk?.priority),
-      action: risk?.action || "Review the scenario and decide whether leadership needs a focused investigation or escalation discussion."
-    },
-    {
-      title: "Decision Journal",
-      href: "/app" as Route,
-      evidence: decision?.reason || decision?.expected_outcome || `${intelligence.decisions.recent.length} recent decision${intelligence.decisions.recent.length === 1 ? "" : "s"} available.`,
-      reasoning: decision ? "A saved leadership decision can be reviewed against later outcomes and business memory." : "No decision record is available yet, so Vaeroex has less context for why actions were taken.",
-      confidence: decision ? "Medium" : "Low",
-      action: decision ? "Review whether the expected outcome happened, then update the decision status." : "Log the next leadership decision so Vaeroex can track the reason and outcome."
-    },
-    {
-      title: "Benchmark Mode",
-      href: "/app/kpis" as Route,
-      evidence: benchmark?.evidence || `${intelligence.benchmarkMode.length} operating benchmark${intelligence.benchmarkMode.length === 1 ? "" : "s"} available.`,
-      reasoning: "Vaeroex compares this workspace against default operating standards, not anonymous customer data.",
-      confidence: benchmark?.status === "Missing data" ? "Low" : "Medium",
-      action: benchmark?.recommendedAction || "Use benchmark gaps to decide which KPI or evidence area needs stronger structure."
-    }
-  ];
-
-  return (
-    <section className="grid gap-4 xl:grid-cols-3">
-      {tools.map((tool) => (
-        <article
-          key={tool.title}
-          className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-slate-100 shadow-panel transition hover:border-cyan-300/45 hover:bg-blue-950/25"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <h3 className="text-sm font-semibold text-white">{tool.title}</h3>
-            <span className={`rounded-full border px-2.5 py-1 text-[0.68rem] font-semibold ${confidenceTone(tool.confidence as "High" | "Medium" | "Low")}`}>
-              {tool.confidence} confidence
-            </span>
-          </div>
-          <p className="mt-3 text-xs leading-5 text-slate-300">
-            <span className="font-semibold text-slate-100">Executive recommendation:</span> {tool.action}
-          </p>
-          <EvidenceDisclosure evidence={tool.evidence} why={tool.reasoning} action={tool.action} compact />
-          <Link
-            href={tool.href}
-            className="mt-4 inline-flex rounded-lg border border-cyan-300/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold text-vaeroex-accent hover:border-cyan-200 hover:bg-cyan-400/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-          >
-            Open related context
-          </Link>
-        </article>
-      ))}
-    </section>
-  );
-}
-
 function SignalList({
   items,
   empty,
@@ -1306,7 +1179,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     shareResult,
     peopleResult,
     decisionResult,
-    recommendationOutcomeResult,
     memoryChunksResult
   ] = await Promise.all([
     supabase
@@ -1331,13 +1203,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
-    supabase
-      .from("vaeroex_recommendation_outcomes")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .is("deleted_at", null)
-      .order("created_at", { ascending: false })
-      .limit(40),
     supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).limit(500)
   ]);
 
@@ -1378,7 +1243,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const shares = (shareResult.data || []) as ShareRow[];
   const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
   const decisions = filterBusinessEvidence((decisionResult.data || []) as BusinessDecisionRow[]);
-  const recommendationOutcomes = filterBusinessEvidence((recommendationOutcomeResult.data || []) as RecommendationOutcomeRow[]);
   let memoryChunks = [] as BusinessMemoryChunkRow[];
   let memoryEligibilityError: Error | null = null;
   try {
@@ -1407,7 +1271,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     shareResult.error,
     peopleResult.error,
     decisionResult.error,
-    recommendationOutcomeResult.error,
     memoryChunksResult.error,
     sourceParentResult.error,
     memoryEligibilityError
@@ -1427,7 +1290,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     metricResult.error,
     peopleResult.error,
     decisionResult.error,
-    recommendationOutcomeResult.error,
     memoryChunksResult.error,
     sourceParentResult.error,
     memoryEligibilityError
@@ -1706,28 +1568,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     if (share.department) return share.department;
     return "Entire workspace";
   };
-  const prestigeIntelligence = buildPrestigeIntelligence({
-    workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
-    isDemoWorkspace: isViewingDemoWorkspace,
-    periodLabel: period,
-    range,
-    kpis: intelligenceKpis,
-    kpiSettings: intelligenceKpiSettings,
-    issues,
-    sops,
-    files,
-    imports,
-    assets,
-    crmLeads,
-    reports: [],
-    vaeroexRuns: businessEvidenceRuns,
-    operationalMetrics: intelligenceOperationalMetrics,
-    assignments,
-    shares,
-    people,
-    decisions,
-    recommendationOutcomes
-  });
   const operationalInsights = buildOperationalEvidenceInsights({
     kpis: intelligenceKpis,
     kpiSettings: intelligenceKpiSettings,
@@ -1749,7 +1589,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sops,
     people,
     decisions,
-    recommendationOutcomes,
     operationalInsights
   });
   const businessHealthMemorySignals = intelligenceLayer.memorySummary.sourceRecords + intelligenceLayer.memorySummary.kpiHistoryRecords;
@@ -1795,7 +1634,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assets,
     people,
     decisions,
-    recommendationOutcomes,
     memoryChunks
   });
   const latestEvidenceUpdate = [
@@ -1804,8 +1642,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...files.map((row) => row.updated_at || row.created_at),
     ...reports.map((row) => row.updated_at || row.created_at),
     ...businessEvidenceRuns.map((row) => row.updated_at || row.created_at),
-    ...decisions.map((row) => row.updated_at || row.created_at),
-    ...recommendationOutcomes.map((row) => row.updated_at || row.created_at)
+    ...decisions.map((row) => row.updated_at || row.created_at)
   ].filter(Boolean).sort().at(-1) || null;
   const businessHealthExplanationAsOf = new Date().toISOString();
   let executiveHomepageModel: ReturnType<typeof buildExecutiveHomepageModel>;
@@ -2000,19 +1837,13 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Advanced Intelligence"
-            summary="Risk simulation, profit leak detection, business memory, decision review, benchmarks, and recommendation tracking stay here when leadership wants deeper context."
+            title="Decision Journal"
+            summary={`${decisions.length} leadership decision${decisions.length === 1 ? "" : "s"} retained for future review.`}
           >
-            <div className="mb-4">
-              <IntelligencePriorityTools intelligence={prestigeIntelligence} />
-            </div>
-            <PrestigeOperationsPanel
-              intelligence={prestigeIntelligence}
-              returnPath="/app"
-              dateRangeStart={range.startDate}
-              dateRangeEnd={range.endDate}
+            <LeadershipDecisionJournal
+              decisions={decisions}
+              returnPath="/app?view=Intelligence%20View#decision-journal"
               isDemoWorkspace={isViewingDemoWorkspace}
-              showHealthHero={false}
             />
           </DashboardAccordion>
         </>

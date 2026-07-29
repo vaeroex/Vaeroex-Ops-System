@@ -23,7 +23,6 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
 const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operational-evidence.ts");
-const { buildPrestigeIntelligence } = require("../lib/intelligence/prestige.ts");
 const { buildGeneratedOutput, fallbackGeneratedOutputSource } = require("../lib/intelligence/generated-output.ts");
 const {
   buildEvidenceGroups,
@@ -324,52 +323,6 @@ const advisorySemantics = semanticHealth(
 );
 assert.equal(advisorySemantics.topRisk, undefined, "unconfirmed Luna semantics remain advisory and cannot create directional findings");
 assert.equal(advisorySemantics.topOpportunity, undefined, "unconfirmed Luna semantics cannot create directional opportunities");
-
-function prestigeFixture(kpis, kpiSettings, decisions = []) {
-  const date = "2026-07-28";
-  return buildPrestigeIntelligence({
-    workspaceName: "Semantic fixture",
-    isDemoWorkspace: false,
-    periodLabel: "Current",
-    range: { startDate: date, endDate: date, previousStartDate: date, previousEndDate: date },
-    kpis,
-    kpiSettings,
-    issues: [], assets: [], sops: [], files: [], imports: [], crmLeads: [], reports: [], vaeroexRuns: [], operationalMetrics: [], assignments: [], shares: [], people: [], decisions, recommendationOutcomes: []
-  });
-}
-
-const prestigeSemanticTarget = prestigeFixture(
-  [kpi({ name: "Revenue", actual_value: 12, target: null })],
-  [kpiSetting("Revenue", "maximize", { ideal_value: 10 })]
-);
-assert.equal(prestigeSemanticTarget.businessHealth.categories.find((category) => category.name === "Sales Health")?.score, 80, "Prestige recognizes a semantic ideal as a valid maximize target");
-assert.equal(prestigeSemanticTarget.dataQuality.gaps.some((gap) => /Revenue has no target/.test(gap.title)), false, "semantic targets do not create false data gaps");
-const prestigeUnknown = prestigeFixture(
-  [kpi({ name: "Revenue", actual_value: 12, target: 10 })],
-  [kpiSetting("Revenue", "unknown")]
-);
-assert.equal(prestigeUnknown.businessHealth.categories.find((category) => category.name === "Sales Health")?.score, 69, "unknown KPI semantics receive the formula's neutral contribution instead of a directional penalty");
-assert.equal(prestigeUnknown.focusPriorities.some((priority) => priority.id === "revenue-below-target"), false, "unknown KPI semantics cannot create a directional Prestige priority");
-
-const decision = {
-  id: "decision-1",
-  title: "Review checkout staffing",
-  related_kpi: "Average Checkout Wait",
-  outcome_summary: null,
-  review_date: null,
-  status: "open",
-  created_at: "2026-07-01T00:00:00Z",
-  updated_at: "2026-07-01T00:00:00Z"
-};
-const prestigeDecision = prestigeFixture(
-  [
-    kpi({ id: "wait-latest", name: "Average Checkout Wait", actual_value: 6, target: 5, metric_date: "2026-07-20" }),
-    kpi({ id: "wait-previous", name: "Average Checkout Wait", actual_value: 8, target: 5, metric_date: "2026-07-10" })
-  ],
-  [kpiSetting("Average Checkout Wait", "minimize", { target: 5 })],
-  [decision]
-);
-assert.match(prestigeDecision.decisions.outcomeNotes[0], /appears to have improved/, "Prestige decision outcomes interpret lower-is-better movement canonically");
 
 const deterministicLatest = buildIntelligenceLayer({
   kpis: [

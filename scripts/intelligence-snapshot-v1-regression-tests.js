@@ -281,7 +281,6 @@ const projections = {
   health: contract.projectBusinessHealthExplanationV1(snapshot),
   finding: contract.projectFindingExplanationV1(snapshot, "finding-checkout-wait"),
   missingFinding: contract.projectFindingExplanationV1(snapshot, "missing"),
-  people: contract.projectPeoplePrestigeV1(snapshot),
   reasoning: contract.projectExecutiveReasoningV1(snapshot)
 };
 assert.equal(projections.overview.topRisk.id, "finding-checkout-wait");
@@ -293,7 +292,6 @@ assert.ok(projections.health.evidenceReferences.length <= 24);
 assert.ok(projections.health.citations.length <= 24);
 assert.equal(projections.finding.finding.state, "available");
 assert.equal(projections.missingFinding.finding.state, "unavailable");
-assert.equal(projections.people.legacyPrestigeAuthorityAllowed, false);
 assert.ok(projections.reasoning.kpis.length <= contract.INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningKpis);
 assert.ok(projections.reasoning.findings.length <= contract.INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningFindings);
 assert.ok(projections.reasoning.evidenceReferences.length <= contract.INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningEvidenceReferences);
@@ -347,7 +345,7 @@ const legacyParity = contract.compareIntelligenceSnapshotV1({
   coverage: baseInput.coverage.output,
   evidenceManifests: baseInput.evidenceManifests.output,
   generatedAt: contract.FOUNDATION_FIXTURE_GENERATED_AT,
-  legacyDuplicates: [{ path: "prestige.businessHealth", authoritative: 78, legacy: 74 }]
+  legacyDuplicates: [{ path: "legacy.businessHealth", authoritative: 78, legacy: 74 }]
 });
 assert.equal(legacyParity.counts.legacy_duplicate, 1);
 

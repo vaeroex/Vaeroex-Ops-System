@@ -782,7 +782,6 @@ function runLightweightKpiOverviewTests() {
 function runLegacyCrmLanguageTests() {
   const generatedOutputFiles = [
     "lib/intelligence/layer.ts",
-    "lib/intelligence/prestige.ts",
     "lib/intelligence/coverage.ts",
     "lib/ai/workspace-snapshot.ts",
     "lib/ai/vaeroex-workflows.ts",
@@ -797,7 +796,7 @@ function runLegacyCrmLanguageTests() {
   const publicExperienceFiles = [
     "components/motion/OperationsIntelligenceEngineDemo.tsx",
     "components/motion/ScrollStory.tsx",
-    "components/intelligence/PrestigeOperationsPanel.tsx",
+    "components/intelligence/LeadershipDecisionJournal.tsx",
     "app/app/crm/page.tsx",
     "app/api/search/route.ts",
     "lib/search/types.ts",

@@ -20,7 +20,6 @@ const generatedNew = read("app/app/generated/new/page.tsx");
 const agentPage = read("app/app/agents/page.tsx");
 const agentActions = read("app/app/agents/actions.ts");
 const home = read("app/app/page.tsx");
-const prestige = read("components/intelligence/PrestigeOperationsPanel.tsx");
 const cronRoute = read("app/api/cron/report-subscriptions/route.ts");
 const generationPolicy = read("lib/reports/generation-policy.ts");
 const legacyReportAction = read("app/app/reports/actions.ts");
@@ -103,7 +102,7 @@ assert.match(migration, /grant execute on function public\.soft_delete_saved_ana
 
 assert.match(reportsNew, /permanentRedirect\("\/app\/reports"\)/);
 assert.match(generatedNew, /permanentRedirect\("\/app\/reports"\)/);
-for (const source of [reportsPage, home, prestige, findingExplanation, agentPage]) {
+for (const source of [reportsPage, home, findingExplanation, agentPage]) {
   assert.doesNotMatch(source, /Create report|Generate report|Generate Improvement Plan|Generate Investigation Summary|Generate Executive Briefing/);
 }
 assert.match(agentActions, /Secondary report generation is no longer available/);

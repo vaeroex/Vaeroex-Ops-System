@@ -26,7 +26,7 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, outcomesResult, metricsResult, memoryResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, reportsResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -40,7 +40,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     supabase.from("form_submissions").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("vaeroex_recommendation_outcomes").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
     supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500)
   ]);
@@ -59,7 +58,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     submissionsResult.error,
     peopleResult.error,
     decisionsResult.error,
-    outcomesResult.error,
     metricsResult.error,
     memoryResult.error
   ].filter(Boolean);
@@ -121,7 +119,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     submissions: submissionsResult.data || [],
     people: peopleResult.data || [],
     decisions: decisionsResult.data || [],
-    recommendationOutcomes: outcomesResult.data || [],
     operationalInsights
   });
   const snapshotAsOf = new Date().toISOString();

@@ -48,15 +48,16 @@ Every producer is wrapped in `IntelligenceProducerEnvelopeV1` with `workspaceId`
 
 Business Health explanation is the first live consumer. Its authorized Executive Overview composition boundary builds `IntelligenceSnapshotV1`, selects the bounded Business Health explanation projection, and preserves the existing explanation package and generation service. Intelligence, KPI pages, Explain Finding, People/Prestige, Reports, Saved Analyses, and every other generation service continue using their existing paths unchanged.
 
-The module defines unconnected pure projections for later staged migration:
+The original foundation defined these unconnected pure projections for staged migration:
 
 - `ExecutiveOverviewProjectionV1`
 - `IntelligenceInboxProjectionV1`
 - `KpiOverviewProjectionV1`
 - `BusinessHealthExplanationProjectionV1`
 - `FindingExplanationProjectionV1`
-- `PeoplePrestigeProjectionV1`, with `legacyPrestigeAuthorityAllowed: false`
 - `ExecutiveReasoningProjectionV1`
+
+The temporary People/Prestige projection was removed when those legacy customer surfaces were retired.
 
 ## Contract Schema
 
@@ -243,7 +244,7 @@ The authoritative Intelligence Layer now exposes its already-calculated Business
 4. Migrate one consumer at a time to a bounded projection, retaining rollback to its existing path.
 5. Remove duplicated consumer calculations only after parity and human review.
 
-Prestige remains a non-authoritative legacy comparison source. Saved Analyses remain historical copied artifacts and are never producer or evidence inputs.
+Saved Analyses remain historical copied artifacts and are never producer or evidence inputs. ADR-005 retires the former non-authoritative parallel intelligence source without broadening this contract.
 
 ## Persistence Decision
 

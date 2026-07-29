@@ -126,7 +126,6 @@ type FormRow = Database["public"]["Tables"]["forms"]["Row"];
 type FormSubmissionRow = Database["public"]["Tables"]["form_submissions"]["Row"];
 type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
-type RecommendationOutcomeRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 
 export type IntelligenceLayerInput = {
   workspace?: {
@@ -147,7 +146,6 @@ export type IntelligenceLayerInput = {
   submissions?: FormSubmissionRow[];
   people?: PersonRow[];
   decisions?: DecisionRow[];
-  recommendationOutcomes?: RecommendationOutcomeRow[];
   operationalInsights?: IntelligenceInsight[];
 };
 
@@ -459,7 +457,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const submissions = filterOriginalBusinessEvidence(input.submissions).filter((submission) => activeFormIds.has(submission.form_id));
   const people = filterOriginalBusinessEvidence(input.people);
   const decisions: DecisionRow[] = [];
-  const recommendationOutcomes: RecommendationOutcomeRow[] = [];
   const operationalInsights = input.operationalInsights || [];
   const openIssues = issues.filter((issue) => !isClosed(issue.status));
   const latestKpis = latestKpisByName(kpis);
@@ -505,7 +502,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         (kpis.length ? 25 : 0) +
         (reports.length ? 15 : 0) +
         (crmLeads.length || issues.length ? 10 : 0) +
-        (decisions.length || recommendationOutcomes.length ? 10 : 0)
+        (decisions.length ? 10 : 0)
     )
   );
   const dataQualityLabel = dataQualityScore >= 70 ? "Strong" : dataQualityScore >= 40 ? "Developing" : "Limited";
@@ -832,7 +829,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       reports: reports.length,
       vaeroexRuns: vaeroexRuns.length,
       decisions: decisions.length,
-      recommendationOutcomes: recommendationOutcomes.length
+      recommendationOutcomes: 0
     }
   };
 }

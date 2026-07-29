@@ -17,8 +17,6 @@ import { PrimaryButton, TextArea, TextInput } from "@/components/operations/Form
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { SectionCard } from "@/components/operations/SectionCard";
-import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import {
@@ -31,7 +29,6 @@ import {
 import { projectKpiCompareV1, projectKpiDetailV1, projectKpiPageV1 } from "@/lib/intelligence/snapshot/v1/projections";
 import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 import { INTELLIGENCE_SNAPSHOT_LIMITS } from "@/lib/intelligence/snapshot/v1/versions";
-import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
 import { buildCanonicalKpiProducerOutputV1 } from "@/lib/kpis/snapshot-producer";
 import {
   kpiStatus,
@@ -144,13 +141,6 @@ type KpiTimeline = (typeof KPI_TIMELINES)[number];
 
 function lower(value: string | null | undefined) {
   return (value || "").toLowerCase();
-}
-
-function findLatestMetric(kpis: KpiRow[], keywords: string[]) {
-  return kpis.find((kpi) => {
-    const haystack = `${lower(kpi.name)} ${lower(kpi.category)}`;
-    return keywords.some((keyword) => haystack.includes(keyword));
-  });
 }
 
 function explicitKpiDirection(name: string, rows: KpiRow[], settings: KpiSettingRow[]): KpiDirection {
@@ -1062,108 +1052,9 @@ function OverlayTrendChart({ trends, mode }: { trends: KpiTrend[]; mode: Compari
   );
 }
 
-function trendActualValues(trend: KpiTrend) {
-  return trend.rows.map((row) => row.actual_value).filter((value): value is number => value !== null);
-}
-
-function trendDateRange(trends: KpiTrend[]) {
-  const dates = trends.flatMap((trend) => trend.rows.map((row) => row.metric_date)).filter(Boolean).sort();
-
-  if (!dates.length) {
-    return null;
-  }
-
-  return { startDate: dates[0], endDate: dates[dates.length - 1] };
-}
-
-function monthsBetween(startDate: string, endDate: string) {
-  const start = new Date(`${startDate}T12:00:00.000Z`);
-  const end = new Date(`${endDate}T12:00:00.000Z`);
-
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-    return 0;
-  }
-
-  return Math.max(1, (end.getUTCFullYear() - start.getUTCFullYear()) * 12 + end.getUTCMonth() - start.getUTCMonth() + 1);
-}
-
-function comparisonConfidence({
-  trends,
-  dataQualityScore,
-  memoryCount
-}: {
-  trends: KpiTrend[];
-  dataQualityScore: number;
-  memoryCount: number;
-}) {
-  const usableTrends = trends.filter((trend) => trendActualValues(trend).length >= 2);
-  const recordCount = trends.reduce((count, trend) => count + trendActualValues(trend).length, 0);
-  const range = trendDateRange(usableTrends);
-  const coverageMonths = range ? monthsBetween(range.startDate, range.endDate) : 0;
-  const recordDepthScore = Math.min(30, recordCount * 2);
-  const breadthScore = Math.min(20, usableTrends.length * 6);
-  const historyScore = Math.min(25, coverageMonths * 4);
-  const qualityScore = Math.min(15, dataQualityScore * 0.15);
-  const memoryScore = Math.min(10, memoryCount * 2);
-  const score = Math.round(Math.min(90, recordDepthScore + breadthScore + historyScore + qualityScore + memoryScore));
-  const label = score >= 70 ? "Good" : score >= 55 ? "Moderate" : score >= 35 ? "Limited" : "Low";
-  const forecastConfidence =
-    score >= 70 && coverageMonths >= 4 && recordCount >= 12
-      ? "Good"
-      : score >= 55 && coverageMonths >= 3 && recordCount >= 8
-        ? "Moderate"
-        : "Low";
-  const limitations = [
-    usableTrends.length < 2 ? "At least two KPIs need usable history for reliable comparison." : "",
-    recordCount < 8 ? "The comparison has fewer than 8 dated KPI values." : "",
-    coverageMonths < 3 ? "Historical coverage is under 3 months, so seasonality and forecasting are limited." : "",
-    dataQualityScore < 60 ? "Workspace data quality is still developing." : "",
-    memoryCount < 3 ? "Business Memory coverage is limited." : ""
-  ].filter(Boolean);
-
+function comparisonContext(range: { label: string; startDate: string; endDate: string }) {
   return {
-    score,
-    label,
-    forecastConfidence,
-    coverageMonths,
-    limitations: limitations.length ? limitations.join(" ") : "Enough KPI history exists for a useful leadership review, though forecasts should still be treated as directional."
-  };
-}
-
-function comparisonContext({
-  trends,
-  range,
-  dataQualityScore,
-  memoryCount
-}: {
-  trends: KpiTrend[];
-  range: { label: string; startDate: string; endDate: string };
-  dataQualityScore: number;
-  memoryCount: number;
-}) {
-  const recordCount = trends.reduce((count, trend) => count + trendActualValues(trend).length, 0);
-  const actualRange = trendDateRange(trends);
-  const confidence = comparisonConfidence({ trends, dataQualityScore, memoryCount });
-  const forecast = buildKpiForecastEligibility(trends.flatMap((trend) => trend.rows));
-  const comparedKpis = trends.map((trend) => trend.name).filter(Boolean);
-  const historicalCoverage = actualRange
-    ? `${monthsBetween(actualRange.startDate, actualRange.endDate)} month${monthsBetween(actualRange.startDate, actualRange.endDate) === 1 ? "" : "s"} (${formatLongDate(actualRange.startDate)} - ${formatLongDate(actualRange.endDate)})`
-    : "No dated KPI history in this range";
-
-  return {
-    timeframe: timeframeDisplay(range),
-    recordCount,
-    comparedKpis,
-    currentKpiAvailability: forecast.currentAvailabilityLabel,
-    historicalCoverage,
-    historicalDepth: forecast.historicalDepthLabel,
-    measurementFreshness: forecast.freshnessLabel,
-    forecastReadiness: forecast,
-    forecastConfidence: forecast.label,
-    confidenceLabel: confidence.label,
-    confidenceScore: confidence.score,
-    dataLimitations: `${forecast.reason} ${confidence.limitations}`,
-    businessMemoryCoverage: `${memoryCount} memory signal${memoryCount === 1 ? "" : "s"} available; data quality ${dataQualityScore}/100`
+    timeframe: timeframeDisplay(range)
   };
 }
 
@@ -1675,7 +1566,7 @@ function KpiChartSettingsForm({
 
 export default async function KpisPage({ searchParams }: KpisPageProps) {
   const params = await searchParams;
-  const { supabase, context, workspaceId } = await requireWorkspacePage();
+  const { supabase, workspaceId } = await requireWorkspacePage();
   const today = new Date().toISOString().slice(0, 10);
 
   const [
@@ -1683,10 +1574,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     folderResult,
     peopleResult,
     shareResult,
-    issueResult,
-    crmResult,
     fileResult,
-    reportResult,
     kpiSettingsResult
   ] = await Promise.all([
     supabase
@@ -1700,19 +1588,14 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
-    supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false })
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
-  const rawCustomerEvidence = crmResult.data || [];
-  const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: [...rawKpis, ...rawCustomerEvidence] });
+  const sourceParentResult = await loadSourceParentEligibilityResult({ supabase, workspaceId, rows: rawKpis });
   const sourceParentEligibility = sourceParentResult.eligibility;
   const eligibleKpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
-  const eligibleCustomerEvidence = filterBySourceParentEligibility(rawCustomerEvidence, sourceParentEligibility);
   const sourceFiles = (fileResult.data || []) as FileUploadRow[];
   const kpiSettings = (kpiSettingsResult.data || []) as KpiSettingRow[];
   const adjustedKpis = sortKpiRowsBySettings(applyKpiSettingsToRows(eligibleKpis, kpiSettings), kpiSettings) as KpiRow[];
@@ -1724,31 +1607,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const allVisibleKpis = adjustedKpis;
   const people = (peopleResult.data || []) as TeamPersonOption[];
   const shares = (shareResult.data || []) as ShareRow[];
-  const revenue = findLatestMetric(kpis, ["revenue", "sales"]);
-  const leads = findLatestMetric(kpis, ["lead"]);
-  const conversionRate = findLatestMetric(kpis, ["conversion"]);
-  const intelligence = buildPrestigeIntelligence({
-    workspaceName: context.activeWorkspace?.name || "Vaeroex workspace",
-    isDemoWorkspace: false,
-    periodLabel: "KPIs",
-    range: { startDate: today, endDate: today, previousStartDate: today, previousEndDate: today },
-    kpis,
-    kpiSettings,
-    issues: issueResult.data || [],
-    assets: [],
-    sops: [],
-    files: fileResult.data || [],
-    imports: [],
-    crmLeads: eligibleCustomerEvidence,
-    reports: [],
-    vaeroexRuns: [],
-    operationalMetrics: [],
-    assignments: [],
-    shares,
-    people: [],
-    decisions: [],
-    recommendationOutcomes: []
-  });
 
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
   const kpiSnapshotAsOf = new Date().toISOString();
@@ -1827,12 +1685,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedTrends = buildTrends(kpis, selectedMetrics, kpiSettings);
   const hasComparison = selectedMetrics.length > 1;
   const comparisonMode = isComparisonMode(params?.mode) ? params.mode : defaultComparisonMode(selectedTrends);
-  const selectedComparisonContext = comparisonContext({
-    trends: selectedTrends,
-    range: selectedTimelineRange,
-    dataQualityScore: intelligence.dataQuality.score,
-    memoryCount: intelligence.memoryTimeline.length
-  });
+  const selectedComparisonContext = comparisonContext(selectedTimelineRange);
   const activeSection =
     params?.section === "compare" || params?.metric === "compare"
       ? "compare"
@@ -1988,10 +1841,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     folderResult.error?.message ||
     peopleResult.error?.message ||
     shareResult.error?.message ||
-          issueResult.error?.message ||
-    crmResult.error?.message ||
     fileResult.error?.message ||
-    reportResult.error?.message ||
     kpiSettingsResult.error?.message ||
     sourceParentResult.error?.message
         }
@@ -2385,41 +2235,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
             searchParams={params}
           />
 
-          <KpiDetailPanel
-            title="Benchmarks and data quality"
-            summary={`Data Quality Score: ${intelligence.dataQuality.score}/100. ${intelligence.dataQuality.gaps.length} gap${intelligence.dataQuality.gaps.length === 1 ? "" : "s"} need review.`}
-          >
-            <section className="grid gap-4 xl:grid-cols-2">
-              <SectionCard title="Benchmark comparisons" description="Vaeroex compares this workspace against default operating standards, not anonymous customer data.">
-                <div className="grid gap-3 md:grid-cols-2">
-                  {intelligence.benchmarkMode.map((item) => (
-                    <article key={item.title} className="rounded-lg border border-white/10 bg-slate-950/35 p-4 text-slate-100">
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="text-sm font-semibold text-white">{item.title}</p>
-                        {(() => {
-                          const tone = item.status === "On track" ? "green" : item.status === "Needs attention" ? "yellow" : "neutral";
-                          return <KpiStatusBadge label={item.status} status={statusForTone(tone)} />;
-                        })()}
-                      </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-300">{item.evidence}</p>
-                      <p className="mt-2 text-xs leading-5 text-slate-400">{item.recommendedAction}</p>
-                    </article>
-                  ))}
-                </div>
-              </SectionCard>
-              <SectionCard title="KPI risk and data quality" description={`Data Quality Score: ${intelligence.dataQuality.score}/100.`}>
-                <div className="space-y-3">
-                  {intelligence.dataQuality.gaps.slice(0, 6).map((gap) => (
-                    <Link key={gap.id} href={gap.href} className="block rounded-lg border border-white/10 bg-slate-950/35 p-3 text-sm text-slate-300">
-                      <span className="font-semibold text-white">{gap.title}</span>
-                      <span className="mt-1 block text-xs leading-5 text-slate-400">{gap.why}</span>
-                    </Link>
-                  ))}
-                  {!intelligence.dataQuality.gaps.length ? <p className="text-sm leading-6 text-slate-300">No major KPI data gaps found.</p> : null}
-                </div>
-              </SectionCard>
-            </section>
-          </KpiDetailPanel>
         </section>
       ) : null}
 

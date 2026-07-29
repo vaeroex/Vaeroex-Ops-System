@@ -46,7 +46,6 @@ const runtimeFiles = [
   "lib/ai/workspace-snapshot.ts",
   "lib/intelligence/layer.ts",
   "lib/intelligence/coverage.ts",
-  "lib/intelligence/prestige.ts",
   "lib/reports/scheduled-generator.ts"
 ];
 
@@ -93,64 +92,5 @@ assert.match(fileActions, /uploadFileAction/, "the existing Evidence upload acti
 
 assert.equal(fs.existsSync(path.join(root, "lib/business-signals/retirement.ts")), false, "retirement-only helper must be removed");
 assert.equal(fs.existsSync(path.join(root, "lib/intelligence/business-signal-evidence.ts")), false, "Business Signal evidence utility must be removed");
-
-const { buildPrestigeIntelligence } = require("../lib/intelligence/prestige.ts");
-const taskFreeInput = {
-  workspaceName: "Task-free baseline",
-  isDemoWorkspace: false,
-  periodLabel: "Monthly",
-  range: {
-    startDate: "2026-07-01",
-    endDate: "2026-07-31",
-    previousStartDate: "2026-06-01",
-    previousEndDate: "2026-06-30"
-  },
-  kpis: [
-    { id: "k1", name: "Revenue", actual_value: 80_000, target: 100_000, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Sales" },
-    { id: "k2", name: "Conversion Rate", actual_value: 5, target: 10, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Sales" },
-    { id: "k3", name: "Customer Satisfaction", actual_value: 82, target: 85, metric_date: "2026-07-01", created_at: "2026-07-01", updated_at: "2026-07-01", category: "Customer" }
-  ],
-  issues: [
-    { id: "i1", title: "Open issue 1", status: "Open", severity: "High", created_at: "2026-07-01", assigned_to: null, assigned_person_id: null, assigned_role: null, assigned_department: null },
-    { id: "i2", title: "Open issue 2", status: "Open", severity: "Medium", created_at: "2026-07-01", assigned_to: "Owner" }
-  ],
-  assets: [],
-  sops: [{ id: "s1", title: "SOP", created_at: "2026-07-01", updated_at: "2026-07-01" }],
-  files: [
-    { id: "f1", display_name: "Workbook.xlsx", analysis_summary: "Validated facts", created_at: "2026-07-01", deleted_at: null, archived_at: null },
-    { id: "f2", display_name: "Notes.pdf", analysis_summary: null, created_at: "2026-07-01", deleted_at: null, archived_at: null }
-  ],
-  imports: [],
-  crmLeads: [
-    { id: "l1", lead_name: "Lead 1", status: "Open", last_activity_at: null, created_at: "2026-07-01" },
-    { id: "l2", lead_name: "Lead 2", status: "Won", last_activity_at: "2026-07-02", created_at: "2026-07-01" }
-  ],
-  reports: [{ id: "r1", title: "Report", created_at: "2026-07-01" }],
-  vaeroexRuns: [],
-  operationalMetrics: [],
-  assignments: [{ id: "a1", title: "Review", status: "Done", created_at: "2026-07-01" }],
-  shares: [],
-  people: [
-    { id: "p1", full_name: "A", role_title: "Owner", department: "Leadership" },
-    { id: "p2", full_name: "B", role_title: "Manager", department: "Operations" }
-  ],
-  decisions: [],
-  recommendationOutcomes: []
-};
-
-const taskFreeResult = buildPrestigeIntelligence(taskFreeInput);
-const sourceVisibility = taskFreeResult.businessHealth.categories.find((category) => category.name === "Source Visibility");
-assert.equal(taskFreeResult.businessHealth.score, 77, "identical non-task and non-Checklist evidence must preserve the corrected Business Health score");
-assert.equal(sourceVisibility?.score, 92, "Source Visibility must preserve the pre-retirement task-free baseline");
-assert.equal(taskFreeResult.businessHealth.dataQualityWarning, null, "complete task-free inputs must retain the previous missing-data behavior");
-
-const withoutReports = buildPrestigeIntelligence({ ...taskFreeInput, reports: [] });
-assert.match(withoutReports.businessHealth.dataQualityWarning || "", /reports/, "reports must remain part of the established missing-data check");
-
-const withRetiredTaskPayload = buildPrestigeIntelligence({
-  ...taskFreeInput,
-  tasks: [{ id: "retired-task", title: "Retired signal", status: "To Do", created_at: "2026-07-01" }]
-});
-assert.deepEqual(withRetiredTaskPayload.businessHealth, taskFreeResult.businessHealth, "retired task payloads must not influence Business Health");
 
 console.log("Business Signals full-retirement regressions passed.");

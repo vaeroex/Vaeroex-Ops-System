@@ -40,7 +40,7 @@ assert.match(globalSearch, /searchParams\.get\("ask"\) === "1"[\s\S]{0,180}route
 for (const file of [
   "app/app/page.tsx",
   "app/app/kpis/page.tsx",
-  "components/intelligence/PrestigeOperationsPanel.tsx",
+  "components/intelligence/LeadershipDecisionJournal.tsx",
   "components/operations/ManagedRecordList.tsx"
 ]) {
   assert.doesNotMatch(read(file), /ContextualAskVaeroex/, `${file} must not expose embedded freeform conversation in Version 1`);

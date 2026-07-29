@@ -66,8 +66,7 @@ const appFiles = [
   "app/app/sops/page.tsx",
   "app/api/search/route.ts",
   "lib/help/content.ts",
-  "lib/intelligence/layer.ts",
-  "lib/intelligence/prestige.ts"
+  "lib/intelligence/layer.ts"
 ];
 for (const file of appFiles) assert.doesNotMatch(read(file), /\/app\/files(?:\?|"|`)/, `${file} must not generate a legacy Files URL`);
 

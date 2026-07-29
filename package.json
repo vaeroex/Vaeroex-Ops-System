@@ -39,6 +39,7 @@
     "test:people-retirement": "node scripts/people-page-retirement-regression-tests.js",
     "test:checklist-intelligence-retirement": "node scripts/checklist-intelligence-retirement-regression-tests.js",
     "test:checklist-ui-retirement": "node scripts/checklist-ui-retirement-regression-tests.js",
+    "test:prestige-retirement": "node scripts/prestige-retirement-regression-tests.js",
     "test:executive-brief": "node scripts/executive-brief-regression-tests.js",
     "test:finding-explanation": "node scripts/finding-explanation-regression-tests.js",
     "test:executive-kpi-analysis-retirement": "node scripts/executive-kpi-analysis-retirement-regression-tests.js",
