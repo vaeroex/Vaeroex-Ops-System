@@ -1,4 +1,8 @@
 import type { EvidenceManifest } from "@/lib/ai/evidence-engine/contracts";
+import type {
+  ContextualEvidenceAuthorityV1,
+  ProjectedContextualEvidenceV1
+} from "@/lib/intelligence/snapshot/v1/projections";
 
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID = "business_health_explanation_v1" as const;
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION = "business_health_explanation_v1" as const;
@@ -86,6 +90,8 @@ export type BusinessHealthExplanationPackage = Readonly<{
   requiredCitationIds: readonly number[];
   citations: readonly BusinessHealthCitationView[];
   hypothesisAllowed: false;
+  contextualEvidence?: readonly ProjectedContextualEvidenceV1[];
+  contextAuthority?: ContextualEvidenceAuthorityV1;
 }>;
 
 export type BusinessHealthProviderAttribution = Readonly<{

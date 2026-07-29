@@ -1,5 +1,6 @@
 import { deepFreeze } from "@/lib/ai/evidence-engine/immutability";
 import { adaptCoverageProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/adapters/coverage";
+import { adaptContextualEvidenceProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/adapters/contextual-evidence";
 import { adaptEvidenceManifestProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/adapters/evidence";
 import { adaptIntelligenceLayerProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/adapters/intelligence-layer";
 import { adaptKpiProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/adapters/kpis";
@@ -8,6 +9,7 @@ import { fingerprintSemanticSnapshot, fingerprintSnapshotInputs } from "@/lib/in
 import { assertIntelligenceSnapshotV1Invariants } from "@/lib/intelligence/snapshot/v1/invariants";
 import {
   orderCitations,
+  orderContextualEvidence,
   orderCoverageCategories,
   orderEvidenceReferences,
   orderFindings,
@@ -23,6 +25,7 @@ import {
 import { unavailable } from "@/lib/intelligence/snapshot/v1/state";
 import type {
   CoverageProducerOutputV1,
+  ContextualEvidenceProducerOutputV1,
   EvidenceManifestProducerOutputV1,
   IntelligenceLayerProducerOutputV1,
   IntelligenceProducerEnvelopeV1,
@@ -40,6 +43,7 @@ import {
   KPI_DETERMINISTIC_PRODUCER_ID,
   COVERAGE_PRODUCER_ID,
   EVIDENCE_MANIFEST_PRODUCER_ID,
+  CONTEXTUAL_EVIDENCE_PRODUCER_ID,
   DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1,
   INTELLIGENCE_SNAPSHOT_BUILDER_VERSION,
   INTELLIGENCE_SNAPSHOT_CONTRACT_ID,
@@ -61,6 +65,7 @@ export type BuildIntelligenceSnapshotV1Input = Readonly<{
   kpis?: IntelligenceProducerEnvelopeV1<KpiProducerOutputV1>;
   coverage?: IntelligenceProducerEnvelopeV1<CoverageProducerOutputV1>;
   evidenceManifests?: IntelligenceProducerEnvelopeV1<EvidenceManifestProducerOutputV1>;
+  contextualEvidence?: IntelligenceProducerEnvelopeV1<ContextualEvidenceProducerOutputV1>;
 }>;
 
 function nowMs() {
@@ -152,6 +157,14 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
       }
     }
   }
+  if (input.contextualEvidence) {
+    assertEnvelope({
+      envelope: input.contextualEvidence,
+      expectedProducerId: CONTEXTUAL_EVIDENCE_PRODUCER_ID,
+      workspaceId: input.workspaceId,
+      asOf: input.asOf
+    });
+  }
 
   const adapterStartedAt = nowMs();
   const layer: ReturnType<typeof adaptIntelligenceLayerProducerOutputV1> = input.intelligenceLayer
@@ -189,6 +202,15 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
   const manifestEvidence = input.evidenceManifests
     ? adaptEvidenceManifestProducerOutputV1(input.evidenceManifests.output)
     : { references: [], citations: [], sourceRegistryVersions: [] };
+  const contextualEvidence = input.contextualEvidence
+    ? adaptContextualEvidenceProducerOutputV1({
+        output: input.contextualEvidence.output,
+        workspaceId: input.workspaceId,
+        asOf: input.asOf,
+        evaluationDate: input.evaluationDate
+      })
+    : null;
+  const hasContextualEvidence = Boolean(contextualEvidence?.length);
   const adapterMs = nowMs() - adapterStartedAt;
 
   const limitations: SnapshotLimitationV1[] = [
@@ -210,7 +232,8 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
     ...(input.intelligenceLayer ? [producerReceipt(input.intelligenceLayer)] : []),
     ...(input.kpis ? [producerReceipt(input.kpis)] : []),
     ...(input.coverage ? [producerReceipt(input.coverage)] : []),
-    ...(input.evidenceManifests ? [producerReceipt(input.evidenceManifests)] : [])
+    ...(input.evidenceManifests ? [producerReceipt(input.evidenceManifests)] : []),
+    ...(input.contextualEvidence && hasContextualEvidence ? [producerReceipt(input.contextualEvidence)] : [])
   ];
 
   const orderingStartedAt = nowMs();
@@ -257,6 +280,7 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
       citations: orderedCitations,
       sourceRegistryVersions: [...manifestEvidence.sourceRegistryVersions].sort()
     },
+    ...(contextualEvidence && hasContextualEvidence ? { contextualEvidence: orderContextualEvidence(contextualEvidence) } : {}),
     limitations: orderLimitations(limitations),
     provenance: orderProvenance(provenance)
   };

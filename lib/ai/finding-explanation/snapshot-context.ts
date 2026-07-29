@@ -16,7 +16,11 @@ export type FindingExplanationSnapshotParityV1 = Readonly<{
 }>;
 
 function packagesMatch(left: FindingExplanationPackage, right: FindingExplanationPackage) {
-  return canonicalSnapshotJson(left) === canonicalSnapshotJson(right);
+  const deterministicPackage = (value: FindingExplanationPackage) => {
+    const { fingerprint: _fingerprint, contextualEvidence: _contextualEvidence, contextAuthority: _contextAuthority, ...deterministic } = value;
+    return deterministic;
+  };
+  return canonicalSnapshotJson(deterministicPackage(left)) === canonicalSnapshotJson(deterministicPackage(right));
 }
 
 function legacyFallback({
@@ -70,7 +74,7 @@ export function buildFindingExplanationFromSnapshotV1({
       finding: projection.finding.value,
       legacyInsight: insight
     });
-    const analysisPackage = buildFindingExplanationPackage({ workspaceId, insight: projectedInsight, now });
+    const analysisPackage = buildFindingExplanationPackage({ workspaceId, insight: projectedInsight, now, projection });
     let parity: FindingExplanationSnapshotParityV1 = {
       status: "exact",
       classification: "exact",

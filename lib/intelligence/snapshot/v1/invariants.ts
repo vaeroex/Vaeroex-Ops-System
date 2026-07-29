@@ -28,6 +28,11 @@ function contextualSource(reference: EvidenceReferenceV1) {
     || /business[ _-]?(?:note|memory)/i.test(`${reference.recordType} ${reference.sourceType}`);
 }
 
+function businessNoteContextSource(reference: EvidenceReferenceV1) {
+  return reference.authorityRole === "supporting_context"
+    || /business[ _-]?note/i.test(`${reference.recordType} ${reference.sourceType}`);
+}
+
 function savedAnalysisSource(reference: EvidenceReferenceV1) {
   return /saved[ _-]?analysis/i.test(`${reference.recordType} ${reference.sourceType} ${reference.recordId}`);
 }
@@ -118,6 +123,7 @@ export function assertIntelligenceSnapshotV1Invariants(snapshot: IntelligenceSna
   check(snapshot.findings.length <= INTELLIGENCE_SNAPSHOT_LIMITS.findings, "finding limit exceeded");
   check(snapshot.evidence.references.length <= INTELLIGENCE_SNAPSHOT_LIMITS.evidenceReferences, "evidence reference limit exceeded");
   check(snapshot.evidence.citations.length <= INTELLIGENCE_SNAPSHOT_LIMITS.citations, "citation limit exceeded");
+  check((snapshot.contextualEvidence?.length || 0) <= INTELLIGENCE_SNAPSHOT_LIMITS.contextualEvidenceRecords, "contextual evidence limit exceeded");
 
   for (const receipt of snapshot.provenance) {
     check(receipt.workspaceId === snapshot.scope.workspaceId, `producer ${receipt.producerId} belongs to another workspace`);
@@ -154,6 +160,28 @@ export function assertIntelligenceSnapshotV1Invariants(snapshot: IntelligenceSna
     }
   }
 
+  const contextualRecords = snapshot.contextualEvidence || [];
+  check(new Set(contextualRecords.map((record) => record.id)).size === contextualRecords.length, "contextual evidence IDs must be unique");
+  check(new Set(contextualRecords.map((record) => record.sourceNoteId)).size === contextualRecords.length, "contextual evidence source-note IDs must be unique");
+  for (const record of contextualRecords) {
+    check(record.workspaceId === snapshot.scope.workspaceId, `contextual evidence ${record.id} belongs to another workspace`);
+    check(record.authorityRole === "supporting_context", `contextual evidence ${record.id} has deterministic authority`);
+    check(!record.originalEvidenceEligible, `contextual evidence ${record.id} was promoted to original evidence`);
+    check(record.lifecycle === "active" && record.validationState === "approved_review", `contextual evidence ${record.id} is not approved and active`);
+    check(Date.parse(record.approvedAt) <= Date.parse(snapshot.scope.asOf), `contextual evidence ${record.id} was approved after asOf`);
+    check(
+      !record.applicability.start || !record.applicability.end || record.applicability.start <= record.applicability.end,
+      `contextual evidence ${record.id} has an inverted applicable period`
+    );
+    check(!record.applicability.end || record.applicability.end >= snapshot.scope.evaluationDate, `contextual evidence ${record.id} is expired`);
+    const expectedTemporalStatus = !record.applicability.start && !record.applicability.end
+      ? "undated"
+      : record.applicability.start && record.applicability.start > snapshot.scope.evaluationDate
+        ? "upcoming"
+        : "applicable";
+    check(record.applicability.temporalStatus === expectedTemporalStatus, `contextual evidence ${record.id} has inconsistent temporal attribution`);
+  }
+
   const priorityRoles = snapshot.priorities.map((priority) => priority.role);
   check(new Set(priorityRoles).size === priorityRoles.length, "priority roles must be unique");
   for (const priority of snapshot.priorities) {
@@ -186,11 +214,15 @@ export function assertIntelligenceSnapshotV1Invariants(snapshot: IntelligenceSna
   for (const finding of snapshot.findings) {
     for (const evidenceId of finding.deterministicDependencies.evidenceReferenceIds) {
       check(evidenceIds.has(evidenceId), `finding ${finding.id} references missing evidence ${evidenceId}`);
+      const reference = snapshot.evidence.references.find((candidate) => candidate.id === evidenceId);
+      check(!reference || !businessNoteContextSource(reference), `finding ${finding.id} depends on Business Note context ${evidenceId}`);
     }
   }
   for (const kpi of snapshot.kpis) {
     for (const evidenceId of kpi.evidenceReferenceIds) {
       check(evidenceIds.has(evidenceId), `KPI ${kpi.id} references missing evidence ${evidenceId}`);
+      const reference = snapshot.evidence.references.find((candidate) => candidate.id === evidenceId);
+      check(!reference || !businessNoteContextSource(reference), `KPI ${kpi.id} depends on Business Note context ${evidenceId}`);
     }
   }
 

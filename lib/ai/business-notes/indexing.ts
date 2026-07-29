@@ -110,7 +110,7 @@ export async function indexApprovedBusinessNote({
       release_channel: note.release_channel,
       evidence_classification: "business_evidence",
       evidence_lifecycle: "active",
-      evidence_role: "supporting",
+      evidence_role: "supporting_context",
       evidence_treatment: "contextual",
       proposed_evidence_treatment: extraction.evidenceTreatment,
       original_evidence_eligible: false,

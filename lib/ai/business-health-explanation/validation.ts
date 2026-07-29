@@ -5,6 +5,10 @@ import type {
   BusinessHealthExplanationModelOutput,
   BusinessHealthExplanationPackage
 } from "@/lib/ai/business-health-explanation/contracts";
+import {
+  contextualEvidenceGroundingText,
+  unattributedContextField
+} from "@/lib/ai/business-notes/reasoning-context";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import { validationFailure, validationValueType } from "@/lib/ai/validation-diagnostics";
@@ -120,7 +124,7 @@ export function validateBusinessHealthExplanationOutput(
     });
   }
 
-  const approvedFactText = JSON.stringify({
+  const deterministicFactText = JSON.stringify({
     score: context.facts.score,
     comparisonDelta: context.facts.comparisonDelta,
     dataQualityBase: context.facts.dataQualityBase,
@@ -131,6 +135,10 @@ export function validateBusinessHealthExplanationOutput(
       fact: driver.fact
     }))
   });
+  const approvedFactText = JSON.stringify({
+    deterministicFacts: deterministicFactText,
+    reportedContext: contextualEvidenceGroundingText(context.contextualEvidence || [])
+  });
   const approvedNumbers = new Set(numericClaims(approvedFactText).map(normalizeNumber));
   const unsupportedNumber = numericClaims(text).find((claim) => !approvedNumbers.has(normalizeNumber(claim)));
   if (unsupportedNumber) {
@@ -138,6 +146,25 @@ export function validateBusinessHealthExplanationOutput(
       reasonCode: "numeric_integrity_failed",
       stage: "numeric_integrity",
       expectedField: "$",
+      expectedType: "string",
+      observedType: "string"
+    });
+  }
+  const unattributedContext = unattributedContextField({
+    outputFields: {
+      executive_interpretation: output.executive_interpretation,
+      why_it_matters: output.why_it_matters,
+      leadership_consideration: output.leadership_consideration,
+      provisional_hypothesis: output.provisional_hypothesis || ""
+    },
+    deterministicText: deterministicFactText,
+    contextualEvidence: context.contextualEvidence || []
+  });
+  if (unattributedContext) {
+    return validationFailure("Business Note context must remain explicitly attributed as unverified reported context.", {
+      reasonCode: "unsupported_relationship",
+      stage: "relationship_support",
+      expectedField: unattributedContext,
       expectedType: "string",
       observedType: "string"
     });

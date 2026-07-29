@@ -16,6 +16,7 @@ import {
   type FindingExplanationPackage
 } from "@/lib/ai/finding-explanation/contracts";
 import type { IntelligenceEvidenceRecord, IntelligenceInsight } from "@/lib/intelligence/layer";
+import type { FindingExplanationProjectionV1 } from "@/lib/intelligence/snapshot/v1/projections";
 
 const MAX_EVIDENCE_RECORDS = 8;
 const STALE_AFTER_DAYS = 45;
@@ -115,12 +116,17 @@ function uniqueStrings(values: readonly (string | null | undefined)[]) {
 export function buildFindingExplanationPackage({
   workspaceId,
   insight,
-  now = new Date()
+  now = new Date(),
+  projection
 }: {
   workspaceId: string;
   insight: IntelligenceInsight;
   now?: Date;
+  projection?: FindingExplanationProjectionV1;
 }): FindingExplanationPackage {
+  if (projection && projection.workspaceId !== workspaceId) {
+    throw new Error("Finding explanation projection belongs to another workspace.");
+  }
   const records = eligibleRecords(insight);
   const candidates = records.map((record, index) => candidateFromRecord({ workspaceId, insight, record, baseRank: index + 1 }));
   const sourceRegistry = buildSourceRegistry({ workspaceId, candidates });
@@ -180,6 +186,7 @@ export function buildFindingExplanationPackage({
     freshness: !latestEvidenceAt ? "unavailable" as const : ageDays !== null && ageDays > STALE_AFTER_DAYS ? "stale" as const : "current" as const,
     independentSourceCount: sourceRegistry.independentOriginalSourceCount
   };
+  const contextualEvidence = projection?.contextualEvidence || [];
   const fingerprint = evidenceEngineHash({
     contractId: FINDING_EXPLANATION_CONTRACT_ID,
     contractVersion: FINDING_EXPLANATION_CONTRACT_VERSION,
@@ -193,7 +200,13 @@ export function buildFindingExplanationPackage({
       lineageVersion: candidate.provenance.lineageVersion,
       lifecycleState: candidate.eligibility.lifecycleState,
       eligibilityDecisionVersion: candidate.eligibility.decisionVersion
-    })).sort((left, right) => left.candidateId.localeCompare(right.candidateId))
+    })).sort((left, right) => left.candidateId.localeCompare(right.candidateId)),
+    ...(contextualEvidence.length ? {
+      contextualEvidence: {
+        authority: projection?.contextAuthority,
+        records: contextualEvidence
+      }
+    } : {})
   });
 
   return {
@@ -204,6 +217,10 @@ export function buildFindingExplanationPackage({
     facts,
     manifest,
     requiredCitationIds,
-    citations
+    citations,
+    ...(contextualEvidence.length ? {
+      contextualEvidence,
+      contextAuthority: projection?.contextAuthority
+    } : {})
   };
 }

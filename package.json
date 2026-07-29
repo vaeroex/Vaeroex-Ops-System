@@ -44,6 +44,7 @@
     "test:finding-explanation": "node scripts/finding-explanation-regression-tests.js",
     "test:executive-kpi-analysis-retirement": "node scripts/executive-kpi-analysis-retirement-regression-tests.js",
     "test:business-notes": "node scripts/business-notes-regression-tests.js",
+    "test:business-notes-context": "node scripts/business-notes-contextual-integration-regression-tests.js",
     "test:workspace-agreement": "node scripts/workspace-agreement-regression-tests.js",
     "test:kpi-semantics": "node scripts/kpi-semantics-regression-tests.js && node scripts/kpi-target-persistence-integration-tests.js",
     "test:intelligence-snapshot": "node scripts/intelligence-snapshot-v1-regression-tests.js",
