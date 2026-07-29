@@ -9,6 +9,7 @@ export const SAVED_ANALYSIS_TYPES = [
 ] as const;
 
 export type SavedAnalysisType = (typeof SAVED_ANALYSIS_TYPES)[number];
+export type SaveableAnalysisType = Exclude<SavedAnalysisType, "executive_brief">;
 export type SavedAnalysisConfidence = "High" | "Medium" | "Low";
 export type SavedAnalysisFreshness = "current" | "stale" | "unavailable";
 export type SavedAnalysisReleaseChannel = "production" | "preview" | "development";

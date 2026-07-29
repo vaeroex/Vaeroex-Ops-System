@@ -14,8 +14,8 @@ const runner = read("lib/ai/qualification/stage-one.ts");
 const types = read("lib/ai/qualification/types.ts");
 
 assert.match(types, /business_health_explanation_v1/);
-assert.match(types, /executive_brief_benchmark_v1/);
 assert.match(types, /leadership_priorities_benchmark_v1/);
+assert.doesNotMatch(types, /executive_brief_benchmark_v1/);
 assert.doesNotMatch(types, /deep_strategic_analysis/, "Deep Strategic Analysis must not consume Stage 1 benchmark budget");
 
 for (const model of [
@@ -41,7 +41,7 @@ assert.match(contracts, /validateBusinessHealthExplanationOutput/, "Business Hea
 assert.match(contracts, /buildEvidenceManifest/, "fixtures must use an immutable Evidence Engine manifest");
 assert.match(contracts, /buildSourceRegistry/, "fixtures must preserve application-owned source identity");
 assert.match(contracts, /citations_attached_after_validation:\s*true/, "models must not own citation IDs");
-assert.match(contracts, /Do not invent causes, impacts, forecasts/, "planned contracts must keep semantic boundaries explicit");
+assert.match(contracts, /Do not create facts, causes, impacts, forecasts/, "active contracts must keep semantic boundaries explicit");
 
 assert.match(client, /stream:\s*true/, "NVIDIA probes must expose first-token timing where transport supports streaming");
 assert.match(client, /controller\.abort\(\)/, "each isolated probe must enforce its own timeout");

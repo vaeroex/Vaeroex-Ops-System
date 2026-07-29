@@ -131,8 +131,7 @@ export async function GET(request: Request) {
     assemblyModes: STAGE_THREE_B_ASSEMBLY_MODES,
     workflowDeadlinesMs: {
       business_health_explanation_v1: 30_000,
-      leadership_priorities_v1: 60_000,
-      executive_brief_v1: 90_000
+      leadership_priorities_v1: 60_000
     },
     isolatedAttempts: 1,
     fallbackEnabled: false,

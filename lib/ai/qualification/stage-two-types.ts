@@ -14,7 +14,6 @@ import type {
 
 export const STAGE_TWO_CONTRACT_IDS = [
   "business_health_explanation_v1",
-  "executive_brief_v1",
   "leadership_priorities_v1"
 ] as const;
 

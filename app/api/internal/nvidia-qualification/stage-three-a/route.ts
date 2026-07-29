@@ -87,7 +87,7 @@ export async function GET(request: Request) {
     totalExecutions: STAGE_THREE_A_PROFILE_IDS.length * STAGE_THREE_A_FIXTURES.length * STAGE_THREE_A_RETRIEVAL_PATHS.length * 4,
     totalJobDeadlineMs: 90_000,
     activeRetrievalChanged: false,
-    excluded: ["executive_brief_v1", "deep_strategic_analysis", "production_routing"]
+    excluded: ["deep_strategic_analysis", "production_routing"]
   }));
 }
 

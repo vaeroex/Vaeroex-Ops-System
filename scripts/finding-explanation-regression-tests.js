@@ -42,7 +42,6 @@ const {
   BUSINESS_HEALTH_GPT56_POLICY_SELECTOR,
   FINDING_EXPLANATION_POLICY_SELECTOR,
   FINDING_EXPLANATION_GPT56_POLICY_ID,
-  isExecutiveBriefPreviewEnabled,
   isFindingExplanationEnabled,
   resolveBusinessHealthGenerationPolicy,
   resolveFindingExplanationGenerationPolicy
@@ -145,7 +144,6 @@ try {
   delete process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
   process.env.VAEROEX_FINDING_EXPLANATION_POLICY = FINDING_EXPLANATION_POLICY_SELECTOR;
   assert.equal(isFindingExplanationEnabled(), true, "the dedicated finding policy must activate independently in Production");
-  assert.equal(isExecutiveBriefPreviewEnabled(), false, "the finding policy must not activate Executive Brief");
   assert.equal(resolveBusinessHealthGenerationPolicy({
     startedAtMs: Date.now(),
     structuredOutput: { name: "business_health_explanation_v1", strict: true, schema: { type: "object" } }
@@ -160,8 +158,6 @@ try {
   process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
   delete process.env.VAEROEX_FINDING_EXPLANATION_POLICY;
   assert.equal(isFindingExplanationEnabled(), false, "the shared executive policy must not activate Explain Finding");
-  process.env.VERCEL_ENV = "preview";
-  assert.equal(isExecutiveBriefPreviewEnabled(), true, "Executive Brief must retain its existing independent Preview gate");
 } finally {
   if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
   else process.env.VERCEL_ENV = originalVercelEnv;

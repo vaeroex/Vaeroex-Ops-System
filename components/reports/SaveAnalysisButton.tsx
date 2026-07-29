@@ -7,7 +7,7 @@ import {
   getSavedAnalysisState,
   saveAnalysisAction
 } from "@/app/app/reports/saved-analysis-actions";
-import type { SavedAnalysisType } from "@/lib/reports/saved-analysis";
+import type { SaveableAnalysisType } from "@/lib/reports/saved-analysis";
 
 export function SaveAnalysisButton({
   analysisType,
@@ -15,7 +15,7 @@ export function SaveAnalysisButton({
   generatedAt,
   light = false
 }: {
-  analysisType: SavedAnalysisType;
+  analysisType: SaveableAnalysisType;
   fingerprint: string;
   generatedAt: string;
   light?: boolean;

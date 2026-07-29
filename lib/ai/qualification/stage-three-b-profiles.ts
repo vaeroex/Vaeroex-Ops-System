@@ -14,8 +14,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     deterministicAssemblyEligible: false,
     workflows: {
       business_health_explanation_v1: { timeoutMs: 30_000, maxOutputTokens: 2_000, temperature: 0, topP: 1, reasoningEffort: "low", reasoningMode: "standard" },
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 4_000, temperature: 0, topP: 1, reasoningEffort: "medium", reasoningMode: "standard" },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 6_000, temperature: 0, topP: 1, reasoningEffort: "medium", reasoningMode: "standard" }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 4_000, temperature: 0, topP: 1, reasoningEffort: "medium", reasoningMode: "standard" }
     }
   },
   {
@@ -27,8 +26,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     deterministicAssemblyEligible: false,
     workflows: {
       business_health_explanation_v1: { timeoutMs: 30_000, maxOutputTokens: 2_500, temperature: 0, topP: 1, reasoningEffort: "medium", reasoningMode: "standard" },
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 5_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "standard" },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 7_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "standard" }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 5_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "standard" }
     }
   },
   {
@@ -40,8 +38,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     deterministicAssemblyEligible: true,
     workflows: {
       business_health_explanation_v1: { timeoutMs: 30_000, maxOutputTokens: 2_500, temperature: 0, topP: 1, reasoningEffort: "low", reasoningMode: "standard" },
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 6_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "standard" },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 8_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "standard" }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 6_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "standard" }
     }
   },
   {
@@ -52,8 +49,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     label: "GPT-5.6 Sol pro mode",
     deterministicAssemblyEligible: true,
     workflows: {
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 8_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "pro" },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 10_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "pro" }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 8_000, temperature: 0, topP: 1, reasoningEffort: "high", reasoningMode: "pro" }
     }
   },
   {
@@ -65,8 +61,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     deterministicAssemblyEligible: true,
     workflows: {
       business_health_explanation_v1: { timeoutMs: 30_000, maxOutputTokens: 2_048, temperature: 0, topP: 1, requestExtensions: nvidiaDisabled },
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 4_096, temperature: 0, topP: 1, requestExtensions: nvidiaDisabled },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 6_144, temperature: 0, topP: 1, requestExtensions: nvidiaDisabled }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 4_096, temperature: 0, topP: 1, requestExtensions: nvidiaDisabled }
     }
   },
   {
@@ -77,8 +72,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     label: "Nemotron 3 Ultra 550B bounded reasoning",
     deterministicAssemblyEligible: true,
     workflows: {
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 8_192, temperature: 1, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 4_096 } },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 16_384, temperature: 1, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 8_192 } }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 8_192, temperature: 1, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 4_096 } }
     }
   },
   {
@@ -90,8 +84,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     deterministicAssemblyEligible: true,
     workflows: {
       business_health_explanation_v1: { timeoutMs: 30_000, maxOutputTokens: 4_096, temperature: 0.6, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 2_048 } },
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 8_192, temperature: 1, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 4_096 } },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 16_384, temperature: 1, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 8_192 } }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 8_192, temperature: 1, topP: 0.95, requestExtensions: { chat_template_kwargs: { enable_thinking: true }, reasoning_budget: 4_096 } }
     }
   },
   {
@@ -103,8 +96,7 @@ export const STAGE_THREE_B_PROFILES: readonly StageThreeBProfile[] = [
     deterministicAssemblyEligible: false,
     workflows: {
       business_health_explanation_v1: { timeoutMs: 30_000, maxOutputTokens: 2_048, temperature: 0.1, topP: 1 },
-      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 4_096, temperature: 0.1, topP: 1 },
-      executive_brief_v1: { timeoutMs: 90_000, maxOutputTokens: 6_144, temperature: 0.1, topP: 1 }
+      leadership_priorities_v1: { timeoutMs: 60_000, maxOutputTokens: 4_096, temperature: 0.1, topP: 1 }
     }
   }
 ] as const;

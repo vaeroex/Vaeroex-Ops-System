@@ -46,7 +46,7 @@ assert.match(generation, /effectiveReasoningMode:\s*payload\.reasoning\?\.mode \
 assert.match(generation, /reasoningTokens/);
 assert.doesNotMatch(generation, /runStructuredAI|provider-manager|providerPolicy/);
 
-for (const deadline of ["30_000", "60_000", "90_000"]) {
+for (const deadline of ["30_000", "60_000"]) {
   assert.match(profiles, new RegExp(`timeoutMs: ${deadline}`));
   assert.match(route, new RegExp(deadline));
 }
@@ -60,18 +60,17 @@ assert.match(profiles, /reasoning_budget/);
 
 for (const contract of [
   "business_health_explanation_v1",
-  "leadership_priorities_v1",
-  "executive_brief_v1"
+  "leadership_priorities_v1"
 ]) {
   assert.match(profiles, new RegExp(contract));
 }
+assert.doesNotMatch(profiles, /executive_brief_v1/);
 assert.match(types, /one_pass/);
 assert.match(types, /deterministic_assembly/);
 assert.match(runner, /deterministicAssembly/);
 assert.match(runner, /covered_signal_ordinals/);
 assert.doesNotMatch(generation, /uniqueItems/, "OpenAI strict schemas must not use the unsupported uniqueItems keyword");
-assert.match(runner, /primary_concern_ordinal/);
-assert.match(runner, /strongest_positive_signal_ordinal/);
+assert.doesNotMatch(runner, /primary_concern_ordinal|strongest_positive_signal_ordinal/);
 assert.match(runner, /verifyEvidenceManifestCitations/);
 assert.match(runner, /numericIntegrity/);
 assert.match(runner, /requiredSignalCoverage/);
@@ -83,13 +82,12 @@ assert.match(runner, /nvidia_prototype_credit_no_token_price/);
 assert.doesNotMatch(runner, /fallback|runStructuredAI|providerPolicy/i);
 
 assert.equal((fixtures.match(/id: "bh-/g) || []).length, 8);
-assert.equal((fixtures.match(/id: "brief-/g) || []).length, 11);
 assert.equal((fixtures.match(/id: "priorities-/g) || []).length, 9);
+assert.doesNotMatch(fixtures, /executive_brief_v1|id: "brief-/);
 assert.match(fixtures, /required_signal_identity/);
-assert.match(fixtures, /primary_concern_required/);
-assert.match(fixtures, /strongest_positive_signal_required/);
-assert.match(fixtures, /do not manufacture upside/i);
-assert.match(fixtures, /Do not repeat the same signal merely to satisfy multiple fields/);
+assert.doesNotMatch(fixtures, /primary_concern_required|strongest_positive_signal_required|manufacture upside/i);
+assert.match(fixtures, /priorities must be a JSON array containing exactly three objects in ordinal order/);
+assert.match(fixtures, /Do not invent causes, impacts, urgency, forecasts/);
 
 for (const surface of [route, page]) {
   assert.match(surface, /process\.env\.VERCEL_ENV === "preview"/);

@@ -13,7 +13,6 @@ export const BUSINESS_HEALTH_GPT56_POLICY_SELECTOR = "gpt56_sol_terra_v1" as con
 export const BUSINESS_HEALTH_GPT56_POLICY_ID = "business_health_preview_gpt56_sol_terra_v1" as const;
 export const BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5.6-sol" as const;
 export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
-export const EXECUTIVE_BRIEF_GPT56_POLICY_ID = "executive_brief_preview_gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
 export const BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR = "gpt56_luna_terra_v1" as const;
@@ -30,11 +29,6 @@ const BUSINESS_HEALTH_LEGACY_OPENAI_TIMEOUT_MS = 8_500;
 const BUSINESS_HEALTH_GPT56_DEADLINE_MS = 90_000;
 const BUSINESS_HEALTH_GPT56_ATTEMPT_TIMEOUT_MS = 30_000;
 const BUSINESS_HEALTH_GPT56_MAX_OUTPUT_TOKENS = 2_500;
-export const EXECUTIVE_BRIEF_GPT56_DEADLINE_MS = 90_000;
-export const EXECUTIVE_BRIEF_GPT56_SOL_TIMEOUT_MS = 52_000;
-export const EXECUTIVE_BRIEF_GPT56_TERRA_TIMEOUT_MS = 30_000;
-export const EXECUTIVE_BRIEF_GPT56_SOL_OUTPUT_TOKENS = 8_000;
-export const EXECUTIVE_BRIEF_GPT56_TERRA_OUTPUT_TOKENS = 7_000;
 const FINDING_EXPLANATION_GPT56_DEADLINE_MS = 75_000;
 const FINDING_EXPLANATION_GPT56_SOL_TIMEOUT_MS = 42_000;
 const FINDING_EXPLANATION_GPT56_TERRA_TIMEOUT_MS = 25_000;
@@ -66,15 +60,15 @@ export type BusinessHealthGenerationPolicy = Readonly<{
   requestMaxOutputTokens: number;
 }>;
 
-export type ExecutiveBriefGenerationPolicy = Readonly<{
+export type StructuredWorkflowGenerationPolicy = Readonly<{
   providerPolicy: AIProviderRoutingPolicy;
   executionBudget: AIProviderExecutionBudget;
   requestTimeoutMs: number;
   requestMaxOutputTokens: number;
 }>;
 
-export type FindingExplanationGenerationPolicy = ExecutiveBriefGenerationPolicy;
-export type BusinessNoteExtractionGenerationPolicy = ExecutiveBriefGenerationPolicy;
+export type FindingExplanationGenerationPolicy = StructuredWorkflowGenerationPolicy;
+export type BusinessNoteExtractionGenerationPolicy = StructuredWorkflowGenerationPolicy;
 
 export const BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS = [
   "timeout",
@@ -87,11 +81,6 @@ export const BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS = [
   "unsupported_inference",
   "provider_refusal"
 ] as const satisfies readonly AIProviderFallbackReason[];
-
-export function isExecutiveBriefPreviewEnabled() {
-  return process.env.VERCEL_ENV === "preview"
-    && process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
-}
 
 export function isFindingExplanationEnabled() {
   return process.env.VAEROEX_FINDING_EXPLANATION_POLICY === FINDING_EXPLANATION_POLICY_SELECTOR;
@@ -276,68 +265,6 @@ export function resolveBusinessHealthGenerationPolicy({
     },
     requestTimeoutMs: BUSINESS_HEALTH_LEGACY_NVIDIA_TIMEOUT_MS,
     requestMaxOutputTokens: 420
-  };
-}
-
-export function resolveExecutiveBriefGenerationPolicy({
-  startedAtMs,
-  structuredOutput
-}: {
-  startedAtMs: number;
-  structuredOutput: AIProviderStructuredOutput;
-}): ExecutiveBriefGenerationPolicy {
-  if (!isExecutiveBriefPreviewEnabled()) {
-    throw new Error("Executive Brief generation is not enabled for this environment.");
-  }
-
-  return {
-    providerPolicy: {
-      id: EXECUTIVE_BRIEF_GPT56_POLICY_ID,
-      fallbackOn: BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
-      steps: [
-        {
-          provider: "openai",
-          model: BUSINESS_HEALTH_GPT56_SOL_MODEL,
-          workflowConfiguration: {
-            timeoutMs: EXECUTIVE_BRIEF_GPT56_SOL_TIMEOUT_MS,
-            maxAttempts: 1,
-            maxOutputTokens: EXECUTIVE_BRIEF_GPT56_SOL_OUTPUT_TOKENS,
-            temperature: null,
-            topP: null,
-            reasoning: { mode: "standard", effort: "high" },
-            structuredOutput,
-            store: false,
-            stream: false
-          }
-        },
-        {
-          provider: "openai",
-          model: BUSINESS_HEALTH_GPT56_TERRA_MODEL,
-          minimumRemainingMs: 10_000,
-          workflowConfiguration: {
-            timeoutMs: EXECUTIVE_BRIEF_GPT56_TERRA_TIMEOUT_MS,
-            maxAttempts: 1,
-            maxOutputTokens: EXECUTIVE_BRIEF_GPT56_TERRA_OUTPUT_TOKENS,
-            temperature: null,
-            topP: null,
-            reasoning: { mode: "standard", effort: "high" },
-            structuredOutput,
-            store: false,
-            stream: false
-          }
-        }
-      ]
-    },
-    executionBudget: {
-      deadlineAtMs: startedAtMs + EXECUTIVE_BRIEF_GPT56_DEADLINE_MS,
-      providerTimeoutMs: { openai: EXECUTIVE_BRIEF_GPT56_SOL_TIMEOUT_MS },
-      minimumAttemptWindowMs: { openai: 10_000 },
-      fallbackReserveMs: EXECUTIVE_BRIEF_GPT56_TERRA_TIMEOUT_MS + 1_000,
-      reserveFallbackForPrimary: true,
-      transitionReserveMs: 1_000
-    },
-    requestTimeoutMs: EXECUTIVE_BRIEF_GPT56_SOL_TIMEOUT_MS,
-    requestMaxOutputTokens: EXECUTIVE_BRIEF_GPT56_SOL_OUTPUT_TOKENS
   };
 }
 

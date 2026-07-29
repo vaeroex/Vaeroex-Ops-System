@@ -12,9 +12,9 @@ const page = read("app/app/admin/nvidia-qualification/stage-two/page.tsx");
 
 for (const contract of [
   "business_health_explanation_v1",
-  "executive_brief_v1",
   "leadership_priorities_v1"
 ]) assert.match(types, new RegExp(contract));
+assert.doesNotMatch(types, /executive_brief_v1/);
 
 for (const excluded of [
   "biggest_risk_v1",
@@ -40,8 +40,8 @@ assert.match(fixtures, /tradeoff as either a JSON string or null/);
 assert.match(fixtures, /uncertainty must be a complete sentence of at least 15 characters/);
 assert.match(fixtures, /Do not omit any field/);
 assert.equal((fixtures.match(/id: "bh-/g) || []).length, 8, "Stage 2 must freeze eight Business Health states");
-assert.equal((fixtures.match(/id: "brief-/g) || []).length, 11, "Stage 3B must retain eleven Executive Brief states");
 assert.equal((fixtures.match(/id: "priorities-/g) || []).length, 9, "Stage 3B must retain nine Leadership Priorities states");
+assert.doesNotMatch(fixtures, /executive_brief_v1|id: "brief-/);
 
 assert.match(runner, /timeoutMs: fixture\.timeoutMs/);
 assert.match(runner, /blindQualityScore/);

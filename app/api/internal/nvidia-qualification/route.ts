@@ -157,7 +157,6 @@ export async function GET(request: Request) {
     benchmarkVersion: "nvidia_capability_stage_1_v1",
     scope: [
       "business_health_explanation_v1",
-      "executive_brief_benchmark_v1",
       "leadership_priorities_benchmark_v1"
     ],
     excluded: ["deep_strategic_analysis"],

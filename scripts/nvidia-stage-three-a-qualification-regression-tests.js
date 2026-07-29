@@ -13,7 +13,7 @@ const page = read("app/app/admin/nvidia-qualification/stage-three-a/page.tsx");
 for (const contract of ["business_health_explanation_v1", "leadership_priorities_v1"]) {
   assert.match(types, new RegExp(contract));
 }
-for (const excluded of ["executive_brief_v1", "deep_strategic_analysis"]) {
+for (const excluded of ["deep_strategic_analysis"]) {
   assert.doesNotMatch(types, new RegExp(excluded));
 }
 for (const profile of [
