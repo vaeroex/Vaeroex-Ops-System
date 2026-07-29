@@ -59,7 +59,6 @@ type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Ro
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
-type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 type RecommendationRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
@@ -74,7 +73,6 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Customer Evidence",
   "SOPs",
   "Checklists",
-  "People",
   "Learned Knowledge",
   "Diagnostics"
 ];
@@ -334,7 +332,6 @@ export async function GET(request: Request) {
     rawCrmLeads,
     sops,
     checklists,
-    people,
     decisions,
     recommendations,
     learnedKnowledgeCandidates,
@@ -436,18 +433,6 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(24)
     ).then((rows) => filterOriginalBusinessEvidence<ChecklistRow>(rows as ChecklistRow[]).slice(0, 6)),
-    scopedResults<PersonRow>(
-      includesDomain("people", "operations"),
-      () => supabase
-        .from("people")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .or(orFilter(["full_name", "email", "phone", "role_title", "department", "status", "notes"], words))
-        .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
     scopedResults<DecisionRow>(
       includesDomain("decisions", "priorities"),
       () => supabase
@@ -634,19 +619,6 @@ export async function GET(request: Request) {
       preview: truncate(checklist.description || compact([checklist.category, checklist.frequency, checklist.assigned_role])),
       href: hrefWithQuery("/app/checklists", checklist.name),
       meta: compact([checklist.category, checklist.frequency])
-    }))
-  );
-
-  addGroup(
-    groups,
-    "People",
-    people.map((person) => ({
-      id: person.id,
-      title: person.full_name,
-      sourceType: "Person",
-      preview: truncate(compact([person.email, person.phone, person.notes])),
-      href: hrefWithQuery("/app/people", person.full_name),
-      meta: compact([person.role_title, person.department, person.status])
     }))
   );
 
