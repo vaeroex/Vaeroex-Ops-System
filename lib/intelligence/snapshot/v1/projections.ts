@@ -117,9 +117,16 @@ export function projectBusinessHealthExplanationV1(snapshot: IntelligenceSnapsho
   });
   const findingEvidenceIds = new Set(drivers.flatMap((driver) => driver.finding.deterministicDependencies.evidenceReferenceIds));
   const citationEvidenceIds = new Set(snapshot.evidence.citations.map((citation) => citation.evidenceReferenceId));
-  const evidenceReferences = snapshot.evidence.references
-    .filter((reference) => findingEvidenceIds.has(reference.id) || citationEvidenceIds.has(reference.id))
+  const citationEvidenceReferences = snapshot.evidence.references
+    .filter((reference) => citationEvidenceIds.has(reference.id))
     .slice(0, 24);
+  const retainedCitationEvidenceIds = new Set(citationEvidenceReferences.map((reference) => reference.id));
+  const evidenceReferences = [
+    ...citationEvidenceReferences,
+    ...snapshot.evidence.references
+      .filter((reference) => findingEvidenceIds.has(reference.id) && !retainedCitationEvidenceIds.has(reference.id))
+      .slice(0, 24 - citationEvidenceReferences.length)
+  ];
   const projectedEvidenceIds = new Set(evidenceReferences.map((reference) => reference.id));
   return {
     ...header(snapshot),

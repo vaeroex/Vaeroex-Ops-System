@@ -263,6 +263,44 @@ assert.deepEqual(
   "the projection must preserve authoritative driver identity, classification, and impact"
 );
 assert.ok(snapshotComposition.receipt.performance.totalMs >= 0, "snapshot construction must expose nonsemantic performance measurements");
+
+const denseRisk = insight({
+  supportingRecords: Array.from({ length: 20 }, (_, index) => evidenceRecord({
+    id: `kpi:dense-${String(index).padStart(2, "0")}`,
+    title: `Dense KPI record ${index + 1}`,
+    sourceKey: `source-file:dense-${index + 1}`
+  }))
+});
+const denseOpportunity = {
+  ...opportunity,
+  supportingRecords: Array.from({ length: 20 }, (_, index) => evidenceRecord({
+    id: `kpi:dense-opportunity-${String(index).padStart(2, "0")}`,
+    title: `Dense opportunity KPI record ${index + 1}`,
+    sourceKey: `source-file:dense-opportunity-${index + 1}`
+  }))
+};
+const denseIntelligence = intelligence({
+  topRisk: denseRisk,
+  topOpportunity: denseOpportunity,
+  topRecommendation: denseRisk,
+  insights: [denseRisk, denseOpportunity]
+});
+const denseSnapshotComposition = buildBusinessHealthExplanationFromSnapshotV1({
+  workspaceId,
+  intelligence: denseIntelligence,
+  homepage: homepage(),
+  snapshots,
+  coverage: foundationCoverageOutput(),
+  sourceLabelsByKey: {},
+  asOf: now.toISOString()
+});
+assert.equal(denseSnapshotComposition.parity.status, "exact", "bounded deterministic references must not displace required manifest citations");
+assert.equal(denseSnapshotComposition.projection.evidenceReferences.length, 24, "dense projections must retain the fixed evidence-reference bound");
+assert.deepEqual(
+  new Set(denseSnapshotComposition.projection.citations.map((citation) => citation.id)),
+  new Set(denseSnapshotComposition.analysisPackage.manifest.evidence.map((entry) => `manifest:${denseSnapshotComposition.analysisPackage.manifest.manifestId}:citation:${entry.citationId}`)),
+  "every required Business Health manifest citation must remain represented in the bounded projection"
+);
 const laterSnapshotComposition = buildBusinessHealthExplanationFromSnapshotV1({
   workspaceId,
   intelligence: intelligence(),
