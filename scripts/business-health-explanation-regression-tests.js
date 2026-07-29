@@ -38,12 +38,15 @@ Module._load = function loadPatched(request, parent, isMain) {
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-business-health-regression-secret";
 
 const { buildBusinessHealthExplanationPackage } = require("../lib/ai/business-health-explanation/context.ts");
+const { buildBusinessHealthExplanationFromSnapshotV1 } = require("../lib/ai/business-health-explanation/snapshot-context.ts");
+const { businessHealthProviderRequestPayload } = require("../lib/ai/business-health-explanation/service.ts");
 const { validateBusinessHealthExplanationOutput } = require("../lib/ai/business-health-explanation/validation.ts");
 const {
   openBusinessHealthExplanationPackage,
   sealBusinessHealthExplanationPackage
 } = require("../lib/ai/business-health-explanation/token.ts");
 const { verifyEvidenceManifestCitations } = require("../lib/ai/evidence-engine/citation-verification.ts");
+const { foundationCoverageOutput } = require("../lib/intelligence/snapshot/v1/fixtures.ts");
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
@@ -114,18 +117,54 @@ const opportunity = insight({
 
 function intelligence(overrides = {}) {
   const risk = insight();
-  return {
+  const insights = overrides.insights || [risk, opportunity];
+  const base = {
     executiveSummary: "Revenue needs attention while retention remains supported.",
-    businessHealth: { available: true, score: 52, status: "Watch", trend: "Holding steady" },
+    businessHealth: {
+      available: true,
+      score: 52,
+      status: "Watch",
+      trend: "Holding steady",
+      components: {
+        dataQualityBase: 60,
+        riskPenalty: 12,
+        opportunityAdjustment: 4,
+        driverImpacts: [
+          {
+            findingId: insights.find((item) => ["Risk", "Bottleneck", "Anomaly"].includes(item.type)).id,
+            kind: "risk",
+            scoreImpact: -12
+          },
+          {
+            findingId: insights.find((item) => item.type === "Opportunity").id,
+            kind: "opportunity",
+            scoreImpact: 4
+          }
+        ]
+      }
+    },
     dataQuality: { score: 60, label: "Developing", confidence: "Medium", reason: "Eligible source coverage remains developing.", suggestedNextData: [] },
-    forecastReadiness: {},
+    forecastReadiness: {
+      state: "no_kpi_data",
+      label: "No KPI data",
+      reason: "No qualified KPI history is available.",
+      ready: false,
+      directional: false,
+      currentKpiCount: 0,
+      totalMeasurementCount: 0,
+      readyKpiCount: 0,
+      directionalKpiCount: 0,
+      historicalDepthLabel: "No KPI history",
+      freshnessLabel: "No current KPI measurements"
+    },
     topRisk: risk,
     topOpportunity: opportunity,
     topRecommendation: risk,
-    insights: [risk, opportunity],
+    insights,
     memorySummary: { profileSignals: 2, sourceRecords: 2, kpiHistoryRecords: 8, reports: 0, vaeroexRuns: 0, decisions: 0, recommendationOutcomes: 0 },
     ...overrides
   };
+  return { ...base, businessHealth: { ...base.businessHealth, ...(overrides.businessHealth || {}) } };
 }
 
 function homepage(overrides = {}) {
@@ -179,6 +218,125 @@ assert.equal(verifyEvidenceManifestCitations({
   citationIds: analysisPackage.requiredCitationIds,
   requiredCitationIds: analysisPackage.requiredCitationIds
 }).valid, true, "centralized Evidence Engine citation verification must pass");
+
+process.env.VERCEL_ENV = "preview";
+const snapshotComposition = buildBusinessHealthExplanationFromSnapshotV1({
+  workspaceId,
+  intelligence: intelligence(),
+  homepage: homepage(),
+  snapshots,
+  coverage: foundationCoverageOutput(),
+  sourceLabelsByKey: {},
+  asOf: now.toISOString()
+});
+assert.equal(snapshotComposition.parity.status, "exact", "the live Preview composition boundary must prove exact legacy parity");
+assert.deepEqual(snapshotComposition.analysisPackage, analysisPackage, "the snapshot projection must preserve the complete provider package and validated response envelope inputs");
+assert.deepEqual(
+  businessHealthProviderRequestPayload(snapshotComposition.analysisPackage),
+  businessHealthProviderRequestPayload(analysisPackage),
+  "the Sol/Terra provider request payload must remain byte-for-byte equivalent in meaning and shape"
+);
+assert.equal(snapshotComposition.analysisPackage.fingerprint, analysisPackage.fingerprint, "the existing cache key must remain stable");
+assert.equal(snapshotComposition.projection.workspaceId, workspaceId);
+assert.equal(snapshotComposition.snapshot.kpis.length, 0, "the scoped Business Health build must not invent omitted KPI producer output");
+assert.ok(
+  snapshotComposition.snapshot.limitations.some((limitation) => limitation.code === "kpi_producer_not_supplied"),
+  "the scoped snapshot must disclose that KPI producer output was not required"
+);
+assert.ok(
+  snapshotComposition.snapshot.provenance.every((receipt) => receipt.producerId !== "kpi_deterministic"),
+  "the scoped snapshot must not claim provenance for an uninvoked KPI producer"
+);
+assert.ok(snapshotComposition.projection.drivers.length <= 4, "the Business Health projection must remain bounded");
+assert.ok(snapshotComposition.projection.evidenceReferences.length <= 24, "bounded evidence references must be enforced");
+assert.ok(snapshotComposition.projection.citations.length <= 24, "bounded citation references must be enforced");
+assert.deepEqual(
+  snapshotComposition.projection.drivers.map((driver) => ({
+    id: driver.finding.id,
+    kind: driver.kind,
+    scoreImpact: driver.scoreImpact
+  })),
+  [
+    { id: "risk-revenue", kind: "risk", scoreImpact: -12 },
+    { id: "opportunity-retention", kind: "opportunity", scoreImpact: 4 }
+  ],
+  "the projection must preserve authoritative driver identity, classification, and impact"
+);
+assert.ok(snapshotComposition.receipt.performance.totalMs >= 0, "snapshot construction must expose nonsemantic performance measurements");
+
+const denseRisk = insight({
+  supportingRecords: Array.from({ length: 20 }, (_, index) => evidenceRecord({
+    id: `kpi:dense-${String(index).padStart(2, "0")}`,
+    title: `Dense KPI record ${index + 1}`,
+    sourceKey: `source-file:dense-${index + 1}`
+  }))
+});
+const denseOpportunity = {
+  ...opportunity,
+  supportingRecords: Array.from({ length: 20 }, (_, index) => evidenceRecord({
+    id: `kpi:dense-opportunity-${String(index).padStart(2, "0")}`,
+    title: `Dense opportunity KPI record ${index + 1}`,
+    sourceKey: `source-file:dense-opportunity-${index + 1}`
+  }))
+};
+const denseIntelligence = intelligence({
+  topRisk: denseRisk,
+  topOpportunity: denseOpportunity,
+  topRecommendation: denseRisk,
+  insights: [denseRisk, denseOpportunity]
+});
+const denseSnapshotComposition = buildBusinessHealthExplanationFromSnapshotV1({
+  workspaceId,
+  intelligence: denseIntelligence,
+  homepage: homepage(),
+  snapshots,
+  coverage: foundationCoverageOutput(),
+  sourceLabelsByKey: {},
+  asOf: now.toISOString()
+});
+assert.equal(denseSnapshotComposition.parity.status, "exact", "bounded deterministic references must not displace required manifest citations");
+assert.equal(denseSnapshotComposition.projection.evidenceReferences.length, 24, "dense projections must retain the fixed evidence-reference bound");
+assert.deepEqual(
+  new Set(denseSnapshotComposition.projection.citations.map((citation) => citation.id)),
+  new Set(denseSnapshotComposition.analysisPackage.manifest.evidence.map((entry) => `manifest:${denseSnapshotComposition.analysisPackage.manifest.manifestId}:citation:${entry.citationId}`)),
+  "every required Business Health manifest citation must remain represented in the bounded projection"
+);
+const laterSnapshotComposition = buildBusinessHealthExplanationFromSnapshotV1({
+  workspaceId,
+  intelligence: intelligence(),
+  homepage: homepage(),
+  snapshots,
+  coverage: foundationCoverageOutput(),
+  sourceLabelsByKey: {},
+  asOf: "2026-07-19T12:10:00.000Z"
+});
+assert.equal(laterSnapshotComposition.analysisPackage.fingerprint, analysisPackage.fingerprint, "a later build receipt must not invalidate the existing explanation cache key");
+
+const originalConsoleError = console.error;
+console.error = () => {};
+const previewFallback = buildBusinessHealthExplanationFromSnapshotV1({
+  workspaceId,
+  intelligence: intelligence(),
+  homepage: homepage({ status: "Critical" }),
+  snapshots,
+  coverage: foundationCoverageOutput(),
+  sourceLabelsByKey: {},
+  asOf: now.toISOString()
+});
+console.error = originalConsoleError;
+assert.equal(previewFallback.parity.status, "fallback", "Preview must fail closed to the legacy package when projection parity breaks");
+assert.equal(previewFallback.parity.classification, "adapter_defect");
+process.env.VERCEL_ENV = "production";
+assert.throws(() => buildBusinessHealthExplanationFromSnapshotV1({
+  workspaceId,
+  intelligence: intelligence(),
+  homepage: homepage({ status: "Critical" }),
+  snapshots,
+  coverage: foundationCoverageOutput(),
+  sourceLabelsByKey: {},
+  asOf: now.toISOString()
+}), /presentation disagrees/, "Production must not silently fall back to the legacy context on a projection disagreement");
+process.env.VERCEL_ENV = "preview";
 
 const laterPackage = build({ now: new Date("2026-07-19T12:10:00.000Z") });
 assert.equal(laterPackage.fingerprint, analysisPackage.fingerprint, "generated timestamps must not affect the relevant evidence fingerprint");
@@ -254,10 +412,16 @@ assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }
 const pageSource = read("app/app/page.tsx");
 const actionSource = read("app/app/business-health-analysis/actions.ts");
 const serviceSource = read("lib/ai/business-health-explanation/service.ts");
+const contextSource = read("lib/ai/business-health-explanation/context.ts");
+const snapshotContextSource = read("lib/ai/business-health-explanation/snapshot-context.ts");
 const workflowPolicySource = read("lib/ai/providers/workflow-provider-policy.ts");
 const panelSource = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
-assert.match(pageSource, /buildBusinessHealthExplanationPackage/, "Overview must build the deterministic package during server rendering");
+assert.match(pageSource, /buildBusinessHealthExplanationFromSnapshotV1/, "Overview must build the deterministic package from the scoped snapshot projection during server rendering");
 assert.doesNotMatch(pageSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
+assert.doesNotMatch(snapshotContextSource, /runStructuredAI|generateBusinessHealthExplanation\(/, "snapshot construction must never invoke a provider");
+assert.match(snapshotContextSource, /process\.env\.VERCEL_ENV === "preview"/, "legacy parity fallback must remain Preview-only");
+assert.match(snapshotContextSource, /projectBusinessHealthExplanationV1/, "the live consumer must receive the bounded V1 projection");
+assert.doesNotMatch(contextSource, /remainingRiskPenalty|remainingOpportunityAdjustment|expectedScore/, "the explanation context must not remain a second Business Health calculator");
 assert.match(actionSource, /getWorkspaceContext/, "the generation action must reauthorize the active workspace");
 assert.match(actionSource, /verifyEvidenceManifestCitations/, "the action must reverify centralized citations before generation");
 assert.match(actionSource, /evidence_classification:\s*"derived_analysis"/, "saved analysis must remain derived and ineligible as original evidence");

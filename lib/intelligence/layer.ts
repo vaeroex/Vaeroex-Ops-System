@@ -17,6 +17,12 @@ import {
 export type IntelligenceInsightType = "Risk" | "Opportunity" | "Forecast" | "Bottleneck" | "Recommendation" | "Anomaly";
 export type IntelligenceConfidence = "High" | "Medium" | "Low";
 
+export type BusinessHealthDriverImpact = Readonly<{
+  findingId: string;
+  kind: "risk" | "opportunity";
+  scoreImpact: number;
+}>;
+
 export type IntelligenceEvidenceRecord = {
   id: string;
   title: string;
@@ -63,6 +69,12 @@ export type IntelligenceLayerResult = {
     score: number;
     status: "Strong" | "Watch" | "At Risk" | "Insufficient Data";
     trend: "Improving" | "Holding steady" | "Declining" | "Not enough history";
+    components: {
+      dataQualityBase: number;
+      riskPenalty: number;
+      opportunityAdjustment: number;
+      driverImpacts: BusinessHealthDriverImpact[];
+    };
   };
   dataQuality: {
     score: number;
@@ -264,6 +276,50 @@ function findingFingerprint(insight: Pick<IntelligenceInsight, "type" | "title" 
   const condition = canonicalCondition(`${insight.title} ${insight.summary}`, typeGroup);
   const normalizedPeriod = /^\d{4}-\d{2}/.test(insight.timePeriod) ? insight.timePeriod.slice(0, 7) : lower(insight.timePeriod) || "current";
   return `${typeGroup}:${topic}:${condition}:${normalizedPeriod}`;
+}
+
+function businessHealthScoreComponents(
+  insights: readonly IntelligenceInsight[],
+  dataQualityBase: number
+): IntelligenceLayerResult["businessHealth"]["components"] {
+  const riskKinds = new Set<IntelligenceInsightType>(["Risk", "Bottleneck", "Anomaly"]);
+  const driverImpacts: BusinessHealthDriverImpact[] = [];
+  let remainingRiskPenalty = 45;
+
+  for (const insight of insights.filter((item) => riskKinds.has(item.type))) {
+    const rawPenalty = insight.priority === "High" ? 12 : insight.priority === "Medium" ? 6 : 0;
+    const appliedPenalty = Math.min(rawPenalty, remainingRiskPenalty);
+    remainingRiskPenalty -= appliedPenalty;
+    if (!appliedPenalty) continue;
+    driverImpacts.push({
+      findingId: insight.id,
+      kind: "risk",
+      scoreImpact: -appliedPenalty
+    });
+  }
+
+  let remainingOpportunityAdjustment = 15;
+  for (const insight of insights.filter((item) => item.type === "Opportunity")) {
+    const appliedAdjustment = Math.min(4, remainingOpportunityAdjustment);
+    remainingOpportunityAdjustment -= appliedAdjustment;
+    if (!appliedAdjustment) continue;
+    driverImpacts.push({
+      findingId: insight.id,
+      kind: "opportunity",
+      scoreImpact: appliedAdjustment
+    });
+  }
+
+  return {
+    dataQualityBase,
+    riskPenalty: Math.abs(driverImpacts
+      .filter((item) => item.kind === "risk")
+      .reduce((sum, item) => sum + item.scoreImpact, 0)),
+    opportunityAdjustment: driverImpacts
+      .filter((item) => item.kind === "opportunity")
+      .reduce((sum, item) => sum + item.scoreImpact, 0),
+    driverImpacts
+  };
 }
 
 function uniqueBy<T>(values: T[], key: (value: T) => string) {
@@ -712,8 +768,10 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const opportunities = sortedInsights.filter((insight) => insight.type === "Opportunity");
   const recommendations = sortedInsights.filter((insight) => insight.type === "Recommendation" || insight.type === "Risk" || insight.type === "Bottleneck");
   const forecasts = sortedInsights.filter((insight) => insight.type === "Forecast");
-  const riskPenalty = Math.min(45, risks.filter((risk) => risk.priority === "High").length * 12 + risks.filter((risk) => risk.priority === "Medium").length * 6);
-  const healthScore = hasHealthEvidence ? Math.max(10, Math.min(100, dataQualityScore - riskPenalty + Math.min(15, opportunities.length * 4))) : 0;
+  const businessHealthComponents = businessHealthScoreComponents(sortedInsights, dataQualityScore);
+  const healthScore = hasHealthEvidence
+    ? Math.max(10, Math.min(100, dataQualityScore - businessHealthComponents.riskPenalty + businessHealthComponents.opportunityAdjustment))
+    : 0;
   const healthStatus = !hasHealthEvidence || dataQualityScore < 25 ? "Insufficient Data" : healthScore >= 75 ? "Strong" : healthScore >= 50 ? "Watch" : "At Risk";
   const trend = !hasHealthEvidence ? "Not enough history" : risks.length > opportunities.length + 1 ? "Declining" : opportunities.length > risks.length ? "Improving" : dataQualityScore < 35 ? "Not enough history" : "Holding steady";
   const topRisk = risks[0];
@@ -734,7 +792,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       available: hasHealthEvidence,
       score: healthScore,
       status: healthStatus,
-      trend
+      trend,
+      components: businessHealthComponents
     },
     dataQuality: {
       score: dataQualityScore,

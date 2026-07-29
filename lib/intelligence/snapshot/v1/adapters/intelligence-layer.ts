@@ -16,6 +16,12 @@ function contextualRecord(recordType: string, sourceKey: string) {
   return /business note|business memory/i.test(recordType) || /^(?:business-note|business-memory):/i.test(sourceKey);
 }
 
+function canonicalEvidenceRecordType(recordId: string, recordType: string) {
+  return recordId.startsWith("kpi:") && ["KPI record", "Imported KPI measurement"].includes(recordType)
+    ? "KPI record"
+    : recordType;
+}
+
 function recordAuthority(classification: "Original" | "Manual" | "Derived", recordType: string, sourceKey: string): EvidenceAuthorityRoleV1 {
   if (contextualRecord(recordType, sourceKey)) return "supporting_context";
   return classification === "Derived" ? "derived" : "original";
@@ -43,7 +49,7 @@ export function adaptIntelligenceLayerProducerOutputV1({
         id,
         workspaceId,
         recordId: record.id,
-        recordType: record.recordType,
+        recordType: canonicalEvidenceRecordType(record.id, record.recordType),
         sourceType: record.classification === "Manual" ? "manual" : "intelligence_layer_source",
         sourceKeyHash: snapshotHash(record.sourceKey),
         sourceIds: [record.id],
@@ -110,10 +116,10 @@ export function adaptIntelligenceLayerProducerOutputV1({
     forecastFindingIds: findings.filter((finding) => finding.type === "Forecast").map((finding) => finding.id)
   };
   const limitations: SnapshotLimitationV1[] = [{
-    code: "business_health_components_not_exposed",
-    scope: "business_health",
+    code: "data_quality_reason",
+    scope: "data_quality",
     severity: "information",
-    message: "The authoritative Intelligence Layer does not yet expose score components; the snapshot does not recreate them."
+    message: output.dataQuality.reason
   }];
   const forecast: ForecastReadinessSnapshotV1 = {
     state: output.forecastReadiness.state,
@@ -133,7 +139,12 @@ export function adaptIntelligenceLayerProducerOutputV1({
         status: output.businessHealth.status,
         trajectory: output.businessHealth.trend,
         confidence: output.dataQuality.confidence,
-        components: unavailable("unavailable", "missing_producer_field")
+        components: available({
+          dataQualityBase: output.businessHealth.components.dataQualityBase,
+          riskPenalty: output.businessHealth.components.riskPenalty,
+          opportunityAdjustment: output.businessHealth.components.opportunityAdjustment,
+          driverImpacts: output.businessHealth.components.driverImpacts.map((impact) => ({ ...impact }))
+        })
       })
       : unavailable("insufficient_data", "insufficient_original_evidence");
 

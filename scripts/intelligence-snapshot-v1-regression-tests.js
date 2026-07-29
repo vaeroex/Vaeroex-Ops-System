@@ -161,7 +161,15 @@ assert.equal(snapshot.businessHealth.state, "available");
 assert.equal(snapshot.businessHealth.value.score, 78);
 assert.equal(snapshot.businessHealth.value.status, "Strong");
 assert.equal(snapshot.businessHealth.value.trajectory, "Holding steady");
-assert.equal(snapshot.businessHealth.value.components.state, "unavailable", "score components must not be recomputed by the adapter");
+assert.equal(snapshot.businessHealth.value.components.state, "available", "the adapter must expose producer-owned score components");
+assert.deepEqual(
+  {
+    dataQualityBase: snapshot.businessHealth.value.components.value.dataQualityBase,
+    riskPenalty: snapshot.businessHealth.value.components.value.riskPenalty,
+    opportunityAdjustment: snapshot.businessHealth.value.components.value.opportunityAdjustment
+  },
+  { dataQualityBase: 92, riskPenalty: 12, opportunityAdjustment: 4 }
+);
 assert.equal(snapshot.dataQuality.value.score, 92);
 assert.equal(snapshot.dataQuality.value.confidence, "High");
 assert.equal(snapshot.readiness.forecast.value.state, "ready");
@@ -194,6 +202,23 @@ assert.throws(() => build(foreignManifest), /belongs to another workspace/);
 const foreignRegistry = clone(baseInput);
 foreignRegistry.evidenceManifests.output[0].sourceRegistry.workspaceId = "workspace-foreign";
 assert.throws(() => build(foreignRegistry), /foreign source registry/);
+
+const sharedKpiEvidence = clone(baseInput);
+sharedKpiEvidence.intelligenceLayer.output.insights[1].supportingRecords[0] = {
+  ...sharedKpiEvidence.intelligenceLayer.output.insights[0].supportingRecords[0],
+  recordType: "Imported KPI measurement"
+};
+const sharedKpiSnapshot = build(sharedKpiEvidence).snapshot;
+assert.equal(
+  sharedKpiSnapshot.evidence.references.filter((reference) => reference.id === "intelligence-layer:kpi:checkout-wait-latest").length,
+  1,
+  "the same physical KPI row may support multiple findings without creating conflicting evidence identity"
+);
+assert.equal(
+  sharedKpiSnapshot.evidence.references.find((reference) => reference.id === "intelligence-layer:kpi:checkout-wait-latest")?.recordType,
+  "KPI record",
+  "KPI evidence identity must not depend on finding-specific presentation labels"
+);
 
 const unsupportedVersion = clone(baseInput);
 unsupportedVersion.kpis.producerVersion = "kpi_semantics_v0";
@@ -263,6 +288,9 @@ assert.equal(projections.overview.topRisk.id, "finding-checkout-wait");
 assert.equal(projections.inbox.findings.length, snapshot.findings.length);
 assert.ok(projections.kpi.kpis.length <= 12);
 assert.equal(projections.health.businessHealth.value.score, 78);
+assert.deepEqual(projections.health.drivers.map((driver) => driver.finding.id), ["finding-checkout-wait", "finding-revenue"]);
+assert.ok(projections.health.evidenceReferences.length <= 24);
+assert.ok(projections.health.citations.length <= 24);
 assert.equal(projections.finding.finding.state, "available");
 assert.equal(projections.missingFinding.finding.state, "unavailable");
 assert.equal(projections.people.legacyPrestigeAuthorityAllowed, false);
@@ -280,8 +308,8 @@ const parity = contract.compareIntelligenceSnapshotV1({
   evidenceManifests: baseInput.evidenceManifests.output,
   generatedAt: contract.FOUNDATION_FIXTURE_GENERATED_AT
 });
-assert.equal(parity.status, "differences", "the known missing score-component producer field must remain visible");
-assert.equal(parity.counts.missing_producer_field, 1);
+assert.equal(parity.status, "exact", "authoritative Business Health score components must preserve exact snapshot parity");
+assert.equal(parity.counts.missing_producer_field, 0);
 assert.equal(parity.counts.adapter_defect, 0);
 assert.equal(parity.counts.genuine_deterministic_disagreement, 0);
 assert.equal(parity.counts.unavailable_for_comparison, 0);

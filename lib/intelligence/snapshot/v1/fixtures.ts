@@ -237,7 +237,29 @@ export function foundationIntelligenceLayerOutput(): IntelligenceLayerProducerOu
 
   return {
     executiveSummary: `${risk.title}. ${risk.why}`,
-    businessHealth: { available: true, score: 78, status: "Strong", trend: "Holding steady" },
+    businessHealth: {
+      available: true,
+      score: 78,
+      status: "Strong",
+      trend: "Holding steady",
+      components: {
+        dataQualityBase: 92,
+        riskPenalty: 12,
+        opportunityAdjustment: 4,
+        driverImpacts: [
+          {
+            findingId: risk.id,
+            kind: "risk",
+            scoreImpact: -12
+          },
+          {
+            findingId: opportunity.id,
+            kind: "opportunity",
+            scoreImpact: 4
+          }
+        ]
+      }
+    },
     dataQuality: {
       score: 92,
       label: "Strong",

@@ -1,3 +1,4 @@
+import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
 import { INTELLIGENCE_SNAPSHOT_LIMITS } from "@/lib/intelligence/snapshot/v1/versions";
 import type {
   EvidenceReferenceV1,
@@ -76,19 +77,65 @@ export function projectKpiOverviewV1(snapshot: IntelligenceSnapshotV1): KpiOverv
 export type BusinessHealthExplanationProjectionV1 = ProjectionHeaderV1 & Readonly<{
   businessHealth: IntelligenceSnapshotV1["businessHealth"];
   dataQuality: IntelligenceSnapshotV1["dataQuality"];
-  driverFindingIds: readonly string[];
-  evidenceReferenceIds: readonly string[];
+  drivers: readonly Readonly<{
+    finding: FindingSnapshotV1;
+    kind: "risk" | "opportunity";
+    scoreImpact: number;
+    stableKey: string;
+  }>[];
+  priorities: readonly PrioritySnapshotV1[];
+  evidenceReferences: readonly EvidenceReferenceV1[];
+  citations: IntelligenceSnapshotV1["evidence"]["citations"];
   limitations: readonly SnapshotLimitationV1[];
 }>;
 
+export function businessHealthDriverStableKey(kind: "risk" | "opportunity", findingFingerprint: string) {
+  return evidenceEngineHash({ kind, fingerprint: findingFingerprint });
+}
+
 export function projectBusinessHealthExplanationV1(snapshot: IntelligenceSnapshotV1): BusinessHealthExplanationProjectionV1 {
-  const drivers = snapshot.findings.slice(0, 8);
+  const impacts = snapshot.businessHealth.state === "available" && snapshot.businessHealth.value.components.state === "available"
+    ? snapshot.businessHealth.value.components.value.driverImpacts
+    : [];
+  const keyedImpacts = impacts.map((impact) => {
+    const finding = snapshot.findings.find((candidate) => candidate.id === impact.findingId);
+    if (!finding) throw new Error(`Business Health driver ${impact.findingId} does not resolve to a canonical finding.`);
+    return { ...impact, finding, stableKey: businessHealthDriverStableKey(impact.kind, finding.fingerprint) };
+  });
+  const ordered = [...keyedImpacts].sort((left, right) => {
+    const weightDelta = Math.abs(right.scoreImpact) - Math.abs(left.scoreImpact);
+    return weightDelta || left.stableKey.localeCompare(right.stableKey);
+  });
+  const firstRisk = ordered.find((item) => item.kind === "risk");
+  const firstOpportunity = ordered.find((item) => item.kind === "opportunity");
+  const selectedImpacts = [firstRisk, firstOpportunity, ...ordered]
+    .filter((item): item is (typeof ordered)[number] => Boolean(item))
+    .filter((item, index, items) => items.findIndex((candidate) => candidate.stableKey === item.stableKey) === index)
+    .slice(0, 4);
+  const drivers = selectedImpacts.map((impact) => {
+    return { finding: impact.finding, kind: impact.kind, scoreImpact: impact.scoreImpact, stableKey: impact.stableKey };
+  });
+  const findingEvidenceIds = new Set(drivers.flatMap((driver) => driver.finding.deterministicDependencies.evidenceReferenceIds));
+  const citationEvidenceIds = new Set(snapshot.evidence.citations.map((citation) => citation.evidenceReferenceId));
+  const citationEvidenceReferences = snapshot.evidence.references
+    .filter((reference) => citationEvidenceIds.has(reference.id))
+    .slice(0, 24);
+  const retainedCitationEvidenceIds = new Set(citationEvidenceReferences.map((reference) => reference.id));
+  const evidenceReferences = [
+    ...citationEvidenceReferences,
+    ...snapshot.evidence.references
+      .filter((reference) => findingEvidenceIds.has(reference.id) && !retainedCitationEvidenceIds.has(reference.id))
+      .slice(0, 24 - citationEvidenceReferences.length)
+  ];
+  const projectedEvidenceIds = new Set(evidenceReferences.map((reference) => reference.id));
   return {
     ...header(snapshot),
     businessHealth: snapshot.businessHealth,
     dataQuality: snapshot.dataQuality,
-    driverFindingIds: drivers.map((finding) => finding.id),
-    evidenceReferenceIds: [...new Set(drivers.flatMap((finding) => finding.deterministicDependencies.evidenceReferenceIds))].slice(0, 24),
+    drivers,
+    priorities: snapshot.priorities,
+    evidenceReferences,
+    citations: snapshot.evidence.citations.filter((citation) => projectedEvidenceIds.has(citation.evidenceReferenceId)).slice(0, 24),
     limitations: snapshot.limitations.filter((limitation) => limitation.scope === "business_health" || limitation.scope === "data_quality")
   };
 }
