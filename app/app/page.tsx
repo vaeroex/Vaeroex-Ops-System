@@ -32,6 +32,9 @@ import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } fr
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import { buildPrestigeIntelligence, type PrestigeIntelligence } from "@/lib/intelligence/prestige";
+import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
+import { buildExecutiveHomepageFromSnapshotV1 } from "@/lib/intelligence/snapshot/v1/consumers/executive-overview";
+import { projectExecutiveOverviewV1 } from "@/lib/intelligence/snapshot/v1/projections";
 import {
   applyKpiSettingsToRows,
   getConfiguredMetricNames,
@@ -1862,13 +1865,41 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...decisions.map((row) => row.updated_at || row.created_at),
     ...recommendationOutcomes.map((row) => row.updated_at || row.created_at)
   ].filter(Boolean).sort().at(-1) || null;
-  const executiveHomepageModel = buildExecutiveHomepageModel({
-    intelligence: intelligenceLayer,
-    coverage: businessIntelligenceCoverage,
-    snapshots: businessHealthSnapshotResult.snapshots,
-    kpiTrends: comparisonTrends,
-    sourceDataAvailable: businessHealthSourceErrors.length === 0
-  });
+  const businessHealthExplanationAsOf = new Date().toISOString();
+  let executiveHomepageModel: ReturnType<typeof buildExecutiveHomepageModel>;
+  try {
+    const executiveOverviewSnapshot = buildIntelligenceSnapshotFromProducersV1({
+      workspaceId,
+      asOf: businessHealthExplanationAsOf,
+      intelligence: intelligenceLayer,
+      coverage: businessIntelligenceCoverage
+    });
+    const executiveOverviewProjection = projectExecutiveOverviewV1(executiveOverviewSnapshot.snapshot);
+    executiveHomepageModel = buildExecutiveHomepageFromSnapshotV1({
+      projection: executiveOverviewProjection,
+      intelligence: intelligenceLayer,
+      coverage: businessIntelligenceCoverage,
+      snapshots: businessHealthSnapshotResult.snapshots,
+      kpiTrends: comparisonTrends,
+      sourceDataAvailable: businessHealthSourceErrors.length === 0
+    }).model;
+  } catch (error) {
+    if (process.env.VERCEL_ENV !== "preview") throw error;
+    console.error(JSON.stringify({
+      level: "error",
+      component: "executive-overview",
+      event: "snapshot_v1_projection_fallback",
+      classification: "adapter_defect",
+      reason: error instanceof Error ? error.message : "snapshot_construction_failed"
+    }));
+    executiveHomepageModel = buildExecutiveHomepageModel({
+      intelligence: intelligenceLayer,
+      coverage: businessIntelligenceCoverage,
+      snapshots: businessHealthSnapshotResult.snapshots,
+      kpiTrends: comparisonTrends,
+      sourceDataAvailable: businessHealthSourceErrors.length === 0
+    });
+  }
   const executiveSourceLabelsByKey = Object.fromEntries([
     ...files.map((file) => [`source-file:${file.id}`, file.display_name]),
     ...imports.flatMap((item) => {
@@ -1876,7 +1907,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       return source ? [[`import:${item.id}`, source.display_name] as const] : [];
     })
   ]);
-  const businessHealthExplanationAsOf = new Date().toISOString();
   const businessHealthExplanationSnapshot = buildBusinessHealthExplanationFromSnapshotV1({
     workspaceId,
     intelligence: intelligenceLayer,

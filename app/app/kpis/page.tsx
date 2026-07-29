@@ -20,7 +20,19 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { buildPrestigeIntelligence } from "@/lib/intelligence/prestige";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
+import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
+import {
+  buildKpiCompareStatesFromSnapshotV1,
+  buildLegacyKpiPageStateV1,
+  buildKpiPageStatesFromSnapshotV1,
+  materializeKpiPageStateV1,
+  type KpiPageConsumerStateV1
+} from "@/lib/intelligence/snapshot/v1/consumers/kpi-pages";
+import { projectKpiCompareV1, projectKpiDetailV1, projectKpiPageV1 } from "@/lib/intelligence/snapshot/v1/projections";
+import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
+import { INTELLIGENCE_SNAPSHOT_LIMITS } from "@/lib/intelligence/snapshot/v1/versions";
 import { buildKpiForecastEligibility } from "@/lib/kpis/forecast-eligibility";
+import { buildCanonicalKpiProducerOutputV1 } from "@/lib/kpis/snapshot-producer";
 import {
   kpiStatus,
   semanticPresentation,
@@ -37,6 +49,7 @@ import {
   kpiDisplayUnit,
   kpiSettingForName,
   kpiSemantics,
+  normalizeKpiName,
   kpiWeight,
   kpiXAxisLabel,
   kpiYAxisLabel,
@@ -50,7 +63,6 @@ import {
   directionLabel,
   evaluateKpiPerformance,
   isKpiTargetMet,
-  recommendKpiTarget,
   resolveKpiTargetReference,
   validateKpiSemanticSelection,
   type KpiDesiredDirection,
@@ -246,16 +258,15 @@ function monthSpan(rows: KpiRow[]) {
   return Math.max(1, (last.getUTCFullYear() - first.getUTCFullYear()) * 12 + last.getUTCMonth() - first.getUTCMonth() + 1);
 }
 
-function recommendedTargetForMetric(metricName: string, rows: KpiRow[], settings: KpiSettingRow[]): KpiTargetRecommendation {
+function recommendedTargetForMetric(
+  metricName: string,
+  rows: KpiRow[],
+  recommendation: CanonicalKpiTargetRecommendation
+): KpiTargetRecommendation {
   const valueRows = rows
     .filter((row) => lower(row.name) === lower(metricName) && row.actual_value !== null)
     .sort((a, b) => `${a.metric_date}-${a.created_at}`.localeCompare(`${b.metric_date}-${b.created_at}`));
   const historyMonths = monthSpan(valueRows);
-  const recommendation: CanonicalKpiTargetRecommendation = recommendKpiTarget({
-    observations: valueRows,
-    semantics: kpiSemantics(metricName, settings)
-  });
-
   return {
     value: recommendation.value,
     confidence: recommendation.confidence,
@@ -425,21 +436,20 @@ function StatusFilterCard({
 
 function KpiTile({
   kpi,
-  rows,
+  deterministic,
   settings,
   color,
   index
 }: {
   kpi: KpiRow;
-  rows: KpiRow[];
+  deterministic: KpiPageConsumerStateV1;
   settings: KpiSettingRow[];
   color: string;
   index: number;
 }) {
-  const direction = explicitKpiDirection(kpi.name, rows, settings);
-  const semantics = kpiSemantics(kpi.name, settings);
-  const targetReference = resolveKpiTargetReference(semantics, kpi.target);
-  const tone = metricTone(kpi.actual_value, kpi.target, semantics);
+  const direction = deterministic.semantics.desiredDirection;
+  const targetReference = deterministic.targetReference;
+  const tone = deterministic.tone;
   const semanticStatus = kpiStatus({
     tone,
     hasCurrentValue: kpi.actual_value !== null,
@@ -460,7 +470,7 @@ function KpiTile({
             <h2 className="truncate text-sm font-semibold text-white">{kpi.name}</h2>
           </div>
         </div>
-        <KpiStatusBadge label={kpiStatusText(kpi, semantics)} status={semanticStatus} />
+        <KpiStatusBadge label={deterministic.statusText} status={semanticStatus} />
       </div>
       <p className="mt-3 text-2xl font-semibold text-white">{formatSettingValue(kpi.actual_value, kpi.name, settings)}</p>
       <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-300 sm:grid-cols-3">
@@ -470,7 +480,17 @@ function KpiTile({
         </p>
         <p>
           <span className="block text-slate-500">{direction !== "unknown" ? "Performance effect" : "Difference"}</span>
-          {direction !== "unknown" ? trendLabelForRows(rows, semantics, kpi.target) : difference}
+          {direction !== "unknown"
+            ? deterministic.evaluation.rawMovement === "insufficient_data"
+              ? "Not enough history"
+              : deterministic.evaluation.latestPerformanceEffect === "favorable"
+                ? "Favorable"
+                : deterministic.evaluation.latestPerformanceEffect === "unfavorable"
+                  ? "Unfavorable"
+                  : deterministic.evaluation.latestPerformanceEffect === "neutral"
+                    ? "No meaningful change"
+                    : deterministic.evaluation.rawMovement === "increased" ? "Increased" : "Decreased"
+            : difference}
         </p>
         <p>
           <span className="block text-slate-500">Last updated</span>
@@ -552,11 +572,10 @@ function statusFilterLabel(filter: KpiStatusFilter) {
   return "Total";
 }
 
-function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter, rows: KpiRow[], settings: KpiSettingRow[]) {
+function matchesStatusFilter(row: KpiRow, filter: KpiStatusFilter, tone: KpiTone) {
   if (filter === "all") return true;
   if (filter === "updated-this-month") return updatedThisMonth(row);
 
-  const tone = metricTone(row.actual_value, row.target, kpiSemantics(row.name, settings));
   if (filter === "on-track") return tone === "green";
   if (filter === "behind-target") return tone === "red" || tone === "yellow";
   return row.actual_value === null || !updatedThisMonth(row);
@@ -1157,7 +1176,7 @@ function percentChangeLabel(trend: KpiTrend) {
   return `${direction} ${numberFormatter.format(Math.abs(trend.changePercent))}%`;
 }
 
-function comparisonNotes(trends: KpiTrend[]) {
+function comparisonNotes(trends: KpiTrend[], deterministicStates: Map<string, KpiPageConsumerStateV1> | null) {
   const usable = trends.filter((trend) => trend.rows.filter((row) => row.actual_value !== null).length >= 2);
 
   if (!usable.length) return ["Add at least two dated values for a KPI to compare movement."];
@@ -1166,7 +1185,15 @@ function comparisonNotes(trends: KpiTrend[]) {
     .filter((trend) => trend.changePercent !== null)
     .sort((a, b) => Math.abs(b.changePercent || 0) - Math.abs(a.changePercent || 0))
     .slice(0, 3)
-    .map((trend) => `${trend.name} is ${percentChangeLabel(trend)} across the selected timeframe. Directionality is not interpreted unless that KPI explicitly defines whether higher or lower is better.`);
+    .map((trend) => {
+      const deterministic = deterministicStates?.get(normalizeKpiName(trend.name));
+      if (deterministicStates && !deterministic) throw new Error(`Compared KPI ${trend.name} is missing from its bounded snapshot projection.`);
+      const projectedChange = deterministic?.evaluation.changePercent ?? trend.changePercent;
+      if (deterministic && projectedChange !== trend.changePercent) {
+        throw new Error(`Compared KPI ${trend.name} percentage movement disagrees with IntelligenceSnapshotV1.`);
+      }
+      return `${trend.name} is ${percentChangeLabel({ ...trend, changePercent: projectedChange })} across the selected timeframe. Directionality is not interpreted unless that KPI explicitly defines whether higher or lower is better.`;
+    });
 
   return notes.length ? notes : ["The selected KPIs do not yet have enough comparable history to calculate percentage movement."];
 }
@@ -1174,13 +1201,15 @@ function comparisonNotes(trends: KpiTrend[]) {
 function ComparisonAnalysis({
   trends,
   mode,
-  context
+  context,
+  deterministicStates
 }: {
   trends: KpiTrend[];
   mode: ComparisonMode;
   context: ReturnType<typeof comparisonContext>;
+  deterministicStates: Map<string, KpiPageConsumerStateV1> | null;
 }) {
-  const notes = comparisonNotes(trends);
+  const notes = comparisonNotes(trends, deterministicStates);
 
   return (
     <div className="space-y-4">
@@ -1436,16 +1465,18 @@ function KpiValueEditForm({
 function KpiChartSettingsForm({
   metricName,
   setting,
-  latest
+  latest,
+  semantics
 }: {
   metricName: string;
   setting: KpiSettingRow | undefined;
   latest: KpiRow | undefined;
+  semantics: KpiSemantics;
 }) {
   const selectedColor = setting?.color ?? "#10B981";
   const lowContrastColor = kpiColorMayBeLowContrast(selectedColor);
   const fallback = deterministicKpiSemantics(metricName);
-  const resolvedSemantics = kpiSemantics(metricName, setting ? [setting] : []);
+  const resolvedSemantics = semantics;
   const proposedDirection = (setting?.desired_direction ?? fallback.desiredDirection) as KpiDesiredDirection;
   const hasActiveDeterministicDirection = resolvedSemantics.desiredDirection !== "unknown" && resolvedSemantics.classificationSource === "deterministic";
   const isUnconfirmed = resolvedSemantics.desiredDirection === "unknown";
@@ -1724,15 +1755,72 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   });
 
   const metricNames = getConfiguredMetricNames(allVisibleKpis, kpiSettings);
+  const kpiSnapshotAsOf = new Date().toISOString();
+  let kpiSnapshot: IntelligenceSnapshotV1 | null = null;
+  let kpiPageStates: KpiPageConsumerStateV1[];
+  if (metricNames.length > INTELLIGENCE_SNAPSHOT_LIMITS.kpis) {
+    console.warn(JSON.stringify({
+      event: "snapshot_v1_consumer_left_on_legacy",
+      consumer: "kpi_pages",
+      workspaceId,
+      reason: "kpi_projection_limit_exceeded",
+      metricCount: metricNames.length,
+      projectionLimit: INTELLIGENCE_SNAPSHOT_LIMITS.kpis
+    }));
+    kpiPageStates = metricNames.map((metricName) => buildLegacyKpiPageStateV1({
+      metricName,
+      rows: allVisibleKpis,
+      settings: kpiSettings
+    }));
+  } else {
+    try {
+      const producer = buildCanonicalKpiProducerOutputV1({
+        workspaceId,
+        rows: allVisibleKpis,
+        settings: kpiSettings,
+        asOf: kpiSnapshotAsOf
+      });
+      const build = buildIntelligenceSnapshotFromProducersV1({
+        workspaceId,
+        asOf: kpiSnapshotAsOf,
+        kpis: producer
+      });
+      kpiSnapshot = build.snapshot;
+      kpiPageStates = buildKpiPageStatesFromSnapshotV1({
+        projection: projectKpiPageV1(kpiSnapshot),
+        rows: allVisibleKpis,
+        settings: kpiSettings
+      }).states;
+    } catch (error) {
+      if (process.env.VERCEL_ENV !== "preview") throw error;
+      console.error(JSON.stringify({
+        event: "snapshot_v1_projection_fallback",
+        consumer: "kpi_pages",
+        workspaceId,
+        reason: error instanceof Error ? error.message : "unknown_error"
+      }));
+      kpiPageStates = metricNames.map((metricName) => buildLegacyKpiPageStateV1({
+        metricName,
+        rows: allVisibleKpis,
+        settings: kpiSettings
+      }));
+    }
+  }
+  const kpiPageStatesByName = new Map(kpiPageStates.map((state) => [normalizeKpiName(state.metricName), state]));
+  const kpiStateForName = (metricName: string) => {
+    const state = kpiPageStatesByName.get(normalizeKpiName(metricName));
+    if (!state) throw new Error(`KPI ${metricName} does not resolve in the bounded KPI page projection.`);
+    return state;
+  };
   const latestKpiRows = latestRowsByMetric(allVisibleKpis, metricNames);
-  const kpiTone = (kpi: KpiRow) => metricTone(kpi.actual_value, kpi.target, kpiSemantics(kpi.name, kpiSettings));
+  const kpiTone = (kpi: KpiRow) => kpiStateForName(kpi.name).tone;
   const behindTargetCount = latestKpiRows.filter((kpi) => ["red", "yellow"].includes(kpiTone(kpi))).length;
   const onTrackCount = latestKpiRows.filter((kpi) => kpiTone(kpi) === "green").length;
   const missingOrStaleCount = metricNames.filter((name) => {
     const row = latestKpiRows.find((kpi) => kpi.name === name);
     return !row || row.actual_value === null || !updatedThisMonth(row);
   }).length;
-  const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter, allVisibleKpis, kpiSettings));
+  const filteredLatestKpiRows = latestKpiRows.filter((kpi) => matchesStatusFilter(kpi, activeStatusFilter, kpiTone(kpi)));
   const filteredMetricNames = new Set(filteredLatestKpiRows.map((kpi) => kpi.name));
   const filteredKpis = activeStatusFilter === "all" ? kpis : kpis.filter((kpi) => filteredMetricNames.has(kpi.name));
   const visibleTileRows = showAllTiles ? filteredLatestKpiRows : filteredLatestKpiRows.slice(0, INITIAL_KPI_CARD_COUNT);
@@ -1762,25 +1850,67 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
   const selectedLatestKpi = selectedMetricRows.at(-1);
   const selectedSourceFile = selectedLatestKpi?.source_file_id ? sourceFiles.find((file) => file.id === selectedLatestKpi.source_file_id) : null;
   const selectedKpiSetting = primaryMetric ? kpiSettingForName(kpiSettings, primaryMetric) : undefined;
-  const selectedKpiDirection = primaryMetric ? explicitKpiDirection(primaryMetric, allVisibleKpis, kpiSettings) : "unknown";
-  const selectedKpiSemantics = primaryMetric ? kpiSemantics(primaryMetric, kpiSettings) : kpiSemantics("Unknown KPI", []);
-  const selectedManualTarget = selectedKpiSetting?.target ?? selectedLatestKpi?.target ?? null;
-  const selectedTargetReference = resolveKpiTargetReference(selectedKpiSemantics, selectedManualTarget);
-  const selectedKpiEvaluation = primaryMetric
-    ? evaluateKpiPerformance({
-        observations: selectedMetricRows,
-        semantics: selectedKpiSemantics,
-        target: selectedManualTarget
-      })
+  let selectedKpiState = primaryMetric ? kpiStateForName(primaryMetric) : null;
+  if (kpiSnapshot && selectedKpiState) {
+    const detailProjection = projectKpiDetailV1(kpiSnapshot, selectedKpiState.kpiId);
+    if (detailProjection.kpi.state !== "available") throw new Error(`KPI ${primaryMetric} is unavailable in its detail projection.`);
+    selectedKpiState = materializeKpiPageStateV1({
+      snapshot: detailProjection.kpi.value,
+      rows: allVisibleKpis,
+      settings: kpiSettings
+    });
+  }
+  const selectedKpiDirection = selectedKpiState?.semantics.desiredDirection ?? "unknown";
+  const selectedKpiSemantics = selectedKpiState?.semantics ?? kpiSemantics("Unknown KPI", []);
+  const selectedManualTarget = selectedKpiState?.manualTarget ?? null;
+  const selectedTargetReference = selectedKpiState?.targetReference ?? { kind: "none" as const };
+  const selectedKpiEvaluation = selectedKpiState?.evaluation ?? null;
+  const selectedRecommendation = selectedKpiState
+    ? recommendedTargetForMetric(primaryMetric, allVisibleKpis, selectedKpiState.recommendation)
     : null;
-  const selectedRecommendation = primaryMetric ? recommendedTargetForMetric(primaryMetric, allVisibleKpis, kpiSettings) : null;
+  const comparisonSnapshotRows = selectedTrends.flatMap((trend) => trend.rows);
+  let selectedComparisonStatesByName: Map<string, KpiPageConsumerStateV1> | null = null;
+  if (comparisonSnapshotRows.length) {
+    try {
+      const comparisonProducer = buildCanonicalKpiProducerOutputV1({
+        workspaceId,
+        rows: comparisonSnapshotRows,
+        settings: kpiSettings,
+        asOf: kpiSnapshotAsOf
+      });
+      const comparisonBuild = buildIntelligenceSnapshotFromProducersV1({
+        workspaceId,
+        asOf: kpiSnapshotAsOf,
+        kpis: comparisonProducer
+      });
+      const comparisonProjection = projectKpiCompareV1(
+        comparisonBuild.snapshot,
+        comparisonBuild.snapshot.kpis.map((kpi) => kpi.id)
+      );
+      selectedComparisonStatesByName = buildKpiCompareStatesFromSnapshotV1({
+        projection: comparisonProjection,
+        rows: comparisonSnapshotRows,
+        settings: kpiSettings
+      }).byName;
+      comparisonNotes(selectedTrends, selectedComparisonStatesByName);
+    } catch (error) {
+      if (process.env.VERCEL_ENV !== "preview") throw error;
+      console.error(JSON.stringify({
+        event: "snapshot_v1_projection_fallback",
+        consumer: "kpi_compare",
+        workspaceId,
+        reason: error instanceof Error ? error.message : "unknown_error"
+      }));
+      selectedComparisonStatesByName = null;
+    }
+  }
   const undoMetricName = params?.target_applied === "true" ? params.undo_kpi : undefined;
   const undoSetting = undoMetricName ? kpiSettingForName(kpiSettings, undoMetricName) : undefined;
   const undoLatestKpi = undoMetricName ? getMetricHistoryRows(allVisibleKpis, undoMetricName).at(-1) : undefined;
   const managedKpis = filteredKpis.map((kpi) => {
     const management = managedValues(kpi);
     const kpiShares = shares.filter((share) => share.source_id === kpi.id);
-    const semantics = kpiSemantics(kpi.name, kpiSettings);
+    const semantics = kpiStateForName(kpi.name).semantics;
     const targetReference = resolveKpiTargetReference(semantics, kpi.target);
 
     return {
@@ -1927,7 +2057,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                 <KpiTile
                   key={kpi.id}
                   kpi={kpi}
-                  rows={getMetricHistoryRows(allVisibleKpis, kpi.name)}
+                  deterministic={kpiStateForName(kpi.name)}
                   settings={kpiSettings}
                   color={kpiColor(kpi.name, kpiSettings, index)}
                   index={index}
@@ -1958,10 +2088,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     <h2 className="mt-2 text-xl font-semibold text-white">{primaryMetric}</h2>
                     <p className="mt-1 text-sm leading-6 text-slate-400">{kpiDefinition(primaryMetric, kpiSettings) || "No definition set yet."}</p>
                   </div>
-                  {selectedKpiDirection !== "unknown" ? (() => {
-                    const tone = metricTone(selectedLatestKpi?.actual_value ?? null, selectedManualTarget, selectedKpiSemantics);
-                    return <KpiStatusBadge label={selectedLatestKpi ? kpiStatusText(selectedLatestKpi, selectedKpiSemantics) : statusLabel(tone)} status={kpiStatus({
-                      tone,
+                  {selectedKpiDirection !== "unknown" && selectedKpiState ? (() => {
+                    return <KpiStatusBadge label={selectedKpiState.statusText} status={kpiStatus({
+                      tone: selectedKpiState.tone,
                       hasCurrentValue: selectedLatestKpi?.actual_value !== null && selectedLatestKpi?.actual_value !== undefined,
                       hasTarget: selectedTargetReference.kind !== "none",
                       hasDirection: true
@@ -2010,7 +2139,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   <p className="mt-2 text-sm leading-6 text-slate-300">
                     {selectedLatestKpi
                       ? selectedKpiDirection !== "unknown"
-                        ? `${primaryMetric} is ${statusLabel(metricTone(selectedLatestKpi.actual_value, selectedManualTarget, selectedKpiSemantics)).toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
+                        ? `${primaryMetric} is ${statusLabel(selectedKpiState?.tone ?? "neutral").toLowerCase()} at ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. ${selectedMetricRows.length < 4 ? "More history will make recommendations more reliable." : "History is sufficient for a useful review."}`
                         : `${primaryMetric} is ${formatSettingValue(selectedLatestKpi.actual_value, primaryMetric, kpiSettings)}. Direction is not explicitly configured, so Vaeroex is not labeling this result favorable or unfavorable.`
                       : "Add a current value to unlock status, trend, and target guidance."}
                   </p>
@@ -2058,7 +2187,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                 <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
                   <summary className="cursor-pointer font-semibold text-white">Chart settings</summary>
                   <div className="mt-3">
-                    <KpiChartSettingsForm metricName={primaryMetric} setting={selectedKpiSetting} latest={selectedLatestKpi} />
+                    <KpiChartSettingsForm metricName={primaryMetric} setting={selectedKpiSetting} latest={selectedLatestKpi} semantics={selectedKpiSemantics} />
                   </div>
                 </details>
                 <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
@@ -2219,7 +2348,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                       : "Select at least two KPIs to compare trend lines."}
                   </p>
                 </div>
-                <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} context={selectedComparisonContext} />
+                <ComparisonAnalysis trends={selectedTrends} mode={comparisonMode} context={selectedComparisonContext} deterministicStates={selectedComparisonStatesByName} />
               </div>
             </>
           ) : (

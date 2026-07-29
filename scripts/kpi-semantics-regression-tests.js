@@ -316,14 +316,15 @@ const acceptAction = operationsActions.slice(
 assert.doesNotMatch(acceptAction, /\btarget\s*:/, "Suggestion acceptance must not overwrite the manual target.");
 assert.match(kpiPage, /Performance direction is not confirmed\./);
 assert.match(kpiPage, /Deterministic performance direction:/);
-assert.match(kpiPage, /const resolvedSemantics = kpiSemantics\(metricName, setting \? \[setting\] : \[\]\)/);
+assert.match(kpiPage, /const resolvedSemantics = semantics;/, "Chart Settings must render the projected canonical semantic state.");
+assert.match(kpiPage, /semantics=\{selectedKpiSemantics\}/, "KPI Detail and Chart Settings must consume one projected semantic state.");
 assert.match(kpiPage, /Accept suggestion/);
 assert.match(kpiPage, /Change manually/);
 assert.match(kpiPage, /Leave unconfirmed/);
 assert.doesNotMatch(kpiPage, /function ManualTargetForm/, "Recommended Target must not contain a second manual target editor.");
 assert.match(kpiPage, /Current manual target/);
 assert.match(kpiPage, /Edit manual targets in Chart Settings\./);
-assert.match(kpiPage, /const selectedManualTarget = selectedKpiSetting\?\.target \?\? selectedLatestKpi\?\.target \?\? null/);
+assert.match(kpiPage, /const selectedManualTarget = selectedKpiState\?\.manualTarget \?\? null/, "KPI Detail must render the snapshot-projected authoritative manual target.");
 assert.match(kpiPage, /resolveSelectedKpiNames\(params\?\.metric, metricNames\)/, "KPI Detail must resolve URL selection through normalized KPI identity.");
 assert.doesNotMatch(kpiPage, /function getSelectedMetrics/, "KPI Detail must not retain the case-sensitive first-item fallback.");
 assert.match(kpiPage, /resolveKpiTargetReference/);

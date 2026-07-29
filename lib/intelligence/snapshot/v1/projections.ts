@@ -74,6 +74,45 @@ export function projectKpiOverviewV1(snapshot: IntelligenceSnapshotV1): KpiOverv
   };
 }
 
+export type KpiPageProjectionV1 = ProjectionHeaderV1 & Readonly<{
+  kpis: readonly KpiSnapshotV1[];
+  forecastReadiness: IntelligenceSnapshotV1["readiness"]["forecast"];
+}>;
+
+export function projectKpiPageV1(snapshot: IntelligenceSnapshotV1, kpiIds?: readonly string[]): KpiPageProjectionV1 {
+  const selectedIds = kpiIds ? new Set(kpiIds) : null;
+  const kpis = selectedIds ? snapshot.kpis.filter((kpi) => selectedIds.has(kpi.id)) : snapshot.kpis;
+  if (selectedIds && kpis.length !== selectedIds.size) {
+    throw new Error("A requested KPI does not resolve in IntelligenceSnapshotV1.");
+  }
+  return { ...header(snapshot), kpis, forecastReadiness: snapshot.readiness.forecast };
+}
+
+export type KpiDetailProjectionV1 = ProjectionHeaderV1 & Readonly<{
+  kpi: SnapshotState<KpiSnapshotV1>;
+}>;
+
+export function projectKpiDetailV1(snapshot: IntelligenceSnapshotV1, kpiId: string): KpiDetailProjectionV1 {
+  const kpi = snapshot.kpis.find((candidate) => candidate.id === kpiId);
+  return {
+    ...header(snapshot),
+    kpi: kpi
+      ? { state: "available", value: kpi }
+      : { state: "unavailable", reason: { code: "source_not_available" } }
+  };
+}
+
+export type KpiCompareProjectionV1 = ProjectionHeaderV1 & Readonly<{
+  kpis: readonly KpiSnapshotV1[];
+}>;
+
+export function projectKpiCompareV1(snapshot: IntelligenceSnapshotV1, kpiIds: readonly string[]): KpiCompareProjectionV1 {
+  const selectedIds = new Set(kpiIds);
+  const kpis = snapshot.kpis.filter((kpi) => selectedIds.has(kpi.id));
+  if (kpis.length !== selectedIds.size) throw new Error("A compared KPI does not resolve in IntelligenceSnapshotV1.");
+  return { ...header(snapshot), kpis };
+}
+
 export type BusinessHealthExplanationProjectionV1 = ProjectionHeaderV1 & Readonly<{
   businessHealth: IntelligenceSnapshotV1["businessHealth"];
   dataQuality: IntelligenceSnapshotV1["dataQuality"];

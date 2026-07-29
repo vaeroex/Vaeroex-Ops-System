@@ -57,7 +57,7 @@ export type BuildIntelligenceSnapshotV1Input = Readonly<{
   evaluationDate: string;
   generatedAt: string;
   versions: IntelligenceSnapshotVersionsV1;
-  intelligenceLayer: IntelligenceProducerEnvelopeV1<IntelligenceLayerProducerOutputV1>;
+  intelligenceLayer?: IntelligenceProducerEnvelopeV1<IntelligenceLayerProducerOutputV1>;
   kpis?: IntelligenceProducerEnvelopeV1<KpiProducerOutputV1>;
   coverage?: IntelligenceProducerEnvelopeV1<CoverageProducerOutputV1>;
   evidenceManifests?: IntelligenceProducerEnvelopeV1<EvidenceManifestProducerOutputV1>;
@@ -109,16 +109,21 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
   const totalStartedAt = nowMs();
   if (!input.workspaceId.trim()) throw new Error("workspaceId is required.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.evaluationDate)) throw new Error("evaluationDate must use YYYY-MM-DD.");
+  if (!input.intelligenceLayer && !input.kpis) {
+    throw new Error("IntelligenceSnapshotV1 requires an Intelligence Layer or canonical KPI producer.");
+  }
   if (canonicalSnapshotJson(input.versions) !== canonicalSnapshotJson(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1)) {
     throw new Error("Unsupported IntelligenceSnapshotV1 calculation, policy, ordering, or adapter version map.");
   }
 
-  assertEnvelope({
-    envelope: input.intelligenceLayer,
-    expectedProducerId: INTELLIGENCE_LAYER_PRODUCER_ID,
-    workspaceId: input.workspaceId,
-    asOf: input.asOf
-  });
+  if (input.intelligenceLayer) {
+    assertEnvelope({
+      envelope: input.intelligenceLayer,
+      expectedProducerId: INTELLIGENCE_LAYER_PRODUCER_ID,
+      workspaceId: input.workspaceId,
+      asOf: input.asOf
+    });
+  }
   if (input.kpis) {
     for (const metric of input.kpis.output) {
       if (metric.workspaceId !== input.workspaceId) throw new Error(`KPI ${metric.id} belongs to another workspace.`);
@@ -149,13 +154,34 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
   }
 
   const adapterStartedAt = nowMs();
-  const layer = adaptIntelligenceLayerProducerOutputV1({
-    workspaceId: input.workspaceId,
-    producerVersion: input.intelligenceLayer.producerVersion,
-    evidenceEligibilityPolicyVersion: input.versions.policies.evidenceEligibility,
-    lineageVersion: input.versions.policies.lineage,
-    output: input.intelligenceLayer.output
-  });
+  const layer: ReturnType<typeof adaptIntelligenceLayerProducerOutputV1> = input.intelligenceLayer
+    ? adaptIntelligenceLayerProducerOutputV1({
+        workspaceId: input.workspaceId,
+        producerVersion: input.intelligenceLayer.producerVersion,
+        evidenceEligibilityPolicyVersion: input.versions.policies.evidenceEligibility,
+        lineageVersion: input.versions.policies.lineage,
+        output: input.intelligenceLayer.output
+      })
+    : {
+        businessHealth: unavailable("unavailable", "missing_producer"),
+        dataQuality: unavailable("unavailable", "missing_producer"),
+        forecastReadiness: unavailable("unavailable", "missing_producer"),
+        findings: [],
+        findingIndex: {
+          riskFindingIds: [],
+          opportunityFindingIds: [],
+          recommendationFindingIds: [],
+          forecastFindingIds: []
+        },
+        priorities: [],
+        evidenceReferences: [],
+        limitations: [{
+          code: "intelligence_layer_producer_not_supplied",
+          scope: "snapshot",
+          severity: "information",
+          message: "The Intelligence Layer was not required by this scoped KPI snapshot consumer."
+        }]
+      };
   const kpis = input.kpis ? adaptKpiProducerOutputV1(input.kpis.output) : [];
   const coverage: SnapshotState<CoverageSnapshotV1> = input.coverage
     ? adaptCoverageProducerOutputV1(input.coverage.output)
@@ -181,7 +207,7 @@ export function buildIntelligenceSnapshotV1(input: BuildIntelligenceSnapshotV1In
     }] : [])
   ];
   const provenance = [
-    producerReceipt(input.intelligenceLayer),
+    ...(input.intelligenceLayer ? [producerReceipt(input.intelligenceLayer)] : []),
     ...(input.kpis ? [producerReceipt(input.kpis)] : []),
     ...(input.coverage ? [producerReceipt(input.coverage)] : []),
     ...(input.evidenceManifests ? [producerReceipt(input.evidenceManifests)] : [])

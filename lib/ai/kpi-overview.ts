@@ -8,6 +8,7 @@ import { getAIProviderRetrySettings, type AIProviderRetrySettings } from "@/lib/
 import { runStructuredAI } from "@/lib/ai/providers/provider-manager";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
 import { applyKpiSettingsToRows, kpiSemantics, kpiSettingForName, normalizeKpiName, sortKpiRowsBySettings, type KpiSettingRow } from "@/lib/kpis/settings";
+import { kpiMeasurementFreshness } from "@/lib/kpis/freshness";
 import { evaluateKpiPerformance, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
 import { filterBySourceParentEligibility, loadSourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -113,13 +114,6 @@ function dateOnly(value: string | null | undefined) {
   return /^\d{4}-\d{2}-\d{2}/.test(value || "") ? (value || "").slice(0, 10) : "";
 }
 
-function daysSince(date: string, now = new Date()) {
-  if (!date) return Number.POSITIVE_INFINITY;
-  const parsed = new Date(`${date}T00:00:00.000Z`).getTime();
-  if (!Number.isFinite(parsed)) return Number.POSITIVE_INFINITY;
-  return Math.floor((now.getTime() - parsed) / 86_400_000);
-}
-
 function isTimeoutLike(error: unknown) {
   return /timed out|timeout|aborterror|aborted/i.test(`${error instanceof Error ? error.name : ""} ${error instanceof Error ? error.message : ""}`);
 }
@@ -153,13 +147,6 @@ function trendForEvaluation(evaluation: KpiPerformanceEvaluation): KpiOverviewMe
   if (evaluation.latestPerformanceEffect === "unfavorable") return "declining";
   if (evaluation.latestPerformanceEffect === "neutral") return "steady";
   return "direction_unknown";
-}
-
-function freshnessForDate(metricDate: string): KpiOverviewMetric["freshness"] {
-  const ageDays = daysSince(metricDate);
-  if (ageDays <= 45) return "current";
-  if (ageDays <= 120) return "stale";
-  return "old";
 }
 
 function confidenceForSummary(summary: Omit<KpiOverviewSummary, "recommendationConfidence">): KpiOverviewSummary["recommendationConfidence"] {
@@ -250,7 +237,7 @@ export function buildKpiOverviewSummary(rows: KpiRow[], settings: KpiSettingRow[
         targetStatus: evaluation.targetStatus,
         reportingPeriod: metricDate || "Not dated",
         lastUpdated: dateOnly(latest?.updated_at) || metricDate || dateOnly(latest?.created_at) || "Not recorded",
-        freshness: freshnessForDate(metricDate),
+        freshness: kpiMeasurementFreshness(metricDate),
         historyCount: rowsByDate.length,
         history
       } satisfies KpiOverviewMetric;

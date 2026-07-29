@@ -3,12 +3,17 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
 import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/context";
+import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
 import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
+import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
+import { buildIntelligenceInboxFromSnapshotV1 } from "@/lib/intelligence/snapshot/v1/consumers/intelligence-inbox";
+import { projectIntelligenceInboxV1 } from "@/lib/intelligence/snapshot/v1/projections";
+import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 import { isSecurityResponseMessage } from "@/lib/security/security-response";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -119,12 +124,44 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     recommendationOutcomes: outcomesResult.data || [],
     operationalInsights
   });
+  const snapshotAsOf = new Date().toISOString();
+  let intelligenceSnapshot: IntelligenceSnapshotV1 | null = null;
+  let displayedInsights = intelligence.insights;
+  try {
+    const snapshotBuild = buildIntelligenceSnapshotFromProducersV1({
+      workspaceId,
+      asOf: snapshotAsOf,
+      intelligence
+    });
+    intelligenceSnapshot = snapshotBuild.snapshot;
+    const inbox = buildIntelligenceInboxFromSnapshotV1({
+      projection: projectIntelligenceInboxV1(snapshotBuild.snapshot),
+      intelligence
+    });
+    displayedInsights = inbox.insights;
+  } catch (error) {
+    if (process.env.VERCEL_ENV !== "preview") throw error;
+    console.error(JSON.stringify({
+      level: "error",
+      component: "intelligence-inbox",
+      event: "snapshot_v1_projection_fallback",
+      classification: "adapter_defect",
+      reason: error instanceof Error ? error.message : "snapshot_construction_failed"
+    }));
+  }
   const userId = context.membership?.user_id;
   const explanationTokens = isFindingExplanationEnabled() && userId
-    ? Object.fromEntries(intelligence.insights.flatMap((insight) => {
+    ? Object.fromEntries(displayedInsights.flatMap((insight) => {
         if (!["Risk", "Anomaly", "Bottleneck"].includes(insight.type)) return [];
         try {
-          const analysisPackage = buildFindingExplanationPackage({ workspaceId, insight });
+          const analysisPackage = intelligenceSnapshot
+            ? buildFindingExplanationFromSnapshotV1({
+                workspaceId,
+                insight,
+                snapshot: intelligenceSnapshot,
+                now: new Date(snapshotAsOf)
+              }).analysisPackage
+            : buildFindingExplanationPackage({ workspaceId, insight, now: new Date(snapshotAsOf) });
           if (!analysisPackage.requiredCitationIds.length) return [];
           const token = trySealFindingExplanationPackage({ analysisPackage, workspaceId, userId });
           return token ? [[insight.id, token]] : [];
@@ -136,7 +173,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   return (
     <div className="space-y-4">
       <ErrorNotice message={displayErrors[0]?.message || null} />
-      <IntelligenceSignalInbox insights={intelligence.insights} initialFindingId={params?.finding} explanationTokens={explanationTokens} />
+      <IntelligenceSignalInbox insights={displayedInsights} initialFindingId={params?.finding} explanationTokens={explanationTokens} />
     </div>
   );
 }
