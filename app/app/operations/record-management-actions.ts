@@ -11,8 +11,6 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type ManagedCollection =
   | "sops"
-  | "checklists"
-  | "checklist_runs"
   | "issues"
   | "reports"
   | "kpis"
@@ -63,34 +61,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "submitter_email", kind: "text", maxLength: 220 },
       { name: "ai_summary", kind: "textarea", maxLength: 3000 },
       { name: "ai_detected_priority", kind: "select", maxLength: 40 }
-    ]
-  },
-  checklists: {
-    table: "checklists",
-    path: "/app/checklists",
-    titleField: "name",
-    fields: [
-      { name: "name", kind: "requiredText", maxLength: 160 },
-      { name: "category", kind: "text", maxLength: 120 },
-      { name: "frequency", kind: "select", maxLength: 80 },
-      { name: "assigned_role", kind: "text", maxLength: 120 },
-      { name: "description", kind: "textarea", maxLength: 1200 },
-      { name: "items_json", kind: "lines", maxLength: 6000 }
-    ]
-  },
-  checklist_runs: {
-    table: "checklist_runs",
-    path: "/app/checklist-runs",
-    titleField: "status",
-    fields: [
-      { name: "status", kind: "select", maxLength: 80 },
-      { name: "completed_at", kind: "date" },
-      { name: "due_date", kind: "date" },
-      { name: "priority", kind: "select", maxLength: 40 },
-      { name: "assigned_role", kind: "text", maxLength: 120 },
-      { name: "assigned_department", kind: "text", maxLength: 140 },
-      { name: "notes", kind: "textarea", maxLength: 1000 },
-      { name: "responses_json", kind: "lines", maxLength: 6000 }
     ]
   },
   issues: {
@@ -396,7 +366,7 @@ function revalidateRelatedPaths(collection: ManagedCollection, path: Route | str
 
   // These collections can affect intelligence presentation or saved-output
   // availability. Revalidation does not make derived records original evidence.
-  if (["kpis", "files", "reports", "issues", "checklists", "ai_agent_runs", "crm_leads"].includes(collection)) {
+  if (["kpis", "files", "reports", "issues", "ai_agent_runs", "crm_leads"].includes(collection)) {
     revalidatePath("/app");
     revalidatePath("/app/intelligence");
     revalidatePath("/app/sources");

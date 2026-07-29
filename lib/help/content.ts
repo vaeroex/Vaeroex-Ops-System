@@ -146,7 +146,6 @@ export const helpArticles: HelpArticle[] = [
     ["files-imports", "Evidence", "Upload files, review source findings, and approve structured imports.", "/app/sources"],
     ["sop-library", "SOP Library", "A place to store, review, and improve working procedures.", "/app/sops"],
     ["issues", "Issues", "A place to log risks, problems, root causes, and recommended fixes.", "/app/issues"],
-    ["checklists", "Checklists", "Repeatable review lists for recurring work and quality checks.", "/app/checklists"],
     ["assets", "Assets", "Tracked equipment, tools, locations, readiness, and status checks.", "/app/assets"],
     ["report-sharing", "Saved Analysis Review", "Preserve completed analysis context in workspace history.", "/app/reports"],
     ["report-scheduling", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
@@ -207,7 +206,7 @@ export const helpArticles: HelpArticle[] = [
     ["monthly-performance", "How to review business performance monthly", "Compare KPI trends, revenue, customer activity, issues, SOP changes, and decisions."],
     ["ceo-use", "How to use Vaeroex as a CEO", "Focus on health score, risks, priorities, business memory, and decisions."],
     ["director-use", "How to use Vaeroex as a Director", "Review scorecards, bottlenecks, evidence, and cross-functional patterns."],
-    ["manager-use", "How to use Vaeroex as a Manager", "Review signals, issues, checklists, and source evidence for clearer operating context."],
+    ["manager-use", "How to use Vaeroex as a Manager", "Review signals, issues, and source evidence for clearer operating context."],
     ["supervisor-use", "How to use Vaeroex as a Supervisor", "Use source evidence to preserve what leadership should know."],
     ["clean-data", "How to keep data clean", "Use clear names, dates, categories, and notes that another leader can understand."],
     ["avoid-sensitive-data", "How to avoid uploading sensitive data", "Keep Vaeroex focused on operational business records and avoid regulated sensitive records."]
