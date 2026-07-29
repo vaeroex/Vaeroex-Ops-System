@@ -1020,34 +1020,6 @@ export async function createAssetCheckAction(formData: FormData) {
   redirectWithMessage(path, "Asset check saved.");
 }
 
-export async function createPersonAction(formData: FormData) {
-  const path = "/app/people";
-  const { supabase, workspaceId } = await requireWorkspace(path);
-  const fullName = text(formData, "full_name");
-
-  requireValue(path, "Name", fullName);
-  validateLength(path, "Email", text(formData, "email"), 160);
-
-  const { error } = await supabase.from("people").insert({
-    workspace_id: workspaceId,
-    full_name: fullName,
-    email: text(formData, "email"),
-    phone: text(formData, "phone"),
-    role_title: text(formData, "role_title"),
-    department: text(formData, "department"),
-    status: text(formData, "status") || "active",
-    start_date: text(formData, "start_date") || null,
-    notes: text(formData, "notes")
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  redirectWithMessage(path, "Person added.");
-}
-
 export async function createSopAction(formData: FormData) {
   const path = "/app/sops";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
