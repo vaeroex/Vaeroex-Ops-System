@@ -7,7 +7,6 @@ export type GlobalSearchGroupLabel =
   | "Customer Evidence"
   | "SOPs"
   | "Checklists"
-  | "People"
   | "Learned Knowledge"
   | "Diagnostics";
 

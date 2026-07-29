@@ -259,7 +259,6 @@ const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
 const kpiSettingsPage = fs.readFileSync(path.join(root, "app/app/kpis/settings/page.tsx"), "utf8");
 const prestige = fs.readFileSync(path.join(root, "lib/intelligence/prestige.ts"), "utf8");
-const peoplePage = fs.readFileSync(path.join(root, "app/app/people/page.tsx"), "utf8");
 const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
 const dormantReports = fs.readFileSync(path.join(root, "app/app/reports/actions.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607270002_kpi_semantic_direction.sql"), "utf8");
@@ -288,10 +287,6 @@ assert.match(kpiSettingsPage, /defaultValue=\{formatNumber\(target\)\}/, "the ta
 assert.match(prestige, /evaluateKpiPerformance/);
 assert.match(prestige, /resolveKpiTargetReference/);
 assert.doesNotMatch(prestige, /latest\.actual_value\s*>=\s*previous\.actual_value/);
-assert.match(peoplePage, /from\("kpi_settings"\)/, "People loads canonical KPI settings for shared intelligence output");
-assert.match(peoplePage, /order\("sort_order", \{ ascending: true \}\)\.order\("weight", \{ ascending: false \}\)/, "People orders KPI settings by columns owned by kpi_settings");
-assert.doesNotMatch(peoplePage, /from\("kpi_settings"\)[^\n]+order\("metric_name"/, "People must not order KPI settings by the operational-metrics column metric_name");
-assert.match(peoplePage, /kpiSettings: kpiSettingsResult\.data \|\| \[\]/);
 assert.match(operationalEvidence, /Math\.abs\(revenue\.changePercent \?\? 0\) >= 5/, "operational thresholds measure magnitude after canonical direction is known");
 assert.match(dormantReports, /performanceEffect === "favorable"/);
 assert.match(dormantReports, /performanceEffect === "unfavorable"/);

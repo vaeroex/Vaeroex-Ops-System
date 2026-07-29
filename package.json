@@ -36,6 +36,7 @@
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js && node scripts/gpt56-business-health-routing-regression-tests.js",
     "test:business-signals-retirement": "node scripts/business-signals-retirement-regression-tests.js",
     "test:notification-retirement": "node scripts/notification-retirement-regression-tests.js",
+    "test:people-retirement": "node scripts/people-page-retirement-regression-tests.js",
     "test:executive-brief": "node scripts/executive-brief-regression-tests.js",
     "test:finding-explanation": "node scripts/finding-explanation-regression-tests.js",
     "test:executive-kpi-analysis-retirement": "node scripts/executive-kpi-analysis-retirement-regression-tests.js",
