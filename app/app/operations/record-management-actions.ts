@@ -23,7 +23,6 @@ type ManagedCollection =
   | "asset_checks"
   | "crm_leads"
   | "files"
-  | "people"
   | "support_requests";
 
 type FieldKind = "text" | "requiredText" | "textarea" | "select" | "date" | "number" | "checkbox" | "lines";
@@ -201,21 +200,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "status", kind: "select", maxLength: 80 },
       { name: "estimated_value", kind: "number" },
       { name: "owner", kind: "text", maxLength: 120 },
-      { name: "notes", kind: "textarea", maxLength: 2000 }
-    ]
-  },
-  people: {
-    table: "people",
-    path: "/app/people",
-    titleField: "full_name",
-    fields: [
-      { name: "full_name", kind: "requiredText", maxLength: 180 },
-      { name: "email", kind: "text", maxLength: 220 },
-      { name: "phone", kind: "text", maxLength: 80 },
-      { name: "role_title", kind: "text", maxLength: 140 },
-      { name: "department", kind: "text", maxLength: 140 },
-      { name: "status", kind: "select", maxLength: 80 },
-      { name: "start_date", kind: "date" },
       { name: "notes", kind: "textarea", maxLength: 2000 }
     ]
   },
