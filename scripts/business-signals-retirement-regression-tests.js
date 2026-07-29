@@ -39,14 +39,11 @@ const runtimeFiles = [
   "app/app/intelligence/page.tsx",
   "app/app/kpis/page.tsx",
   "app/app/people/page.tsx",
-  "app/app/reports/actions.ts",
   "components/app/AppShell.tsx",
   "components/app/GlobalSearch.tsx",
   "lib/ai/bounded-context.ts",
-  "lib/ai/workspace-snapshot.ts",
   "lib/intelligence/layer.ts",
-  "lib/intelligence/coverage.ts",
-  "lib/reports/scheduled-generator.ts"
+  "lib/intelligence/coverage.ts"
 ];
 
 for (const file of runtimeFiles) {
@@ -92,5 +89,8 @@ assert.match(fileActions, /uploadFileAction/, "the existing Evidence upload acti
 
 assert.equal(fs.existsSync(path.join(root, "lib/business-signals/retirement.ts")), false, "retirement-only helper must be removed");
 assert.equal(fs.existsSync(path.join(root, "lib/intelligence/business-signal-evidence.ts")), false, "Business Signal evidence utility must be removed");
+for (const file of ["app/app/reports/actions.ts", "lib/ai/workspace-snapshot.ts", "lib/reports/scheduled-generator.ts"]) {
+  assert.equal(fs.existsSync(path.join(root, file)), false, `${file} must remain deleted after structural cleanup`);
+}
 
 console.log("Business Signals full-retirement regressions passed.");

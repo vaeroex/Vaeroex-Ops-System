@@ -71,12 +71,10 @@ function signalRows(input: Readonly<Record<string, unknown>>) {
 
 function deterministicAssembly({
   value,
-  input,
-  contractId
+  input
 }: {
   value: Record<string, unknown>;
   input: Readonly<Record<string, unknown>>;
-  contractId: StageThreeBProbeResult["contractId"];
 }) {
   const rows = signalRows(input);
   const covered = Array.isArray(value.covered_signal_ordinals)
@@ -88,28 +86,12 @@ function deterministicAssembly({
   }
   const assembled = { ...value };
   delete assembled.covered_signal_ordinals;
-  if (contractId === "executive_brief_v1") {
-    const firstRisk = rows.find((row) => row.classification === "risk");
-    const firstOpportunity = rows.find((row) => row.classification === "opportunity");
-    const concernOrdinal = typeof value.primary_concern_ordinal === "number" ? value.primary_concern_ordinal : null;
-    const opportunityOrdinal = typeof value.strongest_positive_signal_ordinal === "number" ? value.strongest_positive_signal_ordinal : null;
-    if (concernOrdinal !== (firstRisk?.ordinal || null) || opportunityOrdinal !== (firstOpportunity?.ordinal || null)) {
-      return { ok: false as const, reasonCode: "invalid_action" as const, expectedCount: rows.length, observedCount: covered.length };
-    }
-    assembled.primary_concern = firstRisk ? `${firstRisk.label}: ${firstRisk.fact}` : null;
-    assembled.strongest_positive_signal = firstOpportunity ? `${firstOpportunity.label}: ${firstOpportunity.fact}` : null;
-    delete assembled.primary_concern_ordinal;
-    delete assembled.strongest_positive_signal_ordinal;
-  }
   return { ok: true as const, value: assembled };
 }
 
-function assemblyPromptSuffix(assemblyMode: StageThreeBAssemblyMode, contractId: StageThreeBProbeResult["contractId"]) {
+function assemblyPromptSuffix(assemblyMode: StageThreeBAssemblyMode) {
   if (assemblyMode === "one_pass") return "";
-  const briefFields = contractId === "executive_brief_v1"
-    ? " Omit primary_concern and strongest_positive_signal; the application will assemble those fields. Return primary_concern_ordinal and strongest_positive_signal_ordinal as the application-ranked signal ordinal, or null when that class is absent."
-    : "";
-  return `\nFor deterministic application assembly, also return covered_signal_ordinals containing every supplied signal ordinal exactly once.${briefFields} These ordinal fields are transport controls and must not appear in narrative text.`;
+  return "\nFor deterministic application assembly, also return covered_signal_ordinals containing every supplied signal ordinal exactly once. These ordinal fields are transport controls and must not appear in narrative text.";
 }
 
 function boundedScore(value: number) {
@@ -219,7 +201,7 @@ export async function runStageThreeBQualificationProbe({
     settings,
     contractId: fixture.contractId,
     assemblyMode,
-    prompt: `${fixture.systemPrompt}${assemblyPromptSuffix(assemblyMode, fixture.contractId)}`,
+    prompt: `${fixture.systemPrompt}${assemblyPromptSuffix(assemblyMode)}`,
     content: JSON.stringify(fixture.input)
   });
 
@@ -246,7 +228,7 @@ export async function runStageThreeBQualificationProbe({
     } else {
       parsedValue = parsed.value;
       if (assemblyMode === "deterministic_assembly") {
-        const assembly = deterministicAssembly({ value: parsed.value, input: fixture.input, contractId: fixture.contractId });
+        const assembly = deterministicAssembly({ value: parsed.value, input: fixture.input });
         if (!assembly.ok) {
           validationReasonCode = assembly.reasonCode;
           validationStage = assembly.reasonCode === "missing_required_signal" ? "ranked_signal_coverage" : "canonical_schema";

@@ -20,10 +20,6 @@ import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-chan
 import { buildBusinessHealthExplanationFromSnapshotV1 } from "@/lib/ai/business-health-explanation/snapshot-context";
 import { loadBusinessHealthAnalysisState } from "@/lib/ai/business-health-explanation/storage";
 import { trySealBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
-import { buildExecutiveBriefPackage } from "@/lib/ai/executive-brief/context";
-import { loadExecutiveBriefState } from "@/lib/ai/executive-brief/storage";
-import { trySealExecutiveBriefPackage } from "@/lib/ai/executive-brief/token";
-import { isExecutiveBriefPreviewEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
@@ -1734,31 +1730,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         requestTokenAvailable: Boolean(businessHealthAnalysisToken)
       })
     : { status: "available" as const, artifact: null, message: null };
-  const executiveBriefPackage = buildExecutiveBriefPackage({
-    workspaceId,
-    intelligence: intelligenceLayer,
-    homepage: executiveHomepageModel,
-    businessHealthPresentation: {
-      businessHealthSummary: businessHealthAnalysisPackage.facts.deterministicSummary,
-      businessHealthDriverStatements: businessHealthAnalysisPackage.facts.drivers.map((driver) => `${driver.label}: ${driver.fact}`)
-    },
-    sourceLabelsByKey: executiveSourceLabelsByKey
-  });
-  const executiveBriefToken = user && dashboardMode === "Executive View" && isExecutiveBriefPreviewEnabled()
-    ? trySealExecutiveBriefPackage({
-        analysisPackage: executiveBriefPackage,
-        workspaceId,
-        userId: user.id
-      })
-    : null;
-  const executiveBriefState = dashboardMode === "Executive View"
-    ? await loadExecutiveBriefState({
-        supabase,
-        workspaceId,
-        analysisPackage: executiveBriefPackage,
-        requestTokenAvailable: Boolean(executiveBriefToken)
-      })
-    : { status: "available" as const, artifact: null, message: null };
   const isExecutiveView = dashboardMode === "Executive View";
   const isOperationsView = dashboardMode === "Operations View";
   const isIntelligenceView = dashboardMode === "Intelligence View";
@@ -1803,13 +1774,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           model={executiveHomepageModel}
           healthHistory={businessHealthHistory}
           healthHistoryError={businessHealthSnapshotResult.errorMessage}
-          executiveBrief={{
-            state: executiveBriefState,
-            requestToken: executiveBriefToken,
-            facts: executiveBriefPackage.facts,
-            signals: executiveBriefPackage.signals,
-            citations: executiveBriefPackage.citations
-          }}
           businessHealthAnalysis={{
             state: businessHealthAnalysisState,
             requestToken: businessHealthAnalysisToken,

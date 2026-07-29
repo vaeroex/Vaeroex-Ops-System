@@ -58,53 +58,29 @@ function baseSchema(contractId: StageTwoContractId): JsonSchema {
       }
     };
   }
-  if (contractId === "leadership_priorities_v1") {
-    return {
-      type: "object",
-      additionalProperties: false,
-      required: ["overview", "priorities", "uncertainty"],
-      properties: {
-        overview: stringField,
-        priorities: {
-          type: "array",
-          minItems: 3,
-          maxItems: 3,
-          items: {
-            type: "object",
-            additionalProperties: false,
-            required: ["ordinal", "emphasis", "sequencing_rationale", "tradeoff"],
-            properties: {
-              ordinal: { type: "integer", minimum: 1, maximum: 3 },
-              emphasis: stringField,
-              sequencing_rationale: stringField,
-              tradeoff: nullableStringField
-            }
-          }
-        },
-        uncertainty: stringField
-      }
-    };
-  }
   return {
     type: "object",
     additionalProperties: false,
-    required: [
-      "executive_summary",
-      "why_it_matters",
-      "primary_concern",
-      "strongest_positive_signal",
-      "leadership_focus",
-      "uncertainty",
-      "provisional_hypothesis"
-    ],
+    required: ["overview", "priorities", "uncertainty"],
     properties: {
-      executive_summary: stringField,
-      why_it_matters: stringField,
-      primary_concern: nullableStringField,
-      strongest_positive_signal: nullableStringField,
-      leadership_focus: stringField,
-      uncertainty: stringField,
-      provisional_hypothesis: nullableStringField
+      overview: stringField,
+      priorities: {
+        type: "array",
+        minItems: 3,
+        maxItems: 3,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["ordinal", "emphasis", "sequencing_rationale", "tradeoff"],
+          properties: {
+            ordinal: { type: "integer", minimum: 1, maximum: 3 },
+            emphasis: stringField,
+            sequencing_rationale: stringField,
+            tradeoff: nullableStringField
+          }
+        }
+      },
+      uncertainty: stringField
     }
   };
 }
@@ -114,20 +90,8 @@ export function stageThreeBJsonSchema(contractId: StageTwoContractId, assemblyMo
   if (assemblyMode === "one_pass") return schema;
   const properties = { ...(schema.properties as Record<string, unknown>) };
   const required = [...(schema.required as string[])];
-  if (contractId === "executive_brief_v1") {
-    delete properties.primary_concern;
-    delete properties.strongest_positive_signal;
-    required.splice(required.indexOf("primary_concern"), 1);
-    required.splice(required.indexOf("strongest_positive_signal"), 1);
-  }
   required.push("covered_signal_ordinals");
-  const additions: Record<string, unknown> = { covered_signal_ordinals: ordinalArray };
-  if (contractId === "executive_brief_v1") {
-    required.push("primary_concern_ordinal", "strongest_positive_signal_ordinal");
-    additions.primary_concern_ordinal = { type: ["integer", "null"], minimum: 1 };
-    additions.strongest_positive_signal_ordinal = { type: ["integer", "null"], minimum: 1 };
-  }
-  return { ...schema, required, properties: { ...properties, ...additions } };
+  return { ...schema, required, properties: { ...properties, covered_signal_ordinals: ordinalArray } };
 }
 
 function extractOpenAIContent(payload: OpenAIResponsesPayload) {

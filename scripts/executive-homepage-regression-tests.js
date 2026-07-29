@@ -240,7 +240,7 @@ assert.match(sourcesPageSource, /update_source_file_lifecycle|manageSourceFileAc
 assert.match(sourcesPageSource, /\["queued", "pending", "running", "processing"\]\.includes\(latestRun\.status\)/, "Analyzing must require a current active run");
 assert.doesNotMatch(sourcesPageSource, /processing_status \|\| ""\) === "processing"\) return "Analyzing"/, "a stale file processing field must not display Analyzing without an active run");
 assert.match(sourcesPageSource, /hasCompletedAnalysis[\s\S]*if \(hasCompletedAnalysis\) return "Needs Review";/, "completed analysis must remain visible after processing finishes");
-assert.match(sourcesPageSource, /tab\.key !== "knowledge"[\s\S]*memoryChunks\.some/, "zero-count Learned Knowledge must be hidden");
+assert.match(sourcesPageSource, /tab\.key !== "knowledge"[\s\S]*activeKnowledgeRows\.length > 0/, "zero-count Learned Knowledge must be hidden");
 assert.match(kpiPageSource, /kpiSemantics\(name, settings\)\.desiredDirection/, "KPI directionality must come from validated semantic metadata");
 assert.match(kpiPageSource, /actual === null \|\| semantics\.desiredDirection === "unknown"/, "KPI status must remain neutral without confirmed semantics");
 assert.match(kpiPageSource, /resolveKpiTargetReference\(semantics, row\.target\)\.kind === "none"/, "target availability must include canonical semantic targets and ranges");

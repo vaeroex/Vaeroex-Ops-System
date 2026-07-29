@@ -37,7 +37,6 @@ const customerFacingFiles = [
   "components/legal/PublicFooter.tsx",
   "components/legal/PublicSiteHeader.tsx",
   "components/motion/MarketingDashboardPreview.tsx",
-  "components/motion/ScrollStory.tsx",
   "lib/billing/plans.ts",
   "lib/demo/workspace-demo.ts",
   "lib/email/welcome.ts",
@@ -51,6 +50,7 @@ for (const file of customerFacingFiles) {
   assert.doesNotMatch(source, /Operations Intelligence/, `${file} must not expose the former product name`);
   assert.doesNotMatch(source, /\/operations-intelligence/, `${file} must not link to the former product route`);
 }
+assert.equal(fs.existsSync(path.join(root, "components/motion/ScrollStory.tsx")), false, "the unused legacy marketing story component must stay deleted");
 
 assert.match(read("components/motion/OperationsIntelligenceEngineDemo.tsx"), /operations-intelligence-demo-tab/, "internal component identifiers must remain stable");
 assert.match(read(".env.example"), /STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY/, "existing environment-variable names must remain stable");

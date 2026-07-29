@@ -60,10 +60,10 @@ const activeRecommendationReaders = [
   "app/app/page.tsx",
   "app/app/intelligence/page.tsx",
   "lib/ai/bounded-context.ts",
-  "lib/ai/workspace-snapshot.ts",
   "lib/intelligence/coverage.ts",
   "lib/intelligence/layer.ts"
 ];
+assert.equal(fs.existsSync(path.join(root, "lib/ai/workspace-snapshot.ts")), false, "the superseded broad workspace snapshot must stay deleted");
 
 assert.doesNotMatch(overview, /Advanced Intelligence|Risk Simulation|Benchmark Mode|Profit Leak Detector/);
 assert.match(overview, /LeadershipDecisionJournal/);

@@ -327,10 +327,7 @@ check(vaeroexClientRuntime.includes("providerSettings?: AIProviderRetrySettings"
 check(vaeroexClientRuntime.includes("token_budget_check_started") && vaeroexClientRuntime.includes("token_budget_check_finished"), "Vaeroex provider client must log token budget stages.");
 check(vaeroexClientRuntime.includes("modelRoute") && vaeroexClientRuntime.includes("executionPath"), "Vaeroex OpenAI usage must identify model route and execution path.");
 check(vaeroexClientRuntime.includes("collectBoundedSourceIds") && vaeroexClientRuntime.includes("allowedSourceIds"), "Vaeroex output citations must be validated against bounded request evidence.");
-const contextualAskRuntime = read("app/app/contextual-ask/actions.ts");
-check(contextualAskRuntime.includes("isPremiumConversationalVaeroexEnabled"), "Contextual conversational actions must fail closed unless the premium policy is enabled.");
-check(!contextualAskRuntime.includes("buildWorkspaceSnapshot") && contextualAskRuntime.includes("buildFocusedExplanationContext"), "Contextual explanations must use selected-item context instead of a broad workspace snapshot.");
-check(contextualAskRuntime.includes('retrievalStrategy: "keyword_only"') && contextualAskRuntime.includes("maxEvidenceChunks"), "Contextual explanations must use bounded low-cost evidence retrieval.");
+check(!exists("app/app/contextual-ask/actions.ts"), "Retired contextual conversational actions must stay deleted.");
 const usageRuntime = read("lib/ai/usage.ts");
 check(usageRuntime.includes("CONSERVATIVE_UNKNOWN_MODEL_COST_CENTS_PER_1M") && !usageRuntime.includes("{ input: 0, output: 0 }"), "Unknown OpenAI models must never record zero estimated cost.");
 const evidenceIndexRuntime = read("lib/ai/evidence-index.ts");
@@ -343,9 +340,7 @@ const workspaceActionFiles = [
   "app/app/operations/actions.ts",
   "app/app/files/actions.ts",
   "app/app/agents/actions.ts",
-  "app/app/reports/actions.ts",
   "app/app/accountability/actions.ts",
-  "app/app/report-subscriptions/actions.ts",
   "app/app/intelligence/actions.ts"
 ];
 
@@ -443,8 +438,7 @@ check(recordManagementActions.includes("delete_record") && recordManagementActio
 
 const managedRecordList = read("components/operations/ManagedRecordList.tsx");
 check(managedRecordList.includes("Type DELETE for bulk delete"), "Bulk delete form must require visible typed DELETE confirmation.");
-const archivedBulkActions = read("components/operations/ArchivedFilesBulkActions.tsx");
-check(archivedBulkActions.includes("Type DELETE") && archivedBulkActions.includes("typed_confirmation"), "Archived file bulk delete must require typed DELETE confirmation.");
+check(!exists("components/operations/ArchivedFilesBulkActions.tsx"), "The unused archived-files bulk component must stay deleted.");
 
 check(fileActions.includes("stage_file_import"), "File import staging must pass through the gateway.");
 check(fileActions.includes("approve_kpi_import"), "KPI import approval must pass through the gateway.");
@@ -452,18 +446,16 @@ check(fileActions.includes("approve_operational_metrics_import"), "Operational m
 check(fileActions.includes("approve_workbook_import"), "Multi-dataset workbook approval must pass through the gateway.");
 check(!fileActions.includes("\"approve_crm_import\""), "Retired customer-record imports must not call the CRM import approval tool.");
 check(fileActions.includes("Customer record imports have been retired"), "Customer-record imports must fail closed with a clear retired-workflow message.");
-check(fileActions.includes("create_report_from_file"), "Report-from-file generation must pass through the gateway.");
-check(fileActions.includes("attach_file_to_report"), "File-to-report attachment must pass through the gateway.");
+check(!fileActions.includes("create_report_from_file") && !fileActions.includes("attach_file_to_report"), "Retired file-to-report mutations must stay removed.");
 check(fileActions.includes("save_file_analysis_business_memory"), "Saving file analysis to Business Memory must pass through the gateway.");
 
 const operationsActions = read("app/app/operations/actions.ts");
-check(operationsActions.includes("update_kpi_record") && operationsActions.includes("delete_kpi_record"), "KPI edits/deletes must pass through the gateway.");
+check(!operationsActions.includes("export async function updateKpiAction") && !operationsActions.includes("export async function deleteKpiAction"), "Unused legacy KPI record mutations must stay removed.");
+check(operationsActions.includes("export async function updateKpiValueAction") && operationsActions.includes("update_kpi_record"), "The active KPI value editor must retain gateway enforcement.");
 check(operationsActions.includes("update_kpi_settings"), "KPI configuration edits must pass through the gateway.");
 check(!operationsActions.includes("deleteBusinessSignalAction") && !operationsActions.includes('.from("tasks")'), "Retired Business Signal mutations must be removed from customer actions.");
 
-const sourcesActions = read("app/app/sources/actions.ts");
-check(sourcesActions.includes("delete_generated_insights"), "Generated insight deletion must pass through the gateway.");
-check(sourcesActions.includes("business_memory_chunks") && sourcesActions.includes("deleted_at") && sourcesActions.includes("archived_at"), "Deleted generated insights must be excluded from Business Memory retrieval.");
+check(!exists("app/app/sources/actions.ts"), "Unused generated-insight mutation actions must stay deleted.");
 
 const stripeWebhook = read("app/api/stripe/webhook/route.ts");
 check(stripeWebhook.includes("logSecurityAuditEvent") && stripeWebhook.includes("stripe."), "Stripe webhook processing must write security audit events.");
@@ -493,9 +485,10 @@ check(evidenceEligibility.includes("platform_telemetry") && evidenceEligibility.
 check(evidenceEligibility.includes("user_failure_state") && evidenceEligibility.includes("invalid_evidence"), "Evidence classification must distinguish user failure state and invalid evidence.");
 const intelligenceLayer = read("lib/intelligence/layer.ts");
 const intelligenceCoverage = read("lib/intelligence/coverage.ts");
+const boundedContextRuntime = read("lib/ai/bounded-context.ts");
 check(intelligenceLayer.includes("filterOriginalBusinessEvidence") && intelligenceLayer.includes("available: hasHealthEvidence"), "Only original evidence may produce intelligence risks or a Business Health score.");
 check(intelligenceCoverage.includes("filterOriginalBusinessEvidence") && intelligenceCoverage.includes("uniqueSources") && !intelligenceCoverage.includes('label: "Vaeroex Memory"'), "Derived runs and chunks must not inflate coverage or Source Mix.");
-check(contextualAskRuntime.includes("sanitizeBusinessEvidenceText") && contextualAskRuntime.includes("eligibleEvidenceChunks"), "Contextual explanations must sanitize platform failures and reject ineligible retrieved evidence.");
+check(boundedContextRuntime.includes("sanitizeBusinessEvidenceText") && boundedContextRuntime.includes("filterOriginalBusinessEvidence") && boundedContextRuntime.includes("filterBusinessEvidence"), "Bounded conversational context must sanitize platform failures and reject ineligible business evidence.");
 const dashboardRuntime = read("app/app/page.tsx");
 check(dashboardRuntime.includes("businessHealthSourceErrors") && dashboardRuntime.includes("intelligenceLayer.businessHealth.available"), "Business Health snapshots must not persist when required source queries fail or evidence is insufficient.");
 const evidenceRetrievalMigration = read("supabase/migrations/202607110001_business_memory_evidence_eligibility.sql");

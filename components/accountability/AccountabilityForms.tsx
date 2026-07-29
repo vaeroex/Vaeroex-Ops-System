@@ -1,6 +1,6 @@
-import { createAssignmentAction, shareRecordAction } from "@/app/app/accountability/actions";
+import { shareRecordAction } from "@/app/app/accountability/actions";
 import { PrimaryButton, SelectInput, TextArea, TextInput } from "@/components/operations/FormControls";
-import { DISTRIBUTION_SCHEDULES, OPERATIONAL_ROLES, PRIORITIES, SHARE_SCOPES, TEAM_DEPARTMENTS } from "@/lib/team/options";
+import { DISTRIBUTION_SCHEDULES, PRIORITIES, SHARE_SCOPES } from "@/lib/team/options";
 
 export type TeamPersonOption = {
   id: string;
@@ -9,7 +9,7 @@ export type TeamPersonOption = {
   department?: string | null;
 };
 
-export function AssignmentTargetFields({ people, defaultRole }: { people: TeamPersonOption[]; defaultRole?: string }) {
+function ShareRecipientFields({ people, defaultRole }: { people: TeamPersonOption[]; defaultRole?: string }) {
   return (
     <div className="grid gap-3 lg:grid-cols-3">
       <label className="block text-sm font-medium">
@@ -23,14 +23,14 @@ export function AssignmentTargetFields({ people, defaultRole }: { people: TeamPe
           ))}
         </select>
       </label>
-      <SelectInput label="Role" name="role" options={OPERATIONAL_ROLES} defaultValue={defaultRole} />
-      <SelectInput label="Department" name="department" options={TEAM_DEPARTMENTS} />
+      <TextInput label="Role" name="role" defaultValue={defaultRole} />
+      <TextInput label="Department" name="department" />
     </div>
   );
 }
 
 function recipientFields(people: TeamPersonOption[], defaultRole?: string) {
-  return <AssignmentTargetFields people={people} defaultRole={defaultRole} />;
+  return <ShareRecipientFields people={people} defaultRole={defaultRole} />;
 }
 
 function hiddenRecordFields({
@@ -93,52 +93,6 @@ export function ShareRecordPanel({
         </div>
         <TextArea label="Message" name="message" rows={3} placeholder="Add context for the recipients." />
         <PrimaryButton>Share</PrimaryButton>
-      </form>
-    </section>
-  );
-}
-
-export function AssignmentPanel({
-  sourceType,
-  sourceId,
-  sourceTitle,
-  relatedModule,
-  returnPath,
-  actionHref,
-  people,
-  defaultTitle,
-  defaultDescription,
-  defaultRole,
-  compact = false
-}: {
-  sourceType: string;
-  sourceId: string;
-  sourceTitle: string;
-  relatedModule: string;
-  returnPath: string;
-  actionHref: string;
-  people: TeamPersonOption[];
-  defaultTitle?: string;
-  defaultDescription?: string;
-  defaultRole?: string;
-  compact?: boolean;
-}) {
-  return (
-    <section className={compact ? "rounded-lg border border-line bg-white p-3" : "rounded-lg border border-line bg-slate-50 p-4"}>
-      <h4 className="text-sm font-semibold text-ink">Assign</h4>
-      <p className="mt-1 text-sm leading-6 text-muted">Assign this item to a person, role, or department without changing app permissions.</p>
-      <form action={createAssignmentAction} className="mt-4 grid gap-3">
-        {hiddenRecordFields({ sourceType, sourceId, sourceTitle, relatedModule, returnPath, actionHref })}
-        <TextInput label="Assignment title" name="assignment_title" defaultValue={defaultTitle || sourceTitle} required />
-        <TextArea label="Details" name="description" rows={compact ? 2 : 3} defaultValue={defaultDescription || ""} />
-        <SelectInput label="Assign to" name="recipient_scope" options={SHARE_SCOPES.slice(0, 3)} defaultValue={defaultRole ? "Role" : "Role"} required />
-        {recipientFields(people, defaultRole)}
-        <div className="grid gap-3 lg:grid-cols-3">
-          <TextInput label="Due date" name="due_date" type="date" />
-          <SelectInput label="Priority" name="priority" options={PRIORITIES} defaultValue="Medium" />
-          <SelectInput label="Status" name="status" options={["Open", "In Progress", "Waiting", "Done"]} defaultValue="Open" />
-        </div>
-        <PrimaryButton>Assign</PrimaryButton>
       </form>
     </section>
   );

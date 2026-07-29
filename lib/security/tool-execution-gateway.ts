@@ -146,7 +146,7 @@ const generatedBriefingSchema = z
 const completedAnalysisSaveSchema = z
   .object({
     sourceArtifactId: uuidSchema,
-    analysisType: z.enum(["executive_brief", "business_health", "finding_explanation"]),
+    analysisType: z.enum(["business_health", "finding_explanation"]),
     fingerprint: z.string().regex(/^[a-f0-9]{64}$/i)
   })
   .strict();

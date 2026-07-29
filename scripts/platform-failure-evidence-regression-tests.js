@@ -199,8 +199,6 @@ const cleanupSource = require("node:fs").readFileSync(path.join(root, "scripts/i
 const evidenceIndexSource = require("node:fs").readFileSync(path.join(root, "lib/ai/evidence-index.ts"), "utf8");
 const retrievalMigration = require("node:fs").readFileSync(path.join(root, "supabase/migrations/202607110001_business_memory_evidence_eligibility.sql"), "utf8");
 const boundedContextSource = require("node:fs").readFileSync(path.join(root, "lib/ai/bounded-context.ts"), "utf8");
-const reportActionsSource = require("node:fs").readFileSync(path.join(root, "app/app/reports/actions.ts"), "utf8");
-const scheduledReportsSource = require("node:fs").readFileSync(path.join(root, "lib/reports/scheduled-generator.ts"), "utf8");
 const homePageSource = require("node:fs").readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const packageJson = require("../package.json");
 assert.match(fileActionsSource, /extractionFailureReason: finalTextContent && extraction\.fileAttachment \? undefined/, "successful direct file analysis must clear stale local-parser failure state");
@@ -216,10 +214,9 @@ assert.match(retrievalMigration, /source_run\.output_json #>> '\{metadata,eviden
 assert.match(retrievalMigration, /vaeroex \(run\|request\|generation\|analysis\)/, "vector retrieval must reject narrow legacy Vaeroex failure outputs without broad provider keyword blocking");
 assert.doesNotMatch(cleanupSource, /NEXT_PUBLIC_SUPABASE_ANON_KEY/, "live cleanup inspection must never fall back to an anonymous key");
 assert.match(cleanupSource, /business_health_snapshots"\)\.select\("id,source_summary,created_at"\)/, "cleanup inspector must query the current Business Health snapshot schema");
-assert.match(boundedContextSource, /filterEligibleMemoryRowsByLifecycle\(\{ supabase, workspaceId, rows: \[data\] \}\)/, "focused Learned Knowledge must pass through source-lineage validation");
-assert.match(boundedContextSource, /file_uploads[\s\S]+\.is\("archived_at", null\)/, "focused source files must exclude archived records");
-assert.match(reportActionsSource, /sourceErrors[\s\S]+No report was created/, "manual reports must not persist when required source queries fail");
-assert.match(scheduledReportsSource, /sourceErrors[\s\S]+No report was created/, "scheduled reports must not persist when required source queries fail");
+assert.match(boundedContextSource, /file_uploads[\s\S]+\.is\("archived_at", null\)/, "bounded source files must exclude archived records");
+assert.equal(require("node:fs").existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired manual report generation must stay deleted");
+assert.equal(require("node:fs").existsSync(path.join(root, "lib/reports/scheduled-generator.ts")), false, "retired scheduled report generation must stay deleted");
 assert.match(homePageSource, /items=\{businessEvidenceRuns\.slice\(0, 5\)\}/, "Home must not render platform telemetry as recent business insight");
 assert.match(packageJson.scripts["security:check"], /platform-failure-evidence-regression-tests/, "evidence-boundary regressions must be release-gated by the security check");
 

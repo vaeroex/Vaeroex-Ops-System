@@ -91,10 +91,7 @@ check(
 check(!setupActions.includes('supabase\n    .from("workspaces")'), "Workspace setup does not bootstrap a workspace through the RLS-scoped client.");
 check(!setupActions.includes('supabase.from("workspace_members").insert'), "Workspace setup does not bootstrap membership through the RLS-scoped client.");
 
-const onboarding = read("components/app/OnboardingChecklist.tsx");
-check(!onboarding.includes("explore a separate demo workspace"), "Customer onboarding no longer suggests demo workspace access.");
-check(!onboarding.includes("Want to see Vaeroex with data?"), "Customer onboarding no longer renders a demo callout.");
-check(!onboarding.includes("The demo workspace is separate from customer workspaces"), "Customer onboarding no longer describes demo workspace exploration.");
+check(!fs.existsSync(path.join(root, "components/app/OnboardingChecklist.tsx")), "The unused legacy onboarding checklist must stay deleted.");
 
 const helpContent = read("lib/help/content.ts");
 check(!helpContent.includes("Using the demo workspace"), "Customer Help Center no longer exposes a demo workspace article.");

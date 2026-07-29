@@ -277,26 +277,18 @@ assert.throws(() => build(unknownWithSemanticTarget), /semantic target with unkn
 const projections = {
   overview: contract.projectExecutiveOverviewV1(snapshot),
   inbox: contract.projectIntelligenceInboxV1(snapshot),
-  kpi: contract.projectKpiOverviewV1(snapshot),
   health: contract.projectBusinessHealthExplanationV1(snapshot),
   finding: contract.projectFindingExplanationV1(snapshot, "finding-checkout-wait"),
   missingFinding: contract.projectFindingExplanationV1(snapshot, "missing"),
-  reasoning: contract.projectExecutiveReasoningV1(snapshot)
 };
 assert.equal(projections.overview.topRisk.id, "finding-checkout-wait");
 assert.equal(projections.inbox.findings.length, snapshot.findings.length);
-assert.ok(projections.kpi.kpis.length <= 12);
 assert.equal(projections.health.businessHealth.value.score, 78);
 assert.deepEqual(projections.health.drivers.map((driver) => driver.finding.id), ["finding-checkout-wait", "finding-revenue"]);
 assert.ok(projections.health.evidenceReferences.length <= 24);
 assert.ok(projections.health.citations.length <= 24);
 assert.equal(projections.finding.finding.state, "available");
 assert.equal(projections.missingFinding.finding.state, "unavailable");
-assert.ok(projections.reasoning.kpis.length <= contract.INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningKpis);
-assert.ok(projections.reasoning.findings.length <= contract.INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningFindings);
-assert.ok(projections.reasoning.evidenceReferences.length <= contract.INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningEvidenceReferences);
-assert.equal(projections.reasoning.rawEvidenceIncluded, false);
-assert.doesNotMatch(JSON.stringify(projections.reasoning), /unrestricted fixture excerpt/);
 
 const parity = contract.compareIntelligenceSnapshotV1({
   snapshot,

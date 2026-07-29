@@ -8,11 +8,6 @@ import {
 } from "@/lib/ai/business-health-explanation/contracts";
 import { parseBusinessHealthExplanationArtifact } from "@/lib/ai/business-health-explanation/storage";
 import {
-  EXECUTIVE_BRIEF_CONTRACT_ID,
-  type ExecutiveBriefArtifact
-} from "@/lib/ai/executive-brief/contracts";
-import { parseExecutiveBriefArtifact } from "@/lib/ai/executive-brief/storage";
-import {
   FINDING_EXPLANATION_CONTRACT_ID,
   type FindingExplanationArtifact
 } from "@/lib/ai/finding-explanation/contracts";
@@ -22,15 +17,15 @@ import {
   type SavedAnalysisDisplaySection,
   type SavedAnalysisEnvelope,
   type SavedAnalysisReleaseChannel,
-  type SavedAnalysisType,
+  type SaveableAnalysisType,
   parseSavedAnalysisEnvelope
 } from "@/lib/reports/saved-analysis";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
-type CompletedArtifact = ExecutiveBriefArtifact | BusinessHealthExplanationArtifact | FindingExplanationArtifact;
-type SaveAnalysisInput = Readonly<{ analysisType: SavedAnalysisType; fingerprint: string; generatedAt: string }>;
+type CompletedArtifact = BusinessHealthExplanationArtifact | FindingExplanationArtifact;
+type SaveAnalysisInput = Readonly<{ analysisType: SaveableAnalysisType; fingerprint: string; generatedAt: string }>;
 type SavedAnalysisMutationResult = Readonly<{
   status: "saved" | "already_saved" | "deleted" | "error";
   id?: string;
@@ -38,8 +33,7 @@ type SavedAnalysisMutationResult = Readonly<{
   message: string;
 }>;
 
-const contractByType: Record<SavedAnalysisType, string> = {
-  executive_brief: EXECUTIVE_BRIEF_CONTRACT_ID,
+const contractByType: Record<SaveableAnalysisType, string> = {
   business_health: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   finding_explanation: FINDING_EXPLANATION_CONTRACT_ID
 };
@@ -56,28 +50,9 @@ function record(value: Json): Record<string, Json | undefined> {
     : {};
 }
 
-function parseArtifact(type: SavedAnalysisType, value: Json): CompletedArtifact | null {
-  if (type === "executive_brief") return parseExecutiveBriefArtifact(value);
+function parseArtifact(type: SaveableAnalysisType, value: Json): CompletedArtifact | null {
   if (type === "business_health") return parseBusinessHealthExplanationArtifact(value);
   return parseFindingExplanationArtifact(value);
-}
-
-function sectionsForExecutiveBrief(artifact: ExecutiveBriefArtifact): SavedAnalysisDisplaySection[] {
-  const sections: SavedAnalysisDisplaySection[] = [];
-  if (artifact.analysis.primary_concern) sections.push({ id: "primary-concern", label: "Primary concern", body: artifact.analysis.primary_concern });
-  if (artifact.analysis.positive_signal) sections.push({ id: "positive-signal", label: "Positive signal", body: artifact.analysis.positive_signal });
-  sections.push(
-    { id: "why-it-matters", label: "Why it matters", body: artifact.analysis.why_it_matters },
-    { id: "leadership-focus", label: "Leadership focus", body: artifact.analysis.leadership_focus }
-  );
-  if (artifact.analysis.provisional_hypothesis) {
-    sections.push({ id: "supported-hypothesis", label: "Supported hypothesis", body: `Provisional: ${artifact.analysis.provisional_hypothesis}` });
-  }
-  sections.push({ id: "uncertainty", label: "What remains uncertain", body: artifact.analysis.uncertainty, tone: "limitation" });
-  if (artifact.facts.limitations.length) {
-    sections.push({ id: "limitations", label: "Known limitations", body: artifact.facts.limitations, tone: "limitation" });
-  }
-  return sections;
 }
 
 function sectionsForBusinessHealth(artifact: BusinessHealthExplanationArtifact): SavedAnalysisDisplaySection[] {
@@ -129,20 +104,7 @@ function sectionsForFinding(artifact: FindingExplanationArtifact): SavedAnalysis
   ];
 }
 
-function analysisMetadata(type: SavedAnalysisType, artifact: CompletedArtifact) {
-  if (type === "executive_brief") {
-    const current = artifact as ExecutiveBriefArtifact;
-    return {
-      title: "Executive Brief",
-      summaryLabel: "Executive summary",
-      summary: current.analysis.executive_summary,
-      confidence: current.facts.confidence,
-      freshness: current.facts.freshness,
-      evidenceStatus: `${current.citations.length} citation${current.citations.length === 1 ? "" : "s"} · ${current.facts.independentSourceCount} independent source${current.facts.independentSourceCount === 1 ? "" : "s"}`,
-      dateRange: current.facts.latestEvidenceAt ? `Evidence through ${current.facts.latestEvidenceAt.slice(0, 10)}` : null,
-      sections: sectionsForExecutiveBrief(current)
-    } as const;
-  }
+function analysisMetadata(type: SaveableAnalysisType, artifact: CompletedArtifact) {
   if (type === "business_health") {
     const current = artifact as BusinessHealthExplanationArtifact;
     return {
@@ -178,7 +140,7 @@ function savedAnalysisKey({
 }: {
   workspaceId: string;
   channel: SavedAnalysisReleaseChannel;
-  analysisType: SavedAnalysisType;
+  analysisType: SaveableAnalysisType;
   sourceArtifactId: string;
   artifact: CompletedArtifact;
 }) {

@@ -40,9 +40,9 @@ assert.doesNotMatch(operationsActions, /createPersonAction|Person added\./, "No 
 assert.doesNotMatch(recordActions, /\| "people"|people:\s*\{[\s\S]*?path:\s*"\/app\/people"/, "Generic record mutations must not retain a People collection");
 
 assert.match(accountabilityActions, /from\("people"\)/, "Accountability must preserve optional person-recipient label lookup");
-assert.match(accountabilityActions, /from\("operational_assignments"\)\.insert/, "Assignment creation must remain active");
 assert.match(accountabilityActions, /from\("record_shares"\)\.insert/, "KPI sharing must remain active");
-assert.match(accountabilityForms, /export function AssignmentPanel/, "Assignment UI must remain available");
+assert.doesNotMatch(accountabilityActions, /export async function createAssignmentAction\b/, "retired assignment creation must not remain reachable");
+assert.doesNotMatch(accountabilityForms, /export function AssignmentPanel/, "retired assignment UI must stay deleted");
 assert.match(accountabilityForms, /export function ShareRecordPanel/, "Sharing UI must remain available");
 assert.match(kpisPage, /from\("people"\)[\s\S]*ShareRecordPanel/, "KPI Records must preserve optional person recipients and sharing UI");
 assert.match(overviewPage, /from\("people"\)/, "Executive Overview must preserve optional people-context reads");

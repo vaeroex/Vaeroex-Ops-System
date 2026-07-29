@@ -8,7 +8,6 @@ import type {
 
 export const QUALIFICATION_CONTRACT_IDS = [
   "business_health_explanation_v1",
-  "executive_brief_benchmark_v1",
   "leadership_priorities_benchmark_v1"
 ] as const;
 

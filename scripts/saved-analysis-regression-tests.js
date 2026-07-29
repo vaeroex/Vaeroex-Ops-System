@@ -12,7 +12,6 @@ const contracts = read("lib/reports/saved-analysis.ts");
 const list = read("components/reports/SavedAnalysisList.tsx");
 const renderer = read("components/reports/SavedAnalysisRenderer.tsx");
 const saveButton = read("components/reports/SaveAnalysisButton.tsx");
-const executiveBrief = read("components/intelligence/ExecutiveBriefPanel.tsx");
 const businessHealth = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const findingExplanation = read("components/intelligence/IntelligenceSignalInbox.tsx");
 const reportsNew = read("app/app/reports/new/page.tsx");
@@ -22,8 +21,6 @@ const agentActions = read("app/app/agents/actions.ts");
 const home = read("app/app/page.tsx");
 const cronRoute = read("app/api/cron/report-subscriptions/route.ts");
 const generationPolicy = read("lib/reports/generation-policy.ts");
-const legacyReportAction = read("app/app/reports/actions.ts");
-const legacyGeneratedAction = read("app/app/generated/actions.ts");
 const vercel = read("vercel.json");
 const migration = read("supabase/migrations/20260721220519_saved_analysis_uniqueness.sql");
 
@@ -51,12 +48,12 @@ assert.match(saveButton, /getSavedAnalysisState\(\{ analysisType, fingerprint, g
 assert.match(saveButton, /saveAnalysisAction\(\{ analysisType, fingerprint, generatedAt \}\)/);
 assert.match(saveButton, /Already saved/);
 
-assert.match(executiveBrief, /SaveAnalysisButton analysisType="executive_brief"/);
 assert.match(businessHealth, /SaveAnalysisButton analysisType="business_health"/);
 assert.match(findingExplanation, /SaveAnalysisButton analysisType="finding_explanation"/);
-for (const source of [executiveBrief, businessHealth, findingExplanation]) {
+for (const source of [businessHealth, findingExplanation]) {
   assert.match(source, /generatedAt=\{(?:state\.)?artifact\.generatedAt\}/);
 }
+assert.equal(fs.existsSync(path.join(root, "components/intelligence/ExecutiveBriefPanel.tsx")), false, "the retired Executive Brief panel must stay deleted");
 
 assert.match(actions, /\.contains\("source_data_json", \{ record_kind: "saved_analysis", saved_analysis_key: key \}\)/);
 assert.match(actions, /error\?\.code === "23505"/);
@@ -107,8 +104,8 @@ for (const source of [reportsPage, home, findingExplanation, agentPage]) {
 }
 assert.match(agentActions, /Secondary report generation is no longer available/);
 assert.match(generationPolicy, /return true/);
-assert.match(legacyReportAction, /legacyReportGenerationDisabled\(\)/);
-assert.match(legacyGeneratedAction, /legacyReportGenerationDisabled\(\)/);
+assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired manual report generation actions must stay deleted");
+assert.equal(fs.existsSync(path.join(root, "app/app/generated/actions.ts")), false, "retired generated-output actions must stay deleted");
 assert.match(cronRoute, /status: 410/);
 assert.doesNotMatch(vercel, /report-subscriptions|crons/);
 

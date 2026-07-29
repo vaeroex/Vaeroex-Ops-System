@@ -7,12 +7,6 @@ import type {
   BusinessHealthCitationView,
   BusinessHealthExplanationFacts
 } from "@/lib/ai/business-health-explanation/contracts";
-import type {
-  ExecutiveBriefCitationView,
-  ExecutiveBriefFacts,
-  ExecutiveBriefSignal,
-  ExecutiveBriefState
-} from "@/lib/ai/executive-brief/contracts";
 import type { ExecutiveHomepageModel, ExecutivePriorityCard } from "@/lib/intelligence/executive-homepage";
 import {
   businessHealthStatus,
@@ -28,13 +22,6 @@ type ExecutiveHomepageProps = {
   model: ExecutiveHomepageModel;
   healthHistory: BusinessHealthTrendPoint[];
   healthHistoryError?: string | null;
-  executiveBrief: {
-    state: ExecutiveBriefState;
-    requestToken: string | null;
-    facts: ExecutiveBriefFacts;
-    signals: readonly ExecutiveBriefSignal[];
-    citations: readonly ExecutiveBriefCitationView[];
-  };
   businessHealthAnalysis: {
     state: BusinessHealthAnalysisState;
     requestToken: string | null;

@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
-import { VAEROEX_SYSTEM_PROMPT } from "@/lib/ai/prompts/vaeroex-system-prompt";
 import {
   classifyAndPersistKpiSemantics,
   KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE
@@ -19,7 +18,6 @@ import {
   type KpiDesiredDirection,
   type KpiTargetBehavior
 } from "@/lib/kpis/semantics";
-import { legacyReportGenerationDisabled } from "@/lib/reports/generation-policy";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -273,80 +271,6 @@ export async function createKpiAction(formData: FormData) {
 
   revalidatePath(path);
   redirectWithMessage(path, "KPI saved.");
-}
-
-export async function updateKpiAction(formData: FormData) {
-  const path = "/app/kpis";
-  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
-  const kpiId = text(formData, "kpi_id");
-  const name = text(formData, "name");
-  const category = text(formData, "category");
-  const owner = text(formData, "owner");
-  const notes = text(formData, "notes");
-  const source = text(formData, "source");
-
-  requireValue(path, "KPI", kpiId, 80);
-  requireValue(path, "KPI name", name);
-  validateLength(path, "Category", category, 100);
-  validateLength(path, "Owner", owner, 120);
-  validateLength(path, "Notes", notes, 1500);
-  validateLength(path, "Source", source, 160);
-
-  try {
-    await requireToolExecution(
-      {
-        supabase,
-        workspaceId,
-        userId: user.id,
-        userRole: membership.role
-      },
-      {
-        toolName: "update_kpi_record",
-        args: {
-          kpiId,
-          fieldSet: ["name", "category", "owner", "notes", "source"]
-        },
-        initiatedBy: "user",
-        confirmationReceived: true,
-        targetRecordId: kpiId,
-        metadata: {
-          source: "kpi_record_edit"
-        } satisfies Json
-      }
-    );
-  } catch (error) {
-    redirectWithError(path, error instanceof Error ? error.message : "KPI update was blocked by Vaeroex security policy.");
-  }
-
-  const { data, error } = await supabase
-    .from("kpis")
-    .update({
-      name,
-      category,
-      owner,
-      notes,
-      source
-    })
-    .eq("id", kpiId)
-    .eq("workspace_id", workspaceId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  if (!data) {
-    redirectWithError(path, "KPI not found, or you do not have permission to edit it.");
-  }
-
-  if (membership.role === "owner" || membership.role === "admin") {
-    await classifyAndPersistKpiSemantics({ supabase, workspaceId, userId: user.id, label: name, category, definition: notes || null });
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app/reports");
-  redirectWithMessage(path, "KPI updated.");
 }
 
 export async function updateKpiValueAction(formData: FormData) {
@@ -809,67 +733,6 @@ export async function acceptKpiSemanticSuggestionAction(formData: FormData) {
   redirectWithMessage(path, "KPI performance direction confirmed.");
 }
 
-export async function deleteKpiAction(formData: FormData) {
-  const path = "/app/kpis";
-  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
-  const kpiId = text(formData, "kpi_id");
-
-  requireValue(path, "KPI", kpiId, 80);
-
-  try {
-    await requireToolExecution(
-      {
-        supabase,
-        workspaceId,
-        userId: user.id,
-        userRole: membership.role
-      },
-      {
-        toolName: "delete_kpi_record",
-        args: {
-          recordId: kpiId
-        },
-        initiatedBy: "user",
-        confirmationReceived: true,
-        targetRecordId: kpiId,
-        metadata: {
-          source: "kpi_record_delete"
-        } satisfies Json
-      }
-    );
-  } catch (error) {
-    redirectWithError(path, error instanceof Error ? error.message : "KPI deletion was blocked by Vaeroex security policy.");
-  }
-
-  const { data, error } = await supabase
-    .from("kpis")
-    .delete()
-    .eq("id", kpiId)
-    .eq("workspace_id", workspaceId)
-    .select("id")
-    .maybeSingle();
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  if (!data) {
-    redirectWithError(path, "KPI not found, or you do not have permission to delete it.");
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app/reports");
-  redirectWithMessage(path, "KPI deleted.");
-}
-
-export async function createCrmLeadAction(formData: FormData) {
-  void formData;
-  redirectWithError(
-    "/app/sources",
-    "Customer record creation in Vaeroex has been retired. Upload source files, preserve reports, or connect external systems so Vaeroex can analyze customer activity as evidence."
-  );
-}
-
 export async function createIssueAction(formData: FormData) {
   const path = "/app/issues";
   const { supabase, user, workspaceId } = await requireWorkspace(path);
@@ -986,39 +849,4 @@ export async function createSopAction(formData: FormData) {
 
   revalidatePath(path);
   redirectWithMessage(path, "SOP created.");
-}
-
-export async function createReportAction(formData: FormData) {
-  if (legacyReportGenerationDisabled()) {
-    redirectWithError("/app/reports", "Manual report generation is no longer available. Save a completed analysis from its live view instead.");
-  }
-  if (!VAEROEX_SYSTEM_PROMPT.trim()) {
-    redirectWithError("/app/reports", "Vaeroex prompt is not configured.");
-  }
-
-  const path = "/app/reports";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const title = text(formData, "title") || "Weekly Operations Report - Generated by Vaeroex";
-  validateLength(path, "Report title", title, 180);
-  validateLength(path, "Report body", text(formData, "body_markdown"), 30000);
-
-  const { error } = await supabase.from("reports").insert({
-    workspace_id: workspaceId,
-    report_type: text(formData, "report_type") || "Weekly Operations Report",
-    title: title.includes("Vaeroex") ? title : `${title} - Generated by Vaeroex`,
-    date_range_start: text(formData, "date_range_start") || null,
-    date_range_end: text(formData, "date_range_end") || null,
-    body_markdown:
-      text(formData, "body_markdown") ||
-      "# Weekly Operations Report\n\nGenerated by Vaeroex.\n\n## Executive Summary\nAdd workspace activity, bottlenecks, and recommended next actions.",
-    source_data_json: { createdFrom: "manual_phase_3" } satisfies Json,
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  redirectWithMessage(path, "Report created.");
 }
