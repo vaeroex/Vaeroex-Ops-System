@@ -24,6 +24,7 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { SourceImportReview } from "@/components/evidence/SourceImportReview";
 import { BusinessNotesPanel, type BusinessNotesObservability } from "@/components/evidence/BusinessNotesPanel";
 import { EvidenceLifecycleCheckbox, EvidenceLifecycleSelection } from "@/components/evidence/EvidenceLifecycleSelection";
+import { collapseBusinessNoteKnowledgeRows } from "@/lib/ai/business-notes/knowledge-projection";
 import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-channel";
 import { isBusinessNoteExtractionEnabled } from "@/lib/ai/providers/workflow-provider-policy";
 import { createFileAccessLinkMap, type FileAccessLinks } from "@/lib/files/storage-links";
@@ -908,7 +909,7 @@ function filterKnowledgeItems({
   const normalizedQuery = (query || "").trim().toLowerCase();
   const normalizedSourceType = (sourceType || "").trim().toLowerCase();
 
-  return chunks
+  const matchingChunks = chunks
     .filter((chunk) => (archivedOnly ? Boolean(chunk.archived_at && !chunk.deleted_at) : !chunk.archived_at && !chunk.deleted_at))
     .filter((chunk) => !trust || knowledgeTrustStatus(chunk) === trust)
     .filter((chunk) => !normalizedSourceType || knowledgeSourceType(chunk).toLowerCase() === normalizedSourceType)
@@ -917,7 +918,9 @@ function filterKnowledgeItems({
       const file = sourceFileForKnowledge(chunk, files);
       return [knowledgeStatement(chunk), chunk.source_title, chunk.source_excerpt, file?.display_name, file?.original_name, knowledgeSourceType(chunk)]
         .some((value) => String(value || "").toLowerCase().includes(normalizedQuery));
-    })
+    });
+
+  return collapseBusinessNoteKnowledgeRows(matchingChunks)
     .sort((a, b) => {
       if (sort === "oldest") return a.indexed_at.localeCompare(b.indexed_at);
       return b.indexed_at.localeCompare(a.indexed_at);

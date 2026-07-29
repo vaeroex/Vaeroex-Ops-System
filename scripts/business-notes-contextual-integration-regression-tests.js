@@ -37,6 +37,12 @@ const {
   buildBusinessNoteContextRecordV1
 } = require("../lib/ai/business-notes/contextual-contract.ts");
 const {
+  collapseBusinessNoteKnowledgeRows
+} = require("../lib/ai/business-notes/knowledge-projection.ts");
+const {
+  loadApprovedBusinessNoteContextV1
+} = require("../lib/ai/business-notes/contextual-evidence.ts");
+const {
   validateBusinessNoteExtraction
 } = require("../lib/ai/business-notes/validation.ts");
 const {
@@ -164,6 +170,92 @@ assert.equal(contextRecord.validationState, "approved_review");
 assert.equal(contextRecord.userAddedContext[0].partOfOriginalNoteQuotation, false);
 assert.equal(contextRecord.statements[0].sourceQuote, extraction.explicitFacts[0].sourceQuote);
 assert.equal(contextRecord.provenance.extractionVersion, "business_note_extraction_v1");
+
+function memoryChunk(overrides = {}) {
+  return {
+    id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    workspace_id: contract.FOUNDATION_FIXTURE_WORKSPACE_ID,
+    source_type: "business_note",
+    source_id: note().id,
+    source_title: extraction.title,
+    source_excerpt: "Business Note retrieval chunk",
+    summary: extraction.summary,
+    chunk_index: 0,
+    indexed_at: "2026-07-20T12:01:00.000Z",
+    created_at: "2026-07-20T12:01:00.000Z",
+    updated_at: "2026-07-20T12:01:00.000Z",
+    archived_at: null,
+    deleted_at: null,
+    ...overrides
+  };
+}
+
+const repeatedNoteChunks = [
+  memoryChunk({
+    id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    chunk_index: 1,
+    source_excerpt: "Second retrieval chunk"
+  }),
+  memoryChunk()
+];
+const projectedKnowledge = collapseBusinessNoteKnowledgeRows(repeatedNoteChunks);
+assert.equal(projectedKnowledge.length, 1, "one Business Note must render as one Learned Knowledge record regardless of chunk count");
+assert.equal(projectedKnowledge[0].chunk_index, 0, "the canonical first chunk must represent a Business Note in Learned Knowledge");
+assert.equal(repeatedNoteChunks.length, 2, "the display projection must not mutate or delete persisted retrieval chunks");
+
+const secondNoteId = "22222222-2222-4222-8222-222222222222";
+assert.equal(collapseBusinessNoteKnowledgeRows([
+  ...repeatedNoteChunks,
+  memoryChunk({ id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc", source_id: secondNoteId })
+]).length, 2, "distinct Business Notes must remain distinct Learned Knowledge records");
+assert.equal(collapseBusinessNoteKnowledgeRows([
+  memoryChunk({ source_type: "file_upload", source_id: "file-1", chunk_index: 0 }),
+  memoryChunk({ id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", source_type: "file_upload", source_id: "file-1", chunk_index: 1 })
+]).length, 2, "non-Business-Note retrieval chunks must preserve their existing presentation");
+
+function queryResult(result) {
+  const query = {
+    select: () => query,
+    eq: () => query,
+    is: () => query,
+    lte: () => query,
+    order: () => query,
+    limit: () => query,
+    in: () => query,
+    then: (resolve, reject) => Promise.resolve(result).then(resolve, reject)
+  };
+  return query;
+}
+
+async function assertContextLoaderIdempotency() {
+  const approvedNote = note({
+    original_note_text: originalNote,
+    extraction_json: validated.value,
+    reviewed_extraction_json: validated.value,
+    user_corrections_json: { userAddedContext }
+  });
+  const supabase = {
+    from(table) {
+      if (table === "business_notes") return queryResult({ data: [approvedNote], error: null });
+      if (table === "business_memory_chunks") {
+        return queryResult({
+          data: [{ source_id: approvedNote.id }, { source_id: approvedNote.id }],
+          error: null
+        });
+      }
+      throw new Error(`Unexpected table ${table}`);
+    }
+  };
+  const loaded = await loadApprovedBusinessNoteContextV1({
+    supabase,
+    workspaceId: approvedNote.workspace_id,
+    releaseChannel: approvedNote.release_channel,
+    asOf: "2026-07-20T13:00:00.000Z"
+  });
+  assert.equal(loaded.error, null);
+  assert.equal(loaded.records.length, 1, "multiple indexed chunks must produce one BusinessNoteContextRecordV1");
+  assert.equal(loaded.records[0].sourceNoteId, approvedNote.id);
+}
 
 assert.equal(buildBusinessNoteContextRecordV1({
   note: note({ status: "review_required" }),
@@ -436,8 +528,22 @@ assert.match(contextLoaderSource, /\.eq\("evidence_lifecycle_status", "active"\)
 assert.match(contextLoaderSource, /\.lte\("indexed_at", asOf\)/);
 assert.match(contextLoaderSource, /\.is\("archived_at", null\)/);
 assert.match(contextLoaderSource, /\.is\("deleted_at", null\)/);
+assert.match(contextLoaderSource, /const indexedNoteIds = new Set/, "multiple retrieval chunks must only mark one source note as indexed");
+assert.match(contextLoaderSource, /for \(const note of notes\)/, "context records must be produced from unique source notes, not retrieval chunks");
+const indexingSource = read("lib/ai/business-notes/indexing.ts");
+assert.match(indexingSource, /content_hash: hash\(`\$\{note\.id\}:\$\{note\.source_version\}:\$\{index\}:\$\{chunk\}`\)/);
+assert.match(indexingSource, /onConflict: "workspace_id,source_type,source_id,content_hash,chunk_index"/, "repeated indexing must upsert the same deterministic chunk identities");
+assert.match(
+  read("supabase/migrations/202607060001_business_memory_evidence_index.sql"),
+  /create unique index if not exists business_memory_chunks_source_hash_idx[\s\S]*workspace_id, source_type, source_id, content_hash, chunk_index/,
+  "the database must enforce the same deterministic chunk identity"
+);
+const approvalSource = read("app/app/sources/business-notes/actions.ts");
+assert.match(approvalSource, /note\.status !== "review_required"/, "a completed approval must not be approved again");
+assert.match(approvalSource, /\.eq\("status", "review_required"\)/, "approval persistence must remain conditional on the review state");
+assert.match(read("app/app/sources/page.tsx"), /collapseBusinessNoteKnowledgeRows\(matchingChunks\)/, "Learned Knowledge must project one customer-visible record per Business Note");
 assert.doesNotMatch(read("lib/intelligence/snapshot/v1/builder.ts"), /runStructuredAI|generateBusinessHealthExplanation|generateFindingExplanation/);
-assert.match(read("lib/ai/business-notes/indexing.ts"), /evidence_role: "supporting_context"/);
+assert.match(indexingSource, /evidence_role: "supporting_context"/);
 assert.doesNotMatch(read("app/app/reports/saved-analysis-actions.ts"), /contextualEvidence|business_notes/, "Saved Analysis storage must remain unchanged");
 
 const startedAt = performance.now();
@@ -452,4 +558,9 @@ for (let index = 0; index < 100; index += 1) {
 const averageBuildMs = (performance.now() - startedAt) / 100;
 assert.ok(averageBuildMs < 20, `bounded contextual snapshot construction averaged ${averageBuildMs.toFixed(3)}ms`);
 
-console.log(`Business Notes contextual integration regression tests passed (average snapshot build ${averageBuildMs.toFixed(3)}ms).`);
+assertContextLoaderIdempotency()
+  .then(() => console.log(`Business Notes contextual integration regression tests passed (average snapshot build ${averageBuildMs.toFixed(3)}ms).`))
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
