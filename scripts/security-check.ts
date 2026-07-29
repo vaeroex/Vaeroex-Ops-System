@@ -226,7 +226,6 @@ const customerPages = [
   "app/app/checklists/page.tsx",
   "app/app/issues/page.tsx",
   "app/app/assets/page.tsx",
-  "app/app/people/page.tsx",
   "app/app/forms/page.tsx",
   "app/app/form-submissions/page.tsx",
   "app/app/notifications/page.tsx",
@@ -236,6 +235,12 @@ const customerPages = [
 for (const file of customerPages) {
   check(read(file).includes("requireWorkspacePage"), `${file} must call requireWorkspacePage for authenticated workspace access.`);
 }
+
+const retiredPeoplePage = read("app/app/people/page.tsx");
+check(
+  retiredPeoplePage.includes('dynamic = "force-dynamic"') && retiredPeoplePage.includes("requireWorkspacePage") && retiredPeoplePage.includes('permanentRedirect("/app")'),
+  "The retired People route must authorize workspace access before redirecting to Overview."
+);
 
 const legacyFilesPage = read("app/app/files/page.tsx");
 check(legacyFilesPage.includes("permanentRedirect") && legacyFilesPage.includes("/app/sources"), "Legacy Files must redirect into the authenticated Evidence workspace without querying data.");
