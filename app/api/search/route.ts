@@ -26,11 +26,12 @@ import { getVaeroexWorkflow } from "@/lib/ai/vaeroex-workflows";
 import { createWorkflowStageRecorder } from "@/lib/ai/workflow-timing";
 import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { isAiRunUsageLimitReached } from "@/lib/billing/usage-limits";
+import { excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
+import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
-import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
-import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -58,7 +59,6 @@ type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
-type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 type RecommendationRow = Database["public"]["Tables"]["vaeroex_recommendation_outcomes"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
@@ -72,7 +72,6 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Review Signals",
   "Customer Evidence",
   "SOPs",
-  "Checklists",
   "Learned Knowledge",
   "Diagnostics"
 ];
@@ -167,7 +166,6 @@ function sourceHref(sourceType: string | null, title: string | null) {
   if (normalized.includes("report")) return hrefWithQuery("/app/reports", query);
   if (normalized.includes("kpi")) return hrefWithQuery("/app/kpis", query);
   if (normalized.includes("file")) return hrefWithQuery("/app/sources", query);
-  if (normalized.includes("checklist")) return hrefWithQuery("/app/checklists", query);
   if (normalized.includes("sop")) return hrefWithQuery("/app/sops", query);
   if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer")) return hrefWithQuery("/app/sources", query);
 
@@ -331,7 +329,6 @@ export async function GET(request: Request) {
     assignments,
     rawCrmLeads,
     sops,
-    checklists,
     decisions,
     recommendations,
     learnedKnowledgeCandidates,
@@ -395,8 +392,8 @@ export async function GET(request: Request) {
         .is("archived_at", null)
         .or(orFilter(["title", "description", "status", "priority", "source_type", "source_title"], words))
         .order("updated_at", { ascending: false })
-        .limit(6)
-    ),
+        .limit(24)
+    ).then((rows) => excludeChecklistDerivedRecords(rows).slice(0, 6)),
     scopedResults<CrmLeadRow>(
       includesDomain("customers"),
       () => supabase
@@ -421,18 +418,6 @@ export async function GET(request: Request) {
         .order("updated_at", { ascending: false })
         .limit(24)
     ).then((rows) => filterOriginalBusinessEvidence<SopRow>(rows as SopRow[]).slice(0, 6)),
-    scopedResults<ChecklistRow>(
-      includesDomain("compliance", "operations"),
-      () => supabase
-        .from("checklists")
-        .select("*")
-        .eq("workspace_id", workspaceId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .or(orFilter(["name", "description", "category", "frequency", "assigned_role"], words))
-        .order("updated_at", { ascending: false })
-        .limit(24)
-    ).then((rows) => filterOriginalBusinessEvidence<ChecklistRow>(rows as ChecklistRow[]).slice(0, 6)),
     scopedResults<DecisionRow>(
       includesDomain("decisions", "priorities"),
       () => supabase
@@ -606,19 +591,6 @@ export async function GET(request: Request) {
       preview: truncate(sop.body_markdown || compact([sop.department, sop.category])),
       href: hrefWithQuery("/app/sops", sop.title),
       meta: compact([sop.status, sop.department, sop.category])
-    }))
-  );
-
-  addGroup(
-    groups,
-    "Checklists",
-    checklists.map((checklist) => ({
-      id: checklist.id,
-      title: checklist.name,
-      sourceType: "Checklist",
-      preview: truncate(checklist.description || compact([checklist.category, checklist.frequency, checklist.assigned_role])),
-      href: hrefWithQuery("/app/checklists", checklist.name),
-      meta: compact([checklist.category, checklist.frequency])
     }))
   );
 

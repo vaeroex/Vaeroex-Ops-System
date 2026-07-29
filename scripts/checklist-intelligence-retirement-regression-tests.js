@@ -55,9 +55,12 @@ for (const file of coreFiles) {
 const demoCounts = read("lib/demo/workspace-demo.ts").match(/export async function getDemoWorkspaceCounts[\s\S]*?\n}\n/)?.[0] || "";
 assert.doesNotMatch(demoCounts, /from\("checklists"\)|checklists:\s*countValue/, "Executive Overview demo counts must not query or expose Checklist configuration");
 
-assert.match(read("app/app/checklists/page.tsx"), /requireWorkspacePage/, "Checklist route remains available for the later UI-retirement PR");
-assert.match(read("app/app/checklist-runs/page.tsx"), /requireWorkspacePage/, "Checklist Runs route remains available for the later UI-retirement PR");
-assert.match(read("app/app/operations/actions.ts"), /createChecklistAction/, "historical Checklist CRUD remains preserved in this prerequisite PR");
+for (const route of ["app/app/checklists/page.tsx", "app/app/checklist-runs/page.tsx"]) {
+  const source = read(route);
+  assert.match(source, /await requireWorkspacePage\(\)/, `${route} must authorize the workspace before redirecting`);
+  assert.match(source, /permanentRedirect\("\/app"\)/, `${route} must redirect to Executive Overview`);
+}
+assert.doesNotMatch(read("app/app/operations/actions.ts"), /createChecklistAction|runChecklistAction/, "retired Checklist UI mutations must not remain reachable");
 
 const date = "2026-07-01T00:00:00Z";
 const kpi = (overrides = {}) => ({

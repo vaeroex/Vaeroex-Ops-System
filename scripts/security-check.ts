@@ -224,6 +224,7 @@ const customerPages = [
   "app/app/crm/page.tsx",
   "app/app/tasks/page.tsx",
   "app/app/checklists/page.tsx",
+  "app/app/checklist-runs/page.tsx",
   "app/app/issues/page.tsx",
   "app/app/assets/page.tsx",
   "app/app/forms/page.tsx",

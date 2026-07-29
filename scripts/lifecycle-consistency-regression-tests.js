@@ -116,7 +116,7 @@ const checklistRunsPage = read("app/app/checklist-runs/page.tsx");
 const activeQuery = (table) => new RegExp(`from\\("${table}"\\)[\\s\\S]{0,520}\\.eq\\("workspace_id", workspaceId\\)[\\s\\S]{0,180}\\.is\\("(?:archived_at|deleted_at)", null\\)[\\s\\S]{0,180}\\.is\\("(?:archived_at|deleted_at)", null\\)`);
 
 assert.match(kpiPage, activeQuery("kpis"), "KPI charts and trends must query active rows only");
-for (const table of ["reports", "issues", "sops", "checklists"]) {
+for (const table of ["reports", "issues", "sops"]) {
   assert.match(searchRoute, activeQuery(table), `global search must exclude inactive ${table} before limiting`);
 }
 assert.match(searchRoute, /filterOriginalBusinessEvidence<IssueRow>/, "search reasoning must exclude setup-only issues");
@@ -164,7 +164,8 @@ assert.doesNotMatch(boundedContext, /context\.reports[\s\S]{0,500}body_markdown:
 assert.match(boundedContext, /Saved report conclusions are not reused as current business evidence/, "Ask must explain the derived-report evidence boundary");
 assert.doesNotMatch(searchRoute, /sourceType: `Derived report[\s\S]{0,180}truncate\(report\.body_markdown\)/, "Search navigation must not surface stale report conclusions as current evidence");
 assert.match(formSubmissionsPage, /activeFormIds\.has\(submission\.form_id\)/, "orphaned submissions must not remain visible");
-assert.match(checklistRunsPage, /activeChecklistIds\.has\(run\.checklist_id\)/, "orphaned checklist runs must not remain visible");
+assert.match(checklistRunsPage, /await requireWorkspacePage\(\)/, "retired Checklist Runs must authorize before redirecting");
+assert.match(checklistRunsPage, /permanentRedirect\("\/app"\)/, "retired Checklist Runs must not expose historical rows");
 
 for (const source of [searchRoute, boundedContext, reportPage, reportActions, scheduledReports, sourcesPage, workspaceSnapshot]) {
   assert.match(source, /eq\("workspace_id", workspaceId\)/, "every corrected surface must remain explicitly workspace-scoped");

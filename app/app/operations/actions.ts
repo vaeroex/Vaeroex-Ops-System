@@ -235,66 +235,6 @@ export async function createFormSubmissionAction(formData: FormData) {
   redirectWithMessage(path, "Submission saved.");
 }
 
-export async function createChecklistAction(formData: FormData) {
-  const path = "/app/checklists";
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const name = text(formData, "name");
-
-  requireValue(path, "Checklist name", name);
-  validateLength(path, "Checklist description", text(formData, "description"), 1200);
-
-  const { error } = await supabase.from("checklists").insert({
-    workspace_id: workspaceId,
-    name,
-    description: text(formData, "description"),
-    category: text(formData, "category"),
-    frequency: text(formData, "frequency"),
-    items_json: lines(text(formData, "items")) as Json,
-    assigned_role: text(formData, "assigned_role"),
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  redirectWithMessage(path, "Checklist created.");
-}
-
-export async function runChecklistAction(formData: FormData) {
-  const path = returnPath(formData, "/app/checklists");
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const checklistId = text(formData, "checklist_id");
-  const status = text(formData, "status") || "Complete";
-
-  requireValue(path, "Checklist", checklistId);
-  validateLength(path, "Run notes", text(formData, "notes"), 1000);
-
-  const { error } = await supabase.from("checklist_runs").insert({
-    workspace_id: workspaceId,
-    checklist_id: checklistId,
-    assigned_to: user.id,
-    assigned_person_id: text(formData, "person_id") || null,
-    assigned_role: text(formData, "role") || null,
-    assigned_department: text(formData, "department") || null,
-    due_date: text(formData, "due_date") || null,
-    priority: text(formData, "priority") || "Medium",
-    status,
-    responses_json: lines(text(formData, "responses")) as Json,
-    notes: text(formData, "notes"),
-    completed_at: status === "Complete" ? new Date().toISOString() : null
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  revalidatePath("/app/checklist-runs");
-  redirectWithMessage(path, "Checklist run saved.");
-}
-
 export async function createKpiAction(formData: FormData) {
   const path = "/app/kpis";
   const { supabase, user, workspaceId, membership } = await requireWorkspace(path);

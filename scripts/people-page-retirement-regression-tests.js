@@ -14,8 +14,6 @@ const operationsActions = read("app/app/operations/actions.ts");
 const recordActions = read("app/app/operations/record-management-actions.ts");
 const accountabilityActions = read("app/app/accountability/actions.ts");
 const accountabilityForms = read("components/accountability/AccountabilityForms.tsx");
-const checklistsPage = read("app/app/checklists/page.tsx");
-const checklistRunsPage = read("app/app/checklist-runs/page.tsx");
 const kpisPage = read("app/app/kpis/page.tsx");
 const overviewPage = read("app/app/page.tsx");
 const workspaceContext = read("lib/workspaces/current.ts");
@@ -42,8 +40,6 @@ assert.doesNotMatch(searchTypes, /\| "People"/, "Global Search must not retain t
 assert.doesNotMatch(operationsActions, /createPersonAction|Person added\./, "No dedicated People create action may remain reachable");
 assert.doesNotMatch(recordActions, /\| "people"|people:\s*\{[\s\S]*?path:\s*"\/app\/people"/, "Generic record mutations must not retain a People collection");
 
-assert.match(checklistsPage, /from\("people"\)[\s\S]*AssignmentPanel/, "Checklists must preserve optional person-recipient compatibility");
-assert.match(checklistRunsPage, /from\("people"\)[\s\S]*AssignmentTargetFields/, "Checklist runs must preserve person-attributed history and assignment compatibility");
 assert.match(accountabilityActions, /from\("people"\)/, "Accountability must preserve optional person-recipient label lookup");
 assert.match(accountabilityActions, /from\("operational_assignments"\)\.insert/, "Assignment creation must remain active");
 assert.match(accountabilityActions, /from\("record_shares"\)\.insert/, "KPI sharing must remain active");
