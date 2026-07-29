@@ -1,4 +1,5 @@
 import type { Database, Json } from "@/lib/supabase/types";
+import { excludeChecklistDerivedMetrics } from "@/lib/intelligence/checklist-retirement";
 import { filterBusinessEvidence, filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import type { IntelligenceEvidenceRecord, IntelligenceInsight } from "@/lib/intelligence/layer";
 import { compareKpiRowsNewest, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
@@ -704,13 +705,14 @@ export function buildOperationalEvidenceInsights({
   const activeFiles = filterOriginalBusinessEvidence(files);
   const activeImports = filterOriginalBusinessEvidence(imports).filter((item) => activeFiles.some((file) => file.id === item.file_upload_id));
   const parentEligibility = buildSourceParentEligibility({ files: activeFiles, imports: activeImports });
+  const activeKpiSettings = excludeChecklistDerivedMetrics(kpiSettings);
   const eligibleKpis = applyKpiSettingsToRows(
-    filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpis), parentEligibility)
+    excludeChecklistDerivedMetrics(filterBySourceParentEligibility(filterOriginalBusinessEvidence(kpis), parentEligibility))
       .filter((row) => Boolean(row.source_file_id || row.import_id) && importedProvenanceIsEligible(row.raw_data_json)),
-    kpiSettings,
+    activeKpiSettings,
     { includeHidden: true }
   );
-  const eligibleMetrics = filterBySourceParentEligibility(filterOriginalBusinessEvidence(operationalMetrics), parentEligibility)
+  const eligibleMetrics = excludeChecklistDerivedMetrics(filterBySourceParentEligibility(filterOriginalBusinessEvidence(operationalMetrics), parentEligibility))
     .filter((row) => Boolean(row.source_file_id || row.import_id) && importedProvenanceIsEligible(row.raw_data_json));
   const eligibleChunks = filterBySourceParentEligibility(
     filterBusinessEvidence(memoryChunks, { sourceKind: "business_memory" }),
@@ -746,7 +748,7 @@ export function buildOperationalEvidenceInsights({
   }
 
   return Array.from(groups.values())
-    .flatMap((group) => candidateDrafts(group, kpiSettings).map((draft) => completeCandidate(group, draft)))
+    .flatMap((group) => candidateDrafts(group, activeKpiSettings).map((draft) => completeCandidate(group, draft)))
     .sort(candidateSort)
     .slice(0, MAX_OPERATIONAL_FINDINGS);
 }

@@ -1,13 +1,12 @@
 import type { Route } from "next";
 import type { Database } from "@/lib/supabase/types";
+import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
 import { kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
 import { evaluateKpiPerformance, resolveKpiTargetReference } from "@/lib/kpis/semantics";
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
-type ChecklistRow = Database["public"]["Tables"]["checklists"]["Row"];
-type ChecklistRunRow = Database["public"]["Tables"]["checklist_runs"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
@@ -37,8 +36,6 @@ export type PrestigeInput = {
   kpiSettings?: KpiSettingRow[];
   issues: IssueRow[];
   assets: AssetRow[];
-  checklists: ChecklistRow[];
-  checklistRuns: ChecklistRunRow[];
   sops: SopRow[];
   files: FileUploadRow[];
   imports: FileImportRow[];
@@ -121,7 +118,6 @@ export type DepartmentScorecard = {
   pastDueReviewItems: number;
   openIssues: number;
   kpiPerformance: string;
-  checklistPerformance: string;
   crmImpact: string;
   explanation: string;
 };
@@ -289,19 +285,6 @@ function formatKpiTarget(kpi: KpiRow, settings: KpiSettingRow[] = []) {
   return formatMetric(reference.value, kpi.name);
 }
 
-function completionRate(rows: ChecklistRunRow[]) {
-  if (!rows.length) return null;
-  const completed = rows.filter((row) => Boolean(row.completed_at) || ["complete", "completed", "done"].includes(lower(row.status))).length;
-  return (completed / rows.length) * 100;
-}
-
-function kpiTargetRate(kpis: KpiRow[], settings: KpiSettingRow[] = []) {
-  const rows = latestKpis(kpis).filter((row) => row.actual_value !== null);
-  if (!rows.length) return null;
-  const classified = rows.map((row) => metricOnTarget(row, settings)).filter((value): value is boolean => value !== null);
-  return classified.length ? (classified.filter(Boolean).length / classified.length) * 100 : null;
-}
-
 function scoreFromBoolean(good: boolean, goodScore = 92, badScore = 58) {
   return good ? goodScore : badScore;
 }
@@ -432,14 +415,11 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
   const conversion = findKpi(input.kpis, ["conversion"]);
   const satisfaction = findKpi(input.kpis, ["satisfaction"]);
   const responseTime = findKpi(input.kpis, ["response"]);
-  const checklistCompletion = findKpi(input.kpis, ["checklist completion"]);
   const sopReview = findKpi(input.kpis, ["sop review"]);
-  const targetRate = kpiTargetRate(input.kpis, input.kpiSettings);
-  const checkRate = checklistCompletion?.actual_value ?? completionRate(input.checklistRuns);
   const leadsWithoutFollowUp = input.crmLeads.filter((lead) => !isConvertedLead(lead) && !lead.last_activity_at);
   const processScore = scoreFromRate(sopReview?.actual_value ?? null, input.sops.length ? 72 : 55);
   const customerScore = satisfaction?.actual_value ?? (responseTime && metricOnTarget(responseTime, input.kpiSettings) === false ? 62 : input.crmLeads.length ? 76 : 55);
-  const operationsScore = clampScore(88 - openIssues.length * 3 + Math.max(0, (checkRate ?? 80) - 85) / 2);
+  const operationsScore = clampScore(88 - openIssues.length * 3);
   const revenueStatus = revenue ? metricOnTarget(revenue, input.kpiSettings) : null;
   const conversionStatus = conversion ? metricOnTarget(conversion, input.kpiSettings) : null;
   const revenueScore = !revenue ? 66 : revenueStatus === true ? 88 : revenueStatus === false ? 66 : 77;
@@ -451,10 +431,10 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Operational Intelligence Health",
       score: operationsScore,
-      explanation: `${openIssues.length} open issue${openIssues.length === 1 ? "" : "s"} and checklist completion at ${formatMetric(checkRate, "Checklist Completion Rate")}.`,
-      improved: checkRate && checkRate >= 90 ? "Checklist discipline is improving operational visibility." : "Core business records are now centralized enough to review.",
+      explanation: `${openIssues.length} open issue${openIssues.length === 1 ? " is" : "s are"} available for operational review.`,
+      improved: openIssues.length ? "Core business records are centralized enough to review current operational issues." : "No open operational issue currently requires attention.",
       declined: openIssues.length ? "Open issues may indicate operating risk that leadership should review." : "No major operational decline is visible.",
-      nextAction: openIssues.length ? "Review the highest-severity open issue before the next leadership meeting." : "Keep reviewing checklist completion weekly."
+      nextAction: openIssues.length ? "Review the highest-severity open issue before the next leadership meeting." : "Keep current operating evidence available for leadership review."
     }),
     healthCategory({
       name: "Sales Health",
@@ -483,10 +463,10 @@ function buildHealth(input: PrestigeInput, dataQuality: ReturnType<typeof buildD
     healthCategory({
       name: "Process Health",
       score: processScore,
-      explanation: `${input.sops.length} SOPs and ${input.checklists.length} checklists are available; SOP review is ${formatMetric(sopReview?.actual_value, "SOP Review Completion")}.`,
-      improved: processScore >= 80 ? "Process review discipline is strong." : "SOPs and checklists are centralized for review.",
-      declined: processScore < 75 ? "SOP or checklist review needs attention." : "No major process decline is visible.",
-      nextAction: "Review stale SOPs and missed checklist runs."
+      explanation: `${input.sops.length} SOP${input.sops.length === 1 ? " is" : "s are"} available; SOP review is ${formatMetric(sopReview?.actual_value, "SOP Review Completion")}.`,
+      improved: processScore >= 80 ? "Process review discipline is strong." : "SOPs are centralized for review.",
+      declined: processScore < 75 ? "SOP review needs attention." : "No major process decline is visible.",
+      nextAction: "Review stale SOPs and current process evidence."
     }),
     healthCategory({
       name: "Data Quality Health",
@@ -610,7 +590,6 @@ function buildProfitLeaks(input: PrestigeInput) {
   const lostValue = staleLeads.reduce((sum, lead) => sum + (lead.estimated_value || 0), 0);
   const conversion = findKpi(input.kpis, ["conversion"]);
   const revenue = findKpi(input.kpis, ["revenue", "sales"]);
-  const checklistRate = findKpi(input.kpis, ["checklist completion"])?.actual_value ?? completionRate(input.checklistRuns);
 
   if (staleLeads.length) {
     leaks.push({
@@ -685,25 +664,6 @@ function buildProfitLeaks(input: PrestigeInput) {
       }),
       severity: "High",
       estimatedImpact: "Monthly revenue gap"
-    });
-  }
-
-  if (checklistRate !== null && checklistRate < 90) {
-    leaks.push({
-      ...action({
-        id: "missed-checklists",
-        title: "Missed checklists may be creating rework",
-        why: "Checklist misses are an early warning for service, quality, or handoff mistakes.",
-        evidence: `Checklist completion is ${numberFormatter.format(checklistRate)}%.`,
-        owner: "Supervisor",
-        dueDate: addDays(todayDate(), 5),
-      action: "Review checklist compliance evidence and document the likely operational cause.",
-        priority: "Medium",
-        relatedModule: "Checklists",
-        href: "/app/checklists"
-      }),
-      severity: "Medium",
-      estimatedImpact: "Rework and service risk"
     });
   }
 
@@ -863,9 +823,7 @@ function buildDepartmentScorecards(input: PrestigeInput) {
     const kpiRows = latestKpis(input.kpis).filter((kpi) => kpi.category === department || kpi.owner === department);
     const classifiedKpis = kpiRows.map((kpi) => metricOnTarget(kpi, input.kpiSettings)).filter((value): value is boolean => value !== null);
     const onTarget = classifiedKpis.length ? classifiedKpis.filter(Boolean).length / classifiedKpis.length : null;
-    const checkRows = input.checklistRuns.filter((run) => run.assigned_department === department || run.assigned_role === department);
-    const checkRate = completionRate(checkRows);
-    const score = clampScore(88 - pastDueReviewItems.length * 7 - openIssues.length * 5 + (onTarget !== null ? onTarget * 10 : 0) + ((checkRate ?? 80) - 80) / 3);
+    const score = clampScore(88 - pastDueReviewItems.length * 7 - openIssues.length * 5 + (onTarget !== null ? onTarget * 10 : 0));
 
     return {
       department,
@@ -875,12 +833,11 @@ function buildDepartmentScorecards(input: PrestigeInput) {
       pastDueReviewItems: pastDueReviewItems.length,
       openIssues: openIssues.length,
       kpiPerformance: kpiRows.length ? `${Math.round((onTarget || 0) * 100)}% of visible KPIs on target` : "No department KPIs yet",
-      checklistPerformance: checkRate === null ? "No department checklist runs yet" : `${numberFormatter.format(checkRate)}% completion`,
       crmImpact: lower(department).includes("sales") ? `${input.crmLeads.filter((lead) => !isConvertedLead(lead)).length} active customer activity records` : "No direct customer evidence impact",
       explanation:
         score < 70
-          ? `${department} scores lower because open review items, issues, or missing KPI/checklist evidence need attention.`
-          : `${department} is relatively stable based on current issues, KPIs, checklist results, and review items.`
+          ? `${department} scores lower because open review items, issues, or missing KPI evidence need attention.`
+          : `${department} is relatively stable based on current issues, KPIs, and review items.`
     } satisfies DepartmentScorecard;
   });
 }
@@ -889,7 +846,6 @@ function buildToolSprawl(input: PrestigeInput) {
   const usage = [
     ["KPIs", input.kpis.length > 0, "manual KPI tracker"],
     ["Customer evidence", input.crmLeads.length > 0, "customer activity source"],
-    ["Checklists", input.checklists.length > 0, "paper checklist"],
     ["Files", input.files.length > 0, "shared drive review"],
     ["Reports", input.reports.length > 0, "manual report doc"],
     ["SOPs", input.sops.length > 0, "SOP folder"],
@@ -979,19 +935,19 @@ function buildRoleBriefings(input: PrestigeInput, healthScore: number, focus: Pr
       role: "Manager",
       title: "Manager briefing",
       summary: `${openIssues.length} open issue${openIssues.length === 1 ? " is" : "s are"} available for review.`,
-      focus: ["Review open issues", "Review checklist evidence", "Document the next leadership decision"]
+      focus: ["Review open issues", "Review supporting evidence", "Document the next leadership decision"]
     },
     {
       role: "Supervisor",
       title: "Supervisor briefing",
-      summary: "Focus on checklist completion, field issues, and current evidence.",
-      focus: ["Review checklists", "Review field issues", "Confirm source context"]
+      summary: "Focus on field issues and current evidence.",
+      focus: ["Review field issues", "Confirm source context", "Escalate unresolved operating risk"]
     },
     {
       role: "Coordinator / Staff",
       title: "Staff briefing",
-      summary: "Focus on visible source evidence, Saved Analyses, and checklist results.",
-      focus: ["Review Evidence", "Open Saved Analyses", "Review checklist evidence"]
+      summary: "Focus on visible source evidence and Saved Analyses.",
+      focus: ["Review Evidence", "Open Saved Analyses", "Confirm current source context"]
     },
     {
       role: "Viewer",
@@ -1093,7 +1049,6 @@ function buildMeetingMode(input: PrestigeInput, focus: PrestigeAction[]) {
     "Customer evidence review: inspect stalled customer activity, proposal-stage records, and response gaps.",
     `Open issues: review ${input.issues.filter(isOpenIssue).length} active issue${input.issues.filter(isOpenIssue).length === 1 ? "" : "s"}.`,
     "Evidence review: inspect current source records supporting the highest-priority findings.",
-    "Checklist compliance: confirm missed runs, failed runs, and related issue evidence.",
     "SOP review: identify stale or weak procedures affecting current performance.",
     "Department risks: review department scorecards and workload imbalance.",
     "Vaeroex recommendations: review, save, dismiss, or schedule outcome review.",
@@ -1134,19 +1089,29 @@ function buildRiskSimulation(focus: PrestigeAction[], leaks: ProfitLeak[]) {
 }
 
 export function buildPrestigeIntelligence(input: PrestigeInput): PrestigeIntelligence {
-  const dataQuality = buildDataQuality(input);
-  const businessHealth = buildHealth(input, dataQuality);
-  const focusPriorities = buildFocusPriorities(input, dataQuality);
-  const profitLeaks = buildProfitLeaks(input);
-  const memoryTimeline = buildMemoryTimeline(input, focusPriorities);
-  const accountabilityMap = buildAccountability(input);
-  const departmentScorecards = buildDepartmentScorecards(input);
-  const toolSprawl = buildToolSprawl(input);
-  const decisions = buildDecisionSummary(input);
-  const recommendationTracking = buildRecommendationTracking(input, focusPriorities, profitLeaks);
-  const meetingMode = buildMeetingMode(input, focusPriorities);
+  const activeInput = {
+    ...input,
+    kpis: excludeChecklistDerivedMetrics(input.kpis),
+    kpiSettings: excludeChecklistDerivedMetrics(input.kpiSettings || []),
+    issues: excludeChecklistDerivedRecords(input.issues),
+    vaeroexRuns: excludeChecklistDerivedRecords(input.vaeroexRuns),
+    assignments: excludeChecklistDerivedRecords(input.assignments),
+    decisions: excludeChecklistDerivedRecords(input.decisions),
+    recommendationOutcomes: excludeChecklistDerivedRecords(input.recommendationOutcomes)
+  };
+  const dataQuality = buildDataQuality(activeInput);
+  const businessHealth = buildHealth(activeInput, dataQuality);
+  const focusPriorities = buildFocusPriorities(activeInput, dataQuality);
+  const profitLeaks = buildProfitLeaks(activeInput);
+  const memoryTimeline = buildMemoryTimeline(activeInput, focusPriorities);
+  const accountabilityMap = buildAccountability(activeInput);
+  const departmentScorecards = buildDepartmentScorecards(activeInput);
+  const toolSprawl = buildToolSprawl(activeInput);
+  const decisions = buildDecisionSummary(activeInput);
+  const recommendationTracking = buildRecommendationTracking(activeInput, focusPriorities, profitLeaks);
+  const meetingMode = buildMeetingMode(activeInput, focusPriorities);
   const riskSimulation = buildRiskSimulation(focusPriorities, profitLeaks);
-  const benchmarkMode = buildBenchmarkMode(input);
+  const benchmarkMode = buildBenchmarkMode(activeInput);
   const ceoActions = [
     focusPriorities[0]?.title || "Clarify the top operating priority",
     profitLeaks[0]?.title || "Protect revenue and customer response quality",
@@ -1156,8 +1121,8 @@ export function buildPrestigeIntelligence(input: PrestigeInput): PrestigeIntelli
     summary: `If I were the CEO this week, I would focus on business health (${businessHealth.score}/100), revenue leakage, responsibility visibility, customer experience, and the first three executive decisions Vaeroex can tie to evidence.`,
     actions: ceoActions
   };
-  const businessReviewPackage = buildReviewPackage(input, businessHealth, focusPriorities, profitLeaks);
-  const roleBriefings = buildRoleBriefings(input, businessHealth.score, focusPriorities);
+  const businessReviewPackage = buildReviewPackage(activeInput, businessHealth, focusPriorities, profitLeaks);
+  const roleBriefings = buildRoleBriefings(activeInput, businessHealth.score, focusPriorities);
 
   return {
     businessHealth,

@@ -1684,7 +1684,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     peopleResult,
     shareResult,
     issueResult,
-    checklistRunResult,
     crmResult,
     fileResult,
     reportResult,
@@ -1702,7 +1701,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
-    supabase.from("checklist_runs").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(200),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(100),
     supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(20),
@@ -1738,8 +1736,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     kpiSettings,
     issues: issueResult.data || [],
     assets: [],
-    checklists: [],
-    checklistRuns: [],
     sops: [],
     files: fileResult.data || [],
     imports: [],
@@ -1993,7 +1989,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     peopleResult.error?.message ||
     shareResult.error?.message ||
           issueResult.error?.message ||
-          checklistRunResult.error?.message ||
     crmResult.error?.message ||
     fileResult.error?.message ||
     reportResult.error?.message ||

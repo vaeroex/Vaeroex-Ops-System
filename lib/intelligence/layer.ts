@@ -1,5 +1,6 @@
 import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
+import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
 import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
@@ -249,7 +250,6 @@ function kpiEvidenceRecord(kpi: KpiRow, semantics: KpiSemantics, support: string
 
 function canonicalTopic(value: string) {
   const normalized = lower(value);
-  if (/checklist/.test(normalized)) return "checklist-completion";
   if (/response.?time/.test(normalized)) return "response-time";
   if (/follow.?up|overdue/.test(normalized)) return "customer-follow-up";
   if (/conversion/.test(normalized)) return "conversion";
@@ -438,13 +438,13 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const workspace = input.workspace || null;
   const files = filterOriginalBusinessEvidence(input.files);
   const parentEligibility = buildSourceParentEligibility({ files, imports: input.imports || [] });
-  const kpiSettings = input.kpiSettings || [];
+  const kpiSettings = excludeChecklistDerivedMetrics(input.kpiSettings || []);
   const kpis = applyKpiSettingsToRows(
-    filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility),
+    excludeChecklistDerivedMetrics(filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.kpis), parentEligibility)),
     kpiSettings,
     { includeHidden: true }
   );
-  const issues = filterOriginalBusinessEvidence(input.issues);
+  const issues = excludeChecklistDerivedRecords(filterOriginalBusinessEvidence(input.issues));
   // Reports are derived outputs. They remain reviewable, but never become
   // original evidence for new health, coverage, risk, or recommendation logic.
   const reports: ReportRow[] = [];

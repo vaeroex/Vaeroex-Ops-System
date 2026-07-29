@@ -18,7 +18,6 @@ export type DemoWorkspaceCounts = {
   files: number;
   fileAnalyses: number;
   assets: number;
-  checklists: number;
   vaeroexInsights: number;
 };
 
@@ -444,7 +443,6 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
     files,
     fileAnalyses,
     assets,
-    checklists,
     vaeroexInsights
   ] = await Promise.all([
     supabase.from("crm_leads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
@@ -456,7 +454,6 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
     supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId).not("analysis_summary", "is", null),
     supabase.from("assets").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    supabase.from("checklists").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     supabase.from("ai_agent_runs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
   ]);
 
@@ -470,7 +467,6 @@ export async function getDemoWorkspaceCounts(supabase: AppSupabaseClient, worksp
     files: countValue(files),
     fileAnalyses: countValue(fileAnalyses),
     assets: countValue(assets),
-    checklists: countValue(checklists),
     vaeroexInsights: countValue(vaeroexInsights)
   };
 }

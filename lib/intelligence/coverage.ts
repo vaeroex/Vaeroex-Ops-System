@@ -1,4 +1,5 @@
 import type { Database } from "@/lib/supabase/types";
+import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
 import { buildKpiForecastEligibility, type KpiForecastReadinessState } from "@/lib/kpis/forecast-eligibility";
 import {
   filterBusinessEvidence,
@@ -86,8 +87,6 @@ export type BusinessIntelligenceCoverageResult = {
 export type BusinessIntelligenceCoverageInput = {
   kpis?: TableRow<"kpis">[];
   issues?: TableRow<"issues">[];
-  checklists?: TableRow<"checklists">[];
-  checklistRuns?: TableRow<"checklist_runs">[];
   files?: TableRow<"file_uploads">[];
   imports?: TableRow<"file_imports">[];
   sops?: TableRow<"sops">[];
@@ -131,10 +130,10 @@ const CATEGORY_LABELS: Record<BusinessIntelligenceCoverageCategoryId, string> = 
 const NEXT_UPLOADS: Record<BusinessIntelligenceCoverageCategoryId, string> = {
   revenue: "Upload 6-12 months of revenue history to improve revenue confidence and avoid weak forecasting.",
   financials: "Upload recent P&L, expense, margin, cost, or cash-flow summaries to improve financial understanding.",
-  operations: "Upload operating logs, checklist results, job volume, service activity, or recurring workflow data.",
+  operations: "Upload operating logs, job volume, service activity, or recurring workflow data.",
   customers: "Upload customer complaint, support, retention, or account activity data to improve customer risk detection.",
   sales_pipeline: "Upload customer activity, conversion, revenue, win/loss, and response history.",
-  processes: "Upload SOPs, process docs, checklists, or recurring procedures to improve process recommendations.",
+  processes: "Upload SOPs, process docs, or recurring procedures to improve process recommendations.",
   staffing: "Add people, role, department, schedule, utilization, staffing, or assignment context.",
   issues_risks: "Add issue logs, risk reviews, incident summaries, blockers, or unresolved problem history.",
   historical_trends: "Upload multiple months of KPI, revenue, sales, customer, or operating history.",
@@ -429,25 +428,21 @@ function makeConfidenceOverTime(input: BusinessIntelligenceCoverageInput) {
 
 export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCoverageInput): BusinessIntelligenceCoverageResult {
   const derivedFindingCount =
-    filterBusinessEvidence(input.vaeroexRuns || [], { sourceKind: "platform_run" }).length +
-    filterBusinessEvidence(input.decisions || []).length +
-    filterBusinessEvidence(input.recommendationOutcomes || []).length;
+    excludeChecklistDerivedRecords(filterBusinessEvidence(input.vaeroexRuns || [], { sourceKind: "platform_run" })).length +
+    excludeChecklistDerivedRecords(filterBusinessEvidence(input.decisions || [])).length +
+    excludeChecklistDerivedRecords(filterBusinessEvidence(input.recommendationOutcomes || [])).length;
   const activeFiles = activeRows(input.files || []);
   const activeSourceFileIds = new Set(activeFiles.map((file) => file.id));
   const activeImports = (input.imports || []).filter((item) => activeSourceFileIds.has(item.file_upload_id));
   const parentEligibility = buildSourceParentEligibility({ files: activeFiles, imports: activeImports });
-  const activeChecklists = activeRows(input.checklists || []);
-  const activeChecklistIds = new Set(activeChecklists.map((checklist) => checklist.id));
   const activeForms = activeRows(input.forms || []);
   const activeFormIds = new Set(activeForms.map((form) => form.id));
   const activeCrmLeads = filterBySourceParentEligibility(activeRows(input.crmLeads || []), parentEligibility);
   const activeCrmLeadIds = new Set(activeCrmLeads.map((lead) => lead.id));
   input = {
     ...input,
-    kpis: filterBySourceParentEligibility(activeRows(input.kpis || []), parentEligibility),
-    issues: activeRows(input.issues || []),
-    checklists: activeChecklists,
-    checklistRuns: activeRows(input.checklistRuns || []).filter((run) => activeChecklistIds.has(run.checklist_id)),
+    kpis: excludeChecklistDerivedMetrics(filterBySourceParentEligibility(activeRows(input.kpis || []), parentEligibility)),
+    issues: excludeChecklistDerivedRecords(activeRows(input.issues || [])),
     files: activeFiles,
     imports: activeImports,
     sops: activeRows(input.sops || []),
@@ -460,17 +455,17 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     // Saved reports are derived analysis, not additional business evidence.
     reports: [],
     vaeroexRuns: [],
-    operationalMetrics: filterBySourceParentEligibility(activeRows(input.operationalMetrics || []), parentEligibility),
+    operationalMetrics: excludeChecklistDerivedMetrics(filterBySourceParentEligibility(activeRows(input.operationalMetrics || []), parentEligibility)),
     assets: activeRows(input.assets || []),
     decisions: [],
     recommendationOutcomes: []
   };
   const revenueKeywords = ["revenue", "sales", "income", "booking", "invoice", "receivable", "arpu", "arr", "mrr"];
   const financialKeywords = ["financial", "expense", "cost", "profit", "margin", "cash", "payroll", "budget", "p&l", "loss", "invoice", "revenue"];
-  const operationsKeywords = ["operation", "job", "work order", "checklist", "task", "service", "volume", "utilization", "dispatch", "route", "inspection", "asset"];
+  const operationsKeywords = ["operation", "job", "work order", "service", "volume", "utilization", "dispatch", "route", "inspection", "asset"];
   const customerKeywords = ["customer", "client", "complaint", "support", "service", "retention", "satisfaction", "csat", "nps", "account"];
   const salesKeywords = ["lead", "pipeline", "conversion", "proposal", "quote", "estimate", "won", "lost", "sales"];
-  const processKeywords = ["sop", "process", "procedure", "checklist", "workflow", "standard", "policy"];
+  const processKeywords = ["sop", "process", "procedure", "workflow", "standard", "policy"];
   const staffingKeywords = ["staff", "employee", "people", "person", "role", "department", "labor", "utilization", "schedule", "capacity"];
   const riskKeywords = ["risk", "issue", "incident", "blocker", "failure", "complaint", "overdue", "missed", "critical", "problem"];
 
