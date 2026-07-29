@@ -2,7 +2,7 @@ import { createManualSubscriptionAction } from "@/app/app/admin/subscriptions/ac
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 
-const subscriptionStatusOptions = ["active", "trialing", "past_due", "unpaid", "incomplete", "canceled", "expired", "manual_review", "demo"] as const;
+const subscriptionStatusOptions = ["active", "trialing", "past_due", "unpaid", "incomplete", "canceled", "expired", "manual_review"] as const;
 
 export function AdminManualActivationForm({
   returnTo,

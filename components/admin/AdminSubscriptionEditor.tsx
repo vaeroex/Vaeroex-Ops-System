@@ -3,7 +3,7 @@ import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
 import type { Database } from "@/lib/supabase/types";
 
-const subscriptionStatusOptions = ["active", "trialing", "past_due", "unpaid", "incomplete", "canceled", "expired", "manual_review", "demo"] as const;
+const subscriptionStatusOptions = ["active", "trialing", "past_due", "unpaid", "incomplete", "canceled", "expired", "manual_review"] as const;
 type SubscriptionRow = Database["public"]["Tables"]["customer_subscriptions"]["Row"];
 
 export function AdminSubscriptionEditor({ subscription, returnTo }: { subscription: SubscriptionRow; returnTo: string }) {

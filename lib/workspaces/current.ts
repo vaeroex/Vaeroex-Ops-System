@@ -2,9 +2,9 @@ import { cookies } from "next/headers";
 import type { User } from "@supabase/supabase-js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
-import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
+import { isDemoWorkspaceRecord } from "@/lib/workspaces/demo-compatibility";
 
 type MembershipWithWorkspace = WorkspaceMember & {
   workspaces: Workspace | Workspace[] | null;

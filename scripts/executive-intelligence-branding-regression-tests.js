@@ -38,7 +38,6 @@ const customerFacingFiles = [
   "components/legal/PublicSiteHeader.tsx",
   "components/motion/MarketingDashboardPreview.tsx",
   "lib/billing/plans.ts",
-  "lib/demo/workspace-demo.ts",
   "lib/email/welcome.ts",
   "lib/help/content.ts",
   "lib/legal/content.ts",

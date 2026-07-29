@@ -41,7 +41,6 @@ Use the Vaeroex product for the complete Executive Intelligence experience:
 - Executive Briefings
 - Role-Based Briefings
 - Weekly Reviews
-- Demo Workspace
 - Security Features
 - Help Center
 - Future intelligence features
@@ -115,7 +114,7 @@ Webhook events are stored in `subscription_events`. Clear events update `custome
 2. Confirm the checkout email.
 3. Create a Vaeroex app account using the same email.
 4. Open `/app/setup`.
-5. Confirm the app allows setup only when a matching active/manual/demo subscription exists.
+5. Confirm the app allows setup only when matching active, trialing, or manually unlocked access exists.
 6. If access does not unlock, use the “I already purchased” form on `/billing-required`.
 
 ## 8. Handle Cancellations
@@ -128,7 +127,7 @@ If webhook payloads are unclear, manually update the customer on:
 /app/admin/subscriptions
 ```
 
-Canceled or expired subscriptions are blocked from full app modules unless a workspace is demo or manually unlocked.
+Canceled or expired subscriptions are blocked from full app modules unless the workspace is manually unlocked. Historical demo-status records retain compatibility access but cannot be newly assigned.
 
 ## 9. Handle Failed Payments
 

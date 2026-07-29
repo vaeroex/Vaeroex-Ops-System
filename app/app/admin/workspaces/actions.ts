@@ -8,6 +8,15 @@ import { normalizePlanSlug } from "@/lib/billing/plans";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
+const assignableWorkspaceStatuses = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "canceled",
+  "expired",
+  "manual_review"
+]);
+
 function text(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
@@ -25,6 +34,10 @@ export async function updateWorkspaceAccessAction(formData: FormData) {
 
   if (!workspaceId) {
     redirect(withAdminActionNotice(returnTo, "error", "Workspace is required."));
+  }
+
+  if (!assignableWorkspaceStatuses.has(status)) {
+    redirect(withAdminActionNotice(returnTo, "error", "Workspace access status cannot be assigned."));
   }
 
   const { error } = await admin

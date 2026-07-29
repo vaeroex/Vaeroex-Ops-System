@@ -1,5 +1,7 @@
 # Phase 5 Acceptance Review
 
+> Superseded July 29, 2026: the internal seeded-demo system described in this historical review has been retired. No current runtime creates, resets, or repopulates these fixtures.
+
 Date: 2026-06-17
 
 ## Acceptance Criteria

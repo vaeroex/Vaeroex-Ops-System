@@ -27,7 +27,7 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
   - Status: Source verified; needs live admin test.
 
 - [ ] Customer creates workspace.
-  - Expected: Active, manual, or demo customer can access `/app/setup`.
+  - Expected: Active, trialing, or manually unlocked customers can access `/app/setup`.
   - Verify: Missing, canceled, expired, or past-due customer is blocked unless manually unlocked.
   - Status: Source verified; needs live subscription-gating test.
 
@@ -85,7 +85,7 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
 
 - [ ] View subscription status.
   - Expected: Admin can view subscription records, workspace subscription state, manual activation requests, and Squarespace event payloads.
-  - Verify: Active/manual/demo access is allowed; blocked statuses are blocked unless manually unlocked.
+  - Verify: Active, trialing, or manually unlocked access is allowed; blocked statuses remain blocked.
   - Status: Source verified; needs live admin test.
 
 - [ ] View support request.
@@ -117,7 +117,7 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
 
 - [ ] Subscription gating.
   - Expected: Missing, canceled, expired, and past-due subscriptions are blocked from full modules.
-  - Verify: Active, trialing, demo, and manually unlocked access is allowed.
+  - Verify: Active, trialing, and manually unlocked access is allowed.
   - Status: Source verified; needs live account test.
 
 - [ ] API key safety.
@@ -153,10 +153,6 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
     - `202606170003_phase_6_squarespace_subscriptions.sql`
     - `202606170004_admin_support_tools.sql`
   - Status: Source documented; needs live Supabase test.
-
-- [ ] Seed data works.
-  - Expected: `supabase db reset` loads demo workspaces, subscriptions, operations records, Vaeroex runs, and support requests in a disposable database.
-  - Status: Source verified; needs live Supabase test.
 
 - [ ] Vercel deployment instructions work.
   - Expected: Vercel uses `pnpm install` and `pnpm build`, with environment variables configured for Production and Preview.

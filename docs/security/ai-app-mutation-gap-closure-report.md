@@ -2,6 +2,8 @@
 
 Date: July 8, 2026
 
+> Update, July 29, 2026: the internal seeded-demo create/reset runtime was retired. Historical demo-status records retain compatibility access, but no current demo mutation path exists.
+
 ## Scope
 
 This phase expands Vaeroex mutation safety beyond generated-output saves. It focuses on user-driven mutation paths, service-role audit visibility, destructive-action confirmation, source citation validation, and automated regression checks.
@@ -17,7 +19,7 @@ This phase expands Vaeroex mutation safety beyond generated-output saves. It foc
 - Bulk destructive record actions require typed `DELETE` confirmation.
 - Generated insight deletion remains gateway controlled and excludes related Business Memory chunks from future retrieval.
 - Stripe webhook processing writes security audit events without blocking subscription activation if audit logging is temporarily unavailable.
-- Admin subscription, workspace access, and demo reset/create actions write security audit events.
+- Admin subscription and workspace access actions write security audit events.
 - Admin audit logs now include a Security Events section.
 - Repeated blocked/suspicious actions are rate limited by workspace and user.
 - AI output validation now rejects malformed source citation record IDs and oversized citation collections.
@@ -42,7 +44,7 @@ The existing `pnpm security:check` regression suite now verifies:
 - Bulk delete requires typed `DELETE`.
 - Gateway rejects unsafe instruction-like arguments.
 - Blocked/suspicious action rate limiting exists.
-- File import, KPI import, report-from-file, KPI edits/deletes, managed records, generated insights, Stripe webhook, and admin/demo paths are wired to audit/gateway controls.
+- File import, KPI import, KPI edits/deletes, managed records, generated insights, Stripe webhook, and active admin paths are wired to audit/gateway controls.
 - Deleted generated insights are excluded from Business Memory retrieval.
 - Admin Security Events UI queries `security_audit_events`.
 - Source citation validation checks citation record IDs.

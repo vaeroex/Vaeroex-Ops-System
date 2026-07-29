@@ -9,25 +9,18 @@ type BusinessDecisionRow = Database["public"]["Tables"]["business_decisions"]["R
 type LeadershipDecisionJournalProps = {
   decisions: BusinessDecisionRow[];
   returnPath?: string;
-  isDemoWorkspace?: boolean;
 };
 
 const decisionStatuses = ["open", "in_progress", "reviewed", "completed", "dismissed"];
 
 export function LeadershipDecisionJournal({
   decisions,
-  returnPath = "/app",
-  isDemoWorkspace = false
+  returnPath = "/app"
 }: LeadershipDecisionJournalProps) {
   const recentDecisions = decisions.slice(0, 6);
 
   return (
     <div id="decision-journal">
-      {isDemoWorkspace ? (
-        <p className="mb-4 rounded-lg border border-vaeroex-accent/40 bg-vaeroex-soft p-3 text-xs leading-5 text-vaeroex-navy">
-          Demo Workspace decisions are previews only. No live decision record is created.
-        </p>
-      ) : null}
       <CreateDrawer
         title="Log decision"
         description="Vaeroex will retain this leadership decision for future reviews."

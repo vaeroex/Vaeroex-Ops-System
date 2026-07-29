@@ -72,12 +72,6 @@ assert.doesNotMatch(setupPage, /Business Signals?|\/app\/tasks/);
 assert.doesNotMatch(workspaceCreationForm, /Business Signals?|\/app\/tasks/);
 assert.equal(fs.existsSync(path.join(root, "components/setup/SetupWizard.tsx")), false, "the retired questionnaire wizard must not remain");
 
-const demo = read("lib/demo/workspace-demo.ts");
-const seed = read("supabase/seed.sql");
-assert.doesNotMatch(demo, /from\("tasks"\)\.insert|seedTasks/, "demo population must not create task fixtures");
-assert.match(demo, /"tasks"/, "demo reset may retain the legacy table cleanup entry");
-assert.doesNotMatch(seed, /insert into public\.tasks|Business Signals?/, "database seed must not create or describe Business Signals");
-
 const evidenceIndex = read("lib/ai/evidence-index.ts");
 assert.match(evidenceIndex, /source_type === "business_signal" \|\| row\.source_type === "task"/, "legacy task-backed memory must fail closed");
 

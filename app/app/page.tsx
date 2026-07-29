@@ -1,10 +1,6 @@
 import Link from "next/link";
 import type { Route } from "next";
 import type { ReactNode } from "react";
-import {
-  exitDemoWorkspaceAction,
-  resetDemoWorkspaceAction
-} from "@/app/app/demo/actions";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
 import { ExecutiveHomepage } from "@/components/intelligence/ExecutiveHomepage";
@@ -20,8 +16,6 @@ import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-chan
 import { buildBusinessHealthExplanationFromSnapshotV1 } from "@/lib/ai/business-health-explanation/snapshot-context";
 import { loadBusinessHealthAnalysisState } from "@/lib/ai/business-health-explanation/storage";
 import { trySealBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
-import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
-import { ensureDemoWorkspacePopulated, getDemoWorkspaceCounts, isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
 import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
@@ -816,13 +810,11 @@ function intelligenceHealthTone(status: IntelligenceLayerResult["businessHealth"
 function IntelligenceLayerSummary({
   intelligence,
   businessHealthHistory,
-  businessHealthHistoryError,
-  isDemoWorkspace
+  businessHealthHistoryError
 }: {
   intelligence: IntelligenceLayerResult;
   businessHealthHistory: BusinessHealthTrendPoint[];
   businessHealthHistoryError?: string | null;
-  isDemoWorkspace: boolean;
 }) {
   const briefingCards = [
     {
@@ -880,7 +872,6 @@ function IntelligenceLayerSummary({
             currentScore={intelligence.businessHealth.score}
             currentStatus={intelligence.businessHealth.status}
             currentTrend={intelligence.businessHealth.trend}
-            isDemoWorkspace={isDemoWorkspace}
             errorMessage={businessHealthHistoryError}
           />
         </div>
@@ -1029,121 +1020,6 @@ function IntelligenceBriefingHero({
   );
 }
 
-function DemoActionButton({ children, tone = "secondary" }: { children: ReactNode; tone?: "primary" | "secondary" | "danger" }) {
-  const className =
-    tone === "primary"
-      ? "rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white"
-      : tone === "danger"
-        ? "rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700"
-        : "rounded-lg border border-line bg-white px-3 py-2 text-sm font-semibold text-ink";
-
-  return <button className={className}>{children}</button>;
-}
-
-function DemoWorkspaceBanner({
-  counts,
-  canUseAdminTools
-}: {
-  counts: {
-    kpis: number;
-    operationalMetrics: number;
-    crm: number;
-    issues: number;
-    reports: number;
-    sops: number;
-    files: number;
-    fileAnalyses: number;
-    assets: number;
-    alerts: number;
-    insights: number;
-  };
-  canUseAdminTools: boolean;
-}) {
-  const summaryItems = [
-    ["Demo KPIs", counts.kpis],
-    ["Demo Customer Evidence", counts.crm],
-    ["Demo Reports", counts.reports],
-    ["Demo Issues", counts.issues]
-  ];
-  const countItems = [
-    ["KPIs", counts.kpis],
-    ["Business metrics", counts.operationalMetrics],
-    ["Customer activity evidence", counts.crm],
-    ["Open issues", counts.issues],
-    ["Reports", counts.reports],
-    ["SOPs", counts.sops],
-    ["Files", counts.files],
-    ["File analyses", counts.fileAnalyses],
-    ["Assets", counts.assets],
-    ["Alerts", counts.alerts],
-    ["Vaeroex insights", counts.insights]
-  ];
-
-  return (
-    <section className="rounded-lg border-2 border-vaeroex-accent/60 bg-vaeroex-soft p-5 text-vaeroex-navy shadow-panel">
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.18em]">Workspace mode</p>
-          <h2 className="mt-2 text-3xl font-black uppercase tracking-wide">DEMO WORKSPACE</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6">
-            Demo Workspace &mdash; executive intelligence sample data from January to current month. No real emails are sent.
-            It includes YTD KPI movement, customer activity evidence, weak-month alerts, reports, issues, SOPs, files, decisions, and Vaeroex insights.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {canUseAdminTools ? (
-            <form action={resetDemoWorkspaceAction}>
-              <DemoActionButton tone="danger">Reset demo workspace</DemoActionButton>
-            </form>
-          ) : null}
-          <form action={exitDemoWorkspaceAction}>
-            <DemoActionButton>Switch back to my workspace</DemoActionButton>
-          </form>
-        </div>
-      </div>
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
-          <p className="text-sm font-semibold">March dip</p>
-          <p className="mt-2 text-xs leading-5">
-            Revenue fell below target while response time increased, conversion dropped, and open issues rose.
-          </p>
-        </article>
-        <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
-          <p className="text-sm font-semibold">April and May recovery</p>
-          <p className="mt-2 text-xs leading-5">
-            SOP review and customer activity visibility helped the business recover from the weak month.
-          </p>
-        </article>
-        <article className="rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
-          <p className="text-sm font-semibold">Current month signals</p>
-          <p className="mt-2 text-xs leading-5">
-            Revenue is healthy, but response time, conversion, and open issues still need leadership attention.
-          </p>
-        </article>
-      </div>
-      <div className="mt-5 rounded-lg border border-vaeroex-accent/40 bg-white/80 p-4">
-        <p className="text-sm font-semibold">Demo Dashboard Summary</p>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          {summaryItems.map(([label, value]) => (
-            <div key={label} className="rounded-lg bg-vaeroex-soft p-3">
-              <p className="text-2xl font-semibold">{value}</p>
-              <p className="mt-1 text-xs leading-4">{label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="mt-4 grid gap-2 sm:grid-cols-3 xl:grid-cols-6">
-        {countItems.map(([label, value]) => (
-          <div key={label} className="rounded-lg bg-white/80 p-3">
-            <p className="text-lg font-semibold">{value}</p>
-            <p className="mt-1 text-xs leading-4">{label}</p>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export default async function AppDashboardPage({ searchParams }: DashboardPageProps) {
   const params = await searchParams;
   const period = isDashboardPeriod(params?.period) ? params.period : "Weekly";
@@ -1153,13 +1029,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const {
     data: { user }
   } = await supabase.auth.getUser();
-  const canUseAdminOnboardingTools = isVaeroexAdminUser(user);
-  const isViewingDemoWorkspace = isDemoWorkspaceRecord(context.activeWorkspace);
-
-  if (isViewingDemoWorkspace && user) {
-    await ensureDemoWorkspacePopulated(supabase, workspaceId, user);
-  }
-
   const [
     kpiResult,
     kpiSettingsResult,
@@ -1292,8 +1161,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sourceParentResult.error,
     memoryEligibilityError
   ].filter(Boolean);
-  const demoWorkspaceCounts = isViewingDemoWorkspace ? await getDemoWorkspaceCounts(supabase, workspaceId) : null;
-
   const names = getConfiguredMetricNames(intelligenceKpis, intelligenceKpiSettings);
   const revenueMetric = latestMetric(intelligenceKpis, ["revenue", "sales"])?.name || names.find((name) => lower(name).includes("revenue")) || "Revenue";
   const leadsMetric = latestMetric(intelligenceKpis, ["lead", "customer"])?.name || names.find((name) => lower(name).includes("lead") || lower(name).includes("customer")) || "Customer Activity";
@@ -1370,27 +1237,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     oldIssues,
     unanalyzedFiles
   });
-  const demoStoryAlerts: DashboardAlert[] = isViewingDemoWorkspace
-    ? [
-        {
-          id: "demo-march-dip",
-          severity: "High",
-          title: "March performance dip detected",
-          why: "Revenue fell below the $40,000 target while response time rose to 32 hours, conversion dropped to 18%, and open issues increased.",
-          action: "Review March report",
-          href: "/app/reports"
-        },
-        {
-          id: "demo-current-month-mixed",
-          severity: "Medium",
-          title: "Current month has mixed signals",
-          why: "Revenue is above target, but conversion, response time, and open issues still need leadership review.",
-          action: "Review executive intelligence",
-          href: "/app/intelligence"
-        }
-      ]
-    : [];
-  const smartAlerts = [...demoStoryAlerts, ...baseSmartAlerts];
+  const smartAlerts = baseSmartAlerts;
   const prioritizedIssues = [...oldIssues, ...openIssues.filter((issue) => !oldIssues.some((oldIssue) => oldIssue.id === issue.id))];
   const riskSignals: DashboardSignal[] = [
     ...prioritizedIssues.slice(0, 3).map((issue) => ({
@@ -1522,19 +1369,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         }
       : null
   ].filter(Boolean).slice(0, 3) as DashboardSignal[];
-  const demoCounts = {
-    kpis: intelligenceKpis.length,
-    operationalMetrics: intelligenceOperationalMetrics.length,
-    crm: demoWorkspaceCounts?.crmLeads ?? crmLeads.length,
-    issues: demoWorkspaceCounts?.issues ?? openIssues.length,
-    reports: demoWorkspaceCounts?.reports ?? reports.length,
-    sops: demoWorkspaceCounts?.sops ?? sops.length,
-    files: demoWorkspaceCounts?.files ?? files.length,
-    fileAnalyses: demoWorkspaceCounts?.fileAnalyses ?? fileAnalyses.length,
-    assets: demoWorkspaceCounts?.assets ?? 0,
-    alerts: smartAlerts.length,
-    insights: demoWorkspaceCounts?.vaeroexInsights ?? businessEvidenceRuns.length
-  };
   const hasWorkspaceData = Boolean(intelligenceKpis.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || intelligenceOperationalMetrics.length);
   const todayDate = dateOnly(new Date());
   const dueWindowEndDate = dateOnly(addDays(new Date(), 14));
@@ -1765,8 +1599,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
 
       {!isExecutiveView ? <ErrorNotice message={errors[0]?.message || null} /> : null}
 
-      {isViewingDemoWorkspace && !isExecutiveView ? <DemoWorkspaceBanner counts={demoCounts} canUseAdminTools={canUseAdminOnboardingTools} /> : null}
-
       {isExecutiveView ? (
         <ExecutiveHomepage
           firstName={firstNameFromUser(user)}
@@ -1830,7 +1662,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
             <LeadershipDecisionJournal
               decisions={decisions}
               returnPath="/app?view=Intelligence%20View#decision-journal"
-              isDemoWorkspace={isViewingDemoWorkspace}
             />
           </DashboardAccordion>
         </>

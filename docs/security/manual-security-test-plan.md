@@ -24,14 +24,6 @@ Use this when full Supabase-auth integration tests are not available locally.
 4. Log in as Admin.
 5. Expected: admin screens render.
 
-## Demo Isolation
-
-1. As Admin, create or reset the demo workspace.
-2. Confirm the demo banner appears.
-3. Confirm demo counts exist for KPIs, CRM, reports, files, tasks, issues, SOPs, and Vaeroex insights.
-4. Switch back to the real workspace.
-5. Confirm no demo records appear.
-
 ## Files
 
 1. Upload a CSV/XLSX/PDF/DOCX in Workspace A.

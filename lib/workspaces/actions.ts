@@ -4,8 +4,8 @@ import { cookies } from "next/headers";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
-import { isDemoWorkspaceRecord } from "@/lib/demo/workspace-demo";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { isDemoWorkspaceRecord } from "@/lib/workspaces/demo-compatibility";
 
 type WorkspaceSwitchRow = {
   id: string;
