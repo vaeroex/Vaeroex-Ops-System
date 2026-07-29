@@ -13,11 +13,9 @@ const activeRuntimeFiles = [
   "app/app/people/page.tsx",
   "app/app/accountability/actions.ts",
   "app/app/intelligence/actions.ts",
-  "app/app/report-subscriptions/actions.ts",
   "components/accountability/AccountabilityForms.tsx",
   "components/app/AppNavigation.tsx",
-  "components/app/AppShell.tsx",
-  "lib/reports/scheduled-generator.ts"
+  "components/app/AppShell.tsx"
 ];
 
 for (const file of activeRuntimeFiles) {
@@ -40,8 +38,7 @@ for (const source of [shell, navigation]) {
 
 const accountabilityActions = read("app/app/accountability/actions.ts");
 assert.match(accountabilityActions, /\.from\("record_shares"\)\.insert/, "record sharing must remain available");
-assert.match(accountabilityActions, /\.from\("operational_assignments"\)\.insert/, "assignment creation must remain available");
-assert.match(accountabilityActions, /\.from\("issues"\)[\s\S]+\.update\(/, "assignment-driven issue updates must remain available");
+assert.doesNotMatch(accountabilityActions, /export async function createAssignmentAction\b/, "retired assignment creation must not remain reachable");
 for (const action of [
   "createKpiAlertRuleAction",
   "evaluateKpiAlertsAction",
@@ -56,14 +53,14 @@ for (const action of [
 
 const accountabilityForms = read("components/accountability/AccountabilityForms.tsx");
 assert.match(accountabilityForms, /export function ShareRecordPanel/, "record sharing UI must remain available");
-assert.match(accountabilityForms, /export function AssignmentPanel/, "assignment UI must remain available");
+assert.doesNotMatch(accountabilityForms, /export function AssignmentPanel/, "retired assignment UI must stay deleted");
 assert.doesNotMatch(accountabilityForms, /KpiAlertRulePanel|Add KPI alert|Create KPI alert/);
 
 const intelligenceActions = read("app/app/intelligence/actions.ts");
 assert.doesNotMatch(intelligenceActions, /createKpiAlert.*Action/);
 
-const scheduledGenerator = read("lib/reports/scheduled-generator.ts");
-assert.doesNotMatch(scheduledGenerator, /scheduled_report_ready|last_notified_at|\.from\("notifications"\)/);
+assert.equal(fs.existsSync(path.join(root, "app/app/report-subscriptions/actions.ts")), false, "retired report-subscription actions must stay deleted");
+assert.equal(fs.existsSync(path.join(root, "lib/reports/scheduled-generator.ts")), false, "retired scheduled report generation must stay deleted");
 
 const search = read("app/api/search/route.ts");
 assert.doesNotMatch(search, /return "\/app\/notifications"/);

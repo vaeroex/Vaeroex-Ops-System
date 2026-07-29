@@ -101,10 +101,7 @@ const kpiPage = read("app/app/kpis/page.tsx");
 const searchRoute = read("app/api/search/route.ts");
 const boundedContext = read("lib/ai/bounded-context.ts");
 const reportPage = read("app/app/reports/page.tsx");
-const reportActions = read("app/app/reports/actions.ts");
-const scheduledReports = read("lib/reports/scheduled-generator.ts");
 const sourcesPage = read("app/app/sources/page.tsx");
-const workspaceSnapshot = read("lib/ai/workspace-snapshot.ts");
 const sourceParentEligibilityHelper = read("lib/intelligence/source-parent-eligibility.ts");
 const recordActions = read("app/app/operations/record-management-actions.ts");
 const intelligenceLayer = read("lib/intelligence/layer.ts");
@@ -127,28 +124,17 @@ assert.match(boundedContext, activeQuery("sops"), "bounded Ask context must excl
 assert.match(boundedContext, /filterOriginalBusinessEvidence\(issues\)/, "bounded Ask must apply original-evidence rules to issues");
 assert.match(boundedContext, /filterOriginalBusinessEvidence\(rows\)\.slice\(0, 8\)/, "bounded Ask must remove setup-only rows before its final result limit");
 
-for (const source of [reportActions, scheduledReports]) {
-  assert.match(source, /independentOriginalEvidenceKeys/, "every report readiness path must use independent original source identities");
-}
 assert.match(reportPage, /parseSavedAnalysisEnvelope/, "Reports must render copied saved analyses instead of rebuilding them from evidence");
 assert.match(reportPage, /envelope\.workspace_id === workspaceId/, "saved analyses must retain explicit workspace lineage");
-assert.doesNotMatch(reportActions, /\.from\("tasks"\)/, "retired Business Signals cannot enter report generation");
-assert.match(reportActions, activeQuery("issues"), "inactive issues cannot become report evidence");
-assert.match(reportActions, /eligibleChecklistIds\.has\(row\.checklist_id\)/, "report checklist evidence must have an eligible active parent");
-assert.match(reportActions, /eligibleFormIds\.has\(row\.form_id\)/, "report submission evidence must have an eligible active parent");
-assert.doesNotMatch(scheduledReports, /\.from\("tasks"\)/, "scheduled reports must not read retired Business Signals");
-assert.match(scheduledReports, /eligibleChecklistIds\.has\(row\.checklist_id\)/, "scheduled checklist evidence must have an eligible active parent");
+assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired report generation actions must stay deleted");
+assert.equal(fs.existsSync(path.join(root, "lib/reports/scheduled-generator.ts")), false, "retired scheduled report generation must stay deleted");
 
 assert.match(sourcesPage, /filterEligibleMemoryRowsByLifecycle\([\s\S]{0,180}rows: rawMemoryChunks\.filter/, "Learned Knowledge must validate active parent lineage");
 assert.match(sourcesPage, /chunk\.archived_at && !chunk\.deleted_at/, "the archive view may show archived, but not deleted, knowledge");
 
-for (const table of ["file_uploads", "kpis", "issues", "checklists", "sops", "reports"]) {
-  assert.match(workspaceSnapshot, activeQuery(table), `legacy snapshot counts must include active ${table} only`);
-}
-assert.doesNotMatch(workspaceSnapshot, /\.from\("tasks"\)|recentTasks/, "workspace snapshots must not read retired Business Signals");
-assert.match(workspaceSnapshot, /sourceKind: "platform_run"/, "technical failures must remain excluded from snapshot evidence");
+assert.equal(fs.existsSync(path.join(root, "lib/ai/workspace-snapshot.ts")), false, "the superseded broad workspace snapshot must stay deleted");
 assert.match(sourceParentEligibilityHelper, /\.eq\("workspace_id", workspaceId\)/, "parent lifecycle lookups must remain workspace-scoped");
-for (const source of [searchRoute, boundedContext, reportActions, scheduledReports, workspaceSnapshot]) {
+for (const source of [searchRoute, boundedContext]) {
   assert.match(source, /(?:loadSourceParentEligibility|filterBySourceParentEligibility)/, "source-linked structured evidence must validate its parent Source lifecycle");
 }
 assert.match(recordActions, /update_source_file_lifecycle/, "generic Source lifecycle controls must update parent and learned evidence together");
@@ -167,7 +153,7 @@ assert.match(formSubmissionsPage, /activeFormIds\.has\(submission\.form_id\)/, "
 assert.match(checklistRunsPage, /await requireWorkspacePage\(\)/, "retired Checklist Runs must authorize before redirecting");
 assert.match(checklistRunsPage, /permanentRedirect\("\/app"\)/, "retired Checklist Runs must not expose historical rows");
 
-for (const source of [searchRoute, boundedContext, reportPage, reportActions, scheduledReports, sourcesPage, workspaceSnapshot]) {
+for (const source of [searchRoute, boundedContext, reportPage, sourcesPage]) {
   assert.match(source, /eq\("workspace_id", workspaceId\)/, "every corrected surface must remain explicitly workspace-scoped");
 }
 

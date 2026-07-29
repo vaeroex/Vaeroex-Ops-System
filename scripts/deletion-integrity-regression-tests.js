@@ -65,7 +65,6 @@ const recordActions = fs.readFileSync(path.join(root, "app/app/operations/record
 const fileActions = fs.readFileSync(path.join(root, "app/app/files/actions.ts"), "utf8");
 const boundedContext = fs.readFileSync(path.join(root, "lib/ai/bounded-context.ts"), "utf8");
 const searchRoute = fs.readFileSync(path.join(root, "app/api/search/route.ts"), "utf8");
-const workspaceSnapshot = fs.readFileSync(path.join(root, "lib/ai/workspace-snapshot.ts"), "utf8");
 const sourcesPage = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql"), "utf8");
 const packageJson = require("../package.json");
@@ -76,9 +75,10 @@ assert.doesNotMatch(recordActions, /select\("id"\)\.single\(\)/, "managed lifecy
 assert.match(recordActions, /revalidatePath\("\/app\/intelligence"\)/, "evidence mutations must invalidate Intelligence");
 assert.match(recordActions, /revalidatePath\("\/app\/reports"\)/, "evidence mutations must invalidate reports");
 assert.match(fileActions, /update_source_file_lifecycle/, "file lifecycle changes must atomically include learned evidence");
-for (const source of [boundedContext, searchRoute, workspaceSnapshot]) {
+for (const source of [boundedContext, searchRoute]) {
   assert.doesNotMatch(source, /\.from\("tasks"\)/, "active retrieval paths must not read retired task storage");
 }
+assert.equal(fs.existsSync(path.join(root, "lib/ai/workspace-snapshot.ts")), false, "the retired broad workspace snapshot must stay deleted");
 assert.match(sourcesPage, /chunk\.archived_at && !chunk\.deleted_at/, "archived knowledge view must exclude deleted knowledge");
 assert.doesNotMatch(sourcesPage, /archivedOnly \? Boolean\(chunk\.archived_at \|\| chunk\.deleted_at\)/, "deleted knowledge must not remain in the archive view");
 assert.match(migration, /update public\.tasks[\s\S]+update public\.business_memory_chunks/, "signal lifecycle must update the source and dependent memory in one transaction");

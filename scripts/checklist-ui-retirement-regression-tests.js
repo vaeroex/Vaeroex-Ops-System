@@ -34,18 +34,17 @@ assert.doesNotMatch(recordActions, /\| "checklists"|\| "checklist_runs"|checklis
 assert.doesNotMatch(managedList, /\| "checklists"|\| "checklist_runs"|checklists:\s*"checklists"|checklist_runs:\s*"checklist runs"/, "page-only managed-list configuration must be removed");
 
 const databaseTypes = read("lib/supabase/types.ts");
-const reportActions = read("app/app/reports/actions.ts");
-const scheduledReports = read("lib/reports/scheduled-generator.ts");
+const reportDetail = read("app/app/reports/[id]/page.tsx");
 assert.match(databaseTypes, /checklists:\s*\{/, "generated Checklist table types must remain intact");
 assert.match(databaseTypes, /checklist_runs:\s*\{/, "generated Checklist Runs table types must remain intact");
-for (const source of [reportActions, scheduledReports]) {
-  assert.match(source, /\.from\("checklists"\)/, "historical report compatibility must retain Checklist definitions");
-  assert.match(source, /\.from\("checklist_runs"\)/, "historical report compatibility must retain Checklist runs");
-}
+assert.match(reportDetail, /SavedAnalysisRenderer|body_markdown/, "historical Reports must remain readable without retired generation code");
+assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired report generation actions must stay deleted");
+assert.equal(fs.existsSync(path.join(root, "lib/reports/scheduled-generator.ts")), false, "retired scheduled report generation must stay deleted");
 assert.equal(fs.existsSync(path.join(root, "supabase/migrations/202606170001_phase_1_schema_rls.sql")), true, "historical Checklist schema migration must remain intact");
 
 const accountabilityActions = read("app/app/accountability/actions.ts");
-assert.match(accountabilityActions, /from\("operational_assignments"\)\.insert/, "non-Checklist assignment creation must remain available");
+assert.doesNotMatch(accountabilityActions, /createAssignmentAction/, "retired assignment creation UI must not remain reachable");
 assert.match(accountabilityActions, /from\("record_shares"\)\.insert/, "KPI sharing must remain available");
+assert.match(databaseTypes, /operational_assignments:\s*\{/, "historical assignment compatibility must remain intact");
 
 process.stdout.write("Checklist UI retirement regressions passed.\n");

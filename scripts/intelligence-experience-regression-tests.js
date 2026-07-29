@@ -23,7 +23,6 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
 const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operational-evidence.ts");
-const { buildGeneratedOutput, fallbackGeneratedOutputSource } = require("../lib/intelligence/generated-output.ts");
 const {
   buildEvidenceGroups,
   collapsedEvidenceGroupLimit,
@@ -383,18 +382,7 @@ assert.equal(consolidated[0].supportingRecords.length, 6, "consolidation preserv
 
 const noDirectMetric = buildIntelligenceLayer({});
 assert.equal(noDirectMetric.topRisk, undefined, "missing metrics must not create a fabricated risk");
-const fallback = fallbackGeneratedOutputSource("executive_briefing", noDirectMetric);
-assert.equal(fallback.confidence, "Low", "no-evidence brief fallback remains low confidence");
-
-const brief = buildGeneratedOutput({ type: "executive_briefing", source: supported.topRisk, intelligence: supported, workspaceName: "Demo" });
-assert.equal(brief.label, "Executive Brief", "brief label must avoid generated-output terminology");
-assert.equal(brief.priority, "High", "brief preserves the finding priority");
-assert.match(brief.markdown, /Priority: High/, "portable brief preserves priority");
-const authoritativeSource = require("../lib/intelligence/generated-output.ts").sourceFromSearchParams({
-  params: new URLSearchParams({ source: supported.topRisk.id, title: "Unsupported replacement title" }),
-  intelligence: supported
-});
-assert.equal(authoritativeSource.title, supported.topRisk.title, "matched finding text cannot be replaced through query parameters");
+assert.equal(fs.existsSync(path.join(root, "lib/intelligence/generated-output.ts")), false, "retired secondary output builders must stay deleted");
 
 const inboxSource = fs.readFileSync(path.join(root, "components/intelligence/IntelligenceSignalInbox.tsx"), "utf8");
 const outputPageSource = fs.readFileSync(path.join(root, "app/app/reports/new/page.tsx"), "utf8");
@@ -406,7 +394,6 @@ const appNavigationSource = fs.readFileSync(path.join(root, "components/app/AppN
 const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
 const intelligenceLayerSource = fs.readFileSync(path.join(root, "lib/intelligence/layer.ts"), "utf8");
 const operationalEvidenceSource = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
-const scheduledReportSource = fs.readFileSync(path.join(root, "lib/reports/scheduled-generator.ts"), "utf8");
 assert.match(inboxSource, /label: "Summary".*label: "Evidence".*label: "Analysis"/s, "selected findings may expose one bounded analysis view when authorized");
 assert.doesNotMatch(inboxSource, /label: "Understand"|label: "Executive Brief"/, "overlapping finding tabs must be removed");
 assert.match(inboxSource, /Explain Finding/, "risk findings expose one bounded investigation action");
@@ -446,6 +433,5 @@ assert.match(intelligenceLayerSource, /evaluateKpiPerformance/, "Business Health
 assert.match(intelligenceLayerSource, /isKpiTargetMiss/, "Business Health risk inputs must use canonical target status");
 assert.match(operationalEvidenceSource, /selectedRangeTrend === "unfavorable"/, "operational KPI risks must require a canonical unfavorable trend");
 assert.match(operationalEvidenceSource, /selectedRangeTrend === "favorable"/, "operational KPI opportunities must require a canonical favorable trend");
-assert.doesNotMatch(scheduledReportSource, /actual_value\s*[<>]=?\s*[^\n]*target/, "retired scheduled-report code cannot retain a conflicting target comparison");
 
 process.stdout.write("Intelligence experience regressions passed.\n");

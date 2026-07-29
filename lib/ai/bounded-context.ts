@@ -1,7 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildBusinessHealthDecisionContext } from "@/lib/ai/business-health-context";
-import { filterEligibleMemoryRowsByLifecycle } from "@/lib/ai/evidence-index";
 import { buildKpiOverviewSummary, loadKpiOverviewData, type KpiOverviewSummary } from "@/lib/ai/kpi-overview";
 import type { VaeroexEvidenceDomain, VaeroexQueryPlan } from "@/lib/ai/query-depth-planner";
 import { estimateTokenCount } from "@/lib/ai/usage";
@@ -18,24 +17,6 @@ import type { Database, Json } from "@/lib/supabase/types";
 
 type JsonRecord = { [key: string]: Json | undefined };
 
-export type FocusedContextInput = {
-  contextType: string;
-  contextId?: string | null;
-  sourceTitle?: string;
-  sourceSummary?: string;
-  evidence?: string[];
-};
-
-export type FocusedExplanationContext = {
-  workspaceSnapshot: Json;
-  evidenceQuery: string;
-  directEvidence: string[];
-  verifiedRecordCount: number;
-  limitations: string[];
-  estimatedContextTokens: number;
-  loadMs: number;
-};
-
 export type BoundedWorkspaceContext = {
   workspaceSnapshot: Json;
   evidenceQuery: string;
@@ -49,14 +30,6 @@ export type BoundedWorkspaceContext = {
 function compactText(value: string | null | undefined, max = 900) {
   const normalized = (value || "").replace(/\s+/g, " ").trim();
   return normalized.length > max ? `${normalized.slice(0, max - 3).trim()}...` : normalized;
-}
-
-function compactEvidence(values: string[] = [], limit = 8) {
-  return values.map((value) => sanitizeBusinessEvidenceText(compactText(value, 500))).filter(Boolean).slice(0, limit);
-}
-
-function isUuid(value: string | null | undefined) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value || "");
 }
 
 function jsonRecord(value: unknown): JsonRecord {
@@ -139,205 +112,6 @@ async function sourceEligibleRows<T extends { source_file_id?: string | null; im
 
 function filterOriginalOrSourceBackedRows<T extends { source_file_id?: string | null; import_id?: string | null }>(rows: T[]) {
   return rows.filter((row) => Boolean(row.source_file_id || row.import_id) || isOriginalBusinessEvidence(row));
-}
-
-export function buildDeterministicFocusedExplanation({
-  sourceTitle,
-  sourceSummary,
-  evidence,
-  verifiedRecordCount,
-  limitations = [],
-  failureReason
-}: {
-  sourceTitle: string;
-  sourceSummary: string;
-  evidence: string[];
-  verifiedRecordCount: number;
-  limitations?: string[];
-  failureReason?: string;
-}) {
-  const directEvidence = compactEvidence(evidence, 4);
-  const directExplanation = sanitizeBusinessEvidenceText(compactText(sourceSummary, 700)) || `${sourceTitle || "This item"} does not yet include enough detail for a reliable explanation.`;
-  const whyItMatters = directEvidence[0] && directEvidence[0] !== directExplanation ? directEvidence[0] : "";
-  const evidenceLines = directEvidence.length
-    ? directEvidence
-    : verifiedRecordCount
-      ? [`${verifiedRecordCount} workspace record${verifiedRecordCount === 1 ? "" : "s"} supported this explanation.`]
-      : [];
-  const meaningfulLimitations = [
-    ...(failureReason ? [failureReason] : []),
-    ...limitations,
-    ...(!evidenceLines.length ? ["There is not enough source-backed detail to explain this item further without guessing."] : [])
-  ].filter(Boolean);
-  const confidence = confidenceFromEvidence(verifiedRecordCount + directEvidence.length);
-
-  return {
-    title: sourceTitle || "Vaeroex explanation",
-    direct_explanation: directExplanation,
-    why_it_matters: whyItMatters,
-    evidence: evidenceLines,
-    limitations: meaningfulLimitations,
-    recommendation_confidence: confidence,
-    response_markdown: [directExplanation, whyItMatters, evidenceLines[0], meaningfulLimitations[0]].filter(Boolean).join("\n\n")
-  } satisfies Json;
-}
-
-export async function buildFocusedExplanationContext({
-  supabase,
-  workspaceId,
-  input
-}: {
-  supabase: SupabaseClient<Database>;
-  workspaceId: string;
-  input: FocusedContextInput;
-}): Promise<FocusedExplanationContext> {
-  const startedAt = Date.now();
-  const contextType = input.contextType.toLowerCase();
-  const directEvidence = compactEvidence(input.evidence);
-  const verifiedRecords: JsonRecord[] = [];
-  const limitations: string[] = [];
-  const contextId = input.contextId || "";
-
-  if (isUuid(contextId) && contextType.includes("kpi")) {
-    const { data, error } = await supabase
-      .from("kpis")
-      .select("id,name,category,target,actual_value,metric_date,source,updated_at")
-      .eq("workspace_id", workspaceId)
-      .eq("id", contextId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .maybeSingle();
-
-    if (error) limitations.push("The selected KPI record could not be verified.");
-    if (data) {
-      const [{ data: history }, { data: settings }] = await Promise.all([
-        supabase
-          .from("kpis")
-          .select("id,name,target,actual_value,metric_date,source,updated_at")
-          .eq("workspace_id", workspaceId)
-          .eq("name", data.name)
-          .is("deleted_at", null)
-          .is("archived_at", null)
-          .order("metric_date", { ascending: false })
-          .limit(6),
-        supabase
-          .from("kpi_settings")
-          .select("kpi_name,target,weight,definition,is_visible,unit_type,display_unit")
-          .eq("workspace_id", workspaceId)
-          .eq("kpi_name", data.name)
-          .limit(1)
-      ]);
-      verifiedRecords.push({ selected_kpi: data, recent_history: history || [], settings: settings || [] });
-    }
-  } else if (isUuid(contextId) && (contextType.includes("briefing") || contextType.includes("report"))) {
-    const { data, error } = await supabase
-      .from("reports")
-      .select("id,title,report_type,date_range_start,date_range_end,created_at,archived_at,deleted_at")
-      .eq("workspace_id", workspaceId)
-      .eq("id", contextId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .maybeSingle();
-
-    if (error) limitations.push("The selected briefing or report could not be verified.");
-    if (data && isBusinessEvidenceEligible(data)) {
-      verifiedRecords.push({
-        ...data,
-        evidence_role: "derived_analysis",
-        evidence_limitation: "The saved report remains reviewable, but its conclusions are not reused as current business evidence."
-      });
-      limitations.push("Saved report conclusions require review against currently active original evidence.");
-    }
-  } else if (isUuid(contextId) && contextType.includes("file_analysis")) {
-    const { data, error } = await supabase
-      .from("ai_agent_runs")
-      .select("id,agent_type,input_json,output_json,status,created_at,updated_at,archived_at,deleted_at")
-      .eq("workspace_id", workspaceId)
-      .eq("id", contextId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .maybeSingle();
-
-    if (error) limitations.push("The selected file analysis could not be verified.");
-    if (data && isBusinessEvidenceEligible(data, { sourceKind: "platform_run" })) {
-      verifiedRecords.push({ ...data, output_json: jsonRecord(data.output_json) });
-    } else if (data) {
-      limitations.push("That analysis did not produce active business evidence, so Vaeroex left its platform diagnostics out.");
-    }
-  } else if (isUuid(contextId) && (contextType === "file" || contextType.includes("source"))) {
-    const { data, error } = await supabase
-      .from("file_uploads")
-      .select("id,display_name,file_extension,analysis_summary,processing_status,index_status,indexed_chunk_count,processed_at,indexed_at,updated_at,metadata_json,archived_at,deleted_at")
-      .eq("workspace_id", workspaceId)
-      .eq("id", contextId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .maybeSingle();
-
-    if (error) limitations.push("The selected source file could not be verified.");
-    if (data && isBusinessEvidenceEligible(data)) verifiedRecords.push(data);
-  } else if (isUuid(contextId) && (contextType.includes("memory") || contextType.includes("knowledge"))) {
-    const { data, error } = await supabase
-      .from("business_memory_chunks")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .eq("id", contextId)
-      .is("deleted_at", null)
-      .is("archived_at", null)
-      .maybeSingle();
-
-    if (error) limitations.push("The selected Learned Knowledge record could not be verified.");
-    if (data) {
-      const [eligibleMemory] = await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: [data] });
-      if (eligibleMemory) {
-        verifiedRecords.push({ ...eligibleMemory, source_excerpt: compactText(eligibleMemory.source_excerpt, 1_200) });
-      } else {
-        limitations.push("That Learned Knowledge record is inactive or its source lineage is no longer eligible.");
-      }
-    }
-  } else if (isUuid(contextId) && (contextType.includes("risk") || contextType.includes("opportunity") || contextType.includes("intelligence"))) {
-    const [{ data: issue }] = await Promise.all([
-      supabase
-        .from("issues")
-        .select("id,title,description,issue_type,severity,status,root_cause,recommended_fix,created_at,updated_at")
-        .eq("workspace_id", workspaceId)
-        .eq("id", contextId)
-        .is("deleted_at", null)
-        .is("archived_at", null)
-        .maybeSingle()
-    ]);
-
-    if (issue && isOriginalBusinessEvidence(issue)) verifiedRecords.push(issue);
-  }
-
-  const workspaceSnapshot = {
-    scope: "focused_explanation",
-    selected_context: {
-      context_type: input.contextType,
-      context_id: input.contextId || null,
-      source_title: compactText(input.sourceTitle, 180),
-      source_summary: sanitizeBusinessEvidenceText(compactText(input.sourceSummary, 1_200)),
-      page_evidence: directEvidence
-    },
-    verified_workspace_records: verifiedRecords,
-    scope_policy: {
-      selected_item_only: true,
-      unrelated_workspace_records_excluded: true,
-      no_full_workspace_snapshot: true,
-      page_context_is_untrusted_until_supported: true
-    }
-  } satisfies Json;
-  const serialized = safeJsonStringify(workspaceSnapshot);
-
-  return {
-    workspaceSnapshot,
-    evidenceQuery: [input.sourceTitle, input.sourceSummary, ...directEvidence].filter(Boolean).join("\n").slice(0, 4_000),
-    directEvidence,
-    verifiedRecordCount: verifiedRecords.length,
-    limitations,
-    estimatedContextTokens: estimateTokenCount(serialized),
-    loadMs: Date.now() - startedAt
-  };
 }
 
 export async function buildBoundedWorkspaceContext({

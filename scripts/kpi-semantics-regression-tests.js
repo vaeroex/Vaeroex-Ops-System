@@ -259,7 +259,6 @@ const overview = fs.readFileSync(path.join(root, "app/app/page.tsx"), "utf8");
 const kpiOverview = fs.readFileSync(path.join(root, "lib/ai/kpi-overview.ts"), "utf8");
 const kpiSettingsPage = fs.readFileSync(path.join(root, "app/app/kpis/settings/page.tsx"), "utf8");
 const operationalEvidence = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
-const dormantReports = fs.readFileSync(path.join(root, "app/app/reports/actions.ts"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607270002_kpi_semantic_direction.sql"), "utf8");
 
 assert.match(operationsActions, /classifyAndPersistKpiSemantics/);
@@ -284,9 +283,7 @@ assert.match(kpiSettingsPage, /resolveKpiTargetReference\(semantics, target\)/, 
 assert.doesNotMatch(kpiSettingsPage, /setting\?\.desired_direction !== "unknown"/, "KPI Settings must not maintain a second nullable direction resolver");
 assert.match(kpiSettingsPage, /defaultValue=\{formatNumber\(target\)\}/, "the target editor remains manual-target-only");
 assert.match(operationalEvidence, /Math\.abs\(revenue\.changePercent \?\? 0\) >= 5/, "operational thresholds measure magnitude after canonical direction is known");
-assert.match(dormantReports, /performanceEffect === "favorable"/);
-assert.match(dormantReports, /performanceEffect === "unfavorable"/);
-assert.doesNotMatch(dormantReports, /is improving fastest|is declining most/);
+assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired report generation must not retain a duplicate KPI interpreter");
 assert.match(migration, /alter table public\.kpi_settings/);
 assert.doesNotMatch(migration, /\b(delete from|update public\.kpis|drop table|truncate)\b/i);
 assert.doesNotMatch(lifecycleService, /\.from\("kpis"\)\.update/);
@@ -302,7 +299,7 @@ assert.match(operationsActions, /\.eq\("classification_source", "luna"\)/);
 assert.match(operationsActions, /\.eq\("classification_confirmed", false\)/);
 const acceptAction = operationsActions.slice(
   operationsActions.indexOf("export async function acceptKpiSemanticSuggestionAction"),
-  operationsActions.indexOf("export async function deleteKpiAction")
+  operationsActions.indexOf("export async function createIssueAction")
 );
 assert.doesNotMatch(acceptAction, /\btarget\s*:/, "Suggestion acceptance must not overwrite the manual target.");
 assert.match(kpiPage, /Performance direction is not confirmed\./);

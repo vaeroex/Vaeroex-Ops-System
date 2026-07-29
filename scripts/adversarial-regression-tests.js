@@ -104,12 +104,6 @@ const {
   classifySecurityIntent
 } = require("../lib/security/security-response.ts");
 const {
-  isRetryableOpenAIStatus,
-  recordOpenAIFailure,
-  resetOpenAICircuitForTests,
-  assertOpenAICircuitClosed
-} = require("../lib/ai/openai-resilience.ts");
-const {
   getWorkspaceTokenBudget,
   estimatedCostCents
 } = require("../lib/ai/usage.ts");
@@ -460,25 +454,7 @@ function runWebhookReplayTests() {
   assert.equal(timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex")), true, "signature comparison fixture should be safe");
 }
 
-function runOpenAIResilienceTests() {
-  assert.equal(isRetryableOpenAIStatus(429), true, "OpenAI 429 should retry");
-  assert.equal(isRetryableOpenAIStatus(503), true, "OpenAI 503 should retry");
-  assert.equal(isRetryableOpenAIStatus(401), false, "OpenAI 401 should not retry");
-
-  resetOpenAICircuitForTests();
-  const settings = {
-    timeoutMs: 5_000,
-    maxRetries: 1,
-    retryBaseDelayMs: 100,
-    circuitFailureThreshold: 2,
-    circuitOpenMs: 60_000
-  };
-  recordOpenAIFailure(settings, Date.now());
-  assert.doesNotThrow(() => assertOpenAICircuitClosed(Date.now()), "circuit should stay closed before threshold");
-  recordOpenAIFailure(settings, Date.now());
-  assert.throws(() => assertOpenAICircuitClosed(Date.now()), /temporarily unavailable/, "circuit should open after repeated failures");
-  resetOpenAICircuitForTests();
-
+function runUsageGuardrailTests() {
   const budget = getWorkspaceTokenBudget();
   assert.ok(budget.monthlyTokens >= 50_000, "workspace token budget should have a sane lower bound");
   assert.ok(budget.singleRequestTokens >= 5_000, "single request token budget should have a sane lower bound");
@@ -783,19 +759,15 @@ function runLegacyCrmLanguageTests() {
   const generatedOutputFiles = [
     "lib/intelligence/layer.ts",
     "lib/intelligence/coverage.ts",
-    "lib/ai/workspace-snapshot.ts",
     "lib/ai/vaeroex-workflows.ts",
     "lib/ai/prompts/vaeroex-system-prompt.ts",
     "app/app/page.tsx",
     "app/app/agents/page.tsx",
     "app/app/files/actions.ts",
-    "app/app/reports/actions.ts",
-    "lib/reports/scheduled-generator.ts",
     "lib/demo/workspace-demo.ts"
   ];
   const publicExperienceFiles = [
     "components/motion/OperationsIntelligenceEngineDemo.tsx",
-    "components/motion/ScrollStory.tsx",
     "components/intelligence/LeadershipDecisionJournal.tsx",
     "app/app/crm/page.tsx",
     "app/api/search/route.ts",
@@ -857,7 +829,7 @@ function runCrmRetirementTests() {
   assert.doesNotMatch(crmPage, /CreateDrawer|ManagedRecordList|createCrmLeadAction|New Customer Evidence|<form\b|estimated_value|Related value/, "legacy route must not expose CRM create/edit/delete UI");
 
   const operationsActions = read("app/app/operations/actions.ts");
-  assert.match(operationsActions, /Customer record creation in Vaeroex has been retired/, "manual customer-record creation action must fail closed");
+  assert.doesNotMatch(operationsActions, /export async function createCrmLeadAction\b/, "unreachable manual customer-record creation must stay deleted");
   assert.doesNotMatch(operationsActions, /\.from\("crm_leads"\)\s*\.insert|entered_from:\s*"crm_module"/, "manual creation action must not insert CRM rows");
 
   const recordManagementActions = read("app/app/operations/record-management-actions.ts");
@@ -977,10 +949,7 @@ function runQueryDepthPlannerTests() {
     "citations outside the bounded evidence set should be rejected"
   );
 
-  const contextualAction = read("app/app/contextual-ask/actions.ts");
-  assert.doesNotMatch(contextualAction, /buildWorkspaceSnapshot/, "contextual explanations must not load a broad workspace snapshot");
-  assert.match(contextualAction, /buildFocusedExplanationContext/, "contextual explanations should load selected-item context");
-  assert.match(contextualAction, /retrievalStrategy:\s*"keyword_only"/, "contextual explanations should avoid embedding retrieval by default");
+  assert.equal(existsSync(path.join(root, "app/app/contextual-ask/actions.ts")), false, "retired contextual explanation actions must stay deleted");
 
   const agentsAction = read("app/app/agents/actions.ts");
   assert.doesNotMatch(agentsAction, /buildWorkspaceSnapshot/, "Ask Vaeroex should not default to a full workspace snapshot");
@@ -1059,7 +1028,7 @@ async function main() {
   runContextualExplanationRoutingTests();
   runBusinessMemoryPoisoningTests();
   runWebhookReplayTests();
-  runOpenAIResilienceTests();
+  runUsageGuardrailTests();
   runFileAnalysisRequestSizingTests();
   runKpiForecastEligibilityTests();
   runLightweightKpiOverviewTests();

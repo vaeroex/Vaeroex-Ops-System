@@ -10,7 +10,6 @@ const appShell = read("components/app/AppShell.tsx");
 const askPage = read("app/app/ask/page.tsx");
 const agentsPage = read("app/app/agents/page.tsx");
 const agentsActions = read("app/app/agents/actions.ts");
-const contextualActions = read("app/app/contextual-ask/actions.ts");
 const searchRoute = read("app/api/search/route.ts");
 const globalSearch = read("components/app/GlobalSearch.tsx");
 
@@ -31,7 +30,7 @@ assert.ok(postStart >= 0 && postPolicyGate > postStart, "the generative POST rou
 assert.ok(postRequestParsing < 0 || postPolicyGate < postRequestParsing, "the disabled POST route must fail before parsing or provider work");
 assert.match(searchRoute, /export async function GET/, "deterministic GET Search must remain available");
 assert.match(agentsActions, /workflow\.key === "ask_vaeroex"[\s\S]*!isPremiumConversationalVaeroexEnabled\(\)/, "legacy Ask server actions must fail closed");
-assert.match(contextualActions, /if \(!isPremiumConversationalVaeroexEnabled\(\)\)/, "embedded conversational actions must fail closed");
+assert.equal(fs.existsSync(path.join(root, "app/app/contextual-ask/actions.ts")), false, "the unreachable embedded conversational action module must stay deleted");
 
 assert.match(globalSearch, /fetch\(`\/api\/search\?q=/, "Search must continue to use deterministic GET requests");
 assert.doesNotMatch(globalSearch, /method:\s*"POST"/, "Search must not invoke conversational generation");

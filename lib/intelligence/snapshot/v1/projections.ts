@@ -185,19 +185,6 @@ export function projectIntelligenceInboxV1(snapshot: IntelligenceSnapshotV1): In
   return { ...header(snapshot), findings: snapshot.findings, priorities: snapshot.priorities };
 }
 
-export type KpiOverviewProjectionV1 = ProjectionHeaderV1 & Readonly<{
-  kpis: readonly KpiSnapshotV1[];
-  forecastReadiness: IntelligenceSnapshotV1["readiness"]["forecast"];
-}>;
-
-export function projectKpiOverviewV1(snapshot: IntelligenceSnapshotV1): KpiOverviewProjectionV1 {
-  return {
-    ...header(snapshot),
-    kpis: snapshot.kpis.slice(0, 12),
-    forecastReadiness: snapshot.readiness.forecast
-  };
-}
-
 export type KpiPageProjectionV1 = ProjectionHeaderV1 & Readonly<{
   kpis: readonly KpiSnapshotV1[];
   forecastReadiness: IntelligenceSnapshotV1["readiness"]["forecast"];
@@ -351,34 +338,5 @@ export function projectFindingExplanationV1(snapshot: IntelligenceSnapshotV1, fi
     evidenceReferences: snapshot.evidence.references.filter((reference) => evidenceIds.has(reference.id)).slice(0, 24),
     contextualEvidence: projectRelevantContext(snapshot, contextualSubject),
     contextAuthority: CONTEXTUAL_EVIDENCE_AUTHORITY_V1
-  };
-}
-
-export type ExecutiveReasoningProjectionV1 = ProjectionHeaderV1 & Readonly<{
-  businessHealth: IntelligenceSnapshotV1["businessHealth"];
-  kpis: readonly KpiSnapshotV1[];
-  findings: readonly FindingSnapshotV1[];
-  evidenceReferences: readonly EvidenceReferenceV1[];
-  limitations: readonly SnapshotLimitationV1[];
-  rawEvidenceIncluded: false;
-}>;
-
-export function projectExecutiveReasoningV1(snapshot: IntelligenceSnapshotV1): ExecutiveReasoningProjectionV1 {
-  const kpis = snapshot.kpis.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningKpis);
-  const findings = snapshot.findings.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningFindings);
-  const evidenceIds = new Set([
-    ...kpis.flatMap((kpi) => kpi.evidenceReferenceIds),
-    ...findings.flatMap((finding) => finding.deterministicDependencies.evidenceReferenceIds)
-  ]);
-  return {
-    ...header(snapshot),
-    businessHealth: snapshot.businessHealth,
-    kpis,
-    findings,
-    evidenceReferences: snapshot.evidence.references
-      .filter((reference) => evidenceIds.has(reference.id))
-      .slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningEvidenceReferences),
-    limitations: snapshot.limitations.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.executiveReasoningLimitations),
-    rawEvidenceIncluded: false
   };
 }
