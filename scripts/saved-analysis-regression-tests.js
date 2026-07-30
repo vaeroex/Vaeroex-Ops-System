@@ -17,6 +17,7 @@ const findingExplanation = read("components/intelligence/IntelligenceSignalInbox
 const agentPage = read("app/app/agents/page.tsx");
 const agentActions = read("app/app/agents/actions.ts");
 const home = read("app/app/page.tsx");
+const globalSearch = read("components/app/GlobalSearch.tsx");
 const vercel = read("vercel.json");
 const migration = read("supabase/migrations/20260721220519_saved_analysis_uniqueness.sql");
 
@@ -61,6 +62,8 @@ assert.match(migration, /create unique index(?: if not exists)? reports_saved_an
 assert.match(migration, /where deleted_at is null[\s\S]+record_kind[\s\S]+saved_analysis/i);
 
 assert.match(list, /Search saved analyses/);
+assert.match(globalSearch, /saved analysis title/);
+assert.doesNotMatch(globalSearch, /report title/);
 for (const label of ["All", "Business Health", "Finding Explanations"]) assert.match(list, new RegExp(label));
 assert.doesNotMatch(list, /Legacy Leadership/);
 assert.match(list, /Select all visible/);
