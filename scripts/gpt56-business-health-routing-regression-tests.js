@@ -45,6 +45,7 @@ const { resetAIProviderCircuitForTests } = require("../lib/ai/provider-resilienc
 const { estimatedProviderCostCents } = require("../lib/ai/usage.ts");
 const { businessHealthProviderAttemptTelemetry } = require("../lib/ai/business-health-explanation/service.ts");
 const { resolveBusinessHealthAnalysisStateFromRuns } = require("../lib/ai/business-health-explanation/storage.ts");
+const { validateBusinessHealthExplanationOutput } = require("../lib/ai/business-health-explanation/validation.ts");
 
 const strictOutput = {
   name: "business_health_explanation_v1",
@@ -131,6 +132,32 @@ function validateOk(value) {
       };
 }
 
+const labelBoundPackage = {
+  hypothesisAllowed: false,
+  facts: {
+    score: 26,
+    comparisonDelta: null,
+    dataQualityBase: 50,
+    riskPenalty: 24,
+    opportunityAdjustment: 0,
+    drivers: [{
+      kind: "risk",
+      label: "1-Star Reviews",
+      fact: "Actual 37 against a target of 23.",
+      scoreImpact: -12,
+      citationIds: [],
+      limitation: "The KPI does not establish a cause."
+    }]
+  }
+};
+
+const labelBoundOutput = {
+  executive_interpretation: "Business Health is 26 out of 100, and 1-Star Reviews are 37 against a target of 23.",
+  why_it_matters: "The approved deterministic driver remains material to the current assessment.",
+  leadership_consideration: "Review the approved driver while preserving the stated evidence limitations.",
+  provisional_hypothesis: null
+};
+
 function policyGatingTests() {
   const originalVercelEnv = process.env.VERCEL_ENV;
   const originalSelector = process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
@@ -201,6 +228,19 @@ async function providerPolicyTests() {
     assert.equal(direct.model, "gpt-5.6-sol-runtime", "accepted attribution must use the exact runtime model");
     assert.equal(direct.attempts[0].attemptOrdinal, 1);
     assert.equal(direct.attempts[0].policyStep, 1);
+
+    const labelBoundCalls = [];
+    const labelBoundPolicy = resolvePolicy();
+    const labelBound = await runStructuredAI(requestFor(labelBoundPolicy, {
+      openai: provider("openai", async (request) => {
+        labelBoundCalls.push(request.model);
+        return providerResult(labelBoundOutput, `${request.model}-runtime`);
+      }),
+      nvidia: provider("nvidia", async () => { throw new Error("NVIDIA must not be called."); })
+    }, (value) => validateBusinessHealthExplanationOutput(value, labelBoundPackage)));
+    assert.deepEqual(labelBoundCalls, ["gpt-5.6-sol"], "an approved digit-bearing driver label must not invoke Terra");
+    assert.equal(labelBound.fallbackUsed, false, "the original 1-Star Reviews output must be accepted from Sol");
+    assert.equal(labelBound.acceptedAttemptOrdinal, 1);
 
     const fallbackCalls = [];
     const fallbackPolicy = resolvePolicy();
