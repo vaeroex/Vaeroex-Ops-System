@@ -70,7 +70,7 @@ function StatusBadge({ label }: { label: string }) {
 function Metric({ label, value, detail }: { label: string; value: string | number; detail?: string }) {
   return (
     <div className="min-w-0 border-b border-line px-3 py-3 last:border-b-0 sm:border-b-0 sm:border-r sm:last:border-r-0">
-      <p className="text-xs font-semibold uppercase text-muted">{label}</p>
+      <p className="text-xs font-semibold uppercase text-slate-600">{label}</p>
       <p className="mt-1 text-xl font-semibold text-ink">{value}</p>
       {detail ? <p className="mt-1 text-xs leading-5 text-slate-600">{detail}</p> : null}
     </div>
