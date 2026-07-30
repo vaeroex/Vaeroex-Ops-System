@@ -7,6 +7,7 @@ import {
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
+import type { OverviewRunCompatibility } from "@/lib/intelligence/overview-run-compatibility";
 
 type TableRow<T extends keyof Database["public"]["Tables"]> = Database["public"]["Tables"][T]["Row"];
 
@@ -95,7 +96,7 @@ export type BusinessIntelligenceCoverageInput = {
   people?: TableRow<"people">[];
   crmLeads?: TableRow<"crm_leads">[];
   crmHistory?: TableRow<"crm_lead_history">[];
-  vaeroexRuns?: TableRow<"ai_agent_runs">[];
+  overviewRunCompatibility?: Pick<OverviewRunCompatibility, "derivedFindingCount">;
   operationalMetrics?: TableRow<"operational_metrics">[];
   assets?: TableRow<"assets">[];
   decisions?: TableRow<"business_decisions">[];
@@ -418,7 +419,7 @@ function makeConfidenceOverTime(input: BusinessIntelligenceCoverageInput) {
 
 export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCoverageInput): BusinessIntelligenceCoverageResult {
   const derivedFindingCount =
-    excludeChecklistDerivedRecords(filterBusinessEvidence(input.vaeroexRuns || [], { sourceKind: "platform_run" })).length +
+    (input.overviewRunCompatibility?.derivedFindingCount || 0) +
     excludeChecklistDerivedRecords(filterBusinessEvidence(input.decisions || [])).length;
   const activeFiles = activeRows(input.files || []);
   const activeSourceFileIds = new Set(activeFiles.map((file) => file.id));
@@ -441,7 +442,7 @@ export function buildBusinessIntelligenceCoverage(input: BusinessIntelligenceCov
     crmLeads: activeCrmLeads,
     crmHistory: filterBySourceParentEligibility(activeRows(input.crmHistory || []), parentEligibility)
       .filter((history) => activeCrmLeadIds.has(history.lead_id)),
-    vaeroexRuns: [],
+    overviewRunCompatibility: undefined,
     operationalMetrics: excludeChecklistDerivedMetrics(filterBySourceParentEligibility(activeRows(input.operationalMetrics || []), parentEligibility)),
     assets: activeRows(input.assets || []),
     decisions: []

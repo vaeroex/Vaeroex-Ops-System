@@ -60,7 +60,6 @@ const adminCustomer = read("app/app/admin/customers/[workspaceId]/page.tsx");
 const memoryEligibility = read("lib/ai/evidence-index.ts");
 const workflows = read("lib/ai/vaeroex-workflows.ts");
 const agentPage = read("app/app/agents/page.tsx");
-const agentActions = read("app/app/agents/actions.ts");
 const catchAll = read("app/app/[module]/page.tsx");
 
 assert.match(shell, /href: "\/app\/reports", label: "Saved Analyses"/);
@@ -104,7 +103,7 @@ assert.match(memoryEligibility, /"report", "saved_analysis"/);
 
 assert.doesNotMatch(workflows, /"weekly_report"|"daily_summary"|"business_review_package"|saveTargets: \["report"\]|"report": null/);
 assert.doesNotMatch(agentPage, /getReportDrafts|ReportDraftSection|View full report draft|briefing draft/);
-assert.doesNotMatch(agentActions, /reportDrafts|\.from\("reports"\)/);
+assert.equal(exists("app/app/agents/actions.ts"), false, "retired Agents actions must stay deleted");
 assert.match(catchAll, /RETIRED_MODULES = new Set\(\["actions", "briefings", "generated"\]\)/);
 assert.match(catchAll, /RETIRED_MODULES\.has\(module\)\) notFound\(\)/);
 

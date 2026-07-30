@@ -22,7 +22,6 @@ export type ManagedRecordCollection =
   | "kpis"
   | "forms"
   | "form_submissions"
-  | "ai_agent_runs"
   | "assets"
   | "asset_checks"
   | "crm_leads"
@@ -164,7 +163,6 @@ function collectionLabel(collection: ManagedRecordCollection) {
     kpis: "KPIs",
     forms: "forms",
     form_submissions: "form submissions",
-    ai_agent_runs: "Vaeroex results",
     assets: "assets",
     asset_checks: "asset checks",
     crm_leads: "customer context",

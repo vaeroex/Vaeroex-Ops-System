@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { ACTIVE_AI_AGENT_RUN_TYPES } from "@/lib/ai/active-agent-artifacts";
 import type { Database } from "@/lib/supabase/types";
 
 type AdminAuditLogsPageProps = {
@@ -98,7 +99,13 @@ export default async function AdminAuditLogsPage({ searchParams }: AdminAuditLog
   ] = await Promise.all([
     logsQuery.order("created_at", { ascending: false }).limit(logLimit),
     access.admin.from("workspaces").select("id,name").limit(500),
-    access.admin.from("ai_agent_runs").select("id,workspace_id,agent_type,error_message,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(25),
+    access.admin
+      .from("ai_agent_runs")
+      .select("id,workspace_id,agent_type,error_message,created_at")
+      .in("agent_type", [...ACTIVE_AI_AGENT_RUN_TYPES])
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(25),
     access.admin.from("subscription_events").select("id,event_type,customer_email,processing_error,created_at").not("processing_error", "is", null).order("created_at", { ascending: false }).limit(15),
     securityEventsQuery.order("created_at", { ascending: false }).limit(logLimit)
   ]);
@@ -218,12 +225,12 @@ export default async function AdminAuditLogsPage({ searchParams }: AdminAuditLog
       </SectionCard>
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <SectionCard title="Recent Vaeroex errors" description="Grouped by message so repeated failures stay compact.">
+        <SectionCard title="Recent analysis artifact errors" description="Current supported artifact failures, separate from the authoritative security and audit ledgers.">
           <GroupedErrorRuns
             runs={failedRunRows}
             workspaceNames={workspaceName}
-            emptyTitle="No Vaeroex errors"
-            emptyDescription="Failed Vaeroex run details will appear here."
+            emptyTitle="No analysis artifact errors"
+            emptyDescription="Failed supported artifact details will appear here."
           />
         </SectionCard>
 

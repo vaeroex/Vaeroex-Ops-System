@@ -217,7 +217,8 @@ assert.match(cleanupSource, /business_health_snapshots"\)\.select\("id,source_su
 assert.match(boundedContextSource, /file_uploads[\s\S]+\.is\("archived_at", null\)/, "bounded source files must exclude archived records");
 assert.equal(require("node:fs").existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired manual report generation must stay deleted");
 assert.equal(require("node:fs").existsSync(path.join(root, "lib/reports/scheduled-generator.ts")), false, "retired scheduled report generation must stay deleted");
-assert.match(homePageSource, /items=\{businessEvidenceRuns\.slice\(0, 5\)\}/, "Home must not render platform telemetry as recent business insight");
+assert.doesNotMatch(homePageSource, /businessEvidenceRuns/, "Home must not render agent-run telemetry as recent business insight");
+assert.doesNotMatch(homePageSource, /Vaeroex insights/, "Home must not expose the retired Agents presentation surface");
 assert.match(packageJson.scripts["security:check"], /platform-failure-evidence-regression-tests/, "evidence-boundary regressions must be release-gated by the security check");
 
 process.stdout.write("Platform-failure evidence regressions passed.\n");

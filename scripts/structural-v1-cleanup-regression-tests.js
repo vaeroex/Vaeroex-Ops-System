@@ -72,7 +72,8 @@ for (const route of [
   "app/app/checklists/page.tsx",
   "app/app/checklist-runs/page.tsx",
   "app/app/notifications/page.tsx",
-  "app/app/tasks/page.tsx"
+  "app/app/tasks/page.tsx",
+  "app/app/agents/page.tsx"
 ]) {
   const source = read(route);
   const authorization = source.indexOf("requireWorkspacePage()");
@@ -84,8 +85,10 @@ assert.match(read("app/app/reports/[id]/page.tsx"), /parseSavedAnalysisEnvelope/
   "current Saved Analyses must retain their strict reader");
 assert.doesNotMatch(read("app/app/reports/[id]/page.tsx"), /Legacy|legacy generated report/,
   "historical report presentation must stay retired");
-assert.match(read("app/app/agents/page.tsx"), /\.eq\("workspace_id", workspaceId\)/,
-  "historical agent-run rendering must remain workspace scoped");
+assert.match(read("app/app/agents/page.tsx"), /permanentRedirect\("\/app\/intelligence"\)/,
+  "the retired Agents route must redirect to structured Intelligence");
+assert.equal(fs.existsSync(path.join(root, "app/app/agents/actions.ts")), false,
+  "the customer-facing Agents action surface must stay deleted");
 assert.equal(fs.existsSync(path.join(root, "app/api/cron/report-subscriptions/route.ts")), false,
   "the retired report subscription endpoint must stay absent");
 

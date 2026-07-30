@@ -15,7 +15,6 @@ type ManagedCollection =
   | "kpis"
   | "forms"
   | "form_submissions"
-  | "ai_agent_runs"
   | "assets"
   | "asset_checks"
   | "crm_leads"
@@ -122,15 +121,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "status", kind: "select", maxLength: 80 },
       { name: "version", kind: "number" },
       { name: "body_markdown", kind: "textarea", maxLength: 20000 }
-    ]
-  },
-  ai_agent_runs: {
-    table: "ai_agent_runs",
-    path: "/app/agents",
-    titleField: "agent_type",
-    fields: [
-      { name: "status", kind: "select", maxLength: 80 },
-      { name: "error_message", kind: "textarea", maxLength: 2000 }
     ]
   },
   kpis: {
@@ -353,7 +343,7 @@ function revalidateRelatedPaths(collection: ManagedCollection, path: Route | str
 
   // These collections can affect intelligence presentation or saved-output
   // availability. Revalidation does not make derived records original evidence.
-  if (["kpis", "files", "issues", "ai_agent_runs", "crm_leads"].includes(collection)) {
+  if (["kpis", "files", "issues", "crm_leads"].includes(collection)) {
     revalidatePath("/app");
     revalidatePath("/app/intelligence");
     revalidatePath("/app/sources");

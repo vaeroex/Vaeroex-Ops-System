@@ -32,11 +32,7 @@ The gateway currently enforces:
 - audit logging to `security_audit_events`
 - no raw SQL or dynamic tool names
 
-The gateway has been wired into the highest-risk model-derived save/delete paths:
-
-- saving Vaeroex-generated outputs to operational records
-- saving generated briefings/reports
-- deleting generated file-analysis insights
+The gateway remains wired into current model-derived save/delete paths, including Saved Analyses and file-analysis insight lifecycle actions.
 
 The migration `supabase/migrations/202607080002_ai_tool_execution_security.sql` adds the audit log table.
 
@@ -44,12 +40,9 @@ The migration `supabase/migrations/202607080002_ai_tool_execution_security.sql` 
 
 | Tool / Action | Operation | Can model initiate? | Can user initiate? | Requires confirmation? | Workspace scoped? | RLS protected? | Uses service role? | Schema validation? | Audit log? | Risk level |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Ask Vaeroex run | CREATE_RECORD in `ai_agent_runs` | No direct mutation tools | Yes | User submits prompt | Yes | Yes | No | Workflow key is constrained; output is validated | Usage log plus failed-run log | Safe |
-| Contextual Ask | CREATE_RECORD in `ai_agent_runs` | No direct mutation tools | Yes | User clicks contextual control | Yes | Yes | No | Context/action inputs are server controlled | Usage/run logs | Safe |
-| Save Vaeroex output to task/form/checklist/SOP/report | CREATE_RECORD | No | Yes | Yes | Yes | Yes | No | Gateway Zod schema | Gateway audit log | Guarded |
-| Save generated output to briefing/report | CREATE_RECORD | No | Yes | Yes | Yes | Yes | No | Gateway Zod schema | Gateway audit log | Guarded |
 | Delete generated insights | DELETE_RECORD plus archive/delete Business Memory chunks | No | Yes | Yes; bulk requires typed DELETE | Yes | Yes | No | Gateway Zod schema | Gateway audit log | Guarded |
 | File analysis | CREATE_RECORD in `ai_agent_runs`; updates file metadata and evidence index | No direct arbitrary tools | Yes | User action | Yes | Yes | No | Existing server validation; model output validation added | Run/usage logs | Needs continued gateway expansion |
+| Save completed Business Health or Finding analysis | CREATE_RECORD in Saved Analyses after source-artifact validation | No | Yes | Yes | Yes | Yes | No | Versioned Saved Analysis envelope | Gateway audit log | Guarded |
 | KPI/CRM/operational spreadsheet import | CREATE_RECORD | No | Yes, review-gated | Yes | Yes | Yes | No | Parser and mapping validation | Import logs | Needs continued gateway expansion |
 | Business Memory indexing | CREATE/UPDATE `business_memory_chunks` | No | System after user file action | N/A | Yes | Yes | No | Server-controlled chunk/index schema | Processing/job logs | Safe with monitoring |
 | Evidence retrieval RPC | READ | No | System only | N/A | Yes | Function filters workspace and archived/deleted chunks | No | RPC args fixed by server | Usage metadata | Safe |
@@ -222,10 +215,7 @@ Vaeroex is also being hardened around prompt injection, excessive agency, and ev
 
 ## Files Reviewed
 
-- `app/app/agents/actions.ts`
-- `app/app/contextual-ask/actions.ts`
 - `app/app/files/actions.ts`
-- `app/app/generated/actions.ts`
 - `app/app/sources/actions.ts`
 - `components/operations/GeneratedInsightsPanel.tsx`
 - `lib/ai/evidence-index.ts`

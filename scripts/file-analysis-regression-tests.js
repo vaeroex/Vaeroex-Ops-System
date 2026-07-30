@@ -12,8 +12,7 @@ const client = read("lib/ai/vaeroex-client.ts");
 const openAiProvider = read("lib/ai/providers/openai-provider.ts");
 
 const fileWorkflow = workflows.slice(
-  workflows.indexOf('key: "file_analysis"'),
-  workflows.indexOf('key: "ceo_mode"')
+  workflows.indexOf('key: "file_analysis"')
 );
 const analysisAction = actions.slice(actions.indexOf("export async function analyzeFileAction"));
 const analysisRunner = actions.slice(

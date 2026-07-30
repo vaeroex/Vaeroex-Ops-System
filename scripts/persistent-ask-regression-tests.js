@@ -62,8 +62,8 @@ assert.match(globalSearch, /searchParams\.get\("ask"\) === "1"[\s\S]{0,180}route
 assert.doesNotMatch(route, /shouldBuildAnswer|buildGeneralBusinessAnswer|\.limit\(120\)/, "GET Search must not retain the old broad answer-building queries");
 
 assert.match(askPage, /isPremiumConversationalVaeroexEnabled[\s\S]*redirect\("\/app\/intelligence"\)/, "Version 1 Ask visits must fail closed to Intelligence");
-assert.match(askPage, /params\.run[\s\S]*redirect\(`\/app\/agents/, "saved legacy Ask result URLs must remain readable in the result viewer");
-assert.match(agentsPage, /redirect\("\/app\/intelligence"\)/, "blank legacy agents visits must return to structured Intelligence");
+assert.match(askPage, /params\.run[\s\S]*requireWorkspacePage\(\)[\s\S]*redirect\("\/app\/intelligence"\)/, "legacy Ask result URLs must authorize and return to Intelligence");
+assert.match(agentsPage, /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app\/intelligence"\)/, "all legacy Agents URLs must authorize and return to structured Intelligence");
 assert.match(askWorkspace, /sessionStorage\.getItem\(storageKey\)/, "Ask must restore the active browser-session analysis");
 assert.match(askWorkspace, /sessionStorage\.setItem\(storageKey, serialized\)/, "Ask must persist the active analysis in sessionStorage");
 assert.doesNotMatch(askWorkspace, /localStorage/, "Ask analysis history must not become durable browser storage");

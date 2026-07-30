@@ -288,34 +288,12 @@ check(searchRoute.includes("export async function POST") && searchRoute.includes
 check(searchRoute.includes("loadKpiOverviewData") && searchRoute.includes("shouldUseKpiOverviewAnswer"), "Global Search or Ask must route KPI overview through the shared KPI/settings loader with a narrow intent gate.");
 check(!/kpiOverviewIntent\.matched\s*\|\|\s*\/\\b\(kpi\|kpis\|metric\|metrics\|weakest/.test(searchRoute), "Global Search or Ask must not route generic weakest questions into KPI overview.");
 check(searchRoute.includes("business_memory_chunks") && searchRoute.includes('"Learned Knowledge"'), "Global Search or Ask must search active Learned Knowledge instead of implementation-only result records.");
-check(searchRoute.includes("shouldSearchDiagnostics") && searchRoute.includes("isVaeroexAdminUser"), "Global Search or Ask must keep execution diagnostics admin-explicit.");
+check(!searchRoute.includes("/app/agents") && !searchRoute.includes('"Diagnostics"'), "Global Search must not expose the retired Agents diagnostics destination.");
 check(!/sourceType:\s*"Vaeroex Result"/.test(searchRoute), "Global Search or Ask must not expose Vaeroex Result records as ordinary customer-facing knowledge.");
 check(legacyAskPage.includes("AskVaeroexWorkspace") && legacyAskPage.includes("isPremiumConversationalVaeroexEnabled") && legacyAskPage.includes('redirect("/app/intelligence")'), "The dormant premium Ask workspace must fail closed to Intelligence in Version 1.");
-check(legacyAskPage.includes('redirect(`/app/agents') && agentsPage.includes("Saved Vaeroex Result"), "Saved legacy result links must remain readable outside the retired Ask route.");
-check(agentsPage.includes('redirect("/app/intelligence")'), "Blank legacy result visits must return to structured Intelligence.");
-check(agentsPage.includes("canViewDebug ?") && agentsPage.includes("Admin result records"), "Legacy Vaeroex result records must be admin/debug-only outside bookmarked saved runs.");
-check(agentsPage.includes("PendingSubmitButton") && agentsPage.includes('pendingLabel="Generating..."'), "Ask Vaeroex must use PendingSubmitButton with a Generating... pending label.");
-check(agentsPage.includes("data-vaeroex-skip-global-activity={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex form must bypass the document-level global activity submit listener.");
-check(agentsPage.includes("activityDisabled={workflow.key === \"ask_vaeroex\""), "Ask Vaeroex must bypass button-level global activity cursor registration while preserving local pending text.");
-check(agentsPage.includes("Direct Answer") && agentsPage.includes("Evidence Note") && agentsPage.includes("Recommendation Confidence") && agentsPage.includes("Show Supporting Evidence"), "Ask Vaeroex must use direct-answer mode with confidence and collapsed supporting evidence.");
-check(agentsPage.includes("hasWorkspaceKnowledge") && agentsPage.includes("questionCoverage"), "Ask Vaeroex must distinguish workspace knowledge from question-specific evidence coverage.");
-check(!agentsPage.includes("Evidence Summary") && !agentsPage.includes("Vaeroex answered"), "Ask Vaeroex must not regress to report-style Evidence Summary or Vaeroex answered labels.");
-check(!agentsPage.includes("Generate Executive Strategy") && !agentsPage.includes("Create Improvement Plan"), "Ask Vaeroex direct-answer mode must not preemptively show generated-output action buttons.");
-
-const agentsActionsRuntime = read("app/app/agents/actions.ts");
-check(agentsActionsRuntime.includes('workflow.key === "ask_vaeroex"') && agentsActionsRuntime.includes("isPremiumConversationalVaeroexEnabled"), "Legacy Ask server actions must fail closed unless the premium conversational policy is enabled.");
-check(agentsActionsRuntime.includes("ASK_VAEROEX_MEMORY_RETRIEVAL_TIMEOUT_MS"), "Ask Vaeroex must bound Business Memory retrieval so server actions can return.");
-check(agentsActionsRuntime.includes("withStageTimeout") && agentsActionsRuntime.includes("Business Memory retrieval"), "Ask Vaeroex must apply a stage timeout to Business Memory retrieval.");
-check(agentsActionsRuntime.includes("reducedEvidenceContext") && agentsActionsRuntime.includes("continuingWithReducedContext"), "Ask Vaeroex must continue with reduced context when Business Memory retrieval fails safely.");
-check(agentsActionsRuntime.includes("askVaeroexProviderSettings") && agentsActionsRuntime.includes("providerSettings"), "Ask Vaeroex must cap provider timeout/retry settings for server-action execution.");
-check(agentsActionsRuntime.includes("createRunningRun") && agentsActionsRuntime.includes('status: "running"'), "Ask Vaeroex must create a run record before long-running analysis starts.");
-check(agentsActionsRuntime.includes("updateRunRecord") && agentsActionsRuntime.includes("failureOutput"), "Ask Vaeroex must update the same run for success, timeout, and failure outcomes.");
-check(agentsActionsRuntime.includes("vaeroex_run_diagnostics") && agentsActionsRuntime.includes("finalStage"), "Ask Vaeroex failed runs must store admin-only lifecycle diagnostics.");
-check(agentsActionsRuntime.includes("classifySecurityIntent") && agentsActionsRuntime.includes("security_intent_classified"), "Ask Vaeroex must classify security intent before Business Memory and OpenAI generation.");
-check(agentsActionsRuntime.indexOf("classifySecurityIntent") < agentsActionsRuntime.indexOf("business_memory"), "Ask Vaeroex security intent classification must run before Business Memory retrieval.");
-check(agentsActionsRuntime.includes("classifyKpiOverviewIntent") && agentsActionsRuntime.includes("runLightweightKpiOverview"), "Ask Vaeroex must route simple KPI overview prompts through the lightweight KPI workflow.");
-check(!agentsActionsRuntime.includes("buildWorkspaceSnapshot") && agentsActionsRuntime.includes("buildBoundedWorkspaceContext"), "Ask Vaeroex must use bounded planned context instead of a full workspace snapshot.");
-check(agentsActionsRuntime.includes("executionPlanForWorkflow") && agentsActionsRuntime.includes("query_plan"), "Ask Vaeroex must record and enforce a server-side query-depth plan.");
+check(legacyAskPage.includes("params.run") && legacyAskPage.includes("requireWorkspacePage") && !legacyAskPage.includes("/app/agents"), "Saved legacy result URLs must authorize and return to Intelligence.");
+check(agentsPage.indexOf("requireWorkspacePage()") < agentsPage.indexOf('permanentRedirect("/app/intelligence")'), "Every retired Agents URL must authorize before redirecting to structured Intelligence.");
+check(!exists("app/app/agents/actions.ts") && !exists("app/app/agents/loading.tsx"), "The retired Agents action and loading surfaces must stay deleted.");
 const kpiOverviewRuntime = read("lib/ai/kpi-overview.ts");
 check(kpiOverviewRuntime.includes("KPI_OVERVIEW_MAX_ROWS") && kpiOverviewRuntime.includes("KPI_OVERVIEW_HISTORY_PER_METRIC"), "KPI overview must cap historical KPI context.");
 check(kpiOverviewRuntime.includes("loadKpiOverviewData") && kpiOverviewRuntime.includes("kpi_settings"), "KPI overview must load workspace KPI settings through a shared bounded helper.");
@@ -338,7 +316,6 @@ check(
 const workspaceActionFiles = [
   "app/app/operations/actions.ts",
   "app/app/files/actions.ts",
-  "app/app/agents/actions.ts",
   "app/app/accountability/actions.ts",
   "app/app/intelligence/actions.ts"
 ];

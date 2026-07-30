@@ -2744,7 +2744,6 @@ export async function approveFileAnalysisAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/agents");
   redirectWithPathMessage(returnPath, "Findings approved. This source is now available to Business Memory, Search, and Intelligence.", file.id);
 }
 
@@ -2827,7 +2826,6 @@ export async function discardFileAnalysisAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/agents");
   redirectWithPathMessage(returnPath, "Analysis discarded. It will not be used in future Vaeroex answers.", file.id);
 }
 
@@ -4119,7 +4117,6 @@ export async function analyzeFileAction(formData: FormData) {
 
     revalidatePath(FILES_PATH);
     revalidatePath("/app");
-    revalidatePath("/app/agents");
     const insightCount = cleanAnalysisInsightCount(result.cleanResult);
     const limitedContent = result.extraction.kind !== "spreadsheet" && result.extraction.kind !== "image_vision" && result.extraction.textContent.length < 250;
     const message =

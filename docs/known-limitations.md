@@ -50,7 +50,7 @@ Vaeroex Ops System is ready for a limited beta after manual testing passes. It i
 
 ## Operations Modules
 
-- Core modules exist: dashboard, forms, submissions, checklists, checklist runs, tasks, issues, assets, people, SOPs, reports, and Vaeroex Hub.
+- Core Version 1 surfaces include Executive Overview, Business Health, Intelligence, KPIs, Evidence, and Saved Analyses.
 - Edit/delete flows are still limited.
 - Filters and saved views are basic.
 - Intake and workflow editing screens remain placeholder-level.

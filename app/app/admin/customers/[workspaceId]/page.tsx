@@ -18,6 +18,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import { StatusBadge } from "@/components/operations/StatusBadge";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
 import { companyAttentionReasons, formatAdminDate, type AdminCompanyRow } from "@/lib/admin/company-directory";
+import { ACTIVE_AI_AGENT_RUN_TYPES } from "@/lib/ai/active-agent-artifacts";
 import { displayPlanName } from "@/lib/billing/plans";
 import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
 import { SAVED_ANALYSIS_ENVELOPE_VERSION, SAVED_ANALYSIS_TYPES } from "@/lib/reports/saved-analysis";
@@ -93,7 +94,11 @@ export default async function AdminCompanyDetailPage({
         workspace_id: workspaceId,
         release_channel: savedAnalysisChannel
       }),
-    admin.from("ai_agent_runs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
+    admin
+      .from("ai_agent_runs")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .in("agent_type", [...ACTIVE_AI_AGENT_RUN_TYPES])
   ]);
 
   const workspace = workspaceResult.data as WorkspaceRow | null;
@@ -177,7 +182,7 @@ export default async function AdminCompanyDetailPage({
                 <DetailValue label="KPIs" value={String(kpiCount.count || 0)} />
                 <DetailValue label="Evidence files" value={String(fileCount.count || 0)} />
                 <DetailValue label="Saved analyses" value={String(savedAnalysisCount)} />
-                <DetailValue label="Intelligence runs" value={String(intelligenceCount.count || 0)} />
+                <DetailValue label="Analysis artifacts" value={String(intelligenceCount.count || 0)} />
               </dl>
             </SectionCard>
           </section>

@@ -26,7 +26,7 @@ Status labels: SAFE means the route has server-side guard coverage or is intenti
 | `/app/forms` | Authenticated | Active/manual/demo subscription access | Current workspace forms only | SAFE |
 | `/app/form-submissions` | Authenticated | Active/manual/demo subscription access | Current workspace submissions only | SAFE |
 | `/app/notifications` | Authenticated | Active/manual/demo subscription access | Current workspace notifications only | SAFE |
-| `/app/agents` | Authenticated | Active/manual/demo subscription access | Current workspace Vaeroex runs only | SAFE |
+| `/app/agents` | Authenticated | Retired route | Authorizes workspace access, then permanently redirects to `/app/intelligence`; no run payload is rendered | SAFE |
 | `/app/support` | Authenticated | App layout auth; support remains available even if billing help is needed | Active workspace is included only after membership verification | SAFE |
 | `/app/account/subscription` | Authenticated | Workspace context | Active workspace subscription status only | SAFE |
 | `/app/setup` | Authenticated | Account user creating or completing workspace setup | New/current workspace setup flow | SAFE |

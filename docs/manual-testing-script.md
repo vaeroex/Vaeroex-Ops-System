@@ -154,65 +154,30 @@ Result:
 - Pass/fail:
 - Notes:
 
-### 9. Customer Creates Checklist
+### 9. Customer Reviews Executive Intelligence
 
-1. Open `/app/checklists`.
-2. Create a checklist with name, category, frequency, owner role, and items.
+1. Open `/app/intelligence`.
+2. Select a finding and open Explain Finding.
+3. Review citations, confidence, freshness, and limitations.
 
 Expected result:
-- Checklist appears in the checklist list.
-- Plan limit error appears if checklist limit is exceeded.
+- The selected finding and explanation remain workspace-scoped.
+- Citation links open the current source evidence.
+- No historical run, raw payload, or generic workflow launcher is exposed.
 
 Result:
 - Pass/fail:
 - Notes:
 
-### 10. Customer Runs Vaeroex Audit
+### 10. Customer Saves a Completed Analysis
 
-1. Open `/app/agents`.
-2. Select Operations Audit Agent.
-3. Enter operational context.
-4. Run Vaeroex.
-
-Expected result:
-- Vaeroex response appears.
-- Run is saved in `ai_agent_runs`.
-- Usage is recorded in `ai_usage`.
-- Monthly AI run limit blocks when exceeded.
-
-Result:
-- Pass/fail:
-- Notes:
-
-### 11. Customer Generates SOP
-
-1. Open `/app/agents`.
-2. Select SOP Generator Agent.
-3. Enter process context.
-4. Run Vaeroex.
-5. Review output.
-6. Confirm save to SOPs.
+1. Open a completed Business Health or Finding explanation.
+2. Select Save Analysis.
+3. Open the result in `/app/reports`.
 
 Expected result:
-- SOP is not saved until confirmation.
-- Confirmed SOP appears in `/app/sops`.
-
-Result:
-- Pass/fail:
-- Notes:
-
-### 12. Customer Generates Weekly Report
-
-1. Open `/app/agents`.
-2. Select Weekly Report Agent.
-3. Enter reporting context or date range.
-4. Run Vaeroex.
-5. Review output.
-6. Confirm save to Reports.
-
-Expected result:
-- Report is not saved until confirmation.
-- Confirmed report appears in `/app/reports`.
+- The complete validated artifact is copied into Saved Analyses.
+- Opening the saved copy does not depend on a customer-facing run-history page.
 
 Result:
 - Pass/fail:

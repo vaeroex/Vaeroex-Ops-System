@@ -15,7 +15,6 @@ const saveButton = read("components/reports/SaveAnalysisButton.tsx");
 const businessHealth = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const findingExplanation = read("components/intelligence/IntelligenceSignalInbox.tsx");
 const agentPage = read("app/app/agents/page.tsx");
-const agentActions = read("app/app/agents/actions.ts");
 const home = read("app/app/page.tsx");
 const globalSearch = read("components/app/GlobalSearch.tsx");
 const vercel = read("vercel.json");
@@ -104,7 +103,7 @@ assert.match(migration, /grant execute on function public\.soft_delete_saved_ana
 for (const source of [reportsPage, home, findingExplanation, agentPage]) {
   assert.doesNotMatch(source, /Create report|Generate report|Generate Improvement Plan|Generate Investigation Summary|Generate Executive Briefing/);
 }
-assert.doesNotMatch(agentActions, /reportDrafts|\.from\("reports"\)/);
+assert.equal(fs.existsSync(path.join(root, "app/app/agents/actions.ts")), false, "retired Agents actions must stay deleted");
 assert.doesNotMatch(agentPage, /getReportDrafts|ReportDraftSection|View full report draft/);
 assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired manual report generation actions must stay deleted");
 assert.equal(fs.existsSync(path.join(root, "app/app/generated/actions.ts")), false, "retired generated-output actions must stay deleted");
