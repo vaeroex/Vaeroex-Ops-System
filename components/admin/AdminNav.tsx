@@ -5,6 +5,7 @@ const adminLinks: { href: Route; label: string }[] = [
   { href: "/app/admin", label: "Admin Dashboard" },
   { href: "/app/admin/customers", label: "Customers" },
   { href: "/app/admin/ai-usage", label: "Vaeroex Usage" },
+  { href: "/app/admin/ai-trust", label: "AI Trust" },
   { href: "/app/admin/support-requests", label: "Support Requests" },
   { href: "/app/admin/audit-logs", label: "Audit Logs" }
 ];
