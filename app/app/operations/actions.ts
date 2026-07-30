@@ -338,7 +338,6 @@ export async function updateKpiValueAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
   revalidatePath("/app/kpis");
-  revalidatePath("/app/reports");
   redirectWithMessage(path, "KPI value updated.");
 }
 
@@ -579,7 +578,6 @@ export async function updateKpiSettingAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/kpis");
   revalidatePath("/app/kpis/settings");
-  revalidatePath("/app/reports");
   if (text(formData, "target_change_context") === "recommended") {
     redirectWithMessageParams(path, "Recommended target applied.", {
       target_applied: "true",
@@ -729,7 +727,6 @@ export async function acceptKpiSemanticSuggestionAction(formData: FormData) {
   revalidatePath("/app/kpis");
   revalidatePath("/app/kpis/settings");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/reports");
   redirectWithMessage(path, "KPI performance direction confirmed.");
 }
 

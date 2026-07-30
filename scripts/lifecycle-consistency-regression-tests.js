@@ -118,7 +118,8 @@ for (const table of ["reports", "issues", "sops"]) {
 }
 assert.match(searchRoute, /filterOriginalBusinessEvidence<IssueRow>/, "search reasoning must exclude setup-only issues");
 assert.match(searchRoute, /filterOriginalBusinessEvidence<SopRow>/, "search must exclude setup-only SOPs from active results");
-assert.match(searchRoute, /Derived report ·/, "derived reports must be labeled as derived in navigation results");
+assert.match(searchRoute, /"Saved Analyses"/, "Search must label the supported copied analysis surface explicitly");
+assert.match(searchRoute, /record_kind: "saved_analysis", release_channel: savedAnalysisChannel/, "Search must query only current channel-scoped Saved Analyses");
 assert.match(boundedContext, activeQuery("issues"), "bounded Ask context must exclude inactive issues before limiting");
 assert.match(boundedContext, activeQuery("sops"), "bounded Ask context must exclude inactive SOPs before limiting");
 assert.match(boundedContext, /filterOriginalBusinessEvidence\(issues\)/, "bounded Ask must apply original-evidence rules to issues");
@@ -138,17 +139,16 @@ for (const source of [searchRoute, boundedContext]) {
   assert.match(source, /(?:loadSourceParentEligibility|filterBySourceParentEligibility)/, "source-linked structured evidence must validate its parent Source lifecycle");
 }
 assert.match(recordActions, /update_source_file_lifecycle/, "generic Source lifecycle controls must update parent and learned evidence together");
-assert.match(intelligenceLayer, /const reports: ReportRow\[\] = \[\]/, "derived reports must not become original evidence in Intelligence");
-assert.match(coverage, /reports: \[\]/, "derived reports must not increase coverage");
+assert.doesNotMatch(intelligenceLayer, /ReportRow|input\.reports|const reports/, "Intelligence must not accept report rows as deterministic inputs");
+assert.doesNotMatch(coverage, /ReportRow|input\.reports|reports: \[\]/, "report rows must not increase coverage");
 assert.doesNotMatch(coverage, /checklists|checklistRuns|activeChecklistIds/, "retired Checklist inputs cannot affect active intelligence coverage");
 assert.match(coverage, /activeFormIds\.has\(submission\.form_id\)/, "form submissions require an active form parent");
 assert.match(coverage, /activeCrmLeadIds\.has\(history\.lead_id\)/, "customer history requires active eligible customer evidence");
 assert.match(coverage, /activeSourceFileIds\.has\(item\.file_upload_id\)/, "imports require an active Source parent");
 assert.match(intelligenceLayer, /activeFormIds\.has\(submission\.form_id\)/, "Intelligence submissions require an active form parent");
 assert.match(homepage, /const intelligenceLayer = buildIntelligenceLayer\(/, "Executive Overview must delegate Business Health to the canonical layer that excludes derived reports");
-assert.doesNotMatch(boundedContext, /context\.reports[\s\S]{0,500}body_markdown:/, "saved report conclusions must not feed new Ask reasoning");
-assert.match(boundedContext, /Saved report conclusions are not reused as current business evidence/, "Ask must explain the derived-report evidence boundary");
-assert.doesNotMatch(searchRoute, /sourceType: `Derived report[\s\S]{0,180}truncate\(report\.body_markdown\)/, "Search navigation must not surface stale report conclusions as current evidence");
+assert.doesNotMatch(boundedContext, /\.from\("reports"\)|context\.reports|body_markdown[\s\S]{0,500}report/, "saved analysis conclusions must not feed new reasoning");
+assert.doesNotMatch(searchRoute, /Derived report|Legacy report|truncate\(report\.body_markdown\)/, "Search navigation must not surface stale report conclusions as current evidence");
 assert.match(formSubmissionsPage, /activeFormIds\.has\(submission\.form_id\)/, "orphaned submissions must not remain visible");
 assert.match(checklistRunsPage, /await requireWorkspacePage\(\)/, "retired Checklist Runs must authorize before redirecting");
 assert.match(checklistRunsPage, /permanentRedirect\("\/app"\)/, "retired Checklist Runs must not expose historical rows");

@@ -8,7 +8,6 @@ import type { WorkflowStageLogger } from "@/lib/ai/workflow-timing";
 import {
   filterBusinessEvidence,
   filterOriginalBusinessEvidence,
-  isBusinessEvidenceEligible,
   isOriginalBusinessEvidence,
   sanitizeBusinessEvidenceText
 } from "@/lib/intelligence/evidence-eligibility";
@@ -34,19 +33,6 @@ function compactText(value: string | null | undefined, max = 900) {
 
 function jsonRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as JsonRecord) : {};
-}
-
-function hasExplicitReportLineage(value: Json, depth = 0): boolean {
-  if (depth > 4 || !value || typeof value !== "object") return false;
-  if (Array.isArray(value)) return value.some((item) => hasExplicitReportLineage(item, depth + 1));
-
-  return Object.entries(value).some(([key, item]) => {
-    if (/^(original_source_ids|source_file_ids|source_ids|evidence_lineage)$/i.test(key)) {
-      const serialized = safeJsonStringify(item as Json);
-      if (/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i.test(serialized)) return true;
-    }
-    return hasExplicitReportLineage(item as Json, depth + 1);
-  });
 }
 
 function confidenceFromEvidence(count: number) {
@@ -210,37 +196,6 @@ export async function buildBoundedWorkspaceContext({
     );
   }
 
-  if (domainSet.has("reports")) {
-    loaders.push(
-      safeRows(
-        "Briefings and reports",
-          supabase
-            .from("reports")
-          .select("id,title,report_type,date_range_start,date_range_end,source_data_json,created_at,archived_at,deleted_at")
-          .eq("workspace_id", workspaceId)
-          .is("deleted_at", null)
-          .is("archived_at", null)
-          .order("created_at", { ascending: false })
-          .limit(6),
-        limitations
-      ).then((rows) => {
-        const eligibleRows = filterBusinessEvidence(rows);
-        context.reports = eligibleRows.map((row) => ({
-          id: row.id,
-          title: row.title,
-          report_type: row.report_type,
-          date_range_start: row.date_range_start,
-          date_range_end: row.date_range_end,
-          created_at: row.created_at,
-          evidence_role: "derived_analysis",
-          evidence_lineage_available: hasExplicitReportLineage(row.source_data_json),
-          evidence_limitation: "Saved report conclusions are not reused as current business evidence."
-        }));
-        loadedDomainSet.add("reports");
-      })
-    );
-  }
-
   if (domainSet.has("files") || domainSet.has("data_quality")) {
     loaders.push(
       safeRows(
@@ -384,7 +339,6 @@ export async function buildBoundedWorkspaceContext({
     "business_health",
     "business_health_score_context",
     "risk_and_priority_evidence",
-    "reports",
     "sources",
     "operational_metrics",
     "historical_customer_activity",
@@ -439,12 +393,10 @@ export function buildDeterministicBoundedAnswer({
   const issues = Array.isArray(riskContext.issues) ? riskContext.issues : [];
   const recommendations = Array.isArray(riskContext.recommendations) ? riskContext.recommendations : [];
   const healthRows = Array.isArray(structured.business_health) ? structured.business_health : [];
-  const reports = Array.isArray(structured.reports) ? structured.reports : [];
   const sources = Array.isArray(structured.sources) ? structured.sources : [];
   const firstIssue = jsonRecord(issues[0]);
   const firstRecommendation = jsonRecord(recommendations[0]);
   const latestHealth = jsonRecord(healthRows[0]);
-  const firstReport = jsonRecord(reports[0]);
   const firstSource = jsonRecord(sources[0]);
   const metrics = Array.isArray(kpiSummary.metrics) ? kpiSummary.metrics : [];
   const firstMetric = jsonRecord(metrics[0]);
@@ -457,16 +409,13 @@ export function buildDeterministicBoundedAnswer({
   const asksCount = /\b(how many|count|counts)\b/i.test(query);
   const countAnswer = asksCount
     ? [
-        reports.length ? `${reports.length} recent report${reports.length === 1 ? "" : "s"}` : "",
         sources.length ? `${sources.length} active source file${sources.length === 1 ? "" : "s"}` : "",
         issues.length ? `${issues.length} current risk record${issues.length === 1 ? "" : "s"}` : "",
         Array.isArray(kpiSummary.metrics) && kpiSummary.metrics.length ? `${kpiSummary.metrics.length} current KPI${kpiSummary.metrics.length === 1 ? "" : "s"}` : ""
       ].filter(Boolean).join(", ")
     : "";
   const targetedObservation =
-    /\b(report|briefing)\b/i.test(query) && typeof firstReport.title === "string"
-      ? `The latest relevant report is ${firstReport.title}.`
-      : /\b(file|source|document|upload)\b/i.test(query) && typeof firstSource.display_name === "string"
+    /\b(file|source|document|upload)\b/i.test(query) && typeof firstSource.display_name === "string"
         ? `The latest relevant source is ${firstSource.display_name}.`
         : /\b(alert|risk|issue)\b/i.test(query) && typeof firstIssue.title === "string"
           ? `${firstIssue.title} is the clearest current risk record available for this question.`

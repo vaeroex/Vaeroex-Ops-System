@@ -29,7 +29,6 @@ const redirects = read("next.config.mjs");
 const demo = read("app/demo/page.tsx");
 const savedAnalysisList = read("components/reports/SavedAnalysisList.tsx");
 const savedAnalysisPresentation = read("lib/reports/saved-analysis.ts");
-const legacyReportPresentation = read("lib/reports/presentation.ts");
 
 assert.match(homepage, /Vaeroex Intelligence Systems/, "homepage must identify the parent company");
 assert.match(homepage, /VAEROEX · INTELLIGENCE SYSTEMS/, "homepage eyebrow must use the approved company position");
@@ -101,7 +100,7 @@ assert.match(globals, /prefers-reduced-motion: reduce/, "motion must honor reduc
 assert.match(redirects, /source: "\/network"[^\n]+destination: "\/networking"/, "legacy /network route must resolve to the authoritative Network page");
 assert.match(redirects, /source: "\/operations-intelligence"[^\n]+destination: "\/executive-intelligence"[^\n]+statusCode: 301/, "the previous product URL must permanently redirect to Executive Intelligence");
 
-const publicSources = [homepage, operations, pricing, about, contact, network, careers, help, demo, header, footer, trust, trustContent, seo, plans, savedAnalysisList, savedAnalysisPresentation, legacyReportPresentation].join("\n");
+const publicSources = [homepage, operations, pricing, about, contact, network, careers, help, demo, header, footer, trust, trustContent, seo, plans, savedAnalysisList, savedAnalysisPresentation].join("\n");
 assert.doesNotMatch(publicSources, /Hourly Consulting|Full Support Retainer|operations consulting agency/i, "current public experience must not expose legacy consulting offers");
 assert.doesNotMatch(publicSources, /Vaeroex Governance|Generated Outputs|Optional Outputs|workspace reset|automatic permanent purge/i, "current public experience must not expose unreleased or retired product concepts");
 assert.doesNotMatch(publicSources, /Executive Brief|Ask Vaeroex|Business Signals?|Notifications?|KPI Alerts?|Board Report|Improvement Plan|Investigation Summary/i, "current customer messaging must not expose retired features");

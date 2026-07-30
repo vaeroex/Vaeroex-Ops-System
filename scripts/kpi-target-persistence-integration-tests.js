@@ -149,7 +149,6 @@ const actions = loadTypescriptModule("app/app/operations/actions.ts", {
     KPI_TARGET_BEHAVIORS: ["minimum_goal", "maximum_limit", "acceptable_range", "exact_threshold", "stability_goal", "unknown"],
     validateKpiSemanticSelection: () => ({ ok: true })
   },
-  "@/lib/reports/generation-policy": { legacyReportGenerationDisabled: () => true },
   "@/lib/security/tool-execution-gateway": { requireToolExecution: async () => undefined },
   "@/lib/supabase/server": { createSupabaseServerClient: async () => supabase },
   "@/lib/workspaces/current": {
@@ -274,7 +273,7 @@ function assertSingleCanonicalRow() {
   assert.equal(settings.kpiSettingForName(persistedRows, kpiName).id, persisted.id, "The page loader must resolve the exact row written by every action.");
   assert.equal(settings.configuredKpiTarget(kpiName, persistedRows), 3.75, "KPI detail must read the persisted recommended target.");
   assert.equal(rebuiltRows[0].target, 3.75, "KPI Overview must rebuild the KPI with the same target.");
-  for (const expectedPath of ["/app", "/app/kpis", "/app/kpis/settings", "/app/reports"]) {
+  for (const expectedPath of ["/app", "/app/kpis", "/app/kpis/settings"]) {
     assert.ok(revalidatedPaths.includes(expectedPath), `The action must revalidate ${expectedPath}.`);
   }
 

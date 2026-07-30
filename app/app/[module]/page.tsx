@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { GlobalSearchTrigger } from "@/components/app/GlobalSearchTrigger";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
 
@@ -15,7 +16,7 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     whatItWillDo: [
       "Map repeatable business processes from trigger to completion.",
       "Map handoffs, review points, evidence capture, forms, and checklists.",
-      "Connect workflow signals to reports so leaders can see where patterns emerge."
+      "Connect workflow signals to intelligence so leaders can see where patterns emerge."
     ],
     whyItMatters:
       "Many small teams know the work, but the steps live in heads, texts, spreadsheets, and side conversations. A workflow builder will turn that into visible business structure.",
@@ -46,7 +47,7 @@ const comingSoonCopy: Record<string, ComingSoonCopy> = {
     whatItWillDo: [
       "Capture business context before setup.",
       "Identify recurring headaches and spreadsheet-driven processes.",
-      "Use answers to recommend starter workflows, KPIs, forms, SOPs, and reports."
+      "Use answers to recommend starter workflows, KPIs, forms, and SOPs."
     ],
     whyItMatters:
       "A good intake helps Vaeroex recommend practical systems instead of generic templates.",
@@ -64,14 +65,14 @@ const defaultCopy: ComingSoonCopy = {
   whatItWillDo: [
       "Extend Vaeroex with a focused business intelligence capability.",
       "Use workspace-safe records and clear owner-friendly workflows.",
-    "Connect future records to dashboard, reports, and Vaeroex context when appropriate."
+    "Connect future records to the dashboard and Vaeroex context when appropriate."
   ],
   whyItMatters:
     "This module is not ready for daily use yet, so it is not shown in the main navigation.",
   futureCapability: [
     "Workspace-specific records",
     "Search, filters, and record management",
-    "Dashboard and report integration",
+    "Dashboard and intelligence integration",
     "Draft recommendations from Vaeroex where useful"
   ]
 };
@@ -81,6 +82,8 @@ type ModulePageProps = {
     module: string;
   }>;
 };
+
+const RETIRED_MODULES = new Set(["actions", "briefings", "generated"]);
 
 function formatModuleName(module: string) {
   return module
@@ -94,6 +97,7 @@ export default async function ModuleComingSoonPage({ params }: ModulePageProps) 
   await requireWorkspacePage();
 
   const { module } = await params;
+  if (RETIRED_MODULES.has(module)) notFound();
   const copy = comingSoonCopy[module] || {
     ...defaultCopy,
     title: `${formatModuleName(module) || defaultCopy.title} Coming Soon`

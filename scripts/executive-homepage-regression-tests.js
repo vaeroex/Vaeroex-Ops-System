@@ -88,7 +88,7 @@ function intelligence(overrides = {}) {
     topOpportunity: opportunity,
     topRecommendation: risk,
     insights: [risk, opportunity],
-    memorySummary: { profileSignals: 2, sourceRecords: 7, kpiHistoryRecords: 8, reports: 2, vaeroexRuns: 1, decisions: 0, recommendationOutcomes: 0 },
+    memorySummary: { profileSignals: 2, sourceRecords: 7, kpiHistoryRecords: 8, vaeroexRuns: 1, decisions: 0, recommendationOutcomes: 0 },
     ...overrides
   };
 }
@@ -228,12 +228,12 @@ assert.match(homepageSource, /trendDelta !== null && healthHistory\.length >= 2/
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
 assert.doesNotMatch(homepageSource, /View full intelligence|Executive Brief/, "Overview must not expose redundant page actions or report generation");
 assert.doesNotMatch(intelligencePageSource, /Business Health|Business Intelligence Coverage|What leadership should know/, "Intelligence must start with findings instead of repeating Overview");
-for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Reports", "Settings"]) {
+for (const label of ["Overview", "Intelligence", "Performance", "Evidence", "Saved Analyses", "Settings"]) {
   assert.match(appShellSource, new RegExp(`label: "${label}"`), `authenticated navigation must expose ${label} as a primary concept`);
 }
 assert.match(appShellSource, /label: "Primary",\s*collapsible: false/, "primary navigation must not be hidden in a workspace accordion");
 assert.doesNotMatch(appShellSource, /Business Signals?|href: "\/app\/tasks"/, "retired Business Signals must not remain in authenticated navigation");
-assert.match(navigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested report draft routes must keep Reports active");
+assert.match(navigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested Saved Analysis routes must keep their navigation item active");
 assert.doesNotMatch(appShellSource, /href: "\/app", label: "Home"/, "authenticated navigation must use Overview instead of Home");
 assert.match(sourcesPageSource, />Evidence<\//, "the Sources workspace must present the broader Evidence purpose");
 assert.match(sourcesPageSource, /update_source_file_lifecycle|manageSourceFileAction/, "evidence presentation changes must retain lifecycle controls");

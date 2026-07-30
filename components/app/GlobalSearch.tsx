@@ -260,7 +260,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                   value={query}
                   onChange={(event) => updateQuery(event.target.value)}
                   onKeyDown={moveSelection}
-                  placeholder="Search KPIs, evidence, reports, signals, or pages..."
+                  placeholder="Search KPIs, evidence, saved analyses, signals, or pages..."
                   autoComplete="off"
                   className="min-h-12 w-full rounded-lg border border-white/15 bg-slate-950/60 py-3 pl-10 pr-20 text-base font-medium text-white outline-none placeholder:text-slate-500 shadow-sm shadow-black/10 transition focus:border-vaeroex-accent/60 focus:bg-slate-950/75 focus:ring-2 focus:ring-vaeroex-accent/25"
                   aria-controls={resultsId}
@@ -285,7 +285,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
               ) : trimmedQuery.length < 2 ? (
                 <div className="border-l-2 border-vaeroex-accent/45 py-2 pl-4">
                   <p className="text-sm font-semibold text-white">Find a workspace record.</p>
-                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a KPI, report title, source file, issue, or learned observation.</p>
+                  <p className="mt-1 text-sm leading-6 text-slate-400">Try a KPI, saved analysis title, source file, issue, or learned observation.</p>
                 </div>
               ) : error ? (
                 <div className="rounded-lg border border-red-400/30 bg-red-950/30 p-4 text-sm text-red-100" role="alert">{error}</div>

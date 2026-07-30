@@ -3,20 +3,16 @@ export type VaeroexWorkflowKey =
   | "executive_intelligence"
   | "operations_audit"
   | "sop_generator"
-  | "weekly_report"
-  | "daily_summary"
   | "bottleneck_detector"
   | "form_builder"
   | "checklist_builder"
-  | "follow_up"
   | "file_analysis"
   | "ceo_mode"
   | "focus_priorities"
   | "risk_simulation"
-  | "weekly_management_meeting"
-  | "business_review_package";
+  | "weekly_management_meeting";
 
-export type VaeroexSaveTarget = "sop" | "report";
+export type VaeroexSaveTarget = "sop";
 
 export type VaeroexWorkflow = {
   key: VaeroexWorkflowKey;
@@ -48,13 +44,12 @@ Use this root shape whenever possible:
       "business_impact": "Likely impact if ignored",
       "confidence": "Low | Medium | High",
       "leadership_review": "What leadership should review",
-      "recommended_output": "Executive Report | Executive Brief | Improvement Plan | SOP | Meeting Agenda | Investigation Summary | Board Summary"
+      "recommended_output": "Executive Analysis | Improvement Plan | SOP | Meeting Agenda | Investigation Summary | Board Summary"
     }
   ],
   "sop": null,
   "form": null,
   "checklist": null,
-  "report": null,
   "recommendation_categories": [
     "Improve Existing",
     "Fill Missing Data",
@@ -64,7 +59,7 @@ Use this root shape whenever possible:
     "Dashboard / KPI Improvement",
     "Customer / Revenue Intelligence",
     "SOP / Process Improvement",
-    "File / Report Review"
+    "File / Source Review"
   ],
   "save_recommendations": ["Records the user may confirm and save"]
 }
@@ -148,7 +143,7 @@ Workspace-aware recommendation rules:
 - Treat customer records as evidence from external systems, imports, or source files. Do not present Vaeroex as a CRM, lead manager, or customer management product.
 - Do not recommend replacing Salesforce, HubSpot, Monday, ClickUp, Asana, ServiceTitan, Jobber, QuickBooks, NetSuite, or other customer systems.
 - Never recommend creating customer-management records, follow-up tracking, or ownership assignments as generic advice.
-- Prefer recommendations like "customer response activity changed", "leadership should review the current workflow", "generate an executive report", "generate an improvement plan", or "review the SOP with leadership".
+- Prefer recommendations like "customer response activity changed", "leadership should review the current workflow", "prepare an improvement plan", or "review the SOP with leadership".
 - Every recommendation should mention what exists, what is missing or stale, why it matters, evidence, recommendation confidence, business impact, and what leadership should review.
 - Classify recommendations into the recommendation_categories listed in the JSON shape.
 `;
@@ -175,7 +170,7 @@ ${executiveIntelligenceJsonInstructions}
     description: "Ask Vaeroex for executive intelligence, evidence, risk, business impact, and leadership recommendations.",
     actionLabel: "Ask Vaeroex",
     promptPlaceholder: "What should leadership understand about the business right now?",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Answer the user's business question using the workspace context when it helps.
 The first sentence of response_markdown must directly answer the exact question asked.
@@ -201,11 +196,10 @@ ${sharedJsonInstructions}
     description: "Review workspace activity and identify risks, evidence, business impact, and what leadership should review.",
     actionLabel: "Run audit",
     promptPlaceholder: "Optional focus area, such as revenue, customer activity, staffing, risk, or service quality.",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Generate an operations intelligence review using the structure from the Vaeroex system prompt.
 Include what happened, why it matters, evidence, business impact, confidence, likely next trend, and what leadership should review.
-Return a report draft in report with title, report_type, body_markdown, and date range if available.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -226,46 +220,16 @@ ${sharedJsonInstructions}
 `
   },
   {
-    key: "weekly_report",
-    title: "Weekly Report",
-    description: "Draft a weekly intelligence report from evidence, issues, assets, forms, checklist runs, and recent Vaeroex results.",
-    actionLabel: "Draft weekly report",
-    promptPlaceholder: "Optional reporting focus or date range notes.",
-    saveTargets: ["report"],
-    instructions: `
-Generate a weekly intelligence report using the report structure from the Vaeroex system prompt.
-Return the report in report with title, report_type, body_markdown, date_range_start, and date_range_end when inferable.
-${workspaceAwareInstructions}
-${sharedJsonInstructions}
-`
-  },
-  {
-    key: "daily_summary",
-    title: "Daily Summary",
-    description: "Summarize today's business activity, risks, evidence, and executive recommendations.",
-    actionLabel: "Draft daily summary",
-    promptPlaceholder: "Optional shift, team, location, or day-specific notes.",
-    saveTargets: ["report"],
-    instructions: `
-Generate a concise daily intelligence summary.
-Return the summary as a report draft in report with report_type "Daily Summary".
-Include what happened, what changed, risks, evidence, and what leadership should review.
-${workspaceAwareInstructions}
-${sharedJsonInstructions}
-`
-  },
-  {
     key: "bottleneck_detector",
     title: "Bottleneck Detector",
     description: "Find recurring blockers, responsibility gaps, process breakdowns, evidence, and likely business impact.",
     actionLabel: "Find bottlenecks",
     promptPlaceholder: "Optional area to inspect, such as dispatch, intake, customer response, assets, or staffing.",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Analyze workspace context for bottlenecks and repeated execution failures.
 Return bottlenecks as an array with name, evidence, impact, root_cause, confidence, what could happen next, and leadership_review.
-Return a report draft when the analysis is substantial.
-Recommend executive reports, SOPs, checklists, meeting agendas, or improvement plans when documentation would help leadership review.
+Recommend SOPs, meeting agendas, or improvement plans when documentation would help leadership review.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -276,7 +240,7 @@ ${sharedJsonInstructions}
     description: "Draft a visibility form with recommended fields, required fields, follow-up rules, and dashboard metrics.",
     actionLabel: "Draft form",
     promptPlaceholder: "What should this form collect?",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Generate a form draft using the form structure from the Vaeroex system prompt.
 Return the form in form with name, description, form_type, fields, required_fields, suggested_follow_up_actions, and suggested_dashboard_metrics.
@@ -292,26 +256,11 @@ ${sharedJsonInstructions}
     description: "Draft a checklist for leadership-reviewed procedures, standards, and evidence capture.",
     actionLabel: "Draft checklist",
     promptPlaceholder: "What recurring work should this checklist control?",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Generate a checklist draft using the checklist structure from the Vaeroex system prompt.
 Return the checklist in checklist with name, description, category, frequency, assigned_role, items, completion_standard, missed_standard, and escalation_rules.
 Review workspace_context.checklists and checklist_runs before recommending a new checklist so you can suggest improving or running an existing checklist when appropriate.
-${workspaceAwareInstructions}
-${sharedJsonInstructions}
-`
-  },
-  {
-    key: "follow_up",
-    title: "Improvement Plan",
-    description: "Turn issues, reports, or loose business concerns into an executive improvement plan.",
-    actionLabel: "Draft improvement plan",
-    promptPlaceholder: "What should leadership review?",
-    saveTargets: ["report"],
-    instructions: `
-Generate a concrete improvement plan from the user's request and workspace context.
-Include what happened, evidence, likely cause, business impact, confidence, what leadership should review, and suggested supporting documents.
-Use existing issues, file reviews, reports, customer activity evidence, KPIs, and SOPs as evidence.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `
@@ -322,7 +271,7 @@ ${sharedJsonInstructions}
     description: "Review uploaded file content and identify source-backed observations with conservative confidence.",
     actionLabel: "Analyze file",
     promptPlaceholder: "What source-backed observations should Vaeroex learn from this file?",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Analyze the uploaded file content first. The file may be parsed spreadsheet rows, extracted PDF text, extracted DOCX text, a PDF file attached directly for document reading, or a PNG/JPG image attached for OCR and visual analysis.
 Return a concise source-backed result with executive_summary, extracted_text, extracted_findings, kpis_found, risks, operational_issues, recommended_actions, opportunities, unclear_fields, confidence, and response_markdown.
@@ -344,7 +293,7 @@ ${fileAnalysisJsonInstructions}
     description: "Executive language for what leadership should know across revenue, risk, customer experience, visibility, and decision support.",
     actionLabel: "Ask CEO view",
     promptPlaceholder: "Optional context, such as this week, this month, or a weak KPI.",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Answer as Vaeroex in executive language. Prioritize revenue, risk, responsibility visibility, customer experience, process health, evidence, and executive decision support.
 Return only the few issues leadership should seriously review this week.
@@ -358,9 +307,9 @@ ${sharedJsonInstructions}
     description: "Find the top 3-5 executive priorities that matter most right now, with evidence and confidence.",
     actionLabel: "Find focus",
     promptPlaceholder: "Optional focus area, such as this week, Sales, Operations, or Customer Service.",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
-Scan workspace KPIs, customer activity evidence, issues, reports, SOPs, files, alerts, source context, and checklist completion.
+Scan workspace KPIs, customer activity evidence, issues, SOPs, files, alerts, and source context.
 Return only the top 3-5 priorities. Each priority must include title, what happened, why it matters, evidence, confidence, business impact, and what leadership should review.
 Do not return a long generic list.
 ${workspaceAwareInstructions}
@@ -373,7 +322,7 @@ ${sharedJsonInstructions}
     description: "Pre-mortem mode for likely next-month risks and prevention actions.",
     actionLabel: "Simulate risks",
     promptPlaceholder: "Optional planning horizon, such as next month or next quarter.",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
 Analyze declining KPIs, repeated issues, stale SOPs, customer activity changes, checklist misses, and open risks.
 Return predicted risks, why each may happen, evidence, confidence, potential business impact, and what leadership should review.
@@ -387,26 +336,10 @@ ${sharedJsonInstructions}
     description: "Generate a practical leadership meeting agenda, summary, decisions needed, and review questions.",
     actionLabel: "Run meeting mode",
     promptPlaceholder: "Optional team or department focus.",
-    saveTargets: ["report"],
+    saveTargets: [],
     instructions: `
-Generate a weekly leadership meeting agenda with these sections: KPI review, customer activity evidence, open issues, evidence patterns, checklist compliance, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
+Generate a weekly leadership meeting agenda with these sections: KPI review, customer activity evidence, open issues, evidence patterns, SOP review, business risks, Vaeroex recommendations, decisions needed, and leadership review.
 Do not build video or chat. This is a leadership meeting agenda, not a task-management workflow.
-Include a report draft.
-${workspaceAwareInstructions}
-${sharedJsonInstructions}
-`
-  },
-  {
-    key: "business_review_package",
-    title: "Business Review Package",
-    description: "Prepare an owner, board, bank, investor, franchise, monthly, or quarterly business review package.",
-    actionLabel: "Prepare package",
-    promptPlaceholder: "Use case, such as board meeting, owner review, or quarterly review.",
-    saveTargets: ["report"],
-    instructions: `
-Prepare a polished Business Review Package with executive summary, KPI trends, revenue and customer activity trends, business risks, leadership decisions, progress since last period, open decisions, evidence, confidence, and executive recommendations.
-Do not expose public links. Keep it authenticated and customer-ready.
-Return a report draft in report with title, report_type, body_markdown, and date range if inferable.
 ${workspaceAwareInstructions}
 ${sharedJsonInstructions}
 `

@@ -673,7 +673,6 @@ export async function runLightweightKpiOverview({
       metrics: {
         kpi_history_records: summary.totalRows,
         current_kpis: summary.metricCount,
-        reports: 0,
         uploaded_files: 0,
         open_issues: 0,
         open_tasks: 0

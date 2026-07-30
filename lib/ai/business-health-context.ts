@@ -38,15 +38,13 @@ export function buildBusinessHealthDecisionContext({
     original_source_files: countValue(sourceSummary.files),
     active_issue_records: countValue(sourceSummary.issues),
     customer_activity_records: countValue(sourceSummary.crm_leads),
-    business_memory_signals: countValue(latest.memory_signal_count ?? sourceSummary.business_memory_signals),
-    original_report_sources: countValue(sourceSummary.reports)
+    business_memory_signals: countValue(latest.memory_signal_count ?? sourceSummary.business_memory_signals)
   };
   const knownOriginalSourceTypes = [
     sourceCounts.kpi_records > 0,
     sourceCounts.original_source_files > 0,
     sourceCounts.active_issue_records > 0,
-    sourceCounts.customer_activity_records > 0,
-    sourceCounts.original_report_sources > 0
+    sourceCounts.customer_activity_records > 0
   ].filter(Boolean).length;
 
   return {
@@ -73,11 +71,10 @@ export function buildBusinessHealthDecisionContext({
         workspace_profile: "10 points when industry or company size is recorded.",
         original_source_files: "15 points when at least one active original source file is available.",
         kpi_history: "25 points when active KPI history is available.",
-        original_management_reports: "15 points when an eligible original management report is available; Vaeroex-generated reports do not qualify.",
         operating_context: "10 points when active customer activity, issues, or tracked work records are available.",
         decision_outcomes: "10 points when eligible decision or recommendation outcomes are available."
       },
-      availability_rule: "A score requires at least three original source records, at least two original source types, and at least one KPI series, source file, eligible original report, or active issue.",
+      availability_rule: "A score requires at least three original source records, at least two original source types, and at least one KPI series, source file, or active issue.",
       confidence_rules: "Data confidence is High at a data-quality score of 70 or above, Medium at 40-69, and Low below 40.",
       decomposition_limit: "The stored snapshot does not preserve the individual risk and opportunity adjustments. Do not invent that breakdown; use the recorded score, data-quality base, and current cited findings only."
     },

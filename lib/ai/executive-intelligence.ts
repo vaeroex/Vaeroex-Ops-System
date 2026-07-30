@@ -336,7 +336,6 @@ function structuredEvidenceCandidates(context: BoundedWorkspaceContext): Executi
     { domain: "business_health", sourceType: "Historical trend", records: values(structured.business_health), role: "historical", fallbackTitle: "Business Health history" },
     { domain: "risks", sourceType: "Risk", records: values(riskContext.issues), role: "original", fallbackTitle: "Business risk" },
     { domain: "decisions", sourceType: "Recommendation", records: values(riskContext.recommendations), role: "derived", fallbackTitle: "Prior recommendation" },
-    { domain: "reports", sourceType: "Report", records: values(structured.reports).filter((value) => isRecord(value) && value.evidence_lineage_available === true), role: "derived", fallbackTitle: "Saved report" },
     { domain: "documents", sourceType: "Document", records: values(structured.sources), role: "original", fallbackTitle: "Source document" },
     { domain: "operations", sourceType: "Operational metric", records: values(structured.operational_metrics), role: "original", fallbackTitle: "Operational metric" },
     { domain: "customers", sourceType: "Customer activity", records: values(structured.historical_customer_activity), role: "original", fallbackTitle: "Customer activity" },

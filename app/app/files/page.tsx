@@ -18,7 +18,6 @@ const DETAIL_SECTION_BY_LEGACY_PANEL: Record<string, "summary" | "findings" | "i
   intelligence: "findings",
   "analysis-result": "findings",
   evidence: "summary",
-  reports: "history",
   import: "imported",
   "mapping-review": "imported",
   history: "history",

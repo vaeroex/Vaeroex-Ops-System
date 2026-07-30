@@ -114,10 +114,10 @@ export const helpArticles: HelpArticle[] = [
     ["creating-workspace", "Creating your workspace", "Add the organization and owner, review the Workspace Agreement, and sign electronically.", "/app/setup"],
     ["dashboard", "Understanding the dashboard", "Use the dashboard to see business health, risks, opportunities, and priorities.", "/app"],
     ["first-kpi", "Creating your first KPI", "Start with a small set of metrics that actually drive decisions.", "/app/kpis"],
-    ["first-report", "Saving your first analysis", "Preserve a completed Business Health analysis or Finding Explanation for later review.", "/app/reports"],
+    ["first-saved-analysis", "Saving your first analysis", "Preserve a completed Business Health analysis or Finding Explanation for later review.", "/app/reports"],
     ["first-follow-up", "Uploading your first Evidence source", "Add current business information through the existing Evidence upload flow.", "/app/sources"],
     ["first-sop", "Creating your first SOP", "Document the process that should happen the same way each time.", "/app/sops"],
-    ["report-subscriptions", "Understanding Saved Analyses", "Saved Analyses contains only completed intelligence your team explicitly chose to preserve.", "/app/reports"]
+    ["saved-analysis-library", "Understanding Saved Analyses", "Saved Analyses contains only completed intelligence your team explicitly chose to preserve.", "/app/reports"]
   ].map(([id, title, summary, href]) =>
     article({
       id,
@@ -147,8 +147,8 @@ export const helpArticles: HelpArticle[] = [
     ["sop-library", "SOP Library", "A place to store, review, and improve working procedures.", "/app/sops"],
     ["issues", "Issues", "A place to log risks, problems, root causes, and recommended fixes.", "/app/issues"],
     ["assets", "Assets", "Tracked equipment, tools, locations, readiness, and status checks.", "/app/assets"],
-    ["report-sharing", "Saved Analysis Review", "Preserve completed analysis context in workspace history.", "/app/reports"],
-    ["report-scheduling", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
+    ["saved-analysis-review", "Saved Analysis Review", "Preserve completed analysis context in workspace history.", "/app/reports"],
+    ["saved-analysis-history", "Saved Analysis History", "Open prior saved analyses without regenerating or rewriting their content.", "/app/reports"],
     ["vaeroex-ai", "Executive Intelligence", "Review prioritized findings and focused explanations grounded in current workspace evidence.", "/app/intelligence"]
   ].map(([id, title, summary, href]) =>
     article({
@@ -328,7 +328,7 @@ export const contextualHelp: Record<string, { what: string; workflow: string[]; 
   reports: {
     what: "Saved Analyses stores completed Business Health and Explain Finding analyses that a workspace member explicitly chose to preserve.",
     workflow: ["Review a completed live analysis", "Choose Save Analysis", "Search or filter Saved Analyses", "Open the copied analysis when needed"],
-    mistakes: ["Assuming a legacy generated report is an exact saved analysis", "Overlooking freshness", "Skipping evidence review"],
+    mistakes: ["Assuming saved content updates with a live analysis", "Overlooking freshness", "Skipping evidence review"],
     related: ["Business Health Score", "Explain Finding", "Evidence"]
   },
   kpis: {

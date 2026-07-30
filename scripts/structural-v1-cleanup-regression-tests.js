@@ -23,11 +23,15 @@ const retiredOrphans = [
   "components/operations/ArchivedFilesBulkActions.tsx",
   "components/operations/GeneratedInsightsPanel.tsx",
   "components/reports/ReportLifecycleMenu.tsx",
+  "components/reports/ReportExportActions.tsx",
   "lib/ai/workspace-snapshot.ts",
   "lib/ai/openai-resilience.ts",
   "lib/intelligence/generated-output.ts",
   "lib/reports/scheduled-generator.ts",
   "lib/reports/subscriptions.ts",
+  "lib/reports/generation-policy.ts",
+  "lib/reports/legacy-executive-brief-artifact.ts",
+  "lib/reports/presentation.ts",
   "lib/supabase/client.ts"
 ];
 
@@ -76,12 +80,14 @@ for (const route of [
   assert.ok(authorization >= 0 && redirect > authorization, `${route} must authorize before redirecting`);
 }
 
-assert.match(read("app/app/reports/[id]/page.tsx"), /parseSavedAnalysisEnvelope|Legacy/,
-  "historical Reports and Saved Analyses must retain their reader");
+assert.match(read("app/app/reports/[id]/page.tsx"), /parseSavedAnalysisEnvelope/,
+  "current Saved Analyses must retain their strict reader");
+assert.doesNotMatch(read("app/app/reports/[id]/page.tsx"), /Legacy|legacy generated report/,
+  "historical report presentation must stay retired");
 assert.match(read("app/app/agents/page.tsx"), /\.eq\("workspace_id", workspaceId\)/,
   "historical agent-run rendering must remain workspace scoped");
-assert.match(read("app/api/cron/report-subscriptions/route.ts"), /status:\s*410/,
-  "the externally addressable retired cron endpoint must remain an explicit Gone response");
+assert.equal(fs.existsSync(path.join(root, "app/api/cron/report-subscriptions/route.ts")), false,
+  "the retired report subscription endpoint must stay absent");
 
 const databaseTypes = read("lib/supabase/types.ts");
 for (const historicalTable of ["people", "checklists", "checklist_runs", "operational_assignments", "reports", "notifications"]) {

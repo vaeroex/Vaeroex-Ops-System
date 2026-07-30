@@ -78,14 +78,12 @@ async function selectKnown(client, table, ids, workspaceId, columns = "*") {
 async function inspectLive({ url, key, workspaceId }) {
   const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
   const runIds = [...KNOWN_CONTAMINATION.failedTimeoutRuns, ...KNOWN_CONTAMINATION.contaminatedContextualRuns];
-  const [runs, files, chunks, reports, healthSnapshots] = await Promise.all([
+  const [runs, files, chunks, healthSnapshots] = await Promise.all([
     selectKnown(client, "ai_agent_runs", runIds, workspaceId),
     selectKnown(client, "file_uploads", KNOWN_CONTAMINATION.deletedSourceFiles, workspaceId),
     selectKnown(client, "business_memory_chunks", KNOWN_CONTAMINATION.invalidMemoryChunks, workspaceId),
-    client.from("reports").select("id,title,report_type,body_markdown,source_data_json,created_at").eq("workspace_id", workspaceId).limit(1000),
     client.from("business_health_snapshots").select("id,source_summary,created_at").eq("workspace_id", workspaceId).limit(100)
   ]);
-  if (reports.error) throw new Error(`reports inspection failed: ${reports.error.message}`);
   const healthSnapshotsUnavailable = Boolean(
     healthSnapshots.error && ["42P01", "PGRST205"].includes(healthSnapshots.error.code)
   );
@@ -94,7 +92,7 @@ async function inspectLive({ url, key, workspaceId }) {
   }
 
   const allKnownIds = Object.values(KNOWN_CONTAMINATION).flat();
-  const generatedOutputs = [...(reports.data || []), ...(healthSnapshotsUnavailable ? [] : healthSnapshots.data || [])];
+  const generatedOutputs = healthSnapshotsUnavailable ? [] : healthSnapshots.data || [];
   const references = generatedOutputs.filter((record) => allKnownIds.some((id) => JSON.stringify(record).includes(id)));
   const copiedFailures = generatedOutputs.filter((record) => FAILURE_LANGUAGE.test(JSON.stringify(record)));
   const recordsById = new Map([...runs, ...files, ...chunks].map((record) => [record.id, record]));

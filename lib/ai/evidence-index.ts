@@ -560,7 +560,7 @@ export function filterEligibleMemoryRows<T extends MemoryChunkRow | MatchMemoryC
       ) return false;
     }
 
-    if (row.source_type === "business_signal" || row.source_type === "task") return false;
+    if (["business_signal", "task", "report", "saved_analysis"].includes(row.source_type) || row.source_type.endsWith("_brief")) return false;
     if (row.source_type === "business_note") {
       const note = row.source_id ? notesById.get(row.source_id) : null;
       if (

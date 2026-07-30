@@ -73,7 +73,11 @@ assert.doesNotMatch(operationsActions, /deleteBusinessSignalAction|\.from\("task
 assert.match(recordActions, /\.maybeSingle\(\)/, "single-record mutations must allow a zero-row result without a single JSON coercion error");
 assert.doesNotMatch(recordActions, /select\("id"\)\.single\(\)/, "managed lifecycle mutations must not coerce a mutation result to one JSON object");
 assert.match(recordActions, /revalidatePath\("\/app\/intelligence"\)/, "evidence mutations must invalidate Intelligence");
-assert.match(recordActions, /revalidatePath\("\/app\/reports"\)/, "evidence mutations must invalidate reports");
+assert.doesNotMatch(
+  recordActions,
+  /revalidatePath\("\/app\/reports"\)/,
+  "evidence mutations must not treat immutable Saved Analyses as live evidence-dependent views"
+);
 assert.match(fileActions, /update_source_file_lifecycle/, "file lifecycle changes must atomically include learned evidence");
 for (const source of [boundedContext, searchRoute]) {
   assert.doesNotMatch(source, /\.from\("tasks"\)/, "active retrieval paths must not read retired task storage");

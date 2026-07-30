@@ -54,7 +54,6 @@ type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"];
-type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
@@ -221,11 +220,6 @@ function lower(value: string | null | undefined) {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function isFileGeneratedReport(report: ReportRow) {
-  const source = isRecord(report.source_data_json) ? report.source_data_json : {};
-  return source.generated_from === "file" || isRecord(source.file) || Array.isArray(source.attached_files);
 }
 
 function inIsoRange(value: string | null, rangeStart: Date, rangeEnd: Date) {
@@ -640,7 +634,7 @@ function buildSmartAlerts({
           id: "unanalyzed-files",
           severity: "Medium",
           title: `${unanalyzedFiles.length} uploaded file${unanalyzedFiles.length === 1 ? "" : "s"} not reviewed`,
-          why: "Uploaded files should either feed historical memory or produce clear findings for reports.",
+          why: "Uploaded files should either feed historical memory or produce clear intelligence findings.",
           action: "Review files",
           href: "/app/sources"
         }
@@ -934,7 +928,7 @@ function IntelligenceBriefingHero({
       id: "opportunity",
       question: "Top Opportunity",
       fallback: "No clear opportunity is visible yet.",
-      emptyBody: "Add more KPI history, reports, or eligible evidence to reveal stronger opportunity patterns.",
+      emptyBody: "Add more KPI history or eligible evidence to reveal stronger opportunity patterns.",
       detailLabel: "Evidence",
       item: opportunity,
       tone: "opportunity" as const
@@ -1039,7 +1033,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assetResult,
     crmLeadResult,
     crmHistoryResult,
-    reportResult,
     vaeroexRunResult,
     metricResult,
     assignmentResult,
@@ -1063,7 +1056,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("assets").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(10),
     supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
@@ -1101,13 +1093,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const activeCustomerEvidenceIds = new Set(crmLeads.map((lead) => lead.id));
   const crmHistory = filterBySourceParentEligibility(filterBusinessEvidence(rawCrmHistory), sourceParentEligibility)
     .filter((history) => activeCustomerEvidenceIds.has(history.lead_id));
-  const reports = filterBusinessEvidence((reportResult.data || []) as ReportRow[]);
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
   const businessEvidenceRuns = excludeChecklistDerivedRecords(filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" }));
   const operationalMetrics = filterBySourceParentEligibility(filterBusinessEvidence(rawOperationalMetrics), sourceParentEligibility);
   const intelligenceOperationalMetrics = excludeChecklistDerivedMetrics(operationalMetrics);
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
-  const shares = (shareResult.data || []) as ShareRow[];
+  const shares = ((shareResult.data || []) as ShareRow[]).filter((share) => share.source_type !== "report");
   const people = filterBusinessEvidence((peopleResult.data || []) as PersonRow[]);
   const decisions = filterBusinessEvidence((decisionResult.data || []) as BusinessDecisionRow[]);
   let memoryChunks = [] as BusinessMemoryChunkRow[];
@@ -1131,7 +1122,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assetResult.error,
     crmLeadResult.error,
     crmHistoryResult.error,
-    reportResult.error,
     vaeroexRunResult.error,
     metricResult.error,
     assignmentResult.error,
@@ -1152,7 +1142,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     assetResult.error,
     crmLeadResult.error,
     crmHistoryResult.error,
-    reportResult.error,
     vaeroexRunResult.error,
     metricResult.error,
     peopleResult.error,
@@ -1182,7 +1171,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const fileAnalyses = files.filter((file) => Boolean(file.analysis_summary)).slice(0, 6);
   const recentImports = imports.filter((item) => inIsoRange(item.imported_at || item.created_at, range.start, range.end));
   const pendingImports = imports.filter((item) => item.status === "needs_review" || item.status === "extracted");
-  const fileGeneratedReports = reports.filter(isFileGeneratedReport);
   const leadsCreated = crmLeads.filter((lead) => inIsoRange(lead.created_at, range.start, range.end));
   const leadsConverted = crmLeads.filter((lead) => isConvertedStatus(lead.status) && inIsoRange(lead.updated_at || lead.created_at, range.start, range.end));
   const leadHistoryChanges = crmHistory.filter((item) => inIsoRange(item.created_at, range.start, range.end));
@@ -1209,7 +1197,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const opportunities = [
     leadsCreated.length ? `${leadsCreated.length} customer activity record${leadsCreated.length === 1 ? "" : "s"} can be reviewed for response quality or conversion.` : "",
     positiveTrends[0] ? `${positiveTrends[0].name} shows the strongest favorable movement this period.` : "",
-    recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for reports and Vaeroex review.` : "",
+    recentImports.length ? `${recentImports.length} recent import${recentImports.length === 1 ? "" : "s"} added fresh business history for Vaeroex review.` : "",
     intelligenceOperationalMetrics.length ? "Business metrics are available for staffing, job volume, costs, utilization, or custom trend reviews." : ""
   ].filter(Boolean);
   const recommendedActions = [
@@ -1217,8 +1205,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     pendingImports.length ? "Open Files and save approved mappings so the dashboard uses the latest uploaded data." : "",
     negativeTrends.length ? "Review unfavorably moving KPIs against recent imports, customer activity evidence, and open issues." : "",
     !intelligenceKpis.length ? "Connect or add one KPI source so Vaeroex can establish a baseline." : "",
-    !crmLeads.length ? "Connect or import customer activity evidence when available." : "",
-    !reports.length ? "Save a completed leadership analysis when it should remain available for later review." : ""
+    !crmLeads.length ? "Connect or import customer activity evidence when available." : ""
   ].filter(Boolean);
   const latestKpiRows = latestKpisByName(intelligenceKpis);
   const targetMissKpis = latestKpiRows.filter((kpi) => {
@@ -1261,7 +1248,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       title: `${item.import_type.replace(/_/g, " ")} import needs review`,
       source: "Files",
       status: item.status,
-      context: `${item.rows_imported} of ${item.rows_total} rows saved. Review mappings before using this data in reports.`,
+      context: `${item.rows_imported} of ${item.rows_total} rows saved. Review mappings before using this data in intelligence.`,
       href: "/app/sources" as Route
     })),
     ...negativeTrends.slice(0, 3).map((trend) => ({
@@ -1324,7 +1311,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           title: "Approve file import mappings",
           source: `${pendingImports.length} file import${pendingImports.length === 1 ? "" : "s"}`,
           status: "Needs review",
-          context: "Save approved mappings so reports and dashboards use the latest uploaded data.",
+          context: "Save approved mappings so KPIs and dashboards use the latest uploaded data.",
           href: "/app/sources" as Route
         }
       : null,
@@ -1358,18 +1345,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           href: "/app/sources" as Route
         }
       : null,
-    !reports.length
-      ? {
-          id: "action-first-report",
-          title: "Generate a report",
-          source: "Reports",
-          status: "Recommended",
-          context: "Save a management summary so decisions and intelligence findings have a record.",
-          href: "/app/reports" as Route
-        }
-      : null
   ].filter(Boolean).slice(0, 3) as DashboardSignal[];
-  const hasWorkspaceData = Boolean(intelligenceKpis.length || issues.length || files.length || crmLeads.length || reports.length || sops.length || intelligenceOperationalMetrics.length);
+  const hasWorkspaceData = Boolean(intelligenceKpis.length || issues.length || files.length || crmLeads.length || sops.length || intelligenceOperationalMetrics.length);
   const todayDate = dateOnly(new Date());
   const dueWindowEndDate = dateOnly(addDays(new Date(), 14));
   const peopleById = new Map(people.map((person) => [person.id, person]));
@@ -1378,7 +1355,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     const status = lower(assignment.status);
     return !assignment.archived_at && status !== "done" && status !== "dismissed" && status !== "complete";
   });
-  const recentReportShares = shares.filter((share) => share.source_type === "report").slice(0, 5);
   const dueSoonAssignments = activeAssignments
     .filter((assignment) => assignment.due_date && assignment.due_date >= todayDate && assignment.due_date <= dueWindowEndDate)
     .slice(0, 5);
@@ -1414,7 +1390,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiSettings: intelligenceKpiSettings,
     issues,
     files,
-    reports,
     vaeroexRuns: businessEvidenceRuns,
     crmLeads,
     imports,
@@ -1435,7 +1410,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       memorySignalCount: businessHealthMemorySignals,
       sourceSummary: {
         kpis: intelligenceKpis.length,
-        reports: 0,
         files: files.length,
         issues: issues.length,
         crm_leads: crmLeads.length,
@@ -1460,7 +1434,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sops,
     crmLeads,
     crmHistory,
-    reports,
     vaeroexRuns: businessEvidenceRuns,
     operationalMetrics: intelligenceOperationalMetrics,
     assets,
@@ -1472,7 +1445,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...intelligenceKpis.map((row) => row.updated_at || row.created_at),
     ...issues.map((row) => row.updated_at || row.created_at),
     ...files.map((row) => row.updated_at || row.created_at),
-    ...reports.map((row) => row.updated_at || row.created_at),
     ...businessEvidenceRuns.map((row) => row.updated_at || row.created_at),
     ...decisions.map((row) => row.updated_at || row.created_at)
   ].filter(Boolean).sort().at(-1) || null;
@@ -1571,7 +1543,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     dashboardMode === "Executive View"
       ? "How are we doing? Vaeroex summarizes health, risk, opportunity, evidence, and the next executive recommendation."
       : dashboardMode === "Operations View"
-        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, issues, source visibility, customer activity evidence, and reports.`
+        ? `What is happening? A ${period.toLowerCase()} source-record view of KPIs, issues, source visibility, and customer activity evidence.`
         : `What should leadership know that is not immediately obvious? A ${period.toLowerCase()} intelligence briefing from signals, memory, risks, opportunities, and executive recommendations.`;
 
   return (
@@ -1671,22 +1643,21 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         <>
           <DashboardAccordion
             title="Workspace signals"
-            summary={`${overdueOperationalAssignments.length} unresolved review item${overdueOperationalAssignments.length === 1 ? "" : "s"}, ${dueSoonAssignments.length} upcoming item${dueSoonAssignments.length === 1 ? "" : "s"}, and ${recentReportShares.length} recently shared report${recentReportShares.length === 1 ? "" : "s"}.`}
+            summary={`${overdueOperationalAssignments.length} unresolved review item${overdueOperationalAssignments.length === 1 ? "" : "s"} and ${dueSoonAssignments.length} upcoming item${dueSoonAssignments.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
-        <SectionCard
+	        <SectionCard
 	          title="Workspace signals"
-	          description="Shared reports and assigned review items for this workspace."
+	          description="Assigned review items for this workspace."
         >
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            <StatCard label="Shared reports" value={recentReportShares.length} detail="Recent in-app shares" />
+	          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
 	            <StatCard label="Upcoming signals" value={dueSoonAssignments.length} detail="Time-sensitive context" tone={dueSoonAssignments.length ? "border-amber-200 bg-amber-50 text-amber-900" : undefined} />
 	            <StatCard label="Unresolved" value={overdueOperationalAssignments.length} detail="Signals needing review" tone={overdueOperationalAssignments.length ? "border-red-200 bg-red-50 text-red-700" : undefined} />
             <StatCard label="Saved recs" value={recommendationAssignments.length} detail="Vaeroex recommendations" />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/reports" className="rounded-lg border border-line px-3 py-2 text-sm font-semibold">
-              Reports
+              Saved analyses
             </Link>
           </div>
         </SectionCard>
@@ -1753,7 +1724,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
       </section>
 
       <section>
-        <SectionCard title="Recent shares" description="Reports, KPI views, file analyses, and Vaeroex decision support shared inside the workspace.">
+        <SectionCard title="Recent shares" description="KPI views, file analyses, and Vaeroex decision support shared inside the workspace.">
           <SimpleList
             items={shares.slice(0, 6)}
             empty="No records have been shared yet."
@@ -1780,8 +1751,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Improve current structure" : "Build your first structure"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer activity evidence, SOPs, and reports instead of creating duplicate systems."
-              : "Add KPI sources, customer activity evidence, SOPs, and reports only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
+              ? "Your workspace already has activity. Focus on improving existing KPI sources, customer activity evidence, and SOPs instead of creating duplicate systems."
+              : "Add KPI sources, customer activity evidence, and SOPs only when they help Vaeroex analyze the business. You can keep execution in your existing tools."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link href="/app/kpis" className="rounded-lg bg-vaeroex-blue px-3 py-2 text-sm font-semibold text-white">
@@ -1796,7 +1767,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           <p className="text-sm font-semibold text-ink">{hasWorkspaceData ? "Turn visibility into leadership review" : "Import existing data"}</p>
           <p className="mt-2 text-sm leading-6 text-muted">
             {hasWorkspaceData
-              ? "Use recent files, imports, reports, and Vaeroex findings to update leadership reviews and keep reports current."
+              ? "Use recent files, imports, and Vaeroex findings to keep leadership reviews current."
               : "Upload CSV or XLSX files when you already have data to bring in. Vaeroex stages mappings for review before saving anything to history."}
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
@@ -1892,19 +1863,15 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </DashboardAccordion>
 
           <DashboardAccordion
-            title="Files, SOPs, customer evidence, and reports"
-            summary={`${recentFiles.length} recent file${recentFiles.length === 1 ? "" : "s"}, ${sopUpdates.length} SOP update${sopUpdates.length === 1 ? "" : "s"}, ${leadsCreated.length} new customer activity record${leadsCreated.length === 1 ? "" : "s"}, and ${reports.length} saved report${reports.length === 1 ? "" : "s"}.`}
+            title="Files, SOPs, and customer evidence"
+            summary={`${recentFiles.length} recent file${recentFiles.length === 1 ? "" : "s"}, ${sopUpdates.length} SOP update${sopUpdates.length === 1 ? "" : "s"}, and ${leadsCreated.length} new customer activity record${leadsCreated.length === 1 ? "" : "s"}.`}
           >
       <section className="grid gap-4 xl:grid-cols-4">
         <SectionCard title="Files" description="Uploads and approved imports feeding business memory.">
-          <div className="mb-3 grid gap-2 text-xs text-muted sm:grid-cols-2">
+          <div className="mb-3 text-xs text-muted">
             <div className="rounded-lg bg-slate-50 p-3">
               <p className="font-semibold text-ink">{fileAnalyses.length}</p>
               <p>Recent file analyses</p>
-            </div>
-            <div className="rounded-lg bg-slate-50 p-3">
-              <p className="font-semibold text-ink">{fileGeneratedReports.length}</p>
-              <p>Reports created from files</p>
             </div>
           </div>
           <SimpleList
@@ -1986,38 +1953,20 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-        <SectionCard title="Reports and Vaeroex insights" description="Saved management summaries and recent Vaeroex decision support.">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <h3 className="text-sm font-semibold text-ink">Latest reports</h3>
-              <SimpleList
-                items={reports.slice(0, 5)}
-                empty="No reports generated yet."
-                render={(report: ReportRow) => (
-                  <div key={report.id} className="rounded-lg border border-line p-3">
-                    <p className="text-sm font-semibold">{report.title}</p>
-                    <p className="mt-1 text-xs text-muted">{report.report_type} · {new Date(report.created_at).toLocaleDateString()}</p>
-                  </div>
-                )}
-              />
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-ink">Latest Vaeroex insights</h3>
-              <SimpleList
-                items={businessEvidenceRuns.slice(0, 5)}
-                empty="No Vaeroex decision support saved yet."
-                render={(run: VaeroexRunRow) => (
-                  <div key={run.id} className="rounded-lg border border-line p-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <p className="text-sm font-semibold capitalize">{run.agent_type.replace(/_/g, " ")}</p>
-                      <StatusBadge value={run.status} />
-                    </div>
-                    <p className="mt-2 text-xs leading-5 text-muted">{readableOutput(run)}</p>
-                  </div>
-                )}
-              />
-            </div>
-          </div>
+        <SectionCard title="Vaeroex insights" description="Recent Vaeroex decision support.">
+          <SimpleList
+            items={businessEvidenceRuns.slice(0, 5)}
+            empty="No Vaeroex decision support saved yet."
+            render={(run: VaeroexRunRow) => (
+              <div key={run.id} className="rounded-lg border border-line p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold capitalize">{run.agent_type.replace(/_/g, " ")}</p>
+                  <StatusBadge value={run.status} />
+                </div>
+                <p className="mt-2 text-xs leading-5 text-muted">{readableOutput(run)}</p>
+              </div>
+            )}
+          />
         </SectionCard>
       </section>
 

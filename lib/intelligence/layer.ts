@@ -107,7 +107,6 @@ export type IntelligenceLayerResult = {
     profileSignals: number;
     sourceRecords: number;
     kpiHistoryRecords: number;
-    reports: number;
     vaeroexRuns: number;
     decisions: number;
     recommendationOutcomes: number;
@@ -117,7 +116,6 @@ export type IntelligenceLayerResult = {
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
-type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
@@ -137,7 +135,6 @@ export type IntelligenceLayerInput = {
   kpiSettings?: KpiSettingRow[];
   issues?: IssueRow[];
   files?: FileUploadRow[];
-  reports?: ReportRow[];
   vaeroexRuns?: VaeroexRunRow[];
   crmLeads?: CrmLeadRow[];
   imports?: FileImportRow[];
@@ -443,9 +440,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     { includeHidden: true }
   );
   const issues = excludeChecklistDerivedRecords(filterOriginalBusinessEvidence(input.issues));
-  // Reports are derived outputs. They remain reviewable, but never become
-  // original evidence for new health, coverage, risk, or recommendation logic.
-  const reports: ReportRow[] = [];
   const vaeroexRuns: VaeroexRunRow[] = [];
   // Customer activity is evidence only when it is traceable to an import or file.
   const crmLeads = filterBySourceParentEligibility(filterOriginalBusinessEvidence(input.crmLeads), parentEligibility)
@@ -476,20 +470,18 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   });
   const customerContextWithoutFollowup = crmLeads.filter((lead) => !isClosed(lead.status) && (!lead.last_activity_at || isOverdue(lead.last_activity_at)));
   const originalKpiSeries = new Set(kpis.map((kpi) => `${kpi.source_file_id || kpi.import_id || "manual"}:${kpi.name.toLowerCase()}`));
-  const originalSourceRecords = originalKpiSeries.size + files.length + reports.length + sops.length + forms.length + submissions.length + issues.length + crmLeads.length + people.length;
+  const originalSourceRecords = originalKpiSeries.size + files.length + sops.length + forms.length + submissions.length + issues.length + crmLeads.length + people.length;
   const originalSourceTypes = [
     originalKpiSeries.size > 0,
     files.length > 0,
-    reports.length > 0,
     sops.length > 0,
     issues.length > 0,
     crmLeads.length > 0,
     people.length > 0
   ].filter(Boolean).length;
-  const hasHealthEvidence = originalSourceRecords >= 3 && originalSourceTypes >= 2 && (originalKpiSeries.size > 0 || files.length > 0 || reports.length > 0 || issues.length > 0);
+  const hasHealthEvidence = originalSourceRecords >= 3 && originalSourceTypes >= 2 && (originalKpiSeries.size > 0 || files.length > 0 || issues.length > 0);
   const suggestedNextData = [
     !kpis.length ? "Upload KPI history or connect one leadership-level KPI source." : "",
-    !reports.length ? "Upload or generate prior management reports." : "",
     !files.length ? "Upload a recent spreadsheet, report, meeting note, or SOP." : "",
     !crmLeads.length ? "Add customer context or import a customer/lead list." : "",
     !people.length ? "Add leadership or area context so Vaeroex can interpret the evidence." : ""
@@ -500,7 +492,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       (workspace?.industry || workspace?.size ? 10 : 0) +
         (files.length ? 15 : 0) +
         (kpis.length ? 25 : 0) +
-        (reports.length ? 15 : 0) +
         (crmLeads.length || issues.length ? 10 : 0) +
         (decisions.length ? 10 : 0)
     )
@@ -802,7 +793,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
           : dataConfidence === "Medium"
             ? "Based on available workspace records, but more history would improve confidence."
             : "Not enough workspace history exists for high-confidence intelligence yet.",
-      suggestedNextData: suggestedNextData.length ? suggestedNextData : ["Keep adding current reports, outcomes, and KPI history."]
+      suggestedNextData: suggestedNextData.length ? suggestedNextData : ["Keep adding current evidence, outcomes, and KPI history."]
     },
     forecastReadiness: {
       state: forecastEligibility.state,
@@ -826,7 +817,6 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       profileSignals: [workspace?.industry, workspace?.size].filter(Boolean).length,
       sourceRecords: originalSourceRecords,
       kpiHistoryRecords: kpis.length,
-      reports: reports.length,
       vaeroexRuns: vaeroexRuns.length,
       decisions: decisions.length,
       recommendationOutcomes: 0

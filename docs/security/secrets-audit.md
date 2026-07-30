@@ -10,7 +10,6 @@
 | `NVIDIA_API_KEY` | `lib/ai/providers/nvidia-provider.ts` | Server-only; file is marked `server-only` | SAFE |
 | `OPENAI_MODEL` | `lib/ai/model-routing.ts` | Server-only runtime setting | SAFE |
 | `AI_PROVIDER` | `lib/ai/model-routing.ts` | Server-only provider selection; defaults to OpenAI | SAFE |
-| `CRON_SECRET` | `app/api/cron/report-subscriptions/route.ts` | Server-only route authorization secret | SAFE |
 | `STRIPE_SECRET_KEY` | `lib/stripe/billing.ts` | Server-only Stripe API credential | SAFE |
 | `STRIPE_WEBHOOK_SECRET` | `app/api/stripe/webhook/route.ts` | Server-only webhook verification secret | SAFE |
 | `STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY` | `lib/stripe/billing.ts` | Server-only Stripe price identifier used to create Checkout sessions | SAFE |
@@ -27,4 +26,4 @@ Checks performed:
 
 Important rule:
 
-Never create `NEXT_PUBLIC_` versions of `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `STRIPE_SECRET_KEY`, `CRON_SECRET`, or webhook secrets.
+Never create `NEXT_PUBLIC_` versions of `SUPABASE_SERVICE_ROLE_KEY`, `OPENAI_API_KEY`, `NVIDIA_API_KEY`, `STRIPE_SECRET_KEY`, or webhook secrets.

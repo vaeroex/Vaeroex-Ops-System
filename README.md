@@ -165,7 +165,6 @@ VAEROEX_AI_USER_RATE_LIMIT=60
 VAEROEX_AI_WORKSPACE_RATE_LIMIT=240
 VAEROEX_WORKSPACE_MONTHLY_TOKEN_BUDGET=2000000
 VAEROEX_SINGLE_REQUEST_TOKEN_BUDGET=120000
-CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=
 VAEROEX_ADMIN_EMAILS=
@@ -175,8 +174,6 @@ STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY=
 ```
 
 `SUPABASE_SERVICE_ROLE_KEY` must only be used in server-side code. Never expose it to the browser.
-`CRON_SECRET` protects scheduled report subscription jobs. Add the same secret to Vercel and keep it server-side only.
-
 `VAEROEX_ADMIN_EMAILS` is a comma-separated allowlist for internal Vaeroex owner/admin tools, for example:
 
 ```bash
@@ -398,7 +395,6 @@ OPENAI_API_KEY=
 OPENAI_MODEL=
 AI_PROVIDER=openai
 NVIDIA_API_KEY=
-CRON_SECRET=
 RESEND_API_KEY=
 NEXT_PUBLIC_APP_URL=https://vaeroex.com
 VAEROEX_ADMIN_EMAILS=
