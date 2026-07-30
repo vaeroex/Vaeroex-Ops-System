@@ -167,6 +167,7 @@ const redesignedAdminPages = [
   "app/app/admin/page.tsx",
   "app/app/admin/customers/page.tsx",
   "app/app/admin/customers/[workspaceId]/page.tsx",
+  "app/app/admin/ai-trust/page.tsx",
   "app/app/admin/workspaces/page.tsx",
   "app/app/admin/subscriptions/page.tsx"
 ];

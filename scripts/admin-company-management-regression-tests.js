@@ -104,6 +104,7 @@ for (const [href, label] of [
   ["/app/admin", "Admin Dashboard"],
   ["/app/admin/customers", "Customers"],
   ["/app/admin/ai-usage", "Vaeroex Usage"],
+  ["/app/admin/ai-trust", "AI Trust"],
   ["/app/admin/support-requests", "Support Requests"],
   ["/app/admin/audit-logs", "Audit Logs"]
 ]) {
