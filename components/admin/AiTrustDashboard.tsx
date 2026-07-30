@@ -79,7 +79,7 @@ function Metric({ label, value, detail }: { label: string; value: string | numbe
 
 function MetricGrid({ children, columns = 4 }: { children: ReactNode; columns?: 3 | 4 | 5 }) {
   const tracks = columns === 5 ? "xl:grid-cols-5" : columns === 3 ? "lg:grid-cols-3" : "lg:grid-cols-4";
-  return <div className={`overflow-hidden rounded-lg border border-line bg-slate-50/60 sm:grid sm:grid-cols-2 ${tracks}`}>{children}</div>;
+  return <div className={`overflow-hidden rounded-lg border border-line bg-slate-50/80 sm:grid sm:grid-cols-2 ${tracks}`}>{children}</div>;
 }
 
 function queryValue(filters: AiTrustFilters, key: keyof AiTrustFilters) {

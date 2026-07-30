@@ -278,6 +278,8 @@ assert.match(dashboard, /Shadow Mode/);
 assert.match(dashboard, /Trust claim validation: Not yet instrumented/);
 assert.match(dashboard, /Claim Trust: Not yet instrumented/);
 assert.match(dashboard, /This dashboard cannot activate enforcement/);
+assert.match(dashboard, /bg-slate-50\/80/, "metric grids must use the existing Pulsar and Light theme-aware surface token");
+assert.doesNotMatch(dashboard, /bg-slate-50\/60/, "metric grids must not use an unsupported light-only surface token");
 assert.match(migration, /create index if not exists ai_usage_agent_type_created_at_idx[\s\S]+on public\.ai_usage\(agent_type, created_at desc\)/, "cross-workspace Trust queries must use an indexed workflow/date path");
 assert.match(migration, /create index if not exists ai_agent_runs_agent_type_created_at_idx[\s\S]+on public\.ai_agent_runs\(agent_type, created_at desc\)/, "cross-workspace artifact queries must use an indexed workflow/date path");
 assert.match(migration, /create index if not exists business_notes_created_at_idx[\s\S]+on public\.business_notes\(created_at desc\)/, "bounded Business Notes monitoring must use an indexed date path");
