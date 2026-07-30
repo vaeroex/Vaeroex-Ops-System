@@ -11,8 +11,9 @@ import type { ExecutiveHomepageModel } from "@/lib/intelligence/executive-homepa
 import type { IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { canonicalSnapshotJson } from "@/lib/intelligence/snapshot/v1/canonical";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
-import { projectBusinessHealthExplanationV1 } from "@/lib/intelligence/snapshot/v1/projections";
+import { projectBusinessHealthExplanationV1, type BusinessHealthExplanationProjectionV1 } from "@/lib/intelligence/snapshot/v1/projections";
 import type { ContextualEvidenceProducerOutputV1 } from "@/lib/intelligence/snapshot/v1/types";
+import { createBusinessHealthTrustBindingV1 } from "@/lib/ai/trust/workflows/business-health";
 
 export type BusinessHealthExplanationSnapshotParity = Readonly<{
   status: "exact" | "fallback";
@@ -27,6 +28,10 @@ function packagesMatch(left: BusinessHealthExplanationPackage, right: BusinessHe
     return deterministic;
   };
   return canonicalSnapshotJson(deterministicPackage(left)) === canonicalSnapshotJson(deterministicPackage(right));
+}
+
+function withTrustBinding(analysisPackage: BusinessHealthExplanationPackage, projection: BusinessHealthExplanationProjectionV1): BusinessHealthExplanationPackage {
+  return { ...analysisPackage, trustBinding: createBusinessHealthTrustBindingV1(projection) };
 }
 
 function projectionFallbackReason(error: unknown) {
@@ -88,7 +93,7 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
       evidenceContext
     });
     return {
-      analysisPackage: legacyPackage,
+      analysisPackage: withTrustBinding(legacyPackage, projection),
       snapshot: build.snapshot,
       projection,
       receipt: build.receipt,
@@ -137,7 +142,7 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
       classification: parity.classification,
       reasonCode: projectionFallbackReason(error)
     }));
-    return { analysisPackage: legacyPackage, snapshot: build.snapshot, projection, receipt: build.receipt, parity };
+    return { analysisPackage: withTrustBinding(legacyPackage, projection), snapshot: build.snapshot, projection, receipt: build.receipt, parity };
   }
   let parity: BusinessHealthExplanationSnapshotParity = {
     status: "exact",
@@ -169,10 +174,10 @@ export function buildBusinessHealthExplanationFromSnapshotV1({
         event: "snapshot_v1_parity_fallback",
         classification: parity.classification
       }));
-      return { analysisPackage: legacyPackage, snapshot: build.snapshot, projection, receipt: build.receipt, parity };
+      return { analysisPackage: withTrustBinding(legacyPackage, projection), snapshot: build.snapshot, projection, receipt: build.receipt, parity };
     }
     parity = { ...parity, legacyFingerprint: legacyPackage.fingerprint };
   }
 
-  return { analysisPackage, snapshot: build.snapshot, projection, receipt: build.receipt, parity };
+  return { analysisPackage: withTrustBinding(analysisPackage, projection), snapshot: build.snapshot, projection, receipt: build.receipt, parity };
 }
