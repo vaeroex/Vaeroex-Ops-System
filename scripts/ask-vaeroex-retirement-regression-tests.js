@@ -9,7 +9,6 @@ const policy = read("lib/product/conversational-vaeroex.ts");
 const appShell = read("components/app/AppShell.tsx");
 const askPage = read("app/app/ask/page.tsx");
 const agentsPage = read("app/app/agents/page.tsx");
-const agentsActions = read("app/app/agents/actions.ts");
 const searchRoute = read("app/api/search/route.ts");
 const globalSearch = read("components/app/GlobalSearch.tsx");
 
@@ -19,8 +18,8 @@ assert.match(policy, /premium_conversational_v1/, "future conversational access 
 assert.doesNotMatch(policy, /NEXT_PUBLIC_/, "the conversational policy must not be controlled by a client-exposed variable");
 assert.match(appShell, /isPremiumConversationalVaeroexEnabled\(\)[\s\S]*href:\s*"\/app\/ask"/, "Ask navigation must be hidden by default and available only to the future premium policy");
 assert.match(askPage, /if \(!isPremiumConversationalVaeroexEnabled\(\)\) redirect\("\/app\/intelligence"\)/, "direct Version 1 Ask visits must return to Intelligence");
-assert.match(askPage, /params\.run[\s\S]*redirect\(`\/app\/agents/, "bookmarked historical results must remain readable in the result viewer");
-assert.match(agentsPage, /redirect\("\/app\/intelligence"\)/, "the legacy result route must not become a new-question surface");
+assert.match(askPage, /params\.run[\s\S]*requireWorkspacePage\(\)[\s\S]*redirect\("\/app\/intelligence"\)/, "bookmarked historical result URLs must authorize and return to Intelligence");
+assert.match(agentsPage, /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app\/intelligence"\)/, "the retired Agents route must authorize before redirecting");
 assert.doesNotMatch(agentsPage, /href="\/app\/ask"|pathname:\s*"\/app\/ask"|return_path" value=\{`\/app\/ask/, "historical result controls must not send Version 1 users back into Ask");
 
 const postStart = searchRoute.indexOf("export async function POST");
@@ -29,7 +28,7 @@ const postRequestParsing = searchRoute.indexOf("request.json()", postStart);
 assert.ok(postStart >= 0 && postPolicyGate > postStart, "the generative POST route must enforce the conversational policy");
 assert.ok(postRequestParsing < 0 || postPolicyGate < postRequestParsing, "the disabled POST route must fail before parsing or provider work");
 assert.match(searchRoute, /export async function GET/, "deterministic GET Search must remain available");
-assert.match(agentsActions, /workflow\.key === "ask_vaeroex"[\s\S]*!isPremiumConversationalVaeroexEnabled\(\)/, "legacy Ask server actions must fail closed");
+assert.equal(fs.existsSync(path.join(root, "app/app/agents/actions.ts")), false, "legacy Ask and Agents server actions must stay deleted");
 assert.equal(fs.existsSync(path.join(root, "app/app/contextual-ask/actions.ts")), false, "the unreachable embedded conversational action module must stay deleted");
 
 assert.match(globalSearch, /fetch\(`\/api\/search\?q=/, "Search must continue to use deterministic GET requests");

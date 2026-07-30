@@ -68,7 +68,6 @@ const safeTextSchema = (maxLength = 240) =>
     .refine((value) => !unsafeInstructionPattern.test(value), {
       message: "Unsafe instruction-like content is not allowed in tool arguments."
     });
-const saveTargetSchema = z.object({ runId: uuidSchema }).strict();
 const recordIdSchema = z.object({ recordId: uuidSchema }).strict();
 const recordMutationSchema = z
   .object({
@@ -159,15 +158,6 @@ export const TOOL_EXECUTION_REGISTRY = {
     requiresConfirmation: true,
     destructive: false,
     allowedRoles: OPERATOR_ROLES
-  },
-  save_vaeroex_output_sop: {
-    name: "save_vaeroex_output_sop",
-    operationType: "CREATE_RECORD",
-    targetTable: "sops",
-    schema: saveTargetSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: ["owner", "admin"] as WorkspaceRole[]
   },
   stage_file_import: {
     name: "stage_file_import",

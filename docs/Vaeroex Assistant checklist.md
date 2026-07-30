@@ -6,7 +6,7 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
 
 1. Ready for launch:
    - Core Vaeroex Ops System MVP source is ready for a controlled beta.
-   - Customer workspace setup, dashboard modules, Vaeroex Hub, Squarespace subscription access, admin tools, and support request flow are present in source.
+   - Customer workspace setup, Executive Intelligence surfaces, subscription access, admin tools, and support request flow are present in source.
    - The main Vaeroex system prompt exists and is guarded against blank prompt usage.
 
 2. Needs manual testing:
@@ -63,21 +63,13 @@ Status: source-ready for a limited beta, pending live manual testing in a real S
   - Expected: `/app/forms` creates a tenant-scoped form as an included Vaeroex feature.
   - Status: Source verified; needs browser test.
 
-- [ ] Customer creates checklist.
-  - Expected: `/app/checklists` creates a tenant-scoped checklist as an included Vaeroex feature.
+- [ ] Customer reviews Executive Intelligence.
+  - Expected: `/app/intelligence` presents canonical findings and Explain Finding without exposing historical run/debug records.
   - Status: Source verified; needs browser test.
 
-- [ ] Customer runs Vaeroex audit.
-  - Expected: `/app/agents` uses `VAEROEX_SYSTEM_PROMPT`, stores the run in `ai_agent_runs`, and records usage in `ai_usage`.
-  - Status: Source verified; needs OpenAI live test.
-
-- [ ] Customer generates SOP.
-  - Expected: Vaeroex SOP Generator returns a structured draft; customer confirms before saving to SOPs.
-  - Status: Source verified; needs OpenAI/browser test.
-
-- [ ] Customer generates weekly report.
-  - Expected: Vaeroex Weekly Report returns a structured report; customer confirms before saving to Reports.
-  - Status: Source verified; needs OpenAI/browser test.
+- [ ] Customer reviews current analyses.
+  - Expected: Business Health and Finding explanations can be saved to Saved Analyses; file analysis retains source lineage.
+  - Status: Source verified; needs browser test.
 
 ## Admin Flow
 

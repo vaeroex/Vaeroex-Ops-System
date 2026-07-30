@@ -6,8 +6,7 @@ export type GlobalSearchGroupLabel =
   | "Review Signals"
   | "Customer Evidence"
   | "SOPs"
-  | "Learned Knowledge"
-  | "Diagnostics";
+  | "Learned Knowledge";
 
 export type GlobalSearchResult = {
   id: string;

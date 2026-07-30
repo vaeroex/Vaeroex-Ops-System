@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
-import { isVaeroexAdminUser } from "@/lib/admin/admin-emails";
 import { buildBoundedWorkspaceContext } from "@/lib/ai/bounded-context";
 import { buildWorkspaceEvidenceContext, filterEligibleMemoryRowsByLifecycle, type EvidenceContext } from "@/lib/ai/evidence-index";
 import { buildLimitedEvidenceExecutiveAnswer } from "@/lib/ai/executive-fallback";
@@ -62,7 +61,6 @@ type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Ro
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type SopRow = Database["public"]["Tables"]["sops"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
-type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 
 const GROUP_ORDER: GlobalSearchGroupLabel[] = [
@@ -73,8 +71,7 @@ const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "Review Signals",
   "Customer Evidence",
   "SOPs",
-  "Learned Knowledge",
-  "Diagnostics"
+  "Learned Knowledge"
 ];
 
 function normalizeQuery(value: string | null) {
@@ -121,24 +118,6 @@ function hrefWithQuery(path: string, value: string) {
   return `${path}?q=${encodeURIComponent(value)}`;
 }
 
-function textFromJson(value: Json | undefined, depth = 0): string {
-  if (depth > 3 || value === null || value === undefined) return "";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
-  if (Array.isArray(value)) return value.map((item) => textFromJson(item, depth + 1)).filter(Boolean).slice(0, 8).join(" ");
-
-  return Object.entries(value)
-    .filter(([key]) => !["raw_data_json", "source_data_json", "metadata_json"].includes(key))
-    .map(([, item]) => textFromJson(item, depth + 1))
-    .filter(Boolean)
-    .slice(0, 12)
-    .join(" ");
-}
-
-function matchesWords(value: string, words: string[]) {
-  const haystack = value.toLowerCase();
-  return words.some((word) => haystack.includes(word));
-}
-
 function addGroup(groups: Map<GlobalSearchGroupLabel, GlobalSearchResult[]>, label: GlobalSearchGroupLabel, results: GlobalSearchResult[]) {
   if (!results.length) return;
   groups.set(label, [...(groups.get(label) || []), ...results].slice(0, 6));
@@ -170,10 +149,6 @@ function sourceHref(sourceType: string | null, title: string | null) {
   if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer")) return hrefWithQuery("/app/sources", query);
 
   return "/app";
-}
-
-function shouldSearchDiagnostics(query: string, user: { email?: string | null; app_metadata?: Record<string, unknown> | null }) {
-  return isVaeroexAdminUser(user) && /\b(diagnostic|diagnostics|execution|run|runs|failed ask|ask history|workflow history|old failed)\b/i.test(query);
 }
 
 function questionLike(query: string) {
@@ -321,7 +296,6 @@ export async function GET(request: Request) {
   const plannedDomains = new Set<VaeroexEvidenceDomain>(queryPlan.domains);
   const searchAllDomains = queryPlan.domains.length === 0 || (!questionLike(query) && queryPlan.classification === "unsupported");
   const includesDomain = (...domains: VaeroexEvidenceDomain[]) => searchAllDomains || domains.some((domain) => plannedDomains.has(domain));
-  const includeDiagnostics = shouldSearchDiagnostics(query, user);
   const [
     rawKpis,
     rawSavedAnalyses,
@@ -331,8 +305,7 @@ export async function GET(request: Request) {
     rawCrmLeads,
     sops,
     decisions,
-    learnedKnowledgeCandidates,
-    vaeroexRuns
+    learnedKnowledgeCandidates
   ] = await Promise.all([
     scopedResults<KpiRow>(
       includesDomain("kpis", "financials", "business_health"),
@@ -446,17 +419,7 @@ export async function GET(request: Request) {
         .or(orFilter(["source_title", "source_excerpt", "summary", "source_type"], words))
         .order("indexed_at", { ascending: false })
         .limit(24)
-    ),
-    includeDiagnostics
-      ? safeResults<VaeroexRunRow>(
-          supabase
-            .from("ai_agent_runs")
-            .select("*")
-            .eq("workspace_id", workspaceId)
-            .order("created_at", { ascending: false })
-            .limit(80)
-        )
-      : Promise.resolve([])
+    )
   ]);
   const sourceParentResult = await loadSourceParentEligibilityResult({
     supabase,
@@ -593,20 +556,6 @@ export async function GET(request: Request) {
     }))
   );
 
-  const runMatches = includeDiagnostics
-    ? vaeroexRuns
-        .map((run) => {
-          const outputText = textFromJson(run.output_json);
-          return {
-            run,
-            outputText,
-            haystack: compact([run.agent_type, run.status, run.error_message, outputText])
-          };
-        })
-        .filter((item) => matchesWords(item.haystack, words))
-        .slice(0, 4)
-    : [];
-
   addGroup(
     groups,
     "Learned Knowledge",
@@ -628,19 +577,6 @@ export async function GET(request: Request) {
         meta: compact([decision.status, decision.owner, decision.related_kpi])
       }))
     ].slice(0, 6)
-  );
-
-  addGroup(
-    groups,
-    "Diagnostics",
-    runMatches.map(({ run, outputText }) => ({
-        id: run.id,
-        title: run.agent_type.replace(/_/g, " "),
-        sourceType: "Diagnostic Run",
-        preview: truncate(outputText || run.error_message || "Saved Vaeroex result."),
-        href: `/app/agents?run=${encodeURIComponent(run.id)}`,
-        meta: compact([run.status, run.created_at])
-      }))
   );
 
   const responseGroups: GlobalSearchGroup[] = GROUP_ORDER.map((label) => ({

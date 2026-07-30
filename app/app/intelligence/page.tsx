@@ -8,7 +8,6 @@ import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/con
 import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
 import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
-import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
@@ -28,12 +27,11 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, runsResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
@@ -50,7 +48,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     kpisResult.error,
     kpiSettingsResult.error,
     filesResult.error,
-    runsResult.error,
     crmResult.error,
     importsResult.error,
     sopsResult.error,
@@ -83,7 +80,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const eligibleKpis = filterBySourceParentEligibility(kpisResult.data || [], sourceParentEligibility);
   const eligibleCustomerEvidence = filterBySourceParentEligibility(crmResult.data || [], sourceParentEligibility);
   const eligibleOperationalMetrics = filterBySourceParentEligibility(metricsResult.data || [], sourceParentEligibility);
-  const eligibleRuns = filterBusinessEvidence(runsResult.data || [], { sourceKind: "platform_run" });
   let eligibleMemoryChunks = [] as NonNullable<typeof memoryResult.data>;
   let memoryEligibilityError: Error | null = null;
   try {
@@ -110,7 +106,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     kpis: eligibleKpis,
     kpiSettings: kpiSettingsResult.data || [],
     files: filesResult.data || [],
-    vaeroexRuns: eligibleRuns,
     crmLeads: eligibleCustomerEvidence,
     imports: importsResult.data || [],
     sops: sopsResult.data || [],

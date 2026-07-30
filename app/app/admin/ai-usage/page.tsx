@@ -6,6 +6,7 @@ import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { getVaeroexAdminAccess } from "@/lib/admin/vaeroex-admin";
+import { ACTIVE_AI_AGENT_RUN_TYPES } from "@/lib/ai/active-agent-artifacts";
 
 type AdminAiUsagePageProps = {
   searchParams?: Promise<{ filter?: string; limit?: string; usage?: string; error?: string }>;
@@ -16,8 +17,8 @@ const runFilters = [
   { key: "completed", label: "Completed" },
   { key: "failed", label: "Failed" },
   { key: "file_analysis", label: "File analysis" },
-  { key: "ask_vaeroex", label: "Ask Vaeroex" },
-  { key: "operations_audit", label: "Operations audit" }
+  { key: "business_health_explanation_v1", label: "Business Health explanations" },
+  { key: "finding_explanation_v1", label: "Finding explanations" }
 ];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -61,9 +62,7 @@ function matchesRunFilter(run: AdminRunLog, filter: string) {
   if (!filter) return true;
   if (filter === "completed") return status === "completed";
   if (filter === "failed") return status === "failed";
-  if (filter === "file_analysis") return agentType.includes("file_analysis");
-  if (filter === "ask_vaeroex") return agentType.includes("ask") || agentType.includes("chat") || agentType.includes("general");
-  if (filter === "operations_audit") return agentType.includes("operations_audit") || agentType.includes("audit");
+  if (ACTIVE_AI_AGENT_RUN_TYPES.includes(filter as (typeof ACTIVE_AI_AGENT_RUN_TYPES)[number])) return agentType === filter;
 
   return true;
 }
@@ -85,9 +84,20 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
 
   const [{ data: usage }, { data: runs }, { data: workspaces }, { data: failedRuns }] = await Promise.all([
     access.admin.from("ai_usage").select("*").gte("created_at", monthStart.toISOString()).order("created_at", { ascending: false }).limit(200),
-    access.admin.from("ai_agent_runs").select("id,workspace_id,agent_type,status,error_message,created_at").order("created_at", { ascending: false }).limit(100),
+    access.admin
+      .from("ai_agent_runs")
+      .select("id,workspace_id,agent_type,status,error_message,created_at")
+      .in("agent_type", [...ACTIVE_AI_AGENT_RUN_TYPES])
+      .order("created_at", { ascending: false })
+      .limit(100),
     access.admin.from("workspaces").select("id,name").limit(500),
-    access.admin.from("ai_agent_runs").select("id,workspace_id,agent_type,error_message,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(25)
+    access.admin
+      .from("ai_agent_runs")
+      .select("id,workspace_id,agent_type,error_message,created_at")
+      .in("agent_type", [...ACTIVE_AI_AGENT_RUN_TYPES])
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(25)
   ]);
 
   const workspaceName = new Map((workspaces || []).map((workspace) => [workspace.id, workspace.name]));
@@ -127,7 +137,7 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
       <PageHeader
         eyebrow="Internal admin"
         title="Vaeroex usage"
-        description="Review monthly Vaeroex run usage, recent run history, and failed run errors."
+        description="Review monthly provider usage and current supported analysis artifacts."
       />
       <ErrorNotice message={params?.error} />
 
@@ -189,7 +199,7 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
           ) : null}
         </SectionCard>
 
-        <SectionCard title="Recent Vaeroex runs" description="Filtered, compact run history. Details stay collapsed until needed.">
+        <SectionCard title="Recent analysis artifacts" description="Business Health explanations, Finding explanations, and file analysis only.">
           <div className="mb-4 flex flex-wrap gap-2">
             {runFilters.map((filter) => (
               <Link
@@ -208,8 +218,8 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
           <CompactRunTable
             runs={visibleRuns}
             workspaceNames={workspaceName}
-            emptyTitle="No Vaeroex runs"
-            emptyDescription="Recent runs matching this filter will appear here."
+            emptyTitle="No analysis artifacts"
+            emptyDescription="Current supported artifacts matching this filter will appear here."
           />
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-sm text-muted">
             <p>
@@ -228,12 +238,12 @@ export default async function AdminAiUsagePage({ searchParams }: AdminAiUsagePag
         </SectionCard>
       </section>
 
-      <SectionCard title="Recent failures" description="Failed runs are grouped by error so repeated routing noise does not dominate the page. Open a group only when investigating.">
+      <SectionCard title="Recent artifact failures" description="Failures from current supported analysis artifacts, grouped for internal investigation.">
         <GroupedErrorRuns
           runs={allFailedRuns}
           workspaceNames={workspaceName}
-          emptyTitle="No failed runs"
-          emptyDescription="Failed Vaeroex run details will appear here."
+          emptyTitle="No failed artifacts"
+          emptyDescription="Failed supported artifact details will appear here."
         />
       </SectionCard>
     </div>

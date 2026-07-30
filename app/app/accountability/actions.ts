@@ -183,28 +183,3 @@ export async function shareRecordAction(formData: FormData) {
   revalidatePath("/app");
   redirectWithMessage(path, `Shared with ${recipient}.`);
 }
-
-export async function dismissRecommendationAction(formData: FormData) {
-  const path = returnPath(formData, "/app/agents");
-  const { supabase, user, workspaceId } = await requireWorkspace(path);
-  const title = text(formData, "assignment_title") || "Vaeroex recommendation dismissed";
-
-  const { error } = await supabase.from("operational_assignments").insert({
-    workspace_id: workspaceId,
-    source_type: text(formData, "source_type") || "vaeroex_recommendation",
-    source_id: nullableText(formData, "source_id"),
-    source_title: nullableText(formData, "source_title"),
-    title,
-    description: "Dismissed for now.",
-    priority: "Low",
-    status: "Dismissed",
-    created_by: user.id
-  });
-
-  if (error) {
-    redirectWithError(path, error.message);
-  }
-
-  revalidatePath(path);
-  redirectWithMessage(path, "Recommendation dismissed.");
-}

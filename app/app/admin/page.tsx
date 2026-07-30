@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/operations/PageHeader";
 import { SectionCard } from "@/components/operations/SectionCard";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
 import { companyAttentionReasons, formatAdminDate, type AdminCompanyRow } from "@/lib/admin/company-directory";
+import { ACTIVE_AI_AGENT_RUN_TYPES } from "@/lib/ai/active-agent-artifacts";
 
 type AdminHomeProps = {
   searchParams?: Promise<{ error?: string; message?: string }>;
@@ -46,7 +47,13 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
       .or("agreement_status.eq.missing,lifecycle_status.eq.pending_activation,lifecycle_status.eq.inactive")
       .order("workspace_updated_at", { ascending: false })
       .limit(6),
-    admin.from("ai_agent_runs").select("id,workspace_id,agent_type,error_message,created_at").eq("status", "failed").order("created_at", { ascending: false }).limit(8),
+    admin
+      .from("ai_agent_runs")
+      .select("id,workspace_id,agent_type,error_message,created_at")
+      .in("agent_type", [...ACTIVE_AI_AGENT_RUN_TYPES])
+      .eq("status", "failed")
+      .order("created_at", { ascending: false })
+      .limit(8),
     admin.from("subscription_events").select("id,event_type,customer_email,processing_error,created_at").not("processing_error", "is", null).order("created_at", { ascending: false }).limit(5),
     admin.from("workspaces").select("id,name").limit(500)
   ]);
@@ -133,12 +140,12 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
         </SectionCard>
       </section>
 
-      <SectionCard title="Recent platform errors" description="Repeated messages are grouped to keep this operational review concise.">
+      <SectionCard title="Recent analysis artifact errors" description="Failures from current supported analysis artifacts, grouped for internal review.">
         <GroupedErrorRuns
           runs={failedRunRows}
           workspaceNames={workspaceName}
-          emptyTitle="No recent platform errors"
-          emptyDescription="Failed runs will appear here for investigation."
+          emptyTitle="No recent artifact errors"
+          emptyDescription="Failed supported artifacts will appear here for investigation."
         />
       </SectionCard>
     </div>

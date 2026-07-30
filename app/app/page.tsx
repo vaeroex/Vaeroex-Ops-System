@@ -26,8 +26,8 @@ import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/inte
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import {
   buildOverviewRunCompatibility,
-  eligibleOverviewCompatibilityRuns,
-  latestOverviewEvidenceUpdate
+  latestOverviewEvidenceUpdate,
+  type OverviewCompatibilityRun
 } from "@/lib/intelligence/overview-run-compatibility";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import { buildExecutiveHomepageFromSnapshotV1 } from "@/lib/intelligence/snapshot/v1/consumers/executive-overview";
@@ -59,7 +59,6 @@ type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
 type AssetRow = Database["public"]["Tables"]["assets"]["Row"];
 type CrmLeadRow = Database["public"]["Tables"]["crm_leads"]["Row"];
 type CrmLeadHistoryRow = Database["public"]["Tables"]["crm_lead_history"]["Row"];
-type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type OperationalMetricRow = Database["public"]["Tables"]["operational_metrics"]["Row"];
 type AssignmentRow = Database["public"]["Tables"]["operational_assignments"]["Row"];
 type ShareRow = Database["public"]["Tables"]["record_shares"]["Row"];
@@ -350,21 +349,6 @@ function isConvertedStatus(status: string | null | undefined) {
 function isOpenIssue(issue: IssueRow) {
   const deletedAt = (issue as IssueRow & { deleted_at?: string | null }).deleted_at;
   return lower(issue.status) !== "closed" && lower(issue.status) !== "resolved" && !deletedAt;
-}
-
-function readableOutput(run: VaeroexRunRow) {
-  const output = run.output_json;
-
-  if (output && typeof output === "object" && !Array.isArray(output)) {
-    const record = output as Record<string, Json | undefined>;
-    const summary = record.executive_summary || record.summary || record.response_markdown;
-
-    if (typeof summary === "string" && summary.trim()) {
-      return summary.replace(/^#+\s*/gm, "").split("\n").map((line) => line.trim()).filter(Boolean)[0] || "Vaeroex generated an insight.";
-    }
-  }
-
-  return run.status === "failed" ? "A Vaeroex run failed and needs review." : "Vaeroex generated an insight.";
 }
 
 function firstNameFromUser(user: { user_metadata?: Record<string, unknown> } | null) {
@@ -1061,7 +1045,12 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("assets").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
-    supabase.from("ai_agent_runs").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(10),
+    supabase
+      .from("ai_agent_runs")
+      .select("agent_type,input_json,output_json,status,error_message,created_at,updated_at,archived_at,deleted_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: false })
+      .limit(10),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).order("metric_date", { ascending: false }).limit(500),
     supabase.from("operational_assignments").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("due_date", { ascending: true, nullsFirst: false }).limit(60),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
@@ -1098,9 +1087,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const activeCustomerEvidenceIds = new Set(crmLeads.map((lead) => lead.id));
   const crmHistory = filterBySourceParentEligibility(filterBusinessEvidence(rawCrmHistory), sourceParentEligibility)
     .filter((history) => activeCustomerEvidenceIds.has(history.lead_id));
-  const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
-  const businessEvidenceRuns = eligibleOverviewCompatibilityRuns(vaeroexRuns);
-  const overviewRunCompatibility = buildOverviewRunCompatibility(vaeroexRuns);
+  const overviewRunCompatibility = buildOverviewRunCompatibility(
+    (vaeroexRunResult.data || []) as OverviewCompatibilityRun[]
+  );
   const operationalMetrics = filterBySourceParentEligibility(filterBusinessEvidence(rawOperationalMetrics), sourceParentEligibility);
   const intelligenceOperationalMetrics = excludeChecklistDerivedMetrics(operationalMetrics);
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
@@ -1396,7 +1385,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     kpiSettings: intelligenceKpiSettings,
     issues,
     files,
-    vaeroexRuns: businessEvidenceRuns,
     crmLeads,
     imports,
     sops,
@@ -1936,7 +1924,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         </SectionCard>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[.9fr_1.1fr]">
+      <section>
         <SectionCard title="Customer activity evidence" description="Customer status and activity evidence from current source records plus imported history.">
           <div className="space-y-3">
             {Object.entries(pipeline).length ? (
@@ -1958,21 +1946,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           </div>
         </SectionCard>
 
-        <SectionCard title="Vaeroex insights" description="Recent Vaeroex decision support.">
-          <SimpleList
-            items={businessEvidenceRuns.slice(0, 5)}
-            empty="No Vaeroex decision support saved yet."
-            render={(run: VaeroexRunRow) => (
-              <div key={run.id} className="rounded-lg border border-line p-3">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold capitalize">{run.agent_type.replace(/_/g, " ")}</p>
-                  <StatusBadge value={run.status} />
-                </div>
-                <p className="mt-2 text-xs leading-5 text-muted">{readableOutput(run)}</p>
-              </div>
-            )}
-          />
-        </SectionCard>
       </section>
 
           </DashboardAccordion>

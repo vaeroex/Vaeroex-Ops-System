@@ -1,6 +1,6 @@
 # Phase 5 Acceptance Review
 
-> Superseded July 29, 2026: the internal seeded-demo system described in this historical review has been retired. No current runtime creates, resets, or repopulates these fixtures.
+> Historical review, superseded July 29, 2026. The seeded demo, Vaeroex Hub/Agents surface, People, Checklists, notifications, and legacy report workflows described below are retired and are not current acceptance requirements.
 
 Date: 2026-06-17
 
@@ -30,8 +30,8 @@ Date: 2026-06-17
 3. Operations modules:
    Source review confirms module pages, workspace-scoped queries, create/update actions, empty states, error notices, loading skeletons, and toast messages after server-action redirects.
 
-4. Vaeroex Hub:
-   Source review confirms chat/workflow forms, workspace snapshot, prompt usage, run storage, run history, selected result review, and confirmation-only saves.
+4. Current intelligence:
+   Source review confirms canonical intelligence, bounded explanations, active artifact storage, source lineage, and Saved Analysis validation. Historical run payloads are not customer-facing.
 
 5. Demo seed:
    Source review confirms five workspaces with operational records across the main modules.

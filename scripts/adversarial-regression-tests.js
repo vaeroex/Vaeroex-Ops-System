@@ -340,9 +340,7 @@ function runSecurityResponseRenderingTests() {
   assert.doesNotMatch(securityNotice, /Executive Summary|Executive Recommendation|Top Problems|Business Health|Confidence|Improvement Plan|Checklist/i);
 
   const agentsPage = read("app/app/agents/page.tsx");
-  assert.match(agentsPage, /isSecurityResponseRun/, "Ask Vaeroex page must detect terminal security runs");
-  assert.match(agentsPage, /isSecurityResponseMessage\(run\.title\)/, "legacy saved security-denied run titles must render as Security Response");
-  assert.match(agentsPage, /return\s+\(\s*<div className="mx-auto max-w-3xl">\s*<SecurityResponseNotice \/>/s, "selected security runs must return only the security response page");
+  assert.match(agentsPage, /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app\/intelligence"\)/, "retired Agents URLs must never render historical or debug payloads");
 }
 
 function runSecurityIntentClassifierTests() {
@@ -739,12 +737,6 @@ function runLightweightKpiOverviewTests() {
   const timeoutFallbackOutput = buildDeterministicKpiOverviewOutput(severalSummary, { fallbackReason: "OpenAI timeout" });
   assert.match(String(timeoutFallbackOutput.direct_answer), /deeper analysis took longer than expected/i, "OpenAI timeout should still return a useful KPI overview");
 
-  const agentsAction = read("app/app/agents/actions.ts");
-  assert.match(agentsAction, /classifyKpiOverviewIntent/, "Ask Vaeroex should detect lightweight KPI overview intent");
-  assert.match(agentsAction, /runLightweightKpiOverview/, "Ask Vaeroex should route KPI overview prompts to the lightweight workflow");
-  assert.match(agentsAction, /lightweight_kpi_overview/, "Ask Vaeroex should store lightweight KPI overview diagnostics");
-  assert.match(agentsAction, /maxRetries:\s*0/, "KPI overview retry should avoid repeating an expensive identical OpenAI request");
-
   const kpiOverviewHelper = read("lib/ai/kpi-overview.ts");
   assert.match(kpiOverviewHelper, /Business Memory or document retrieval/, "KPI overview should explicitly avoid broad retrieval by default");
   assert.match(kpiOverviewHelper, /KPI_OVERVIEW_MAX_ROWS/, "KPI overview should cap historical KPI rows");
@@ -758,7 +750,6 @@ function runLegacyCrmLanguageTests() {
     "lib/ai/vaeroex-workflows.ts",
     "lib/ai/prompts/vaeroex-system-prompt.ts",
     "app/app/page.tsx",
-    "app/app/agents/page.tsx",
     "app/app/files/actions.ts"
   ];
   const publicExperienceFiles = [
@@ -885,12 +876,12 @@ function runGlobalSearchAskMergeTests() {
   assert.match(searchRoute, /buildBoundedWorkspaceContext/, "explicit global questions should load only planner-selected domains");
 
   const legacyAskPage = read("app/app/ask/page.tsx");
-  assert.match(legacyAskPage, /params\.run[\s\S]*redirect\(`\/app\/agents/, "legacy /app/ask result links must move to the result viewer");
+  assert.match(legacyAskPage, /params\.run[\s\S]*requireWorkspacePage\(\)[\s\S]*redirect\("\/app\/intelligence"\)/, "legacy /app/ask result links must authorize and return to Intelligence");
   assert.match(legacyAskPage, /isPremiumConversationalVaeroexEnabled[\s\S]*redirect\("\/app\/intelligence"\)/, "blank /app/ask visits must fail closed in Version 1");
 
   const agentsPage = read("app/app/agents/page.tsx");
-  assert.match(agentsPage, /Saved Vaeroex Result/, "legacy agents route should read as saved results, not a primary Ask destination");
-  assert.match(agentsPage, /redirect\("\/app\/intelligence"\)/, "blank /app/agents visits must redirect into structured Intelligence");
+  assert.match(agentsPage, /requireWorkspacePage\(\)[\s\S]*permanentRedirect\("\/app\/intelligence"\)/, "all /app/agents visits must authorize and redirect into structured Intelligence");
+  assert.equal(existsSync(path.join(root, "app/app/agents/actions.ts")), false, "the legacy Agents server action surface must stay deleted");
 }
 
 function runQueryDepthPlannerTests() {
@@ -946,10 +937,7 @@ function runQueryDepthPlannerTests() {
 
   assert.equal(existsSync(path.join(root, "app/app/contextual-ask/actions.ts")), false, "retired contextual explanation actions must stay deleted");
 
-  const agentsAction = read("app/app/agents/actions.ts");
-  assert.doesNotMatch(agentsAction, /buildWorkspaceSnapshot/, "Ask Vaeroex should not default to a full workspace snapshot");
-  assert.match(agentsAction, /executionPlanForWorkflow/, "Ask Vaeroex should use the query-depth planner");
-  assert.match(agentsAction, /buildBoundedWorkspaceContext/, "deep reasoning should load only planned domains");
+  assert.equal(existsSync(path.join(root, "app/app/agents/actions.ts")), false, "retired generic Agents execution must remain unreachable");
 }
 
 function runEvidenceEligibilityTests() {

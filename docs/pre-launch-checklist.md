@@ -46,25 +46,15 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
   - Verify: Plan limits are enforced and public/private settings behave correctly.
   - Status: Source verified; needs browser test.
 
-- [ ] Customer creates checklist.
-  - Expected: `/app/checklists` creates a tenant-scoped checklist.
-  - Verify: Plan limits are enforced and the checklist appears only in the active workspace.
+- [ ] Customer reviews Executive Intelligence.
+  - Expected: `/app/intelligence` shows canonical findings and bounded explanations.
+  - Verify: citations, confidence, limitations, workspace isolation, and Saved Analysis actions remain intact.
   - Status: Source verified; needs browser test.
 
-- [ ] Customer runs Vaeroex audit.
-  - Expected: `/app/agents` runs Operations Audit Agent using `VAEROEX_SYSTEM_PROMPT`.
-  - Verify: Run is stored in `ai_agent_runs` and usage is recorded in `ai_usage`.
-  - Status: Source verified; needs OpenAI live test.
-
-- [ ] Customer generates SOP.
-  - Expected: SOP Generator Agent returns a draft and requires confirmation before saving.
-  - Verify: Confirmed SOP appears in `/app/sops`.
-  - Status: Source verified; needs OpenAI/browser test.
-
-- [ ] Customer generates weekly report.
-  - Expected: Weekly Report Agent returns a report and requires confirmation before saving.
-  - Verify: Confirmed report appears in `/app/reports`.
-  - Status: Source verified; needs OpenAI/browser test.
+- [ ] Customer analyzes an Evidence source.
+  - Expected: approved file analysis is source-grounded and remains linked to the original Evidence file.
+  - Verify: file-analysis artifacts and usage are workspace-scoped; no customer run/debug history is exposed.
+  - Status: Source verified; needs provider/browser test.
 
 ## Admin Flow
 
@@ -180,7 +170,7 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
 
 1. Ready for launch:
    - Ready for a controlled beta after live manual testing passes.
-   - Source includes customer setup, operations modules, Vaeroex Hub, Squarespace access, internal admin, support request flow, and launch docs.
+   - Source includes customer setup, Executive Intelligence, subscription access, internal admin, support request flow, and launch docs.
 
 2. Needs manual testing:
    - Vercel production deployment build.

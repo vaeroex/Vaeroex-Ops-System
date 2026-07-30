@@ -11,11 +11,8 @@ export default async function AskVaeroexPage({ searchParams }: LegacyAskPageProp
   const params = (await searchParams) || {};
 
   if (params.run || params.error || params.saved || params.debug) {
-    const query = new URLSearchParams();
-    for (const [key, value] of Object.entries(params)) {
-      if (typeof value === "string") query.set(key, value);
-    }
-    redirect(`/app/agents${query.size ? `?${query.toString()}` : ""}`);
+    await requireWorkspacePage();
+    redirect("/app/intelligence");
   }
 
   if (!isPremiumConversationalVaeroexEnabled()) redirect("/app/intelligence");
