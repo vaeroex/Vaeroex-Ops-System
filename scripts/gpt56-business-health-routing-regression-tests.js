@@ -142,7 +142,7 @@ const labelBoundPackage = {
     opportunityAdjustment: 0,
     drivers: [{
       kind: "risk",
-      label: "1-Star Reviews",
+      label: "1-Star Reviews remained above target for 8 periods",
       fact: "Actual 37 against a target of 23.",
       scoreImpact: -12,
       citationIds: [],

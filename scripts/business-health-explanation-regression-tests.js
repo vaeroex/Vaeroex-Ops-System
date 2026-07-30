@@ -457,6 +457,22 @@ assert.equal(validateBusinessHealthExplanationOutput(labelValidationOutput(
   "1-Star Reviews are 37 against a target of 23, preserving the deterministic comparison."
 ), oneStarPackage).ok, true, "the original live 1-Star Reviews failure must validate with its grounded values");
 
+const liveOneStarPackage = labelValidationPackage(["1-Star Reviews remained above target for 8 periods"], {
+  "1-Star Reviews remained above target for 8 periods": "Actual 37 against a target of 23."
+});
+assert.equal(validateBusinessHealthExplanationOutput(labelValidationOutput(
+  "1-Star Reviews are 37 against a target of 23, preserving the deterministic comparison."
+), liveOneStarPackage).ok, true, "the canonical KPI prefix of a deterministic target-miss title must remain an approved label span");
+expectNumericIntegrityFailure(labelValidationOutput(
+  "1-Star Reviews remain visible alongside 8 separately claimed periods."
+), liveOneStarPackage, "canonical title parsing must not globally whitelist its period count");
+expectNumericIntegrityFailure(labelValidationOutput(
+  "1-Star Strategy remains visible while Reviews require separate investigation."
+), liveOneStarPackage, "canonical title parsing must not whitelist an arbitrary numeric phrase");
+expectNumericIntegrityFailure(labelValidationOutput(
+  "1-Star remains visible while Reviews require separate investigation."
+), liveOneStarPackage, "canonical title parsing must not whitelist a partial KPI label");
+
 const checkoutPackage = labelValidationPackage(["Average Checkout Wait"], {
   "Average Checkout Wait": "Actual 6.2 against a target of 5."
 });

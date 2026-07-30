@@ -57,8 +57,20 @@ function approvedLabelPattern(label: string) {
   );
 }
 
+const CANONICAL_KPI_DRIVER_TITLE_PATTERN = /^(.+?)\s+(?:remained\s+(?:below target|above target|below acceptable range|above acceptable range|outside target)\s+for\s+\d+\s+periods?|is\s+(?:below target|above target|below acceptable range|above acceptable range|outside target))$/i;
+
+function approvedDriverLabelSpans(label: string) {
+  const normalized = label.trim();
+  const canonicalKpiTitle = normalized.match(CANONICAL_KPI_DRIVER_TITLE_PATTERN);
+  return Array.from(new Set([
+    normalized,
+    canonicalKpiTitle?.[1]?.trim() || ""
+  ].filter(Boolean))).sort((left, right) => right.length - left.length);
+}
+
 function withoutApprovedDriverLabels(value: string, labels: readonly string[]) {
-  return labels.reduce((masked, label) => {
+  const approvedSpans = labels.flatMap(approvedDriverLabelSpans).sort((left, right) => right.length - left.length);
+  return approvedSpans.reduce((masked, label) => {
     const pattern = approvedLabelPattern(label);
     return pattern ? masked.replace(pattern, (match) => " ".repeat(match.length)) : masked;
   }, value);
