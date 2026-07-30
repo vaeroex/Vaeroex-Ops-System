@@ -24,6 +24,11 @@ import { buildExecutiveHomepageModel } from "@/lib/intelligence/executive-homepa
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceLayer, type IntelligenceLayerResult } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
+import {
+  buildOverviewRunCompatibility,
+  eligibleOverviewCompatibilityRuns,
+  latestOverviewEvidenceUpdate
+} from "@/lib/intelligence/overview-run-compatibility";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import { buildExecutiveHomepageFromSnapshotV1 } from "@/lib/intelligence/snapshot/v1/consumers/executive-overview";
 import { projectExecutiveOverviewV1 } from "@/lib/intelligence/snapshot/v1/projections";
@@ -1094,7 +1099,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
   const crmHistory = filterBySourceParentEligibility(filterBusinessEvidence(rawCrmHistory), sourceParentEligibility)
     .filter((history) => activeCustomerEvidenceIds.has(history.lead_id));
   const vaeroexRuns = (vaeroexRunResult.data || []) as VaeroexRunRow[];
-  const businessEvidenceRuns = excludeChecklistDerivedRecords(filterBusinessEvidence(vaeroexRuns, { sourceKind: "platform_run" }));
+  const businessEvidenceRuns = eligibleOverviewCompatibilityRuns(vaeroexRuns);
+  const overviewRunCompatibility = buildOverviewRunCompatibility(vaeroexRuns);
   const operationalMetrics = filterBySourceParentEligibility(filterBusinessEvidence(rawOperationalMetrics), sourceParentEligibility);
   const intelligenceOperationalMetrics = excludeChecklistDerivedMetrics(operationalMetrics);
   const assignments = (assignmentResult.data || []) as AssignmentRow[];
@@ -1414,7 +1420,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         issues: issues.length,
         crm_leads: crmLeads.length,
         business_memory_signals: businessHealthMemorySignals,
-        vaeroex_runs: businessEvidenceRuns.length,
+        vaeroex_runs: overviewRunCompatibility.snapshotSourceCount,
         ...evidenceLineageMetadata({ sourceType: "business_health_snapshot" })
       }
     });
@@ -1434,20 +1440,19 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     sops,
     crmLeads,
     crmHistory,
-    vaeroexRuns: businessEvidenceRuns,
+    overviewRunCompatibility,
     operationalMetrics: intelligenceOperationalMetrics,
     assets,
     people,
     decisions,
     memoryChunks
   });
-  const latestEvidenceUpdate = [
+  const latestEvidenceUpdate = latestOverviewEvidenceUpdate([
     ...intelligenceKpis.map((row) => row.updated_at || row.created_at),
     ...issues.map((row) => row.updated_at || row.created_at),
     ...files.map((row) => row.updated_at || row.created_at),
-    ...businessEvidenceRuns.map((row) => row.updated_at || row.created_at),
     ...decisions.map((row) => row.updated_at || row.created_at)
-  ].filter(Boolean).sort().at(-1) || null;
+  ], overviewRunCompatibility);
   const businessHealthExplanationAsOf = new Date().toISOString();
   let executiveHomepageModel: ReturnType<typeof buildExecutiveHomepageModel>;
   try {
