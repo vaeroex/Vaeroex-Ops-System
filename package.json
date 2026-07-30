@@ -37,6 +37,7 @@
     "test:ask-retirement": "node scripts/ask-vaeroex-retirement-regression-tests.js",
     "test:evidence-engine": "node scripts/evidence-engine-regression-tests.js",
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js && node scripts/gpt56-business-health-routing-regression-tests.js",
+    "test:trust-layer-v1": "node scripts/trust-layer-v1-regression-tests.js",
     "test:business-signals-retirement": "node scripts/business-signals-retirement-regression-tests.js",
     "test:notification-retirement": "node scripts/notification-retirement-regression-tests.js",
     "test:people-retirement": "node scripts/people-page-retirement-regression-tests.js",

@@ -230,7 +230,11 @@ const snapshotComposition = buildBusinessHealthExplanationFromSnapshotV1({
   asOf: now.toISOString()
 });
 assert.equal(snapshotComposition.parity.status, "exact", "the live Preview composition boundary must prove exact legacy parity");
-assert.deepEqual(snapshotComposition.analysisPackage, analysisPackage, "the snapshot projection must preserve the complete provider package and validated response envelope inputs");
+const { trustBinding, ...snapshotProviderPackage } = snapshotComposition.analysisPackage;
+assert.deepEqual(snapshotProviderPackage, analysisPackage, "the snapshot projection must preserve the complete provider package and validated response envelope inputs");
+assert.equal(trustBinding.snapshotFingerprint, snapshotComposition.snapshot.fingerprints.snapshot, "the encrypted package must carry the authoritative snapshot binding for post-generation trust checks");
+assert.equal(trustBinding.projectionAsOf, snapshotComposition.projection.asOf);
+assert.match(trustBinding.projectionFingerprint, /^[a-f0-9]{64}$/);
 assert.deepEqual(
   businessHealthProviderRequestPayload(snapshotComposition.analysisPackage),
   businessHealthProviderRequestPayload(analysisPackage),

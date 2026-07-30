@@ -3,6 +3,7 @@ import type {
   ContextualEvidenceAuthorityV1,
   ProjectedContextualEvidenceV1
 } from "@/lib/intelligence/snapshot/v1/projections";
+import type { TrustProjectionBindingV1 } from "@/lib/ai/trust/contracts";
 
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID = "business_health_explanation_v1" as const;
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION = "business_health_explanation_v1" as const;
@@ -92,6 +93,7 @@ export type BusinessHealthExplanationPackage = Readonly<{
   hypothesisAllowed: false;
   contextualEvidence?: readonly ProjectedContextualEvidenceV1[];
   contextAuthority?: ContextualEvidenceAuthorityV1;
+  trustBinding?: TrustProjectionBindingV1;
 }>;
 
 export type BusinessHealthProviderAttribution = Readonly<{

@@ -13,6 +13,10 @@ import { resolveVaeroexModel } from "@/lib/ai/model-routing";
 import { runStructuredAI, type AIProviderAttempt } from "@/lib/ai/providers/provider-manager";
 import { resolveBusinessHealthGenerationPolicy } from "@/lib/ai/providers/workflow-provider-policy";
 import { assertWorkspaceTokenBudget, estimateTokenCount, type VaeroexTokenUsage } from "@/lib/ai/usage";
+import { evidenceEngineHash } from "@/lib/ai/evidence-engine/hash";
+import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
+import { logTrustShadowTelemetryV1, trustShadowFailureTelemetryV1, trustShadowTelemetryV1, type TrustShadowTelemetryV1 } from "@/lib/ai/trust/logging";
+import { runBusinessHealthTrustShadowV1 } from "@/lib/ai/trust/workflows/business-health";
 import type { Database, Json } from "@/lib/supabase/types";
 
 const SYSTEM_PROMPT = `You are Vaeroex's fixed Business Health explanation writer.
@@ -162,6 +166,22 @@ export async function generateBusinessHealthExplanation({
     }
   });
   const generatedAt = new Date().toISOString();
+  const trustStartedAt = Date.now();
+  const trustExecution = { cacheState: "miss" as const, fallbackUsed: generation.fallbackUsed, stale: analysisPackage.facts.freshness === "stale" };
+  const releaseChannel = currentSavedAnalysisReleaseChannel();
+  let trustShadow: TrustShadowTelemetryV1 | null = null;
+  try {
+    const trustResult = runBusinessHealthTrustShadowV1({ workspaceId, validatedOutput: generation.output, boundedProjection: analysisPackage, provider: generation.provider, model: generation.model, requestId: generation.requestId, generationTimestamp: generatedAt, releaseChannel, execution: trustExecution });
+    trustShadow = trustShadowTelemetryV1({ result: trustResult, cacheState: trustExecution.cacheState, fallbackUsed: trustExecution.fallbackUsed, stale: trustExecution.stale, validationLatencyMs: Date.now() - trustStartedAt });
+    logTrustShadowTelemetryV1(trustShadow);
+  } catch {
+    try {
+      trustShadow = trustShadowFailureTelemetryV1({ workflowId: analysisPackage.contractId, outputContractVersion: analysisPackage.contractVersion, validatorVersion: analysisPackage.validatorVersion, workspaceId, releaseChannel, snapshotFingerprint: analysisPackage.trustBinding?.snapshotFingerprint || null, projectionFingerprint: analysisPackage.trustBinding?.projectionFingerprint || null, manifestIdentity: analysisPackage.manifest.manifestId, provider: generation.provider, model: generation.model, requestId: generation.requestId, generationTimestamp: generatedAt, responseHash: evidenceEngineHash(generation.output), cacheState: trustExecution.cacheState, fallbackUsed: trustExecution.fallbackUsed, stale: trustExecution.stale, validationLatencyMs: Date.now() - trustStartedAt });
+      logTrustShadowTelemetryV1(trustShadow);
+    } catch {
+      trustShadow = null;
+    }
+  }
   const artifact: BusinessHealthExplanationArtifact = {
     contractId: analysisPackage.contractId,
     contractVersion: analysisPackage.contractVersion,
@@ -203,7 +223,8 @@ export async function generateBusinessHealthExplanation({
       provider_attempts: generation.attempts.map(businessHealthProviderAttemptTelemetry),
       estimated_request_tokens: estimatedRequestTokens,
       evidence_count: analysisPackage.requiredCitationIds.length,
-      driver_count: analysisPackage.facts.drivers.length
+      driver_count: analysisPackage.facts.drivers.length,
+      ...(trustShadow ? { trust_shadow: trustShadow as unknown as Json } : {})
     } satisfies Json
   };
 
