@@ -44,6 +44,38 @@ function normalizeNumber(value: string) {
   return value.replace(/[$,%\s]/g, "").replace(/^\+/, "");
 }
 
+function regexEscape(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function approvedLabelPattern(label: string) {
+  const tokens = label.match(/[A-Za-z0-9]+/g) || [];
+  if (!tokens.length) return null;
+  return new RegExp(
+    `(?<![A-Za-z0-9])${tokens.map(regexEscape).join("[^A-Za-z0-9]+")}(?![A-Za-z0-9])`,
+    "giu"
+  );
+}
+
+const CANONICAL_KPI_DRIVER_TITLE_PATTERN = /^(.+?)\s+(?:remained\s+(?:below target|above target|below acceptable range|above acceptable range|outside target)\s+for\s+\d+\s+periods?|is\s+(?:below target|above target|below acceptable range|above acceptable range|outside target))$/i;
+
+function approvedDriverLabelSpans(label: string) {
+  const normalized = label.trim();
+  const canonicalKpiTitle = normalized.match(CANONICAL_KPI_DRIVER_TITLE_PATTERN);
+  return Array.from(new Set([
+    normalized,
+    canonicalKpiTitle?.[1]?.trim() || ""
+  ].filter(Boolean))).sort((left, right) => right.length - left.length);
+}
+
+function withoutApprovedDriverLabels(value: string, labels: readonly string[]) {
+  const approvedSpans = labels.flatMap(approvedDriverLabelSpans).sort((left, right) => right.length - left.length);
+  return approvedSpans.reduce((masked, label) => {
+    const pattern = approvedLabelPattern(label);
+    return pattern ? masked.replace(pattern, (match) => " ".repeat(match.length)) : masked;
+  }, value);
+}
+
 function driverTerms(label: string) {
   return Array.from(new Set(
     label
@@ -126,6 +158,7 @@ export function validateBusinessHealthExplanationOutput(
 
   const deterministicFactText = JSON.stringify({
     score: context.facts.score,
+    scoreScaleMax: 100,
     comparisonDelta: context.facts.comparisonDelta,
     dataQualityBase: context.facts.dataQualityBase,
     riskPenalty: context.facts.riskPenalty,
@@ -140,7 +173,8 @@ export function validateBusinessHealthExplanationOutput(
     reportedContext: contextualEvidenceGroundingText(context.contextualEvidence || [])
   });
   const approvedNumbers = new Set(numericClaims(approvedFactText).map(normalizeNumber));
-  const unsupportedNumber = numericClaims(text).find((claim) => !approvedNumbers.has(normalizeNumber(claim)));
+  const numericText = withoutApprovedDriverLabels(text, context.facts.drivers.map((driver) => driver.label));
+  const unsupportedNumber = numericClaims(numericText).find((claim) => !approvedNumbers.has(normalizeNumber(claim)));
   if (unsupportedNumber) {
     return validationFailure("The response introduced a number outside the approved deterministic facts.", {
       reasonCode: "numeric_integrity_failed",
