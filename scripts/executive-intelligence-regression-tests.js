@@ -767,25 +767,6 @@ assert.match(multiSourceFailureAnswer.executiveBriefing.limitedEvidence.evidence
 assert.equal(multiSourceFailureAnswer.executiveBriefing.keyFindings.length, 3, "provider failure must preserve up to three conservative ranked findings");
 assert.equal(new Set(multiSourceFailureAnswer.executiveBriefing.keyFindings.map((finding) => finding.finding)).size, 3, "provider fallback findings must remain distinct");
 
-const derivedOnlyBounded = makeBoundedContext({
-  reports: [{ id: sourceId(60), title: "Prior executive brief", report_type: "Executive Brief", evidence_lineage_available: false, created_at: now }]
-}, 1);
-const derivedOnlyReasoning = buildExecutiveReasoningContext({
-  query: "What should leadership focus on this week?",
-  plan: executivePlan,
-  boundedContext: derivedOnlyBounded,
-  evidenceContext: emptyEvidenceContext
-});
-const derivedOnlyAnswer = buildLimitedEvidenceExecutiveAnswer({
-  query: "What should leadership focus on this week?",
-  boundedContext: derivedOnlyBounded,
-  reasoningContext: derivedOnlyReasoning
-});
-assert.equal(derivedOnlyReasoning.independentSourceCount, 0, "derived reports must not count as original corroboration");
-assert.equal(derivedOnlyReasoning.rankedEvidenceCount, 0, "a derived report without explicit original lineage must not enter the citation set");
-assert.equal(derivedOnlyAnswer.recommendationConfidence, "Insufficient", "derived-only evidence cannot support a new recommendation");
-assert.match(derivedOnlyAnswer.directAnswer, /underlying original evidence/i, "derived-only answers must explain the lineage limitation");
-
 const healthKpiSummary = {
   totalRows: 4,
   metricCount: 2,

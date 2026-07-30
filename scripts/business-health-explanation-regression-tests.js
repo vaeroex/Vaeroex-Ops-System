@@ -161,7 +161,7 @@ function intelligence(overrides = {}) {
     topOpportunity: opportunity,
     topRecommendation: risk,
     insights,
-    memorySummary: { profileSignals: 2, sourceRecords: 2, kpiHistoryRecords: 8, reports: 0, vaeroexRuns: 0, decisions: 0, recommendationOutcomes: 0 },
+    memorySummary: { profileSignals: 2, sourceRecords: 2, kpiHistoryRecords: 8, vaeroexRuns: 0, decisions: 0, recommendationOutcomes: 0 },
     ...overrides
   };
   return { ...base, businessHealth: { ...base.businessHealth, ...(overrides.businessHealth || {}) } };

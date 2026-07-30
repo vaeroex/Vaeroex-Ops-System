@@ -3,13 +3,12 @@ import type { Json } from "@/lib/supabase/types";
 export const SAVED_ANALYSIS_ENVELOPE_VERSION = 1 as const;
 
 export const SAVED_ANALYSIS_TYPES = [
-  "executive_brief",
   "business_health",
   "finding_explanation"
 ] as const;
 
 export type SavedAnalysisType = (typeof SAVED_ANALYSIS_TYPES)[number];
-export type SaveableAnalysisType = Exclude<SavedAnalysisType, "executive_brief">;
+export type SaveableAnalysisType = SavedAnalysisType;
 export type SavedAnalysisConfidence = "High" | "Medium" | "Low";
 export type SavedAnalysisFreshness = "current" | "stale" | "unavailable";
 export type SavedAnalysisReleaseChannel = "production" | "preview" | "development";
@@ -207,7 +206,6 @@ export function parseSavedAnalysisEnvelope(value: unknown): SavedAnalysisEnvelop
 }
 
 export function savedAnalysisTypeLabel(type: SavedAnalysisType) {
-  if (type === "executive_brief") return "Legacy Leadership Analysis";
   if (type === "business_health") return "Business Health";
   return "Finding Explanation";
 }

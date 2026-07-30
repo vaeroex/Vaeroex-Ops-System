@@ -14,23 +14,21 @@ const renderer = read("components/reports/SavedAnalysisRenderer.tsx");
 const saveButton = read("components/reports/SaveAnalysisButton.tsx");
 const businessHealth = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const findingExplanation = read("components/intelligence/IntelligenceSignalInbox.tsx");
-const reportsNew = read("app/app/reports/new/page.tsx");
-const generatedNew = read("app/app/generated/new/page.tsx");
 const agentPage = read("app/app/agents/page.tsx");
 const agentActions = read("app/app/agents/actions.ts");
 const home = read("app/app/page.tsx");
-const cronRoute = read("app/api/cron/report-subscriptions/route.ts");
-const generationPolicy = read("lib/reports/generation-policy.ts");
 const vercel = read("vercel.json");
 const migration = read("supabase/migrations/20260721220519_saved_analysis_uniqueness.sql");
 
 assert.match(`${reportsPage}\n${list}`, /Saved Analyses/);
 assert.doesNotMatch(reportsPage, /Generate report|Generate Report|ReportLifecycleMenu/);
 assert.match(reportsPage, /\.eq\("workspace_id", workspaceId\)/);
-assert.match(reportsPage, /Legacy Reports/);
-assert.match(reportsPage, /remain unchanged and read-only/);
+assert.match(reportsPage, /record_kind: "saved_analysis", release_channel: channel/);
+assert.doesNotMatch(reportsPage, /Legacy Reports|legacy generated report/);
 assert.match(reportDetail, /parseSavedAnalysisEnvelope/);
 assert.match(reportDetail, /SavedAnalysisRenderer/);
+assert.match(reportDetail, /savedAnalysis\.workspace_id !== workspaceId/);
+assert.match(reportDetail, /savedAnalysis\.release_channel !== channel/);
 assert.doesNotMatch(renderer, /dangerouslySetInnerHTML|provider-manager|vaeroex-client|OpenAI|NVIDIA_API_KEY/);
 assert.doesNotMatch(actions, /provider-manager|vaeroex-client|runExecutive|generateExecutive|NVIDIA_API_KEY|OPENAI_API_KEY/);
 
@@ -39,6 +37,8 @@ for (const field of [
   "provider_attribution", "generated_at", "saved_at", "confidence", "evidence_fingerprint",
   "citations", "evidence_lineage", "release_channel", "artifact", "saved_analysis_key"
 ]) assert.match(contracts, new RegExp(field), `saved-analysis envelope must preserve ${field}`);
+assert.match(contracts, /SAVED_ANALYSIS_TYPES = \[\s*"business_health",\s*"finding_explanation"\s*\]/);
+assert.doesNotMatch(contracts, /executive_brief/);
 
 assert.match(actions, /artifact: completed\.artifact/);
 assert.match(actions, /artifact\.generatedAt === generatedAt/);
@@ -61,13 +61,14 @@ assert.match(migration, /create unique index(?: if not exists)? reports_saved_an
 assert.match(migration, /where deleted_at is null[\s\S]+record_kind[\s\S]+saved_analysis/i);
 
 assert.match(list, /Search saved analyses/);
-for (const label of ["All", "Legacy Leadership", "Business Health", "Finding Explanations"]) assert.match(list, new RegExp(label));
+for (const label of ["All", "Business Health", "Finding Explanations"]) assert.match(list, new RegExp(label));
+assert.doesNotMatch(list, /Legacy Leadership/);
 assert.match(list, /Select all visible/);
 assert.match(list, /Clear selection/);
 assert.match(list, /Delete selected/);
 assert.match(list, /window\.confirm/);
 assert.match(list, /deleteSavedAnalysesAction\(ids\)/);
-assert.doesNotMatch(reportsPage, /legacy[\s\S]{0,900}type="checkbox"/i, "legacy reports must not enter saved-analysis selection");
+assert.doesNotMatch(reportsPage, /legacy/i, "legacy reports must not enter saved-analysis presentation");
 
 assert.match(actions, /new Set\(ids\)/);
 assert.match(actions, /Nothing was deleted/);
@@ -97,16 +98,21 @@ assert.match(migration, /deleted_count <> cardinality\(p_report_ids\)[\s\S]+rais
 assert.match(migration, /revoke all on function public\.soft_delete_saved_analyses\([\s\S]+from public, anon/);
 assert.match(migration, /grant execute on function public\.soft_delete_saved_analyses\([\s\S]+to authenticated/);
 
-assert.match(reportsNew, /permanentRedirect\("\/app\/reports"\)/);
-assert.match(generatedNew, /permanentRedirect\("\/app\/reports"\)/);
 for (const source of [reportsPage, home, findingExplanation, agentPage]) {
   assert.doesNotMatch(source, /Create report|Generate report|Generate Improvement Plan|Generate Investigation Summary|Generate Executive Briefing/);
 }
-assert.match(agentActions, /Secondary report generation is no longer available/);
-assert.match(generationPolicy, /return true/);
+assert.doesNotMatch(agentActions, /reportDrafts|\.from\("reports"\)/);
+assert.doesNotMatch(agentPage, /getReportDrafts|ReportDraftSection|View full report draft/);
 assert.equal(fs.existsSync(path.join(root, "app/app/reports/actions.ts")), false, "retired manual report generation actions must stay deleted");
 assert.equal(fs.existsSync(path.join(root, "app/app/generated/actions.ts")), false, "retired generated-output actions must stay deleted");
-assert.match(cronRoute, /status: 410/);
+for (const retiredPath of [
+  "app/app/reports/new/page.tsx",
+  "app/app/generated/new/page.tsx",
+  "app/app/briefings/page.tsx",
+  "app/api/cron/report-subscriptions/route.ts",
+  "lib/reports/generation-policy.ts",
+  "lib/reports/legacy-executive-brief-artifact.ts"
+]) assert.equal(fs.existsSync(path.join(root, retiredPath)), false, `${retiredPath} must stay retired`);
 assert.doesNotMatch(vercel, /report-subscriptions|crons/);
 
 console.log("Saved-analysis regressions passed.");

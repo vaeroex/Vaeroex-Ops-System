@@ -5,7 +5,7 @@ import { dismissRecommendationAction } from "@/app/app/accountability/actions";
 import { runVaeroexAction, saveVaeroexOutputAction } from "@/app/app/agents/actions";
 import { ConfirmSubmitButton } from "@/components/operations/ConfirmSubmitButton";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
-import { TextArea, TextInput } from "@/components/operations/FormControls";
+import { TextArea } from "@/components/operations/FormControls";
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { PageHeader } from "@/components/operations/PageHeader";
 import { PendingSubmitButton } from "@/components/operations/PendingSubmitButton";
@@ -30,13 +30,11 @@ export const maxDuration = 60;
 type JsonRecord = Record<string, unknown>;
 
 const saveLabels: Record<VaeroexSaveTarget, string> = {
-  sop: "SOP draft",
-  report: "briefing draft"
+  sop: "SOP draft"
 };
 
 const saveDestinations: Record<string, { label: string; href: Route }> = {
-  sop: { label: "SOPs", href: "/app/sops" },
-  report: { label: "Reports", href: "/app/reports" as Route }
+  sop: { label: "SOPs", href: "/app/sops" }
 };
 const vaeroexRunEditFields: ManagedRecordEditField[] = [
   { name: "status", label: "Status", type: "select", options: ["queued", "running", "completed", "failed"] },
@@ -112,10 +110,9 @@ function dataUsedSummary(input: JsonRecord) {
 
   return [
     { label: "KPIs", value: numberValue(metrics.kpi_history_records) || asArray(snapshot.kpi_history).length },
-    { label: "Reports", value: numberValue(metrics.reports) || asArray(snapshot.reports).length },
     { label: "Sources", value: numberValue(metrics.uploaded_files) || asArray(snapshot.files).length },
     { label: "Issues", value: numberValue(metrics.open_issues) || asArray(snapshot.recent_issues).length },
-    { label: "Business Memory", value: asArray(snapshot.recent_vaeroex_results).length + asArray(snapshot.reports).length },
+    { label: "Business Memory", value: asArray(snapshot.recent_vaeroex_results).length },
     { label: "Actions", value: numberValue(metrics.open_tasks) || asArray(snapshot.recent_tasks).length },
     { label: "Decisions", value: asArray(snapshot.business_decisions).length }
   ];
@@ -201,11 +198,7 @@ function runDiagnosticsFromOutput(output?: Json) {
 
 function workflowDataUsed(key: VaeroexWorkflowKey) {
   if (key === "file_analysis") {
-    return "Selected file content, prior imports, KPIs, reports";
-  }
-
-  if (key === "weekly_report" || key === "daily_summary" || key === "business_review_package") {
-    return "KPIs, issues, customer activity evidence, reports, Vaeroex runs";
+    return "Selected file content, prior imports, KPIs, and eligible evidence";
   }
 
   if (key === "sop_generator" || key === "form_builder" || key === "checklist_builder") {
@@ -216,7 +209,7 @@ function workflowDataUsed(key: VaeroexWorkflowKey) {
     return "Workspace health, risks, KPIs, decisions, evidence, and business memory";
   }
 
-  return "Workspace records, issues, files, reports, and eligible evidence";
+  return "Workspace records, issues, files, and eligible evidence";
 }
 
 function resultTitle(output: JsonRecord, fallback: string) {
@@ -496,7 +489,7 @@ function inferRelatedModule(text: string) {
   if (normalized.includes("crm") || normalized.includes("lead") || normalized.includes("customer follow")) return "Customer Evidence";
   if (normalized.includes("sop") || normalized.includes("procedure")) return "SOPs";
   if (normalized.includes("checklist")) return "Checklists";
-  if (normalized.includes("report") || normalized.includes("briefing")) return "Reports";
+  if (normalized.includes("report") || normalized.includes("briefing")) return "Executive Review";
   if (normalized.includes("file") || normalized.includes("spreadsheet")) return "Sources";
   if (normalized.includes("issue") || normalized.includes("risk")) return "Issues";
   return "Executive Review";
@@ -510,11 +503,10 @@ function moduleHref(moduleName: string): Route {
   if (normalized.includes("customer")) return "/app/sources";
   if (normalized.includes("sop")) return "/app/sops";
   if (normalized.includes("checklist")) return "/app/checklists";
-  if (normalized.includes("report") || normalized.includes("briefing")) return "/app/reports" as Route;
   if (normalized.includes("file") || normalized.includes("source")) return "/app/sources";
   if (normalized.includes("issue")) return "/app/issues";
   if (normalized.includes("form")) return "/app/forms";
-  return "/app/reports";
+  return "/app/intelligence";
 }
 
 function getActionableRecommendations(output: JsonRecord) {
@@ -616,35 +608,13 @@ function getSopDrafts(output: JsonRecord) {
   });
 }
 
-function getReportDrafts(output: JsonRecord) {
-  const drafts = [...asArray(output.report), ...asArray(output.reports)];
-
-  if (!drafts.length && !isStructuredText(output.response_markdown) && (output.response_markdown || output.summary)) {
-    drafts.push(output);
-  }
-
-  return drafts.map((draft, index) => {
-    const record = asRecord(draft);
-
-    return {
-      title: str(record.title, index === 0 ? "Vaeroex report draft" : `Vaeroex report draft ${index + 1}`),
-      type: str(record.report_type, "Intelligence Report"),
-      body: str(record.body_markdown) || str(record.response_markdown) || str(record.summary)
-    };
-  });
-}
-
-function hasDraftForTarget(output: JsonRecord, target: VaeroexSaveTarget, workflowKey: string) {
-  if (target === "sop") {
-    return Boolean(getSopDrafts(output).length);
-  }
-
-  return false;
+function hasDraftForTarget(output: JsonRecord) {
+  return Boolean(getSopDrafts(output).length);
 }
 
 function SaveButtons({ runId, workflowKey, output }: { runId: string; workflowKey: string; output: JsonRecord }) {
   const workflow = getVaeroexWorkflow(workflowKey);
-  const targets = workflow.saveTargets.filter((target) => target === "sop" && hasDraftForTarget(output, target, workflowKey));
+  const targets = workflow.saveTargets.filter(() => hasDraftForTarget(output));
 
   if (!targets.length) {
     return (
@@ -934,36 +904,12 @@ function SopDraftSection({ sops }: { sops: ReturnType<typeof getSopDrafts> }) {
   );
 }
 
-function ReportDraftSection({ reports }: { reports: ReturnType<typeof getReportDrafts> }) {
-  if (!reports.length) {
-    return null;
-  }
-
-  return (
-    <div className="rounded-lg border border-line bg-white p-4">
-      <h4 className="text-sm font-semibold">Report Draft</h4>
-      <div className="mt-3 space-y-4">
-        {reports.map((report) => (
-          <article key={report.title}>
-            <p className="font-semibold">{report.title}</p>
-            <p className="mt-1 text-xs text-muted">{report.type}</p>
-            <div className="mt-3 rounded-md bg-slate-50 p-3">
-              <ReadableText value={report.body} />
-            </div>
-          </article>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId: string; runTitle: string }) {
   const visibleOutput = displayOutput(output);
   const sections = businessSections(visibleOutput);
   const forms = getFormDrafts(visibleOutput);
   const checklists = getChecklistDrafts(visibleOutput);
   const sops = getSopDrafts(visibleOutput);
-  const reports = getReportDrafts(visibleOutput);
   const recommendations = getActionableRecommendations(visibleOutput);
   const detail = cleanReadableText(visibleOutput.response_markdown);
   const topProblems = sections.problems.slice(0, 3);
@@ -1002,15 +948,6 @@ function BusinessResult({ output, runId, runTitle }: { output: JsonRecord; runId
             <ChecklistDraftSection checklists={checklists} />
             <FormDraftSection forms={forms} />
             <SopDraftSection sops={sops} />
-          </div>
-        </details>
-      ) : null}
-
-      {reports.length ? (
-        <details className="rounded-lg border border-white/10 bg-[#08111f] p-4">
-          <summary className="cursor-pointer text-sm font-semibold text-slate-100">View full report draft</summary>
-          <div className="mt-3">
-            <ReportDraftSection reports={reports} />
           </div>
         </details>
       ) : null}
@@ -1077,7 +1014,7 @@ function evidenceSourceLabel(item: string) {
   if (/kpi|metric|revenue|target|trend|history|forecast|score/.test(normalized)) return "KPI History";
   if (/business memory|memory/.test(normalized)) return "Business Memory";
   if (/signal/.test(normalized)) return "Evidence";
-  if (/report|brief|briefing|review/.test(normalized)) return "Reports";
+  if (/report|brief|briefing|review/.test(normalized)) return "Executive Review";
   if (/file|source|upload|document|spreadsheet|csv|xlsx|pdf/.test(normalized)) return "Source Files";
   if (/sop|process|procedure|policy/.test(normalized)) return "Process Documents";
 
@@ -1291,15 +1228,11 @@ function failureReasons(input: JsonRecord, message?: string | null) {
   }
 
   if (!hasAnyData) {
-    reasons.push("This workspace has little or no KPI, report, file, issue, source-signal, or business-memory context yet.");
+    reasons.push("This workspace has little or no KPI, file, issue, source-signal, or business-memory context yet.");
   }
 
   if (!numberValue(metrics.kpi_history_records)) {
     reasons.push("No KPI history was available for trend-based analysis.");
-  }
-
-  if (!numberValue(metrics.reports)) {
-    reasons.push("No saved reports were available for business memory.");
   }
 
   if (!reasons.length) {
@@ -1541,12 +1474,6 @@ function WorkflowRunForm({
         placeholder={workflow.promptPlaceholder}
         rows={compact ? 4 : 3}
       />
-      {workflow.key === "weekly_report" || workflow.key === "daily_summary" || workflow.key === "business_review_package" ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          <TextInput label="Start date" name="date_range_start" type="date" />
-          <TextInput label="End date" name="date_range_end" type="date" />
-        </div>
-      ) : null}
       <PendingSubmitButton className={vaeroexSubmitClass} pendingLabel="Generating..." activityDisabled={workflow.key === "ask_vaeroex"}>
         {workflow.actionLabel}
       </PendingSubmitButton>

@@ -210,18 +210,14 @@ async function runToolGatewayTests() {
   );
 
   await expectBlocked(
-    "prompt injection inside tool arguments",
+    "retired report mutation",
     {
       toolName: "create_report_from_file",
-      args: {
-        fileId: "33333333-3333-4333-8333-333333333333",
-        title: "Executive review; DROP TABLE reports",
-        reportType: "Executive Brief"
-      },
+      args: {},
       initiatedBy: "user",
       confirmationReceived: true
     },
-    /schema validation/
+    /not registered in the allowlist/
   );
 
   await expectBlocked(

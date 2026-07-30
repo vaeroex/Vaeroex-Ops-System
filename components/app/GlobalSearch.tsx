@@ -260,7 +260,7 @@ export function GlobalSearch({ className = "", variant = "desktop" }: GlobalSear
                   value={query}
                   onChange={(event) => updateQuery(event.target.value)}
                   onKeyDown={moveSelection}
-                  placeholder="Search KPIs, evidence, reports, signals, or pages..."
+                  placeholder="Search KPIs, evidence, saved analyses, signals, or pages..."
                   autoComplete="off"
                   className="min-h-12 w-full rounded-lg border border-white/15 bg-slate-950/60 py-3 pl-10 pr-20 text-base font-medium text-white outline-none placeholder:text-slate-500 shadow-sm shadow-black/10 transition focus:border-vaeroex-accent/60 focus:bg-slate-950/75 focus:ring-2 focus:ring-vaeroex-accent/25"
                   aria-controls={resultsId}

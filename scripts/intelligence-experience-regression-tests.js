@@ -385,8 +385,6 @@ assert.equal(noDirectMetric.topRisk, undefined, "missing metrics must not create
 assert.equal(fs.existsSync(path.join(root, "lib/intelligence/generated-output.ts")), false, "retired secondary output builders must stay deleted");
 
 const inboxSource = fs.readFileSync(path.join(root, "components/intelligence/IntelligenceSignalInbox.tsx"), "utf8");
-const outputPageSource = fs.readFileSync(path.join(root, "app/app/reports/new/page.tsx"), "utf8");
-const legacyOutputPageSource = fs.readFileSync(path.join(root, "app/app/generated/new/page.tsx"), "utf8");
 const savedReportSource = fs.readFileSync(path.join(root, "app/app/reports/[id]/page.tsx"), "utf8");
 const saveActionSource = fs.readFileSync(path.join(root, "app/app/reports/saved-analysis-actions.ts"), "utf8");
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
@@ -417,12 +415,13 @@ assert.match(inboxSource, /xl:max-h-\[calc\(100dvh-8rem\)\].*xl:overflow-y-auto/
 assert.doesNotMatch(inboxSource, /(?<!xl:)max-h-\[calc\(100dvh|(?<!xl:)overflow-y-auto/, "mobile evidence flow must not create a nested viewport scroller");
 assert.match(sourcesPageSource, /\.eq\("workspace_id", workspaceId\)/, "supporting Evidence destinations remain workspace scoped");
 assert.match(sourcesPageSource, /filterEligibleMemoryRowsByLifecycle/, "supporting Evidence destinations must validate lifecycle lineage");
-assert.match(outputPageSource, /permanentRedirect\("\/app\/reports"\)/, "retired report-draft routes must redirect to Reports");
-assert.match(legacyOutputPageSource, /permanentRedirect\("\/app\/reports"\)/, "legacy generated routes must redirect to Reports");
+assert.equal(fs.existsSync(path.join(root, "app/app/reports/new/page.tsx")), false, "retired report-draft route must stay absent");
+assert.equal(fs.existsSync(path.join(root, "app/app/generated/new/page.tsx")), false, "legacy generated route must stay absent");
 assert.match(inboxSource, /SaveAnalysisButton analysisType="finding_explanation"/, "completed finding explanations must expose explicit Save Analysis");
 assert.match(saveActionSource, /artifact: completed\.artifact/, "saved analyses must copy the exact validated artifact");
 assert.match(saveActionSource, /source_data_json: envelope/, "saved analyses must persist the versioned copied envelope");
 assert.match(savedReportSource, /SavedAnalysisRenderer/, "saved analyses must reopen through the read-only renderer");
+assert.match(savedReportSource, /parseSavedAnalysisEnvelope/, "saved analysis detail must reject ambiguous legacy rows");
 assert.match(appNavigationSource, /pathname\.startsWith\(`\$\{href\}\//, "nested Intelligence and Reports routes must keep their sidebar section active");
 assert.doesNotMatch(intelligencePageSource, /Forecast Summary/, "weak forecast readiness is not promoted into the executive summary");
 assert.match(intelligencePageSource, /from\("operational_metrics"\)/, "Intelligence loads bounded operational evidence");

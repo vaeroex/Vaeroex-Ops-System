@@ -19,7 +19,6 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 export type ManagedRecordCollection =
   | "sops"
   | "issues"
-  | "reports"
   | "kpis"
   | "forms"
   | "form_submissions"
@@ -162,7 +161,6 @@ function collectionLabel(collection: ManagedRecordCollection) {
   const labels: Record<ManagedRecordCollection, string> = {
     sops: "SOPs",
     issues: "issues",
-    reports: "reports",
     kpis: "KPIs",
     forms: "forms",
     form_submissions: "form submissions",

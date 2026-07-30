@@ -33,6 +33,8 @@ import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMessage } from "@/lib/security/security-response";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
+import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
+import { parseSavedAnalysisEnvelope } from "@/lib/reports/saved-analysis";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
@@ -65,7 +67,7 @@ type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Ro
 
 const GROUP_ORDER: GlobalSearchGroupLabel[] = [
   "KPIs",
-  "Reports",
+  "Saved Analyses",
   "Files",
   "Issues",
   "Review Signals",
@@ -162,7 +164,6 @@ function sourceHref(sourceType: string | null, title: string | null) {
 
   if (normalized.includes("task") || normalized.includes("follow")) return hrefWithQuery("/app/sources", query);
   if (normalized.includes("issue")) return hrefWithQuery("/app/issues", query);
-  if (normalized.includes("report")) return hrefWithQuery("/app/reports", query);
   if (normalized.includes("kpi")) return hrefWithQuery("/app/kpis", query);
   if (normalized.includes("file")) return hrefWithQuery("/app/sources", query);
   if (normalized.includes("sop")) return hrefWithQuery("/app/sops", query);
@@ -257,6 +258,7 @@ export async function GET(request: Request) {
   }
 
   const workspaceId = context.activeWorkspace.id;
+  const savedAnalysisChannel = currentSavedAnalysisReleaseChannel();
   const subscriptionStatus = await getSubscriptionStatus({ supabase, userId: user.id, email: user.email, workspaceId });
 
   if (!subscriptionStatus.allowed) {
@@ -322,7 +324,7 @@ export async function GET(request: Request) {
   const includeDiagnostics = shouldSearchDiagnostics(query, user);
   const [
     rawKpis,
-    reports,
+    rawSavedAnalyses,
     files,
     issues,
     assignments,
@@ -352,6 +354,7 @@ export async function GET(request: Request) {
         .eq("workspace_id", workspaceId)
         .is("deleted_at", null)
         .is("archived_at", null)
+        .contains("source_data_json", { record_kind: "saved_analysis", release_channel: savedAnalysisChannel })
         .or(orFilter(["title", "report_type", "body_markdown"], words))
         .order("created_at", { ascending: false })
         .limit(6)
@@ -391,7 +394,11 @@ export async function GET(request: Request) {
         .or(orFilter(["title", "description", "status", "priority", "source_type", "source_title"], words))
         .order("updated_at", { ascending: false })
         .limit(24)
-    ).then((rows) => excludeChecklistDerivedRecords(rows).slice(0, 6)),
+    ).then((rows) =>
+      excludeChecklistDerivedRecords(rows)
+        .filter((row) => !row.source_type?.toLowerCase().includes("report"))
+        .slice(0, 6)
+    ),
     scopedResults<CrmLeadRow>(
       includesDomain("customers"),
       () => supabase
@@ -459,6 +466,12 @@ export async function GET(request: Request) {
   const sourceParentEligibility = sourceParentResult.eligibility;
   const kpis = filterBySourceParentEligibility(rawKpis, sourceParentEligibility);
   const crmLeads = filterBySourceParentEligibility(rawCrmLeads, sourceParentEligibility);
+  const savedAnalyses = rawSavedAnalyses.flatMap((row) => {
+    const envelope = parseSavedAnalysisEnvelope(row.source_data_json);
+    return envelope?.workspace_id === workspaceId && envelope.release_channel === savedAnalysisChannel
+      ? [{ row, envelope }]
+      : [];
+  });
   let learnedKnowledgePage = learnedKnowledgeCandidates;
   let learnedKnowledge = await filterEligibleMemoryRowsByLifecycle({
     supabase,
@@ -504,14 +517,14 @@ export async function GET(request: Request) {
 
   addGroup(
     groups,
-    "Reports",
-    reports.map((report) => ({
-      id: report.id,
-      title: report.title,
-      sourceType: `Derived report · ${report.report_type}`,
-      preview: "Saved derived analysis. Review its original evidence before using its conclusions.",
-      href: hrefWithQuery("/app/reports", report.title),
-      meta: report.created_at
+    "Saved Analyses",
+    savedAnalyses.map(({ row, envelope }) => ({
+      id: row.id,
+      title: envelope.title,
+      sourceType: "Saved Analysis",
+      preview: truncate(envelope.display.summary),
+      href: `/app/reports/${row.id}`,
+      meta: envelope.saved_at
     }))
   );
 

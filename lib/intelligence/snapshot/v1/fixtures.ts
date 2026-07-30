@@ -288,7 +288,6 @@ export function foundationIntelligenceLayerOutput(): IntelligenceLayerProducerOu
       profileSignals: 2,
       sourceRecords: 4,
       kpiHistoryRecords: 36,
-      reports: 0,
       vaeroexRuns: 0,
       decisions: 0,
       recommendationOutcomes: 0

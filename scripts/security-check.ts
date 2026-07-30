@@ -362,7 +362,6 @@ const serverSecrets = [
   "SUPABASE_SERVICE_ROLE_KEY",
   "OPENAI_API_KEY",
   "NVIDIA_API_KEY",
-  "CRON_SECRET",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET"
 ];
@@ -404,8 +403,6 @@ for (const toolName of [
   "approve_kpi_import",
   "approve_operational_metrics_import",
   "approve_workbook_import",
-  "create_report_from_file",
-  "attach_file_to_report",
   "save_file_analysis_business_memory",
   "update_kpi_record",
   "update_kpi_settings",
@@ -416,6 +413,9 @@ for (const toolName of [
   "bulk_manage_records"
 ]) {
   check(toolGateway.includes(toolName), `AI tool execution gateway must register mutation path: ${toolName}.`);
+}
+for (const retiredTool of ["save_vaeroex_output_report", "save_generated_output_briefing", "create_report_from_file", "attach_file_to_report"]) {
+  check(!toolGateway.includes(retiredTool), `Retired report mutation must not remain registered: ${retiredTool}.`);
 }
 check(toolGateway.includes("Bulk record deletion requires typed DELETE confirmation"), "Bulk destructive record actions must require typed DELETE confirmation.");
 check(toolGateway.includes("recentBlockedActionCount"), "Gateway must rate-limit repeated blocked or suspicious actions.");

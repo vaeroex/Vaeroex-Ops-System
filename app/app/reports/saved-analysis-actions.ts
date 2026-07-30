@@ -20,6 +20,7 @@ import {
   type SaveableAnalysisType,
   parseSavedAnalysisEnvelope
 } from "@/lib/reports/saved-analysis";
+import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
 import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access";
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
@@ -37,12 +38,6 @@ const contractByType: Record<SaveableAnalysisType, string> = {
   business_health: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   finding_explanation: FINDING_EXPLANATION_CONTRACT_ID
 };
-
-function releaseChannel(): SavedAnalysisReleaseChannel {
-  if (process.env.VERCEL_ENV === "production") return "production";
-  if (process.env.VERCEL_ENV === "preview") return "preview";
-  return "development";
-}
 
 function record(value: Json): Record<string, Json | undefined> {
   return value && typeof value === "object" && !Array.isArray(value)
@@ -212,7 +207,7 @@ export async function getSavedAnalysisState(input: SaveAnalysisInput) {
   if (!completed) return { saved: false, id: null };
   const key = savedAnalysisKey({
     workspaceId,
-    channel: releaseChannel(),
+    channel: currentSavedAnalysisReleaseChannel(),
     analysisType: input.analysisType,
     sourceArtifactId: completed.runId,
     artifact: completed.artifact
@@ -229,7 +224,7 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
   const completed = await completedArtifact({ ...input, supabase, workspaceId });
   if (!completed) return { status: "error", message: "Only a completed validated analysis can be saved." };
 
-  const channel = releaseChannel();
+  const channel = currentSavedAnalysisReleaseChannel();
   const key = savedAnalysisKey({ workspaceId, channel, analysisType: input.analysisType, sourceArtifactId: completed.runId, artifact: completed.artifact });
   const existing = await existingSavedAnalysis({ supabase, workspaceId, key });
   if (existing) return { status: "already_saved", id: existing.id, message: "Already saved" };
@@ -320,7 +315,23 @@ export async function deleteSavedAnalysesAction(ids: readonly string[]): Promise
     return { status: "error", message: "The selected analyses could not be validated. Nothing was deleted." };
   }
   const { supabase, user, workspaceId, membership } = await requireWorkspaceAccess();
-  const channel = releaseChannel();
+  const channel = currentSavedAnalysisReleaseChannel();
+  const { data: selectedRows, error: selectedRowsError } = await supabase
+    .from("reports")
+    .select("id,source_data_json")
+    .eq("workspace_id", workspaceId)
+    .is("archived_at", null)
+    .is("deleted_at", null)
+    .in("id", uniqueIds);
+  const selectedById = new Map((selectedRows || []).map((row) => [row.id, parseSavedAnalysisEnvelope(row.source_data_json)]));
+  const everySelectionIsCurrent = !selectedRowsError && uniqueIds.every((id) => {
+    const envelope = selectedById.get(id);
+    return envelope?.workspace_id === workspaceId && envelope.release_channel === channel;
+  });
+
+  if (!everySelectionIsCurrent) {
+    return { status: "error", message: "One or more selected analyses are unavailable. Nothing was deleted." };
+  }
 
   try {
     for (let index = 0; index < uniqueIds.length; index += 100) {
@@ -369,8 +380,4 @@ export async function deleteSavedAnalysesAction(ids: readonly string[]): Promise
 
   revalidatePath("/app/reports");
   return { status: "deleted", count: deletedCount, message: `${deletedCount} saved ${deletedCount === 1 ? "analysis" : "analyses"} deleted.` };
-}
-
-export async function currentSavedAnalysisReleaseChannel() {
-  return releaseChannel();
 }

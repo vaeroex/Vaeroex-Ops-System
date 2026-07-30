@@ -46,7 +46,6 @@ import type { Database, Json } from "@/lib/supabase/types";
 import { getWorkspaceContext } from "@/lib/workspaces/current";
 
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
-type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
 type ImportType = "kpi" | "metrics";
 type JsonRecord = Record<string, unknown>;
@@ -1236,7 +1235,6 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
   const actions = outputList(output, "recommended_actions").concat(outputList(output, "suggested_tasks"));
   const opportunities = outputList(output, "opportunities").concat(outputList(output, "business_opportunities"));
   const suggestedTasks = outputList(output, "suggested_tasks").concat(outputList(output, "follow_up_tasks")).concat(outputList(output, "tasks"));
-  const suggestedReports = outputList(output, "suggested_reports").concat(outputList(output, "reports"));
   const suggestedKpiRecords = outputList(output, "suggested_kpi_records").concat(kpis);
   const suggestedCustomerEvidence = outputList(output, "suggested_crm_records").concat(outputList(output, "crm_records")).concat(outputList(output, "crm_leads"));
 
@@ -1253,7 +1251,6 @@ function cleanAnalysisResult(outputJson: Json, file: FileUploadRow, extraction: 
     recommended_actions: actions.slice(0, 8),
     opportunities: opportunities.slice(0, 8),
     suggested_tasks: suggestedTasks.slice(0, 8),
-    suggested_reports: suggestedReports.slice(0, 8),
     suggested_kpi_records: suggestedKpiRecords.slice(0, 8),
     response_markdown: str(output.response_markdown, summary)
   } satisfies JsonRecord;
@@ -1268,7 +1265,6 @@ function cleanAnalysisInsightCount(result: JsonRecord) {
     ...asArray(result.recommended_actions),
     ...asArray(result.opportunities),
     ...asArray(result.suggested_tasks),
-    ...asArray(result.suggested_reports),
     ...asArray(result.suggested_kpi_records)
   ].length;
 }
@@ -1685,14 +1681,6 @@ function compactFileMetadataForAnalysis(metadata: Json) {
   ]);
 }
 
-function reportReferencesFile(report: Pick<ReportRow, "source_data_json">, fileId: string) {
-  const source = isRecord(report.source_data_json) ? report.source_data_json : {};
-  const file = isRecord(source.file) ? source.file : {};
-  const attachedFiles = Array.isArray(source.attached_files) ? source.attached_files.filter(isRecord) as JsonRecord[] : [];
-
-  return file.id === fileId || attachedFiles.some((item) => item.id === fileId);
-}
-
 function requestMetricsFromUsage(metadata: Json | undefined): VaeroexRequestSizeMetrics | null {
   if (!isRecord(metadata)) {
     return null;
@@ -1860,18 +1848,12 @@ async function runFileVaeroexAnalysis({
     throw new Error(unsupportedFileContentMessage(file));
   }
 
-  const [fileImports, fileReports, evidenceContext] = await Promise.all([
+  const [fileImports, evidenceContext] = await Promise.all([
     supabase
       .from("file_imports")
       .select("id,import_type,status,rows_total,rows_imported,extraction_summary,created_at,imported_at")
       .eq("workspace_id", workspaceId)
       .eq("file_upload_id", file.id)
-      .order("created_at", { ascending: false })
-      .limit(10),
-    supabase
-      .from("reports")
-      .select("id,title,report_type,created_at,source_data_json")
-      .eq("workspace_id", workspaceId)
       .order("created_at", { ascending: false })
       .limit(10),
     buildWorkspaceEvidenceContext({
@@ -1904,10 +1886,6 @@ async function runFileVaeroexAnalysis({
       unrelated_workspace_records_excluded: true
     }
   } satisfies Json;
-  const relatedReports = (fileReports.data ?? [])
-    .filter((report) => reportReferencesFile(report as Pick<ReportRow, "source_data_json">, file.id))
-    .slice(0, 5)
-    .map((report) => compactRecordForAnalysis(report, ["id", "title", "report_type", "created_at"]));
   const extraInputs = {
     file: {
       id: file.id,
@@ -1927,7 +1905,6 @@ async function runFileVaeroexAnalysis({
       extraction_failure_reason: extraction.extractionFailureReason || null
     },
     import_history: fileImports.data ?? [],
-    related_reports: relatedReports,
     spreadsheet_preview: extraction.kind === "spreadsheet" ? extraction.preview : [],
     spreadsheet_row_text: extraction.kind === "spreadsheet" ? extraction.rowText : "",
     extracted_text: extraction.textContent,
@@ -2399,7 +2376,6 @@ export async function uploadFileAction(formData: FormData) {
 
   revalidatePath(FILES_PATH);
   revalidatePath(SOURCES_PATH);
-  revalidatePath("/app/reports");
   redirectWithPathMessage(
     returnPath,
     storedExtension === "csv" || storedExtension === "xlsx"
@@ -2466,7 +2442,6 @@ export async function manageSourceFileAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/reports");
   redirectWithPathMessage(
     returnPath,
     action === "archive"
@@ -2542,7 +2517,6 @@ export async function manageLearnedKnowledgeAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/reports");
   redirectWithPathMessage(
     returnPath,
     action === "delete"
@@ -2624,7 +2598,6 @@ export async function bulkManageLearnedKnowledgeAction(input: {
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/intelligence");
-  revalidatePath("/app/reports");
   const verb = input.action === "delete" ? "deleted" : input.action === "archive" ? "archived" : "restored";
   return { ok: true, message: `${ids.length} Learned Knowledge item${ids.length === 1 ? "" : "s"} ${verb}.` };
 }
@@ -3193,7 +3166,6 @@ export async function importFileAction(formData: FormData) {
   revalidatePath(SOURCES_PATH);
   revalidatePath(`${SOURCES_PATH}/${file.id}`);
   revalidatePath("/app/kpis");
-  revalidatePath("/app/reports");
   redirectWithMessage(`${reprepareImport ? "Workbook detection updated" : "Data extracted"} from ${rows.length} row${rows.length === 1 ? "" : "s"} across ${spreadsheet.worksheets.length} worksheet${spreadsheet.worksheets.length === 1 ? "" : "s"}. Review the mappings before saving records.`, file.id, "imported");
 }
 
@@ -3698,7 +3670,6 @@ async function saveWorkbookImport({
   revalidatePath(SOURCES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/kpis");
-  revalidatePath("/app/reports");
   redirectWithMessage(`${enabledPlans.length} worksheet${enabledPlans.length === 1 ? "" : "s"} imported independently. Business Memory now preserves workbook, worksheet, and original-row lineage.`, file.id, "imported");
 }
 
@@ -4043,7 +4014,6 @@ export async function saveExtractedImportAction(formData: FormData) {
   revalidatePath(FILES_PATH);
   revalidatePath("/app");
   revalidatePath("/app/kpis");
-  revalidatePath("/app/reports");
   if (importType === "kpi") {
     const duplicateNote = duplicateKpiRowCount
       ? ` ${duplicateKpiRowCount} duplicate row${duplicateKpiRowCount === 1 ? "" : "s"} skipped.`
@@ -4054,7 +4024,7 @@ export async function saveExtractedImportAction(formData: FormData) {
 
     redirectWithMessage(
       importedRowCount
-        ? `KPI history updated. Dashboard and reports now include this data. ${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved.${duplicateNote}${settingsNote}`
+        ? `KPI history updated. Dashboard and Intelligence now include this data. ${importedRowCount} approved row${importedRowCount === 1 ? "" : "s"} saved.${duplicateNote}${settingsNote}`
         : `KPI history already included this data. No duplicate KPI rows were saved.${duplicateNote}${settingsNote}`,
       file.id,
       "imported"
@@ -4150,7 +4120,6 @@ export async function analyzeFileAction(formData: FormData) {
     revalidatePath(FILES_PATH);
     revalidatePath("/app");
     revalidatePath("/app/agents");
-    revalidatePath("/app/reports");
     const insightCount = cleanAnalysisInsightCount(result.cleanResult);
     const limitedContent = result.extraction.kind !== "spreadsheet" && result.extraction.kind !== "image_vision" && result.extraction.textContent.length < 250;
     const message =

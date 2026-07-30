@@ -46,7 +46,6 @@ function evidenceGroups(references: ExecutiveEvidenceReference[]): ExecutiveInte
   const groups: ExecutiveIntelligenceBriefing["supportingEvidence"] = [
     { category: "KPIs", items: [] },
     { category: "Business Memory", items: [] },
-    { category: "Reports", items: [] },
     { category: "Documents", items: [] },
     { category: "Historical Trends", items: [] }
   ];
@@ -57,7 +56,7 @@ function evidenceGroups(references: ExecutiveEvidenceReference[]): ExecutiveInte
       : /memory/i.test(reference.sourceType)
         ? "Business Memory"
         : /report/i.test(reference.sourceType)
-          ? "Reports"
+          ? "Documents"
           : /histor|health/i.test(reference.sourceType)
             ? "Historical Trends"
             : "Documents";
@@ -178,8 +177,6 @@ export function buildLimitedEvidenceExecutiveAnswer({
   const snapshot = record(boundedContext.workspaceSnapshot);
   const structured = record(snapshot.structured_context);
   const healthContext = record(structured.business_health_score_context);
-  const reports = Array.isArray(structured.reports) ? structured.reports.map(record) : [];
-  const unlinkedReportTitle = reports.map((report) => stringValue(report.title)).find(Boolean) || "";
   const currentAssessment = record(healthContext.current_assessment);
   const coverage = record(healthContext.coverage_indicators);
   const score = numberValue(currentAssessment.score);
@@ -235,7 +232,7 @@ export function buildLimitedEvidenceExecutiveAnswer({
       ? `${original.title} is the most relevant current source for this question, but the cross-source analysis did not complete, so this response does not infer a broader conclusion.`
       : original
       ? `${original.title} is the strongest supported signal for this question, but one narrow evidence base is not enough for a company-wide conclusion.`
-      : selected?.evidenceRole === "derived" || unlinkedReportTitle
+      : selected?.evidenceRole === "derived"
         ? "A prior analysis is available, but its underlying original evidence is not independently available for this decision, so leadership should not treat it as current corroboration."
         : "Leadership cannot yet make a reliable company-wide conclusion from the connected information, but it can reduce decision risk immediately by establishing a current, independently supported baseline.";
   const dataConfidence = stringValue(currentAssessment.data_confidence) || "not established";
@@ -247,7 +244,7 @@ export function buildLimitedEvidenceExecutiveAnswer({
       ? `${independentSourceCount} independent original sources across ${reasoningContext.originalSourceTypeCount} evidence type${reasoningContext.originalSourceTypeCount === 1 ? "" : "s"} are available. This limited response avoids a cross-source conclusion because the deeper comparison did not complete.`
       : original
       ? `One independent original source supports a narrow conclusion. Its scale, persistence, and relationship to the rest of the business are not yet corroborated.`
-      : selected?.evidenceRole === "derived" || unlinkedReportTitle
+      : selected?.evidenceRole === "derived"
         ? "Only secondary analysis is available for this question. Original evidence is required before its conclusions can support a new leadership decision."
         : "No independent original source currently supports this question. That limits decision confidence, but it does not indicate that the business itself is performing poorly.";
   const conservativeFindings = !businessHealth && rankedSignalFindings.length

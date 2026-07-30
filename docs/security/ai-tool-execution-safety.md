@@ -129,14 +129,12 @@ Browser/client code must never reference:
 - `OPENAI_API_KEY`
 - `STRIPE_SECRET_KEY`
 - `STRIPE_WEBHOOK_SECRET`
-- `CRON_SECRET`
 
 The service-role client is isolated in `lib/supabase/admin.ts` and marked `server-only`.
 
 Current service-role paths found:
 
 - Stripe webhook subscription processing
-- scheduled report cron processing
 - Vaeroex admin subscription/support/workspace controls
 - support request creation where needed
 - manual activation request route

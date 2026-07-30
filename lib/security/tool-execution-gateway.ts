@@ -109,19 +109,6 @@ const fileImportApprovalSchema = z
     rowsApproved: z.number().int().min(0).max(1_000)
   })
   .strict();
-const fileReportSchema = z
-  .object({
-    fileId: uuidSchema,
-    title: safeTextSchema(),
-    reportType: safeTextSchema()
-  })
-  .strict();
-const fileToReportSchema = z
-  .object({
-    fileId: uuidSchema,
-    reportId: uuidSchema
-  })
-  .strict();
 const fileMemorySaveSchema = z
   .object({
     fileId: uuidSchema,
@@ -133,14 +120,6 @@ const kpiMutationSchema = z
   .object({
     kpiId: uuidSchema,
     fieldSet: z.array(safeTextSchema(80)).max(12).optional()
-  })
-  .strict();
-const generatedBriefingSchema = z
-  .object({
-    title: safeTextSchema(),
-    outputType: safeTextSchema(),
-    bodyMarkdown: z.string().trim().min(1).max(60_000),
-    sourceData: z.unknown().optional()
   })
   .strict();
 const completedAnalysisSaveSchema = z
@@ -190,24 +169,6 @@ export const TOOL_EXECUTION_REGISTRY = {
     destructive: false,
     allowedRoles: ["owner", "admin"] as WorkspaceRole[]
   },
-  save_vaeroex_output_report: {
-    name: "save_vaeroex_output_report",
-    operationType: "CREATE_RECORD",
-    targetTable: "reports",
-    schema: saveTargetSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: ["owner", "admin"] as WorkspaceRole[]
-  },
-  save_generated_output_briefing: {
-    name: "save_generated_output_briefing",
-    operationType: "CREATE_RECORD",
-    targetTable: "reports",
-    schema: generatedBriefingSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: ["owner", "admin"] as WorkspaceRole[]
-  },
   stage_file_import: {
     name: "stage_file_import",
     operationType: "CREATE_RECORD",
@@ -240,24 +201,6 @@ export const TOOL_EXECUTION_REGISTRY = {
     operationType: "CREATE_RECORD",
     targetTable: "business_memory_chunks",
     schema: fileImportApprovalSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: OPERATOR_ROLES
-  },
-  create_report_from_file: {
-    name: "create_report_from_file",
-    operationType: "CREATE_RECORD",
-    targetTable: "reports",
-    schema: fileReportSchema,
-    requiresConfirmation: true,
-    destructive: false,
-    allowedRoles: OPERATOR_ROLES
-  },
-  attach_file_to_report: {
-    name: "attach_file_to_report",
-    operationType: "UPDATE_RECORD",
-    targetTable: "reports",
-    schema: fileToReportSchema,
     requiresConfirmation: true,
     destructive: false,
     allowedRoles: OPERATOR_ROLES

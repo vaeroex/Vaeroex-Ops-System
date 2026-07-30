@@ -98,6 +98,5 @@ export async function createBusinessDecisionAction(formData: FormData) {
   }
 
   revalidatePath("/app");
-  revalidatePath("/app/reports");
   redirectWithMessage(path, "Decision logged. Vaeroex will include it in future reviews.");
 }

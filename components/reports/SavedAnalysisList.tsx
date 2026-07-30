@@ -15,7 +15,6 @@ type Filter = "all" | SavedAnalysisType;
 
 const filters: Array<{ value: Filter; label: string }> = [
   { value: "all", label: "All" },
-  { value: "executive_brief", label: "Legacy Leadership" },
   { value: "business_health", label: "Business Health" },
   { value: "finding_explanation", label: "Finding Explanations" }
 ];

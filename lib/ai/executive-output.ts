@@ -626,7 +626,7 @@ function evidenceCategory(source: ExecutiveCitationCatalogEntry): ExecutiveIntel
   const value = `${source.domain || ""} ${source.sourceType} ${source.title}`.toLowerCase();
   if (/business memory|learned knowledge/.test(value)) return "Business Memory";
   if (/historical|trend|snapshot/.test(value)) return "Historical Trends";
-  if (/report|briefing|plan/.test(value)) return "Reports";
+  if (/report|briefing|plan/.test(value)) return "Documents";
   if (/kpi|metric|measurement/.test(value)) return "KPIs";
   return "Documents";
 }
@@ -638,7 +638,6 @@ function supportingEvidenceGroups(
   const categories: ExecutiveIntelligenceBriefing["supportingEvidence"][number]["category"][] = [
     "KPIs",
     "Business Memory",
-    "Reports",
     "Documents",
     "Historical Trends"
   ];

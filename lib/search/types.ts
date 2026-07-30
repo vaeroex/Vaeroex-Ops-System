@@ -1,6 +1,6 @@
 export type GlobalSearchGroupLabel =
   | "KPIs"
-  | "Reports"
+  | "Saved Analyses"
   | "Files"
   | "Issues"
   | "Review Signals"
@@ -78,7 +78,7 @@ export type ExecutiveIntelligenceBriefing = {
     evidence: ExecutiveEvidenceReference[];
   }>;
   supportingEvidence: Array<{
-    category: "KPIs" | "Business Memory" | "Reports" | "Documents" | "Historical Trends";
+    category: "KPIs" | "Business Memory" | "Documents" | "Historical Trends";
     items: ExecutiveEvidenceReference[];
   }>;
   confidenceAssessment: {

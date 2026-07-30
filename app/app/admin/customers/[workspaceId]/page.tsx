@@ -19,6 +19,8 @@ import { StatusBadge } from "@/components/operations/StatusBadge";
 import { requireVaeroexAdmin } from "@/lib/admin/vaeroex-admin";
 import { companyAttentionReasons, formatAdminDate, type AdminCompanyRow } from "@/lib/admin/company-directory";
 import { displayPlanName } from "@/lib/billing/plans";
+import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
+import { SAVED_ANALYSIS_ENVELOPE_VERSION, SAVED_ANALYSIS_TYPES } from "@/lib/reports/saved-analysis";
 import type { Database } from "@/lib/supabase/types";
 
 type WorkspaceRow = Database["public"]["Tables"]["workspaces"]["Row"];
@@ -70,14 +72,27 @@ export default async function AdminCompanyDetailPage({
 
   const company = companyResult.data as AdminCompanyRow;
   const returnTo = `/app/admin/customers/${workspaceId}?tab=${tab}`;
-  const [workspaceResult, subscriptionsResult, agreementResult, membersResult, kpiCount, fileCount, reportCount, intelligenceCount] = await Promise.all([
+  const savedAnalysisChannel = currentSavedAnalysisReleaseChannel();
+  const [workspaceResult, subscriptionsResult, agreementResult, membersResult, kpiCount, fileCount, savedAnalysisResult, intelligenceCount] = await Promise.all([
     admin.from("workspaces").select("*").eq("id", workspaceId).maybeSingle(),
     admin.from("customer_subscriptions").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(20),
     admin.from("workspace_agreements").select("*").eq("workspace_id", workspaceId).maybeSingle(),
     admin.from("workspace_members").select("id,user_id,role,status,invited_email,created_at").eq("workspace_id", workspaceId).order("created_at", { ascending: true }).limit(100),
     admin.from("kpis").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
     admin.from("file_uploads").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
-    admin.from("reports").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId),
+    admin
+      .from("reports")
+      .select("id", { count: "exact", head: true })
+      .eq("workspace_id", workspaceId)
+      .is("archived_at", null)
+      .is("deleted_at", null)
+      .in("analysis_type", [...SAVED_ANALYSIS_TYPES])
+      .contains("source_data_json", {
+        record_kind: "saved_analysis",
+        envelope_version: SAVED_ANALYSIS_ENVELOPE_VERSION,
+        workspace_id: workspaceId,
+        release_channel: savedAnalysisChannel
+      }),
     admin.from("ai_agent_runs").select("id", { count: "exact", head: true }).eq("workspace_id", workspaceId)
   ]);
 
@@ -101,6 +116,7 @@ export default async function AdminCompanyDetailPage({
   const activationRequests = (activationRequestsResult.data || []) as ActivationRequest[];
   const events = (eventsResult.data || []) as SubscriptionEvent[];
   const delivery = deliveryResult.data as DeliveryRow | null;
+  const savedAnalysisCount = savedAnalysisResult.count || 0;
   const queryResults = [
     workspaceResult,
     subscriptionsResult,
@@ -108,7 +124,7 @@ export default async function AdminCompanyDetailPage({
     membersResult,
     kpiCount,
     fileCount,
-    reportCount,
+    savedAnalysisResult,
     intelligenceCount,
     activationRequestsResult,
     eventsResult,
@@ -160,7 +176,7 @@ export default async function AdminCompanyDetailPage({
               <dl className="grid gap-3 sm:grid-cols-2">
                 <DetailValue label="KPIs" value={String(kpiCount.count || 0)} />
                 <DetailValue label="Evidence files" value={String(fileCount.count || 0)} />
-                <DetailValue label="Saved analyses and legacy reports" value={String(reportCount.count || 0)} />
+                <DetailValue label="Saved analyses" value={String(savedAnalysisCount)} />
                 <DetailValue label="Intelligence runs" value={String(intelligenceCount.count || 0)} />
               </dl>
             </SectionCard>

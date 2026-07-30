@@ -50,7 +50,7 @@ const DOMAIN_PATTERNS: Array<[VaeroexEvidenceDomain, RegExp]> = [
   ["business_health", /\b(business health|health score|health trend|overall health)\b/i],
   ["risks", /\b(risk|risks|issue|issues|bottleneck|bottlenecks|anomaly|anomalies|warning|warnings|alert|alerts)\b/i],
   ["priorities", /\b(priority|priorities|focus|attention|most important|leadership review)\b/i],
-  ["reports", /\b(report|reports|briefing|briefings|executive brief|board summary)\b/i],
+  ["reports", /\b(report|reports|saved analysis|saved analyses)\b/i],
   ["files", /\b(file|files|document|documents|spreadsheet|upload|uploads|source|sources)\b/i],
   ["business_memory", /\b(business memory|learned knowledge|historical context|workspace knowledge|evidence)\b/i],
   ["financials", /\b(revenue|profit|profitability|margin|cash|cost|costs|expense|expenses|financial|financials|invoice|invoices)\b/i],

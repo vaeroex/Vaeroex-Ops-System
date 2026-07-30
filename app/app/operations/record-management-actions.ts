@@ -12,7 +12,6 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 type ManagedCollection =
   | "sops"
   | "issues"
-  | "reports"
   | "kpis"
   | "forms"
   | "form_submissions"
@@ -123,18 +122,6 @@ const COLLECTIONS: Record<ManagedCollection, CollectionConfig> = {
       { name: "status", kind: "select", maxLength: 80 },
       { name: "version", kind: "number" },
       { name: "body_markdown", kind: "textarea", maxLength: 20000 }
-    ]
-  },
-  reports: {
-    table: "reports",
-    path: "/app/reports",
-    titleField: "title",
-    fields: [
-      { name: "title", kind: "requiredText", maxLength: 180 },
-      { name: "report_type", kind: "text", maxLength: 140 },
-      { name: "date_range_start", kind: "date" },
-      { name: "date_range_end", kind: "date" },
-      { name: "body_markdown", kind: "textarea", maxLength: 30000 }
     ]
   },
   ai_agent_runs: {
@@ -366,11 +353,10 @@ function revalidateRelatedPaths(collection: ManagedCollection, path: Route | str
 
   // These collections can affect intelligence presentation or saved-output
   // availability. Revalidation does not make derived records original evidence.
-  if (["kpis", "files", "reports", "issues", "ai_agent_runs", "crm_leads"].includes(collection)) {
+  if (["kpis", "files", "issues", "ai_agent_runs", "crm_leads"].includes(collection)) {
     revalidatePath("/app");
     revalidatePath("/app/intelligence");
     revalidatePath("/app/sources");
-    revalidatePath("/app/reports");
   }
 }
 

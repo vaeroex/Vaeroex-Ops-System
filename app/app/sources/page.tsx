@@ -57,7 +57,6 @@ type SourcesPageProps = {
 type FileUploadRow = Database["public"]["Tables"]["file_uploads"]["Row"];
 type FileImportRow = Database["public"]["Tables"]["file_imports"]["Row"];
 type FileImportDataRow = Database["public"]["Tables"]["file_import_rows"]["Row"];
-type ReportRow = Database["public"]["Tables"]["reports"]["Row"];
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type VaeroexRunRow = Database["public"]["Tables"]["ai_agent_runs"]["Row"];
 type FolderRow = Database["public"]["Tables"]["record_folders"]["Row"];
@@ -246,16 +245,6 @@ function fileConfidence(file: FileUploadRow, runs: VaeroexRunRow[]) {
     (runs[0] ? runConfidence(runs[0]) : "") ||
     (file.analysis_summary ? "Needs confirmation" : "")
   );
-}
-
-function reportsForFile(reports: ReportRow[], fileId: string) {
-  return reports.filter((report) => {
-    const source = isRecord(report.source_data_json) ? report.source_data_json : {};
-    const file = isRecord(source.file) ? source.file : {};
-    const attachedFiles = Array.isArray(source.attached_files) ? source.attached_files.filter(isRecord) : [];
-
-    return file.id === fileId || attachedFiles.some((item) => isRecord(item) && item.id === fileId);
-  });
 }
 
 function latestAnalysisAt(file: FileUploadRow) {
@@ -553,7 +542,6 @@ function SourceFileDetailPanel({
   fileImportRows,
   linkedKpis,
   linkedRuns,
-  linkedReports,
   actionError,
   activeSection = "summary"
 }: {
@@ -564,7 +552,6 @@ function SourceFileDetailPanel({
   fileImportRows: FileImportDataRow[];
   linkedKpis: KpiRow[];
   linkedRuns: VaeroexRunRow[];
-  linkedReports: ReportRow[];
   actionError?: string | null;
   activeSection?: SourceDetailSection;
 }) {
@@ -612,7 +599,7 @@ function SourceFileDetailPanel({
     { key: "summary", label: "Summary" },
     ...(findings.length || risks.length || opportunities.length || unclearFields.length ? [{ key: "findings" as const, label: "Findings" }] : []),
     ...(isSpreadsheet(file) || fileImports.length ? [{ key: "imported" as const, label: "Imported Data" }] : []),
-    ...(linkedRuns.length || fileImports.length || linkedReports.length ? [{ key: "history" as const, label: "History" }] : [])
+    ...(linkedRuns.length || fileImports.length ? [{ key: "history" as const, label: "History" }] : [])
   ];
   const visibleSection = sections.some((section) => section.key === activeSection) ? activeSection : "summary";
   const returnPath = sourceDetailHref(file.id, visibleSection);
@@ -710,7 +697,7 @@ function SourceFileDetailPanel({
         </div>
       ) : null}
 
-      {visibleSection === "history" ? <div className="mt-5"><SourceFileDetails file={file} fileImports={fileImports} linkedKpis={linkedKpis} linkedRuns={linkedRuns} linkedReports={linkedReports} /></div> : null}
+      {visibleSection === "history" ? <div className="mt-5"><SourceFileDetails file={file} fileImports={fileImports} linkedKpis={linkedKpis} linkedRuns={linkedRuns} /></div> : null}
     </div>
   );
 }
@@ -719,14 +706,12 @@ function SourceFileDetails({
   file,
   fileImports,
   linkedKpis,
-  linkedRuns,
-  linkedReports
+  linkedRuns
 }: {
   file: FileUploadRow;
   fileImports: FileImportRow[];
   linkedKpis: KpiRow[];
   linkedRuns: VaeroexRunRow[];
-  linkedReports: ReportRow[];
 }) {
   return (
     <details className="rounded-lg border border-white/10 bg-slate-950/45 p-3">
@@ -766,15 +751,10 @@ function SourceFileDetails({
         </section>
         <section className="rounded-lg border border-white/10 bg-[#08111f] p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">Insights using this file</p>
-          {linkedRuns.length || linkedReports.length ? (
+          {linkedRuns.length ? (
             <div className="mt-2 space-y-2">
               {linkedRuns.slice(0, 4).map((run) => (
                 <p key={run.id} className="line-clamp-2 text-sm text-slate-300">{runSummary(run)}</p>
-              ))}
-              {linkedReports.slice(0, 4).map((report) => (
-                <Link key={report.id} href={`/app/reports/${report.id}` as Route} className="block text-sm font-semibold text-cyan-100 hover:text-white">
-                  {report.title}
-                </Link>
               ))}
             </div>
           ) : (
@@ -1142,12 +1122,11 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         .order("row_number", { ascending: true })
         .limit(2000)
     : Promise.resolve({ data: [], error: null });
-  const [filesResult, foldersResult, importsResult, importRowsResult, reportsResult, kpisResult, runsResult, memoryResult, notesResult, agreementsResult] = await Promise.all([
+  const [filesResult, foldersResult, importsResult, importRowsResult, kpisResult, runsResult, memoryResult, notesResult, agreementsResult] = await Promise.all([
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     getRecordFolders(supabase, workspaceId, "files"),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     importRowsQuery,
-    supabase.from("reports").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(300),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("metric_date", { ascending: false }).limit(500),
     supabase
       .from("ai_agent_runs")
@@ -1184,7 +1163,6 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
   const folders = foldersResult.folders as Pick<FolderRow, "id" | "name">[];
   const imports = (importsResult.data || []) as FileImportRow[];
   const importRows = (importRowsResult.data || []) as FileImportDataRow[];
-  const reports = (reportsResult.data || []) as ReportRow[];
   const kpis = (kpisResult.data || []) as KpiRow[];
   const runs = (runsResult.data || []) as VaeroexRunRow[];
   const rawMemoryChunks = (memoryResult.data || []) as MemoryChunkRow[];
@@ -1211,7 +1189,7 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
     runsByFile.set(fileId, [...(runsByFile.get(fileId) || []), run]);
   });
 
-  const errors = [filesResult.error, foldersResult.error, importsResult.error, importRowsResult.error, reportsResult.error, kpisResult.error, runsResult.error, memoryResult.error, notesResult.error, agreementsResult.error].filter(Boolean);
+  const errors = [filesResult.error, foldersResult.error, importsResult.error, importRowsResult.error, kpisResult.error, runsResult.error, memoryResult.error, notesResult.error, agreementsResult.error].filter(Boolean);
   const visibleFiles = filteredFiles({
     files,
     status: params.status,
@@ -1279,7 +1257,6 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
 
     const linkedKpis = linkedFile ? kpis.filter((kpi) => kpi.source_file_id === linkedFile.id) : [];
     const linkedRuns = linkedFile ? runs.filter((run) => runFileId(run) === linkedFile.id) : [];
-    const linkedReports = linkedFile ? reportsForFile(reports, linkedFile.id) : [];
     const fileImportRows = linkedFile ? importRows.filter((item) => item.file_upload_id === linkedFile.id) : [];
 
     return (
@@ -1304,7 +1281,6 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
             fileImportRows={fileImportRows}
             linkedKpis={linkedKpis}
             linkedRuns={linkedRuns}
-            linkedReports={linkedReports}
             access={accessByFileId.get(linkedFile.id)}
             actionError={selectedFileActionError}
             activeSection={activeSection}
