@@ -8,6 +8,10 @@ import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/con
 import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
 import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import type { IntelligenceCardLifecycleRecord } from "@/lib/intelligence/card-lifecycle/contracts";
+import { buildIntelligenceCardIdentityV1, buildIntelligenceCardSnapshotV1 } from "@/lib/intelligence/card-lifecycle/identity";
+import { buildIntelligenceCardLifecycleOverlayV1 } from "@/lib/intelligence/card-lifecycle/overlay";
+import { trySealIntelligenceCardLifecycleToken } from "@/lib/intelligence/card-lifecycle/token";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
@@ -27,7 +31,7 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -40,8 +44,21 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
-    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500)
+    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500),
+    supabase.from("intelligence_card_lifecycle").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false })
   ]);
+
+  const lifecycleRecords = (lifecycleResult.data || []) as IntelligenceCardLifecycleRecord[];
+  const dismissalActorIds = [...new Set(lifecycleRecords
+    .filter((record) => record.lifecycle_state === "dismissed")
+    .map((record) => record.last_mutated_by))];
+  const dismissalActorsResult = dismissalActorIds.length
+    ? await supabase.from("profiles").select("id,full_name,email").in("id", dismissalActorIds)
+    : { data: [], error: null };
+  const actorDisplayNames = Object.fromEntries((dismissalActorsResult.data || []).map((profile) => [
+    profile.id,
+    profile.full_name?.trim() || profile.email?.trim() || "Workspace leader"
+  ]));
 
   const errors = [
     issuesResult.error,
@@ -56,7 +73,9 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     peopleResult.error,
     decisionsResult.error,
     metricsResult.error,
-    memoryResult.error
+    memoryResult.error,
+    lifecycleResult.error,
+    dismissalActorsResult.error
   ].filter(Boolean);
 
   if (errors.some((error) => isSecurityResponseMessage(error?.message))) {
@@ -182,10 +201,43 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         }
       }))
     : {};
+  const lifecycleIdentities = Object.fromEntries(displayedInsights.map((insight) => {
+    const finding = intelligenceSnapshot?.findings.find((candidate) => candidate.id === insight.id) || null;
+    return [insight.id, buildIntelligenceCardIdentityV1({ insight, finding })];
+  }));
+  const canManageLifecycle = Boolean(context.membership && ["owner", "admin", "manager"].includes(context.membership.role));
+  const lifecycleTokens = canManageLifecycle && userId
+    ? Object.fromEntries(displayedInsights.flatMap((insight) => {
+        const identity = lifecycleIdentities[insight.id];
+        const token = trySealIntelligenceCardLifecycleToken({
+          workspaceId,
+          userId,
+          findingKeyHash: identity.findingKeyHash,
+          findingFingerprint: insight.fingerprint,
+          materialSignature: identity.materialSignature,
+          findingId: insight.id,
+          cardSnapshot: buildIntelligenceCardSnapshotV1(insight)
+        });
+        return token ? [[insight.id, token]] : [];
+      }))
+    : {};
+  const lifecycleCards = buildIntelligenceCardLifecycleOverlayV1({
+    insights: displayedInsights,
+    identities: lifecycleIdentities,
+    lifecycleRecords,
+    lifecycleTokens,
+    actorDisplayNames
+  });
   return (
     <div className="space-y-4">
       <ErrorNotice message={displayErrors[0]?.message || null} />
-      <IntelligenceSignalInbox insights={displayedInsights} initialFindingId={params?.finding} explanationTokens={explanationTokens} />
+      <IntelligenceSignalInbox
+        currentCards={lifecycleCards.current}
+        historyCards={lifecycleCards.history}
+        initialFindingId={params?.finding}
+        explanationTokens={explanationTokens}
+        canManageLifecycle={canManageLifecycle}
+      />
     </div>
   );
 }

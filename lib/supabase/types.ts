@@ -65,6 +65,23 @@ export type Database = {
           similarity: number;
         }>;
       };
+      mutate_intelligence_card_lifecycle_v1: {
+        Args: {
+          p_workspace_id: string;
+          p_actor_id: string;
+          p_action: "acknowledge" | "dismiss" | "pin" | "unpin";
+          p_finding_key_hash: string;
+          p_finding_fingerprint: string;
+          p_material_signature: string;
+          p_finding_id: string;
+          p_card_snapshot_json: Json;
+          p_reason_code?: "irrelevant" | "duplicate" | "temporary" | "not_material" | "other" | null;
+          p_reason_text?: string | null;
+          p_recheck_after?: string | null;
+          p_request_id?: string;
+        };
+        Returns: Json;
+      };
       review_manual_activation_request: {
         Args: {
           p_request_id: string;
@@ -215,6 +232,90 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["workspace_admin_lifecycle"]["Insert"]>;
+        Relationships: [];
+      };
+      intelligence_card_lifecycle: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          finding_key_hash: string;
+          finding_fingerprint: string;
+          lifecycle_state: "active" | "acknowledged" | "dismissed";
+          state_material_signature: string | null;
+          last_material_signature: string;
+          last_finding_id: string;
+          reason_code: "irrelevant" | "duplicate" | "temporary" | "not_material" | "other" | null;
+          reason_text: string | null;
+          recheck_after: string | null;
+          pinned: boolean;
+          pinned_by: string | null;
+          pinned_at: string | null;
+          card_snapshot_json: Json;
+          last_mutated_by: string;
+          last_mutated_at: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          finding_key_hash: string;
+          finding_fingerprint: string;
+          lifecycle_state?: "active" | "acknowledged" | "dismissed";
+          state_material_signature?: string | null;
+          last_material_signature: string;
+          last_finding_id: string;
+          reason_code?: "irrelevant" | "duplicate" | "temporary" | "not_material" | "other" | null;
+          reason_text?: string | null;
+          recheck_after?: string | null;
+          pinned?: boolean;
+          pinned_by?: string | null;
+          pinned_at?: string | null;
+          card_snapshot_json?: Json;
+          last_mutated_by: string;
+          last_mutated_at?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["intelligence_card_lifecycle"]["Insert"]>;
+        Relationships: [];
+      };
+      intelligence_card_lifecycle_events: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          lifecycle_id: string;
+          finding_key_hash: string;
+          event_type: "acknowledged" | "dismissed" | "pinned" | "unpinned" | "reopened_by_material_change" | "reopened_by_recheck";
+          from_state: "active" | "acknowledged" | "dismissed";
+          to_state: "active" | "acknowledged" | "dismissed";
+          material_signature: string;
+          actor_user_id: string;
+          reason_code: "irrelevant" | "duplicate" | "temporary" | "not_material" | "other" | null;
+          reason_text: string | null;
+          recheck_after: string | null;
+          card_snapshot_json: Json;
+          request_id: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          lifecycle_id: string;
+          finding_key_hash: string;
+          event_type: "acknowledged" | "dismissed" | "pinned" | "unpinned" | "reopened_by_material_change" | "reopened_by_recheck";
+          from_state: "active" | "acknowledged" | "dismissed";
+          to_state: "active" | "acknowledged" | "dismissed";
+          material_signature: string;
+          actor_user_id: string;
+          reason_code?: "irrelevant" | "duplicate" | "temporary" | "not_material" | "other" | null;
+          reason_text?: string | null;
+          recheck_after?: string | null;
+          card_snapshot_json?: Json;
+          request_id: string;
+          created_at?: string;
+        };
+        Update: never;
         Relationships: [];
       };
       workspace_members: {
