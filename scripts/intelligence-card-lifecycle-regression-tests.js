@@ -123,11 +123,24 @@ const dismissedOverlay = buildIntelligenceCardLifecycleOverlayV1({
   insights: [baseInsight],
   identities: { [baseInsight.id]: identityA },
   lifecycleRecords: [dismissed],
+  actorDisplayNames: { "manager-a": "Morgan Rivera" },
   nowMs: Date.parse("2026-07-31T00:00:00Z")
 });
 assert.equal(dismissedOverlay.current.length, 0, "dismissed cards leave Current");
 assert.equal(dismissedOverlay.history.length, 1, "dismissed cards move to History");
 assert.equal(dismissedOverlay.history[0].findingId, baseInsight.id, "direct links retain the finding identity in History");
+assert.equal(dismissedOverlay.history[0].reasonCode, "temporary", "dismissal reason remains available to History");
+assert.equal(dismissedOverlay.history[0].dismissedBy, "Morgan Rivera", "dismissal actor resolves from workspace-scoped profile data");
+assert.equal(dismissedOverlay.history[0].stateChangedAt, "2026-07-30T00:00:00.000Z", "dismissal timestamp remains available to History");
+assert.equal(dismissedOverlay.history[0].recheckAfter, "2026-08-30T00:00:00.000Z", "recheck date remains available to History");
+
+const dismissedWithNoteOverlay = buildIntelligenceCardLifecycleOverlayV1({
+  insights: [baseInsight],
+  identities: { [baseInsight.id]: identityA },
+  lifecycleRecords: [{ ...dismissed, reason_text: "Review after the seasonal period." }],
+  actorDisplayNames: { "manager-a": "Morgan Rivera" }
+});
+assert.equal(dismissedWithNoteOverlay.history[0].reasonText, "Review after the seasonal period.", "bounded optional dismissal notes remain available to History");
 
 const missingOverlay = buildIntelligenceCardLifecycleOverlayV1({
   insights: [],
@@ -170,6 +183,19 @@ assert.match(component, /No active issues require attention\./, "healthy state i
 assert.match(component, /No undismissed issues are in the current feed\. Dismissed findings remain in History\./, "dismissed-only state is explicit");
 assert.match(component, /What could improve the business further/, "deterministic improvements remain visible in healthy states");
 assert.match(component, /requestedCard\?\.view \|\| "current"/, "direct links to dismissed cards open History");
+assert.match(component, /cursor-pointer/, "History cards expose a pointer cursor");
+assert.match(component, /View details.*ChevronRight/s, "History cards expose a visible navigation affordance");
+assert.match(component, /hover:border-cyan-300\/50.*hover:bg-cyan-950\/20/, "History cards expose a stronger hover state");
+assert.match(component, /ring-2 ring-cyan-300\/55/, "selected History cards have a distinct selected state");
+assert.match(component, /Leadership disposition/, "History detail distinguishes lifecycle metadata from deterministic content");
+assert.match(component, /dismissalReasonLabel\(card\.reasonCode\)/, "dismissal reasons render with customer-facing labels");
+assert.match(component, /card\.reasonText \? \(/, "optional notes render only when present");
+assert.match(component, /Dismissed by/, "dismissal actor renders in History detail");
+assert.match(component, /formatLifecycleTimestamp\(card\.stateChangedAt\)/, "dismissal timestamp renders in History detail");
+assert.match(component, /formatLifecycleTimestamp\(card\.recheckAfter\)/, "recheck date renders when present");
+assert.match(page, /intelligence_card_lifecycle"\)\.select\("\*"\)\.eq\("workspace_id", workspaceId\)/, "lifecycle metadata remains workspace scoped");
+assert.match(page, /profiles"\)\.select\("id,full_name,email"\)\.in\("id", dismissalActorIds\)/, "actor lookup is bounded to actors from workspace-scoped lifecycle rows");
+assert.match(migration, /workspace members can read intelligence card lifecycle events[\s\S]*is_workspace_member\(workspace_id\)/i, "cross-workspace lifecycle metadata remains blocked by RLS");
 assert.match(action, /requireWorkspaceRole\(\["owner", "admin", "manager"\]\)/, "server action independently enforces leadership roles");
 assert.match(action, /createSupabaseAdminClient/, "writes use the trusted server path");
 assert.doesNotMatch([migration, page, component, action].join("\n"), /generateText|openai|nvidia|provider request/i, "lifecycle construction and mutation introduce zero provider calls");

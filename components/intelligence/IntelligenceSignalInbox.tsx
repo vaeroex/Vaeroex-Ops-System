@@ -3,7 +3,7 @@
 import Link from "next/link";
 import type { Route } from "next";
 import { useRouter } from "next/navigation";
-import { Check, History, Pin, PinOff, X } from "lucide-react";
+import { Check, ChevronRight, History, Pin, PinOff, X } from "lucide-react";
 import { useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
 import { mutateIntelligenceCardLifecycleAction } from "@/app/app/intelligence/lifecycle-actions";
@@ -61,6 +61,25 @@ function formatSignalDate(value: string) {
   if (Number.isNaN(date.getTime())) return "Date unavailable";
 
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
+}
+
+function formatLifecycleTimestamp(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date unavailable";
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  }).format(date);
+}
+
+function dismissalReasonLabel(reason: IntelligenceCardLifecycleReason | null) {
+  if (reason === "temporary") return "Temporary condition";
+  if (reason === "irrelevant") return "Not relevant";
+  if (reason === "duplicate") return "Duplicate";
+  if (reason === "not_material") return "Not material";
+  if (reason === "other") return "Other";
+  return "Not specified";
 }
 
 function compactText(value: string, maxLength = 150) {
@@ -392,6 +411,37 @@ function lifecycleStatusLabel(card: IntelligenceLifecycleCardV1) {
   return null;
 }
 
+function LeadershipDisposition({ card }: { card: IntelligenceLifecycleCardV1 }) {
+  return (
+    <section className="rounded-lg border border-slate-500/30 bg-slate-950/45 p-4" aria-labelledby="leadership-disposition-heading">
+      <h4 id="leadership-disposition-heading" className="text-sm font-semibold text-white">Leadership disposition</h4>
+      <p className="mt-1 text-xs leading-5 text-slate-400">Presentation history recorded by workspace leadership. It does not alter the deterministic finding.</p>
+      <dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">
+        <dt className="text-slate-400">Status</dt>
+        <dd className="font-medium text-slate-100">Dismissed</dd>
+        <dt className="text-slate-400">Reason</dt>
+        <dd className="text-slate-100">{dismissalReasonLabel(card.reasonCode)}</dd>
+        {card.reasonText ? (
+          <>
+            <dt className="text-slate-400">Note</dt>
+            <dd className="whitespace-pre-wrap break-words text-slate-100">{card.reasonText}</dd>
+          </>
+        ) : null}
+        <dt className="text-slate-400">Dismissed by</dt>
+        <dd className="text-slate-100">{card.dismissedBy || "Workspace leader"}</dd>
+        <dt className="text-slate-400">Dismissed</dt>
+        <dd className="text-slate-100">{card.stateChangedAt ? formatLifecycleTimestamp(card.stateChangedAt) : "Date unavailable"}</dd>
+        {card.recheckAfter ? (
+          <>
+            <dt className="text-slate-400">Recheck after</dt>
+            <dd className="text-slate-100">{formatLifecycleTimestamp(card.recheckAfter)}</dd>
+          </>
+        ) : null}
+      </dl>
+    </section>
+  );
+}
+
 export function IntelligenceSignalInbox({
   currentCards,
   historyCards,
@@ -528,8 +578,10 @@ export function IntelligenceSignalInbox({
     const CategoryIcon = category.Icon;
     const PriorityIcon = priority.Icon;
     const statusLabel = lifecycleStatusLabel(card);
+    const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
+    const historyAffordance = card.view === "history";
     return (
-      <button key={card.findingKeyHash} type="button" onClick={() => selectCard(card)} className={`vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition ${selectedCard?.findingKeyHash === card.findingKeyHash ? "ring-1 ring-current/30" : "hover:brightness-[1.03]"}`}>
+      <button key={card.findingKeyHash} type="button" aria-current={selected ? "true" : undefined} onClick={() => selectCard(card)} className={`vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap gap-2">
@@ -541,7 +593,10 @@ export function IntelligenceSignalInbox({
             <h3 className="text-sm font-semibold leading-5 text-white">{compactText(card.snapshot.title, 110)}</h3>
             <p className="mt-1 text-sm leading-5 text-slate-300">{compactText(card.snapshot.summary)}</p>
           </div>
-          <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(card.snapshot.confidence)}`}>Confidence: {card.snapshot.confidence}</span>
+          <div className="flex shrink-0 flex-col items-end gap-2">
+            <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${confidenceClass(card.snapshot.confidence)}`}>Confidence: {card.snapshot.confidence}</span>
+            {historyAffordance ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200">View details <ChevronRight aria-hidden="true" className="h-4 w-4" /></span> : null}
+          </div>
         </div>
         <p className="mt-2 text-xs text-slate-500">{formatSignalDate(card.snapshot.lastUpdated)}</p>
       </button>
@@ -631,6 +686,8 @@ export function IntelligenceSignalInbox({
                 </div>
                 <button type="button" onClick={() => setSelectedKey("")} className="min-h-10 rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-cyan-950/30 xl:hidden">Back to list</button>
               </div>
+
+              {selectedCard.view === "history" && selectedCard.lifecycleState === "dismissed" ? <LeadershipDisposition card={selectedCard} /> : null}
 
               {selectedCard.view === "current" && canManageLifecycle && selectedCard.lifecycleToken ? (
                 <section className="space-y-3 border-y border-white/10 py-3" aria-label="Finding lifecycle actions">

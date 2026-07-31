@@ -62,6 +62,7 @@ export type IntelligenceLifecycleCardV1 = Readonly<{
   reopenedFrom: "acknowledged" | "dismissed" | null;
   reasonCode: IntelligenceCardLifecycleReason | null;
   reasonText: string | null;
+  dismissedBy: string | null;
   recheckAfter: string | null;
   stateChangedAt: string | null;
   lifecycleToken: string | null;

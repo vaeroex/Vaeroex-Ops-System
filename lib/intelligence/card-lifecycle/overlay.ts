@@ -57,12 +57,14 @@ export function buildIntelligenceCardLifecycleOverlayV1({
   identities,
   lifecycleRecords,
   lifecycleTokens = {},
+  actorDisplayNames = {},
   nowMs = Date.now()
 }: {
   insights: readonly IntelligenceInsight[];
   identities: Readonly<Record<string, IntelligenceCardIdentityV1>>;
   lifecycleRecords: readonly IntelligenceCardLifecycleRecord[];
   lifecycleTokens?: Readonly<Record<string, string>>;
+  actorDisplayNames?: Readonly<Record<string, string>>;
   nowMs?: number;
 }) {
   const recordsByKey = new Map(lifecycleRecords.map((record) => [record.finding_key_hash, record]));
@@ -90,6 +92,9 @@ export function buildIntelligenceCardLifecycleOverlayV1({
       reopenedFrom: effective.reopenedFrom,
       reasonCode: record?.reason_code || null,
       reasonText: record?.reason_text || null,
+      dismissedBy: record?.lifecycle_state === "dismissed"
+        ? actorDisplayNames[record.last_mutated_by] || "Workspace leader"
+        : null,
       recheckAfter: record?.recheck_after || null,
       stateChangedAt: record?.last_mutated_at || null,
       lifecycleToken: lifecycleTokens[insight.id] || null
@@ -113,6 +118,9 @@ export function buildIntelligenceCardLifecycleOverlayV1({
       reopenedFrom: null,
       reasonCode: record.reason_code,
       reasonText: record.reason_text,
+      dismissedBy: record.lifecycle_state === "dismissed"
+        ? actorDisplayNames[record.last_mutated_by] || "Workspace leader"
+        : null,
       recheckAfter: record.recheck_after,
       stateChangedAt: record.last_mutated_at,
       lifecycleToken: null

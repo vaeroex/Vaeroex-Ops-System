@@ -48,6 +48,18 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     supabase.from("intelligence_card_lifecycle").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false })
   ]);
 
+  const lifecycleRecords = (lifecycleResult.data || []) as IntelligenceCardLifecycleRecord[];
+  const dismissalActorIds = [...new Set(lifecycleRecords
+    .filter((record) => record.lifecycle_state === "dismissed")
+    .map((record) => record.last_mutated_by))];
+  const dismissalActorsResult = dismissalActorIds.length
+    ? await supabase.from("profiles").select("id,full_name,email").in("id", dismissalActorIds)
+    : { data: [], error: null };
+  const actorDisplayNames = Object.fromEntries((dismissalActorsResult.data || []).map((profile) => [
+    profile.id,
+    profile.full_name?.trim() || profile.email?.trim() || "Workspace leader"
+  ]));
+
   const errors = [
     issuesResult.error,
     kpisResult.error,
@@ -62,7 +74,8 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     decisionsResult.error,
     metricsResult.error,
     memoryResult.error,
-    lifecycleResult.error
+    lifecycleResult.error,
+    dismissalActorsResult.error
   ].filter(Boolean);
 
   if (errors.some((error) => isSecurityResponseMessage(error?.message))) {
@@ -211,8 +224,9 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const lifecycleCards = buildIntelligenceCardLifecycleOverlayV1({
     insights: displayedInsights,
     identities: lifecycleIdentities,
-    lifecycleRecords: (lifecycleResult.data || []) as IntelligenceCardLifecycleRecord[],
-    lifecycleTokens
+    lifecycleRecords,
+    lifecycleTokens,
+    actorDisplayNames
   });
   return (
     <div className="space-y-4">
