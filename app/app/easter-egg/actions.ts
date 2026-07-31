@@ -58,8 +58,8 @@ export async function startEasterEggRunAction(idempotencyKey: string): Promise<G
     seed
   }).select("id,seed,game_contract_version").single();
 
-  if (!inserted.error && inserted.data) {
-    return { ok: true, data: { runId: inserted.data.id, seed: inserted.data.seed, contractVersion: inserted.data.game_contract_version } };
+  if (!inserted.error && inserted.data?.game_contract_version === EASTER_EGG_GAME_CONTRACT_VERSION) {
+    return { ok: true, data: { runId: inserted.data.id, seed: inserted.data.seed, contractVersion: EASTER_EGG_GAME_CONTRACT_VERSION } };
   }
 
   if (inserted.error?.code === "23505") {
@@ -70,8 +70,10 @@ export async function startEasterEggRunAction(idempotencyKey: string): Promise<G
       .eq("actor_user_id", access.user.id)
       .eq("idempotency_key", idempotencyKey)
       .maybeSingle();
-    if (!existing.error && existing.data?.validation_status === "pending") {
-      return { ok: true, data: { runId: existing.data.id, seed: existing.data.seed, contractVersion: existing.data.game_contract_version } };
+    if (!existing.error
+      && existing.data?.validation_status === "pending"
+      && existing.data.game_contract_version === EASTER_EGG_GAME_CONTRACT_VERSION) {
+      return { ok: true, data: { runId: existing.data.id, seed: existing.data.seed, contractVersion: EASTER_EGG_GAME_CONTRACT_VERSION } };
     }
   }
 
@@ -124,14 +126,17 @@ export async function submitEasterEggRunAction(input: EasterEggRunSubmission): P
     startedAtMs: Date.parse(existing.data.created_at),
     submittedAtMs,
     activeTickCount: input.activeTickCount,
-    obstacleCount: input.obstacleCount,
+    hazardCount: input.hazardCount,
+    platformCount: input.platformCount,
+    difficultyTier: input.difficultyTier,
+    courseFingerprint: input.courseFingerprint,
     score: input.score
   });
   const terminalStatus = validation.valid ? "valid" : "rejected";
   const completedAt = new Date(submittedAtMs).toISOString();
   const storedScore = Number.isSafeInteger(input.score) ? Math.max(0, Math.min(10_000_000, input.score)) : 0;
   const storedTickCount = Number.isSafeInteger(input.activeTickCount) ? Math.max(0, Math.min(216_000, input.activeTickCount)) : 0;
-  const storedObstacleCount = Number.isSafeInteger(input.obstacleCount) ? Math.max(0, Math.min(100_000, input.obstacleCount)) : 0;
+  const storedObstacleCount = Number.isSafeInteger(input.hazardCount) ? Math.max(0, Math.min(100_000, input.hazardCount)) : 0;
   const update = await admin
     .from("easter_egg_runs")
     .update({

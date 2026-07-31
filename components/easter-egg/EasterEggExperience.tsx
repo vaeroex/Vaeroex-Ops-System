@@ -10,7 +10,7 @@ import {
   submitEasterEggRunAction,
   updateEasterEggLeaderboardSettingsAction
 } from "@/app/app/easter-egg/actions";
-import type { EasterEggLeaderboardEntry, EasterEggRunStart, EasterEggWorkspaceSettings } from "@/lib/easter-egg/contracts";
+import type { EasterEggLeaderboardEntry, EasterEggRunStart, EasterEggRunSubmission, EasterEggWorkspaceSettings } from "@/lib/easter-egg/contracts";
 
 const EndlessRunnerGame = dynamic(() => import("@/components/easter-egg/EndlessRunnerGame"), {
   ssr: false,
@@ -46,7 +46,7 @@ export function EasterEggExperience({ initialHighScore, initialSettings, leaderb
     });
   }, [pending]);
 
-  const finishRun = useCallback((result: { activeTickCount: number; obstacleCount: number; score: number }) => {
+  const finishRun = useCallback((result: Omit<EasterEggRunSubmission, "runId">) => {
     if (!run) return;
     startTransition(async () => {
       const submitted = await submitEasterEggRunAction({ runId: run.runId, ...result });
