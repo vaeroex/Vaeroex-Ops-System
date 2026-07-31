@@ -33,6 +33,11 @@ export type ExecutiveHomepageModel = {
     trendDelta: number | null;
     summary: string;
     driver: string;
+    displayTitle: string;
+    driverPresentation: {
+      identity: string;
+      details: readonly string[];
+    };
     confidence: "High" | "Medium" | "Low";
     memorySignals: number;
     eligibleSignalCategories: readonly EligibleBusinessSignalCategory[];
@@ -87,6 +92,72 @@ function findingTitle(insight: IntelligenceInsight, kind: "risk" | "opportunity"
   }
 
   return conciseSentences(insight.title, kind === "risk" ? "Current risk requires review" : "A supported opportunity is emerging", 1);
+}
+
+function isBusinessNoteContext(insight: IntelligenceInsight) {
+  return insight.sourceTypes.some((sourceType) => /business notes?/i.test(sourceType))
+    || insight.supportingRecords?.some((record) => /business notes?/i.test(record.recordType));
+}
+
+function isValueOnlyTitle(value: string) {
+  const normalized = value.trim();
+  return /^actual\b/i.test(normalized)
+    || /^value\b/i.test(normalized)
+    || /^\d+(?:[.,]\d+)?\s+(?:above|below|over|under|vs\.?|versus)\b/i.test(normalized)
+    || /^[$£€]\s?\d+(?:[.,]\d+)?(?:\s+(?:above|below|over|under|vs\.?|versus)\b|$)/i.test(normalized);
+}
+
+function insightIdentity(insight: IntelligenceInsight) {
+  const kpiRecord = insight.sourceTypes.includes("KPIs")
+    ? insight.supportingRecords?.find((record) => record.recordType === "KPI record")
+    : null;
+  if (kpiRecord?.title?.trim()) return kpiRecord.title.trim();
+
+  const affectedArea = insight.affectedArea?.trim();
+  if (affectedArea && !/^(business|general|operations)$/i.test(affectedArea)) return affectedArea;
+
+  return conciseSentences(insight.title, "Current Business Health", 1);
+}
+
+function executiveTakeaway(insight: IntelligenceInsight | undefined, kind: "risk" | "opportunity", fallback: string) {
+  if (!insight || isBusinessNoteContext(insight)) return fallback;
+  const title = findingTitle(insight, kind);
+  if (!isValueOnlyTitle(title)) return title;
+  return `${insightIdentity(insight)} ${kind === "risk" ? "requires attention" : "presents a supported opportunity"}`;
+}
+
+function labeledMetricDetail(value: string) {
+  const normalized = value.trim().replace(/[.]$/, "");
+  const match = normalized.match(/^(Actual|Target|Acceptable range)\s*:?\s*(.+)$/i);
+  if (!match) return null;
+  const label = match[1].toLowerCase() === "actual"
+    ? "Actual"
+    : match[1].toLowerCase() === "target"
+      ? "Target"
+      : "Acceptable range";
+  return `${label}: ${match[2].trim()}`;
+}
+
+function healthDriverPresentation(insight: IntelligenceInsight | undefined, fallback: string) {
+  if (!insight || isBusinessNoteContext(insight)) {
+    return { identity: "Business Health evidence coverage", details: [fallback] };
+  }
+
+  if (insight.sourceTypes.includes("KPIs")) {
+    const recordValues = (insight.supportingRecords || []).flatMap((record) => record.value.split("·"));
+    const details = [...insight.evidence, ...recordValues]
+      .map(labeledMetricDetail)
+      .filter((detail): detail is string => Boolean(detail))
+      .filter((detail, index, items) => items.indexOf(detail) === index)
+      .slice(0, 2);
+    return { identity: insightIdentity(insight), details };
+  }
+
+  const details = insight.evidence
+    .map((detail) => detail.trim().replace(/[.]$/, ""))
+    .filter(Boolean)
+    .slice(0, 2);
+  return { identity: insightIdentity(insight), details };
 }
 
 function emptyPriority(tone: ExecutivePriorityTone): ExecutivePriorityCard {
@@ -306,6 +377,22 @@ export function buildExecutiveHomepageModel({
       "No single evidence-backed driver currently dominates Business Health.",
       1
     );
+  const authoritativeDriver = risk || opportunity;
+  const healthDisplayTitle = !hasUsableHealth
+    ? healthSummary
+    : risk
+      ? executiveTakeaway(risk, "risk", "Current Business Health requires leadership review")
+      : opportunity
+        ? executiveTakeaway(opportunity, "opportunity", "Current Business Health has no active risk requiring attention")
+        : conciseSentences(intelligence.executiveSummary, "No material business risk is visible in the current eligible evidence.");
+  const driverPresentation = hasUsableHealth
+    ? healthDriverPresentation(authoritativeDriver, "No eligible deterministic driver is currently available.")
+    : {
+        identity: sourceDataAvailable
+          ? `${weakest?.label || "Business"} Evidence Coverage`
+          : "Business Data Availability",
+        details: [healthDriver]
+      };
 
   return {
     health: {
@@ -316,6 +403,8 @@ export function buildExecutiveHomepageModel({
       trendDelta,
       summary: healthSummary,
       driver: healthDriver,
+      displayTitle: healthDisplayTitle,
+      driverPresentation,
       confidence: hasUsableHealth ? intelligence.dataQuality.confidence : "Low",
       memorySignals: sourceDataAvailable ? memorySignals : 0,
       eligibleSignalCategories: sourceDataAvailable ? eligibleSignalCategories : []

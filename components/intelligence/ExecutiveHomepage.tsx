@@ -153,14 +153,19 @@ export function ExecutiveHomepage({
               <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">
                 {businessHealthAnalysis.state.status === "current" ? "Validated executive interpretation" : "Current assessment"}
               </p>
-              <h2 className="text-xl font-semibold leading-7 sm:text-2xl">{model.health.summary}</h2>
+              <h2 className="text-xl font-semibold leading-7 sm:text-2xl">{model.health.displayTitle}</h2>
               {businessHealthAnalysis.state.status === "current" && businessHealthAnalysis.state.artifact ? (
                 <p className="mt-3 text-sm leading-6 text-slate-200">{businessHealthAnalysis.state.artifact.analysis.executive_interpretation}</p>
               ) : null}
               <dl className="mt-4 border-t border-white/10 pt-4 text-sm">
                 <div className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(healthStatus)}`}>
                   <dt className="text-xs font-semibold text-cyan-200">Highest Impact Driver</dt>
-                  <dd className="mt-1 leading-6 text-slate-200">{model.health.driver}</dd>
+                  <dd className="mt-1 leading-6 text-slate-200">
+                    <span className="block font-semibold text-white">{model.health.driverPresentation.identity}</span>
+                    {model.health.driverPresentation.details.map((detail) => (
+                      <span key={detail} className="block">{detail}</span>
+                    ))}
+                  </dd>
                 </div>
               </dl>
               <div className="mt-3">
