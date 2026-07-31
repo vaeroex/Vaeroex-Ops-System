@@ -101,6 +101,17 @@ export type Database = {
       };
     };
     Views: {
+      easter_egg_public_leaderboard_v1: {
+        Row: {
+          workspace_id: string;
+          public_display_name: string;
+          score: number;
+          achieved_at: string;
+          score_rank: number;
+          leaderboard_position: number;
+        };
+        Relationships: [];
+      };
       admin_company_directory_v1: {
         Row: {
           workspace_id: string;
@@ -149,6 +160,74 @@ export type Database = {
       };
     };
     Tables: {
+      easter_egg_workspace_settings: {
+        Row: {
+          workspace_id: string;
+          public_participation_requested: boolean;
+          public_display_name: string | null;
+          moderation_status: "none" | "pending" | "approved" | "rejected";
+          workspace_approved_by: string | null;
+          workspace_approved_at: string | null;
+          moderated_by: string | null;
+          moderated_at: string | null;
+          moderation_reason_code: "inappropriate" | "reserved" | "unclear" | "other" | null;
+          created_at: string;
+          updated_at: string;
+          updated_by: string;
+        };
+        Insert: {
+          workspace_id: string;
+          public_participation_requested?: boolean;
+          public_display_name?: string | null;
+          moderation_status?: "none" | "pending" | "approved" | "rejected";
+          workspace_approved_by?: string | null;
+          workspace_approved_at?: string | null;
+          moderated_by?: string | null;
+          moderated_at?: string | null;
+          moderation_reason_code?: "inappropriate" | "reserved" | "unclear" | "other" | null;
+          created_at?: string;
+          updated_at?: string;
+          updated_by: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["easter_egg_workspace_settings"]["Insert"]>;
+        Relationships: [];
+      };
+      easter_egg_runs: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          actor_user_id: string;
+          idempotency_key: string;
+          game_contract_version: "easter_egg_runner_v1" | "easter_egg_runner_v2" | "easter_egg_runner_v3";
+          seed: number;
+          validation_status: "pending" | "valid" | "rejected";
+          score: number | null;
+          run_duration_ms: number | null;
+          obstacle_count: number | null;
+          active_tick_count: number | null;
+          validation_reason_code: string | null;
+          created_at: string;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          actor_user_id: string;
+          idempotency_key: string;
+          game_contract_version: "easter_egg_runner_v1" | "easter_egg_runner_v2" | "easter_egg_runner_v3";
+          seed: number;
+          validation_status?: "pending" | "valid" | "rejected";
+          score?: number | null;
+          run_duration_ms?: number | null;
+          obstacle_count?: number | null;
+          active_tick_count?: number | null;
+          validation_reason_code?: string | null;
+          created_at?: string;
+          completed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["easter_egg_runs"]["Insert"]>;
+        Relationships: [];
+      };
       profiles: {
         Row: {
           id: string;

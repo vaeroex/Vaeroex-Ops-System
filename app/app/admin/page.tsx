@@ -148,6 +148,13 @@ export default async function AdminHomePage({ searchParams }: AdminHomeProps) {
           emptyDescription="Failed supported artifacts will appear here for investigation."
         />
       </SectionCard>
+
+      <section className="border-t border-line pt-5">
+        <Link href="/app/admin/easter-egg" className="inline-flex min-h-10 items-center rounded-md border border-line px-3 py-2 text-sm font-semibold text-ink hover:border-vaeroex-blue focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vaeroex-blue/30">
+          Easter Egg Activity
+        </Link>
+        <p className="mt-2 text-xs text-muted">Casual game activity and public display-name moderation, kept separate from AI Trust.</p>
+      </section>
     </div>
   );
 }
