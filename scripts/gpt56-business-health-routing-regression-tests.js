@@ -255,14 +255,15 @@ async function providerPolicyTests() {
     const fallbackPolicy = resolvePolicy();
     const fallback = await runStructuredAI(requestFor(fallbackPolicy, {
       openai: provider("openai", async (request) => {
-        fallbackCalls.push(request.model);
+        fallbackCalls.push({ model: request.model, systemPrompt: request.systemPrompt });
         return request.model === "gpt-5.6-sol"
           ? providerResult({ ok: false }, "gpt-5.6-sol-runtime")
           : providerResult({ ok: true }, "gpt-5.6-terra-runtime");
       }),
       nvidia: provider("nvidia", async () => { throw new Error("NVIDIA must not be called."); })
     }, validateOk));
-    assert.deepEqual(fallbackCalls, ["gpt-5.6-sol", "gpt-5.6-terra"], "an allowed Sol validation failure must invoke Terra exactly once");
+    assert.deepEqual(fallbackCalls.map((call) => call.model), ["gpt-5.6-sol", "gpt-5.6-terra"], "an allowed Sol validation failure must invoke Terra exactly once");
+    assert.ok(fallbackCalls.every((call) => call.systemPrompt === "PRIVATE_SYSTEM_PROMPT"), "Terra fallback must preserve the same bounded prompt contract without changing routing behavior");
     assert.equal(fallback.fallbackUsed, true, "same-provider fallback must be derived from the accepted policy step");
     assert.equal(fallback.acceptedAttemptOrdinal, 2);
     assert.equal(fallback.model, "gpt-5.6-terra-runtime");
