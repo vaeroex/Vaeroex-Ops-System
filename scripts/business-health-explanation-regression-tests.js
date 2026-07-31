@@ -37,7 +37,15 @@ Module._load = function loadPatched(request, parent, isMain) {
 
 process.env.SUPABASE_SERVICE_ROLE_KEY = "local-business-health-regression-secret";
 
-const { buildBusinessHealthExplanationPackage } = require("../lib/ai/business-health-explanation/context.ts");
+const {
+  buildBusinessHealthExplanationPackage,
+  businessHealthExplanationFingerprint
+} = require("../lib/ai/business-health-explanation/context.ts");
+const {
+  BUSINESS_HEALTH_GENERATION_POLICY_VERSION
+} = require("../lib/ai/business-health-explanation/contracts.ts");
+const { claimBusinessHealthGeneration } = require("../lib/ai/business-health-explanation/generation-claim.ts");
+const { resolveBusinessHealthAnalysisStateFromRuns } = require("../lib/ai/business-health-explanation/storage.ts");
 const { buildBusinessHealthExplanationFromSnapshotV1 } = require("../lib/ai/business-health-explanation/snapshot-context.ts");
 const { businessHealthProviderRequestPayload } = require("../lib/ai/business-health-explanation/service.ts");
 const { validateBusinessHealthExplanationOutput } = require("../lib/ai/business-health-explanation/validation.ts");
@@ -205,6 +213,7 @@ function build(overrides = {}) {
 
 const analysisPackage = build();
 assert.equal(analysisPackage.contractId, "business_health_explanation_v1");
+assert.equal(analysisPackage.generationPolicyVersion, BUSINESS_HEALTH_GENERATION_POLICY_VERSION);
 assert.equal(analysisPackage.facts.score, 52, "the contract must preserve the application-owned score");
 assert.equal(analysisPackage.facts.riskPenalty, 12, "the contract must preserve the deterministic risk penalty");
 assert.equal(analysisPackage.facts.opportunityAdjustment, 4, "the contract must preserve the deterministic opportunity adjustment");
@@ -344,6 +353,25 @@ process.env.VERCEL_ENV = "preview";
 
 const laterPackage = build({ now: new Date("2026-07-19T12:10:00.000Z") });
 assert.equal(laterPackage.fingerprint, analysisPackage.fingerprint, "generated timestamps must not affect the relevant evidence fingerprint");
+
+const policyFingerprintInput = { facts: { score: 52 }, evidence: [{ id: "E1" }] };
+const policyV2Fingerprint = businessHealthExplanationFingerprint({
+  generationPolicyVersion: "business_health_generation_policy_v2",
+  packageFingerprintInput: policyFingerprintInput
+});
+assert.equal(policyV2Fingerprint, businessHealthExplanationFingerprint({
+  generationPolicyVersion: "business_health_generation_policy_v2",
+  packageFingerprintInput: policyFingerprintInput,
+  provider: "openai",
+  model: "gpt-5.6-sol",
+  fallbackUsed: true,
+  deploymentId: "deployment-private",
+  requestId: "request-private"
+}), "provider, model, fallback, deployment, and request metadata must not affect the package fingerprint");
+assert.notEqual(policyV2Fingerprint, businessHealthExplanationFingerprint({
+  generationPolicyVersion: "business_health_generation_policy_v3",
+  packageFingerprintInput: policyFingerprintInput
+}), "an intentional generation-policy version bump must invalidate unchanged deterministic inputs");
 
 const labeledPackage = build({ sourceLabelsByKey: {
   "source-file:retail-workbook": "Retail Performance Workbook",
@@ -549,6 +577,20 @@ assert.doesNotMatch(token, /Monthly Revenue|11111111|22222222/, "the client hand
 assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }, now.getTime()).ok, true, "the authorized user and workspace must open the package");
 assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId: "33333333-3333-4333-8333-333333333333", userId }, now.getTime()).ok, false, "another workspace must not open the package");
 assert.equal(openBusinessHealthExplanationPackage(token, { workspaceId, userId }, now.getTime() + 16 * 60 * 1000).reason, "expired", "stale page tokens must expire safely");
+const wrongPolicyToken = sealBusinessHealthExplanationPackage({
+  analysisPackage: { ...analysisPackage, generationPolicyVersion: "business_health_generation_policy_v3" },
+  workspaceId,
+  userId,
+  nowMs: now.getTime()
+});
+assert.equal(openBusinessHealthExplanationPackage(wrongPolicyToken, { workspaceId, userId }, now.getTime()).ok, false, "an incorrect sealed generation-policy version must fail closed");
+const missingPolicyToken = sealBusinessHealthExplanationPackage({
+  analysisPackage: Object.fromEntries(Object.entries(analysisPackage).filter(([key]) => key !== "generationPolicyVersion")),
+  workspaceId,
+  userId,
+  nowMs: now.getTime()
+});
+assert.equal(openBusinessHealthExplanationPackage(missingPolicyToken, { workspaceId, userId }, now.getTime()).ok, false, "a missing sealed generation-policy version must fail closed");
 
 const pageSource = read("app/app/page.tsx");
 const actionSource = read("app/app/business-health-analysis/actions.ts");
@@ -557,6 +599,8 @@ const contextSource = read("lib/ai/business-health-explanation/context.ts");
 const snapshotContextSource = read("lib/ai/business-health-explanation/snapshot-context.ts");
 const workflowPolicySource = read("lib/ai/providers/workflow-provider-policy.ts");
 const panelSource = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
+const claimSource = read("lib/ai/business-health-explanation/generation-claim.ts");
+const claimMigration = read("supabase/migrations/20260731071855_business_health_generation_claim.sql");
 assert.match(pageSource, /buildBusinessHealthExplanationFromSnapshotV1/, "Overview must build the deterministic package from the scoped snapshot projection during server rendering");
 assert.doesNotMatch(pageSource, /generateBusinessHealthExplanation\(/, "server rendering must never invoke a generation provider");
 assert.doesNotMatch(snapshotContextSource, /runStructuredAI|generateBusinessHealthExplanation\(/, "snapshot construction must never invoke a provider");
@@ -575,6 +619,20 @@ assert.match(workflowPolicySource, /gpt-5\.6-sol[\s\S]*gpt-5\.6-terra/, "the app
 assert.match(serviceSource, /runStructuredAI/, "the fixed workflow must use the provider-neutral manager");
 assert.match(actionSource, /loadBusinessHealthAnalysisState/, "a failed refresh must reload and preserve the last valid stale artifact");
 assert.match(actionSource, /action:\s*"business_health_explanation\.generate"[\s\S]*limit:\s*1[\s\S]*windowSeconds:\s*60[\s\S]*identifiers:\s*\[analysisPackage\.fingerprint\]/, "duplicate generation must remain rate-limited by the contract fingerprint");
+assert.ok(
+  actionSource.indexOf("const generationClaim = await claimBusinessHealthGeneration")
+    < actionSource.indexOf("const generated = await generateBusinessHealthExplanation"),
+  "the durable database claim must succeed before any provider-backed generation begins"
+);
+assert.match(actionSource, /generation_policy_version:\s*analysisPackage\.generationPolicyVersion/, "run input must persist the application-owned generation-policy version");
+assert.match(serviceSource, /generation_policy_version:\s*analysisPackage\.generationPolicyVersion/, "usage telemetry must retain the privacy-safe generation-policy version");
+assert.doesNotMatch(JSON.stringify(businessHealthProviderRequestPayload(analysisPackage)), /generationPolicyVersion|generation_policy_version|business_health_generation_policy_v2/, "the generation-policy version must not be sent to Sol or Terra");
+assert.match(claimSource, /insert\([\s\S]*status:\s*"processing"[\s\S]*\.select\("id"\)/, "the processing-row insert must be the atomic claim");
+assert.match(claimSource, /insertError\?\.code !== "23505"/, "only a database uniqueness conflict may enter conflict resolution");
+assert.match(claimSource, /\.eq\("workspace_id", workspaceId\)/, "conflict lookup must remain workspace scoped");
+assert.match(claimMigration, /create unique index if not exists ai_agent_runs_business_health_generation_claim_uidx/i);
+assert.match(claimMigration, /agent_type = 'business_health_explanation_v1'[\s\S]*status in \('processing', 'completed'\)[\s\S]*generation_policy_version[\s\S]*fingerprint/i);
+assert.doesNotMatch(claimMigration, /archived_at|deleted_at/, "hidden completed rows must retain the durable generation claim");
 assert.match(panelSource, />\s*View analysis\s*</, "Overview must expose the approved executive action label");
 assert.match(panelSource, /sm:max-w-2xl/, "desktop must use a bounded right-side panel");
 assert.match(panelSource, /absolute inset-0 flex w-full/, "mobile must use a full-screen analysis sheet");
@@ -604,4 +662,166 @@ assert.ok(
   "the expanded Business Health panel must lead with interpretation before deterministic evidence mechanics"
 );
 
-process.stdout.write("Business Health explanation regressions passed.\n");
+function claimArtifact(packageUnderTest = analysisPackage) {
+  return {
+    contractId: packageUnderTest.contractId,
+    contractVersion: packageUnderTest.contractVersion,
+    validatorVersion: packageUnderTest.validatorVersion,
+    fingerprint: packageUnderTest.fingerprint,
+    generatedAt: "2026-07-31T07:00:00.000Z",
+    analysis: validOutput,
+    facts: packageUnderTest.facts,
+    citations: packageUnderTest.citations,
+    providerAttribution: {
+      provider: "openai",
+      model: "gpt-5.6-sol",
+      fallbackUsed: false,
+      providerPolicyId: "business_health_gpt56_sol_terra_v1"
+    }
+  };
+}
+
+function fakeClaimAdmin() {
+  const rows = [];
+  let sequence = 0;
+  function query() {
+    const state = { insert: null, equals: [], contains: null, statuses: null };
+    const builder = {
+      insert(value) { state.insert = value; return builder; },
+      select() { return builder; },
+      eq(column, value) { state.equals.push([column, value]); return builder; },
+      contains(_column, value) { state.contains = value; return builder; },
+      in(_column, value) { state.statuses = value; return builder; },
+      async maybeSingle() {
+        await new Promise((resolve) => setImmediate(resolve));
+        const candidate = state.insert;
+        const input = candidate.input_json || {};
+        const conflict = rows.find((row) =>
+          row.workspace_id === candidate.workspace_id
+          && row.agent_type === candidate.agent_type
+          && ["processing", "completed"].includes(row.status)
+          && row.input_json?.generation_policy_version
+          && row.input_json?.fingerprint
+          && row.input_json.fingerprint === input.fingerprint
+        );
+        if (conflict) return { data: null, error: { code: "23505" } };
+        const row = {
+          id: `run-${++sequence}`,
+          archived_at: null,
+          deleted_at: null,
+          ...candidate
+        };
+        rows.push(row);
+        return { data: { id: row.id }, error: null };
+      },
+      async limit(limit) {
+        const selected = rows.filter((row) => {
+          if (state.equals.some(([column, value]) => row[column] !== value)) return false;
+          if (state.statuses && !state.statuses.includes(row.status)) return false;
+          if (state.contains && Object.entries(state.contains).some(([key, value]) => row.input_json?.[key] !== value)) return false;
+          return true;
+        }).slice(0, limit);
+        return { data: selected, error: null };
+      }
+    };
+    return builder;
+  }
+  return { rows, from: () => query() };
+}
+
+function claimInput(packageUnderTest = analysisPackage) {
+  return {
+    workflow: packageUnderTest.contractId,
+    contract_id: packageUnderTest.contractId,
+    contract_version: packageUnderTest.contractVersion,
+    validator_version: packageUnderTest.validatorVersion,
+    generation_policy_version: packageUnderTest.generationPolicyVersion,
+    fingerprint: packageUnderTest.fingerprint
+  };
+}
+
+async function runGenerationClaimRegressions() {
+  const prePolicyFingerprint = businessHealthExplanationFingerprint({
+    generationPolicyVersion: "business_health_generation_policy_v1",
+    packageFingerprintInput: policyFingerprintInput
+  });
+  const prePolicyArtifact = claimArtifact({ ...analysisPackage, fingerprint: prePolicyFingerprint });
+  const staleState = resolveBusinessHealthAnalysisStateFromRuns({
+    runs: [{
+      id: "pre-policy-run",
+      status: "completed",
+      input_json: { fingerprint: prePolicyFingerprint },
+      output_json: prePolicyArtifact,
+      error_message: null,
+      created_at: "2026-07-30T07:00:00.000Z",
+      updated_at: "2026-07-30T07:00:00.000Z"
+    }],
+    analysisPackage,
+    requestTokenAvailable: true
+  });
+  assert.equal(staleState.status, "stale", "a pre-policy artifact must become stale after the application-owned version bump");
+  assert.equal(staleState.artifact?.fingerprint, prePolicyFingerprint, "the prior valid artifact must remain readable while stale");
+
+  const admin = fakeClaimAdmin();
+  const request = (overrides = {}) => claimBusinessHealthGeneration({
+    admin,
+    workspaceId,
+    userId,
+    fingerprint: analysisPackage.fingerprint,
+    generationPolicyVersion: analysisPackage.generationPolicyVersion,
+    inputJson: claimInput(),
+    ...overrides
+  });
+
+  const parallel = await Promise.all(Array.from({ length: 8 }, () => request()));
+  assert.equal(parallel.filter((result) => result.status === "claimed").length, 1, "parallel same-tab and multi-tab requests must produce exactly one database claim");
+  assert.equal(parallel.filter((result) => result.status === "processing").length, 7, "parallel duplicates must reuse the in-flight claim without another provider call");
+  assert.equal(admin.rows.length, 1);
+
+  const differentUser = await request({ userId: "44444444-4444-4444-8444-444444444444" });
+  assert.equal(differentUser.status, "processing", "different users in one workspace must share the same claim");
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  assert.equal((await request()).status, "processing", "a request independent of the rate-limit window must still reuse the processing claim");
+
+  admin.rows[0].status = "completed";
+  admin.rows[0].output_json = claimArtifact();
+  const completed = await request();
+  assert.equal(completed.status, "completed", "a completed conflict must return the existing validated artifact");
+  assert.equal(completed.artifact.fingerprint, analysisPackage.fingerprint);
+
+  admin.rows[0].archived_at = "2026-07-31T07:05:00.000Z";
+  assert.equal((await request()).status, "hidden_completed", "an archived completed artifact must keep its generation claim without being exposed as current");
+  admin.rows[0].archived_at = null;
+  admin.rows[0].output_json = {};
+  assert.equal((await request()).status, "failed_closed", "a malformed completed conflict must fail closed");
+
+  admin.rows[0].status = "failed";
+  const retry = await Promise.all([request(), request()]);
+  assert.equal(retry.filter((result) => result.status === "claimed").length, 1, "a failed run must permit exactly one legitimate retry claim");
+  assert.equal(retry.filter((result) => result.status === "processing").length, 1);
+
+  const otherWorkspace = await request({ workspaceId: "55555555-5555-4555-8555-555555555555" });
+  assert.equal(otherWorkspace.status, "claimed", "claim uniqueness must remain isolated by workspace");
+
+  const v3Fingerprint = businessHealthExplanationFingerprint({
+    generationPolicyVersion: "business_health_generation_policy_v3",
+    packageFingerprintInput: policyFingerprintInput
+  });
+  const v3 = await request({
+    fingerprint: v3Fingerprint,
+    generationPolicyVersion: "business_health_generation_policy_v3",
+    inputJson: {
+      ...claimInput(),
+      generation_policy_version: "business_health_generation_policy_v3",
+      fingerprint: v3Fingerprint
+    }
+  });
+  assert.equal(v3.status, "claimed", "a reviewed policy-version bump must permit a new generation claim");
+}
+
+runGenerationClaimRegressions()
+  .then(() => process.stdout.write("Business Health explanation regressions passed.\n"))
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });

@@ -5,6 +5,7 @@ import type { BusinessHealthExplanationPackage } from "@/lib/ai/business-health-
 import {
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
+  BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
   BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION
 } from "@/lib/ai/business-health-explanation/contracts";
 
@@ -37,6 +38,7 @@ function validPackage(value: unknown): value is BusinessHealthExplanationPackage
     candidate.contractId === BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID &&
     candidate.contractVersion === BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION &&
     candidate.validatorVersion === BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION &&
+    candidate.generationPolicyVersion === BUSINESS_HEALTH_GENERATION_POLICY_VERSION &&
     typeof candidate.fingerprint === "string" &&
     candidate.fingerprint.length === 64 &&
     Boolean(candidate.facts && typeof candidate.facts === "object") &&

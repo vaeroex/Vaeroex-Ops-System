@@ -8,6 +8,7 @@ import {
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   type BusinessHealthAnalysisState
 } from "@/lib/ai/business-health-explanation/contracts";
+import { claimBusinessHealthGeneration } from "@/lib/ai/business-health-explanation/generation-claim";
 import {
   businessHealthProviderAttemptTelemetry,
   generateBusinessHealthExplanation
@@ -32,12 +33,14 @@ function logBusinessHealthCacheEvent({
   fingerprint,
   contractVersion,
   validatorVersion,
+  generationPolicyVersion,
   freshness
 }: {
   event: "cache_hit" | "cache_miss" | "last_valid_preserved";
   fingerprint: string;
   contractVersion: string;
   validatorVersion: string;
+  generationPolicyVersion: string;
   freshness: string;
 }) {
   console.log(JSON.stringify({
@@ -47,12 +50,13 @@ function logBusinessHealthCacheEvent({
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion,
     validatorVersion,
+    generationPolicyVersion,
     fingerprint,
     freshness
   }));
 }
 
-function failedUsage(error: unknown, latencyMs: number) {
+function failedUsage(error: unknown, latencyMs: number, generationPolicyVersion: string) {
   const attempts = error instanceof AIProviderExecutionError ? error.attempts : [];
   const totals = attempts.reduce((sum, attempt) => ({
     inputTokens: sum.inputTokens + attempt.inputTokens,
@@ -71,6 +75,7 @@ function failedUsage(error: unknown, latencyMs: number) {
     status: "failed" as const,
     metadata: {
       workflow: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
+      generation_policy_version: generationPolicyVersion,
       provider_attempts: attempts.map(businessHealthProviderAttemptTelemetry),
       fallback_used: attempts.some((attempt) => attempt.fallback),
       reasoning_tokens: totals.reasoningTokens,
@@ -138,6 +143,7 @@ export async function generateBusinessHealthExplanationAction(
       fingerprint: analysisPackage.fingerprint,
       contractVersion: analysisPackage.contractVersion,
       validatorVersion: analysisPackage.validatorVersion,
+      generationPolicyVersion: analysisPackage.generationPolicyVersion,
       freshness: analysisPackage.facts.freshness
     });
     return { status: "current", artifact: cached, message: null };
@@ -147,6 +153,7 @@ export async function generateBusinessHealthExplanationAction(
     fingerprint: analysisPackage.fingerprint,
     contractVersion: analysisPackage.contractVersion,
     validatorVersion: analysisPackage.validatorVersion,
+    generationPolicyVersion: analysisPackage.generationPolicyVersion,
     freshness: analysisPackage.facts.freshness
   });
 
@@ -164,7 +171,7 @@ export async function generateBusinessHealthExplanationAction(
     return { status: "unavailable", artifact: null, message: "This workspace has reached its monthly intelligence usage limit." };
   }
 
-  // Durable atomic deduplication belongs to the future background-generation path; this Preview flow retains fingerprint rate limiting.
+  // This remains an abuse throttle. The ai_agent_runs insert below is the durable generation claim.
   const claim = await enforceRateLimit({
     action: "business_health_explanation.generate",
     limit: 1,
@@ -174,7 +181,8 @@ export async function generateBusinessHealthExplanationAction(
     requestHeaders: new Headers({ "x-real-ip": "business-health-analysis" }),
     metadata: {
       workflow: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
-      contract_version: analysisPackage.contractVersion
+      contract_version: analysisPackage.contractVersion,
+      generation_policy_version: analysisPackage.generationPolicyVersion
     },
     strict: true
   }).catch(() => null);
@@ -203,6 +211,7 @@ export async function generateBusinessHealthExplanationAction(
     contract_id: analysisPackage.contractId,
     contract_version: analysisPackage.contractVersion,
     validator_version: analysisPackage.validatorVersion,
+    generation_policy_version: analysisPackage.generationPolicyVersion,
     fingerprint: analysisPackage.fingerprint,
     evidence_manifest_version: analysisPackage.manifest.version,
     submode: analysisPackage.submode,
@@ -211,21 +220,47 @@ export async function generateBusinessHealthExplanationAction(
     evidence_classification: "derived_analysis",
     original_evidence_eligible: false
   } satisfies Json;
-  const { data: run, error: insertError } = await admin
-    .from("ai_agent_runs")
-    .insert({
-      workspace_id: workspaceId,
-      agent_type: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
-      input_json: inputJson,
-      output_json: {},
-      status: "processing",
-      created_by: user.id
-    })
-    .select("id")
-    .maybeSingle();
-  if (insertError || !run) {
+  const generationClaim = await claimBusinessHealthGeneration({
+    admin,
+    workspaceId,
+    userId: user.id,
+    fingerprint: analysisPackage.fingerprint,
+    generationPolicyVersion: analysisPackage.generationPolicyVersion,
+    inputJson
+  }).catch(() => ({ status: "failed_closed" as const }));
+  if (generationClaim.status === "completed") {
+    logBusinessHealthCacheEvent({
+      event: "cache_hit",
+      fingerprint: analysisPackage.fingerprint,
+      contractVersion: analysisPackage.contractVersion,
+      validatorVersion: analysisPackage.validatorVersion,
+      generationPolicyVersion: analysisPackage.generationPolicyVersion,
+      freshness: analysisPackage.facts.freshness
+    });
+    return { status: "current", artifact: generationClaim.artifact, message: null };
+  }
+  if (generationClaim.status === "processing") {
+    const preserved = await loadBusinessHealthAnalysisState({
+      supabase,
+      workspaceId,
+      analysisPackage,
+      requestTokenAvailable: true
+    }).catch(() => null);
+    return preserved?.status === "stale"
+      ? { ...preserved, message: "A refreshed analysis is already being prepared. The previous valid analysis remains available." }
+      : { status: "unavailable", artifact: null, message: "This analysis is already being prepared. Refresh shortly to view it." };
+  }
+  if (generationClaim.status === "hidden_completed") {
+    return {
+      status: "unavailable",
+      artifact: null,
+      message: "A completed generation already exists for this Business Health package and remains retained as historical data."
+    };
+  }
+  if (generationClaim.status !== "claimed") {
     return { status: "failed", artifact: null, message: SAFE_FAILURE_MESSAGE };
   }
+  const runId = generationClaim.runId;
 
   try {
     const generated = await generateBusinessHealthExplanation({
@@ -243,7 +278,7 @@ export async function generateBusinessHealthExplanationAction(
         updated_at: new Date().toISOString()
       })
       .eq("workspace_id", workspaceId)
-      .eq("id", run.id);
+      .eq("id", runId);
     if (updateError) throw new Error("Business Health analysis could not be saved.");
     await recordVaeroexAiUsage({
       supabase: admin,
@@ -262,13 +297,13 @@ export async function generateBusinessHealthExplanationAction(
         updated_at: new Date().toISOString()
       })
       .eq("workspace_id", workspaceId)
-      .eq("id", run.id);
+      .eq("id", runId);
     await recordVaeroexAiUsage({
       supabase: admin,
       workspaceId,
       userId: user.id,
       agentType: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
-      usage: failedUsage(error, Date.now() - startedAt)
+      usage: failedUsage(error, Date.now() - startedAt, analysisPackage.generationPolicyVersion)
     });
     const preserved = await loadBusinessHealthAnalysisState({
       supabase,
@@ -282,6 +317,7 @@ export async function generateBusinessHealthExplanationAction(
         fingerprint: analysisPackage.fingerprint,
         contractVersion: analysisPackage.contractVersion,
         validatorVersion: analysisPackage.validatorVersion,
+        generationPolicyVersion: analysisPackage.generationPolicyVersion,
         freshness: analysisPackage.facts.freshness
       });
       return preserved;

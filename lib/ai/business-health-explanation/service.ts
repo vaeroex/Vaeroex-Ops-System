@@ -211,6 +211,7 @@ export async function generateBusinessHealthExplanation({
       workflow: analysisPackage.contractId,
       contract_version: analysisPackage.contractVersion,
       validator_version: analysisPackage.validatorVersion,
+      generation_policy_version: analysisPackage.generationPolicyVersion,
       fingerprint: analysisPackage.fingerprint,
       freshness: analysisPackage.facts.freshness,
       provider: generation.provider,

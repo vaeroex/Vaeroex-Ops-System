@@ -8,6 +8,7 @@ import type { TrustProjectionBindingV1 } from "@/lib/ai/trust/contracts";
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID = "business_health_explanation_v1" as const;
 export const BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION = "business_health_explanation_v1" as const;
 export const BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION = "business_health_explanation_validator_v1" as const;
+export const BUSINESS_HEALTH_GENERATION_POLICY_VERSION = "business_health_generation_policy_v2" as const;
 
 export const BUSINESS_HEALTH_EXPLANATION_JSON_SCHEMA = {
   type: "object",
@@ -84,6 +85,7 @@ export type BusinessHealthExplanationPackage = Readonly<{
   contractId: typeof BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID;
   contractVersion: typeof BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION;
   validatorVersion: typeof BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION;
+  generationPolicyVersion: typeof BUSINESS_HEALTH_GENERATION_POLICY_VERSION;
   fingerprint: string;
   submode: BusinessHealthExplanationSubmode;
   facts: BusinessHealthExplanationFacts;
