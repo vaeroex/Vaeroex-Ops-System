@@ -29,7 +29,8 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 };
 
 const {
-  areConsecutiveBusinessHealthDates,
+  buildBusinessHealthTrendBuckets,
+  buildBusinessHealthTrendDisplayPoints,
   businessHealthTrendRangeStart,
   filterStoredBusinessHealthTrendPoints
 } = require("../lib/intelligence/business-health-trend.ts");
@@ -39,20 +40,41 @@ const asOfDate = "2026-07-31";
 const storedPoints = [
   { snapshotDate: "2025-12-31", score: 40, status: "At Risk", trend: "Declining" },
   { snapshotDate: "2026-01-01", score: 42, status: "At Risk", trend: "Holding steady" },
-  { snapshotDate: "2026-01-31", score: 44, status: "At Risk", trend: "Holding steady" },
+  { snapshotDate: "2026-01-31", score: 20, status: "At Risk", trend: "Holding steady" },
+  { snapshotDate: "2026-02-13", score: 40, status: "At Risk", trend: "Holding steady" },
   { snapshotDate: "2026-04-30", score: 50, status: "Watch", trend: "Improving" },
+  { snapshotDate: "2026-05-02", score: 20, status: "Watch", trend: "Improving" },
+  { snapshotDate: "2026-05-08", score: 40, status: "Watch", trend: "Improving" },
+  { snapshotDate: "2026-05-09", score: 60, status: "Watch", trend: "Improving" },
   { snapshotDate: "2026-06-30", score: 54, status: "Watch", trend: "Improving" },
+  { snapshotDate: "2026-07-02", score: 52, status: "Watch", trend: "Holding steady" },
   { snapshotDate: "2026-07-25", score: 55, status: "Watch", trend: "Holding steady" },
   { snapshotDate: "2026-07-27", score: 57, status: "Watch", trend: "Improving" },
-  { snapshotDate: "2026-07-31", score: 60, status: "Watch", trend: "Improving" },
+  { snapshotDate: "2026-07-31", score: 80, status: "Watch", trend: "Improving" },
   { snapshotDate: "2026-08-01", score: 99, status: "Strong", trend: "Improving" }
 ];
 
 assert.equal(businessHealthTrendRangeStart("7D", asOfDate), "2026-07-25");
-assert.equal(businessHealthTrendRangeStart("1M", asOfDate), "2026-06-30");
-assert.equal(businessHealthTrendRangeStart("3M", asOfDate), "2026-04-30");
+assert.equal(businessHealthTrendRangeStart("1M", asOfDate), "2026-07-02");
+assert.equal(businessHealthTrendRangeStart("3M", asOfDate), "2026-05-02");
 assert.equal(businessHealthTrendRangeStart("6M", asOfDate), "2026-01-31");
 assert.equal(businessHealthTrendRangeStart("YTD", asOfDate), "2026-01-01");
+
+assert.equal(buildBusinessHealthTrendBuckets("7D", asOfDate).length, 7, "7 Days must expose seven calendar-day slots");
+assert.equal(buildBusinessHealthTrendBuckets("1M", asOfDate).length, 30, "1 Month must expose thirty calendar-day slots");
+assert.equal(buildBusinessHealthTrendBuckets("3M", asOfDate).length, 13, "3 Months must expose thirteen weekly slots");
+assert.equal(buildBusinessHealthTrendBuckets("6M", asOfDate).length, 13, "6 Months must expose thirteen two-week slots");
+assert.equal(buildBusinessHealthTrendBuckets("YTD", asOfDate).length, 7, "YTD must expose every calendar month through July");
+assert.deepEqual(
+  buildBusinessHealthTrendBuckets("3M", asOfDate).at(-1),
+  { key: "2026-07-25:2026-07-31", startDate: "2026-07-25", endDate: "2026-07-31", kind: "weekly_average" },
+  "the latest date must remain in the final weekly period"
+);
+assert.deepEqual(
+  buildBusinessHealthTrendBuckets("6M", asOfDate).at(-1),
+  { key: "2026-07-18:2026-07-31", startDate: "2026-07-18", endDate: "2026-07-31", kind: "biweekly_average" },
+  "the latest date must remain in the final two-week period"
+);
 
 assert.deepEqual(
   filterStoredBusinessHealthTrendPoints(storedPoints, "7D", asOfDate).map((point) => point.snapshotDate),
@@ -61,23 +83,47 @@ assert.deepEqual(
 );
 assert.deepEqual(
   filterStoredBusinessHealthTrendPoints(storedPoints, "1M", asOfDate).map((point) => point.snapshotDate),
-  ["2026-06-30", "2026-07-25", "2026-07-27", "2026-07-31"]
+  ["2026-07-02", "2026-07-25", "2026-07-27", "2026-07-31"]
 );
 assert.deepEqual(
   filterStoredBusinessHealthTrendPoints(storedPoints, "3M", asOfDate).map((point) => point.snapshotDate),
-  ["2026-04-30", "2026-06-30", "2026-07-25", "2026-07-27", "2026-07-31"]
+  ["2026-05-02", "2026-05-08", "2026-05-09", "2026-06-30", "2026-07-02", "2026-07-25", "2026-07-27", "2026-07-31"]
 );
-assert.deepEqual(
-  filterStoredBusinessHealthTrendPoints(storedPoints, "6M", asOfDate).map((point) => point.snapshotDate),
-  ["2026-01-31", "2026-04-30", "2026-06-30", "2026-07-25", "2026-07-27", "2026-07-31"]
-);
-assert.deepEqual(
-  filterStoredBusinessHealthTrendPoints(storedPoints, "YTD", asOfDate).map((point) => point.snapshotDate),
-  ["2026-01-01", "2026-01-31", "2026-04-30", "2026-06-30", "2026-07-25", "2026-07-27", "2026-07-31"]
-);
-assert.equal(areConsecutiveBusinessHealthDates("2026-07-30", "2026-07-31"), true);
-assert.equal(areConsecutiveBusinessHealthDates("2026-07-25", "2026-07-27"), false, "missing dates must break the visible line");
 assert.equal(filterStoredBusinessHealthTrendPoints([], "7D", asOfDate).length, 0, "no current or synthetic point may be inserted");
+
+const dailyPoints = buildBusinessHealthTrendDisplayPoints(storedPoints, "7D", asOfDate);
+assert.deepEqual(dailyPoints.map((point) => point.startDate), ["2026-07-25", "2026-07-27", "2026-07-31"]);
+assert.ok(dailyPoints.every((point) => point.kind === "daily" && point.sampleCount === 1), "daily views must not aggregate or invent dates");
+assert.deepEqual(dailyPoints.map((point) => point.bucketIndex), [0, 2, 6], "missing daily slots must remain empty rather than carried forward");
+
+const monthlyDailyPoints = buildBusinessHealthTrendDisplayPoints(storedPoints, "1M", asOfDate);
+assert.deepEqual(monthlyDailyPoints.map((point) => point.startDate), ["2026-07-02", "2026-07-25", "2026-07-27", "2026-07-31"]);
+assert.ok(monthlyDailyPoints.every((point) => point.kind === "daily"), "the 30-day view must retain every stored daily point");
+
+const weeklyPoints = buildBusinessHealthTrendDisplayPoints(storedPoints, "3M", asOfDate);
+assert.deepEqual(weeklyPoints[0], {
+  key: "2026-05-02:2026-05-08",
+  startDate: "2026-05-02",
+  endDate: "2026-05-08",
+  kind: "weekly_average",
+  bucketIndex: 0,
+  score: 30,
+  sampleCount: 2,
+  sourceDates: ["2026-05-02", "2026-05-08"]
+}, "weekly points must average only stored daily scores within their period");
+assert.equal(weeklyPoints.at(-1).bucketIndex, 12, "the latest available score must be represented in the final weekly period");
+assert.equal(weeklyPoints.at(-1).score, 64, "the final weekly average must use every stored score in that week");
+
+const biweeklyPoints = buildBusinessHealthTrendDisplayPoints(storedPoints, "6M", asOfDate);
+assert.equal(biweeklyPoints[0].score, 30, "two-week periods must average only their stored daily scores");
+assert.equal(biweeklyPoints[0].sampleCount, 2);
+assert.equal(biweeklyPoints.at(-1).bucketIndex, 12, "the latest score must be represented in the final two-week period");
+
+const ytdPoints = buildBusinessHealthTrendDisplayPoints(storedPoints, "YTD", asOfDate);
+assert.equal(ytdPoints[0].kind, "monthly_average");
+assert.equal(ytdPoints[0].score, 31, "monthly periods must average only the stored daily scores in that calendar month");
+assert.equal(ytdPoints.at(-1).startDate, "2026-07-01");
+assert.ok(!ytdPoints.some((point) => point.startDate === "2026-03-01"), "months without history must remain missing");
 
 const intelligence = buildIntelligenceLayer({
   files: [
@@ -99,9 +145,15 @@ const historySource = fs.readFileSync(path.join(root, "lib/intelligence/business
 const historyMigration = fs.readFileSync(path.join(root, "supabase/migrations/202607080001_business_health_snapshots.sql"), "utf8");
 
 for (const label of ["7 Days", "1 Month", "3 Months", "6 Months", "YTD"]) assert.match(chartSource, new RegExp(label));
-assert.doesNotMatch(chartSource, /currentScore|average\(|buildMonthlyPoints|linearGradient/, "the chart must not add current values, aggregate snapshots, or visually smooth missing history");
-assert.match(chartSource, /areConsecutiveBusinessHealthDates/, "missing stored dates must break the plotted line");
-assert.match(chartSource, /Business Health score[\s\S]*onPointerEnter[\s\S]*onFocus/, "stored points must expose matching hover and keyboard details");
+assert.doesNotMatch(chartSource, /currentScore|linearGradient/, "the chart must not inject current or synthetic Business Health values");
+assert.match(chartSource, /Y_AXIS_VALUES = \[100, 75, 50, 25, 0\]/, "the fixed Business Health axis must label every 25-point interval");
+assert.match(chartSource, /buildBusinessHealthTrendBuckets/, "X-axis periods must come from the selected calendar range rather than sparse stored points");
+assert.match(chartSource, /buildBusinessHealthTrendDisplayPoints/, "plotted data must use the canonical stored-history projection");
+assert.match(chartSource, /strokeDasharray=\{crossesMissingPeriod/, "missing periods must remain visually distinguishable without becoming zero");
+for (const tooltipLabel of ["Daily score", "Weekly average", "Two-week average", "Monthly average", "Average Business Health"]) {
+  assert.match(chartSource, new RegExp(tooltipLabel), `tooltips must include ${tooltipLabel}`);
+}
+assert.match(chartSource, /onPointerEnter[\s\S]*onFocus[\s\S]*onClick/, "stored and averaged points must support hover, keyboard focus, and click details");
 assert.match(chartSource, /More stored Business Health history is needed/, "insufficient history must have an explicit empty state");
 assert.match(historySource, /\.eq\("workspace_id", workspaceId\)/, "history reads must remain workspace-scoped");
 assert.match(historyMigration, /unique \(workspace_id, snapshot_date\)/, "one stored daily snapshot must remain the canonical selection rule");
