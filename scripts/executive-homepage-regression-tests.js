@@ -88,7 +88,19 @@ function intelligence(overrides = {}) {
     topOpportunity: opportunity,
     topRecommendation: risk,
     insights: [risk, opportunity],
-    memorySummary: { profileSignals: 2, sourceRecords: 7, kpiHistoryRecords: 8, vaeroexRuns: 1, decisions: 0, recommendationOutcomes: 0 },
+    memorySummary: {
+      profileSignals: 2,
+      sourceRecords: 7,
+      kpiHistoryRecords: 8,
+      vaeroexRuns: 1,
+      decisions: 0,
+      recommendationOutcomes: 0,
+      eligibleSignalCategories: [
+        { id: "kpi_observations", label: "KPI observations", count: 8 },
+        { id: "kpi_series", label: "KPI series", count: 2 },
+        { id: "files", label: "Files", count: 5 }
+      ]
+    },
     ...overrides
   };
 }
@@ -224,7 +236,7 @@ assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\
 assert.match(homepageSource, /sm:text-right/, "the Version 1 snapshot must keep confidence aligned opposite the main driver");
 assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Version 1 homepage must keep Business Health as the cohesive opening snapshot");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
-assert.match(homepageSource, /trendDelta !== null && healthHistory\.length >= 2/, "the trend chart must require valid historical depth");
+assert.match(homepageSource, /model\.health\.available[\s\S]*<BusinessHealthTrendChart/, "the stored-history chart must own its insufficient-history state whenever Business Health is available");
 assert.doesNotMatch(healthTrendSource, /buildDemoTrendPoints|Sample demo trend/, "Business Health must not fabricate a demo trend when history is insufficient");
 assert.doesNotMatch(homepageSource, /View full intelligence|Executive Brief/, "Overview must not expose redundant page actions or report generation");
 assert.doesNotMatch(intelligencePageSource, /Business Health|Business Intelligence Coverage|What leadership should know/, "Intelligence must start with findings instead of repeating Overview");

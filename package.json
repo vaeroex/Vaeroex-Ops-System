@@ -18,6 +18,7 @@
     "test:deletion-integrity": "node scripts/deletion-integrity-regression-tests.js",
     "test:lifecycle-consistency": "node scripts/lifecycle-consistency-regression-tests.js",
     "test:homepage": "node scripts/executive-homepage-regression-tests.js",
+    "test:overview-insights": "node scripts/overview-insights-regression-tests.js",
     "test:overview-run-compatibility": "node scripts/overview-run-compatibility-regression-tests.js",
     "test:agents-retirement": "node scripts/agents-retirement-regression-tests.js",
     "test:reports": "node scripts/report-consolidation-regression-tests.js",

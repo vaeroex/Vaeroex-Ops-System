@@ -852,9 +852,7 @@ function IntelligenceLayerSummary({
           </dl>
           <BusinessHealthTrendChart
             points={businessHealthHistory}
-            currentScore={intelligence.businessHealth.score}
-            currentStatus={intelligence.businessHealth.status}
-            currentTrend={intelligence.businessHealth.trend}
+            asOfDate={dateOnly(new Date())}
             errorMessage={businessHealthHistoryError}
           />
         </div>
@@ -1570,6 +1568,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
           lastUpdatedLabel={lastUpdatedLabel(latestEvidenceUpdate)}
           model={executiveHomepageModel}
           healthHistory={businessHealthHistory}
+          healthHistoryAsOfDate={dateOnly(new Date())}
           healthHistoryError={businessHealthSnapshotResult.errorMessage}
           businessHealthAnalysis={{
             state: businessHealthAnalysisState,
