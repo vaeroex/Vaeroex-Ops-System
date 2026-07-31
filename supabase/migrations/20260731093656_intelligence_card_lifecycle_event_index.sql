@@ -1,0 +1,2 @@
+create index intelligence_card_lifecycle_events_lifecycle_idx
+  on public.intelligence_card_lifecycle_events(lifecycle_id);
