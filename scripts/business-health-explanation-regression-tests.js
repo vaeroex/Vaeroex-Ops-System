@@ -567,11 +567,11 @@ assert.match(actionSource, /getWorkspaceContext/, "the generation action must re
 assert.match(actionSource, /verifyEvidenceManifestCitations/, "the action must reverify centralized citations before generation");
 assert.match(actionSource, /evidence_classification:\s*"derived_analysis"/, "saved analysis must remain derived and ineligible as original evidence");
 assert.match(actionSource, /\.eq\("workspace_id", workspaceId\)/, "run mutations must remain explicitly workspace scoped");
-assert.match(workflowPolicySource, /process\.env\.VERCEL_ENV === "preview"/, "workflow-specific experimental routing must remain Preview-specific");
-assert.match(workflowPolicySource, /VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR/, "the GPT-5.6 experiment must require its exact Preview selector");
+assert.doesNotMatch(workflowPolicySource, /process\.env\.VERCEL_ENV === "preview"\s*&&\s*process\.env\.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY/, "the approved GPT-5.6 policy must not remain restricted to Preview");
+assert.match(workflowPolicySource, /VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR/, "GPT-5.6 routing must require its exact selector in every release channel");
 assert.match(workflowPolicySource, /business_health_preview_nvidia_primary_v1/, "selector absence must preserve the existing Preview provider policy");
-assert.match(workflowPolicySource, /business_health_openai_primary_v1/, "non-Preview routing must remain explicit and isolated");
-assert.match(workflowPolicySource, /gpt-5\.6-sol[\s\S]*gpt-5\.6-terra/, "the Preview experiment must use code-owned Sol then Terra model IDs");
+assert.match(workflowPolicySource, /business_health_openai_primary_v1/, "selector-disabled Production routing must remain explicit and isolated");
+assert.match(workflowPolicySource, /gpt-5\.6-sol[\s\S]*gpt-5\.6-terra/, "the approved policy must use code-owned Sol then Terra model IDs");
 assert.match(serviceSource, /runStructuredAI/, "the fixed workflow must use the provider-neutral manager");
 assert.match(actionSource, /loadBusinessHealthAnalysisState/, "a failed refresh must reload and preserve the last valid stale artifact");
 assert.match(actionSource, /action:\s*"business_health_explanation\.generate"[\s\S]*limit:\s*1[\s\S]*windowSeconds:\s*60[\s\S]*identifiers:\s*\[analysisPackage\.fingerprint\]/, "duplicate generation must remain rate-limited by the contract fingerprint");

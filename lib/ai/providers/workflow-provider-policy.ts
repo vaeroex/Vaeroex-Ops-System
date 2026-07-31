@@ -183,10 +183,7 @@ export function resolveBusinessHealthGenerationPolicy({
   startedAtMs: number;
   structuredOutput: AIProviderStructuredOutput;
 }): BusinessHealthGenerationPolicy {
-  if (
-    process.env.VERCEL_ENV === "preview" &&
-    process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR
-  ) {
+  if (process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY === BUSINESS_HEALTH_GPT56_POLICY_SELECTOR) {
     return {
       providerPolicy: {
         id: BUSINESS_HEALTH_GPT56_POLICY_ID,
