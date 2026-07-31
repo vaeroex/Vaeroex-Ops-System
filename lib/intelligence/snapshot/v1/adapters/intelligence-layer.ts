@@ -1,5 +1,6 @@
 import { snapshotHash } from "@/lib/intelligence/snapshot/v1/canonical";
 import { available, unavailable } from "@/lib/intelligence/snapshot/v1/state";
+import { INTELLIGENCE_SNAPSHOT_LIMITS } from "@/lib/intelligence/snapshot/v1/versions";
 import type {
   EvidenceAuthorityRoleV1,
   EvidenceReferenceV1,
@@ -13,7 +14,11 @@ import type {
 } from "@/lib/intelligence/snapshot/v1/types";
 
 function contextualRecord(recordType: string, sourceKey: string) {
-  return /business note|business memory/i.test(recordType) || /^(?:business-note|business-memory):/i.test(sourceKey);
+  return /business note/i.test(recordType) || /^business-note:/i.test(sourceKey);
+}
+
+export function boundFindingSupportingRecordsV1<T>(records: readonly T[]) {
+  return records.slice(0, INTELLIGENCE_SNAPSHOT_LIMITS.findingEvidenceReferences);
 }
 
 function canonicalEvidenceRecordType(recordId: string, recordType: string) {
@@ -42,7 +47,7 @@ export function adaptIntelligenceLayerProducerOutputV1({
 }) {
   const evidenceById = new Map<string, EvidenceReferenceV1>();
   const findings: FindingSnapshotV1[] = output.insights.map((insight) => {
-    const evidenceReferenceIds = insight.supportingRecords.map((record) => {
+    const evidenceReferenceIds = boundFindingSupportingRecordsV1(insight.supportingRecords).map((record) => {
       const id = `intelligence-layer:${record.id}`;
       const authorityRole = recordAuthority(record.classification, record.recordType, record.sourceKey);
       const reference: EvidenceReferenceV1 = {

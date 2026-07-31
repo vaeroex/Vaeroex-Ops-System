@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
+import { boundFindingSupportingRecordsV1 } from "@/lib/intelligence/snapshot/v1/adapters/intelligence-layer";
 import { canonicalSnapshotJson } from "@/lib/intelligence/snapshot/v1/canonical";
 import type { IntelligenceInboxProjectionV1 } from "@/lib/intelligence/snapshot/v1/projections";
 import type { FindingSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
@@ -23,7 +24,9 @@ const canonicalFindingFields = (finding: FindingSnapshotV1 | IntelligenceInsight
 });
 
 function expectedEvidenceReferenceIds(insight: IntelligenceInsight) {
-  return insight.supportingRecords.map((record) => `intelligence-layer:${record.id}`).sort();
+  return boundFindingSupportingRecordsV1(insight.supportingRecords)
+    .map((record) => `intelligence-layer:${record.id}`)
+    .sort();
 }
 
 export function materializeFindingPresentationV1({

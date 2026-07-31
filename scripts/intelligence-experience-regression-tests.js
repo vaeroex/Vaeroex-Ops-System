@@ -212,6 +212,25 @@ const onlineFinding = retailInsights.find((insight) => insight.title === "Online
 assert.equal(onlineFinding.confidence, "Medium", "one workbook caps finding confidence at Medium");
 assert.equal(onlineFinding.independentSourceCount, 1, "chunks and KPI points from one workbook remain one independent source");
 assert.ok(onlineFinding.supportingRecords.some((record) => record.recordType === "Business Memory citation"), "eligible memory supports an existing finding");
+const businessNoteChunk = {
+  ...memoryChunk("Monthly Sales", 99),
+  id: "business-note-chunk",
+  source_type: "business_note",
+  source_id: "business-note-source"
+};
+const insightsWithBusinessNoteChunk = buildOperationalEvidenceInsights({
+  kpis: retailKpis,
+  kpiSettings: retailKpiSettings,
+  operationalMetrics: retailMetrics,
+  memoryChunks: [...retailChunks, businessNoteChunk],
+  files: [retailFile],
+  imports: [retailImport]
+});
+assert.equal(
+  insightsWithBusinessNoteChunk.some((insight) => insight.supportingRecords.some((record) => record.id === "memory:business-note-chunk")),
+  false,
+  "Business Note chunks remain contextual and cannot become deterministic finding dependencies"
+);
 assert.equal(buildOperationalEvidenceInsights({ memoryChunks: retailChunks, files: [retailFile], imports: [retailImport] }).length, 0, "memory chunks cannot independently create findings");
 const withInactiveMetric = buildOperationalEvidenceInsights({
   kpis: retailKpis,

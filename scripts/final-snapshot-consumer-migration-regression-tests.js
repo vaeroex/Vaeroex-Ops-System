@@ -95,6 +95,35 @@ assert.deepEqual(inbox.insights, intelligence.insights, "Intelligence Inbox must
 assert.equal(inbox.parity.status, "exact");
 assert.equal(inbox.parity.classification, "exact");
 
+const largeEvidenceIntelligence = clone(foundationIntelligenceLayerOutput());
+const largeEvidenceTemplate = largeEvidenceIntelligence.insights[0].supportingRecords[0];
+largeEvidenceIntelligence.insights[0].supportingRecords = Array.from({ length: 30 }, (_, index) => ({
+  ...clone(largeEvidenceTemplate),
+  id: `large-evidence-${String(index + 1).padStart(2, "0")}`,
+  sourceKey: `large-source-${String(index + 1).padStart(2, "0")}`
+}));
+const largeEvidenceBuild = buildIntelligenceSnapshotFromProducersV1({
+  workspaceId: FOUNDATION_FIXTURE_WORKSPACE_ID,
+  asOf: FOUNDATION_FIXTURE_AS_OF,
+  intelligence: largeEvidenceIntelligence,
+  coverage
+});
+const largeEvidenceInbox = buildIntelligenceInboxFromSnapshotV1({
+  projection: projectIntelligenceInboxV1(largeEvidenceBuild.snapshot),
+  intelligence: largeEvidenceIntelligence
+});
+assert.equal(
+  largeEvidenceBuild.snapshot.findings[0].deterministicDependencies.evidenceReferenceIds.length,
+  24,
+  "the bounded snapshot projection must cap deterministic finding dependencies"
+);
+assert.equal(
+  largeEvidenceInbox.insights[0].supportingRecords.length,
+  30,
+  "the customer-visible Intelligence finding must retain its complete legacy evidence presentation"
+);
+assert.deepEqual(largeEvidenceInbox.insights[0], largeEvidenceIntelligence.insights[0]);
+
 const reorderedIntelligence = { ...intelligence, insights: [...intelligence.insights].reverse() };
 const reorderedBuild = buildIntelligenceSnapshotFromProducersV1({
   workspaceId: FOUNDATION_FIXTURE_WORKSPACE_ID,
