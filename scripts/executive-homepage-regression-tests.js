@@ -48,10 +48,22 @@ function insight(overrides = {}) {
     confidence: "High",
     evidence: ["Actual: $7,000", "Target: $8,000"],
     evidenceCount: 2,
+    supportingRecords: [{
+      id: "kpi:revenue-1",
+      title: "Revenue",
+      recordType: "KPI record",
+      date: "2026-07-11",
+      value: "Actual $7,000 · Target $8,000",
+      support: "The latest recorded value is below target.",
+      href: "/app/kpis?metric=Revenue&section=detail",
+      classification: "Original",
+      sourceKey: "manual-kpi:revenue"
+    }],
     sourceTypes: ["KPIs"],
     sourceHref: "/app/kpis",
     priority: "High",
     lastUpdated: "2026-07-11T10:00:00.000Z",
+    affectedArea: "Revenue",
     ...overrides
   };
 }
@@ -152,6 +164,13 @@ const populated = buildExecutiveHomepageModel({
 });
 assert.equal(populated.health.score, 68, "valid Business Health must render");
 assert.equal(populated.health.trendDelta, -4, "stored snapshots must drive the visible change");
+assert.equal(populated.health.displayTitle, "Revenue is below target", "the executive takeaway must use the deterministic finding title");
+assert.deepEqual(populated.health.driverPresentation, {
+  identity: "Revenue",
+  details: ["Actual: $7,000", "Target: $8,000"]
+}, "KPI drivers must show their identity before applicable actual and target values");
+assert.equal(populated.health.summary, "Revenue is below its current target.", "the existing deterministic summary contract must remain unchanged");
+assert.equal(populated.health.driver, "Actual: $7,000", "the existing deterministic driver contract must remain unchanged");
 assert.equal(populated.priorities.length, 3, "exactly three priorities must render");
 assert.doesNotMatch(populated.priorities[0].title, /may indicate a pattern/i, "homepage titles must state the supported issue directly");
 assert.equal(populated.changes.state, "changes");
@@ -172,6 +191,75 @@ assert.equal(
   "Gross margin declined from 52.1% to 49.8%. Revenue remains below target.",
   "sentence compaction must not split decimal values"
 );
+
+const operationalDriver = buildExecutiveHomepageModel({
+  intelligence: intelligence({
+    topRisk: insight({
+      title: "Delayed orders remain elevated",
+      summary: "Fourteen active delays remain open.",
+      affectedArea: "Delayed Orders",
+      sourceTypes: ["Issues"],
+      evidence: ["14 active delays"],
+      supportingRecords: []
+    })
+  }),
+  coverage: coverage(), snapshots: [], kpiTrends: [], sourceDataAvailable: true
+});
+assert.equal(operationalDriver.health.displayTitle, "Delayed orders remain elevated");
+assert.deepEqual(operationalDriver.health.driverPresentation, {
+  identity: "Delayed Orders",
+  details: ["14 active delays"]
+}, "non-KPI drivers must show an understandable identity with only applicable detail");
+
+const valueOnlyTitle = buildExecutiveHomepageModel({
+  intelligence: intelligence({
+    topRisk: insight({
+      title: "Actual 37 vs target 0",
+      affectedArea: "1-Star Reviews",
+      evidence: ["Actual: 37", "Target: 0"],
+      supportingRecords: [{
+        id: "kpi:reviews-1",
+        title: "1-Star Reviews",
+        recordType: "KPI record",
+        date: "2026-07-11",
+        value: "Actual 37 · Target 0",
+        support: "The latest recorded value is above target.",
+        href: "/app/kpis?metric=1-Star%20Reviews&section=detail",
+        classification: "Original",
+        sourceKey: "manual-kpi:1-star-reviews"
+      }]
+    })
+  }),
+  coverage: coverage(), snapshots: [], kpiTrends: [], sourceDataAvailable: true
+});
+assert.equal(valueOnlyTitle.health.displayTitle, "1-Star Reviews requires attention", "value-only titles must fall back to the authoritative driver identity");
+assert.deepEqual(valueOnlyTitle.health.driverPresentation, {
+  identity: "1-Star Reviews",
+  details: ["Actual: 37", "Target: 0"]
+});
+assert.doesNotMatch(valueOnlyTitle.health.displayTitle, /^(?:Actual|Value)\b|^\d+(?:[.,]\d+)?\s+(?:above|below|over|under|vs\.?|versus)\b/i, "value-only titles must never render");
+
+const businessNoteBoundary = buildExecutiveHomepageModel({
+  intelligence: intelligence({
+    topRisk: insight({
+      title: "Leadership note says a customer is unhappy",
+      summary: "A Business Note reports an unhappy customer.",
+      affectedArea: "Leadership context",
+      sourceTypes: ["Business Notes"],
+      evidence: ["Business Note: customer concern"],
+      supportingRecords: []
+    })
+  }),
+  coverage: coverage(), snapshots: [], kpiTrends: [], sourceDataAvailable: true
+});
+assert.doesNotMatch(businessNoteBoundary.health.displayTitle, /note|customer is unhappy/i, "Business Notes must not become the Overview headline");
+assert.doesNotMatch(businessNoteBoundary.health.driverPresentation.identity, /note|customer/i, "Business Notes must not become the Highest Impact Driver");
+
+const dismissedPresentation = buildExecutiveHomepageModel({
+  intelligence: intelligence({ topRisk: insight({ lifecycleState: "dismissed" }) }),
+  coverage: coverage(), snapshots: [], kpiTrends: [], sourceDataAvailable: true
+});
+assert.equal(dismissedPresentation.health.displayTitle, populated.health.displayTitle, "presentation lifecycle metadata must not alter the deterministic title");
 
 const longOutput = buildExecutiveHomepageModel({
   intelligence: intelligence({
@@ -226,6 +314,9 @@ const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const healthTrendSource = fs.readFileSync(path.join(root, "components/intelligence/BusinessHealthTrendChart.tsx"), "utf8");
 const kpiPageSource = fs.readFileSync(path.join(root, "app/app/kpis/page.tsx"), "utf8");
+const homepageModelSource = fs.readFileSync(path.join(root, "lib/intelligence/executive-homepage.ts"), "utf8");
+const businessHealthContextSource = fs.readFileSync(path.join(root, "lib/ai/business-health-explanation/context.ts"), "utf8");
+const snapshotFingerprintSource = fs.readFileSync(path.join(root, "lib/intelligence/snapshot/v1/fingerprints.ts"), "utf8");
 assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visible loading state");
 assert.match(homepageSource, /lg:grid-cols-\[1fr_1fr_\.78fr\]/, "executive focus and readiness cards must use horizontal space without forcing mobile columns");
 assert.match(homepageSource, /Needs Attention/, "risk and leadership decision must be consolidated into one focus card");
@@ -241,6 +332,10 @@ for (const label of ["Current state", "Since previous review", "Confidence"]) {
 assert.match(homepageSource, /No previous review available\./, "the compact summary must handle a missing prior review cleanly");
 assert.match(homepageSource, /trendDelta === 0[\s\S]*\? "Unchanged"/, "an unchanged review must use concise deterministic wording");
 assert.equal((homepageSource.match(/>Highest Impact Driver<\//g) || []).length, 1, "Highest Impact Driver must not be duplicated");
+assert.doesNotMatch(homepageModelSource, /runStructuredAI|OpenAIProvider|NvidiaProvider|createAI|fetch\(/, "Overview presentation must make zero provider calls");
+assert.match(businessHealthContextSource, /deterministicSummary:\s*homepage\.health\.summary/, "Business Health provider context must keep the existing deterministic summary field");
+assert.doesNotMatch(businessHealthContextSource, /displayTitle|driverPresentation/, "presentation-only fields must not enter Business Health provider context");
+assert.doesNotMatch(snapshotFingerprintSource, /displayTitle|driverPresentation/, "presentation-only fields must not affect snapshot fingerprints");
 assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Version 1 homepage must keep Business Health as the cohesive opening snapshot");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
 assert.match(homepageSource, /model\.health\.available[\s\S]*<BusinessHealthTrendChart/, "the stored-history chart must own its insufficient-history state whenever Business Health is available");
