@@ -429,7 +429,16 @@ assert.doesNotMatch(businessHealthExplanationSystemPrompt(healthWithoutContext.a
 const healthPayload = businessHealthProviderRequestPayload(healthWithContext.analysisPackage);
 assert.equal(healthPayload.reported_context.length, 2);
 assert.equal(healthPayload.application_owned.context_authority.role, "supporting_context");
-assert.match(businessHealthExplanationSystemPrompt(healthWithContext.analysisPackage), /reported_context/);
+const healthContextPrompt = businessHealthExplanationSystemPrompt(healthWithContext.analysisPackage);
+assert.match(healthContextPrompt, /reported_context/);
+assert.match(healthContextPrompt, /An approved Business Note reports/);
+assert.match(healthContextPrompt, /Leadership reported/);
+assert.match(healthContextPrompt, /According to approved Business Note context/);
+assert.match(healthContextPrompt, /may provide context/);
+assert.match(healthContextPrompt, /could be relevant/);
+assert.match(healthContextPrompt, /does not establish causation/);
+assert.match(healthContextPrompt, /Never present reported_context as independently observed, established, confirmed, validated, or verified fact/);
+assert.match(healthContextPrompt, /In why_it_matters, do not use Business Note-only language unless that field contains both explicit attribution and bounded interpretation/);
 assert.doesNotMatch(JSON.stringify(healthPayload.reported_context), /business-note-context:/, "internal note IDs must not enter the provider request");
 const healthContextOutput = {
   executive_interpretation: "Checkout wait remains the required top risk while revenue remains the required opportunity. The Business Note reports a temporary warehouse move that may help explain the checkout wait.",
@@ -438,6 +447,26 @@ const healthContextOutput = {
   provisional_hypothesis: null
 };
 assert.equal(validateBusinessHealthExplanationOutput(healthContextOutput, healthWithContext.analysisPackage).ok, true, "explicitly attributed context must remain available to reasoning");
+const healthAttributedWhyItMatters = validateBusinessHealthExplanationOutput({
+  ...healthContextOutput,
+  executive_interpretation: "Checkout wait remains the required top risk while revenue remains the required opportunity.",
+  why_it_matters: "An approved Business Note reports a temporary warehouse move. This reported context may provide context for checkout wait and does not establish causation."
+}, healthWithContext.analysisPackage);
+assert.equal(healthAttributedWhyItMatters.ok, true, "attributed and bounded Business Note context must remain valid in why_it_matters");
+const healthUnattributedWhyItMatters = validateBusinessHealthExplanationOutput({
+  ...healthContextOutput,
+  executive_interpretation: "Checkout wait remains the required top risk while revenue remains the required opportunity.",
+  why_it_matters: "A temporary warehouse move may provide context for checkout wait, but it does not establish causation."
+}, healthWithContext.analysisPackage);
+assert.equal(healthUnattributedWhyItMatters.ok, false, "Business Note-only terms must still fail when why_it_matters omits attribution");
+assert.equal(healthUnattributedWhyItMatters.diagnostic.reasonCode, "unsupported_relationship");
+assert.equal(healthUnattributedWhyItMatters.diagnostic.expectedField, "why_it_matters");
+const healthDeterministicOnly = validateBusinessHealthExplanationOutput({
+  ...healthContextOutput,
+  executive_interpretation: "Checkout wait remains the required top risk while revenue remains the required opportunity.",
+  why_it_matters: "The approved checkout wait and revenue evidence may be stated directly because both are deterministic score drivers."
+}, healthWithContext.analysisPackage);
+assert.equal(healthDeterministicOnly.ok, true, "deterministic evidence must remain directly stateable when optional Business Note context is available");
 const healthUnattributed = validateBusinessHealthExplanationOutput({
   ...healthContextOutput,
   executive_interpretation: "Checkout wait remains the required top risk while revenue remains the required opportunity. A temporary warehouse move may help explain the checkout wait."

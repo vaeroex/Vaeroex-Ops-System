@@ -169,7 +169,7 @@ function policyGatingTests() {
     assert.deepEqual(selected.providerPolicy.steps.map((step) => [step.provider, step.model]), [
       ["openai", "gpt-5.6-sol"],
       ["openai", "gpt-5.6-terra"]
-    ], "the exact Preview selector must permit a same-provider multi-model policy");
+    ], "the exact selector must permit a same-provider multi-model policy");
     assert.equal(selected.executionBudget.deadlineAtMs - Date.now() <= 90_000, true, "the selected workflow deadline must not exceed 90 seconds");
     assert.equal(selected.providerPolicy.steps[0].workflowConfiguration.reasoning.effort, "low");
     assert.equal(selected.providerPolicy.steps[1].workflowConfiguration.reasoning.effort, "medium");
@@ -191,7 +191,16 @@ function policyGatingTests() {
     assert.equal(resolvePolicy().providerPolicy.id, "business_health_preview_nvidia_primary_v1", "an invalid selector must preserve existing Preview routing");
     process.env.VERCEL_ENV = "production";
     process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = BUSINESS_HEALTH_GPT56_POLICY_SELECTOR;
-    assert.equal(resolvePolicy().providerPolicy.id, "business_health_openai_primary_v1", "the selector must be ignored outside Preview");
+    const productionSelected = resolvePolicy();
+    assert.equal(productionSelected.providerPolicy.id, BUSINESS_HEALTH_GPT56_POLICY_ID, "the exact selector must activate the approved policy in Production");
+    assert.deepEqual(productionSelected.providerPolicy.steps.map((step) => [step.provider, step.model]), [
+      ["openai", "gpt-5.6-sol"],
+      ["openai", "gpt-5.6-terra"]
+    ], "Production must preserve the approved Sol to Terra route");
+    delete process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY;
+    assert.equal(resolvePolicy().providerPolicy.id, "business_health_openai_primary_v1", "Production must preserve legacy routing when the selector is absent");
+    process.env.VAEROEX_EXECUTIVE_SYNTHESIS_POLICY = "invalid_policy";
+    assert.equal(resolvePolicy().providerPolicy.id, "business_health_openai_primary_v1", "Production must preserve legacy routing when the selector is invalid");
   } finally {
     if (originalVercelEnv === undefined) delete process.env.VERCEL_ENV;
     else process.env.VERCEL_ENV = originalVercelEnv;
@@ -246,14 +255,15 @@ async function providerPolicyTests() {
     const fallbackPolicy = resolvePolicy();
     const fallback = await runStructuredAI(requestFor(fallbackPolicy, {
       openai: provider("openai", async (request) => {
-        fallbackCalls.push(request.model);
+        fallbackCalls.push({ model: request.model, systemPrompt: request.systemPrompt });
         return request.model === "gpt-5.6-sol"
           ? providerResult({ ok: false }, "gpt-5.6-sol-runtime")
           : providerResult({ ok: true }, "gpt-5.6-terra-runtime");
       }),
       nvidia: provider("nvidia", async () => { throw new Error("NVIDIA must not be called."); })
     }, validateOk));
-    assert.deepEqual(fallbackCalls, ["gpt-5.6-sol", "gpt-5.6-terra"], "an allowed Sol validation failure must invoke Terra exactly once");
+    assert.deepEqual(fallbackCalls.map((call) => call.model), ["gpt-5.6-sol", "gpt-5.6-terra"], "an allowed Sol validation failure must invoke Terra exactly once");
+    assert.ok(fallbackCalls.every((call) => call.systemPrompt === "PRIVATE_SYSTEM_PROMPT"), "Terra fallback must preserve the same bounded prompt contract without changing routing behavior");
     assert.equal(fallback.fallbackUsed, true, "same-provider fallback must be derived from the accepted policy step");
     assert.equal(fallback.acceptedAttemptOrdinal, 2);
     assert.equal(fallback.model, "gpt-5.6-terra-runtime");
