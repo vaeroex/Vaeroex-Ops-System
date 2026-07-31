@@ -1,292 +1,296 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import {
+  buildBusinessHealthTrendBuckets,
+  buildBusinessHealthTrendDisplayPoints,
+  type BusinessHealthTrendBucket,
+  type BusinessHealthTrendDisplayPoint,
+  type BusinessHealthTrendRange,
+  type StoredBusinessHealthTrendPoint
+} from "@/lib/intelligence/business-health-trend";
 
-export type BusinessHealthTrendPoint = {
-  snapshotDate: string;
-  score: number;
-  status: string;
-  trend: string;
-};
+export type BusinessHealthTrendPoint = StoredBusinessHealthTrendPoint;
 
-type RangeKey = "7D" | "6M" | "YTD";
 type BusinessHealthTrendChartProps = {
   points: BusinessHealthTrendPoint[];
-  currentScore?: number;
-  currentStatus?: string;
-  currentTrend?: string;
+  asOfDate: string;
   errorMessage?: string | null;
   loading?: boolean;
 };
-type ChartPoint = {
-  key: string;
-  label: string;
-  score: number;
+
+type PositionedPoint = BusinessHealthTrendDisplayPoint & {
+  x: number;
+  y: number;
 };
 
-const ranges: Array<{ key: RangeKey; label: string }> = [
-  { key: "7D", label: "7D" },
-  { key: "6M", label: "6M" },
+const CHART_WIDTH = 360;
+const PLOT_LEFT = 30;
+const PLOT_RIGHT = 350;
+const PLOT_TOP = 10;
+const PLOT_BOTTOM = 98;
+const Y_AXIS_VALUES = [100, 75, 50, 25, 0] as const;
+
+const ranges: Array<{ key: BusinessHealthTrendRange; label: string }> = [
+  { key: "7D", label: "7 Days" },
+  { key: "1M", label: "1 Month" },
+  { key: "3M", label: "3 Months" },
+  { key: "6M", label: "6 Months" },
   { key: "YTD", label: "YTD" }
 ];
 
-function dateOnly(date: Date) {
-  return date.toISOString().slice(0, 10);
+const RANGE_LABELS: Record<BusinessHealthTrendRange, string> = {
+  "7D": "Last 7 days",
+  "1M": "Last 30 days",
+  "3M": "Last 13 weeks",
+  "6M": "Last 13 two-week periods",
+  YTD: "Year to date"
+};
+
+function formatDate(value: string, includeYear = false) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    ...(includeYear ? { year: "numeric" as const } : {}),
+    timeZone: "UTC"
+  }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
-function todayKey() {
-  const today = new Date();
-  return dateOnly(new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())));
+function formatMonth(value: string, includeYear = false) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: includeYear ? "long" : "short",
+    ...(includeYear ? { year: "numeric" as const } : {}),
+    timeZone: "UTC"
+  }).format(new Date(`${value}T00:00:00.000Z`));
 }
 
-function monthKey(date: Date) {
-  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+function formatScore(value: number) {
+  return Number.isInteger(value) ? String(value) : value.toFixed(1);
 }
 
-function formatMonthLabel(key: string) {
-  const [year, month] = key.split("-").map(Number);
-  return new Intl.DateTimeFormat("en-US", { month: "short" }).format(new Date(Date.UTC(year, month - 1, 1)));
+function formatPeriod(point: BusinessHealthTrendDisplayPoint) {
+  if (point.kind === "daily") return formatDate(point.startDate, true);
+  if (point.kind === "monthly_average") return formatMonth(point.startDate, true);
+  return `${formatDate(point.startDate)}–${formatDate(point.endDate, true)}`;
 }
 
-function formatDayLabel(value: string) {
-  const date = new Date(`${value}T00:00:00Z`);
-  return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(date);
+function periodKindLabel(point: BusinessHealthTrendDisplayPoint) {
+  if (point.kind === "daily") return "Daily score";
+  if (point.kind === "weekly_average") return "Weekly average";
+  if (point.kind === "biweekly_average") return "Two-week average";
+  return "Monthly average";
 }
 
-function average(values: number[]) {
-  return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+function axisLabel(bucket: BusinessHealthTrendBucket) {
+  return bucket.kind === "monthly_average" ? formatMonth(bucket.startDate) : formatDate(bucket.startDate);
 }
 
-function clampScore(value: number) {
-  return Math.max(0, Math.min(100, Math.round(value)));
+function axisTickIndexes(bucketCount: number, range: BusinessHealthTrendRange) {
+  if (bucketCount <= 1) return [0];
+  const interval = range === "7D" || range === "YTD" ? 1 : range === "1M" ? 5 : 2;
+  const indexes = Array.from({ length: bucketCount }, (_, index) => index).filter((index) => index % interval === 0);
+  if (indexes.at(-1) !== bucketCount - 1) indexes.push(bucketCount - 1);
+  return indexes;
 }
 
-function normalizePoints(points: BusinessHealthTrendPoint[]) {
-  const byDate = new Map<string, BusinessHealthTrendPoint>();
-
-  for (const point of points) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(point.snapshotDate) || !Number.isFinite(point.score)) {
-      continue;
-    }
-
-    byDate.set(point.snapshotDate, {
-      ...point,
-      score: clampScore(point.score)
-    });
-  }
-
-  return Array.from(byDate.values()).sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
+function xForBucket(bucketIndex: number, bucketCount: number) {
+  if (bucketCount <= 1) return (PLOT_LEFT + PLOT_RIGHT) / 2;
+  return PLOT_LEFT + (bucketIndex / (bucketCount - 1)) * (PLOT_RIGHT - PLOT_LEFT);
 }
 
-function pointsWithCurrentScore(points: BusinessHealthTrendPoint[], currentScore?: number, currentStatus?: string, currentTrend?: string) {
-  const normalized = normalizePoints(points);
-
-  if (!normalized.length || typeof currentScore !== "number" || !Number.isFinite(currentScore)) {
-    return normalized;
-  }
-
-  const currentDate = todayKey();
-  return [
-    ...normalized.filter((point) => point.snapshotDate !== currentDate),
-    {
-      snapshotDate: currentDate,
-      score: clampScore(currentScore),
-      status: currentStatus || normalized[normalized.length - 1]?.status || "Current",
-      trend: currentTrend || normalized[normalized.length - 1]?.trend || "Current"
-    }
-  ].sort((a, b) => a.snapshotDate.localeCompare(b.snapshotDate));
+function yForScore(score: number) {
+  return PLOT_BOTTOM - (score / 100) * (PLOT_BOTTOM - PLOT_TOP);
 }
 
-function buildDailyPoints(points: BusinessHealthTrendPoint[]) {
-  const today = new Date();
-  const start = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 6));
-  const startKey = dateOnly(start);
-
-  return points
-    .filter((point) => point.snapshotDate >= startKey)
-    .slice(-7)
-    .map((point) => ({
-      key: point.snapshotDate,
-      label: formatDayLabel(point.snapshotDate),
-      score: point.score
-    }));
-}
-
-function buildMonthlyPoints(points: BusinessHealthTrendPoint[], range: Extract<RangeKey, "6M" | "YTD">) {
-  const today = new Date();
-  const start =
-    range === "YTD"
-      ? new Date(Date.UTC(today.getUTCFullYear(), 0, 1))
-      : new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - 5, 1));
-  const grouped = new Map<string, number[]>();
-
-  for (const point of points) {
-    const date = new Date(`${point.snapshotDate}T00:00:00Z`);
-
-    if (date < start) {
-      continue;
-    }
-
-    const key = monthKey(date);
-    grouped.set(key, [...(grouped.get(key) || []), point.score]);
-  }
-
-  return Array.from(grouped.entries())
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, values]) => ({
-      key,
-      label: formatMonthLabel(key),
-      score: average(values)
-    }));
-}
-
-function chartData(points: BusinessHealthTrendPoint[], range: RangeKey) {
-  if (range === "7D") return buildDailyPoints(points);
-  return buildMonthlyPoints(points, range);
-}
-
-function pathFor(points: ChartPoint[]) {
-  if (!points.length) return "";
-
-  const width = 320;
-  const height = 92;
-  const paddingX = 18;
-  const paddingY = 10;
-  const innerWidth = width - paddingX * 2;
-  const innerHeight = height - paddingY * 2;
-
-  return points
-    .map((point, index) => {
-      const x = points.length === 1 ? width / 2 : paddingX + (index / (points.length - 1)) * innerWidth;
-      const y = height - paddingY - (Math.max(0, Math.min(100, point.score)) / 100) * innerHeight;
-      return `${index === 0 ? "M" : "L"} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
-function pointCoordinates(points: ChartPoint[]) {
-  const width = 320;
-  const height = 92;
-  const paddingX = 18;
-  const paddingY = 10;
-  const innerWidth = width - paddingX * 2;
-  const innerHeight = height - paddingY * 2;
-
-  return points.map((point, index) => ({
+function positionPoints(points: readonly BusinessHealthTrendDisplayPoint[], bucketCount: number) {
+  return points.map((point) => ({
     ...point,
-    x: points.length === 1 ? width / 2 : paddingX + (index / (points.length - 1)) * innerWidth,
-    y: height - paddingY - (Math.max(0, Math.min(100, point.score)) / 100) * innerHeight
+    x: xForBucket(point.bucketIndex, bucketCount),
+    y: yForScore(point.score)
   }));
+}
+
+function tooltipPosition(point: PositionedPoint) {
+  const width = 156;
+  const x = Math.max(2, Math.min(CHART_WIDTH - width - 2, point.x - width / 2));
+  const y = point.y < 52 ? point.y + 9 : point.y - 45;
+  return { width, x, y };
 }
 
 export function BusinessHealthTrendChart({
   points,
-  currentScore,
-  currentStatus,
-  currentTrend,
+  asOfDate,
   errorMessage,
   loading = false
 }: BusinessHealthTrendChartProps) {
-  const [range, setRange] = useState<RangeKey>("7D");
-  const realPoints = useMemo(() => pointsWithCurrentScore(points, currentScore, currentStatus, currentTrend), [points, currentScore, currentStatus, currentTrend]);
-  const trendPoints = realPoints;
-  const selectedPoints = useMemo(() => chartData(trendPoints, range), [trendPoints, range]);
-  const coordinates = useMemo(() => pointCoordinates(selectedPoints), [selectedPoints]);
-  const linePath = useMemo(() => pathFor(selectedPoints), [selectedPoints]);
-  const first = selectedPoints[0]?.score;
-  const last = selectedPoints[selectedPoints.length - 1]?.score;
-  const change = typeof first === "number" && typeof last === "number" ? last - first : 0;
-  const rangeLabel = range === "7D" ? "Last 7 days" : range === "6M" ? "Last 6 months" : "Year to date";
-  const isLimited = selectedPoints.length > 0 && (range === "7D" ? selectedPoints.length < 4 : selectedPoints.length < 2);
-  const showError = Boolean(errorMessage && !trendPoints.length);
+  const [range, setRange] = useState<BusinessHealthTrendRange>("7D");
+  const [activeKey, setActiveKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const buckets = useMemo(() => buildBusinessHealthTrendBuckets(range, asOfDate), [range, asOfDate]);
+  const displayPoints = useMemo(
+    () => buildBusinessHealthTrendDisplayPoints(points, range, asOfDate),
+    [points, range, asOfDate]
+  );
+  const positionedPoints = useMemo(
+    () => positionPoints(displayPoints, buckets.length),
+    [displayPoints, buckets.length]
+  );
+  const displayedKey = activeKey || selectedKey;
+  const activePoint = positionedPoints.find((point) => point.key === displayedKey) || null;
+  const rangeLabel = RANGE_LABELS[range];
+  const first = displayPoints[0];
+  const last = displayPoints.at(-1);
+  const change = first && last && first.key !== last.key ? Math.round((last.score - first.score) * 10) / 10 : null;
+  const tickIndexes = axisTickIndexes(buckets.length, range);
+  const hasGap = displayPoints.some((point, index) => index > 0 && point.bucketIndex - displayPoints[index - 1].bucketIndex > 1);
 
   return (
-    <div className="mt-4 rounded-lg border border-cyan-300/15 bg-slate-950/40 p-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
+    <div className="mt-4 rounded-lg border border-cyan-300/15 bg-slate-950/40 p-3" data-business-health-trend>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Health trend</p>
           <p className="mt-1 text-xs text-slate-300">
-            {selectedPoints.length ? `${rangeLabel} · ${change === 0 ? "Stable" : change > 0 ? `+${change}` : change} pts` : rangeLabel}
+            {change !== null
+              ? `${rangeLabel} · ${change === 0 ? "Stable" : change > 0 ? `+${formatScore(change)}` : formatScore(change)} pts`
+              : `${rangeLabel} · ${displayPoints.length} ${displayPoints.length === 1 ? "period" : "periods"} with stored history`}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {realPoints.length ? (
-            <span className="rounded-full border border-cyan-300/25 bg-cyan-400/10 px-2.5 py-1 text-[0.68rem] font-semibold text-cyan-100">
-              Stored snapshots
-            </span>
-          ) : null}
-          <div className="flex rounded-lg border border-white/10 bg-white/[0.04] p-1">
-            {ranges.map((item) => (
-              <button
-                key={item.key}
-                type="button"
-                onClick={() => setRange(item.key)}
-                className={`min-h-8 rounded-md px-2.5 text-xs font-semibold transition ${
-                  range === item.key
-                    ? "bg-vaeroex-blue text-white"
-                    : "text-slate-300 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/50"
-                }`}
-              >
-                {item.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap gap-1 rounded-lg border border-white/10 bg-white/[0.04] p-1" aria-label="Business Health trend range">
+          {ranges.map((item) => (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={range === item.key}
+              onClick={() => {
+                setRange(item.key);
+                setActiveKey(null);
+                setSelectedKey(null);
+              }}
+              className={`min-h-9 rounded-md px-2.5 text-xs font-semibold transition ${
+                range === item.key
+                  ? "bg-vaeroex-blue text-white"
+                  : "text-slate-300 hover:bg-cyan-950/40 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300"
+              }`}
+            >
+              {item.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {loading ? (
-        <div className="mt-3 h-24 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" aria-live="polite">
+        <div className="mt-3 h-36 animate-pulse rounded-lg border border-white/10 bg-white/[0.04]" aria-live="polite">
           <span className="sr-only">Loading Business Health history.</span>
         </div>
-      ) : showError ? (
+      ) : errorMessage && !points.length ? (
         <div className="mt-3 rounded-lg border border-amber-300/20 bg-amber-500/10 p-4 text-xs leading-5 text-amber-100">
           {errorMessage}
         </div>
-      ) : selectedPoints.length ? (
+      ) : displayPoints.length ? (
         <div className="mt-3">
-          <svg viewBox="0 0 320 92" role="img" aria-label={`Business Health trend for ${rangeLabel}`} className="h-24 w-full overflow-visible">
-            <defs>
-              <linearGradient id="business-health-line" x1="0" x2="1" y1="0" y2="0">
-                <stop offset="0%" stopColor="#1E6BFF" />
-                <stop offset="100%" stopColor="#38BDF8" />
-              </linearGradient>
-              <linearGradient id="business-health-fill" x1="0" x2="0" y1="0" y2="1">
-                <stop offset="0%" stopColor="rgba(56,189,248,.22)" />
-                <stop offset="100%" stopColor="rgba(30,107,255,0)" />
-              </linearGradient>
-            </defs>
-            <line x1="18" x2="302" y1="10" y2="10" stroke="rgba(148,163,184,.2)" strokeDasharray="3 6" />
-            <line x1="18" x2="302" y1="82" y2="82" stroke="rgba(148,163,184,.24)" />
-            <text x="0" y="13" fill="rgba(203,213,225,.72)" fontSize="9">
-              100
-            </text>
-            <text x="6" y="84" fill="rgba(203,213,225,.72)" fontSize="9">
-              0
-            </text>
-            {selectedPoints.length > 1 ? (
-              <>
-                <path d={`${linePath} L ${coordinates[coordinates.length - 1].x.toFixed(2)} 82 L ${coordinates[0].x.toFixed(2)} 82 Z`} fill="url(#business-health-fill)" opacity="0.85" />
-                <path d={linePath} fill="none" stroke="url(#business-health-line)" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-              </>
-            ) : null}
-            {coordinates.map((point) => (
-              <g key={point.key}>
-                <circle cx={point.x} cy={point.y} r="4" fill="#38BDF8" stroke="#061225" strokeWidth="2" />
-                <text x={point.x} y="91" textAnchor="middle" fill="rgba(203,213,225,.78)" fontSize="8">
-                  {point.label}
+          <svg
+            viewBox="0 0 360 128"
+            role="group"
+            aria-label={`Business Health trend for ${rangeLabel}. ${displayPoints.length} plotted ${displayPoints.length === 1 ? "point" : "points"}.`}
+            className="h-36 w-full overflow-visible"
+          >
+            {Y_AXIS_VALUES.map((value) => {
+              const y = yForScore(value);
+              return (
+                <g key={value} aria-hidden="true">
+                  <line
+                    x1={PLOT_LEFT}
+                    x2={PLOT_RIGHT}
+                    y1={y}
+                    y2={y}
+                    stroke="rgba(148,163,184,.2)"
+                    strokeDasharray={value === 0 ? undefined : "3 6"}
+                  />
+                  <text x="2" y={y + 3} fill="rgba(203,213,225,.76)" fontSize="9">{value}</text>
+                </g>
+              );
+            })}
+
+            {positionedPoints.slice(1).map((point, index) => {
+              const previous = positionedPoints[index];
+              const crossesMissingPeriod = point.bucketIndex - previous.bucketIndex > 1;
+              return (
+                <line
+                  key={`${previous.key}-${point.key}`}
+                  x1={previous.x}
+                  y1={previous.y}
+                  x2={point.x}
+                  y2={point.y}
+                  stroke="#38bdf8"
+                  strokeDasharray={crossesMissingPeriod ? "4 5" : undefined}
+                  strokeLinecap="round"
+                  strokeWidth="3"
+                />
+              );
+            })}
+
+            {positionedPoints.map((point) => {
+              const active = activePoint?.key === point.key;
+              const valueLabel = point.kind === "daily" ? "Business Health score" : "Average Business Health";
+              return (
+                <circle
+                  key={point.key}
+                  cx={point.x}
+                  cy={point.y}
+                  r={active ? 6 : 4.5}
+                  fill="#38bdf8"
+                  stroke={active ? "#f8fafc" : "#061225"}
+                  strokeWidth={active ? 2.5 : 2}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${formatPeriod(point)}. ${valueLabel} ${formatScore(point.score)} out of 100. ${periodKindLabel(point)}.`}
+                  onPointerEnter={() => setActiveKey(point.key)}
+                  onPointerLeave={() => setActiveKey((current) => current === point.key ? null : current)}
+                  onFocus={() => setActiveKey(point.key)}
+                  onBlur={() => setActiveKey((current) => current === point.key ? null : current)}
+                  onClick={() => setSelectedKey((current) => current === point.key ? null : point.key)}
+                  className="cursor-pointer outline-none"
+                />
+              );
+            })}
+
+            {tickIndexes.map((index) => {
+              const bucket = buckets[index];
+              return (
+                <text
+                  key={`tick-${bucket.key}`}
+                  x={xForBucket(index, buckets.length)}
+                  y="120"
+                  textAnchor={index === 0 ? "start" : index === buckets.length - 1 ? "end" : "middle"}
+                  fill="rgba(203,213,225,.72)"
+                  fontSize="7.5"
+                  aria-hidden="true"
+                >
+                  {axisLabel(bucket)}
                 </text>
-              </g>
-            ))}
+              );
+            })}
+
+            {activePoint ? (() => {
+              const tooltip = tooltipPosition(activePoint);
+              const valueLabel = activePoint.kind === "daily" ? "Business Health" : "Average Business Health";
+              return (
+                <g aria-hidden="true" pointerEvents="none">
+                  <rect x={tooltip.x} y={tooltip.y} width={tooltip.width} height="39" rx="5" fill="#0f1f38" stroke="rgba(103,232,249,.45)" />
+                  <text x={tooltip.x + 8} y={tooltip.y + 11} fill="#cbd5e1" fontSize="8.5">{formatPeriod(activePoint)}</text>
+                  <text x={tooltip.x + 8} y={tooltip.y + 23} fill="#ffffff" fontSize="9.5" fontWeight="600">{valueLabel}: {formatScore(activePoint.score)}</text>
+                  <text x={tooltip.x + 8} y={tooltip.y + 34} fill="#94a3b8" fontSize="8">{periodKindLabel(activePoint)}</text>
+                </g>
+              );
+            })() : null}
           </svg>
-          {isLimited ? (
-            <p className="mt-2 text-xs leading-5 text-slate-400">
-              Limited history available. Vaeroex is showing the Business Health points collected so far.
-            </p>
+          {hasGap ? (
+            <p className="mt-1 text-xs leading-5 text-slate-400">Dashed line segments cross periods without stored Business Health reviews.</p>
           ) : null}
         </div>
       ) : (
         <div className="mt-3 rounded-lg border border-dashed border-white/15 bg-white/[0.03] p-4 text-xs leading-5 text-slate-300">
-          Start collecting signals to build your health trend.
+          More stored Business Health history is needed for this range. Vaeroex will show only actual dated reviews as they become available.
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight, ShieldCheck, TrendingUp } from "lucide-react";
 import { BusinessHealthAnalysisPanel } from "@/components/intelligence/BusinessHealthAnalysisPanel";
 import { BusinessHealthTrendChart, type BusinessHealthTrendPoint } from "@/components/intelligence/BusinessHealthTrendChart";
+import { EligibleBusinessSignals } from "@/components/intelligence/EligibleBusinessSignals";
 import type {
   BusinessHealthAnalysisState,
   BusinessHealthCitationView,
@@ -21,6 +22,7 @@ type ExecutiveHomepageProps = {
   lastUpdatedLabel: string;
   model: ExecutiveHomepageModel;
   healthHistory: BusinessHealthTrendPoint[];
+  healthHistoryAsOfDate: string;
   healthHistoryError?: string | null;
   businessHealthAnalysis: {
     state: BusinessHealthAnalysisState;
@@ -77,6 +79,7 @@ export function ExecutiveHomepage({
   lastUpdatedLabel,
   model,
   healthHistory,
+  healthHistoryAsOfDate,
   healthHistoryError,
   businessHealthAnalysis
 }: ExecutiveHomepageProps) {
@@ -85,7 +88,6 @@ export function ExecutiveHomepage({
   const risk = model.priorities[0];
   const opportunity = model.priorities[1];
   const decision = model.priorities[2];
-  const showHealthTrend = model.health.available && trendDelta !== null && healthHistory.length >= 2;
   const healthStatus = businessHealthStatus(model.health.status);
   const healthPresentation = semanticPresentation(healthStatus);
   const HealthIcon = healthPresentation.Icon;
@@ -124,11 +126,9 @@ export function ExecutiveHomepage({
               ) : (
                 <p className="mt-5 text-2xl font-semibold">Business Health needs more eligible evidence.</p>
               )}
-              {model.health.available ? (
+              {model.health.available && trendDelta !== null ? (
                 <p className="mt-3 text-sm text-slate-300">
-                  {trendDelta === null
-                    ? "Trend will appear after additional dated evidence is available."
-                    : `${trendDelta > 0 ? "Up" : trendDelta < 0 ? "Down" : "Unchanged"} ${Math.abs(trendDelta)} point${Math.abs(trendDelta) === 1 ? "" : "s"} since the previous stored review.`}
+                  {`${trendDelta > 0 ? "Up" : trendDelta < 0 ? "Down" : "Unchanged"} ${Math.abs(trendDelta)} point${Math.abs(trendDelta) === 1 ? "" : "s"} since the previous stored review.`}
                 </p>
               ) : null}
             </div>
@@ -143,13 +143,18 @@ export function ExecutiveHomepage({
               ) : null}
               <dl className="mt-4 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-[minmax(0,1fr)_auto]">
                 <div className={`vaeroex-semantic-detail border-l-2 pl-3 ${semanticStatusClass(healthStatus)}`}>
-                  <dt className="text-xs font-semibold text-cyan-200">Main driver</dt>
+                  <dt className="text-xs font-semibold text-cyan-200">Highest Impact Driver</dt>
                   <dd className="mt-1 leading-6 text-slate-200">{model.health.driver}</dd>
                 </div>
                 <div className="sm:text-right">
                   <dt className="text-xs font-semibold text-cyan-200">Confidence</dt>
                   <dd className="mt-1 font-semibold text-white">{model.health.confidence}</dd>
-                  <dd className="mt-1 text-xs text-slate-300">{model.health.memorySignals} eligible signal{model.health.memorySignals === 1 ? "" : "s"}</dd>
+                  <dd>
+                    <EligibleBusinessSignals
+                      total={model.health.memorySignals}
+                      categories={model.health.eligibleSignalCategories}
+                    />
+                  </dd>
                 </div>
               </dl>
               <BusinessHealthAnalysisPanel
@@ -161,12 +166,10 @@ export function ExecutiveHomepage({
             </div>
           </div>
 
-          {showHealthTrend ? (
+          {model.health.available ? (
             <BusinessHealthTrendChart
               points={healthHistory}
-              currentScore={model.health.score || 0}
-              currentStatus={model.health.status}
-              currentTrend={model.health.trend || "Not enough history"}
+              asOfDate={healthHistoryAsOfDate}
               errorMessage={healthHistoryError}
             />
           ) : null}

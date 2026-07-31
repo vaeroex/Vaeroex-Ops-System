@@ -1,6 +1,6 @@
 import type { BusinessHealthSnapshotRow } from "@/lib/intelligence/business-health-history";
 import type { BusinessIntelligenceCoverageResult } from "@/lib/intelligence/coverage";
-import type { IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
+import type { EligibleBusinessSignalCategory, IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
 
 export type ExecutivePriorityTone = "risk" | "opportunity" | "decision";
 
@@ -35,6 +35,7 @@ export type ExecutiveHomepageModel = {
     driver: string;
     confidence: "High" | "Medium" | "Low";
     memorySignals: number;
+    eligibleSignalCategories: readonly EligibleBusinessSignalCategory[];
   };
   priorities: [ExecutivePriorityCard, ExecutivePriorityCard, ExecutivePriorityCard];
   changes: {
@@ -276,6 +277,11 @@ export function buildExecutiveHomepageModel({
   const risk = hasUsableHealth ? intelligence.topRisk : undefined;
   const opportunity = hasUsableHealth ? intelligence.topOpportunity : undefined;
   const memorySignals = intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords;
+  const eligibleSignalCategories = intelligence.memorySummary.eligibleSignalCategories;
+  const eligibleSignalCategoryTotal = eligibleSignalCategories.reduce((total, category) => total + category.count, 0);
+  if (sourceDataAvailable && eligibleSignalCategoryTotal !== memorySignals) {
+    throw new Error("Eligible Business Signal categories do not match the authoritative total.");
+  }
   const previousSnapshot = previousReviewSnapshot(snapshots);
   const trendDelta = previousSnapshot ? intelligence.businessHealth.score - previousSnapshot.score : null;
   const strongest = [...coverage.categories].sort((a, b) => b.coverage - a.coverage)[0];
@@ -311,7 +317,8 @@ export function buildExecutiveHomepageModel({
       summary: healthSummary,
       driver: healthDriver,
       confidence: hasUsableHealth ? intelligence.dataQuality.confidence : "Low",
-      memorySignals: sourceDataAvailable ? memorySignals : 0
+      memorySignals: sourceDataAvailable ? memorySignals : 0,
+      eligibleSignalCategories: sourceDataAvailable ? eligibleSignalCategories : []
     },
     priorities: hasUsableHealth
       ? [priorityFromInsight(risk, "risk"), priorityFromInsight(opportunity, "opportunity"), decisionFromIntelligence(intelligence)]

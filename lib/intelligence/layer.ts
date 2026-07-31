@@ -110,8 +110,24 @@ export type IntelligenceLayerResult = {
     vaeroexRuns: number;
     decisions: number;
     recommendationOutcomes: number;
+    eligibleSignalCategories: readonly EligibleBusinessSignalCategory[];
   };
 };
+
+export type EligibleBusinessSignalCategory = Readonly<{
+  id:
+    | "kpi_observations"
+    | "kpi_series"
+    | "files"
+    | "process_documents"
+    | "forms"
+    | "form_submissions"
+    | "operational_issues"
+    | "customer_records"
+    | "organization_context";
+  label: string;
+  count: number;
+}>;
 
 type KpiRow = Database["public"]["Tables"]["kpis"]["Row"];
 type IssueRow = Database["public"]["Tables"]["issues"]["Row"];
@@ -470,7 +486,20 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   });
   const customerContextWithoutFollowup = crmLeads.filter((lead) => !isClosed(lead.status) && (!lead.last_activity_at || isOverdue(lead.last_activity_at)));
   const originalKpiSeries = new Set(kpis.map((kpi) => `${kpi.source_file_id || kpi.import_id || "manual"}:${kpi.name.toLowerCase()}`));
-  const originalSourceRecords = originalKpiSeries.size + files.length + sops.length + forms.length + submissions.length + issues.length + crmLeads.length + people.length;
+  const eligibleSignalCategories: EligibleBusinessSignalCategory[] = [
+    { id: "kpi_observations", label: "KPI observations", count: kpis.length },
+    { id: "kpi_series", label: "KPI series", count: originalKpiSeries.size },
+    { id: "files", label: "Files", count: files.length },
+    { id: "process_documents", label: "SOPs and process documents", count: sops.length },
+    { id: "forms", label: "Forms", count: forms.length },
+    { id: "form_submissions", label: "Form submissions", count: submissions.length },
+    { id: "operational_issues", label: "Operational evidence", count: issues.length },
+    { id: "customer_records", label: "Customer records", count: crmLeads.length },
+    { id: "organization_context", label: "Organization context", count: people.length }
+  ];
+  const originalSourceRecords = eligibleSignalCategories
+    .filter((category) => category.id !== "kpi_observations")
+    .reduce((total, category) => total + category.count, 0);
   const originalSourceTypes = [
     originalKpiSeries.size > 0,
     files.length > 0,
@@ -819,7 +848,8 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       kpiHistoryRecords: kpis.length,
       vaeroexRuns: vaeroexRuns.length,
       decisions: decisions.length,
-      recommendationOutcomes: 0
+      recommendationOutcomes: 0,
+      eligibleSignalCategories
     }
   };
 }

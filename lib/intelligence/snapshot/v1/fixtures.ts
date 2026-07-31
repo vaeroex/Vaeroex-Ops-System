@@ -290,7 +290,11 @@ export function foundationIntelligenceLayerOutput(): IntelligenceLayerProducerOu
       kpiHistoryRecords: 36,
       vaeroexRuns: 0,
       decisions: 0,
-      recommendationOutcomes: 0
+      recommendationOutcomes: 0,
+      eligibleSignalCategories: [
+        { id: "kpi_observations", label: "KPI observations", count: 36 },
+        { id: "kpi_series", label: "KPI series", count: 4 }
+      ]
     }
   };
 }
