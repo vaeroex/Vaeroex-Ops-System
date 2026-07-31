@@ -33,6 +33,7 @@ import { classifySecurityIntent, isSecurityResponseMessage, securityResponseMess
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import { currentSavedAnalysisReleaseChannel } from "@/lib/reports/release-channel";
+import { isEasterEggDiscoveryQuery } from "@/lib/easter-egg/discovery";
 import { parseSavedAnalysisEnvelope } from "@/lib/reports/saved-analysis";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database, Json } from "@/lib/supabase/types";
@@ -64,6 +65,7 @@ type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 type MemoryChunkRow = Database["public"]["Tables"]["business_memory_chunks"]["Row"];
 
 const GROUP_ORDER: GlobalSearchGroupLabel[] = [
+  "Hidden",
   "KPIs",
   "Saved Analyses",
   "Files",
@@ -206,7 +208,8 @@ function buildKpiGlobalAnswer(query: string, summary: KpiOverviewSummary, groups
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const query = normalizeQuery(url.searchParams.get("q"));
+  const rawQuery = url.searchParams.get("q");
+  const query = normalizeQuery(rawQuery);
 
   if (query.length < 2) {
     return NextResponse.json({ query, groups: [] });
@@ -253,6 +256,23 @@ export async function GET(request: Request) {
 
   if (!rateLimit.allowed) {
     return NextResponse.json({ error: rateLimitMessage(rateLimit) }, { status: 429 });
+  }
+
+  if (isEasterEggDiscoveryQuery(rawQuery)) {
+    return NextResponse.json({
+      query,
+      groups: [{
+        label: "Hidden",
+        results: [{
+          id: "easter-egg-runner-v1",
+          title: "You found it",
+          sourceType: "Hidden feature",
+          preview: "A deeply serious test of executive reflexes.",
+          href: "/app/easter-egg",
+          meta: "Space, click, or tap to jump"
+        }]
+      }]
+    });
   }
 
   const securityIntent = classifySecurityIntent(query);
