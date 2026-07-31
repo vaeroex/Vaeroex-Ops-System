@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
+  BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
   BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
   type BusinessHealthExplanationPackage
 } from "@/lib/ai/business-health-explanation/contracts";
@@ -147,6 +148,7 @@ const businessHealthPackage: BusinessHealthExplanationPackage = {
   contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
   validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
+  generationPolicyVersion: BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
   fingerprint: evidenceEngineHash({ fixture: "business-health-watch-declining-v1", manifestId: manifest.manifestId }),
   submode: "at_risk_worsening",
   facts: {

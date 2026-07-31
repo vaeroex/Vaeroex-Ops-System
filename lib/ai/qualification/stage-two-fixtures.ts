@@ -3,6 +3,7 @@ import "server-only";
 import {
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
+  BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
   BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
   type BusinessHealthExplanationPackage,
   type BusinessHealthExplanationSubmode
@@ -146,6 +147,7 @@ function businessHealthFixture(spec: BusinessHealthSpec): StageTwoFixture {
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
+    generationPolicyVersion: BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
     fingerprint: evidenceEngineHash({ fixtureId: spec.id, manifestId: manifest.manifestId }),
     submode: spec.submode,
     facts: {

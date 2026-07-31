@@ -19,6 +19,7 @@ import type {
 import {
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
   BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
+  BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
   BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION
 } from "@/lib/ai/business-health-explanation/contracts";
 import type { BusinessHealthSnapshotRow } from "@/lib/intelligence/business-health-history";
@@ -33,6 +34,19 @@ const MAX_DRIVERS = 4;
 const MAX_RECORDS_PER_DRIVER = 2;
 const MAX_EVIDENCE_RECORDS = 8;
 const STALE_AFTER_DAYS = 45;
+
+export function businessHealthExplanationFingerprint({
+  generationPolicyVersion,
+  packageFingerprintInput
+}: {
+  generationPolicyVersion: string;
+  packageFingerprintInput: unknown;
+}) {
+  return evidenceEngineHash({
+    generationPolicyVersion,
+    packageFingerprintInput
+  });
+}
 
 type WeightedInsight = {
   insight: IntelligenceInsight;
@@ -475,7 +489,7 @@ export function buildBusinessHealthExplanationPackage({
     limitations
   };
   const contextualEvidence = projection?.contextualEvidence || [];
-  const fingerprint = evidenceEngineHash({
+  const packageFingerprintInput = {
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
@@ -525,12 +539,17 @@ export function buildBusinessHealthExplanationPackage({
         records: contextualEvidence
       }
     } : {})
+  };
+  const fingerprint = businessHealthExplanationFingerprint({
+    generationPolicyVersion: BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
+    packageFingerprintInput
   });
 
   return {
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
+    generationPolicyVersion: BUSINESS_HEALTH_GENERATION_POLICY_VERSION,
     fingerprint,
     submode,
     facts,
