@@ -415,7 +415,7 @@ function LeadershipDisposition({ card }: { card: IntelligenceLifecycleCardV1 }) 
   return (
     <section className="rounded-lg border border-slate-500/30 bg-slate-950/45 p-4" aria-labelledby="leadership-disposition-heading">
       <h4 id="leadership-disposition-heading" className="text-sm font-semibold text-white">Leadership disposition</h4>
-      <p className="mt-1 text-xs leading-5 text-slate-400">Presentation history recorded by workspace leadership. It does not alter the deterministic finding.</p>
+      <p className="mt-1 text-xs leading-5 text-slate-400">These actions only affect how this finding is presented. They do not change your business data, Business Memory, or Business Health.</p>
       <dl className="mt-3 grid gap-x-4 gap-y-2 text-sm sm:grid-cols-[8rem_minmax(0,1fr)]">
         <dt className="text-slate-400">Status</dt>
         <dd className="font-medium text-slate-100">Dismissed</dd>

@@ -188,6 +188,7 @@ assert.match(component, /View details.*ChevronRight/s, "History cards expose a v
 assert.match(component, /hover:border-cyan-300\/50.*hover:bg-cyan-950\/20/, "History cards expose a stronger hover state");
 assert.match(component, /ring-2 ring-cyan-300\/55/, "selected History cards have a distinct selected state");
 assert.match(component, /Leadership disposition/, "History detail distinguishes lifecycle metadata from deterministic content");
+assert.match(component, /These actions only affect how this finding is presented\. They do not change your business data, Business Memory, or Business Health\./, "Leadership disposition explains its presentation-only authority boundary");
 assert.match(component, /dismissalReasonLabel\(card\.reasonCode\)/, "dismissal reasons render with customer-facing labels");
 assert.match(component, /card\.reasonText \? \(/, "optional notes render only when present");
 assert.match(component, /Dismissed by/, "dismissal actor renders in History detail");
