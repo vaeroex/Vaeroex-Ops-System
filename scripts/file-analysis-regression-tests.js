@@ -7,6 +7,7 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 const actions = read("app/app/files/actions.ts");
 const sources = read("app/app/sources/page.tsx");
+const analysisProgressSubmit = read("components/operations/AnalysisProgressSubmit.tsx");
 const workflows = read("lib/ai/vaeroex-workflows.ts");
 const client = read("lib/ai/vaeroex-client.ts");
 const openAiProvider = read("lib/ai/providers/openai-provider.ts");
@@ -84,7 +85,18 @@ for (const status of ["Uploaded", "Analyzing", "No usable data found", "Needs cl
 assert.equal((sources.match(/>Preview original<\/a>/g) || []).length, 1, "Preview original must appear in one action area");
 assert.equal((sources.match(/>Download original<\/a>/g) || []).length, 1, "Download original must appear in one action area");
 assert.match(sources, /pendingLabel="Analyzing source\.\.\."/, "Analyze source must keep visible progress feedback");
-assert.match(sources, /status !== "Analyzing"/, "Analyze source must be disabled while an analysis is active");
+assert.match(sources, /persistedPending=\{status === "Analyzing"\}/, "persisted active analysis state must keep the progress control busy after a reload");
+assert.doesNotMatch(sources, /status !== "Analyzing" && !isSpreadsheet/, "the analysis form must remain mounted while the authoritative run is active");
+assert.match(sources, /showSteps=\{false\}/, "file analysis must not claim an exact workflow stage when only pending state is authoritative");
 assert.match(sources, /manageSourceFileAction/, "archive and soft-delete lifecycle controls must remain available");
+
+assert.match(analysisProgressSubmit, /const showingPending = pending \|\| localPending \|\| persistedPending/, "progress must bridge immediate submission, React form state, and persisted processing state");
+assert.match(analysisProgressSubmit, /disabled=\{showingPending\}/, "Analyze source must remain disabled for the full active request");
+assert.match(analysisProgressSubmit, /clickLockedRef\.current[\s\S]{0,120}event\.preventDefault\(\)/, "duplicate submissions must be rejected before another server action starts");
+assert.match(analysisProgressSubmit, /aria-busy=\{showingPending\}/, "the analysis region must expose its busy state");
+assert.match(analysisProgressSubmit, /aria-live="polite"/, "analysis status changes must be announced accessibly");
+assert.match(analysisProgressSubmit, /LoaderCircle[\s\S]{0,180}animate-spin/, "active analysis must render a visible spinner");
+assert.doesNotMatch(analysisProgressSubmit, /setInterval/, "analysis stages must not advance on fake timing");
+assert.equal((analysisAction.match(/runFileVaeroexAnalysis\(/g) || []).length, 1, "loading-state handling must not add a provider-backed analysis call");
 
 console.log("File analysis regression tests passed.");
