@@ -220,6 +220,49 @@ assert.equal(
   "KPI evidence identity must not depend on finding-specific presentation labels"
 );
 
+const derivedBusinessMemory = clone(baseInput);
+derivedBusinessMemory.intelligenceLayer.output.insights[0].supportingRecords.push({
+  ...clone(derivedBusinessMemory.intelligenceLayer.output.insights[0].supportingRecords[0]),
+  id: "memory:file-derived-context",
+  recordType: "Business Memory citation",
+  classification: "Derived",
+  sourceKey: "source-file:fixture-file"
+});
+const derivedBusinessMemorySnapshot = build(derivedBusinessMemory).snapshot;
+const derivedBusinessMemoryReference = derivedBusinessMemorySnapshot.evidence.references.find(
+  (reference) => reference.id === "intelligence-layer:memory:file-derived-context"
+);
+assert.equal(derivedBusinessMemoryReference?.authorityRole, "derived", "file-derived Business Memory retains derived authority");
+assert.equal(derivedBusinessMemoryReference?.originalEvidenceEligible, false);
+
+const businessNoteFindingDependency = clone(baseInput);
+businessNoteFindingDependency.intelligenceLayer.output.insights[0].supportingRecords.push({
+  ...clone(businessNoteFindingDependency.intelligenceLayer.output.insights[0].supportingRecords[0]),
+  id: "business-note:context",
+  recordType: "Business Note context",
+  classification: "Derived",
+  sourceKey: "business-note:fixture-note"
+});
+assert.throws(
+  () => build(businessNoteFindingDependency),
+  /depends on Business Note context/,
+  "actual Business Note context must remain unable to drive deterministic findings"
+);
+
+const oversizedFindingDependencies = clone(baseInput);
+const dependencyTemplate = oversizedFindingDependencies.intelligenceLayer.output.insights[0].supportingRecords[0];
+oversizedFindingDependencies.intelligenceLayer.output.insights[0].supportingRecords = Array.from({ length: 30 }, (_, index) => ({
+  ...clone(dependencyTemplate),
+  id: `operational-record-${String(index + 1).padStart(2, "0")}`,
+  sourceKey: `source-file:fixture-${String(index + 1).padStart(2, "0")}`
+}));
+const oversizedFindingSnapshot = build(oversizedFindingDependencies).snapshot;
+assert.equal(
+  oversizedFindingSnapshot.findings[0].deterministicDependencies.evidenceReferenceIds.length,
+  24,
+  "snapshot finding dependencies must respect the existing contract bound"
+);
+
 const unsupportedVersion = clone(baseInput);
 unsupportedVersion.kpis.producerVersion = "kpi_semantics_v0";
 assert.throws(() => build(unsupportedVersion), /Unsupported canonical_kpi_semantics producer version/);

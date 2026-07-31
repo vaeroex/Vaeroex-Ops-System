@@ -717,7 +717,7 @@ export function buildOperationalEvidenceInsights({
   const eligibleChunks = filterBySourceParentEligibility(
     filterBusinessEvidence(memoryChunks, { sourceKind: "business_memory" }),
     parentEligibility
-  );
+  ).filter((chunk) => chunk.source_type !== "business_note");
   const groups = new Map<string, SourceGroup>();
 
   const ensureGroup = (sourceKey: string, sourceFileId: string | null, importId: string | null) => {
