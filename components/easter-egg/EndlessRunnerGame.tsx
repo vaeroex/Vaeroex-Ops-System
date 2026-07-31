@@ -46,7 +46,7 @@ export default function EndlessRunnerGame({ run, onFinished, onRestart }: Endles
         private worldObjects: Array<{
           plan: EasterEggCourseObjectPlan;
           bodyObject: import("phaser").GameObjects.Rectangle;
-          label: import("phaser").GameObjects.Text;
+          visual: import("phaser").GameObjects.Container;
         }> = [];
         private tick = 0;
         private nextObjectIndex = 0;
@@ -119,17 +119,181 @@ export default function EndlessRunnerGame({ run, onFinished, onRestart }: Endles
           onFinished({ activeTickCount: this.tick, ...progress, score: finalScore });
         }
 
+        private addHazardText(
+          container: import("phaser").GameObjects.Container,
+          x: number,
+          y: number,
+          value: string,
+          size = 7
+        ) {
+          const text = this.add.text(x, y, value, {
+            color: "#fff7ed",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: `${size}px`,
+            fontStyle: "bold",
+            align: "center"
+          }).setOrigin(0.5);
+          container.add(text);
+        }
+
+        private createHazardVisual(plan: EasterEggCourseObjectPlan, x: number) {
+          const centerY = plan.bottomY - plan.visualHeight / 2;
+          const container = this.add.container(x, centerY);
+          const graphics = this.add.graphics();
+          const left = -plan.visualWidth / 2;
+          const top = -plan.visualHeight / 2;
+          const right = plan.visualWidth / 2;
+          const bottom = plan.visualHeight / 2;
+          const danger = 0xfb7185;
+          const light = 0xfff7ed;
+          const dark = 0x190b18;
+          const panel = plan.fill;
+
+          graphics.lineStyle(2, danger, 1);
+          switch (plan.visualKind) {
+            case "email-inbox":
+              graphics.fillStyle(panel, 1).fillRoundedRect(left + 2, top + 8, plan.visualWidth - 4, plan.visualHeight - 10, 4);
+              graphics.strokeRoundedRect(left + 2, top + 8, plan.visualWidth - 4, plan.visualHeight - 10, 4);
+              graphics.lineBetween(left + 5, top + 11, 0, top + 20).lineBetween(0, top + 20, right - 5, top + 11);
+              graphics.fillStyle(danger, 1).fillCircle(right - 6, top + 6, 6);
+              this.addHazardText(container, right - 6, top + 6, "!", 8);
+              break;
+            case "spreadsheet":
+              graphics.fillStyle(0x052e2b, 1).fillRoundedRect(left + 1, top + 1, plan.visualWidth - 2, plan.visualHeight - 2, 3);
+              graphics.strokeRoundedRect(left + 1, top + 1, plan.visualWidth - 2, plan.visualHeight - 2, 3);
+              graphics.lineStyle(1, 0x5eead4, 0.75);
+              for (let row = 1; row < 4; row += 1) graphics.lineBetween(left + 4, top + 4 + row * 6, right - 4, top + 4 + row * 6);
+              for (let column = 1; column < 3; column += 1) graphics.lineBetween(left + 4 + column * 12, top + 4, left + 4 + column * 12, bottom - 4);
+              graphics.fillStyle(danger, 0.9).fillRect(left + 17, top + 10, 12, 6);
+              this.addHazardText(container, 4, 1, "#REF!", 6);
+              break;
+            case "printer":
+              graphics.fillStyle(0x334155, 1).fillRoundedRect(left + 3, top + 14, plan.visualWidth - 6, 24, 4);
+              graphics.strokeRoundedRect(left + 3, top + 14, plan.visualWidth - 6, 24, 4);
+              graphics.fillStyle(light, 1).fillRect(left + 10, top + 1, plan.visualWidth - 20, 19);
+              graphics.lineStyle(1, 0x64748b, 1).lineBetween(left + 13, top + 7, right - 13, top + 7).lineBetween(left + 13, top + 11, right - 10, top + 11);
+              graphics.fillStyle(danger, 1).fillCircle(right - 9, top + 25, 3);
+              graphics.fillStyle(0x0f172a, 1).fillRect(left + 10, bottom - 8, plan.visualWidth - 20, 8);
+              this.addHazardText(container, 0, bottom - 4, "JAM", 6);
+              break;
+            case "coffee":
+              graphics.fillStyle(0x78350f, 1).fillRoundedRect(left + 3, top + 6, plan.visualWidth - 13, plan.visualHeight - 8, 4);
+              graphics.strokeRoundedRect(left + 3, top + 6, plan.visualWidth - 13, plan.visualHeight - 8, 4);
+              graphics.lineStyle(3, danger, 1).strokeCircle(right - 8, top + 15, 7);
+              graphics.fillStyle(0xfbbf24, 0.65).fillEllipse(left + 5, bottom - 3, 23, 5);
+              graphics.lineStyle(1, light, 0.8).lineBetween(left + 7, top + 3, left + 10, top - 2).lineBetween(left + 15, top + 3, left + 18, top - 2);
+              break;
+            case "kpi-chart":
+              graphics.fillStyle(0x172554, 1).fillRoundedRect(left + 2, top + 2, plan.visualWidth - 4, plan.visualHeight - 4, 4);
+              graphics.strokeRoundedRect(left + 2, top + 2, plan.visualWidth - 4, plan.visualHeight - 4, 4);
+              graphics.lineStyle(1, 0x64748b, 0.8).lineBetween(left + 9, bottom - 12, right - 7, bottom - 12).lineBetween(left + 9, top + 11, left + 9, bottom - 12);
+              graphics.lineStyle(4, danger, 1).beginPath().moveTo(left + 12, top + 18).lineTo(-2, 0).lineTo(right - 10, bottom - 19).strokePath();
+              graphics.fillStyle(danger, 1).fillTriangle(right - 15, bottom - 20, right - 6, bottom - 14, right - 7, bottom - 25);
+              this.addHazardText(container, 0, top + 8, "KPI", 7);
+              break;
+            case "meeting-calendar":
+              graphics.fillStyle(0x431407, 1).fillRoundedRect(left + 2, top + 4, plan.visualWidth - 4, plan.visualHeight - 6, 4);
+              graphics.strokeRoundedRect(left + 2, top + 4, plan.visualWidth - 4, plan.visualHeight - 6, 4);
+              graphics.fillStyle(danger, 1).fillRect(left + 3, top + 5, plan.visualWidth - 6, 9);
+              graphics.lineStyle(3, light, 1).lineBetween(left + 15, top, left + 15, top + 9).lineBetween(right - 15, top, right - 15, top + 9);
+              this.addHazardText(container, 0, 7, "MEETING", 7);
+              break;
+            case "receipts":
+              graphics.fillStyle(0xfef3c7, 1).fillRect(left + 10, top + 1, plan.visualWidth - 17, plan.visualHeight - 4);
+              graphics.fillStyle(0xfffbeb, 1).fillRect(left + 4, top + 7, plan.visualWidth - 17, plan.visualHeight - 10);
+              graphics.lineStyle(2, danger, 1).strokeRect(left + 4, top + 7, plan.visualWidth - 17, plan.visualHeight - 10);
+              graphics.lineStyle(1, 0x92400e, 0.8);
+              for (let row = 0; row < 4; row += 1) graphics.lineBetween(left + 10, top + 15 + row * 6, right - 18, top + 15 + row * 6);
+              this.addHazardText(container, -2, bottom - 6, "$$", 7);
+              break;
+            case "compliance-warning":
+              graphics.fillStyle(0xf59e0b, 1).fillTriangle(0, top + 2, left + 2, bottom - 2, right - 2, bottom - 2);
+              graphics.lineStyle(3, danger, 1).strokeTriangle(0, top + 2, left + 2, bottom - 2, right - 2, bottom - 2);
+              graphics.fillStyle(dark, 1).fillRect(-2, top + 25, 4, 24).fillCircle(0, bottom - 15, 3);
+              this.addHazardText(container, 0, bottom - 7, "POLICY", 6);
+              break;
+            case "deadline-folder":
+              graphics.fillStyle(0x4c0519, 1).fillRoundedRect(left + 2, top + 18, plan.visualWidth - 4, plan.visualHeight - 20, 4);
+              graphics.fillStyle(0x9f1239, 1).fillRect(left + 7, top + 8, 27, 16);
+              graphics.lineStyle(3, danger, 1).strokeRoundedRect(left + 2, top + 18, plan.visualWidth - 4, plan.visualHeight - 20, 4);
+              graphics.lineStyle(2, light, 0.7).strokeRect(left + 9, top + 38, plan.visualWidth - 18, 30);
+              this.addHazardText(container, 0, top + 53, "EOD", 13);
+              this.addHazardText(container, 0, bottom - 15, "DUE", 7);
+              break;
+            case "quick-call":
+              graphics.fillStyle(0x3b0764, 1).fillRoundedRect(left + 2, top + 2, plan.visualWidth - 4, plan.visualHeight - 11, 8);
+              graphics.strokeRoundedRect(left + 2, top + 2, plan.visualWidth - 4, plan.visualHeight - 11, 8);
+              graphics.fillTriangle(left + 15, bottom - 11, left + 8, bottom - 1, left + 27, bottom - 10);
+              this.addHazardText(container, 2, -3, "QUICK CALL?", 7);
+              break;
+            case "loading-spinner":
+              graphics.fillStyle(0x1e1b4b, 1).fillRoundedRect(left + 2, top + 3, plan.visualWidth - 4, plan.visualHeight - 6, 8);
+              graphics.strokeRoundedRect(left + 2, top + 3, plan.visualWidth - 4, plan.visualHeight - 6, 8);
+              for (let index = 0; index < 8; index += 1) {
+                const angle = (Math.PI * 2 * index) / 8;
+                graphics.fillStyle(index < 3 ? danger : 0x818cf8, index < 3 ? 1 : 0.45).fillCircle(left + 15 + Math.cos(angle) * 8, Math.sin(angle) * 8, 2);
+              }
+              this.addHazardText(container, 14, 0, "LOADING", 6);
+              break;
+            case "sticky-note":
+              graphics.fillStyle(0xfacc15, 1).fillRect(left + 3, top + 2, plan.visualWidth - 6, plan.visualHeight - 5);
+              graphics.lineStyle(2, danger, 1).strokeRect(left + 3, top + 2, plan.visualWidth - 6, plan.visualHeight - 5);
+              graphics.fillStyle(0xfef08a, 1).fillTriangle(right - 13, top + 2, right - 3, top + 2, right - 3, top + 12);
+              this.addHazardText(container, 0, -4, "CIRCLE", 7);
+              this.addHazardText(container, 0, 6, "BACK", 7);
+              break;
+            case "laptop-update":
+              graphics.fillStyle(0x172554, 1).fillRoundedRect(left + 7, top + 1, plan.visualWidth - 14, plan.visualHeight - 12, 4);
+              graphics.lineStyle(3, danger, 1).strokeRoundedRect(left + 7, top + 1, plan.visualWidth - 14, plan.visualHeight - 12, 4);
+              graphics.fillStyle(0x1e293b, 1).fillTriangle(left + 1, bottom - 4, right - 1, bottom - 4, right - 9, bottom - 12);
+              graphics.lineStyle(2, 0x67e8f9, 1).strokeCircle(0, top + 14, 7).lineBetween(4, top + 9, 8, top + 9).lineBetween(8, top + 9, 8, top + 13);
+              this.addHazardText(container, 0, 9, "UPDATE", 6);
+              break;
+            case "notification-tower":
+              for (let index = 0; index < 5; index += 1) {
+                const y = bottom - 15 - index * 20;
+                graphics.fillStyle(index % 2 === 0 ? 0x4c0519 : 0x172554, 1).fillRoundedRect(left + 3 + (index % 2) * 3, y - 9, plan.visualWidth - 9, 18, 4);
+                graphics.lineStyle(2, danger, 1).strokeRoundedRect(left + 3 + (index % 2) * 3, y - 9, plan.visualWidth - 9, 18, 4);
+                graphics.fillStyle(danger, 1).fillCircle(right - 7, y - 6, 5);
+              }
+              this.addHazardText(container, right - 7, top + 7, "99+", 6);
+              break;
+          }
+          container.addAt(graphics, 0);
+          return container;
+        }
+
+        private createPlatformVisual(plan: EasterEggCourseObjectPlan, x: number, centerY: number) {
+          const container = this.add.container(x, centerY);
+          const graphics = this.add.graphics();
+          graphics.fillStyle(0x0e7490, 1).fillRoundedRect(-plan.visualWidth / 2, -plan.visualHeight / 2, plan.visualWidth, plan.visualHeight, 4);
+          graphics.lineStyle(3, 0x67e8f9, 1).strokeRoundedRect(-plan.visualWidth / 2, -plan.visualHeight / 2, plan.visualWidth, plan.visualHeight, 4);
+          graphics.lineStyle(2, 0xa5f3fc, 0.8);
+          for (let xOffset = -plan.visualWidth / 2 + 16; xOffset < plan.visualWidth / 2 - 12; xOffset += 32) {
+            graphics.lineBetween(xOffset, 3, xOffset + 6, -3).lineBetween(xOffset + 6, -3, xOffset + 12, 3);
+          }
+          container.add(graphics);
+          const label = this.add.text(0, 0, "SAFE STEP", {
+            color: "#cffafe",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+            fontSize: "8px",
+            fontStyle: "bold"
+          }).setOrigin(0.5);
+          container.add(label);
+          return container;
+        }
+
         private spawnObject(plan: EasterEggCourseObjectPlan) {
           const centerY = plan.kind === "platform" ? plan.topY + plan.height / 2 : plan.bottomY - plan.height / 2;
+          const spawnX = EASTER_EGG_RULESET.spawnX + plan.xOffset;
           const bodyObject = this.add.rectangle(
-            EASTER_EGG_RULESET.spawnX + plan.xOffset,
+            spawnX,
             centerY,
             plan.width,
             plan.height,
-            plan.fill,
-            1
+            plan.kind === "platform" ? plan.fill : 0xffffff,
+            plan.kind === "platform" ? 0.92 : 0.001
           );
-          bodyObject.setStrokeStyle(plan.kind === "platform" ? 3 : 2, plan.kind === "platform" ? 0x67e8f9 : 0xfb7185, 1);
           this.physics.add.existing(bodyObject);
           const body = bodyObject.body as import("phaser").Physics.Arcade.Body;
           body.setAllowGravity(false);
@@ -144,16 +308,10 @@ export default function EndlessRunnerGame({ run, onFinished, onRestart }: Endles
           } else {
             this.hazards.add(bodyObject);
           }
-
-          const label = this.add.text(bodyObject.x, centerY, plan.kind === "platform" ? "SAFE STEP" : `! ${plan.label}`, {
-            color: plan.kind === "platform" ? "#cffafe" : "#fff7ed",
-            fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
-            fontSize: plan.width < 52 ? "8px" : "9px",
-            fontStyle: "bold",
-            align: "center",
-            wordWrap: { width: Math.max(30, plan.width - 6) }
-          }).setOrigin(0.5);
-          this.worldObjects.push({ plan, bodyObject, label });
+          const visual = plan.kind === "platform"
+            ? this.createPlatformVisual(plan, spawnX, centerY)
+            : this.createHazardVisual(plan, spawnX);
+          this.worldObjects.push({ plan, bodyObject, visual });
         }
 
         update() {
@@ -169,9 +327,9 @@ export default function EndlessRunnerGame({ run, onFinished, onRestart }: Endles
             const object = this.worldObjects[index];
             const body = object.bodyObject.body as import("phaser").Physics.Arcade.Body;
             body.setVelocityX(-speed);
-            object.label.setPosition(object.bodyObject.x, object.bodyObject.y);
+            object.visual.x = object.bodyObject.x;
             if (object.bodyObject.x < -140) {
-              object.label.destroy();
+              object.visual.destroy();
               object.bodyObject.destroy();
               this.worldObjects.splice(index, 1);
             }
@@ -267,7 +425,7 @@ export default function EndlessRunnerGame({ run, onFinished, onRestart }: Endles
         {paused ? <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center bg-slate-950/70 text-lg font-semibold text-white">Paused</div> : null}
       </div>
       <p className="text-sm text-slate-300" aria-live="polite">{status}</p>
-      <p className="text-xs text-slate-400">Press Space, click the game, or tap to jump. Land on cyan SAFE STEP platforms and avoid red-edged warning blocks. The game pauses when this tab is hidden.</p>
+      <p className="text-xs text-slate-400">Press Space, click the game, or tap to jump. Land on cyan SAFE STEP platforms and avoid red-edged workplace hazards. The game pauses when this tab is hidden.</p>
     </div>
   );
 }

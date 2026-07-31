@@ -18,7 +18,7 @@ const TIER_MAX_SPEED_TICKS: Record<EasterEggDifficultyTierId, number> = {
   2: 2_399,
   3: 4_499,
   4: 7_199,
-  5: 8_000
+  5: 216_000
 };
 
 const VALIDATION_SPAWN_X = 560;

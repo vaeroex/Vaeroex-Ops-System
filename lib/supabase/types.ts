@@ -198,7 +198,7 @@ export type Database = {
           workspace_id: string;
           actor_user_id: string;
           idempotency_key: string;
-          game_contract_version: "easter_egg_runner_v1" | "easter_egg_runner_v2";
+          game_contract_version: "easter_egg_runner_v1" | "easter_egg_runner_v2" | "easter_egg_runner_v3";
           seed: number;
           validation_status: "pending" | "valid" | "rejected";
           score: number | null;
@@ -214,7 +214,7 @@ export type Database = {
           workspace_id: string;
           actor_user_id: string;
           idempotency_key: string;
-          game_contract_version: "easter_egg_runner_v1" | "easter_egg_runner_v2";
+          game_contract_version: "easter_egg_runner_v1" | "easter_egg_runner_v2" | "easter_egg_runner_v3";
           seed: number;
           validation_status?: "pending" | "valid" | "rejected";
           score?: number | null;

@@ -19,7 +19,7 @@ require.extensions[".ts"] = function compileTypeScript(module, filename) {
   module._compile(output, filename);
 };
 
-const { isEasterEggDiscoveryQuery, normalizeEasterEggDiscoveryQuery } = require("../lib/easter-egg/discovery.ts");
+const { EASTER_EGG_SEARCH_PHRASES, isEasterEggDiscoveryQuery, normalizeEasterEggDiscoveryQuery } = require("../lib/easter-egg/discovery.ts");
 const { validateEasterEggDisplayName } = require("../lib/easter-egg/display-name.ts");
 const {
   EASTER_EGG_DIFFICULTY_TIERS,
@@ -44,10 +44,15 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), "utf8");
 }
 
-assert.equal(isEasterEggDiscoveryQuery("easter egg"), true, "the exact normalized search phrase discovers the game");
+for (const query of EASTER_EGG_SEARCH_PHRASES) {
+  assert.equal(isEasterEggDiscoveryQuery(query), true, `approved exact discovery phrase works: ${query}`);
+}
 assert.equal(isEasterEggDiscoveryQuery("  EASTER   EGG  "), true, "case and whitespace normalization are allowed");
 assert.equal(isEasterEggDiscoveryQuery("ｅａｓｔｅｒ　ｅｇｇ"), true, "Unicode compatibility normalization is deterministic");
-for (const query of ["easter eggs", "easter,egg", "secret game", "easter egg report", "company easter egg policy", "egg"]) {
+for (const query of [
+  "game", "fun", "hidden", "secret", "easter eggs", "easter,egg", "secret games", "hidden game report",
+  "play a mini game", "surprise me with revenue", "i am bored", "company easter egg policy", "egg"
+]) {
   assert.equal(isEasterEggDiscoveryQuery(query), false, `legitimate search is not intercepted: ${query}`);
 }
 assert.equal(normalizeEasterEggDiscoveryQuery("Easter\nEgg"), "easter egg");
@@ -72,7 +77,7 @@ const score = calculateEasterEggScore(activeTickCount, progress.hazardCount);
 const durationMs = runDurationMs(activeTickCount);
 const valid = validateEasterEggRun({
   seed,
-  contractVersion: "easter_egg_runner_v2",
+  contractVersion: "easter_egg_runner_v3",
   startedAtMs: 1_000_000,
   submittedAtMs: 1_000_000 + durationMs + 800,
   activeTickCount,
@@ -80,7 +85,7 @@ const valid = validateEasterEggRun({
   score
 });
 assert.deepEqual(valid, { valid: true, reason: "accepted", durationMs }, "a deterministic replay validates");
-const validationBase = { seed, contractVersion: "easter_egg_runner_v2", startedAtMs: 1_000_000, submittedAtMs: 1_000_000 + durationMs, activeTickCount, ...progress, score };
+const validationBase = { seed, contractVersion: "easter_egg_runner_v3", startedAtMs: 1_000_000, submittedAtMs: 1_000_000 + durationMs, activeTickCount, ...progress, score };
 assert.equal(validateEasterEggRun({ ...validationBase, hazardCount: progress.hazardCount + 1, score: calculateEasterEggScore(activeTickCount, progress.hazardCount + 1) }).reason, "impossible_obstacle_count", "impossible hazard claims fail closed");
 assert.equal(validateEasterEggRun({ ...validationBase, platformCount: progress.platformCount + 1 }).reason, "impossible_platform_count", "impossible safe-platform claims fail closed");
 assert.equal(validateEasterEggRun({ ...validationBase, difficultyTier: Math.max(1, progress.difficultyTier - 1) }).reason, "difficulty_tier_mismatch", "client tier claims must match deterministic progression");
@@ -89,6 +94,7 @@ assert.equal(validateEasterEggRun({ ...validationBase, courseFingerprint: "not-a
 assert.equal(validateEasterEggRun({ ...validationBase, score: score + 1 }).reason, "score_mismatch", "tampered scores fail closed");
 assert.equal(validateEasterEggRun({ ...validationBase, contractVersion: "future" }).reason, "contract_mismatch", "unknown rulesets fail closed");
 assert.equal(validateEasterEggRun({ ...validationBase, contractVersion: "easter_egg_runner_v1" }).reason, "contract_mismatch", "old-contract pending runs fail closed rather than using V2 rules");
+assert.equal(validateEasterEggRun({ ...validationBase, contractVersion: "easter_egg_runner_v2" }).reason, "contract_mismatch", "V2 pending runs fail closed rather than using V3 rules");
 assert.equal(validateEasterEggRun({ ...validationBase, submittedAtMs: 1_001_000 }).reason, "duration_mismatch", "implausibly fast submissions fail closed");
 
 assert.deepEqual(EASTER_EGG_DIFFICULTY_TIERS.map((tier) => difficultyTierAtTick(tier.startTick).id), [1, 2, 3, 4, 5], "difficulty tiers unlock at exact active-tick thresholds");
@@ -96,9 +102,27 @@ assert.ok(runnerSpeedAtTick(0) < runnerSpeedAtTick(900) && runnerSpeedAtTick(900
 assert.equal(runnerSpeedAtTick(216_000), 510, "world speed has a validated upper cap");
 assert.ok(patternGapDistanceAtTick(0) > patternGapDistanceAtTick(2_400) && patternGapDistanceAtTick(2_400) > patternGapDistanceAtTick(7_200), "average pattern spacing tightens by tier");
 assert.ok(allowedPatternsForTier(1).every((pattern) => !pattern.objects.some((object) => object.kind === "platform")), "the onboarding tier contains only basic ground hazards");
-assert.ok(allowedPatternsForTier(2).some((pattern) => pattern.id === "platform-boost"), "one-step platform traversal unlocks in the mid game");
+assert.deepEqual(allowedPatternsForTier(1).map((pattern) => pattern.id), ["single-basic"], "Normal teaches one small hazard with no sequence surprises");
+assert.ok(allowedPatternsForTier(2).some((pattern) => pattern.id === "paired-small-interruptions"), "Busy adds a forgiving two-hazard sequence");
+assert.ok(allowedPatternsForTier(2).every((pattern) => !pattern.objects.some((object) => object.kind === "platform")), "Busy remains ground-based and learnable");
+assert.ok(allowedPatternsForTier(3).every((pattern) => !pattern.objects.some((object) => object.kind === "platform")), "Quarter End introduces deliberate ground timing before platforms");
+assert.ok(allowedPatternsForTier(4).some((pattern) => pattern.id === "platform-boost"), "platform traversal unlocks at Executive Panic");
 assert.ok(allowedPatternsForTier(5).some((pattern) => pattern.id === "late-mixed-sequence"), "the hardest bounded sequence unlocks only in the final tier");
 assert.ok(EASTER_EGG_HAZARD_TYPES.filter((hazard) => hazard.minTier <= 5).length >= 10, "business-themed hazard variety is bounded and substantial");
+const normalHazards = EASTER_EGG_HAZARD_TYPES.filter((hazard) => hazard.minTier === 1);
+assert.ok(normalHazards.every((hazard) => hazard.collisionHeight <= 25 && hazard.collisionWidth <= 36), "Normal uses the smallest forgiving hitboxes");
+const busyHazards = EASTER_EGG_HAZARD_TYPES.filter((hazard) => hazard.minTier <= 2);
+assert.ok(busyHazards.every((hazard) => hazard.collisionHeight <= 35 && hazard.collisionWidth <= 40), "Busy stays small to medium rather than becoming tall");
+assert.ok(patternGapDistanceAtTick(0) >= 430, "Normal provides a broad reaction window");
+assert.ok(runnerSpeedAtTick(0) <= 215 && runnerSpeedAtTick(899) < 240, "Normal uses the slowest bounded speed band");
+assert.ok(runnerSpeedAtTick(900) < 250 && runnerSpeedAtTick(2_399) <= 286, "Busy increases speed modestly");
+assert.ok(runnerSpeedAtTick(4_500) >= 390 && runnerSpeedAtTick(7_200) >= 470, "later tiers carry the severe speed increase");
+for (const hazard of EASTER_EGG_HAZARD_TYPES) {
+  assert.ok(hazard.id && hazard.visualKind, `${hazard.id} has stable visual and obstacle identities`);
+  assert.ok(hazard.collisionWidth <= hazard.visualWidth && hazard.collisionHeight <= hazard.visualHeight, `${hazard.id} collision remains inside its visual bounds`);
+  assert.ok(hazard.collisionWidth / hazard.visualWidth >= 0.75 && hazard.collisionHeight / hazard.visualHeight >= 0.72, `${hazard.id} collision closely matches its visible solid object`);
+}
+assert.equal(new Set(EASTER_EGG_HAZARD_TYPES.map((hazard) => hazard.visualKind)).size, EASTER_EGG_HAZARD_TYPES.length, "each business hazard owns one deterministic visual definition");
 const passabilityFailures = [];
 for (const pattern of EASTER_EGG_PATTERN_CATALOG) {
   for (let tier = pattern.minTier; tier <= pattern.maxTier; tier += 1) {
@@ -130,6 +154,7 @@ assert.equal(validateEasterEggDisplayName("A").valid, false, "display names are 
 
 const migration = read("supabase/migrations/20260731213000_easter_egg_runner_v1.sql");
 const v2Migration = read("supabase/migrations/20260731224500_easter_egg_runner_v2_contract.sql");
+const v3Migration = read("supabase/migrations/20260731231500_easter_egg_runner_v3_contract.sql");
 const actions = read("app/app/easter-egg/actions.ts");
 const adminActions = read("app/app/admin/easter-egg/actions.ts");
 const gamePage = read("app/app/easter-egg/page.tsx");
@@ -155,6 +180,8 @@ assert.doesNotMatch(migration, /drop table|drop column|truncate/i, "migration co
 assert.match(v2Migration, /easter_egg_runner_v1', 'easter_egg_runner_v2/, "the compatibility migration preserves completed V1 rows while accepting V2 starts");
 assert.match(v2Migration, /impossible_platform_count/, "V2 validation outcomes remain persistable");
 assert.doesNotMatch(v2Migration, /drop table|drop column|truncate|delete from/i, "the V2 contract migration does not remove schema or data");
+assert.match(v3Migration, /easter_egg_runner_v1'[\s\S]*easter_egg_runner_v2'[\s\S]*easter_egg_runner_v3'/, "the V3 migration preserves all historical contract rows");
+assert.doesNotMatch(v3Migration, /drop table|drop column|truncate|delete from/i, "the V3 contract migration does not remove schema or data");
 
 assert.match(actions, /requireWorkspaceAccess\(\)/, "start and submit actions independently require workspace access");
 assert.match(actions, /requireWorkspaceRole\(\["owner", "admin"\]\)/, "only owners and admins mutate workspace leaderboard settings");
@@ -183,7 +210,10 @@ assert.match(runner, /scene\.pause\(\)/, "hidden-tab pause stops the fixed-tick 
 assert.match(runner, /this\.platforms/, "safe platforms have a collision group separate from hazards");
 assert.match(runner, /checkCollision\.up = true/, "safe platforms expose a top landing surface");
 assert.match(runner, /SAFE STEP/, "safe platforms are unambiguously labeled in the game");
-assert.match(runner, /! \$\{plan\.label\}/, "hazards retain an explicit danger marker");
+for (const visualKind of EASTER_EGG_HAZARD_TYPES.map((hazard) => hazard.visualKind)) {
+  assert.match(runner, new RegExp(`case \\\"${visualKind}\\\"`), `${visualKind} has local Phaser artwork`);
+}
+assert.match(runner, /plan\.kind === "platform" \? plan\.fill : 0xffffff[\s\S]*0\.001/, "hazard physics use a separate fixed collision body rather than decorative empty space");
 assert.match(runner, /difficultyTierAtTick\(this\.tick\)/, "visible difficulty uses the shared active-tick progression");
 assert.doesNotMatch(runner, /setInterval|setTimeout/, "difficulty and stages do not advance on fake wall-clock timing");
 assert.match(runner, /aria-live="polite"/, "meaningful game status changes are announced");
