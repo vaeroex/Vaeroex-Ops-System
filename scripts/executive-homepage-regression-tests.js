@@ -233,7 +233,14 @@ assert.match(homepageSource, /Top Opportunity/, "the opportunity must remain dis
 assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
 assert.match(homepageSource, /Validated executive interpretation/, "the Version 1 homepage must label the visible validated interpretation correctly");
 assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the Version 1 Business Health snapshot must retain its score and interpretation columns");
-assert.match(homepageSource, /sm:text-right/, "the Version 1 snapshot must keep confidence aligned opposite the main driver");
+assert.match(homepageSource, />Executive Overview<\//, "Overview must use a stable executive heading instead of a time-based greeting");
+assert.doesNotMatch(homepageSource, /Good morning|Good afternoon|Good evening/, "Overview must not contain time-of-day greetings");
+for (const label of ["Current state", "Since previous review", "Confidence"]) {
+  assert.match(homepageSource, new RegExp(`>${label}<`), `the compact Business Health summary must expose ${label}`);
+}
+assert.match(homepageSource, /No previous review available\./, "the compact summary must handle a missing prior review cleanly");
+assert.match(homepageSource, /trendDelta === 0[\s\S]*\? "Unchanged"/, "an unchanged review must use concise deterministic wording");
+assert.equal((homepageSource.match(/>Highest Impact Driver<\//g) || []).length, 1, "Highest Impact Driver must not be duplicated");
 assert.doesNotMatch(homepageSource, /<ExecutiveBriefPanel/, "the Version 1 homepage must keep Business Health as the cohesive opening snapshot");
 assert.doesNotMatch(homepageSource, /GlobalSearchTrigger|Ask Vaeroex|Help/, "executive header must not duplicate global navigation actions");
 assert.match(homepageSource, /model\.health\.available[\s\S]*<BusinessHealthTrendChart/, "the stored-history chart must own its insufficient-history state whenever Business Health is available");
