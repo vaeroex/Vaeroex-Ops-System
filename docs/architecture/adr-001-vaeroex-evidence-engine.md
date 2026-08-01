@@ -292,6 +292,8 @@ NVIDIA reranking remains shadow-only unless frozen-fixture and Preview evaluatio
 
 Promotion is a separate architecture and release decision.
 
+The 2026-08-01 hosted Preview qualification completed 128/128 real NVIDIA requests with zero failures, 135 ms p95 latency, 17 category wins, 7 ties, and 0 losses. Ranking metrics improved, but irrelevant selected chunks decreased by only 2.29% relative, below the required 10% adoption gate. NVIDIA reranking therefore remains disabled and shadow-only. See [NVIDIA Reranker Shadow POC Results](./nvidia-reranker-shadow-poc-results.md).
+
 ## Deferred Scope
 
 This ADR does not authorize:
