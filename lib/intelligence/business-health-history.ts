@@ -1,5 +1,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import {
+  BUSINESS_HEALTH_CALCULATION_VERSION,
+  BUSINESS_HEALTH_CALCULATION_VERSION_V1,
+  BUSINESS_HEALTH_CALCULATION_VERSIONS,
+  DATA_QUALITY_CALCULATION_VERSION
+} from "@/lib/intelligence/snapshot/v1/versions";
+import type { BusinessHealthCalculationVersion } from "@/lib/intelligence/snapshot/v1/versions";
 import type { Database, Json } from "@/lib/supabase/types";
 
 export type BusinessHealthSnapshotRow = Database["public"]["Tables"]["business_health_snapshots"]["Row"];
@@ -23,6 +30,21 @@ function dateOnly(date: Date) {
   return date.toISOString().slice(0, 10);
 }
 
+function jsonRecord(value: Json): Record<string, Json | undefined> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, Json | undefined> : {};
+}
+
+export function businessHealthCalculationVersionFromSourceSummary(value: Json): BusinessHealthCalculationVersion {
+  const version = jsonRecord(value).business_health_calculation_version;
+  return typeof version === "string" && BUSINESS_HEALTH_CALCULATION_VERSIONS.includes(version as BusinessHealthCalculationVersion)
+    ? version as BusinessHealthCalculationVersion
+    : BUSINESS_HEALTH_CALCULATION_VERSION_V1;
+}
+
+export function businessHealthSnapshotCalculationVersion(snapshot: Pick<BusinessHealthSnapshotRow, "source_summary">) {
+  return businessHealthCalculationVersionFromSourceSummary(snapshot.source_summary);
+}
+
 export async function recordDailyBusinessHealthSnapshot(
   supabase: SupabaseClient<Database>,
   input: BusinessHealthSnapshotInput
@@ -40,7 +62,11 @@ export async function recordDailyBusinessHealthSnapshot(
         data_confidence: input.dataConfidence,
         data_quality_score: input.dataQualityScore,
         memory_signal_count: input.memorySignalCount,
-        source_summary: input.sourceSummary
+        source_summary: {
+          ...jsonRecord(input.sourceSummary),
+          business_health_calculation_version: BUSINESS_HEALTH_CALCULATION_VERSION,
+          data_quality_calculation_version: DATA_QUALITY_CALCULATION_VERSION
+        }
       },
       {
         ignoreDuplicates: true,

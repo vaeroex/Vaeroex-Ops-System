@@ -102,14 +102,16 @@ assert.ok(monthlyDailyPoints.every((point) => point.kind === "daily"), "the 30-d
 
 const weeklyPoints = buildBusinessHealthTrendDisplayPoints(storedPoints, "3M", asOfDate);
 assert.deepEqual(weeklyPoints[0], {
-  key: "2026-05-02:2026-05-08",
+  key: "2026-05-02:2026-05-08:method-0",
   startDate: "2026-05-02",
   endDate: "2026-05-08",
   kind: "weekly_average",
   bucketIndex: 0,
   score: 30,
   sampleCount: 2,
-  sourceDates: ["2026-05-02", "2026-05-08"]
+  sourceDates: ["2026-05-02", "2026-05-08"],
+  calculationVersion: "business_health_calculation_v1",
+  methodSegment: 0
 }, "weekly points must average only stored daily scores within their period");
 assert.equal(weeklyPoints.at(-1).bucketIndex, 12, "the latest available score must be represented in the final weekly period");
 assert.equal(weeklyPoints.at(-1).score, 64, "the final weekly average must use every stored score in that week");
@@ -124,6 +126,17 @@ assert.equal(ytdPoints[0].kind, "monthly_average");
 assert.equal(ytdPoints[0].score, 31, "monthly periods must average only the stored daily scores in that calendar month");
 assert.equal(ytdPoints.at(-1).startDate, "2026-07-01");
 assert.ok(!ytdPoints.some((point) => point.startDate === "2026-03-01"), "months without history must remain missing");
+
+const formulaBoundaryPoints = buildBusinessHealthTrendDisplayPoints([
+  { snapshotDate: "2026-07-25", score: 70, status: "Watch", trend: "Holding steady", calculationVersion: "business_health_calculation_v1" },
+  { snapshotDate: "2026-07-27", score: 72, status: "Watch", trend: "Improving", calculationVersion: "business_health_calculation_v1" },
+  { snapshotDate: "2026-07-29", score: 40, status: "At Risk", trend: "Declining", calculationVersion: "business_health_calculation_v2" },
+  { snapshotDate: "2026-07-31", score: 42, status: "At Risk", trend: "Holding steady", calculationVersion: "business_health_calculation_v2" }
+], "3M", asOfDate);
+const boundaryBucket = formulaBoundaryPoints.filter((point) => point.bucketIndex === 12);
+assert.equal(boundaryBucket.length, 2, "one aggregate period crossing V1 and V2 must be split at the scoring-method boundary");
+assert.deepEqual(boundaryBucket.map((point) => point.score), [71, 41], "V1 and V2 scores must never be averaged together");
+assert.notEqual(boundaryBucket[0].methodSegment, boundaryBucket[1].methodSegment, "the chart must expose a disconnected formula segment");
 
 const intelligence = buildIntelligenceLayer({
   files: [
@@ -149,6 +162,9 @@ assert.doesNotMatch(chartSource, /currentScore|linearGradient/, "the chart must 
 assert.match(chartSource, /Y_AXIS_VALUES = \[100, 75, 50, 25, 0\]/, "the fixed Business Health axis must label every 25-point interval");
 assert.match(chartSource, /buildBusinessHealthTrendBuckets/, "X-axis periods must come from the selected calendar range rather than sparse stored points");
 assert.match(chartSource, /buildBusinessHealthTrendDisplayPoints/, "plotted data must use the canonical stored-history projection");
+assert.match(chartSource, /Scoring method updated/, "the chart must label a V1 to V2 boundary");
+assert.match(chartSource, /point\.methodSegment !== previous\.methodSegment/, "the chart must not connect V1 and V2 scores");
+assert.match(chartSource, /methodOffset/, "V1 and V2 points sharing one aggregate period must remain visually distinct");
 assert.match(chartSource, /strokeDasharray=\{crossesMissingPeriod/, "missing periods must remain visually distinguishable without becoming zero");
 for (const tooltipLabel of ["Daily score", "Weekly average", "Two-week average", "Monthly average", "Average Business Health"]) {
   assert.match(chartSource, new RegExp(tooltipLabel), `tooltips must include ${tooltipLabel}`);

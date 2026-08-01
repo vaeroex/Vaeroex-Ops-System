@@ -284,19 +284,87 @@ function semanticHealth(name, values, setting, target = null) {
 
 const maximizeRisk = semanticHealth("Revenue", [8, 8, 8, 8, 8, 8], kpiSetting("Revenue", "maximize"), 10);
 const minimizeRisk = semanticHealth("Average Checkout Wait", [12, 12, 12, 12, 12, 12], kpiSetting("Average Checkout Wait", "minimize"), 10);
-assert.equal(maximizeRisk.businessHealth.score, 28, "the existing Business Health formula remains unchanged for a material maximize-target miss");
-assert.equal(minimizeRisk.businessHealth.score, maximizeRisk.businessHealth.score, "an equivalent minimize-target miss receives the same unchanged Business Health penalty");
+assert.equal(maximizeRisk.businessHealth.score, 32, "a material maximize-target miss applies the Formula V2 High-risk penalty to the fixed baseline");
+assert.equal(minimizeRisk.businessHealth.score, maximizeRisk.businessHealth.score, "an equivalent minimize-target miss receives the same Formula V2 penalty");
 assert.match(minimizeRisk.topRisk?.title || "", /above target/, "lower-is-better KPIs create risks when they exceed their maximum target");
 assert.equal(minimizeRisk.topRecommendation?.id, minimizeRisk.topRisk?.id, "direction-aware KPI risks continue to drive deterministic priorities");
 assert.equal(minimizeRisk.topOpportunity, undefined, "a worse lower-is-better result cannot become an opportunity");
 
+const sharedRevenueRecord = maximizeRisk.topRisk.supportingRecords[0];
+const duplicateRiskManifestations = buildIntelligenceLayer({
+  kpis: importedKpi("Revenue", [8, 8, 8, 8, 8, 8], { target: 10 }),
+  kpiSettings: [kpiSetting("Revenue", "maximize")],
+  files: [retailFile],
+  imports: [retailImport],
+  sops: [semanticSop],
+  operationalInsights: [
+    {
+      ...maximizeRisk.topRisk,
+      id: "fulfillment-manifestation",
+      title: "Fulfillment remained below target",
+      affectedArea: "Fulfillment",
+      supportingRecords: [sharedRevenueRecord, { ...sharedRevenueRecord, id: "fulfillment-detail", title: "Fulfillment detail", sourceKey: "source:fulfillment" }],
+      fingerprint: ""
+    },
+    {
+      ...maximizeRisk.topRisk,
+      id: "capacity-manifestation",
+      title: "Capacity remained below target",
+      affectedArea: "Capacity",
+      supportingRecords: [sharedRevenueRecord, { ...sharedRevenueRecord, id: "capacity-detail", title: "Capacity detail", sourceKey: "source:capacity" }],
+      fingerprint: ""
+    }
+  ]
+});
+assert.equal(duplicateRiskManifestations.businessHealth.components.riskPenalty, 18, "risk manifestations sharing one authoritative dependency and condition count once even when their other dependencies differ");
+assert.equal(duplicateRiskManifestations.businessHealth.score, 32);
+
 const maximizeOpportunity = semanticHealth("Revenue", [12, 12, 12, 12, 12, 12], kpiSetting("Revenue", "maximize"), 10);
 const minimizeOpportunity = semanticHealth("Average Checkout Wait", [8, 8, 8, 8, 8, 8], kpiSetting("Average Checkout Wait", "minimize"), 10);
-assert.equal(maximizeOpportunity.businessHealth.score, 44, "maximize target achievement keeps the existing opportunity contribution");
-assert.equal(minimizeOpportunity.businessHealth.score, maximizeOpportunity.businessHealth.score, "minimize target achievement uses the same unchanged opportunity contribution");
+assert.equal(maximizeOpportunity.businessHealth.score, 60, "maximize target achievement receives the Formula V2 confirmed-performance contribution");
+assert.equal(minimizeOpportunity.businessHealth.score, maximizeOpportunity.businessHealth.score, "minimize target achievement uses the same Formula V2 contribution");
 assert.match(minimizeOpportunity.topOpportunity?.title || "", /on or below target/, "lower-is-better target achievement is described directionally");
 assert.match(minimizeRisk.topRisk?.fingerprint || "", /performance-gap/, "a lower-is-better target miss keeps the canonical risk fingerprint");
 assert.match(minimizeOpportunity.topOpportunity?.fingerprint || "", /positive-performance/, "a lower-is-better target achievement keeps the canonical opportunity fingerprint");
+
+const sustainedFavorable = semanticHealth("Revenue", [6, 7, 8, 9, 10, 12], kpiSetting("Revenue", "maximize"));
+assert.equal(sustainedFavorable.businessHealth.score, 58, "a sustained favorable targetless KPI trend contributes eight points once");
+assert.match(sustainedFavorable.topOpportunity?.title || "", /sustained favorable trend/, "the positive score driver remains visible as a deterministic KPI finding");
+assert.equal(sustainedFavorable.businessHealth.components.opportunityAdjustment, 8);
+
+const genericOpportunityOnly = buildIntelligenceLayer({
+  files: [retailFile],
+  imports: [retailImport],
+  sops: [semanticSop],
+  crmLeads: [{
+    id: "customer-context",
+    lead_name: "Customer account",
+    company: null,
+    status: "Open",
+    last_activity_at: "2026-01-01",
+    source_file_id: retailFile.id,
+    import_id: retailImport.id,
+    created_at: "2026-07-01T00:00:00Z",
+    updated_at: "2026-07-01T00:00:00Z",
+    archived_at: null,
+    deleted_at: null
+  }]
+});
+assert.equal(genericOpportunityOnly.topOpportunity?.type, "Opportunity", "the generic review opportunity remains visible");
+assert.equal(genericOpportunityOnly.businessHealth.score, 0, "generic opportunities contribute zero to Business Health");
+assert.equal(genericOpportunityOnly.businessHealth.status, "Insufficient Data", "generic opportunities cannot satisfy the performance gate");
+
+const withLeadershipDecision = semanticHealth("Revenue", [6, 7, 8, 9, 10, 12], kpiSetting("Revenue", "maximize"));
+const withAdditionalDecision = buildIntelligenceLayer({
+  kpis: importedKpi("Revenue", [6, 7, 8, 9, 10, 12]),
+  kpiSettings: [kpiSetting("Revenue", "maximize")],
+  files: [retailFile],
+  imports: [retailImport],
+  sops: [semanticSop],
+  decisions: [{ id: "decision-1", title: "Leadership decision", created_at: "2026-07-01T00:00:00Z" }]
+});
+assert.deepEqual(withAdditionalDecision.businessHealth, withLeadershipDecision.businessHealth, "leadership decisions contribute zero to health and confidence authority");
+assert.deepEqual(withAdditionalDecision.dataQuality, withLeadershipDecision.dataQuality, "leadership decisions contribute zero to Intelligence Readiness");
 
 const rangeSetting = kpiSetting("Staff Utilization", "target_range", { ideal_range_min: 70, ideal_range_max: 85 });
 const rangeRisk = semanticHealth("Staff Utilization", [96, 96, 96, 96, 96, 96], rangeSetting);
@@ -323,13 +391,14 @@ for (const [direction, risk, opportunity] of [
   ["exact target", exactRisk, exactOpportunity],
   ["maintain", maintainRisk, maintainOpportunity]
 ]) {
-  assert.equal(risk.businessHealth.score, 28, `${direction} target misses preserve the existing Business Health risk penalty`);
-  assert.equal(opportunity.businessHealth.score, 44, `${direction} target achievements preserve the existing Business Health opportunity bonus`);
+  assert.equal(risk.businessHealth.score, 32, `${direction} target misses use the Formula V2 High-risk penalty`);
+  assert.equal(opportunity.businessHealth.score, 60, `${direction} target achievements use the Formula V2 confirmed-performance contribution`);
   assert.equal(risk.topRecommendation?.id, risk.topRisk?.id, `${direction} target misses feed the existing deterministic priority selection`);
 }
 
 const unknownSemantics = semanticHealth("Mystery Index", [2, 2, 2, 2, 2, 2], kpiSetting("Mystery Index", "unknown"), 10);
-assert.equal(unknownSemantics.businessHealth.score, 40, "unknown semantics do not add directional risk or opportunity terms to Business Health");
+assert.equal(unknownSemantics.businessHealth.score, 0, "unknown semantics fail closed without a directional Business Health outcome");
+assert.equal(unknownSemantics.businessHealth.status, "Insufficient Data", "unknown semantics cannot manufacture a health classification");
 assert.equal(unknownSemantics.topRisk, undefined, "unknown semantics cannot create a directional risk finding");
 assert.equal(unknownSemantics.topOpportunity, undefined, "unknown semantics cannot create a directional opportunity finding");
 assert.equal(unknownSemantics.topRecommendation, undefined, "unknown semantics cannot create a directional priority");

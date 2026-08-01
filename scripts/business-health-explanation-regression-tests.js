@@ -130,11 +130,12 @@ function intelligence(overrides = {}) {
     executiveSummary: "Revenue needs attention while retention remains supported.",
     businessHealth: {
       available: true,
-      score: 52,
-      status: "Watch",
+      unavailableReason: null,
+      score: 42,
+      status: "At Risk",
       trend: "Holding steady",
       components: {
-        dataQualityBase: 60,
+        dataQualityBase: 50,
         riskPenalty: 12,
         opportunityAdjustment: 4,
         driverImpacts: [
@@ -179,8 +180,8 @@ function homepage(overrides = {}) {
   return {
     health: {
       available: true,
-      score: 52,
-      status: "Watch",
+      score: 42,
+      status: "At Risk",
       trend: "Holding steady",
       trendDelta: 0,
       summary: "Revenue is below target while retention remains above target.",
@@ -196,8 +197,8 @@ function homepage(overrides = {}) {
 }
 
 const snapshots = [
-  { snapshot_date: "2026-07-18", score: 52 },
-  { snapshot_date: "2026-07-11", score: 52 }
+  { snapshot_date: "2026-07-18", score: 42 },
+  { snapshot_date: "2026-07-11", score: 42 }
 ];
 
 function build(overrides = {}) {
@@ -214,7 +215,7 @@ function build(overrides = {}) {
 const analysisPackage = build();
 assert.equal(analysisPackage.contractId, "business_health_explanation_v1");
 assert.equal(analysisPackage.generationPolicyVersion, BUSINESS_HEALTH_GENERATION_POLICY_VERSION);
-assert.equal(analysisPackage.facts.score, 52, "the contract must preserve the application-owned score");
+assert.equal(analysisPackage.facts.score, 42, "the contract must preserve the application-owned score");
 assert.equal(analysisPackage.facts.riskPenalty, 12, "the contract must preserve the deterministic risk penalty");
 assert.equal(analysisPackage.facts.opportunityAdjustment, 4, "the contract must preserve the deterministic opportunity adjustment");
 assert.equal(analysisPackage.facts.drivers.length, 2, "the bounded package must retain the top risk and opportunity");
@@ -330,7 +331,7 @@ console.error = () => {};
 const previewFallback = buildBusinessHealthExplanationFromSnapshotV1({
   workspaceId,
   intelligence: intelligence(),
-  homepage: homepage({ status: "Critical" }),
+  homepage: homepage({ status: "Watch" }),
   snapshots,
   coverage: foundationCoverageOutput(),
   sourceLabelsByKey: {},
@@ -343,7 +344,7 @@ process.env.VERCEL_ENV = "production";
 assert.throws(() => buildBusinessHealthExplanationFromSnapshotV1({
   workspaceId,
   intelligence: intelligence(),
-  homepage: homepage({ status: "Critical" }),
+  homepage: homepage({ status: "Watch" }),
   snapshots,
   coverage: foundationCoverageOutput(),
   sourceLabelsByKey: {},
@@ -410,8 +411,10 @@ const inactiveSourcePackage = build({ intelligence: intelligence({
 assert.notEqual(inactiveSourcePackage.fingerprint, analysisPackage.fingerprint, "a relevant eligibility change must invalidate the fingerprint");
 assert.ok(inactiveSourcePackage.manifest.evidence.every((entry) => entry.title !== "Monthly Revenue"), "ineligible derived evidence must be excluded");
 
-assert.equal(build({ homepage: homepage({ status: "Healthy", trend: "Improving", trendDelta: 3 }) }).submode, "healthy_improving");
-assert.equal(build({ homepage: homepage({ status: "Critical", trend: "Declining", trendDelta: -4 }) }).submode, "at_risk_worsening");
+assert.equal(build({ homepage: homepage({ status: "Strong", trend: "Improving", trendDelta: 3 }) }).submode, "healthy_improving");
+assert.equal(build({ homepage: homepage({ status: "At Risk", trend: "Declining", trendDelta: -4 }) }).submode, "at_risk_worsening");
+assert.equal(build({ homepage: homepage({ status: "Healthy", trend: "Improving", trendDelta: 3 }) }).submode, "healthy_improving", "historical V1 status labels remain readable");
+assert.equal(build({ homepage: homepage({ status: "Critical", trend: "Declining", trendDelta: -4 }) }).submode, "at_risk_worsening", "historical V1 status labels remain readable");
 assert.equal(build({ now: new Date("2027-01-19T12:00:00.000Z") }).submode, "evidence_stale");
 assert.equal(build({ homepage: homepage({ available: false, score: null }) }).submode, "evidence_limited");
 
@@ -559,7 +562,7 @@ for (const inventedClaim of [
   );
 }
 
-const numericFailure = validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue is 42 points and Customer Retention remains visible." }, analysisPackage);
+const numericFailure = validateBusinessHealthExplanationOutput({ ...validOutput, executive_interpretation: "Monthly Revenue is 99 points and Customer Retention remains visible." }, analysisPackage);
 assert.equal(numericFailure.ok, false, "invented numbers must be rejected");
 assert.equal(numericFailure.diagnostic.reasonCode, "numeric_integrity_failed", "numeric failures must remain distinguishable for the bounded fallback allowlist");
 assert.equal(validateBusinessHealthExplanationOutput({ ...validOutput, provisional_hypothesis: "Revenue was caused by customer behavior." }, analysisPackage).ok, false, "unauthorized hypotheses must be rejected");
@@ -607,6 +610,9 @@ assert.doesNotMatch(snapshotContextSource, /runStructuredAI|generateBusinessHeal
 assert.match(snapshotContextSource, /process\.env\.VERCEL_ENV === "preview"/, "legacy parity fallback must remain Preview-only");
 assert.match(snapshotContextSource, /projectBusinessHealthExplanationV1/, "the live consumer must receive the bounded V1 projection");
 assert.doesNotMatch(contextSource, /remainingRiskPenalty|remainingOpportunityAdjustment|expectedScore/, "the explanation context must not remain a second Business Health calculator");
+assert.match(contextSource, /calculationVersions:[\s\S]*BUSINESS_HEALTH_CALCULATION_VERSION[\s\S]*DATA_QUALITY_CALCULATION_VERSION/, "the explanation fingerprint must include both deterministic Formula V2 versions");
+assert.match(serviceSource, /performance_baseline:[\s\S]*negative_performance:[\s\S]*positive_performance:/, "the provider package must describe V2 components as performance rather than data-quality scoring");
+assert.doesNotMatch(serviceSource, /data_quality_base:\s*analysisPackage\.facts/, "the V2 provider package must not present readiness as the Business Health base");
 assert.match(actionSource, /getWorkspaceContext/, "the generation action must reauthorize the active workspace");
 assert.match(actionSource, /verifyEvidenceManifestCitations/, "the action must reverify centralized citations before generation");
 assert.match(actionSource, /evidence_classification:\s*"derived_analysis"/, "saved analysis must remain derived and ineligible as original evidence");

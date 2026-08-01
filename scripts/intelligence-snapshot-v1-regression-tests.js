@@ -50,6 +50,8 @@ const snapshot = first.snapshot;
 
 assert.equal(snapshot.contract.id, "intelligence_snapshot_v1");
 assert.equal(snapshot.contract.version, "1.0.0");
+assert.equal(snapshot.versions.calculations.businessHealth, "business_health_calculation_v2");
+assert.equal(snapshot.versions.calculations.dataQuality, "data_quality_calculation_v2");
 assert.equal(snapshot.scope.workspaceId, contract.FOUNDATION_FIXTURE_WORKSPACE_ID);
 assert.equal(snapshot.scope.asOf, contract.FOUNDATION_FIXTURE_AS_OF);
 assert.equal(snapshot.scope.evaluationDate, contract.FOUNDATION_FIXTURE_EVALUATION_DATE);
@@ -158,8 +160,8 @@ assert.equal(unknown.manualTarget.value.value, 50, "unknown semantics must not d
 assert.deepEqual(unknown.effectiveAuthoritativeTarget.value, { kind: "scalar", value: 50, source: "manual" });
 
 assert.equal(snapshot.businessHealth.state, "available");
-assert.equal(snapshot.businessHealth.value.score, 78);
-assert.equal(snapshot.businessHealth.value.status, "Strong");
+assert.equal(snapshot.businessHealth.value.score, 42);
+assert.equal(snapshot.businessHealth.value.status, "At Risk");
 assert.equal(snapshot.businessHealth.value.trajectory, "Holding steady");
 assert.equal(snapshot.businessHealth.value.components.state, "available", "the adapter must expose producer-owned score components");
 assert.deepEqual(
@@ -168,7 +170,7 @@ assert.deepEqual(
     riskPenalty: snapshot.businessHealth.value.components.value.riskPenalty,
     opportunityAdjustment: snapshot.businessHealth.value.components.value.opportunityAdjustment
   },
-  { dataQualityBase: 92, riskPenalty: 12, opportunityAdjustment: 4 }
+  { dataQualityBase: 50, riskPenalty: 12, opportunityAdjustment: 4 }
 );
 assert.equal(snapshot.dataQuality.value.score, 92);
 assert.equal(snapshot.dataQuality.value.confidence, "High");
@@ -178,6 +180,14 @@ assert.deepEqual(snapshot.priorities.map((item) => item.role), ["top_risk", "top
 assert.deepEqual(snapshot.findingIndex.riskFindingIds, ["finding-checkout-wait"]);
 assert.deepEqual(snapshot.findingIndex.opportunityFindingIds, ["finding-revenue"]);
 assert.ok(snapshot.findings.every((finding) => finding.origin === "deterministic" && finding.producerId === "intelligence_layer"));
+
+const legacyV1Snapshot = clone(snapshot);
+legacyV1Snapshot.versions.calculations.businessHealth = "business_health_calculation_v1";
+legacyV1Snapshot.versions.calculations.dataQuality = "data_quality_calculation_v1";
+legacyV1Snapshot.businessHealth.value.score = 78;
+legacyV1Snapshot.businessHealth.value.status = "Strong";
+legacyV1Snapshot.businessHealth.value.components.value.dataQualityBase = 92;
+assert.doesNotThrow(() => contract.parseIntelligenceSnapshotV1(legacyV1Snapshot), "historical V1 snapshots must remain parsable");
 
 const originalEvidence = snapshot.evidence.references.find((item) => item.recordId === "candidate-original");
 const contextualEvidence = snapshot.evidence.references.find((item) => item.recordId === "candidate-context");
@@ -326,7 +336,7 @@ const projections = {
 };
 assert.equal(projections.overview.topRisk.id, "finding-checkout-wait");
 assert.equal(projections.inbox.findings.length, snapshot.findings.length);
-assert.equal(projections.health.businessHealth.value.score, 78);
+assert.equal(projections.health.businessHealth.value.score, 42);
 assert.deepEqual(projections.health.drivers.map((driver) => driver.finding.id), ["finding-checkout-wait", "finding-revenue"]);
 assert.ok(projections.health.evidenceReferences.length <= 24);
 assert.ok(projections.health.citations.length <= 24);

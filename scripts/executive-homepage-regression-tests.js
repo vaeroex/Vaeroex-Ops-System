@@ -148,7 +148,7 @@ function snapshot(overrides = {}) {
     data_confidence: "Medium",
     data_quality_score: 60,
     memory_signal_count: 10,
-    source_summary: {},
+    source_summary: { business_health_calculation_version: "business_health_calculation_v2" },
     created_at: "2026-07-10T10:00:00.000Z",
     updated_at: "2026-07-10T10:00:00.000Z",
     ...overrides
@@ -163,6 +163,7 @@ const populated = buildExecutiveHomepageModel({
   sourceDataAvailable: true
 });
 assert.equal(populated.health.score, 68, "valid Business Health must render");
+assert.equal(populated.health.status, "Watch", "the customer-visible status must use the authoritative Formula V2 label");
 assert.equal(populated.health.trendDelta, -4, "stored snapshots must drive the visible change");
 assert.equal(populated.health.displayTitle, "Revenue is below target", "the executive takeaway must use the deterministic finding title");
 assert.deepEqual(populated.health.driverPresentation, {
@@ -279,6 +280,19 @@ const firstReview = buildExecutiveHomepageModel({
 });
 assert.equal(firstReview.changes.state, "first_review");
 assert.equal(firstReview.health.trend, null, "insufficient history must not claim a trend");
+
+const formulaBoundaryReview = buildExecutiveHomepageModel({
+  intelligence: intelligence(),
+  coverage: coverage(),
+  snapshots: [snapshot({
+    source_summary: { business_health_calculation_version: "business_health_calculation_v1" },
+    score: 92
+  })],
+  kpiTrends: [],
+  sourceDataAvailable: true
+});
+assert.equal(formulaBoundaryReview.health.trendDelta, null, "V1 history must not produce a continuous delta against Formula V2");
+assert.equal(formulaBoundaryReview.changes.state, "first_review", "the first V2 review begins a new comparison series");
 
 const noFindings = buildExecutiveHomepageModel({
   intelligence: intelligence({ topRisk: undefined, topOpportunity: undefined, topRecommendation: undefined, insights: [] }),

@@ -1,6 +1,10 @@
 import { canonicalKpiIdentity } from "@/lib/intelligence/snapshot/v1/ordering";
 import { fingerprintSemanticSnapshot, fingerprintSnapshotInputs } from "@/lib/intelligence/snapshot/v1/fingerprints";
-import { INTELLIGENCE_SNAPSHOT_LIMITS, SUPPORTED_PRODUCER_VERSIONS } from "@/lib/intelligence/snapshot/v1/versions";
+import {
+  BUSINESS_HEALTH_CALCULATION_VERSION,
+  INTELLIGENCE_SNAPSHOT_LIMITS,
+  SUPPORTED_PRODUCER_VERSIONS
+} from "@/lib/intelligence/snapshot/v1/versions";
 import type { EvidenceReferenceV1, IntelligenceSnapshotV1, KpiSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 
 export class IntelligenceSnapshotInvariantError extends Error {
@@ -258,6 +262,13 @@ export function assertIntelligenceSnapshotV1Invariants(snapshot: IntelligenceSna
         components.driverImpacts.filter((impact) => impact.kind === "opportunity").reduce((sum, impact) => sum + impact.scoreImpact, 0) === components.opportunityAdjustment,
         "Business Health driver impacts disagree with the authoritative opportunity adjustment"
       );
+      if (snapshot.versions.calculations.businessHealth === BUSINESS_HEALTH_CALCULATION_VERSION) {
+        check(components.dataQualityBase === 50, "Business Health V2 must use the fixed performance baseline");
+        check(
+          snapshot.businessHealth.value.score === Math.max(0, Math.min(100, 50 + components.opportunityAdjustment - components.riskPenalty)),
+          "Business Health V2 score disagrees with the authoritative performance formula"
+        );
+      }
     }
   }
   if (snapshot.dataQuality.state === "available") {

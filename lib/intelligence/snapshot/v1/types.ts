@@ -21,6 +21,8 @@ import type {
   IntelligenceLayerResult
 } from "@/lib/intelligence/layer";
 import type {
+  BusinessHealthCalculationVersion,
+  DataQualityCalculationVersion,
   DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1,
   SupportedProducerId,
   SupportedProducerVersion
@@ -45,6 +47,7 @@ export type SnapshotReasonCode =
   | "missing_producer_field"
   | "producer_reported_unavailable"
   | "insufficient_original_evidence"
+  | "no_evaluable_performance_outcome"
   | "insufficient_history"
   | "target_not_configured"
   | "recommendation_not_available"
@@ -77,7 +80,16 @@ export type IntelligenceProducerEnvelopeV1<T> = Readonly<{
   output: T;
 }>;
 
-export type IntelligenceSnapshotVersionsV1 = typeof DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1;
+type CurrentIntelligenceSnapshotVersionsV1 = typeof DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1;
+
+export type IntelligenceSnapshotVersionsV1 = Readonly<{
+  calculations: Omit<CurrentIntelligenceSnapshotVersionsV1["calculations"], "businessHealth" | "dataQuality"> & Readonly<{
+    businessHealth: BusinessHealthCalculationVersion;
+    dataQuality: DataQualityCalculationVersion;
+  }>;
+  policies: CurrentIntelligenceSnapshotVersionsV1["policies"];
+  adapters: CurrentIntelligenceSnapshotVersionsV1["adapters"];
+}>;
 
 export type KpiSemanticSnapshotV1 = Readonly<{
   desiredDirection: KpiDesiredDirection;

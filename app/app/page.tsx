@@ -16,7 +16,11 @@ import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-chan
 import { buildBusinessHealthExplanationFromSnapshotV1 } from "@/lib/ai/business-health-explanation/snapshot-context";
 import { loadBusinessHealthAnalysisState } from "@/lib/ai/business-health-explanation/storage";
 import { trySealBusinessHealthExplanationPackage } from "@/lib/ai/business-health-explanation/token";
-import { getBusinessHealthSnapshotResult, recordDailyBusinessHealthSnapshot } from "@/lib/intelligence/business-health-history";
+import {
+  businessHealthSnapshotCalculationVersion,
+  getBusinessHealthSnapshotResult,
+  recordDailyBusinessHealthSnapshot
+} from "@/lib/intelligence/business-health-history";
 import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { evidenceLineageMetadata, filterBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
@@ -1026,7 +1030,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     shareResult,
     peopleResult,
     decisionResult,
-    memoryChunksResult
+    memoryChunksResult,
+    formResult,
+    submissionResult
   ] = await Promise.all([
     supabase
       .from("kpis")
@@ -1054,7 +1060,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(40),
     supabase.from("people").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name").limit(100),
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }).limit(30),
-    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).limit(500)
+    supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).is("archived_at", null).limit(500),
+    supabase.from("forms").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),
+    supabase.from("form_submissions").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(500)
   ]);
 
   const rawKpis = (kpiResult.data || []) as KpiRow[];
@@ -1122,6 +1130,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     peopleResult.error,
     decisionResult.error,
     memoryChunksResult.error,
+    formResult.error,
+    submissionResult.error,
     sourceParentResult.error,
     memoryEligibilityError
   ].filter(Boolean);
@@ -1377,7 +1387,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     files,
     imports
   });
+  const businessHealthExplanationAsOf = new Date().toISOString();
   const intelligenceLayer = buildIntelligenceLayer({
+    asOf: businessHealthExplanationAsOf,
     workspace: context.activeWorkspace,
     kpis: intelligenceKpis,
     kpiSettings: intelligenceKpiSettings,
@@ -1386,6 +1398,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     crmLeads,
     imports,
     sops,
+    forms: formResult.data || [],
+    submissions: submissionResult.data || [],
     people,
     decisions,
     operationalInsights
@@ -1407,6 +1421,9 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
         crm_leads: crmLeads.length,
         business_memory_signals: businessHealthMemorySignals,
         vaeroex_runs: overviewRunCompatibility.snapshotSourceCount,
+        performance_baseline: intelligenceLayer.businessHealth.components.dataQualityBase,
+        positive_performance: intelligenceLayer.businessHealth.components.opportunityAdjustment,
+        negative_performance: intelligenceLayer.businessHealth.components.riskPenalty,
         ...evidenceLineageMetadata({ sourceType: "business_health_snapshot" })
       }
     });
@@ -1416,7 +1433,8 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     snapshotDate: snapshot.snapshot_date,
     score: snapshot.score,
     status: snapshot.status,
-    trend: snapshot.trend
+    trend: snapshot.trend,
+    calculationVersion: businessHealthSnapshotCalculationVersion(snapshot)
   }));
   const businessIntelligenceCoverage = buildBusinessIntelligenceCoverage({
     kpis: intelligenceKpis,
@@ -1439,7 +1457,6 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     ...files.map((row) => row.updated_at || row.created_at),
     ...decisions.map((row) => row.updated_at || row.created_at)
   ], overviewRunCompatibility);
-  const businessHealthExplanationAsOf = new Date().toISOString();
   let executiveHomepageModel: ReturnType<typeof buildExecutiveHomepageModel>;
   try {
     const executiveOverviewSnapshot = buildIntelligenceSnapshotFromProducersV1({

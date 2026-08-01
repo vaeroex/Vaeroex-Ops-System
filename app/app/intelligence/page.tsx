@@ -119,7 +119,9 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     imports: importsResult.data || []
   });
   const displayErrors = [...errors, sourceParentResult.error, memoryEligibilityError].filter(Boolean) as Array<{ message: string }>;
+  const snapshotAsOf = new Date().toISOString();
   const intelligence = buildIntelligenceLayer({
+    asOf: snapshotAsOf,
     workspace: context.activeWorkspace,
     issues: issuesResult.data || [],
     kpis: eligibleKpis,
@@ -134,7 +136,6 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     decisions: decisionsResult.data || [],
     operationalInsights
   });
-  const snapshotAsOf = new Date().toISOString();
   const businessNoteContextReleaseChannel = businessNoteReleaseChannel();
   const businessNoteContext = await loadApprovedBusinessNoteContextV1({
     supabase,

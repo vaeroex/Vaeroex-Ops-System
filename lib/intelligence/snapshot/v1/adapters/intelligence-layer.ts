@@ -151,7 +151,12 @@ export function adaptIntelligenceLayerProducerOutputV1({
           driverImpacts: output.businessHealth.components.driverImpacts.map((impact) => ({ ...impact }))
         })
       })
-      : unavailable("insufficient_data", "insufficient_original_evidence");
+      : unavailable(
+        "insufficient_data",
+        output.businessHealth.unavailableReason === "no_evaluable_performance_outcome"
+          ? "no_evaluable_performance_outcome"
+          : "insufficient_original_evidence"
+      );
 
   return {
     businessHealth,

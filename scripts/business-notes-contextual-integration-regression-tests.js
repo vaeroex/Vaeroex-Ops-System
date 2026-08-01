@@ -386,9 +386,9 @@ const intelligence = contract.foundationIntelligenceLayerOutput();
 const homepage = {
   health: {
     available: true,
-    score: 78,
-    status: "Healthy",
-    trend: "Holding steady",
+    score: intelligence.businessHealth.score,
+    status: intelligence.businessHealth.status,
+    trend: intelligence.businessHealth.trend,
     trendDelta: null,
     summary: intelligence.executiveSummary,
     driver: intelligence.topRisk.title,

@@ -81,6 +81,10 @@ function periodKindLabel(point: BusinessHealthTrendDisplayPoint) {
   return "Monthly average";
 }
 
+function scoringMethodLabel(point: BusinessHealthTrendDisplayPoint) {
+  return point.calculationVersion === "business_health_calculation_v2" ? "Formula V2" : "Formula V1";
+}
+
 function axisLabel(bucket: BusinessHealthTrendBucket) {
   return bucket.kind === "monthly_average" ? formatMonth(bucket.startDate) : formatDate(bucket.startDate);
 }
@@ -103,11 +107,19 @@ function yForScore(score: number) {
 }
 
 function positionPoints(points: readonly BusinessHealthTrendDisplayPoint[], bucketCount: number) {
-  return points.map((point) => ({
-    ...point,
-    x: xForBucket(point.bucketIndex, bucketCount),
-    y: yForScore(point.score)
-  }));
+  const pointsPerBucket = new Map<number, BusinessHealthTrendDisplayPoint[]>();
+  for (const point of points) pointsPerBucket.set(point.bucketIndex, [...(pointsPerBucket.get(point.bucketIndex) || []), point]);
+
+  return points.map((point) => {
+    const bucketPoints = pointsPerBucket.get(point.bucketIndex) || [point];
+    const index = bucketPoints.findIndex((candidate) => candidate.key === point.key);
+    const methodOffset = bucketPoints.length > 1 ? (index - (bucketPoints.length - 1) / 2) * 10 : 0;
+    return {
+      ...point,
+      x: xForBucket(point.bucketIndex, bucketCount) + methodOffset,
+      y: yForScore(point.score)
+    };
+  });
 }
 
 function tooltipPosition(point: PositionedPoint) {
@@ -140,9 +152,14 @@ export function BusinessHealthTrendChart({
   const rangeLabel = RANGE_LABELS[range];
   const first = displayPoints[0];
   const last = displayPoints.at(-1);
-  const change = first && last && first.key !== last.key ? Math.round((last.score - first.score) * 10) / 10 : null;
+  const hasScoringMethodBoundary = new Set(displayPoints.map((point) => point.methodSegment)).size > 1;
+  const change = first && last && first.key !== last.key && first.methodSegment === last.methodSegment
+    ? Math.round((last.score - first.score) * 10) / 10
+    : null;
   const tickIndexes = axisTickIndexes(buckets.length, range);
-  const hasGap = displayPoints.some((point, index) => index > 0 && point.bucketIndex - displayPoints[index - 1].bucketIndex > 1);
+  const hasGap = displayPoints.some((point, index) => index > 0
+    && point.methodSegment === displayPoints[index - 1].methodSegment
+    && point.bucketIndex - displayPoints[index - 1].bucketIndex > 1);
 
   return (
     <div className="mt-4 rounded-lg border border-cyan-300/15 bg-slate-950/40 p-3" data-business-health-trend>
@@ -150,7 +167,9 @@ export function BusinessHealthTrendChart({
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Health trend</p>
           <p className="mt-1 text-xs text-slate-300">
-            {change !== null
+            {hasScoringMethodBoundary
+              ? `${rangeLabel} · Scoring method updated`
+              : change !== null
               ? `${rangeLabel} · ${change === 0 ? "Stable" : change > 0 ? `+${formatScore(change)}` : formatScore(change)} pts`
               : `${rangeLabel} · ${displayPoints.length} ${displayPoints.length === 1 ? "period" : "periods"} with stored history`}
           </p>
@@ -213,6 +232,7 @@ export function BusinessHealthTrendChart({
 
             {positionedPoints.slice(1).map((point, index) => {
               const previous = positionedPoints[index];
+              if (point.methodSegment !== previous.methodSegment) return null;
               const crossesMissingPeriod = point.bucketIndex - previous.bucketIndex > 1;
               return (
                 <line
@@ -226,6 +246,17 @@ export function BusinessHealthTrendChart({
                   strokeLinecap="round"
                   strokeWidth="3"
                 />
+              );
+            })}
+
+            {positionedPoints.slice(1).map((point, index) => {
+              const previous = positionedPoints[index];
+              if (point.methodSegment === previous.methodSegment) return null;
+              return (
+                <g key={`method-boundary-${point.key}`} aria-hidden="true">
+                  <line x1={point.x} x2={point.x} y1={PLOT_TOP} y2={PLOT_BOTTOM} stroke="rgba(251,191,36,.8)" strokeDasharray="3 4" />
+                  <text x={point.x + 3} y={PLOT_TOP + 8} fill="rgba(253,230,138,.95)" fontSize="7">Formula V2</text>
+                </g>
               );
             })}
 
@@ -243,7 +274,7 @@ export function BusinessHealthTrendChart({
                   strokeWidth={active ? 2.5 : 2}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${formatPeriod(point)}. ${valueLabel} ${formatScore(point.score)} out of 100. ${periodKindLabel(point)}.`}
+                  aria-label={`${formatPeriod(point)}. ${valueLabel} ${formatScore(point.score)} out of 100. ${periodKindLabel(point)}. ${scoringMethodLabel(point)}.`}
                   onPointerEnter={() => setActiveKey(point.key)}
                   onPointerLeave={() => setActiveKey((current) => current === point.key ? null : current)}
                   onFocus={() => setActiveKey(point.key)}
@@ -276,16 +307,20 @@ export function BusinessHealthTrendChart({
               const valueLabel = activePoint.kind === "daily" ? "Business Health" : "Average Business Health";
               return (
                 <g aria-hidden="true" pointerEvents="none">
-                  <rect x={tooltip.x} y={tooltip.y} width={tooltip.width} height="39" rx="5" fill="#0f1f38" stroke="rgba(103,232,249,.45)" />
+                  <rect x={tooltip.x} y={tooltip.y} width={tooltip.width} height="49" rx="5" fill="#0f1f38" stroke="rgba(103,232,249,.45)" />
                   <text x={tooltip.x + 8} y={tooltip.y + 11} fill="#cbd5e1" fontSize="8.5">{formatPeriod(activePoint)}</text>
                   <text x={tooltip.x + 8} y={tooltip.y + 23} fill="#ffffff" fontSize="9.5" fontWeight="600">{valueLabel}: {formatScore(activePoint.score)}</text>
                   <text x={tooltip.x + 8} y={tooltip.y + 34} fill="#94a3b8" fontSize="8">{periodKindLabel(activePoint)}</text>
+                  <text x={tooltip.x + 8} y={tooltip.y + 44} fill="#fcd34d" fontSize="8">{scoringMethodLabel(activePoint)}</text>
                 </g>
               );
             })() : null}
           </svg>
           {hasGap ? (
             <p className="mt-1 text-xs leading-5 text-slate-400">Dashed line segments cross periods without stored Business Health reviews.</p>
+          ) : null}
+          {hasScoringMethodBoundary ? (
+            <p className="mt-1 text-xs leading-5 text-amber-200">Formula V1 history remains visible, but Vaeroex does not calculate a continuous change or period average across the Formula V2 boundary.</p>
           ) : null}
         </div>
       ) : (
