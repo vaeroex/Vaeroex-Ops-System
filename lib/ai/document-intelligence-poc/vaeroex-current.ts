@@ -28,7 +28,7 @@ export async function extractWithCurrentVaeroexPath(document: BenchmarkDocument)
   const text = isPdf ? cleanExtractedText(extractPdfText(document.sourceBytes)) : "";
   const supported = Boolean(text);
   const pieces = text ? text.split(/\n+/).map((value) => value.trim()).filter(Boolean) : [];
-  const pages = supported ? [{
+  const pages: DocumentExtractionResult["pages"] = supported ? [{
     pageNumber: 1,
     width: document.groundTruth[0]?.width || 1,
     height: document.groundTruth[0]?.height || 1,
