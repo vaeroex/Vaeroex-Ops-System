@@ -62,7 +62,8 @@ function line(
   id: string,
   text: string,
   box: readonly [number, number, number, number],
-  fields: Omit<FixtureElementSpec, "id" | "text" | "box"> = {}
+  fields: Omit<FixtureElementSpec, "id" | "text" | "box" | "type"> &
+    Readonly<{ type?: FixtureElementSpec["type"] }> = {}
 ): FixtureElementSpec {
   return { id, text, box, type: "paragraph", ...fields };
 }
