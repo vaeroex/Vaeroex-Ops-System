@@ -21,8 +21,19 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
   return originalResolveFilename.call(this, request, parent, isMain, options);
 };
 
+const originalLoad = Module._load;
+Module._load = function loadPatched(request, parent, isMain) {
+  if (request === "server-only") return {};
+  return originalLoad.call(this, request, parent, isMain);
+};
+
 const { buildIntelligenceLayer, consolidateDuplicateInsights } = require("../lib/intelligence/layer.ts");
 const { buildOperationalEvidenceInsights } = require("../lib/intelligence/operational-evidence.ts");
+const { buildIntelligenceSnapshotFromProducersV1 } = require("../lib/intelligence/snapshot/v1/composition.ts");
+const {
+  BUSINESS_HEALTH_CALCULATION_VERSION,
+  DATA_QUALITY_CALCULATION_VERSION
+} = require("../lib/intelligence/snapshot/v1/versions.ts");
 const {
   buildEvidenceGroups,
   collapsedEvidenceGroupLimit,
@@ -331,6 +342,87 @@ const sustainedFavorable = semanticHealth("Revenue", [6, 7, 8, 9, 10, 12], kpiSe
 assert.equal(sustainedFavorable.businessHealth.score, 58, "a sustained favorable targetless KPI trend contributes eight points once");
 assert.match(sustainedFavorable.topOpportunity?.title || "", /sustained favorable trend/, "the positive score driver remains visible as a deterministic KPI finding");
 assert.equal(sustainedFavorable.businessHealth.components.opportunityAdjustment, 8);
+
+function achievedTargetHealth(names) {
+  return buildIntelligenceLayer({
+    kpis: names.flatMap((name) => importedKpi(name, [12, 12, 12, 12, 12, 12], { target: 10 })),
+    kpiSettings: names.map((name) => kpiSetting(name, "maximize")),
+    files: [retailFile],
+    imports: [retailImport],
+    sops: [semanticSop]
+  });
+}
+
+const achievedTargetNames = [
+  "Revenue",
+  "Gross Margin",
+  "Conversion Rate",
+  "Customer Satisfaction",
+  "1-Star Reviews",
+  "Average Checkout Wait",
+  "Average Response Time"
+];
+const threeTargetAchievements = achievedTargetHealth(achievedTargetNames.slice(0, 3));
+assert.equal(threeTargetAchievements.businessHealth.score, 80, "three target-achieving canonical KPIs contribute thirty points through the production producer");
+assert.equal(threeTargetAchievements.businessHealth.components.driverImpacts.length, 3);
+
+const fiveTargetAchievements = achievedTargetHealth(achievedTargetNames.slice(0, 5));
+assert.equal(fiveTargetAchievements.businessHealth.score, 100, "five target-achieving canonical KPIs reach the existing Formula V2 positive cap through the production producer");
+assert.equal(fiveTargetAchievements.businessHealth.components.opportunityAdjustment, 50);
+assert.equal(fiveTargetAchievements.insights.filter((insight) => insight.businessHealthEffect).length, 5, "all five eligible scoring findings remain available to the production calculation");
+assert.equal(fiveTargetAchievements.businessHealth.components.driverImpacts.length, 5, "the score provenance retains every applied achievement instead of a display-limited subset");
+
+const sevenTargetAchievements = achievedTargetHealth(achievedTargetNames);
+assert.equal(sevenTargetAchievements.businessHealth.score, 100, "achievements beyond the positive cap remain clamped to 100");
+assert.equal(sevenTargetAchievements.businessHealth.components.opportunityAdjustment, 50, "the production producer preserves the Formula V2 positive cap");
+assert.equal(sevenTargetAchievements.insights.filter((insight) => insight.businessHealthEffect).length, 7, "the producer considers eligible achievements even after enough contributions exist to reach the cap");
+
+const mixedPositivePerformance = buildIntelligenceLayer({
+  kpis: [
+    ...["Target A", "Target B", "Target C"].flatMap((name) => importedKpi(name, [12, 12, 12, 12, 12, 12], { target: 10 })),
+    ...["Trend A", "Trend B", "Trend C"].flatMap((name) => importedKpi(name, [6, 7, 8, 9, 10, 12]))
+  ],
+  kpiSettings: [
+    ...["Target A", "Target B", "Target C"].map((name) => kpiSetting(name, "maximize")),
+    ...["Trend A", "Trend B", "Trend C"].map((name) => kpiSetting(name, "maximize"))
+  ],
+  files: [retailFile],
+  imports: [retailImport],
+  sops: [semanticSop]
+});
+assert.equal(mixedPositivePerformance.businessHealth.score, 100, "target achievements and targetless favorable trends share the same existing positive cap");
+assert.equal(mixedPositivePerformance.businessHealth.components.opportunityAdjustment, 50);
+assert.equal(mixedPositivePerformance.insights.filter((insight) => insight.businessHealthEffect).length, 6, "the production producer evaluates both eligible positive-performance types");
+
+const duplicateCanonicalAchievements = buildIntelligenceLayer({
+  kpis: [
+    ...importedKpi("Revenue", [12, 12, 12, 12, 12, 12], { target: 10 }),
+    ...importedKpi("Revenue ($M)", [12, 12, 12, 12, 12, 12], { target: 10 })
+  ],
+  kpiSettings: [
+    kpiSetting("Revenue", "maximize", { canonical_name: "revenue" }),
+    kpiSetting("Revenue ($M)", "maximize", { canonical_name: "revenue" })
+  ],
+  files: [retailFile],
+  imports: [retailImport],
+  sops: [semanticSop]
+});
+assert.equal(duplicateCanonicalAchievements.businessHealth.score, 60, "duplicate representations of one canonical KPI contribute only once");
+assert.equal(duplicateCanonicalAchievements.businessHealth.components.driverImpacts.length, 1);
+
+const fiveTargetSnapshot = buildIntelligenceSnapshotFromProducersV1({
+  workspaceId: "formula-v2-production-path-workspace",
+  asOf: "2026-07-14T12:00:00.000Z",
+  intelligence: fiveTargetAchievements
+}).snapshot;
+assert.equal(fiveTargetSnapshot.businessHealth.state, "available");
+assert.equal(fiveTargetSnapshot.businessHealth.value.score, 100, "IntelligenceSnapshotV1 receives the corrected production score");
+assert.equal(fiveTargetSnapshot.businessHealth.value.components.value.driverImpacts.length, 5, "snapshot provenance includes all five applied KPI achievements");
+assert.equal(fiveTargetSnapshot.versions.calculations.businessHealth, BUSINESS_HEALTH_CALCULATION_VERSION);
+assert.equal(fiveTargetSnapshot.versions.calculations.dataQuality, DATA_QUALITY_CALCULATION_VERSION);
+
+const explanationServiceSource = fs.readFileSync(path.join(root, "lib/ai/business-health-explanation/service.ts"), "utf8");
+assert.match(explanationServiceSource, /analysisPackage\.facts\.drivers\.slice\(0, 3\)/, "the existing bounded explanation projection remains a presentation boundary after scoring");
 
 const genericOpportunityOnly = buildIntelligenceLayer({
   files: [retailFile],

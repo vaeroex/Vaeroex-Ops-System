@@ -23,6 +23,7 @@ const adminHome = read("app/app/admin/page.tsx");
 const adminAudit = read("app/app/admin/audit-logs/page.tsx");
 const activeTypes = read("lib/ai/active-agent-artifacts.ts");
 const businessHealthActions = read("app/app/business-health-analysis/actions.ts");
+const businessHealthGenerationClaim = read("lib/ai/business-health-explanation/generation-claim.ts");
 const findingActions = read("app/app/finding-explanation/actions.ts");
 const fileActions = read("app/app/files/actions.ts");
 const savedAnalyses = read("app/app/reports/saved-analysis-actions.ts");
@@ -84,7 +85,9 @@ assert.doesNotMatch(adminUsage, /Ask Vaeroex|Operations audit|ask_vaeroex|operat
 assert.match(adminAudit, /security_audit_events/);
 assert.match(adminAudit, /audit_logs/);
 
-assert.match(businessHealthActions, /agent_type: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID/);
+assert.match(businessHealthActions, /claimBusinessHealthGeneration/, "Business Health generation must delegate the atomic run claim before provider execution");
+assert.match(businessHealthGenerationClaim, /\.from\("ai_agent_runs"\)[\s\S]*\.insert\(\{[\s\S]*agent_type: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID/, "the durable generation claim helper must own the active Business Health run insert");
+assert.match(businessHealthGenerationClaim, /\.eq\("workspace_id", workspaceId\)[\s\S]*\.eq\("agent_type", BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID\)/, "conflict resolution must remain workspace- and workflow-scoped");
 assert.match(findingActions, /agent_type: FINDING_EXPLANATION_CONTRACT_ID/);
 assert.match(fileActions, /getVaeroexWorkflow\("file_analysis"\)[\s\S]*agent_type: workflow\.key/);
 assert.match(savedAnalyses, /from\("ai_agent_runs"\)/, "Saved Analysis creation must still validate its source artifact");
