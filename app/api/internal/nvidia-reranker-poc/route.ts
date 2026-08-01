@@ -100,8 +100,10 @@ export async function POST(request: Request) {
     activeRun = runNvidiaRerankerPocQualification({ reranker: new NvidiaTextReranker() })
       .then(privacySafeRerankerPocQualificationReport);
     completedRun = await activeRun;
+    console.info("nvidia_reranker_poc_qualification", JSON.stringify(completedRun));
     return noStore(NextResponse.json({ ok: true, reused: false, report: completedRun }));
   } catch {
+    console.warn("nvidia_reranker_poc_qualification_failed");
     return noStore(NextResponse.json({ ok: false, error: "The synthetic NVIDIA benchmark could not be completed." }, { status: 503 }));
   } finally {
     activeRun = null;
