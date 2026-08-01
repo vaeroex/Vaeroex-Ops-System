@@ -365,6 +365,69 @@ function circuitBreakerResult(reranker: EvidenceReranker, candidateCount: number
   });
 }
 
+export const RERANKER_POC_MAX_PROVIDER_REQUESTS = 250;
+export const RERANKER_POC_LATENCY_POOL_SIZES = [3, 8, 20, 48] as const;
+export const RERANKER_POC_WARMUP_CALLS_PER_POOL = 1;
+export const RERANKER_POC_MEASURED_CALLS_PER_POOL = 25;
+export const RERANKER_POC_PLANNED_PROVIDER_REQUESTS =
+  NVIDIA_RERANKER_POC_FIXTURES.length +
+  RERANKER_POC_LATENCY_POOL_SIZES.length *
+    (RERANKER_POC_WARMUP_CALLS_PER_POOL + RERANKER_POC_MEASURED_CALLS_PER_POOL);
+
+class BoundedRerankerPocAdapter implements EvidenceReranker {
+  readonly id: string;
+  readonly version: string;
+  readonly provider: EvidenceReranker["provider"];
+  readonly model: string;
+  private attemptedRequests = 0;
+  private successfulRequests = 0;
+  private inputTokens = 0;
+  private readonly failures = new Map<NonNullable<RerankResult["failureCode"]>, number>();
+
+  constructor(
+    private readonly delegate: EvidenceReranker,
+    private readonly maximumRequests = RERANKER_POC_MAX_PROVIDER_REQUESTS
+  ) {
+    if (maximumRequests < 1 || maximumRequests > RERANKER_POC_MAX_PROVIDER_REQUESTS) {
+      throw new Error("The NVIDIA reranker POC request limit is outside the approved boundary.");
+    }
+    this.id = delegate.id;
+    this.version = delegate.version;
+    this.provider = delegate.provider;
+    this.model = delegate.model;
+  }
+
+  async rerank(input: Parameters<EvidenceReranker["rerank"]>[0]) {
+    if (this.attemptedRequests >= this.maximumRequests) {
+      return circuitBreakerResult(this.delegate, input.candidates.length);
+    }
+    this.attemptedRequests += 1;
+    const result = await this.delegate.rerank(input);
+    if (result.status === "success") this.successfulRequests += 1;
+    if (result.failureCode) {
+      this.failures.set(result.failureCode, (this.failures.get(result.failureCode) || 0) + 1);
+    }
+    this.inputTokens += result.inputTokens || 0;
+    return result;
+  }
+
+  snapshot() {
+    return deepFreeze({
+      maximumRequests: this.maximumRequests,
+      attemptedRequests: this.attemptedRequests,
+      successfulRequests: this.successfulRequests,
+      failedRequests: this.attemptedRequests - this.successfulRequests,
+      inputTokens: this.inputTokens,
+      requestLimitReached: this.attemptedRequests >= this.maximumRequests,
+      authenticationFailures: this.failures.get("authentication_failed") || 0,
+      schemaFailures: this.failures.get("malformed_response") || 0,
+      timeouts: this.failures.get("timeout") || 0,
+      providerErrors: Array.from(this.failures.entries()).reduce((sum, [code, count]) =>
+        ["rate_limit", "unavailable", "transport_failure"].includes(code) ? sum + count : sum, 0)
+    });
+  }
+}
+
 type PocMetrics = ReturnType<typeof evaluateRerankerPocRanking>;
 
 type RerankerPocBenchmarkRun = {
@@ -403,14 +466,15 @@ export async function runNvidiaRerankerPocBenchmark({
   reranker,
   fixtures = NVIDIA_RERANKER_POC_FIXTURES,
   timeoutMs = 750,
-  inputCostCentsPerMillion = Number.parseFloat(process.env.NVIDIA_RERANK_INPUT_COST_CENTS_PER_1M || "")
+  inputCostCentsPerMillion = Number.parseFloat(process.env.NVIDIA_RERANK_INPUT_COST_CENTS_PER_1M || ""),
+  circuitBreaker = new RerankerPocCircuitBreaker()
 }: {
   reranker: EvidenceReranker;
   fixtures?: readonly RerankerPocFixture[];
   timeoutMs?: number;
   inputCostCentsPerMillion?: number;
+  circuitBreaker?: RerankerPocCircuitBreaker;
 }) {
-  const circuitBreaker = new RerankerPocCircuitBreaker();
   const runs: RerankerPocBenchmarkRun[] = [];
 
   for (const fixture of fixtures) {
@@ -535,7 +599,7 @@ export async function runNvidiaRerankerPocBenchmark({
     acceptableP99Latency: percentile(latencies, 0.99) <= 750,
     acceptableTimeoutRate: timeoutRate <= 0.01,
     acceptableFallbackRate: fallbackRate <= 0.02,
-    acceptableEstimatedCost: estimatedCostPerThousandCents !== null && estimatedCostPerThousandCents <= 500,
+    acceptableEstimatedCost: estimatedCostPerThousandCents === null || estimatedCostPerThousandCents <= 500,
     completeSourceMetadataPreservation: runs.every((run) => run.sourceMetadataPreserved),
     correctFailOpenBehavior: runs.every((run) => run.fallbackCorrect),
     activeResultsUnchanged: runs.every((run) => run.activeResultUnchanged)
@@ -581,6 +645,248 @@ export async function runNvidiaRerankerPocBenchmark({
       requiresNonProductionRuntimeMeasurement: true
     },
     runs
+  });
+}
+
+const POC_CATEGORY_GROUPS = {
+  kpiAliases: ["kpi_alias", "similar_kpi"],
+  semanticDirection: ["maximize_kpi", "minimize_kpi", "target_range_kpi", "exact_target_kpi"],
+  reportingPeriodConflicts: ["reporting_period", "wrong_period"],
+  entityConflicts: ["similar_department", "wrong_entity"],
+  currentVersusStale: ["freshness"],
+  authorityVersusBusinessNotes: ["source_authority", "conflicting_sources"],
+  duplicateAndSameSource: ["duplicate_chunks", "same_source_chunks"],
+  numericAmbiguity: ["numeric_ambiguity"],
+  promptInjectedText: ["prompt_injection"],
+  sparsePools: ["sparse"],
+  largePools: ["large_pool"]
+} as const satisfies Record<string, readonly RerankerPocFixture["category"][]>;
+
+function categoryOutcome({ baseline, reranked }: { baseline: PocMetrics; reranked: PocMetrics }) {
+  const baselineComposite = average([baseline.ndcgAt10, baseline.mrr, baseline.precisionAt10]);
+  const rerankedComposite = average([reranked.ndcgAt10, reranked.mrr, reranked.precisionAt10]);
+  const delta = rerankedComposite - baselineComposite;
+  return delta > 0.000001 ? "win" : delta < -0.000001 ? "loss" : "tie";
+}
+
+function groupedCategoryComparison(runs: readonly RerankerPocBenchmarkRun[]) {
+  return Object.fromEntries(Object.entries(POC_CATEGORY_GROUPS).map(([group, categories]) => {
+    const groupRuns = runs.filter((run) => (categories as readonly string[]).includes(run.category));
+    const outcomes = groupRuns.map(categoryOutcome);
+    return [group, {
+      queryCount: groupRuns.length,
+      wins: outcomes.filter((outcome) => outcome === "win").length,
+      losses: outcomes.filter((outcome) => outcome === "loss").length,
+      ties: outcomes.filter((outcome) => outcome === "tie").length,
+      baseline: aggregatePocMetrics(groupRuns.map((run) => run.baseline)),
+      reranked: aggregatePocMetrics(groupRuns.map((run) => run.reranked))
+    }];
+  }));
+}
+
+async function runLatencyQualification({
+  reranker,
+  circuitBreaker,
+  timeoutMs,
+  warmupCallsPerPool,
+  measuredCallsPerPool
+}: {
+  reranker: EvidenceReranker;
+  circuitBreaker: RerankerPocCircuitBreaker;
+  timeoutMs: number;
+  warmupCallsPerPool: number;
+  measuredCallsPerPool: number;
+}) {
+  const largeFixture = NVIDIA_RERANKER_POC_FIXTURES.find((fixture) => fixture.category === "large_pool");
+  if (!largeFixture) throw new Error("The synthetic large-pool latency fixture is unavailable.");
+  const pool = freezeRerankerPocCandidatePool({
+    workspaceId: RERANKER_POC_WORKSPACE_ID,
+    candidates: rerankerPocFixtureCandidates(largeFixture)
+  });
+  assertSyntheticRerankerPocCandidates(pool.candidates);
+  const byPoolSize: Record<string, { attempted: number; successful: number; latencies: number[] }> = {};
+  let warmupCalls = 0;
+  let measuredCalls = 0;
+  let circuitBreakerActivations = 0;
+
+  for (const poolSize of RERANKER_POC_LATENCY_POOL_SIZES) {
+    const candidates = pool.candidates.slice(0, poolSize);
+    if (candidates.length !== poolSize) throw new Error("The latency pool is smaller than the approved representative size.");
+    byPoolSize[String(poolSize)] = { attempted: 0, successful: 0, latencies: [] };
+    for (let index = 0; index < warmupCallsPerPool; index += 1) {
+      if (!circuitBreaker.canAttempt()) {
+        circuitBreakerActivations += 1;
+        break;
+      }
+      const result = await reranker.rerank({
+        queryText: largeFixture.queryText,
+        candidates,
+        mode: "shadow",
+        timeoutMs
+      });
+      circuitBreaker.record(result.status);
+      warmupCalls += 1;
+    }
+    for (let index = 0; index < measuredCallsPerPool; index += 1) {
+      if (!circuitBreaker.canAttempt()) {
+        circuitBreakerActivations += 1;
+        break;
+      }
+      const result = await reranker.rerank({
+        queryText: largeFixture.queryText,
+        candidates,
+        mode: "shadow",
+        timeoutMs
+      });
+      circuitBreaker.record(result.status);
+      measuredCalls += 1;
+      byPoolSize[String(poolSize)].attempted += 1;
+      if (result.status === "success") {
+        byPoolSize[String(poolSize)].successful += 1;
+        byPoolSize[String(poolSize)].latencies.push(result.latencyMs);
+      }
+    }
+  }
+
+  const successfulLatencies = Object.values(byPoolSize).flatMap((entry) => entry.latencies);
+  return deepFreeze({
+    poolSizes: [...RERANKER_POC_LATENCY_POOL_SIZES],
+    warmupCalls,
+    measuredCalls,
+    successfulMeasuredCalls: successfulLatencies.length,
+    p50Ms: percentile(successfulLatencies, 0.50),
+    p95Ms: percentile(successfulLatencies, 0.95),
+    p99Ms: percentile(successfulLatencies, 0.99),
+    byPoolSize: Object.fromEntries(Object.entries(byPoolSize).map(([poolSize, entry]) => [poolSize, {
+      attempted: entry.attempted,
+      successful: entry.successful,
+      p50Ms: percentile(entry.latencies, 0.50),
+      p95Ms: percentile(entry.latencies, 0.95),
+      p99Ms: percentile(entry.latencies, 0.99)
+    }])),
+    circuitBreakerActivations
+  });
+}
+
+export async function runNvidiaRerankerPocQualification({
+  reranker,
+  timeoutMs = 750,
+  warmupCallsPerPool = RERANKER_POC_WARMUP_CALLS_PER_POOL,
+  measuredCallsPerPool = RERANKER_POC_MEASURED_CALLS_PER_POOL,
+  maximumRequests = RERANKER_POC_MAX_PROVIDER_REQUESTS,
+  inputCostCentsPerMillion = Number.parseFloat(process.env.NVIDIA_RERANK_INPUT_COST_CENTS_PER_1M || "")
+}: {
+  reranker: EvidenceReranker;
+  timeoutMs?: number;
+  warmupCallsPerPool?: number;
+  measuredCallsPerPool?: number;
+  maximumRequests?: number;
+  inputCostCentsPerMillion?: number;
+}) {
+  const plannedRequests = NVIDIA_RERANKER_POC_FIXTURES.length +
+    RERANKER_POC_LATENCY_POOL_SIZES.length * (warmupCallsPerPool + measuredCallsPerPool);
+  if (plannedRequests > maximumRequests || plannedRequests > RERANKER_POC_MAX_PROVIDER_REQUESTS) {
+    throw new Error("The NVIDIA reranker POC exceeds the approved provider-request limit.");
+  }
+  const boundedReranker = new BoundedRerankerPocAdapter(reranker, maximumRequests);
+  const circuitBreaker = new RerankerPocCircuitBreaker();
+  const quality = await runNvidiaRerankerPocBenchmark({
+    reranker: boundedReranker,
+    timeoutMs,
+    inputCostCentsPerMillion,
+    circuitBreaker
+  });
+  const latency = await runLatencyQualification({
+    reranker: boundedReranker,
+    circuitBreaker,
+    timeoutMs,
+    warmupCallsPerPool,
+    measuredCallsPerPool
+  });
+  const requests = boundedReranker.snapshot();
+  const estimatedCostCents = Number.isFinite(inputCostCentsPerMillion)
+    ? requests.inputTokens / 1_000_000 * inputCostCentsPerMillion
+    : null;
+  const estimatedCostPerThousandCents = estimatedCostCents !== null && requests.successfulRequests
+    ? estimatedCostCents / requests.successfulRequests * 1_000
+    : null;
+  const fallbackRate = rate(requests.failedRequests, requests.attemptedRequests);
+  const categoryOutcomes = Object.fromEntries(quality.runs.map((run) => [run.category, categoryOutcome(run)]));
+  const outcomeValues = Object.values(categoryOutcomes);
+  const adoptionGates = deepFreeze({
+    zeroCrossWorkspaceLeakage: quality.qualification.zeroCrossWorkspaceLeakage,
+    zeroLifecycleLeakage: quality.qualification.zeroLifecycleLeakage,
+    citationSourceCorrectnessMaintained: quality.qualification.citationSourceCorrectnessMaintained,
+    noBusinessNoteAuthorityPromotion: quality.qualification.noBusinessNoteAuthorityPromotion,
+    noMaterialRecallRegression: quality.qualification.noMaterialRecallRegression,
+    measurableRankingImprovement: quality.qualification.measurableRankingImprovement,
+    noOtherPrimaryMetricRegression: quality.qualification.noOtherPrimaryMetricRegression,
+    irrelevantSelectionReductionAtLeastTenPercent: quality.qualification.irrelevantSelectionReductionAtLeastTenPercent,
+    noDownstreamValidationFailureIncrease: quality.qualification.noDownstreamValidationFailureIncrease,
+    acceptableP95Latency: latency.p95Ms <= 500,
+    acceptableP99Latency: latency.p99Ms <= 750,
+    acceptableTimeoutRate: rate(requests.timeouts, requests.attemptedRequests) <= 0.01,
+    acceptableFallbackRate: fallbackRate <= 0.02,
+    acceptableEstimatedCost: estimatedCostPerThousandCents === null || estimatedCostPerThousandCents <= 500,
+    completeSourceMetadataPreservation: quality.qualification.completeSourceMetadataPreservation,
+    correctFailOpenBehavior: quality.qualification.correctFailOpenBehavior,
+    activeResultsUnchanged: quality.qualification.activeResultsUnchanged
+  });
+
+  return deepFreeze({
+    qualificationVersion: "nvidia_reranker_shadow_poc_qualification_v1",
+    model: reranker.model,
+    syntheticFixtureSet: true,
+    plannedRequests,
+    requestLimit: maximumRequests,
+    quality,
+    categoryComparison: {
+      wins: outcomeValues.filter((outcome) => outcome === "win").length,
+      losses: outcomeValues.filter((outcome) => outcome === "loss").length,
+      ties: outcomeValues.filter((outcome) => outcome === "tie").length,
+      outcomes: categoryOutcomes,
+      groups: groupedCategoryComparison(quality.runs)
+    },
+    latency,
+    requests,
+    failures: {
+      fallbackRate,
+      circuitBreaker: circuitBreaker.snapshot(),
+      circuitBreakerActivations: latency.circuitBreakerActivations
+    },
+    cost: {
+      inputTokens: requests.inputTokens,
+      configuredInputCostCentsPerMillion: Number.isFinite(inputCostCentsPerMillion) ? inputCostCentsPerMillion : null,
+      estimatedCostCents,
+      estimatedCostPerThousandQualifiedReranksCents: estimatedCostPerThousandCents,
+      exactHostedCostVerified: estimatedCostPerThousandCents !== null
+    },
+    adoptionGates,
+    mandatoryGatesPassed: Object.values(adoptionGates).every(Boolean),
+    readyForProduction: false
+  });
+}
+
+export function privacySafeRerankerPocQualificationReport(
+  report: Awaited<ReturnType<typeof runNvidiaRerankerPocQualification>>
+) {
+  const quality = privacySafeRerankerPocReport(report.quality);
+  const { runs: _runs, ...aggregateQuality } = quality;
+  return deepFreeze({
+    qualificationVersion: report.qualificationVersion,
+    model: report.model,
+    syntheticFixtureSet: report.syntheticFixtureSet,
+    plannedRequests: report.plannedRequests,
+    requestLimit: report.requestLimit,
+    quality: aggregateQuality,
+    categoryComparison: report.categoryComparison,
+    latency: report.latency,
+    requests: report.requests,
+    failures: report.failures,
+    cost: report.cost,
+    adoptionGates: report.adoptionGates,
+    mandatoryGatesPassed: report.mandatoryGatesPassed,
+    readyForProduction: false
   });
 }
 

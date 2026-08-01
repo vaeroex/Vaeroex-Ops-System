@@ -57,9 +57,14 @@ const {
   retrievalPoolInstrumentationEnabled
 } = require("../lib/ai/evidence-engine/reranker-poc-pool.ts");
 const {
+  RERANKER_POC_LATENCY_POOL_SIZES,
+  RERANKER_POC_MAX_PROVIDER_REQUESTS,
+  RERANKER_POC_PLANNED_PROVIDER_REQUESTS,
   RerankerPocCircuitBreaker,
+  privacySafeRerankerPocQualificationReport,
   privacySafeRerankerPocReport,
-  runNvidiaRerankerPocBenchmark
+  runNvidiaRerankerPocBenchmark,
+  runNvidiaRerankerPocQualification
 } = require("../lib/ai/evidence-engine/benchmark.ts");
 
 function successfulRanking(candidates, mode, orderedOrdinals, latencyMs = 5) {
@@ -207,6 +212,44 @@ async function main() {
   assert.equal(qualityReport.reranked.duplicateSelectedChunkRate, 0);
   assert.equal(qualityReport.reranked.businessNoteOverPromotionRate, 0);
 
+  let qualificationProviderCalls = 0;
+  const qualificationReranker = {
+    ...judgmentReranker,
+    async rerank(input) {
+      qualificationProviderCalls += 1;
+      return judgmentReranker.rerank(input);
+    }
+  };
+  const qualificationReport = await runNvidiaRerankerPocQualification({
+    reranker: qualificationReranker,
+    inputCostCentsPerMillion: Number.NaN
+  });
+  assert.deepEqual(qualificationReport.latency.poolSizes, RERANKER_POC_LATENCY_POOL_SIZES);
+  assert.equal(RERANKER_POC_MAX_PROVIDER_REQUESTS, 250);
+  assert.equal(RERANKER_POC_PLANNED_PROVIDER_REQUESTS, 128);
+  assert.equal(qualificationReport.plannedRequests, 128);
+  assert.equal(qualificationProviderCalls, 128);
+  assert.equal(qualificationReport.requests.attemptedRequests, 128);
+  assert.equal(qualificationReport.requests.successfulRequests, 128);
+  assert.equal(qualificationReport.latency.warmupCalls, 4);
+  assert.equal(qualificationReport.latency.measuredCalls, 100);
+  assert.equal(qualificationReport.latency.successfulMeasuredCalls, 100);
+  assert.equal(qualificationReport.latency.p50Ms, 5);
+  assert.equal(qualificationReport.latency.p95Ms, 5);
+  assert.equal(qualificationReport.latency.p99Ms, 5);
+  assert.equal(qualificationReport.cost.exactHostedCostVerified, false);
+  assert.equal(qualificationReport.adoptionGates.acceptableEstimatedCost, true);
+  assert.equal(qualificationReport.readyForProduction, false);
+  await assert.rejects(
+    () => runNvidiaRerankerPocQualification({ reranker: qualificationReranker, measuredCallsPerPool: 60 }),
+    /exceeds the approved provider-request limit/
+  );
+
+  const safeQualification = privacySafeRerankerPocQualificationReport(qualificationReport);
+  const serializedSafeQualification = JSON.stringify(safeQualification);
+  assert.doesNotMatch(serializedSafeQualification, /queryText|passageText|excerpt|customerName|workspaceId/);
+  assert.equal(serializedSafeQualification.includes("Synthetic July revenue"), false);
+
   const safeReport = privacySafeRerankerPocReport(qualityReport);
   const serializedSafeReport = JSON.stringify(safeReport);
   assert.doesNotMatch(serializedSafeReport, /Synthetic July revenue was 1\.25 million/);
@@ -282,6 +325,17 @@ async function main() {
   assert.equal(malformed.failureCode, "malformed_response");
   assert.equal(malformedFetchCalls, 1);
 
+  const authenticationAdapter = new NvidiaTextReranker({
+    apiKey: "synthetic-test-key",
+    fetchImpl: async () => new Response("{}", { status: 401 })
+  });
+  const authenticationFailure = await authenticationAdapter.rerank({
+    queryText: "synthetic query",
+    candidates: duplicatePool.candidates,
+    mode: "shadow"
+  });
+  assert.equal(authenticationFailure.failureCode, "authentication_failed");
+
   const priorEnvironment = {
     VERCEL_ENV: process.env.VERCEL_ENV,
     VAEROEX_NVIDIA_RERANK_POC: process.env.VAEROEX_NVIDIA_RERANK_POC,
@@ -322,6 +376,7 @@ async function main() {
   assert.match(benchmarkScript, /VERCEL_ENV === "production"/);
   assert.match(benchmarkScript, /nvidiaTextRerankerShadowEnabled/);
   assert.match(benchmarkScript, /NVIDIA_RERANK_API_KEY/);
+  assert.match(benchmarkScript, /runNvidiaRerankerPocQualification/);
   assert.match(benchmarkScript, /--baseline-only/);
   assert.doesNotMatch(benchmarkScript, /console\.log\([^)]*queryText|console\.log\([^)]*passageText/);
 

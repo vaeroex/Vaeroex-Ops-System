@@ -169,11 +169,13 @@ export class NvidiaTextReranker implements EvidenceReranker {
       const latencyMs = Date.now() - startedAt;
 
       if (!response.ok) {
-        const failureCode = response.status === 429
-          ? "rate_limit"
-          : response.status >= 500
-            ? "unavailable"
-            : "transport_failure";
+        const failureCode = response.status === 401 || response.status === 403
+          ? "authentication_failed"
+          : response.status === 429
+            ? "rate_limit"
+            : response.status >= 500
+              ? "unavailable"
+              : "transport_failure";
         return failureResult({ mode, inputCount: boundedCandidates.length, inputTokens: estimatedInputTokens, latencyMs, failureCode });
       }
 

@@ -40,8 +40,10 @@ const {
 } = require("../lib/ai/evidence-engine/nvidia-text-reranker.ts");
 const { NVIDIA_RERANKER_POC_FIXTURES } = require("../lib/ai/evidence-engine/reranker-poc-fixtures.ts");
 const {
+  privacySafeRerankerPocQualificationReport,
   privacySafeRerankerPocReport,
-  runNvidiaRerankerPocBenchmark
+  runNvidiaRerankerPocBenchmark,
+  runNvidiaRerankerPocQualification
 } = require("../lib/ai/evidence-engine/benchmark.ts");
 
 const baselineOnly = process.argv.includes("--baseline-only");
@@ -105,22 +107,33 @@ function outputPath() {
 async function main() {
   assertSafeBenchmarkEnvironment();
   const iterations = boundedIterations();
-  const fixtures = Array.from({ length: iterations }, () => NVIDIA_RERANKER_POC_FIXTURES).flat();
-  const report = await runNvidiaRerankerPocBenchmark({
-    reranker: baselineOnly ? baselineOnlyReranker : new NvidiaTextReranker(),
-    fixtures
-  });
-  const privacySafeReport = privacySafeRerankerPocReport(report);
-  const { runs, ...aggregateReport } = privacySafeReport;
-  const safeReport = {
-    executionMode: baselineOnly ? "baseline_only" : "nvidia_shadow",
-    model: baselineOnly ? "deterministic" : "nvidia/llama-nemotron-rerank-1b-v2",
-    syntheticFixtureSet: true,
-    iterations,
-    detailedReport,
-    ...aggregateReport,
-    ...(detailedReport ? { runs } : {})
-  };
+  let safeReport;
+  if (baselineOnly) {
+    const fixtures = Array.from({ length: iterations }, () => NVIDIA_RERANKER_POC_FIXTURES).flat();
+    const report = await runNvidiaRerankerPocBenchmark({ reranker: baselineOnlyReranker, fixtures });
+    const privacySafeReport = privacySafeRerankerPocReport(report);
+    const { runs, ...aggregateReport } = privacySafeReport;
+    safeReport = {
+      executionMode: "baseline_only",
+      model: "deterministic",
+      syntheticFixtureSet: true,
+      iterations,
+      detailedReport,
+      ...aggregateReport,
+      ...(detailedReport ? { runs } : {})
+    };
+  } else {
+    if (iterations !== 1) {
+      throw new Error("The real NVIDIA quality benchmark permits exactly one run per synthetic category.");
+    }
+    const report = await runNvidiaRerankerPocQualification({ reranker: new NvidiaTextReranker() });
+    safeReport = {
+      executionMode: "nvidia_shadow",
+      iterations: 1,
+      detailedReport: false,
+      ...privacySafeRerankerPocQualificationReport(report)
+    };
+  }
   const serialized = `${JSON.stringify(safeReport, null, 2)}\n`;
   const destination = outputPath();
   if (destination) fs.writeFileSync(destination, serialized, { encoding: "utf8", mode: 0o600 });
