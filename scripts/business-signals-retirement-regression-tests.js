@@ -73,7 +73,7 @@ assert.doesNotMatch(workspaceCreationForm, /Business Signals?|\/app\/tasks/);
 assert.equal(fs.existsSync(path.join(root, "components/setup/SetupWizard.tsx")), false, "the retired questionnaire wizard must not remain");
 
 const evidenceIndex = read("lib/ai/evidence-index.ts");
-assert.match(evidenceIndex, /source_type === "business_signal" \|\| row\.source_type === "task"/, "legacy task-backed memory must fail closed");
+assert.match(evidenceIndex, /\["business_signal", "task", "report", "saved_analysis"\]\.includes\(row\.source_type\)/, "legacy Business Signal and task-backed memory must remain in the explicit fail-closed source list");
 
 const sourcesPage = read("app/app/sources/page.tsx");
 const fileActions = read("app/app/files/actions.ts");

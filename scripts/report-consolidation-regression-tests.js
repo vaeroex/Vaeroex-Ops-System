@@ -122,8 +122,11 @@ assert.deepEqual(reportTableUsers, [
   "app/app/admin/customers/[workspaceId]/page.tsx",
   "app/app/reports/[id]/page.tsx",
   "app/app/reports/page.tsx",
-  "app/app/reports/saved-analysis-actions.ts"
+  "app/app/reports/saved-analysis-actions.ts",
+  "lib/admin/ai-trust-data.ts"
 ]);
+const aiTrustData = read("lib/admin/ai-trust-data.ts");
+assert.match(aiTrustData, /from\("reports"\)\.select\("id", \{ count: "exact", head: true \}\)[\s\S]*\.eq\("report_type", "Saved Analysis"\)[\s\S]*analysis_type: "finding_explanation"/, "the admin Trust reader may count only current finding Saved Analyses, not retired report artifacts");
 
 const { SAVED_ANALYSIS_TYPES, parseSavedAnalysisEnvelope, savedAnalysisListItem } = require("../lib/reports/saved-analysis.ts");
 assert.deepEqual([...SAVED_ANALYSIS_TYPES], ["business_health", "finding_explanation"]);

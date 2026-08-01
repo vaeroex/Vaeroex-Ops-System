@@ -48,8 +48,8 @@ assert.match(homepage, /card\.tone === "risk"\) return "critical"/, "risk catego
 assert.match(homepage, /\{!card\.empty \? <span className=\{`vaeroex-semantic-badge/, "each non-empty executive priority must display urgency separately from category identity");
 assert.match(homepage, /businessHealthStatus\(model\.health\.status\)/, "Business Health state must be rendered through the shared semantic layer");
 assert.match(homepage, /intelligenceReadinessStatus\(model\.readiness\.label\)/, "Readiness state must be rendered through the shared semantic layer");
-assert.match(inbox, /findingCategoryStatus\(insight\.type\)/, "finding category identity must be applied in the Intelligence list");
-assert.match(inbox, /findingPriorityStatus\(insight\.priority\)/, "finding urgency must remain separate from category identity");
+assert.match(inbox, /findingCategoryStatus\(card\.snapshot\.type\)/, "finding category identity must be applied from the lifecycle card's immutable deterministic snapshot");
+assert.match(inbox, /findingPriorityStatus\(card\.snapshot\.priority\)/, "finding urgency must remain separate from category identity after lifecycle presentation wrapping");
 assert.match(healthPanel, /businessHealthStatus\(factsForDisplay\.status\)/, "Business Health analysis must use the shared state semantics without changing its content model");
 
 assert.match(kpis, /function metricTone\(/, "KPI scoring classification must remain in its existing deterministic function");

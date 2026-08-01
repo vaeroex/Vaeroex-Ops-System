@@ -787,7 +787,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         fingerprint: ""
       };
     }),
-    ...targetAchievements.slice(0, 3).map(({ kpi, semantics, history: kpiHistory }) => {
+    ...targetAchievements.map(({ kpi, semantics, history: kpiHistory }) => {
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;
       const condition = targetSuccessLabel(semantics);

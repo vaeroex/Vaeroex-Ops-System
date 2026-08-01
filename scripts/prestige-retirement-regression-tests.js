@@ -119,8 +119,10 @@ for (const file of sourceFiles("lib/ai")) {
 const contract = require("../lib/intelligence/snapshot/v1/index.ts");
 const snapshot = contract.buildIntelligenceSnapshotV1(contract.foundationSnapshotBuildInput()).snapshot;
 assert.equal(snapshot.businessHealth.state, "available");
-assert.equal(snapshot.businessHealth.value.score, 78, "canonical Business Health remains at the parity fixture baseline");
-assert.equal(snapshot.businessHealth.value.status, "Strong", "canonical Business Health status remains unchanged");
+assert.equal(snapshot.businessHealth.value.score, 42, "canonical Business Health retains the current Formula V2 fixture result after Prestige retirement");
+assert.equal(snapshot.businessHealth.value.status, "At Risk", "the retired Prestige path cannot override Formula V2 status");
+assert.equal(snapshot.versions.calculations.businessHealth, "business_health_calculation_v2");
+assert.equal(snapshot.versions.calculations.dataQuality, "data_quality_calculation_v2");
 assert.equal(snapshot.readiness.coverage.state, "available");
 assert.equal(snapshot.readiness.coverage.value.overallCoverage, 89, "canonical readiness remains at the parity fixture baseline");
 assert.equal(snapshot.findings.length, 2, "canonical findings remain unchanged");
