@@ -116,7 +116,7 @@ export type RerankResult = Readonly<{
   inputTokens: number | null;
   inputTokensEstimated: boolean;
   latencyMs: number;
-  failureCode: "disabled" | "missing_credentials" | "timeout" | "rate_limit" | "unavailable" | "malformed_response" | "transport_failure" | null;
+  failureCode: "disabled" | "missing_credentials" | "authentication_failed" | "timeout" | "rate_limit" | "unavailable" | "malformed_response" | "transport_failure" | "circuit_breaker_open" | "unsafe_benchmark_input" | null;
 }>;
 
 export interface EvidenceReranker {

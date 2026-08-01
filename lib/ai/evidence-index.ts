@@ -10,8 +10,13 @@ import {
   type EvidenceQuery
 } from "@/lib/ai/evidence-engine/contracts";
 import { buildEvidenceManifest } from "@/lib/ai/evidence-engine/manifest";
-import { NvidiaTextReranker, nvidiaTextRerankerShadowEnabled } from "@/lib/ai/evidence-engine/nvidia-text-reranker";
-import { DeterministicNoopReranker, runEvidenceRerankerShadow } from "@/lib/ai/evidence-engine/reranker";
+import { DeterministicNoopReranker } from "@/lib/ai/evidence-engine/reranker";
+import {
+  buildRetrievalPoolMeasurement,
+  contentFreePoolMeasurement,
+  retrievalPoolInstrumentationEnabled,
+  type RetrievalPoolMeasurement
+} from "@/lib/ai/evidence-engine/reranker-poc-pool";
 import { buildSourceRegistry } from "@/lib/ai/evidence-engine/source-registry";
 import { EvidenceDecisionTrace } from "@/lib/ai/evidence-engine/tracing";
 import { verifyEvidenceManifestCitations } from "@/lib/ai/evidence-engine/citation-verification";
@@ -635,7 +640,7 @@ async function keywordEvidence({
   candidateLimit: number;
 }) {
   const queryTerms = terms(query);
-  if (!queryTerms.length) return [];
+  if (!queryTerms.length) return { chunks: [], candidatesBeforeEligibility: 0 };
 
   const pageSize = Math.min(120, Math.max(40, limit * 10));
   const textFilter = queryTerms
@@ -645,6 +650,7 @@ async function keywordEvidence({
   let offset = 0;
   let pageLength = pageSize;
   let pagesScanned = 0;
+  let candidatesBeforeEligibility = 0;
 
   while (eligibleRows.length < limit && pageLength === pageSize && pagesScanned < 10) {
     const { data, error } = await supabase
@@ -657,14 +663,15 @@ async function keywordEvidence({
       .order("indexed_at", { ascending: false })
       .range(offset, offset + pageSize - 1);
 
-    if (error || !data) return [];
+    if (error || !data) return { chunks: [], candidatesBeforeEligibility };
+    candidatesBeforeEligibility += data.length;
     pageLength = data.length;
     offset += data.length;
     pagesScanned += 1;
     eligibleRows.push(...await filterEligibleMemoryRowsByLifecycle({ supabase, workspaceId, rows: data }));
   }
 
-  return eligibleRows
+  const chunks = eligibleRows
     .map((row) => {
       const haystack = `${row.source_title} ${row.summary || ""} ${row.source_excerpt}`.toLowerCase();
       const score = queryTerms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
@@ -675,6 +682,8 @@ async function keywordEvidence({
     .sort((a, b) => b.score - a.score || b.row.confidence_score - a.row.confidence_score)
     .slice(0, candidateLimit)
     .map((item) => toEvidenceChunk(item.row, item.score / Math.max(queryTerms.length, 1)));
+
+  return { chunks, candidatesBeforeEligibility };
 }
 
 export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
@@ -690,12 +699,17 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
 
   async retrieve(query: EvidenceQuery): Promise<CandidateRetrievalResult & {
     retrievalMode: EvidenceContext["retrievalMode"];
+    poolMeasurement: RetrievalPoolMeasurement | null;
   }> {
     const { supabase, stageLogger, timingLogger, embeddingTimeoutMs } = this.dependencies;
+    const retrievalStartedAt = Date.now();
     const candidateLimit = Math.min(48, Math.max(query.resultLimit, query.candidateLimit));
     let chunks: EvidenceContextChunk[] = [];
     let retrievalMode: EvidenceContext["retrievalMode"] = "none";
     let embeddingVersion: string | null = null;
+    let candidatesBeforeEligibility = 0;
+    let vectorSucceeded = false;
+    let keywordFallbackUsed = false;
     const limitations: string[] = [];
 
     if (query.strategy === "auto") {
@@ -726,6 +740,7 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
         });
 
         if (!error && data?.length) {
+          candidatesBeforeEligibility = data.length;
           const lifecycleFilterStartedAt = Date.now();
           const eligibleRows = await filterEligibleMemoryRowsByLifecycle({
             supabase,
@@ -737,6 +752,7 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
             .slice(0, candidateLimit)
             .map((row) => toEvidenceChunk(row, "similarity" in row ? row.similarity : undefined));
           if (chunks.length) retrievalMode = "vector";
+          vectorSucceeded = chunks.length > 0;
         } else if (error) {
           limitations.push("Vector retrieval is not available yet. Vaeroex used keyword evidence fallback.");
         }
@@ -750,16 +766,19 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
     if (!chunks.length) {
       stageLogger?.("keyword_retrieval_started", { limit: query.resultLimit });
       const keywordStartedAt = Date.now();
-      chunks = await keywordEvidence({
+      const keywordResult = await keywordEvidence({
         supabase,
         workspaceId: query.workspaceId,
         query: query.text,
         limit: query.resultLimit,
         candidateLimit
       });
+      chunks = keywordResult.chunks;
+      candidatesBeforeEligibility = keywordResult.candidatesBeforeEligibility;
       timingLogger?.("keyword_database_retrieval_ms", Date.now() - keywordStartedAt);
       stageLogger?.("keyword_retrieval_finished", { matchCount: Math.min(chunks.length, query.resultLimit) });
       retrievalMode = chunks.length ? "keyword" : "none";
+      keywordFallbackUsed = query.strategy === "auto" && chunks.length > 0;
       embeddingVersion = null;
     }
 
@@ -772,6 +791,20 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
           baseRank: index + 1,
           embeddingVersion
         }));
+    const poolMeasurement = retrievalPoolInstrumentationEnabled()
+      ? buildRetrievalPoolMeasurement({
+          candidatesBeforeEligibility,
+          eligibleCandidates: candidates,
+          selectedCount: Math.min(query.resultLimit, candidates.length),
+          retrievalMode,
+          vectorSucceeded,
+          keywordFallbackUsed,
+          retrievalLatencyMs: Date.now() - retrievalStartedAt
+        })
+      : null;
+    if (poolMeasurement) {
+      stageLogger?.("retrieval_pool_measured", contentFreePoolMeasurement(poolMeasurement));
+    }
 
     return {
       version: "candidate_retrieval_result_v1",
@@ -781,7 +814,8 @@ export class SupabasePgvectorCandidateRetriever implements CandidateRetriever {
       retrievalMode,
       candidates,
       selectedCandidateIds: candidates.slice(0, query.resultLimit).map((candidate) => candidate.candidateId),
-      limitations
+      limitations,
+      poolMeasurement
     };
   }
 }
@@ -838,6 +872,17 @@ export async function buildWorkspaceEvidenceContext({
     reasonCode: null
   });
 
+  trace.add({
+    stage: "rerank",
+    status: "skipped",
+    durationMs: 0,
+    inputCount: retrieval.candidates.length,
+    outputCount: retrieval.candidates.length,
+    provider: "nvidia",
+    model: "nvidia/llama-nemotron-rerank-1b-v2",
+    reasonCode: "synthetic_benchmark_only"
+  });
+
   const selectedIds = new Set(retrieval.selectedCandidateIds);
   const selectedCandidates = retrieval.candidates.filter((candidate) => selectedIds.has(candidate.candidateId));
   const sourceRegistryStartedAt = Date.now();
@@ -891,25 +936,6 @@ export async function buildWorkspaceEvidenceContext({
     reasonCode: citationVerification.valid ? null : "citation_verification_failed"
   });
 
-  if (nvidiaTextRerankerShadowEnabled() && retrieval.candidates.length) {
-    await runEvidenceRerankerShadow({
-      queryText: query,
-      candidates: retrieval.candidates,
-      reranker: new NvidiaTextReranker(),
-      trace
-    });
-  } else {
-    trace.add({
-      stage: "rerank",
-      status: "skipped",
-      durationMs: 0,
-      inputCount: retrieval.candidates.length,
-      outputCount: retrieval.candidates.length,
-      provider: "nvidia",
-      model: "nvidia/llama-nemotron-rerank-1b-v2",
-      reasonCode: "shadow_disabled"
-    });
-  }
   const traceSnapshot = trace.snapshot();
   stageLogger?.("evidence_engine_foundation_finished", {
     traceVersion: traceSnapshot.version,

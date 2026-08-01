@@ -7,3 +7,5 @@ export * from "@/lib/ai/evidence-engine/nvidia-text-reranker";
 export * from "@/lib/ai/evidence-engine/tracing";
 export * from "@/lib/ai/evidence-engine/benchmark-fixtures";
 export * from "@/lib/ai/evidence-engine/benchmark";
+export * from "@/lib/ai/evidence-engine/reranker-poc-fixtures";
+export * from "@/lib/ai/evidence-engine/reranker-poc-pool";

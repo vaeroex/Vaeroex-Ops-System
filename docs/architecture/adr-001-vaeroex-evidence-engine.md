@@ -39,7 +39,9 @@ The Evidence Engine owns:
 
 Generation models may summarize or reason over an approved evidence manifest. They may not determine or override any responsibility listed above.
 
-The first implementation slice introduces contracts and adapters around the existing Supabase and pgvector retrieval path. It does not change active ranking, routing, database state, or user-facing behavior. NVIDIA reranking runs only in explicit shadow evaluation mode, and its order is never applied to an active response in this slice.
+The first implementation slice introduces contracts and adapters around the existing Supabase and pgvector retrieval path. It does not change active ranking, routing, database state, or user-facing behavior. NVIDIA reranking runs only in an explicit synthetic benchmark shadow mode, and its order is never applied to an active response in this slice.
+
+The shadow proof of concept freezes an already-authorized synthetic candidate pool after exact duplicate and canonical-source handling. Baseline and NVIDIA orders are compared before bounded selection, source-registry construction, manifest construction, and citation assignment. Runtime customer retrieval never invokes the NVIDIA adapter; optional candidate-pool instrumentation is content-free, non-Production, and disabled by default.
 
 ## Architecture
 
@@ -289,6 +291,8 @@ NVIDIA reranking remains shadow-only unless frozen-fixture and Preview evaluatio
 - correct fail-open behavior for timeout, rate limit, unavailable, and malformed responses
 
 Promotion is a separate architecture and release decision.
+
+The 2026-08-01 hosted Preview qualification completed 128/128 real NVIDIA requests with zero failures, 135 ms p95 latency, 17 category wins, 7 ties, and 0 losses. Ranking metrics improved, but irrelevant selected chunks decreased by only 2.29% relative, below the required 10% adoption gate. NVIDIA reranking therefore remains disabled and shadow-only. See [NVIDIA Reranker Shadow POC Results](./nvidia-reranker-shadow-poc-results.md).
 
 ## Deferred Scope
 
