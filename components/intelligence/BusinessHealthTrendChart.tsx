@@ -319,9 +319,6 @@ export function BusinessHealthTrendChart({
           {hasGap ? (
             <p className="mt-1 text-xs leading-5 text-slate-400">Dashed line segments cross periods without stored Business Health reviews.</p>
           ) : null}
-          {hasScoringMethodBoundary ? (
-            <p className="mt-1 text-xs leading-5 text-amber-200">Formula V1 history remains visible, but Vaeroex does not calculate a continuous change or period average across the Formula V2 boundary.</p>
-          ) : null}
         </div>
       ) : (
         <div className="mt-3 rounded-lg border border-dashed border-white/15 bg-white/[0.03] p-4 text-xs leading-5 text-slate-300">

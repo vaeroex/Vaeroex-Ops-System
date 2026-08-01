@@ -163,6 +163,7 @@ assert.match(chartSource, /Y_AXIS_VALUES = \[100, 75, 50, 25, 0\]/, "the fixed B
 assert.match(chartSource, /buildBusinessHealthTrendBuckets/, "X-axis periods must come from the selected calendar range rather than sparse stored points");
 assert.match(chartSource, /buildBusinessHealthTrendDisplayPoints/, "plotted data must use the canonical stored-history projection");
 assert.match(chartSource, /Scoring method updated/, "the chart must label a V1 to V2 boundary");
+assert.doesNotMatch(chartSource, /Formula V1 history remains visible/, "the chart must not expose the internal Formula V1 migration explanation");
 assert.match(chartSource, /point\.methodSegment !== previous\.methodSegment/, "the chart must not connect V1 and V2 scores");
 assert.match(chartSource, /methodOffset/, "V1 and V2 points sharing one aggregate period must remain visually distinct");
 assert.match(chartSource, /strokeDasharray=\{crossesMissingPeriod/, "missing periods must remain visually distinguishable without becoming zero");
