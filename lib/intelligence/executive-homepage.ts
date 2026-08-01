@@ -1,4 +1,6 @@
 import type { BusinessHealthSnapshotRow } from "@/lib/intelligence/business-health-history";
+import { businessHealthSnapshotCalculationVersion } from "@/lib/intelligence/business-health-history";
+import { BUSINESS_HEALTH_CALCULATION_VERSION } from "@/lib/intelligence/snapshot/v1/versions";
 import type { BusinessIntelligenceCoverageResult } from "@/lib/intelligence/coverage";
 import type { EligibleBusinessSignalCategory, IntelligenceInsight, IntelligenceLayerResult } from "@/lib/intelligence/layer";
 
@@ -253,14 +255,13 @@ function readinessLabel(coverage: number): ExecutiveHomepageModel["readiness"]["
 }
 
 function healthStatusLabel(status: IntelligenceLayerResult["businessHealth"]["status"]) {
-  if (status === "Strong") return "Healthy";
-  if (status === "Watch") return "Watch";
-  if (status === "At Risk") return "Critical";
-  return "Limited evidence";
+  return status;
 }
 
 function previousReviewSnapshot(snapshots: BusinessHealthSnapshotRow[]) {
-  const ordered = [...snapshots].sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
+  const ordered = snapshots
+    .filter((snapshot) => businessHealthSnapshotCalculationVersion(snapshot) === BUSINESS_HEALTH_CALCULATION_VERSION)
+    .sort((a, b) => a.snapshot_date.localeCompare(b.snapshot_date));
   const latest = ordered.at(-1);
   if (!latest) return null;
 
@@ -360,7 +361,9 @@ export function buildExecutiveHomepageModel({
 
   const healthSummary = !hasUsableHealth
     ? sourceDataAvailable
-      ? "Vaeroex needs more eligible original evidence before it can score Business Health reliably."
+      ? intelligence.businessHealth.unavailableReason === "no_evaluable_performance_outcome"
+        ? "Authoritative evidence is available, but it does not yet contain an evaluable positive or negative business-performance outcome."
+        : "Vaeroex needs more eligible original evidence before it can score Business Health reliably."
       : "Some required business information could not be retrieved. Existing evidence remains available in Intelligence and Sources."
     : risk
       ? conciseSentences(risk.summary, intelligence.executiveSummary)
@@ -370,7 +373,9 @@ export function buildExecutiveHomepageModel({
 
   const healthDriver = !hasUsableHealth
     ? sourceDataAvailable
-      ? "Setup context, generated outputs, and Business Memory do not count as independent business evidence."
+      ? intelligence.businessHealth.unavailableReason === "no_evaluable_performance_outcome"
+        ? "The absence of a supported risk or positive performance outcome is not treated as proof that the business is healthy."
+        : "Setup context, generated outputs, and Business Memory do not count as independent business evidence."
       : "No business conclusion was generated from the unavailable source queries."
     : conciseSentences(
       risk?.evidence[0] || opportunity?.evidence[0],

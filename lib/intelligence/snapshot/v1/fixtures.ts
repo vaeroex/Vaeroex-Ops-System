@@ -239,11 +239,12 @@ export function foundationIntelligenceLayerOutput(): IntelligenceLayerProducerOu
     executiveSummary: `${risk.title}. ${risk.why}`,
     businessHealth: {
       available: true,
-      score: 78,
-      status: "Strong",
+      unavailableReason: null,
+      score: 42,
+      status: "At Risk",
       trend: "Holding steady",
       components: {
-        dataQualityBase: 92,
+        dataQualityBase: 50,
         riskPenalty: 12,
         opportunityAdjustment: 4,
         driverImpacts: [

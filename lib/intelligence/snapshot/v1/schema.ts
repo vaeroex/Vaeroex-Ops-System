@@ -7,6 +7,8 @@ import {
   BUSINESS_NOTE_TYPES
 } from "@/lib/ai/business-notes/contracts";
 import {
+  BUSINESS_HEALTH_CALCULATION_VERSIONS,
+  DATA_QUALITY_CALCULATION_VERSIONS,
   DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1,
   INTELLIGENCE_SNAPSHOT_LIMITS
 } from "@/lib/intelligence/snapshot/v1/versions";
@@ -29,6 +31,7 @@ const reasonCode = z.enum([
   "missing_producer_field",
   "producer_reported_unavailable",
   "insufficient_original_evidence",
+  "no_evaluable_performance_outcome",
   "insufficient_history",
   "target_not_configured",
   "recommendation_not_available",
@@ -274,8 +277,8 @@ const versions = z.object({
   calculations: z.object({
     kpiSemantics: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.kpiSemantics),
     intelligenceLayer: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.intelligenceLayer),
-    businessHealth: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.businessHealth),
-    dataQuality: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.dataQuality),
+    businessHealth: z.enum(BUSINESS_HEALTH_CALCULATION_VERSIONS),
+    dataQuality: z.enum(DATA_QUALITY_CALCULATION_VERSIONS),
     forecastReadiness: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.forecastReadiness),
     coverage: z.literal(DEFAULT_INTELLIGENCE_SNAPSHOT_VERSIONS_V1.calculations.coverage)
   }).strict(),

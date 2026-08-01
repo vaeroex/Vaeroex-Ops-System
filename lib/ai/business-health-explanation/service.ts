@@ -73,9 +73,9 @@ export function businessHealthProviderRequestPayload(analysisPackage: BusinessHe
       status: analysisPackage.facts.status,
       trajectory: analysisPackage.facts.trajectory,
       comparison: analysisPackage.facts.comparison,
-      data_quality_base: analysisPackage.facts.dataQualityBase,
-      risk_penalty: analysisPackage.facts.riskPenalty,
-      opportunity_adjustment: analysisPackage.facts.opportunityAdjustment,
+      performance_baseline: analysisPackage.facts.dataQualityBase,
+      negative_performance: analysisPackage.facts.riskPenalty,
+      positive_performance: analysisPackage.facts.opportunityAdjustment,
       freshness: analysisPackage.facts.freshness
     },
     required_drivers: analysisPackage.facts.drivers.slice(0, 3).map((driver, driverIndex) => ({

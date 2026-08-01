@@ -456,7 +456,12 @@ check(evidenceEligibility.includes("user_failure_state") && evidenceEligibility.
 const intelligenceLayer = read("lib/intelligence/layer.ts");
 const intelligenceCoverage = read("lib/intelligence/coverage.ts");
 const boundedContextRuntime = read("lib/ai/bounded-context.ts");
-check(intelligenceLayer.includes("filterOriginalBusinessEvidence") && intelligenceLayer.includes("available: hasHealthEvidence"), "Only original evidence may produce intelligence risks or a Business Health score.");
+check(
+  intelligenceLayer.includes("filterOriginalBusinessEvidence")
+    && intelligenceLayer.includes("evidenceEligible: hasHealthEvidence")
+    && intelligenceLayer.includes('"insufficient_original_evidence"'),
+  "Only original evidence may satisfy the eligibility gate for intelligence risks or a Business Health score."
+);
 check(intelligenceCoverage.includes("filterOriginalBusinessEvidence") && intelligenceCoverage.includes("uniqueSources") && !intelligenceCoverage.includes('label: "Vaeroex Memory"'), "Derived runs and chunks must not inflate coverage or Source Mix.");
 check(boundedContextRuntime.includes("sanitizeBusinessEvidenceText") && boundedContextRuntime.includes("filterOriginalBusinessEvidence") && boundedContextRuntime.includes("filterBusinessEvidence"), "Bounded conversational context must sanitize platform failures and reject ineligible business evidence.");
 const dashboardRuntime = read("app/app/page.tsx");

@@ -1,7 +1,12 @@
 import type { Database } from "@/lib/supabase/types";
 import { buildKpiForecastEligibility, type KpiForecastEligibilitySummary } from "@/lib/kpis/forecast-eligibility";
 import { excludeChecklistDerivedMetrics, excludeChecklistDerivedRecords } from "@/lib/intelligence/checklist-retirement";
-import { filterOriginalBusinessEvidence } from "@/lib/intelligence/evidence-eligibility";
+import { filterOriginalBusinessEvidence, independentOriginalEvidenceKeys } from "@/lib/intelligence/evidence-eligibility";
+import {
+  calculateBusinessHealthPerformance,
+  calculateIntelligenceReadiness,
+  type BusinessHealthPerformanceSignal
+} from "@/lib/intelligence/business-health-formula";
 import { buildSourceParentEligibility, filterBySourceParentEligibility } from "@/lib/intelligence/source-parent-eligibility";
 import { compareKpiRowsNewest, groupKpisByNormalizedName, normalizeKpiName } from "@/lib/intelligence/kpi-identity";
 import { applyKpiSettingsToRows, kpiSemantics, type KpiSettingRow } from "@/lib/kpis/settings";
@@ -61,12 +66,17 @@ export type IntelligenceInsight = {
   limitation: string;
   fingerprint: string;
   suggestedNextData?: string;
+  businessHealthEffect?: Readonly<{
+    identity: string;
+    points: 8 | 10;
+  }>;
 };
 
 export type IntelligenceLayerResult = {
   executiveSummary: string;
   businessHealth: {
     available: boolean;
+    unavailableReason: "insufficient_original_evidence" | "no_evaluable_performance_outcome" | null;
     score: number;
     status: "Strong" | "Watch" | "At Risk" | "Insufficient Data";
     trend: "Improving" | "Holding steady" | "Declining" | "Not enough history";
@@ -142,6 +152,7 @@ type PersonRow = Database["public"]["Tables"]["people"]["Row"];
 type DecisionRow = Database["public"]["Tables"]["business_decisions"]["Row"];
 
 export type IntelligenceLayerInput = {
+  asOf?: Date | string;
   workspace?: {
     name?: string | null;
     industry?: string | null;
@@ -289,48 +300,129 @@ function findingFingerprint(insight: Pick<IntelligenceInsight, "type" | "title" 
   return `${typeGroup}:${topic}:${condition}:${normalizedPeriod}`;
 }
 
-function businessHealthScoreComponents(
-  insights: readonly IntelligenceInsight[],
-  dataQualityBase: number
-): IntelligenceLayerResult["businessHealth"]["components"] {
-  const riskKinds = new Set<IntelligenceInsightType>(["Risk", "Bottleneck", "Anomaly"]);
-  const driverImpacts: BusinessHealthDriverImpact[] = [];
-  let remainingRiskPenalty = 45;
+function canonicalKpiPerformanceIdentity(semantics: KpiSemantics) {
+  return [
+    semantics.canonicalName.trim().toLowerCase(),
+    semantics.metricRole,
+    `${semantics.scale}`,
+    (semantics.unit || "").trim().toLowerCase()
+  ].join("|");
+}
 
-  for (const insight of insights.filter((item) => riskKinds.has(item.type))) {
-    const rawPenalty = insight.priority === "High" ? 12 : insight.priority === "Medium" ? 6 : 0;
-    const appliedPenalty = Math.min(rawPenalty, remainingRiskPenalty);
-    remainingRiskPenalty -= appliedPenalty;
-    if (!appliedPenalty) continue;
-    driverImpacts.push({
-      findingId: insight.id,
-      kind: "risk",
-      scoreImpact: -appliedPenalty
-    });
+function distinctDatedKpiHistory(history: KpiRow[]) {
+  const byDate = new Map<string, KpiRow>();
+  for (const row of [...history].sort(compareKpiRowsNewest)) {
+    if (row.actual_value === null || !Number.isFinite(row.actual_value) || !/^\d{4}-\d{2}-\d{2}/.test(row.metric_date || "")) continue;
+    const date = row.metric_date.slice(0, 10);
+    if (!byDate.has(date)) byDate.set(date, row);
+  }
+  return [...byDate.values()].sort((left, right) => left.metric_date.localeCompare(right.metric_date));
+}
+
+function canonicalKpiReadinessCounts(kpis: KpiRow[], settings: KpiSettingRow[], asOf: Date | string | undefined) {
+  const parsedAsOf = typeof asOf === "string" ? new Date(asOf) : asOf || new Date();
+  const referenceDate = Number.isNaN(parsedAsOf.getTime()) ? new Date() : parsedAsOf;
+  const byIdentity = new Map<string, Set<string>>();
+
+  for (const row of kpis) {
+    const semantics = kpiSemantics(row.name, settings);
+    const identity = canonicalKpiPerformanceIdentity(semantics);
+    const dates = byIdentity.get(identity) || new Set<string>();
+    if (row.actual_value !== null && Number.isFinite(row.actual_value) && /^\d{4}-\d{2}-\d{2}/.test(row.metric_date || "")) {
+      dates.add(row.metric_date.slice(0, 10));
+    }
+    byIdentity.set(identity, dates);
   }
 
-  let remainingOpportunityAdjustment = 15;
-  for (const insight of insights.filter((item) => item.type === "Opportunity")) {
-    const appliedAdjustment = Math.min(4, remainingOpportunityAdjustment);
-    remainingOpportunityAdjustment -= appliedAdjustment;
-    if (!appliedAdjustment) continue;
-    driverImpacts.push({
-      findingId: insight.id,
-      kind: "opportunity",
-      scoreImpact: appliedAdjustment
-    });
-  }
-
+  const series = [...byIdentity.values()];
   return {
-    dataQualityBase,
-    riskPenalty: Math.abs(driverImpacts
-      .filter((item) => item.kind === "risk")
-      .reduce((sum, item) => sum + item.scoreImpact, 0)),
-    opportunityAdjustment: driverImpacts
-      .filter((item) => item.kind === "opportunity")
-      .reduce((sum, item) => sum + item.scoreImpact, 0),
-    driverImpacts
+    count: series.length,
+    withHistoricalDepth: series.filter((dates) => dates.size >= 4).length,
+    fresh: series.filter((dates) => {
+      const latest = [...dates].sort().at(-1);
+      if (!latest) return false;
+      const latestDate = new Date(`${latest}T12:00:00.000Z`);
+      return !Number.isNaN(latestDate.getTime()) && Math.floor((referenceDate.getTime() - latestDate.getTime()) / 86400000) <= 45;
+    }).length
   };
+}
+
+function isSustainedFavorableTrend({ kpi, semantics, evaluation, history }: EvaluatedKpiTarget) {
+  if (
+    semantics.desiredDirection === "unknown"
+    || semantics.desiredDirection === "target_range"
+    || semantics.desiredDirection === "exact_target"
+    || semantics.desiredDirection === "maintain"
+    || effectiveKpiTarget(semantics, kpi.target) !== null
+  ) return false;
+  const datedHistory = distinctDatedKpiHistory(history);
+  if (datedHistory.length < 4 || evaluation.selectedRangeTrend !== "favorable") return false;
+  const intervalEffects = datedHistory.slice(1).map((row, index) => evaluateKpiPerformance({
+    observations: [datedHistory[index], row],
+    semantics,
+    target: null
+  }).latestPerformanceEffect);
+  const determinate = intervalEffects.filter((effect) => effect === "favorable" || effect === "unfavorable" || effect === "neutral");
+  const favorable = determinate.filter((effect) => effect === "favorable").length;
+  return determinate.length > 0 && favorable / determinate.length >= 0.6;
+}
+
+function riskPerformanceDescriptor(insight: IntelligenceInsight, canonicalKpiIdentityByLabel: Map<string, string>) {
+  const dependencies = insight.supportingRecords.map((record) => {
+    const kpiIdentity = canonicalKpiIdentityByLabel.get(normalizeKpiName(record.title));
+    if (kpiIdentity) return `kpi:${kpiIdentity}`;
+    if (record.id.startsWith("issue:")) return record.id;
+    return `${record.recordType.trim().toLowerCase()}:${record.sourceKey}:${record.title.trim().toLowerCase()}`;
+  });
+  const canonicalDependencies = [...new Set(dependencies)].sort();
+  return {
+    insight,
+    condition: canonicalCondition(`${insight.title} ${insight.summary}`, "risk"),
+    dependencies: new Set(canonicalDependencies.length ? canonicalDependencies : [`finding:${insight.id}`]),
+    points: insight.priority === "High" ? 18 : insight.priority === "Medium" ? 10 : 4
+  };
+}
+
+function negativePerformanceSignals(insights: IntelligenceInsight[], canonicalKpiIdentityByLabel: Map<string, string>) {
+  const descriptors = insights
+    .map((insight) => riskPerformanceDescriptor(insight, canonicalKpiIdentityByLabel))
+    .sort((left, right) => left.condition.localeCompare(right.condition) || [...left.dependencies].join("|").localeCompare([...right.dependencies].join("|")) || left.insight.id.localeCompare(right.insight.id));
+  const groups: Array<{
+    condition: string;
+    dependencies: Set<string>;
+    descriptors: typeof descriptors;
+  }> = [];
+
+  for (const descriptor of descriptors) {
+    const matchingIndexes = groups.flatMap((group, index) =>
+      group.condition === descriptor.condition && [...descriptor.dependencies].some((dependency) => group.dependencies.has(dependency))
+        ? [index]
+        : []
+    );
+    if (!matchingIndexes.length) {
+      groups.push({ condition: descriptor.condition, dependencies: new Set(descriptor.dependencies), descriptors: [descriptor] });
+      continue;
+    }
+
+    const first = groups[matchingIndexes[0]];
+    first.descriptors.push(descriptor);
+    descriptor.dependencies.forEach((dependency) => first.dependencies.add(dependency));
+    for (const index of matchingIndexes.slice(1).reverse()) {
+      const overlapping = groups[index];
+      overlapping.descriptors.forEach((item) => first.descriptors.push(item));
+      overlapping.dependencies.forEach((dependency) => first.dependencies.add(dependency));
+      groups.splice(index, 1);
+    }
+  }
+
+  return groups.map((group) => {
+    const strongest = [...group.descriptors].sort((left, right) => right.points - left.points || left.insight.id.localeCompare(right.insight.id))[0];
+    return {
+      identity: `${group.condition}|${[...group.dependencies].sort().join("+")}`,
+      findingId: strongest.insight.id,
+      points: strongest.points
+    };
+  });
 }
 
 function uniqueBy<T>(values: T[], key: (value: T) => string) {
@@ -366,7 +458,12 @@ export function consolidateDuplicateInsights(insights: IntelligenceInsight[]) {
       contradictoryEvidence: uniqueBy([...current.contradictoryEvidence, ...insight.contradictoryEvidence], (item) => item),
       missingEvidence: uniqueBy([...current.missingEvidence, ...insight.missingEvidence], (item) => item),
       sourceTypes: uniqueBy([...current.sourceTypes, ...insight.sourceTypes], (item) => item),
-      lastUpdated: [current.lastUpdated, insight.lastUpdated].sort().at(-1) || current.lastUpdated
+      lastUpdated: [current.lastUpdated, insight.lastUpdated].sort().at(-1) || current.lastUpdated,
+      businessHealthEffect: !current.businessHealthEffect
+        ? insight.businessHealthEffect
+        : !insight.businessHealthEffect || current.businessHealthEffect.points >= insight.businessHealthEffect.points
+          ? current.businessHealthEffect
+          : insight.businessHealthEffect
     });
   });
 
@@ -472,12 +569,23 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const latestKpis = latestKpisByName(kpis);
   const historyCounts = kpiHistoryCounts(kpis);
   const historyByName = kpiHistoryByName(kpis);
-  const forecastEligibility = buildKpiForecastEligibility(kpis);
+  const forecastEligibility = buildKpiForecastEligibility(kpis, { now: input.asOf });
   const evaluatedKpis = latestKpis.map((kpi) => evaluateKpiTarget(kpi, historyByName.get(normalizeKpiName(kpi.name)) || [kpi], kpiSettings));
   const materialTargetMisses = evaluatedKpis.filter(({ evaluation, gapRatio }) =>
     isKpiTargetMiss(evaluation.targetStatus) && gapRatio !== null && gapRatio > MATERIAL_TARGET_GAP_RATIO
   );
-  const targetAchievements = evaluatedKpis.filter(({ evaluation }) => isKpiTargetMet(evaluation.targetStatus));
+  const targetAchievements = uniqueBy(
+    evaluatedKpis.filter(({ semantics, evaluation }) => semantics.desiredDirection !== "unknown" && isKpiTargetMet(evaluation.targetStatus)),
+    ({ semantics }) => canonicalKpiPerformanceIdentity(semantics)
+  );
+  const targetAchievementIdentities = new Set(targetAchievements.map(({ semantics }) => canonicalKpiPerformanceIdentity(semantics)));
+  const sustainedFavorableTrends = uniqueBy(
+    evaluatedKpis.filter((evaluated) => {
+      const identity = canonicalKpiPerformanceIdentity(evaluated.semantics);
+      return !targetAchievementIdentities.has(identity) && isSustainedFavorableTrend(evaluated);
+    }),
+    ({ semantics }) => canonicalKpiPerformanceIdentity(semantics)
+  );
   const pendingImports = imports.filter((item) => ["extracted", "needs_review"].includes(lower(item.status)));
   const staleSops = sops.filter((sop) => {
     const date = new Date(sop.updated_at || sop.created_at);
@@ -515,18 +623,37 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     !crmLeads.length ? "Add customer context or import a customer/lead list." : "",
     !people.length ? "Add leadership or area context so Vaeroex can interpret the evidence." : ""
   ].filter(Boolean);
-  const dataQualityScore = Math.min(
-    100,
-    Math.round(
-      (workspace?.industry || workspace?.size ? 10 : 0) +
-        (files.length ? 15 : 0) +
-        (kpis.length ? 25 : 0) +
-        (crmLeads.length || issues.length ? 10 : 0) +
-        (decisions.length ? 10 : 0)
-    )
-  );
-  const dataQualityLabel = dataQualityScore >= 70 ? "Strong" : dataQualityScore >= 40 ? "Developing" : "Limited";
-  const dataConfidence = dataQualityScore >= 70 ? "High" : dataQualityScore >= 40 ? "Medium" : "Low";
+  const independentSourceIdentityCount = independentOriginalEvidenceKeys([
+    { kind: "file", values: files },
+    { kind: "kpi", values: kpis },
+    { kind: "issue", values: issues },
+    { kind: "customer", values: crmLeads },
+    { kind: "process", values: sops },
+    { kind: "form", values: forms },
+    { kind: "form_submission", values: submissions }
+  ]).size;
+  const readinessSourceTypeCount = [
+    originalKpiSeries.size > 0,
+    files.length > 0,
+    issues.length > 0,
+    crmLeads.length > 0,
+    sops.length > 0 || forms.length > 0 || submissions.length > 0
+  ].filter(Boolean).length;
+  const canonicalKpiReadiness = canonicalKpiReadinessCounts(kpis, kpiSettings, input.asOf);
+  const intelligenceReadiness = calculateIntelligenceReadiness({
+    hasWorkspaceProfile: Boolean(workspace?.industry || workspace?.size),
+    hasOriginalFiles: files.length > 0,
+    hasCanonicalKpis: canonicalKpiReadiness.count > 0,
+    hasTraceableCustomerOrOperationalRecords: crmLeads.length > 0 || issues.length > 0,
+    independentSourceIdentityCount,
+    sourceTypeCount: readinessSourceTypeCount,
+    canonicalKpiCount: canonicalKpiReadiness.count,
+    kpisWithHistoricalDepth: canonicalKpiReadiness.withHistoricalDepth,
+    freshKpiCount: canonicalKpiReadiness.fresh
+  });
+  const dataQualityScore = intelligenceReadiness.score;
+  const dataQualityLabel = intelligenceReadiness.label;
+  const dataConfidence = intelligenceReadiness.confidence;
   const insights: IntelligenceInsight[] = [
     ...operationalInsights,
     ...openIssues.slice(0, 4).map((issue) => {
@@ -692,7 +819,51 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         affectedArea: kpi.category || kpi.name,
         timePeriod: kpi.metric_date,
         limitation: history < 3 ? `Only ${history} historical record${history === 1 ? " is" : "s are"} available, so the result may not represent a durable trend.` : "The KPI history confirms the result, but not what caused it.",
-        fingerprint: ""
+        fingerprint: "",
+        businessHealthEffect: {
+          identity: canonicalKpiPerformanceIdentity(semantics),
+          points: 10 as const
+        }
+      };
+    }),
+    ...sustainedFavorableTrends.map(({ kpi, semantics, history: kpiHistory }) => {
+      const datedHistory = distinctDatedKpiHistory(kpiHistory);
+      const supportingRecords = datedHistory.slice(-4).map((row, index) =>
+        kpiEvidenceRecord(row, semantics, index === datedHistory.slice(-4).length - 1
+          ? "The latest value completes a sustained favorable KPI trend."
+          : "This dated value supports the sustained KPI trend.")
+      );
+      const independentSourceCount = new Set(supportingRecords.map((record) => record.sourceKey)).size;
+      const start = datedHistory[0];
+      const latest = datedHistory.at(-1) || kpi;
+
+      return {
+        id: `kpi-trend-opportunity-${kpi.id}`,
+        type: "Opportunity" as const,
+        title: `${kpi.name} has a sustained favorable trend`,
+        summary: `${formatMetric(start.actual_value, kpi.name)} to ${formatMetric(latest.actual_value, kpi.name)} across ${datedHistory.length} dated periods.`,
+        why: "The canonical KPI semantics classify the sustained movement as favorable, and no authoritative target is configured.",
+        impact: "The trend is confirmed in the KPI history, but the current evidence does not establish its cause or durability beyond the measured periods.",
+        recommendedAction: "Decide whether the practices associated with this trend should be documented and monitored.",
+        confidence: independentSourceCount >= 2 ? "High" as const : "Medium" as const,
+        evidence: [`Dated periods: ${datedHistory.length}`, `Latest value: ${formatMetric(latest.actual_value, kpi.name)}`, "No authoritative target is configured"],
+        evidenceCount: supportingRecords.length,
+        supportingRecords,
+        independentSourceCount,
+        contradictoryEvidence: [],
+        missingEvidence: ["Evidence explaining what caused the favorable movement"],
+        sourceTypes: ["KPIs"],
+        sourceHref: "/app/kpis",
+        priority: "Medium" as const,
+        lastUpdated: latest.updated_at || latest.created_at,
+        affectedArea: kpi.category || kpi.name,
+        timePeriod: `${start.metric_date} to ${latest.metric_date}`,
+        limitation: "The KPI history confirms favorable movement, not causation or future performance.",
+        fingerprint: "",
+        businessHealthEffect: {
+          identity: canonicalKpiPerformanceIdentity(semantics),
+          points: 8 as const
+        }
       };
     }),
     ...pendingImports.slice(0, 3).map((item) => {
@@ -785,12 +956,28 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
   const opportunities = sortedInsights.filter((insight) => insight.type === "Opportunity");
   const recommendations = sortedInsights.filter((insight) => insight.type === "Recommendation" || insight.type === "Risk" || insight.type === "Bottleneck");
   const forecasts = sortedInsights.filter((insight) => insight.type === "Forecast");
-  const businessHealthComponents = businessHealthScoreComponents(sortedInsights, dataQualityScore);
-  const healthScore = hasHealthEvidence
-    ? Math.max(10, Math.min(100, dataQualityScore - businessHealthComponents.riskPenalty + businessHealthComponents.opportunityAdjustment))
-    : 0;
-  const healthStatus = !hasHealthEvidence || dataQualityScore < 25 ? "Insufficient Data" : healthScore >= 75 ? "Strong" : healthScore >= 50 ? "Watch" : "At Risk";
-  const trend = !hasHealthEvidence ? "Not enough history" : risks.length > opportunities.length + 1 ? "Declining" : opportunities.length > risks.length ? "Improving" : dataQualityScore < 35 ? "Not enough history" : "Holding steady";
+  const canonicalKpiIdentityByLabel = new Map(evaluatedKpis.map(({ kpi, semantics }) => [normalizeKpiName(kpi.name), canonicalKpiPerformanceIdentity(semantics)]));
+  const positivePerformanceSignals: BusinessHealthPerformanceSignal[] = sortedInsights.flatMap((insight) => insight.businessHealthEffect
+    ? [{ identity: insight.businessHealthEffect.identity, findingId: insight.id, points: insight.businessHealthEffect.points }]
+    : []);
+  const negativeSignals = negativePerformanceSignals(risks, canonicalKpiIdentityByLabel);
+  const businessHealthPerformance = calculateBusinessHealthPerformance({
+    evidenceEligible: hasHealthEvidence,
+    positiveSignals: positivePerformanceSignals,
+    negativeSignals
+  });
+  const businessHealthComponents = businessHealthPerformance.components;
+  const healthScore = businessHealthPerformance.score;
+  const healthStatus = businessHealthPerformance.status;
+  const scoredRiskCount = businessHealthComponents.driverImpacts.filter((impact) => impact.kind === "risk").length;
+  const scoredPositiveCount = businessHealthComponents.driverImpacts.filter((impact) => impact.kind === "opportunity").length;
+  const trend = !businessHealthPerformance.available
+    ? "Not enough history"
+    : scoredRiskCount > scoredPositiveCount + 1
+      ? "Declining"
+      : scoredPositiveCount > scoredRiskCount
+        ? "Improving"
+        : "Holding steady";
   const topRisk = risks[0];
   const topOpportunity = opportunities[0];
   const topRecommendation = recommendations[0];
@@ -799,14 +986,19 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
     ? `${topRisk.title}. ${topRisk.why}`
     : topOpportunity
       ? `${topOpportunity.title}. ${topOpportunity.why}`
-      : dataQualityScore < 40
+      : dataQualityScore < 50
         ? "Vaeroex needs more source data before it can produce a confident leadership briefing."
         : "No major risk is visible right now. Continue adding source data and reviewing business memory.";
 
   return {
     executiveSummary,
     businessHealth: {
-      available: hasHealthEvidence,
+      available: businessHealthPerformance.available,
+      unavailableReason: !hasHealthEvidence
+        ? "insufficient_original_evidence"
+        : !businessHealthPerformance.hasEvaluableOutcome
+          ? "no_evaluable_performance_outcome"
+          : null,
       score: healthScore,
       status: healthStatus,
       trend,
@@ -818,10 +1010,10 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
       confidence: dataConfidence,
       reason:
         dataConfidence === "High"
-          ? "Based on multiple source types, historical records, and saved Vaeroex context."
+          ? "Authoritative evidence is complete, diverse, historically deep, and current enough for high-confidence interpretation."
           : dataConfidence === "Medium"
-            ? "Based on available workspace records, but more history would improve confidence."
-            : "Not enough workspace history exists for high-confidence intelligence yet.",
+            ? "Authoritative evidence is usable, but source diversity, KPI history, or freshness still limits confidence."
+            : "Authoritative evidence remains limited in completeness, independent-source diversity, KPI history, or freshness.",
       suggestedNextData: suggestedNextData.length ? suggestedNextData : ["Keep adding current evidence, outcomes, and KPI history."]
     },
     forecastReadiness: {

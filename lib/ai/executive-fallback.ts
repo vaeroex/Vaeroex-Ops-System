@@ -8,6 +8,7 @@ import type {
   GlobalSearchAnswer
 } from "@/lib/search/types";
 import type { Json } from "@/lib/supabase/types";
+import { BUSINESS_HEALTH_CALCULATION_VERSION } from "@/lib/intelligence/snapshot/v1/versions";
 
 type JsonRecord = Record<string, Json | undefined>;
 
@@ -178,9 +179,11 @@ export function buildLimitedEvidenceExecutiveAnswer({
   const structured = record(snapshot.structured_context);
   const healthContext = record(structured.business_health_score_context);
   const currentAssessment = record(healthContext.current_assessment);
+  const scoreComponents = record(healthContext.score_components);
   const coverage = record(healthContext.coverage_indicators);
   const score = numberValue(currentAssessment.score);
   const dataQualityScore = numberValue(currentAssessment.data_quality_score);
+  const formulaV2 = stringValue(scoreComponents.calculation_version) === BUSINESS_HEALTH_CALCULATION_VERSION;
   const original = reasoningContext.rankedEvidence.find((item) => item.evidenceRole === "original") || null;
   const secondary = reasoningContext.rankedEvidence.find((item) => item.evidenceRole !== "supporting") || null;
   const healthEvidence = reasoningContext.rankedEvidence.find((item) => item.domain === "business_health") || null;
@@ -239,7 +242,9 @@ export function buildLimitedEvidenceExecutiveAnswer({
   const sourceFiles = numberValue(coverage.original_source_files) || 0;
   const kpiRecords = numberValue(coverage.kpi_records) || 0;
   const healthReadiness = businessHealth
-    ? `The latest assessment records a data-quality base of ${dataQualityScore ?? "not established"} and ${dataConfidence.toLowerCase()} data confidence, with ${kpiRecords} KPI record${kpiRecords === 1 ? "" : "s"} and ${sourceFiles} original source file${sourceFiles === 1 ? "" : "s"} recorded at that time. The score starts from data quality, subtracts 12 points for each High-priority risk and 6 for each Medium-priority risk up to 45 points, then adds 4 points per opportunity up to 15. The saved snapshot does not preserve the item-by-item adjustments, so that breakdown should not be inferred.`
+    ? formulaV2
+      ? `The latest assessment records an Intelligence Readiness score of ${dataQualityScore ?? "not established"} and ${dataConfidence.toLowerCase()} confidence, with ${kpiRecords} KPI record${kpiRecords === 1 ? "" : "s"} and ${sourceFiles} original source file${sourceFiles === 1 ? "" : "s"} recorded at that time. Business Health uses a fixed 50-point performance baseline, confirmed positive KPI performance, and deduplicated deterministic risks. Readiness does not increase or reduce the health score.`
+      : `The latest assessment records a data-quality base of ${dataQualityScore ?? "not established"} and ${dataConfidence.toLowerCase()} data confidence, with ${kpiRecords} KPI record${kpiRecords === 1 ? "" : "s"} and ${sourceFiles} original source file${sourceFiles === 1 ? "" : "s"} recorded at that time. The score starts from data quality, subtracts 12 points for each High-priority risk and 6 for each Medium-priority risk up to 45 points, then adds 4 points per opportunity up to 15. The saved snapshot does not preserve the item-by-item adjustments, so that breakdown should not be inferred.`
     : original && independentSourceCount > 1
       ? `${independentSourceCount} independent original sources across ${reasoningContext.originalSourceTypeCount} evidence type${reasoningContext.originalSourceTypeCount === 1 ? "" : "s"} are available. This limited response avoids a cross-source conclusion because the deeper comparison did not complete.`
       : original
@@ -257,7 +262,9 @@ export function buildLimitedEvidenceExecutiveAnswer({
     : reference
       ? [{
         finding: businessHealth
-          ? `The recorded Business Health score is ${score}, with a recorded data-quality base of ${dataQualityScore ?? "not established"}.`
+          ? formulaV2
+            ? `The recorded Business Health score is ${score}, with an independently recorded Intelligence Readiness score of ${dataQualityScore ?? "not established"}.`
+            : `The recorded Business Health score is ${score}, with a recorded data-quality base of ${dataQualityScore ?? "not established"}.`
           : `${reference.title} is relevant to the question, but its broader significance is not established.`,
         businessImpact: businessHealth
           ? "The score can guide a review, but it cannot by itself distinguish operating performance from assessment readiness."

@@ -29,6 +29,10 @@ import {
   businessHealthDriverStableKey,
   type BusinessHealthExplanationProjectionV1
 } from "@/lib/intelligence/snapshot/v1/projections";
+import {
+  BUSINESS_HEALTH_CALCULATION_VERSION,
+  DATA_QUALITY_CALCULATION_VERSION
+} from "@/lib/intelligence/snapshot/v1/versions";
 
 const MAX_DRIVERS = 4;
 const MAX_RECORDS_PER_DRIVER = 2;
@@ -233,10 +237,10 @@ function selectSubmode({
   const improving = normalizedTrend.includes("improving") || (trendDelta !== null && trendDelta > 0);
   const worsening = normalizedTrend.includes("declining") || (trendDelta !== null && trendDelta < 0);
 
-  if (normalizedStatus.includes("healthy") && improving) return "healthy_improving";
-  if (normalizedStatus.includes("healthy") && worsening) return "healthy_slowing";
-  if ((normalizedStatus.includes("watch") || normalizedStatus.includes("critical")) && improving) return "watch_recovering";
-  if (normalizedStatus.includes("critical") && worsening) return "at_risk_worsening";
+  if ((normalizedStatus.includes("healthy") || normalizedStatus.includes("strong")) && improving) return "healthy_improving";
+  if ((normalizedStatus.includes("healthy") || normalizedStatus.includes("strong")) && worsening) return "healthy_slowing";
+  if ((normalizedStatus.includes("watch") || normalizedStatus.includes("critical") || normalizedStatus.includes("at risk")) && improving) return "watch_recovering";
+  if ((normalizedStatus.includes("critical") || normalizedStatus.includes("at risk")) && worsening) return "at_risk_worsening";
   return "stable";
 }
 
@@ -274,10 +278,7 @@ function sourceLabelForCitation(
 }
 
 function healthStatusLabel(status: IntelligenceLayerResult["businessHealth"]["status"]) {
-  if (status === "Strong") return "Healthy";
-  if (status === "Watch") return "Watch";
-  if (status === "At Risk") return "Critical";
-  return "Limited evidence";
+  return status;
 }
 
 export type BusinessHealthExplanationEvidenceContext = Readonly<{
@@ -493,6 +494,10 @@ export function buildBusinessHealthExplanationPackage({
     contractId: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
     contractVersion: BUSINESS_HEALTH_EXPLANATION_CONTRACT_VERSION,
     validatorVersion: BUSINESS_HEALTH_EXPLANATION_VALIDATOR_VERSION,
+    calculationVersions: {
+      businessHealth: BUSINESS_HEALTH_CALCULATION_VERSION,
+      dataQuality: DATA_QUALITY_CALCULATION_VERSION
+    },
     submode,
     facts: {
       score: facts.score,

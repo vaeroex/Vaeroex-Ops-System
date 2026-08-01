@@ -1,3 +1,9 @@
+import {
+  BUSINESS_HEALTH_CALCULATION_VERSION_V1,
+  BUSINESS_HEALTH_CALCULATION_VERSIONS,
+  type BusinessHealthCalculationVersion
+} from "@/lib/intelligence/snapshot/v1/versions";
+
 export type BusinessHealthTrendRange = "7D" | "1M" | "3M" | "6M" | "YTD";
 
 export type StoredBusinessHealthTrendPoint = Readonly<{
@@ -5,6 +11,7 @@ export type StoredBusinessHealthTrendPoint = Readonly<{
   score: number;
   status: string;
   trend: string;
+  calculationVersion?: BusinessHealthCalculationVersion;
 }>;
 
 export type BusinessHealthTrendPeriodKind = "daily" | "weekly_average" | "biweekly_average" | "monthly_average";
@@ -21,6 +28,8 @@ export type BusinessHealthTrendDisplayPoint = BusinessHealthTrendBucket & Readon
   score: number;
   sampleCount: number;
   sourceDates: readonly string[];
+  calculationVersion: BusinessHealthCalculationVersion;
+  methodSegment: number;
 }>;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -118,6 +127,12 @@ function averageScore(points: readonly StoredBusinessHealthTrendPoint[]) {
   return Math.round(average * 10) / 10;
 }
 
+function calculationVersion(point: StoredBusinessHealthTrendPoint): BusinessHealthCalculationVersion {
+  return point.calculationVersion && BUSINESS_HEALTH_CALCULATION_VERSIONS.includes(point.calculationVersion)
+    ? point.calculationVersion
+    : BUSINESS_HEALTH_CALCULATION_VERSION_V1;
+}
+
 export function buildBusinessHealthTrendDisplayPoints(
   points: readonly StoredBusinessHealthTrendPoint[],
   range: BusinessHealthTrendRange,
@@ -125,21 +140,35 @@ export function buildBusinessHealthTrendDisplayPoints(
 ) {
   const buckets = buildBusinessHealthTrendBuckets(range, asOfDate);
   const storedPoints = filterStoredBusinessHealthTrendPoints(points, range, asOfDate);
+  let methodSegment = 0;
+  const segmentedPoints = storedPoints.map((point, index) => {
+    const version = calculationVersion(point);
+    if (index > 0 && version !== calculationVersion(storedPoints[index - 1])) methodSegment += 1;
+    return { ...point, calculationVersion: version, methodSegment };
+  });
 
   return buckets.flatMap<BusinessHealthTrendDisplayPoint>((bucket, bucketIndex) => {
-    const sourcePoints = storedPoints.filter(
+    const sourcePoints = segmentedPoints.filter(
       (point) => point.snapshotDate >= bucket.startDate && point.snapshotDate <= bucket.endDate
     );
 
     if (!sourcePoints.length) return [];
+    const segments = new Map<number, typeof sourcePoints>();
+    for (const point of sourcePoints) segments.set(point.methodSegment, [...(segments.get(point.methodSegment) || []), point]);
+    const splitByMethod = segments.size > 1;
 
-    return [{
+    return [...segments.entries()].map(([segment, segmentPoints]) => ({
       ...bucket,
+      key: `${bucket.key}:method-${segment}`,
+      startDate: splitByMethod ? segmentPoints[0].snapshotDate : bucket.startDate,
+      endDate: splitByMethod ? segmentPoints[segmentPoints.length - 1].snapshotDate : bucket.endDate,
       bucketIndex,
-      score: bucket.kind === "daily" ? sourcePoints[sourcePoints.length - 1].score : averageScore(sourcePoints),
-      sampleCount: sourcePoints.length,
-      sourceDates: sourcePoints.map((point) => point.snapshotDate)
-    }];
+      score: bucket.kind === "daily" ? segmentPoints[segmentPoints.length - 1].score : averageScore(segmentPoints),
+      sampleCount: segmentPoints.length,
+      sourceDates: segmentPoints.map((point) => point.snapshotDate),
+      calculationVersion: segmentPoints[0].calculationVersion,
+      methodSegment: segment
+    }));
   });
 }
 
