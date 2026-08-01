@@ -1,5 +1,6 @@
 const fs = require("node:fs");
 const Module = require("node:module");
+const os = require("node:os");
 const path = require("node:path");
 const ts = require("typescript");
 
@@ -33,16 +34,52 @@ Module._load = function loadPatched(request, parent, isMain) {
   return originalLoad.call(this, request, parent, isMain);
 };
 
-const { NvidiaTextReranker } = require("../lib/ai/evidence-engine/nvidia-text-reranker.ts");
-const { EVIDENCE_ENGINE_FROZEN_FIXTURES } = require("../lib/ai/evidence-engine/benchmark-fixtures.ts");
-const { runEvidenceEngineRerankerBenchmark } = require("../lib/ai/evidence-engine/benchmark.ts");
+const {
+  NvidiaTextReranker,
+  nvidiaTextRerankerShadowEnabled
+} = require("../lib/ai/evidence-engine/nvidia-text-reranker.ts");
+const { NVIDIA_RERANKER_POC_FIXTURES } = require("../lib/ai/evidence-engine/reranker-poc-fixtures.ts");
+const {
+  privacySafeRerankerPocReport,
+  runNvidiaRerankerPocBenchmark
+} = require("../lib/ai/evidence-engine/benchmark.ts");
+
+const baselineOnly = process.argv.includes("--baseline-only");
+const detailedReport = process.argv.includes("--detailed");
+
+const baselineOnlyReranker = {
+  id: "baseline_only",
+  version: "baseline_only_v1",
+  provider: "deterministic",
+  model: "deterministic",
+  async rerank({ candidates, mode }) {
+    return {
+      version: "rerank_result_v1",
+      adapterId: this.id,
+      adapterVersion: this.version,
+      provider: this.provider,
+      model: this.model,
+      mode,
+      status: "skipped",
+      rankings: [],
+      inputCount: candidates.length,
+      inputTokens: 0,
+      inputTokensEstimated: false,
+      latencyMs: 0,
+      failureCode: "disabled"
+    };
+  }
+};
 
 function assertSafeBenchmarkEnvironment() {
   if (process.env.VERCEL_ENV === "production") {
     throw new Error("Evidence Engine reranker benchmarks refuse Production.");
   }
-  if (process.env.VAEROEX_EVIDENCE_ENGINE_BENCHMARK_CONFIRM !== "preview") {
-    throw new Error("Set VAEROEX_EVIDENCE_ENGINE_BENCHMARK_CONFIRM=preview to run frozen-fixture shadow evaluation.");
+  if (baselineOnly) return;
+  if (!nvidiaTextRerankerShadowEnabled()) {
+    throw new Error(
+      "Enable the explicit synthetic POC, shadow, confirmation, and benchmark-mode gates before calling NVIDIA."
+    );
   }
   if (!process.env.NVIDIA_RERANK_API_KEY && !process.env.NVIDIA_API_KEY) {
     throw new Error("A server-side NVIDIA_RERANK_API_KEY or NVIDIA_API_KEY is required.");
@@ -50,49 +87,44 @@ function assertSafeBenchmarkEnvironment() {
 }
 
 function boundedIterations() {
-  const configured = Number.parseInt(process.env.EVIDENCE_ENGINE_RERANK_ITERATIONS || "5", 10);
+  const configured = Number.parseInt(process.env.EVIDENCE_ENGINE_RERANK_ITERATIONS || "1", 10);
   return Math.min(20, Math.max(1, Number.isFinite(configured) ? configured : 5));
+}
+
+function outputPath() {
+  const argument = process.argv.find((value) => value.startsWith("--output="));
+  if (!argument) return null;
+  const resolved = path.resolve(argument.slice("--output=".length));
+  const temporaryRoot = `${path.resolve(os.tmpdir())}${path.sep}`;
+  if (!resolved.startsWith(temporaryRoot)) {
+    throw new Error("Benchmark reports may be written only beneath the operating-system temporary directory.");
+  }
+  return resolved;
 }
 
 async function main() {
   assertSafeBenchmarkEnvironment();
   const iterations = boundedIterations();
-  const fixtures = Array.from({ length: iterations }, () => EVIDENCE_ENGINE_FROZEN_FIXTURES).flat();
-  const report = await runEvidenceEngineRerankerBenchmark({
-    reranker: new NvidiaTextReranker(),
+  const fixtures = Array.from({ length: iterations }, () => NVIDIA_RERANKER_POC_FIXTURES).flat();
+  const report = await runNvidiaRerankerPocBenchmark({
+    reranker: baselineOnly ? baselineOnlyReranker : new NvidiaTextReranker(),
     fixtures
   });
-  const safeRuns = report.runs.map((run) => ({
-    fixtureId: run.fixtureId,
-    status: run.rerankResult.status,
-    failureCode: run.rerankResult.failureCode,
-    latencyMs: run.rerankResult.latencyMs,
-    inputCount: run.rerankResult.inputCount,
-    inputTokens: run.rerankResult.inputTokens,
-    inputTokensEstimated: run.rerankResult.inputTokensEstimated,
-    fallbackCorrect: run.fallbackCorrect
-  }));
-
-  console.log(JSON.stringify({
-    benchmarkVersion: report.benchmarkVersion,
-    model: "nvidia/llama-nemotron-rerank-1b-v2",
-    mode: "shadow",
-    frozenFixtureSet: true,
+  const privacySafeReport = privacySafeRerankerPocReport(report);
+  const { runs, ...aggregateReport } = privacySafeReport;
+  const safeReport = {
+    executionMode: baselineOnly ? "baseline_only" : "nvidia_shadow",
+    model: baselineOnly ? "deterministic" : "nvidia/llama-nemotron-rerank-1b-v2",
+    syntheticFixtureSet: true,
     iterations,
-    fixtureRuns: report.fixtureCount,
-    baseline: report.baseline,
-    reranked: report.reranked,
-    latency: report.latency,
-    cost: report.cost,
-    adapterFailures: report.adapterFailures,
-    fallbackCorrectness: report.fallbackCorrectness,
-    lifecycleExclusionAccuracy: report.lifecycleExclusionAccuracy,
-    workspaceIsolationAccuracy: report.workspaceIsolationAccuracy,
-    qualification: report.qualification,
-    downstreamAnswerEvaluationRequiredBeforePromotion: true,
-    readyForPromotion: false,
-    runs: safeRuns
-  }, null, 2));
+    detailedReport,
+    ...aggregateReport,
+    ...(detailedReport ? { runs } : {})
+  };
+  const serialized = `${JSON.stringify(safeReport, null, 2)}\n`;
+  const destination = outputPath();
+  if (destination) fs.writeFileSync(destination, serialized, { encoding: "utf8", mode: 0o600 });
+  process.stdout.write(serialized);
 }
 
 main().catch((error) => {

@@ -12,7 +12,7 @@ export const NVIDIA_TEXT_RERANKER_MODEL = "nvidia/llama-nemotron-rerank-1b-v2";
 export const NVIDIA_TEXT_RERANKER_ADAPTER_VERSION = "nvidia_text_reranker_v1";
 const DEFAULT_NVIDIA_RERANK_ENDPOINT =
   "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-nemotron-rerank-1b-v2/reranking";
-const MAX_SHADOW_CANDIDATES = 48;
+export const NVIDIA_TEXT_RERANKER_MAX_CANDIDATES = 48;
 const MAX_PASSAGE_CHARACTERS = 1_800;
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -48,7 +48,7 @@ export function buildNvidiaTextRerankRequest({
   return {
     model: NVIDIA_TEXT_RERANKER_MODEL,
     query: { text: queryText.slice(0, 4_000) },
-    passages: candidates.slice(0, MAX_SHADOW_CANDIDATES).map((candidate) => ({ text: boundedPassage(candidate) })),
+    passages: candidates.map((candidate) => ({ text: boundedPassage(candidate) })),
     truncate: "END" as const
   };
 }
@@ -111,7 +111,16 @@ export class NvidiaTextReranker implements EvidenceReranker {
     mode: "shadow" | "active";
     timeoutMs?: number;
   }): Promise<RerankResult> {
-    const boundedCandidates = candidates.slice(0, MAX_SHADOW_CANDIDATES);
+    const candidateIds = candidates.map((candidate) => candidate.candidateId);
+    if (candidates.length > NVIDIA_TEXT_RERANKER_MAX_CANDIDATES || new Set(candidateIds).size !== candidateIds.length) {
+      return failureResult({
+        mode,
+        inputCount: candidates.length,
+        latencyMs: 0,
+        failureCode: "unsafe_benchmark_input"
+      });
+    }
+    const boundedCandidates = candidates;
     const requestBody = buildNvidiaTextRerankRequest({ queryText, candidates: boundedCandidates });
     const estimatedInputTokens = Math.max(
       1,
@@ -220,6 +229,8 @@ export class NvidiaTextReranker implements EvidenceReranker {
 
 export function nvidiaTextRerankerShadowEnabled() {
   if (process.env.VERCEL_ENV === "production") return false;
-  return process.env.VAEROEX_NVIDIA_RERANK_SHADOW === "true" &&
-    process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM === "preview";
+  return process.env.VAEROEX_NVIDIA_RERANK_POC === "true" &&
+    process.env.VAEROEX_NVIDIA_RERANK_SHADOW === "true" &&
+    process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM === "synthetic_benchmark" &&
+    process.env.VAEROEX_NVIDIA_RERANK_BENCHMARK_MODE === "synthetic";
 }

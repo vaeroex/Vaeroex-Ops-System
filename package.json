@@ -38,6 +38,7 @@
     "test:persistent-ask": "node scripts/persistent-ask-regression-tests.js",
     "test:ask-retirement": "node scripts/ask-vaeroex-retirement-regression-tests.js",
     "test:evidence-engine": "node scripts/evidence-engine-regression-tests.js",
+    "test:nvidia-reranker-shadow-poc": "node scripts/nvidia-reranker-shadow-poc-regression-tests.js",
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js && node scripts/gpt56-business-health-routing-regression-tests.js",
     "test:business-health-formula-v2": "node scripts/business-health-formula-v2-regression-tests.js",
     "test:trust-layer-v1": "node scripts/trust-layer-v1-regression-tests.js",
@@ -66,6 +67,7 @@
     "test:nvidia-qualification-stage-three-a": "node scripts/nvidia-stage-three-a-qualification-regression-tests.js",
     "test:nvidia-qualification-stage-three-b": "node scripts/nvidia-stage-three-b-qualification-regression-tests.js",
     "benchmark:evidence-engine-reranker": "node scripts/evidence-engine-reranker-benchmark.js",
+    "benchmark:evidence-engine-reranker:baseline": "node scripts/evidence-engine-reranker-benchmark.js --baseline-only",
     "benchmark:answers": "node scripts/answer-quality-benchmark.js"
   },
   "dependencies": {

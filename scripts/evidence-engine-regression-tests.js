@@ -377,15 +377,21 @@ async function main() {
   assert.equal(JSON.stringify(trace.snapshot()).includes("workspace-a"), false);
 
   const previousVercelEnv = process.env.VERCEL_ENV;
+  const previousPoc = process.env.VAEROEX_NVIDIA_RERANK_POC;
   const previousShadow = process.env.VAEROEX_NVIDIA_RERANK_SHADOW;
   const previousConfirm = process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM;
+  const previousBenchmarkMode = process.env.VAEROEX_NVIDIA_RERANK_BENCHMARK_MODE;
   process.env.VERCEL_ENV = "production";
+  process.env.VAEROEX_NVIDIA_RERANK_POC = "true";
   process.env.VAEROEX_NVIDIA_RERANK_SHADOW = "true";
-  process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM = "preview";
+  process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM = "synthetic_benchmark";
+  process.env.VAEROEX_NVIDIA_RERANK_BENCHMARK_MODE = "synthetic";
   assert.equal(nvidiaTextRerankerShadowEnabled(), false);
   if (previousVercelEnv === undefined) delete process.env.VERCEL_ENV; else process.env.VERCEL_ENV = previousVercelEnv;
+  if (previousPoc === undefined) delete process.env.VAEROEX_NVIDIA_RERANK_POC; else process.env.VAEROEX_NVIDIA_RERANK_POC = previousPoc;
   if (previousShadow === undefined) delete process.env.VAEROEX_NVIDIA_RERANK_SHADOW; else process.env.VAEROEX_NVIDIA_RERANK_SHADOW = previousShadow;
   if (previousConfirm === undefined) delete process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM; else process.env.VAEROEX_EVIDENCE_ENGINE_SHADOW_CONFIRM = previousConfirm;
+  if (previousBenchmarkMode === undefined) delete process.env.VAEROEX_NVIDIA_RERANK_BENCHMARK_MODE; else process.env.VAEROEX_NVIDIA_RERANK_BENCHMARK_MODE = previousBenchmarkMode;
 
   assert.equal(EVIDENCE_ENGINE_FROZEN_FIXTURES.length, 10);
   for (const fixture of EVIDENCE_ENGINE_FROZEN_FIXTURES) {
@@ -467,7 +473,8 @@ async function main() {
 
   const evidenceIndexSource = read("lib/ai/evidence-index.ts");
   assert.match(evidenceIndexSource, /class SupabasePgvectorCandidateRetriever implements CandidateRetriever/);
-  assert.match(evidenceIndexSource, /runEvidenceRerankerShadow/);
+  assert.doesNotMatch(evidenceIndexSource, /runEvidenceRerankerShadow|new NvidiaTextReranker/);
+  assert.match(evidenceIndexSource, /synthetic_benchmark_only/);
   assert.doesNotMatch(evidenceIndexSource, /applyRerankResult/);
   assert.match(evidenceIndexSource, /selectedCandidateIds/);
   const migrationSource = read("supabase/migrations/202607110001_business_memory_evidence_eligibility.sql");

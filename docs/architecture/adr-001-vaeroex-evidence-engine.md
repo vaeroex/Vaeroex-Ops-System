@@ -39,7 +39,9 @@ The Evidence Engine owns:
 
 Generation models may summarize or reason over an approved evidence manifest. They may not determine or override any responsibility listed above.
 
-The first implementation slice introduces contracts and adapters around the existing Supabase and pgvector retrieval path. It does not change active ranking, routing, database state, or user-facing behavior. NVIDIA reranking runs only in explicit shadow evaluation mode, and its order is never applied to an active response in this slice.
+The first implementation slice introduces contracts and adapters around the existing Supabase and pgvector retrieval path. It does not change active ranking, routing, database state, or user-facing behavior. NVIDIA reranking runs only in an explicit synthetic benchmark shadow mode, and its order is never applied to an active response in this slice.
+
+The shadow proof of concept freezes an already-authorized synthetic candidate pool after exact duplicate and canonical-source handling. Baseline and NVIDIA orders are compared before bounded selection, source-registry construction, manifest construction, and citation assignment. Runtime customer retrieval never invokes the NVIDIA adapter; optional candidate-pool instrumentation is content-free, non-Production, and disabled by default.
 
 ## Architecture
 

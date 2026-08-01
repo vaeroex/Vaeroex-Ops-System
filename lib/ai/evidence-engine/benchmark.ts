@@ -6,6 +6,23 @@ import {
   type FrozenEvidenceFixture
 } from "@/lib/ai/evidence-engine/benchmark-fixtures";
 import { applyRerankResult } from "@/lib/ai/evidence-engine/reranker";
+import {
+  NVIDIA_RERANKER_POC_FIXTURES,
+  RERANKER_POC_WORKSPACE_ID,
+  assertSyntheticRerankerPocCandidates,
+  rerankerPocFixtureCandidates,
+  rerankerPocRecordIsEligible,
+  type RerankerPocFixture,
+  type RerankerPocRecord
+} from "@/lib/ai/evidence-engine/reranker-poc-fixtures";
+import {
+  aggregatePoolSizeDistribution,
+  applyDeterministicAuthorityAndDiversityPolicy,
+  buildRetrievalPoolMeasurement,
+  freezeRerankerPocCandidatePool,
+  type RetrievalPoolMeasurement
+} from "@/lib/ai/evidence-engine/reranker-poc-pool";
+import { deepFreeze } from "@/lib/ai/evidence-engine/immutability";
 
 function average(values: number[]) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
@@ -180,4 +197,425 @@ export async function runEvidenceEngineRerankerBenchmark({
     qualification,
     runs
   };
+}
+
+const POC_RECALL_CUTOFFS = [1, 3, 5, 10, 20] as const;
+const POC_PRECISION_CUTOFFS = [1, 3, 5, 10] as const;
+
+function normalizedCandidateContent(candidate: EvidenceCandidate) {
+  return `${candidate.title}\n${candidate.summary || ""}\n${candidate.excerpt}`
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function pocRecordsById(fixture: RerankerPocFixture) {
+  return new Map(fixture.records.map((record) => [record.candidateId, record]));
+}
+
+function relevantRecord(record: RerankerPocRecord | undefined) {
+  return Boolean(record && record.relevanceGrade > 0 && rerankerPocRecordIsEligible(record));
+}
+
+function rate(count: number, total: number) {
+  return total ? count / total : 0;
+}
+
+export function evaluateRerankerPocRanking(
+  fixture: RerankerPocFixture,
+  candidates: readonly EvidenceCandidate[]
+) {
+  const byId = pocRecordsById(fixture);
+  const eligibleCandidateIds = new Set(rerankerPocFixtureCandidates(fixture).map((candidate) => candidate.candidateId));
+  const eligibleRelevantIds = new Set(
+    candidates
+      .filter((candidate) => relevantRecord(byId.get(candidate.candidateId)))
+      .map((candidate) => candidate.candidateId)
+  );
+  const selected = candidates.slice(0, fixture.resultLimit);
+  const at = (cutoff: number) => candidates.slice(0, cutoff);
+  const relevantAt = (cutoff: number) => at(cutoff).filter((candidate) => relevantRecord(byId.get(candidate.candidateId))).length;
+  const recallAt = (cutoff: number) => eligibleRelevantIds.size ? relevantAt(cutoff) / eligibleRelevantIds.size : 1;
+  const precisionAt = (cutoff: number) => rate(relevantAt(cutoff), Math.min(cutoff, candidates.length));
+  const gradesAt = (cutoff: number) => at(cutoff).map((candidate) => byId.get(candidate.candidateId)?.relevanceGrade || 0);
+  const idealGradesAt = (cutoff: number) => Array.from(eligibleRelevantIds)
+    .map((candidateId) => byId.get(candidateId)?.relevanceGrade || 0)
+    .sort((left, right) => right - left)
+    .slice(0, cutoff);
+  const ndcgAt = (cutoff: number) => {
+    const ideal = dcg(idealGradesAt(cutoff));
+    return ideal ? dcg(gradesAt(cutoff)) / ideal : 1;
+  };
+  const firstRelevantIndex = candidates.findIndex((candidate) => relevantRecord(byId.get(candidate.candidateId)));
+  const selectedRecords = selected.map((candidate) => byId.get(candidate.candidateId)).filter((item): item is RerankerPocRecord => Boolean(item));
+  const exactSelectedKeys = selected.map((candidate) => `${candidate.source.canonicalSourceKey}:${normalizedCandidateContent(candidate)}`);
+  const duplicateSelectedCount = exactSelectedKeys.length - new Set(exactSelectedKeys).size;
+  const relevantSelectedRecords = selectedRecords.filter((record) => record.relevanceGrade > 0);
+  let authorityPairs = 0;
+  let authorityInversions = 0;
+  for (let leftIndex = 0; leftIndex < relevantSelectedRecords.length; leftIndex += 1) {
+    for (let rightIndex = leftIndex + 1; rightIndex < relevantSelectedRecords.length; rightIndex += 1) {
+      const left = relevantSelectedRecords[leftIndex];
+      const right = relevantSelectedRecords[rightIndex];
+      if (left.expectedAuthorityPreference === right.expectedAuthorityPreference) continue;
+      authorityPairs += 1;
+      if (left.expectedAuthorityPreference > right.expectedAuthorityPreference) authorityInversions += 1;
+    }
+  }
+  const firstRelevantOriginal = selectedRecords.findIndex((record) => record.relevanceGrade > 0 && record.evidenceRole === "original");
+  const firstRelevantBusinessNote = selectedRecords.findIndex((record) =>
+    record.relevanceGrade > 0 && record.sourceType === "business_note"
+  );
+  const businessNoteOverPromotion = firstRelevantOriginal >= 0 && firstRelevantBusinessNote >= 0 && firstRelevantBusinessNote < firstRelevantOriginal
+    ? 1
+    : 0;
+  const coveredGroups = new Set(selectedRecords.map((record) => record.relevanceGroup).filter((value): value is string => Boolean(value)));
+  const downstreamContextValidationFailed = fixture.requiredRelevanceGroups.some((group) => !coveredGroups.has(group));
+  const citationSourceCorrect = selected.every((candidate) => {
+    const record = byId.get(candidate.candidateId);
+    return Boolean(
+      record &&
+      eligibleCandidateIds.has(candidate.candidateId) &&
+      candidate.workspaceId === RERANKER_POC_WORKSPACE_ID &&
+      candidate.source.sourceId === record?.sourceId &&
+      candidate.source.canonicalSourceKey === `${RERANKER_POC_WORKSPACE_ID}:${record?.canonicalSourceId}`
+    );
+  });
+
+  return {
+    recallAt1: recallAt(1),
+    recallAt3: recallAt(3),
+    recallAt5: recallAt(5),
+    recallAt10: recallAt(10),
+    recallAt20: recallAt(20),
+    precisionAt1: precisionAt(1),
+    precisionAt3: precisionAt(3),
+    precisionAt5: precisionAt(5),
+    precisionAt10: precisionAt(10),
+    mrr: firstRelevantIndex >= 0 ? 1 / (firstRelevantIndex + 1) : eligibleRelevantIds.size ? 0 : 1,
+    ndcgAt5: ndcgAt(5),
+    ndcgAt10: ndcgAt(10),
+    firstRelevantResultPosition: firstRelevantIndex >= 0 ? firstRelevantIndex + 1 : null,
+    irrelevantSelectedChunkRate: rate(selectedRecords.filter((record) => record.relevanceGrade === 0).length, selected.length),
+    duplicateSelectedChunkRate: rate(duplicateSelectedCount, selected.length),
+    wrongEntityRate: rate(selectedRecords.filter((record) => record.wrongEntity).length, selected.length),
+    wrongKpiRate: rate(selectedRecords.filter((record) => record.wrongKpi).length, selected.length),
+    wrongReportingPeriodRate: rate(selectedRecords.filter((record) => record.wrongReportingPeriod).length, selected.length),
+    staleSourceRate: rate(selectedRecords.filter((record) => record.freshness === "stale").length, selected.length),
+    sourceAuthorityInversionRate: rate(authorityInversions, authorityPairs),
+    businessNoteOverPromotionRate: businessNoteOverPromotion,
+    citationSourceCorrectness: citationSourceCorrect ? 1 : 0,
+    downstreamContextValidationFailureRate: downstreamContextValidationFailed ? 1 : 0
+  };
+}
+
+export class RerankerPocCircuitBreaker {
+  private attempts = 0;
+  private failures = 0;
+  private consecutiveFailures = 0;
+  private openReason: "five_consecutive_failures" | "sustained_failure_rate" | null = null;
+
+  canAttempt() {
+    return this.openReason === null;
+  }
+
+  record(status: RerankResult["status"]) {
+    if (status === "skipped") return;
+    this.attempts += 1;
+    if (status === "success") {
+      this.consecutiveFailures = 0;
+      return;
+    }
+    this.failures += 1;
+    this.consecutiveFailures += 1;
+    if (this.consecutiveFailures >= 5) {
+      this.openReason = "five_consecutive_failures";
+    } else if (this.attempts >= 50 && this.failures / this.attempts > 0.02) {
+      this.openReason = "sustained_failure_rate";
+    }
+  }
+
+  snapshot() {
+    return deepFreeze({
+      attempts: this.attempts,
+      failures: this.failures,
+      consecutiveFailures: this.consecutiveFailures,
+      open: this.openReason !== null,
+      openReason: this.openReason
+    });
+  }
+}
+
+function circuitBreakerResult(reranker: EvidenceReranker, candidateCount: number): RerankResult {
+  return deepFreeze({
+    version: "rerank_result_v1" as const,
+    adapterId: reranker.id,
+    adapterVersion: reranker.version,
+    provider: reranker.provider,
+    model: reranker.model,
+    mode: "shadow" as const,
+    status: "skipped" as const,
+    rankings: [],
+    inputCount: candidateCount,
+    inputTokens: 0,
+    inputTokensEstimated: false,
+    latencyMs: 0,
+    failureCode: "circuit_breaker_open" as const
+  });
+}
+
+type PocMetrics = ReturnType<typeof evaluateRerankerPocRanking>;
+
+type RerankerPocBenchmarkRun = {
+  queryId: string;
+  category: RerankerPocFixture["category"];
+  retrievalMode: RerankerPocFixture["retrievalMode"];
+  resultLimit: number;
+  measurement: RetrievalPoolMeasurement;
+  baseline: PocMetrics;
+  reranked: PocMetrics;
+  baselineSelectedCandidateIds: string[];
+  rerankedSelectedCandidateIds: string[];
+  rerankResult: RerankResult;
+  fallbackCorrect: boolean;
+  sourceMetadataPreserved: boolean;
+  activeResultUnchanged: true;
+  excludedCandidateIds: string[];
+  crossWorkspaceExcludedCandidateIds: string[];
+  lifecycleExcludedCandidateIds: string[];
+};
+
+function aggregatePocMetrics(items: readonly PocMetrics[]) {
+  const keys = Object.keys(items[0] || {}) as Array<keyof PocMetrics>;
+  return Object.fromEntries(keys.map((key) => {
+    const values = items.map((item) => item[key]).filter((value): value is number => typeof value === "number");
+    return [key, average(values)];
+  })) as Record<keyof PocMetrics, number>;
+}
+
+function relativeReduction(baseline: number, candidate: number) {
+  if (baseline === 0) return candidate === 0 ? 0 : Number.NEGATIVE_INFINITY;
+  return (baseline - candidate) / baseline;
+}
+
+export async function runNvidiaRerankerPocBenchmark({
+  reranker,
+  fixtures = NVIDIA_RERANKER_POC_FIXTURES,
+  timeoutMs = 750,
+  inputCostCentsPerMillion = Number.parseFloat(process.env.NVIDIA_RERANK_INPUT_COST_CENTS_PER_1M || "")
+}: {
+  reranker: EvidenceReranker;
+  fixtures?: readonly RerankerPocFixture[];
+  timeoutMs?: number;
+  inputCostCentsPerMillion?: number;
+}) {
+  const circuitBreaker = new RerankerPocCircuitBreaker();
+  const runs: RerankerPocBenchmarkRun[] = [];
+
+  for (const fixture of fixtures) {
+    const eligibleCandidates = rerankerPocFixtureCandidates(fixture);
+    const frozenPool = freezeRerankerPocCandidatePool({
+      workspaceId: RERANKER_POC_WORKSPACE_ID,
+      candidates: eligibleCandidates
+    });
+    assertSyntheticRerankerPocCandidates(frozenPool.candidates);
+    const measurement = buildRetrievalPoolMeasurement({
+      candidatesBeforeEligibility: fixture.records.length,
+      eligibleCandidates,
+      selectedCount: Math.min(fixture.resultLimit, frozenPool.candidates.length),
+      retrievalMode: fixture.retrievalMode,
+      vectorSucceeded: fixture.retrievalMode === "vector",
+      keywordFallbackUsed: false,
+      retrievalLatencyMs: 0
+    });
+    const sourceMetadataBefore = frozenPool.candidates.map((candidate) => JSON.stringify({
+      candidateId: candidate.candidateId,
+      workspaceId: candidate.workspaceId,
+      source: candidate.source,
+      evidenceRole: candidate.evidenceRole,
+      confidenceScore: candidate.confidenceScore,
+      eligibility: candidate.eligibility
+    }));
+    const result = circuitBreaker.canAttempt()
+      ? await reranker.rerank({
+          queryText: fixture.queryText,
+          candidates: frozenPool.candidates,
+          mode: "shadow",
+          timeoutMs
+        })
+      : circuitBreakerResult(reranker, frozenPool.candidates.length);
+    circuitBreaker.record(result.status);
+    const rerankedCandidates = applyRerankResult(frozenPool.candidates, result);
+    const policyCandidates = result.status === "success"
+      ? applyDeterministicAuthorityAndDiversityPolicy(rerankedCandidates)
+      : [...frozenPool.candidates];
+    const sourceMetadataAfter = policyCandidates.map((candidate) => JSON.stringify({
+      candidateId: candidate.candidateId,
+      workspaceId: candidate.workspaceId,
+      source: candidate.source,
+      evidenceRole: candidate.evidenceRole,
+      confidenceScore: candidate.confidenceScore,
+      eligibility: candidate.eligibility
+    })).sort();
+    const preservedMetadata = [...sourceMetadataBefore].sort().every((value, index) => value === sourceMetadataAfter[index]);
+    const fallbackCorrect = result.status === "success" ||
+      rerankedCandidates.map((candidate) => candidate.candidateId).join("|") === frozenPool.candidates.map((candidate) => candidate.candidateId).join("|");
+
+    runs.push({
+      queryId: fixture.queryId,
+      category: fixture.category,
+      retrievalMode: fixture.retrievalMode,
+      resultLimit: fixture.resultLimit,
+      measurement,
+      baseline: evaluateRerankerPocRanking(fixture, frozenPool.candidates),
+      reranked: evaluateRerankerPocRanking(fixture, policyCandidates),
+      baselineSelectedCandidateIds: frozenPool.candidates.slice(0, fixture.resultLimit).map((candidate) => candidate.candidateId),
+      rerankedSelectedCandidateIds: policyCandidates.slice(0, fixture.resultLimit).map((candidate) => candidate.candidateId),
+      rerankResult: result,
+      fallbackCorrect,
+      sourceMetadataPreserved: preservedMetadata,
+      activeResultUnchanged: true,
+      excludedCandidateIds: fixture.records.filter((record) => !rerankerPocRecordIsEligible(record)).map((record) => record.candidateId),
+      crossWorkspaceExcludedCandidateIds: fixture.records
+        .filter((record) => record.expectedExclusion === "cross_workspace")
+        .map((record) => record.candidateId),
+      lifecycleExcludedCandidateIds: fixture.records
+        .filter((record) => record.expectedExclusion !== null && record.expectedExclusion !== "cross_workspace")
+        .map((record) => record.candidateId)
+    });
+  }
+
+  const baseline = aggregatePocMetrics(runs.map((run) => run.baseline));
+  const reranked = aggregatePocMetrics(runs.map((run) => run.reranked));
+  const calls = runs.filter((run) => run.rerankResult.status !== "skipped");
+  const successfulCalls = calls.filter((run) => run.rerankResult.status === "success");
+  const latencies = calls.map((run) => run.rerankResult.latencyMs);
+  const inputTokens = calls.reduce((sum, run) => sum + (run.rerankResult.inputTokens || 0), 0);
+  const estimatedCostCents = Number.isFinite(inputCostCentsPerMillion)
+    ? (inputTokens / 1_000_000) * inputCostCentsPerMillion
+    : null;
+  const estimatedCostPerThousandCents = estimatedCostCents !== null && successfulCalls.length
+    ? estimatedCostCents / successfulCalls.length * 1_000
+    : null;
+  const timeoutRate = rate(calls.filter((run) => run.rerankResult.failureCode === "timeout").length, calls.length);
+  const providerErrorRate = rate(calls.filter((run) => run.rerankResult.status === "failed" && run.rerankResult.failureCode !== "timeout").length, calls.length);
+  const fallbackRate = rate(runs.filter((run) => run.rerankResult.status !== "success").length, runs.length);
+  const categoryMetrics = Object.fromEntries(Array.from(new Set(runs.map((run) => run.category))).map((category) => {
+    const categoryRuns = runs.filter((run) => run.category === category);
+    return [category, {
+      queryCount: categoryRuns.length,
+      baseline: aggregatePocMetrics(categoryRuns.map((run) => run.baseline)),
+      reranked: aggregatePocMetrics(categoryRuns.map((run) => run.reranked))
+    }];
+  }));
+  const primaryMetrics = ["recallAt20", "precisionAt10", "ndcgAt10", "mrr"] as const;
+  const measurableRankingImprovement =
+    reranked.ndcgAt10 >= baseline.ndcgAt10 + 0.05 ||
+    reranked.mrr >= baseline.mrr + 0.05 ||
+    reranked.precisionAt10 >= baseline.precisionAt10 + 0.05;
+  const noOtherPrimaryMetricRegression = primaryMetrics.every((key) => reranked[key] >= baseline[key] - 0.01);
+  const qualification = {
+    zeroCrossWorkspaceLeakage: runs.every((run) => run.crossWorkspaceExcludedCandidateIds.every((candidateId) =>
+      !run.baselineSelectedCandidateIds.includes(candidateId) && !run.rerankedSelectedCandidateIds.includes(candidateId)
+    )),
+    zeroLifecycleLeakage: runs.every((run) => run.lifecycleExcludedCandidateIds.every((candidateId) =>
+      !run.baselineSelectedCandidateIds.includes(candidateId) && !run.rerankedSelectedCandidateIds.includes(candidateId)
+    )),
+    citationSourceCorrectnessMaintained: reranked.citationSourceCorrectness === 1,
+    noBusinessNoteAuthorityPromotion: reranked.businessNoteOverPromotionRate === 0,
+    noMaterialRecallRegression: reranked.recallAt20 >= baseline.recallAt20 - 0.01,
+    measurableRankingImprovement,
+    noOtherPrimaryMetricRegression,
+    irrelevantSelectionReductionAtLeastTenPercent:
+      relativeReduction(baseline.irrelevantSelectedChunkRate, reranked.irrelevantSelectedChunkRate) >= 0.10,
+    noDownstreamValidationFailureIncrease:
+      reranked.downstreamContextValidationFailureRate <= baseline.downstreamContextValidationFailureRate,
+    acceptableP95Latency: percentile(latencies, 0.95) <= 500,
+    acceptableP99Latency: percentile(latencies, 0.99) <= 750,
+    acceptableTimeoutRate: timeoutRate <= 0.01,
+    acceptableFallbackRate: fallbackRate <= 0.02,
+    acceptableEstimatedCost: estimatedCostPerThousandCents !== null && estimatedCostPerThousandCents <= 500,
+    completeSourceMetadataPreservation: runs.every((run) => run.sourceMetadataPreserved),
+    correctFailOpenBehavior: runs.every((run) => run.fallbackCorrect),
+    activeResultsUnchanged: runs.every((run) => run.activeResultUnchanged)
+  };
+  const mandatoryGatesPassed = Object.values(qualification).every(Boolean);
+
+  return deepFreeze({
+    benchmarkVersion: "nvidia_reranker_shadow_poc_benchmark_v1",
+    fixtureVersion: "nvidia_reranker_poc_fixture_v1",
+    fixtureCount: fixtures.length,
+    baseline,
+    reranked,
+    categoryMetrics,
+    poolSizeDistribution: aggregatePoolSizeDistribution(runs.map((run) => run.measurement)),
+    latency: {
+      p50Ms: percentile(latencies, 0.50),
+      p95Ms: percentile(latencies, 0.95),
+      p99Ms: percentile(latencies, 0.99)
+    },
+    failures: {
+      timeoutRate,
+      providerErrorRate,
+      fallbackRate,
+      providerErrorCount: calls.filter((run) => run.rerankResult.status === "failed").length,
+      circuitBreaker: circuitBreaker.snapshot()
+    },
+    cost: {
+      inputTokens,
+      configuredInputCostCentsPerMillion: Number.isFinite(inputCostCentsPerMillion) ? inputCostCentsPerMillion : null,
+      estimatedCostCents,
+      estimatedCostPerThousandQualifiedReranksCents: estimatedCostPerThousandCents,
+      estimateAvailable: estimatedCostPerThousandCents !== null
+    },
+    qualification: {
+      ...qualification,
+      mandatoryGatesPassed,
+      qualifiedForActivePilot: mandatoryGatesPassed && successfulCalls.length === fixtures.length,
+      readyForProduction: false
+    },
+    activeVolumeAssessment: {
+      measuredFromActiveRuntime: false,
+      knownFocusedFileAnalysisResultLimit: 3,
+      requiresNonProductionRuntimeMeasurement: true
+    },
+    runs
+  });
+}
+
+export function privacySafeRerankerPocReport(report: Awaited<ReturnType<typeof runNvidiaRerankerPocBenchmark>>) {
+  return deepFreeze({
+    benchmarkVersion: report.benchmarkVersion,
+    fixtureVersion: report.fixtureVersion,
+    fixtureCount: report.fixtureCount,
+    baseline: report.baseline,
+    reranked: report.reranked,
+    categoryMetrics: report.categoryMetrics,
+    poolSizeDistribution: report.poolSizeDistribution,
+    latency: report.latency,
+    failures: report.failures,
+    cost: report.cost,
+    qualification: report.qualification,
+    activeVolumeAssessment: report.activeVolumeAssessment,
+    runs: report.runs.map((run) => ({
+      queryId: run.queryId,
+      category: run.category,
+      retrievalMode: run.retrievalMode,
+      resultLimit: run.resultLimit,
+      poolMeasurement: run.measurement,
+      baselineSelectedCandidateIds: run.baselineSelectedCandidateIds,
+      rerankedSelectedCandidateIds: run.rerankedSelectedCandidateIds,
+      excludedCandidateIds: run.excludedCandidateIds,
+      status: run.rerankResult.status,
+      failureCode: run.rerankResult.failureCode,
+      latencyMs: run.rerankResult.latencyMs,
+      inputCount: run.rerankResult.inputCount,
+      inputTokens: run.rerankResult.inputTokens,
+      inputTokensEstimated: run.rerankResult.inputTokensEstimated,
+      fallbackCorrect: run.fallbackCorrect,
+      sourceMetadataPreserved: run.sourceMetadataPreserved,
+      activeResultUnchanged: run.activeResultUnchanged
+    }))
+  });
 }
