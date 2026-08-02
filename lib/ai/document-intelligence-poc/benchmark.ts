@@ -37,15 +37,23 @@ function aggregateMetrics(comparisons: readonly DocumentBenchmarkComparison[]): 
 const STRUCTURE_CLASSES = new Set<BenchmarkDocumentClass>(["dense_financial_table", "merged_cell_table", "multi_page_table", "spreadsheet_rendered_as_pdf"]);
 const DIFFICULT_CLASSES = new Set<BenchmarkDocumentClass>(["scanned_pdf", "image_only_pdf", "rotated_page", "skewed_scan", "low_resolution_image", "poor_contrast_scan", "handwritten_annotation"]);
 
-function recommendation({
+export function recommendDocumentClass({
   documentClass,
   current,
-  nvidia
+  nvidia,
+  nvidiaComparisons
 }: {
   documentClass: BenchmarkDocumentClass;
   current: DocumentComparisonMetrics;
   nvidia: DocumentComparisonMetrics;
+  nvidiaComparisons: readonly DocumentBenchmarkComparison[];
 }): DocumentClassRecommendation {
+  const successful = nvidiaComparisons.filter((comparison) => comparison.status === "success");
+  if (!successful.length) {
+    const locallyInvalid = nvidiaComparisons.every((comparison) => comparison.failureCode === "validation_failed");
+    return locallyInvalid ? "REJECT FOR THIS DOCUMENT CLASS" : "BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE";
+  }
+  if (successful.length !== nvidiaComparisons.length) return "REJECT FOR THIS DOCUMENT CLASS";
   if (STRUCTURE_CLASSES.has(documentClass) && nvidia.rowReconstructionAccuracy === null) {
     return "BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE";
   }
@@ -70,9 +78,9 @@ function recommendation({
   return "REMAIN SHADOW ONLY";
 }
 
-export async function runDocumentIntelligencePocBenchmark() {
+export async function runDocumentIntelligencePocBenchmark({ enableNvidia = false }: { enableNvidia?: boolean } = {}) {
   const fixtures = await loadDocumentIntelligenceFixtures();
-  const nvidiaAdapter = new NvidiaOcrBenchmarkAdapter();
+  const nvidiaAdapter = new NvidiaOcrBenchmarkAdapter({ enabled: enableNvidia });
   const currentComparisons: DocumentBenchmarkComparison[] = [];
   const nvidiaComparisons: DocumentBenchmarkComparison[] = [];
   const nvidiaTelemetry = [];
@@ -85,7 +93,7 @@ export async function runDocumentIntelligencePocBenchmark() {
   }
   const parserProbePage = fixtures.find((fixture) => fixture.documentId === "synthetic-doc-executive-kpi-review")?.renderedPages[0];
   if (!parserProbePage) throw new Error("The parser qualification fixture is missing.");
-  const richerParser = await qualifyNvidiaDocumentParser({ page: parserProbePage });
+  const richerParser = await qualifyNvidiaDocumentParser({ page: parserProbePage, enabled: enableNvidia });
   const classes = Array.from(new Set(fixtures.flatMap((fixture) => fixture.documentClasses))).sort();
   const byClass = classes.map((documentClass) => {
     const current = currentComparisons.filter((comparison) => comparison.documentClasses.includes(documentClass));
@@ -97,8 +105,9 @@ export async function runDocumentIntelligencePocBenchmark() {
       fixtureCount: nvidia.length,
       current: currentMetrics,
       nvidia: nvidiaMetrics,
+      successfulNvidiaFixtures: nvidia.filter((comparison) => comparison.status === "success").length,
       catastrophicErrors: Array.from(new Set(nvidia.flatMap((comparison) => comparison.catastrophicErrors))).sort(),
-      recommendation: recommendation({ documentClass, current: currentMetrics, nvidia: nvidiaMetrics })
+      recommendation: recommendDocumentClass({ documentClass, current: currentMetrics, nvidia: nvidiaMetrics, nvidiaComparisons: nvidia })
     };
   });
   const successfulLatencies = nvidiaComparisons.filter((item) => item.status === "success").map((item) => item.latencyMs);

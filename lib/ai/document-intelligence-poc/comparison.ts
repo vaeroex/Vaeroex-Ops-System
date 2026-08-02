@@ -40,6 +40,35 @@ function rate(correct: number, total: number): DocumentComparisonMetric {
   return total ? correct / total : null;
 }
 
+const UNSCORED_METRICS: DocumentComparisonMetrics = {
+  characterErrorRate: null,
+  wordErrorRate: null,
+  exactNumericAccuracy: null,
+  signAccuracy: null,
+  decimalAccuracy: null,
+  currencyAccuracy: null,
+  percentageAccuracy: null,
+  dateAccuracy: null,
+  reportingPeriodAccuracy: null,
+  kpiNameAccuracy: null,
+  kpiValueAccuracy: null,
+  kpiTargetAccuracy: null,
+  unitAccuracy: null,
+  rowReconstructionAccuracy: null,
+  columnReconstructionAccuracy: null,
+  mergedCellReconstructionAccuracy: null,
+  readingOrderAccuracy: null,
+  pageAssociationAccuracy: null,
+  boundingBoxCoverage: null,
+  boundingBoxCorrectness: null,
+  headingAccuracy: null,
+  sectionAssociationAccuracy: null,
+  hallucinatedTextRate: null,
+  omittedTextRate: null,
+  duplicatedTextRate: null,
+  catastrophicBusinessErrorRate: null
+};
+
 function flattenTruth(document: BenchmarkDocument) {
   return document.groundTruth.flatMap((page) => page.elements.map((element) => ({ pageNumber: page.pageNumber, element })));
 }
@@ -114,11 +143,7 @@ function accuracyForField(
 }
 
 function catastrophicErrors(document: BenchmarkDocument, result: DocumentExtractionResult) {
-  if (result.status !== "success") {
-    return flattenTruth(document).some(({ element }) => element.normalizedNumericValue !== null)
-      ? ["critical_page_omitted" as const]
-      : [];
-  }
+  if (result.status !== "success") return [];
   const truth = flattenTruth(document);
   const predicted = flattenOutput(result);
   const errors = new Set<CatastrophicBusinessErrorCode>();
@@ -157,6 +182,22 @@ function catastrophicErrors(document: BenchmarkDocument, result: DocumentExtract
 }
 
 export function compareDocumentExtraction(document: BenchmarkDocument, result: DocumentExtractionResult): DocumentBenchmarkComparison {
+  if (result.status !== "success") {
+    return {
+      documentId: document.documentId,
+      documentClasses: document.documentClasses,
+      parser: result.parser,
+      status: result.status,
+      metrics: UNSCORED_METRICS,
+      catastrophicErrors: [],
+      latencyMs: result.latencyMs,
+      requestCount: result.requestCount,
+      retryCount: result.retryCount,
+      failureCode: result.failureCode,
+      supportedCapabilities: result.supportedCapabilities,
+      unsupportedCapabilities: result.unsupportedCapabilities
+    };
+  }
   const truth = flattenTruth(document);
   const predicted = flattenOutput(result);
   const truthText = truth.map(({ element }) => element.normalizedText).join("\n");

@@ -38,10 +38,6 @@ const {
   privacySafeDocumentIntelligenceReport,
   runDocumentIntelligencePocBenchmark
 } = require("../lib/ai/document-intelligence-poc/benchmark.ts");
-const {
-  nvidiaDocumentIntelligencePocEnabled
-} = require("../lib/ai/document-intelligence-poc/nvidia-ocr.ts");
-
 const nvidiaMode = process.argv.includes("--nvidia");
 
 function outputPath() {
@@ -60,17 +56,14 @@ function assertExecutionBoundary() {
     throw new Error("The NVIDIA document intelligence benchmark refuses Production.");
   }
   if (!nvidiaMode) return;
-  if (!nvidiaDocumentIntelligencePocEnabled()) {
-    throw new Error("The explicit Preview synthetic-document POC gates are required.");
-  }
   if (!process.env.NVIDIA_API_KEY) {
-    throw new Error("The Preview-scoped NVIDIA_API_KEY is required.");
+    throw new Error("A non-Production NVIDIA_API_KEY is required for the explicit --nvidia benchmark.");
   }
 }
 
 async function main() {
   assertExecutionBoundary();
-  const report = privacySafeDocumentIntelligenceReport(await runDocumentIntelligencePocBenchmark());
+  const report = privacySafeDocumentIntelligenceReport(await runDocumentIntelligencePocBenchmark({ enableNvidia: nvidiaMode }));
   const serialized = `${JSON.stringify(report, null, 2)}\n`;
   const destination = outputPath();
   if (destination) fs.writeFileSync(destination, serialized, { encoding: "utf8", mode: 0o600 });

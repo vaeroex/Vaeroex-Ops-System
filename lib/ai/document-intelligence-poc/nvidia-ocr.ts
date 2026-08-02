@@ -60,13 +60,8 @@ function transportFailure(error: unknown): Exclude<DocumentExtractionFailureCode
   return /abort|timeout|timed out/i.test(value) ? "timeout" : "transport_failure";
 }
 
-export function nvidiaDocumentIntelligencePocEnabled() {
-  if (process.env.VERCEL_ENV === "production") return false;
-  return process.env.VERCEL_ENV === "preview" &&
-    process.env.VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE_POC === "true" &&
-    process.env.VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE_SHADOW === "true" &&
-    process.env.VAEROEX_DOCUMENT_INTELLIGENCE_SHADOW_CONFIRM === "synthetic_benchmark" &&
-    process.env.VAEROEX_DOCUMENT_INTELLIGENCE_BENCHMARK_MODE === "synthetic";
+export function nvidiaDocumentIntelligenceBenchmarkAllowed(enabled: boolean) {
+  return enabled && process.env.VERCEL_ENV !== "production";
 }
 
 export function buildNvidiaOcrRequest(document: BenchmarkDocument) {
@@ -130,6 +125,7 @@ export class NvidiaOcrBenchmarkAdapter {
   private pageCount = 0;
 
   constructor(private readonly options: {
+    enabled?: boolean;
     apiKey?: string;
     endpoint?: string;
     fetchImpl?: FetchLike;
@@ -137,7 +133,7 @@ export class NvidiaOcrBenchmarkAdapter {
   } = {}) {}
 
   async extract(document: BenchmarkDocument): Promise<DocumentExtractionResult> {
-    if (!nvidiaDocumentIntelligencePocEnabled()) {
+    if (!nvidiaDocumentIntelligenceBenchmarkAllowed(this.options.enabled === true)) {
       return emptyResult({ document, status: "skipped", code: "disabled", latencyMs: 0, requestCount: 0, retryCount: 0, statusCode: null, retryAfterPresent: false });
     }
     if (!/^synthetic-doc-[a-z0-9-]+$/.test(document.documentId)) {

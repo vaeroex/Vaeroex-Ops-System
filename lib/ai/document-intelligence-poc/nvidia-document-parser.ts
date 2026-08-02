@@ -3,7 +3,7 @@ import "server-only";
 import { performance } from "node:perf_hooks";
 import type { BenchmarkRenderedPage, DocumentExtractionFailureCode } from "@/lib/ai/document-intelligence-poc/contracts";
 import { validBenchmarkImageBytes } from "@/lib/ai/document-intelligence-poc/fixtures";
-import { nvidiaDocumentIntelligencePocEnabled } from "@/lib/ai/document-intelligence-poc/nvidia-ocr";
+import { nvidiaDocumentIntelligenceBenchmarkAllowed } from "@/lib/ai/document-intelligence-poc/nvidia-ocr";
 
 export const NVIDIA_DOCUMENT_PARSER_MODEL = "nvidia/nemotron-parse";
 export const NVIDIA_DOCUMENT_PARSER_ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions";
@@ -43,16 +43,18 @@ function safeResult(fields: Partial<NvidiaDocumentParserQualification>): NvidiaD
 }
 export async function qualifyNvidiaDocumentParser({
   page,
+  enabled = false,
   apiKey = process.env.NVIDIA_API_KEY,
   fetchImpl = fetch,
   timeoutMs = 45_000
 }: {
   page: BenchmarkRenderedPage;
+  enabled?: boolean;
   apiKey?: string;
   fetchImpl?: FetchLike;
   timeoutMs?: number;
 }): Promise<NvidiaDocumentParserQualification> {
-  if (!nvidiaDocumentIntelligencePocEnabled()) return safeResult({ status: "skipped", failureCode: "disabled" });
+  if (!nvidiaDocumentIntelligenceBenchmarkAllowed(enabled)) return safeResult({ status: "skipped", failureCode: "disabled" });
   if (!apiKey) return safeResult({ status: "blocked", failureCode: "missing_credentials" });
   if (!validBenchmarkImageBytes(page.bytes, page.mimeType) || page.bytes.length > MAX_INLINE_IMAGE_BYTES) {
     return safeResult({ status: "blocked", failureCode: "unsafe_benchmark_input" });

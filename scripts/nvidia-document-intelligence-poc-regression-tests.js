@@ -32,23 +32,16 @@ Module._load = function loadPatched(request, parent, isMain) {
 };
 
 const { compareDocumentExtraction } = require("../lib/ai/document-intelligence-poc/comparison.ts");
+const { recommendDocumentClass } = require("../lib/ai/document-intelligence-poc/benchmark.ts");
 const { loadDocumentIntelligenceFixtures } = require("../lib/ai/document-intelligence-poc/fixtures.ts");
 const {
   buildNvidiaOcrRequest,
   NvidiaOcrBenchmarkAdapter,
   NVIDIA_OCR_MODEL,
-  nvidiaDocumentIntelligencePocEnabled,
+  nvidiaDocumentIntelligenceBenchmarkAllowed,
   privacySafeNvidiaOcrTelemetry
 } = require("../lib/ai/document-intelligence-poc/nvidia-ocr.ts");
 const { extractWithCurrentVaeroexPath } = require("../lib/ai/document-intelligence-poc/vaeroex-current.ts");
-
-function withPreviewGates() {
-  process.env.VERCEL_ENV = "preview";
-  process.env.VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE_POC = "true";
-  process.env.VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE_SHADOW = "true";
-  process.env.VAEROEX_DOCUMENT_INTELLIGENCE_SHADOW_CONFIRM = "synthetic_benchmark";
-  process.env.VAEROEX_DOCUMENT_INTELLIGENCE_BENCHMARK_MODE = "synthetic";
-}
 
 function fakeOcrResponse(document, mutateText) {
   return {
@@ -81,19 +74,15 @@ async function main() {
     assert.ok(fixtures.every((fixture) => fixture.groundTruth.every((page) => page.elements.every((element) => element.provenance.synthetic && element.provenance.benchmarkOnly))));
 
     process.env.VERCEL_ENV = "production";
-    process.env.VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE_POC = "true";
-    process.env.VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE_SHADOW = "true";
-    process.env.VAEROEX_DOCUMENT_INTELLIGENCE_SHADOW_CONFIRM = "synthetic_benchmark";
-    process.env.VAEROEX_DOCUMENT_INTELLIGENCE_BENCHMARK_MODE = "synthetic";
-    assert.equal(nvidiaDocumentIntelligencePocEnabled(), false, "Production must remain hard-disabled");
+    assert.equal(nvidiaDocumentIntelligenceBenchmarkAllowed(true), false, "Production must remain hard-disabled");
     let providerCalls = 0;
-    const disabled = await new NvidiaOcrBenchmarkAdapter({ apiKey: "test", fetchImpl: async () => { providerCalls += 1; throw new Error("unreachable"); } }).extract(fixtures[0]);
+    const disabled = await new NvidiaOcrBenchmarkAdapter({ enabled: true, apiKey: "test", fetchImpl: async () => { providerCalls += 1; throw new Error("unreachable"); } }).extract(fixtures[0]);
     assert.equal(disabled.status, "skipped");
     assert.equal(disabled.failureCode, "disabled");
     assert.equal(providerCalls, 0);
 
-    withPreviewGates();
-    assert.equal(nvidiaDocumentIntelligencePocEnabled(), true);
+    process.env.VERCEL_ENV = "preview";
+    assert.equal(nvidiaDocumentIntelligenceBenchmarkAllowed(true), true);
     const fixture = fixtures.find((item) => item.documentId === "synthetic-doc-executive-kpi-review");
     assert.ok(fixture);
     const request = buildNvidiaOcrRequest(fixture);
@@ -104,6 +93,7 @@ async function main() {
 
     providerCalls = 0;
     const adapter = new NvidiaOcrBenchmarkAdapter({
+      enabled: true,
       apiKey: "test",
       fetchImpl: async () => {
         providerCalls += 1;
@@ -126,11 +116,12 @@ async function main() {
     assert.equal(comparison.metrics.rowReconstructionAccuracy, null, "Standalone OCR must not claim table reconstruction");
 
     const firstKey = result.idempotencyKey;
-    const second = await new NvidiaOcrBenchmarkAdapter({ apiKey: "test", fetchImpl: async () => new Response(JSON.stringify(fakeOcrResponse(fixture)), { status: 200 }) }).extract(fixture);
+    const second = await new NvidiaOcrBenchmarkAdapter({ enabled: true, apiKey: "test", fetchImpl: async () => new Response(JSON.stringify(fakeOcrResponse(fixture)), { status: 200 }) }).extract(fixture);
     assert.equal(second.idempotencyKey, firstKey, "Identical fixture and parser inputs must remain idempotent");
 
     let retryCalls = 0;
     const retried = await new NvidiaOcrBenchmarkAdapter({
+      enabled: true,
       apiKey: "test",
       fetchImpl: async () => {
         retryCalls += 1;
@@ -143,20 +134,39 @@ async function main() {
 
     let malformedCalls = 0;
     const malformed = await new NvidiaOcrBenchmarkAdapter({
+      enabled: true,
       apiKey: "test",
       fetchImpl: async () => { malformedCalls += 1; return new Response("{}", { status: 200 }); }
     }).extract(fixture);
     assert.equal(malformed.failureCode, "malformed_response");
     assert.equal(malformedCalls, 1, "Validation failures must not retry");
+    const malformedComparison = compareDocumentExtraction(fixture, malformed);
+    assert.ok(Object.values(malformedComparison.metrics).every((metric) => metric === null));
+    assert.deepEqual(malformedComparison.catastrophicErrors, [], "Provider-contract failures must remain unscored");
+    assert.equal(recommendDocumentClass({
+      documentClass: "clean_digital_pdf",
+      current: malformedComparison.metrics,
+      nvidia: malformedComparison.metrics,
+      nvidiaComparisons: [malformedComparison]
+    }), "BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE");
 
     const corrupted = fixtures.find((item) => item.documentId === "synthetic-doc-corrupted-image");
     assert.ok(corrupted);
     let corruptedCalls = 0;
-    const corruptedResult = await new NvidiaOcrBenchmarkAdapter({ apiKey: "test", fetchImpl: async () => { corruptedCalls += 1; throw new Error("unreachable"); } }).extract(corrupted);
+    const corruptedResult = await new NvidiaOcrBenchmarkAdapter({ enabled: true, apiKey: "test", fetchImpl: async () => { corruptedCalls += 1; throw new Error("unreachable"); } }).extract(corrupted);
     assert.equal(corruptedResult.failureCode, "validation_failed");
     assert.equal(corruptedCalls, 0);
+    const corruptedComparison = compareDocumentExtraction(corrupted, corruptedResult);
+    assert.ok(Object.values(corruptedComparison.metrics).every((metric) => metric === null));
+    assert.equal(recommendDocumentClass({
+      documentClass: "corrupted_page",
+      current: corruptedComparison.metrics,
+      nvidia: corruptedComparison.metrics,
+      nvidiaComparisons: [corruptedComparison]
+    }), "REJECT FOR THIS DOCUMENT CLASS");
 
     const signChanged = await new NvidiaOcrBenchmarkAdapter({
+      enabled: true,
       apiKey: "test",
       fetchImpl: async () => new Response(JSON.stringify(fakeOcrResponse(fixture, (text) => text.replace("-42", "42"))), { status: 200 })
     }).extract(fixture);
@@ -187,6 +197,8 @@ async function main() {
     assert.match(combined, /writesBusinessMemory:\s*false/);
     assert.match(combined, /entersSnapshot:\s*false/);
     assert.doesNotMatch(combined, /console\.(?:log|error).*raw|Authorization.*console/i);
+    assert.doesNotMatch(combined, /VAEROEX_NVIDIA_DOCUMENT_INTELLIGENCE|DOCUMENT_INTELLIGENCE_SHADOW_CONFIRM/);
+    assert.equal(fs.existsSync(path.join(root, "app/api/internal/nvidia-document-intelligence-poc/route.ts")), false);
 
     console.log("NVIDIA document intelligence POC regressions passed.");
   } finally {
