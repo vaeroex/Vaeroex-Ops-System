@@ -8,8 +8,10 @@ import type {
 } from "@/lib/ai/document-intelligence-poc/contracts";
 import { compareDocumentExtraction } from "@/lib/ai/document-intelligence-poc/comparison";
 import { loadDocumentIntelligenceFixtures } from "@/lib/ai/document-intelligence-poc/fixtures";
-import { qualifyNvidiaDocumentParser } from "@/lib/ai/document-intelligence-poc/nvidia-document-parser";
-import { NvidiaOcrBenchmarkAdapter, privacySafeNvidiaOcrTelemetry } from "@/lib/ai/document-intelligence-poc/nvidia-ocr";
+import {
+  extractWithNvidiaMultimodalClient,
+  privacySafeNvidiaMultimodalTelemetry
+} from "@/lib/ai/document-intelligence-poc/nvidia-multimodal-extraction";
 import { extractWithCurrentVaeroexPath } from "@/lib/ai/document-intelligence-poc/vaeroex-current";
 
 function average(values: readonly number[]) {
@@ -80,20 +82,19 @@ export function recommendDocumentClass({
 
 export async function runDocumentIntelligencePocBenchmark({ enableNvidia = false }: { enableNvidia?: boolean } = {}) {
   const fixtures = await loadDocumentIntelligenceFixtures();
-  const nvidiaAdapter = new NvidiaOcrBenchmarkAdapter({ enabled: enableNvidia });
   const currentComparisons: DocumentBenchmarkComparison[] = [];
   const nvidiaComparisons: DocumentBenchmarkComparison[] = [];
   const nvidiaTelemetry = [];
+  const nvidiaExtraction = await extractWithNvidiaMultimodalClient(fixtures, { enabled: enableNvidia });
   for (const fixture of fixtures) {
     const current = await extractWithCurrentVaeroexPath(fixture);
-    const nvidia = await nvidiaAdapter.extract(fixture);
+    const nvidia = nvidiaExtraction.results.find((result) => result.documentId === fixture.documentId);
+    if (!nvidia) throw new Error("The official NVIDIA client omitted a benchmark document result.");
     currentComparisons.push(compareDocumentExtraction(fixture, current));
     nvidiaComparisons.push(compareDocumentExtraction(fixture, nvidia));
-    nvidiaTelemetry.push(privacySafeNvidiaOcrTelemetry(nvidia));
+    nvidiaTelemetry.push(privacySafeNvidiaMultimodalTelemetry(nvidia));
   }
-  const parserProbePage = fixtures.find((fixture) => fixture.documentId === "synthetic-doc-executive-kpi-review")?.renderedPages[0];
-  if (!parserProbePage) throw new Error("The parser qualification fixture is missing.");
-  const richerParser = await qualifyNvidiaDocumentParser({ page: parserProbePage, enabled: enableNvidia });
+  const richerParser = nvidiaExtraction.parserQualification;
   const classes = Array.from(new Set(fixtures.flatMap((fixture) => fixture.documentClasses))).sort();
   const byClass = classes.map((documentClass) => {
     const current = currentComparisons.filter((comparison) => comparison.documentClasses.includes(documentClass));
@@ -117,12 +118,12 @@ export async function runDocumentIntelligencePocBenchmark({ enableNvidia = false
     fixtureCount: fixtures.length,
     pageCount: fixtures.reduce((sum, fixture) => sum + fixture.renderedPages.length, 0),
     providerCalls: {
-      attempted: nvidiaTelemetry.reduce((sum, item) => sum + item.requestCount, 0) + richerParser.requestCount,
-      succeeded: nvidiaComparisons.filter((item) => item.status === "success").length + (richerParser.status === "available" ? 1 : 0),
-      authenticationFailures: nvidiaComparisons.filter((item) => item.failureCode === "authentication_failed").length + (richerParser.failureCode === "authentication_failed" ? 1 : 0),
-      providerFailures: nvidiaComparisons.filter((item) => item.failureCode === "provider_unavailable").length + (richerParser.failureCode === "provider_unavailable" ? 1 : 0),
+      attempted: nvidiaTelemetry.reduce((sum, item) => sum + item.requestCount, 0),
+      succeeded: nvidiaComparisons.filter((item) => item.status === "success").reduce((sum, item) => sum + item.requestCount, 0),
+      authenticationFailures: nvidiaComparisons.filter((item) => item.failureCode === "authentication_failed").reduce((sum, item) => sum + item.requestCount, 0),
+      providerFailures: nvidiaComparisons.filter((item) => item.failureCode === "provider_unavailable").reduce((sum, item) => sum + item.requestCount, 0),
       schemaFailures: nvidiaComparisons.filter((item) => item.failureCode === "malformed_response" || item.failureCode === "validation_failed").length,
-      timeouts: nvidiaComparisons.filter((item) => item.failureCode === "timeout").length + (richerParser.failureCode === "timeout" ? 1 : 0),
+      timeouts: nvidiaComparisons.filter((item) => item.failureCode === "timeout").reduce((sum, item) => sum + item.requestCount, 0),
       retries: nvidiaComparisons.reduce((sum, item) => sum + item.retryCount, 0),
       latencyMs: {
         p50: percentile(successfulLatencies, 0.5),

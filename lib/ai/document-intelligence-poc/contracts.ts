@@ -6,7 +6,7 @@ export const DOCUMENT_INTELLIGENCE_BENCHMARK_VERSION = "document_intelligence_be
 export const DOCUMENT_INTELLIGENCE_NORMALIZATION_VERSION = "document_intelligence_normalization_v1" as const;
 export const DOCUMENT_EXTRACTION_RESULT_VERSION = "document_extraction_result_v1" as const;
 
-export type DocumentBenchmarkParser = "vaeroex_current" | "nvidia_ocr" | "nvidia_document_parser";
+export type DocumentBenchmarkParser = "vaeroex_current" | "nvidia_multimodal_extraction";
 export type DocumentInputFormat = "digital_pdf" | "image_pdf" | "png" | "jpeg";
 export type DocumentIntelligenceCapability =
   | "text"
@@ -100,6 +100,7 @@ export type DocumentExtractionFailureCode =
   | "timeout"
   | "transport_failure"
   | "provider_unavailable"
+  | "client_unavailable"
   | "malformed_response"
   | "validation_failed"
   | "unsupported_input"
@@ -252,7 +253,7 @@ export type PrivacySafeProviderTelemetry = Readonly<{
   parser: DocumentBenchmarkParser;
   provider: "vaeroex" | "nvidia";
   model: string;
-  endpointCategory: "local" | "hosted_ocr" | "hosted_document_parser";
+  endpointCategory: "local" | "hosted_multimodal_extraction";
   status: DocumentExtractionResult["status"];
   inputPageCount: number;
   inputBytes: number;

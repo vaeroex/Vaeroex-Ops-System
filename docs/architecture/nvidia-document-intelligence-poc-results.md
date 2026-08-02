@@ -4,88 +4,106 @@
 - Run date: 2026-08-01
 - Environment: isolated Vercel Preview
 - Corpus: 12 synthetic documents, 13 rendered pages
-- OCR candidate: `nvidia/nemotron-ocr-v2`
-- Rich parser probe: `nvidia/nemotron-parse`
-- Decision: blocked at the hosted endpoint/output-contract boundary
+- Official client: NVIDIA NeMo Retriever Multimodal Extraction
+- Extraction model: `nvidia/nemotron-parse`
+- Official client revision: `52886112cafab4c4bca1cda0d4f588785adfe4d3`
+- Hosted contract profile: `hosted_tool_call`
+- Decision: integration passed; global adoption gate failed
 
 This report contains aggregate, content-free measurements only. It contains no customer data, workspace or user identifiers, source identifiers, filenames, raw benchmark text, raw provider requests or responses, authorization headers, credentials, or secret-derived values.
 
 ## Execution Boundary
 
-The benchmark used only committed synthetic fixtures and manually verified ground truth. It ran alongside, and did not modify, the active Vaeroex extraction path. Provider output was held in memory only long enough to validate and score it. It did not enter ordinary file analysis, Business Memory, Evidence, KPI tables, IntelligenceSnapshotV1, Business Health, findings, Saved Analyses, Trust telemetry, or any customer-visible result.
+The frozen benchmark used only committed synthetic fixtures and manually verified ground truth. It ran alongside, and did not modify, the active Vaeroex extraction path. Provider output was held in memory only long enough to validate and score it. It did not enter ordinary file analysis, Business Memory, Evidence, KPI tables, IntelligenceSnapshotV1, Business Health, findings, Saved Analyses, Trust telemetry, or any customer-visible result.
 
-The permanent harness requires the explicit `--nvidia` command option and refuses to run when `VERCEL_ENV=production`. No deployed API route, admin page, temporary branch gate, or active ingestion import remains. Provider failure leaves the current Vaeroex path unchanged.
+The permanent harness requires the explicit `--nvidia` command option and refuses to run when `VERCEL_ENV=production`. No deployed API route, admin page, temporary branch gate, build override, or active ingestion import remains. Provider failure leaves the current Vaeroex path unchanged.
 
-## Current Vaeroex Baseline
+## Official Client Integration
 
-The baseline invokes the repository's current deterministic local PDF text extractor where technically applicable. Image-only and multimodal documents are reported as unsupported by this isolated local baseline rather than invoking the active customer analysis provider. CSV and XLSX remain on their existing deterministic parser and are outside the OCR replacement scope.
+The former handwritten OCR and parser adapters were replaced by the official `nemo_retriever` client. The bridge calls `create_ingestor(...)` with `ExtractParams(method="nemotron_parse")`, verifies the hosted tool-call contract at startup, and normalizes only the official client result into the provider-neutral benchmark contract.
 
-The corpus demonstrates why a specialist OCR capability may be valuable for scans and images, but it does not authorize replacing deterministic spreadsheet ingestion, clean PDF extraction, or the active multimodal workflow.
-
-## Hosted OCR Result
-
-The run made 11 hosted OCR requests. All 11 returned without an authentication, transport, timeout, rate-limit, or provider-status failure, with observed request durations from 145 ms to 507 ms. None matched the documented normalized response contract expected by the adapter, so all were classified `malformed_response`. The corrupted-image fixture was rejected locally before transmission and made zero provider calls.
-
-Because no OCR response produced a contract-valid extraction, OCR accuracy is **unscored**. Character, word, numeric, KPI, page-provenance, bounding-box, omission, hallucination, and catastrophic-business-error metrics are `null`, not zero. A failed provider contract is not treated as extracted empty text and cannot pass an adoption gate.
+The official source revision generates development package versions from build time. The retained installer fixes the build metadata inputs so repeated installation of the pinned revision is deterministic; no binary wheel is committed.
 
 | Provider measurement | Result |
 |---|---:|
-| Hosted OCR requests | 11 |
-| Contract-valid OCR results | 0 |
+| Eligible hosted page calls | 12 |
+| Successful hosted page calls | 12 |
 | Authentication failures | 0 |
-| Provider-status failures | 0 |
+| Provider failures | 0 |
 | Timeouts | 0 |
 | Retries | 0 |
-| Schema/validation failures | 12 (11 hosted responses, 1 local corrupt-input rejection) |
-| Valid-result p50 / p95 / p99 | Unavailable |
+| Local schema/input failures | 1 corrupt fixture |
+| p50 latency | 990 ms |
+| p95 latency | 3,100 ms |
+| p99 latency | 3,100 ms |
 
-No inference about NVIDIA OCR quality can be made from this run. The blocker is endpoint/response-contract compatibility, not measured recognition accuracy.
+The corrupt fixture was rejected locally before the official client ran. The richer document-parser qualification reused the same extraction output and made zero additional provider calls. The official output contract was observed successfully.
 
-## Rich Document Parser Result
+## Aggregate Quality
 
-The separate `nvidia/nemotron-parse` probe made one bounded request to the hosted chat-completions endpoint. It returned HTTP 400 with `unsupported_input` after 250 ms. No output contract was observed. Tables, merged cells, charts, reading order, headings, and sections therefore remain unqualified; they were not counted as ordinary standalone OCR errors.
+Higher is better for accuracy and coverage metrics. Lower is better for error, omission, duplication, hallucination, and catastrophic-error rates.
+
+| Metric | Current isolated baseline | Official NeMo Retriever |
+|---|---:|---:|
+| Character error rate | 0.2783 | 0.2772 |
+| Word error rate | 0.7619 | 0.3173 |
+| Exact numeric accuracy | 0.8000 | 0.8667 |
+| Sign accuracy | 0.5667 | 0.9500 |
+| Decimal accuracy | 0.2333 | 0.9333 |
+| Currency accuracy | 0.0000 | 0.4762 |
+| Percentage accuracy | 0.3333 | 0.8000 |
+| Date accuracy | 0.0000 | 0.5000 |
+| Reporting-period accuracy | 0.6000 | 0.1333 |
+| KPI-name accuracy | 0.0000 | 0.4259 |
+| KPI-value accuracy | 0.2917 | 0.4444 |
+| KPI-target accuracy | 0.4167 | 0.8000 |
+| Unit accuracy | 0.5833 | 0.7500 |
+| Row reconstruction | Unavailable | 0.7778 |
+| Column reconstruction | Unavailable | 0.7500 |
+| Reading-order accuracy | Unavailable | 0.5471 |
+| Page association | 0.7000 | 0.9750 |
+| Bounding-box coverage | 0.0000 | 0.3325 |
+| Bounding-box correctness | 0.0000 | 0.0000 |
+| Hallucinated-text rate | 0.2000 | 0.0187 |
+| Omitted-text rate | 0.2000 | 0.0040 |
+| Duplicated-text rate | 1.0000 | 0.1678 |
+| Catastrophic-business-error rate | 0.4667 | 0.1061 |
+
+The official client materially improved word recognition, numeric fidelity, signs, decimals, page association, omission, hallucination, and duplication. It did not meet Vaeroex's adoption thresholds. Reporting-period accuracy regressed, currency fidelity remained inadequate, bounding boxes were not correct against ground truth, and catastrophic business errors remained non-zero.
+
+The benchmark reported a 0.9091 merged-cell reconstruction value from normalized unit spans, but the official bridge does not preserve authoritative merged-cell spans. Merged cells remain explicitly unqualified, and that number is not adoption evidence. Heading and section associations also remain unqualified in the normalized contract.
+
+## Catastrophic Errors
+
+The observed aggregate catastrophic-business-error rate was 0.1061. Failures included:
+
+- changed currency magnitude;
+- changed numeric sign;
+- merged reporting periods;
+- omitted critical values;
+- decimal shifts.
+
+Any non-zero catastrophic error blocks global adoption for business-document extraction. The benchmark therefore rejects activation despite the substantial average quality improvement.
 
 ## Class Decisions
 
-Every class with a hosted OCR attempt is blocked because there is no contract-valid provider result to score. The corrupt-input class is rejected because the benchmark safety validator correctly refuses malformed input before transmission.
+Two narrow class-level recommendations passed the benchmark rules:
 
 | Document class | Decision |
 |---|---|
-| chart_with_labels | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| clean_digital_pdf | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| conflicting_footnotes | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| corrupted_page | REJECT FOR THIS DOCUMENT CLASS |
-| currencies | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| decimals | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| dense_financial_table | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| empty_page | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| handwritten_annotation | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| image_only_pdf | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| invoice | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| kpi_dashboard_export | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| low_resolution_image | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| merged_cell_table | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| mixed_text_image_page | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| multi_page_table | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| negative_values | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| operational_report | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| parentheses_negative_values | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| percentages | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| poor_contrast_scan | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| profit_and_loss_statement | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| prompt_injection_text | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| repeated_headers_and_footers | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| reporting_period_changes | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| rotated_page | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| scanned_pdf | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| screenshot | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| skewed_scan | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| spreadsheet_rendered_as_pdf | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| three_column_report | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
-| two_column_report | BLOCKED - NVIDIA CAPABILITY NOT AVAILABLE |
+| empty_page | QUALIFIED FOR CONDITIONAL FALLBACK |
+| handwritten_annotation | QUALIFIED FOR SPECIALIST PILOT |
+
+These recommendations are benchmark evidence only. They do not enable a fallback or pilot in the product.
+
+The following 30 classes remain rejected under the current gate:
+
+`chart_with_labels`, `clean_digital_pdf`, `conflicting_footnotes`, `corrupted_page`, `currencies`, `decimals`, `dense_financial_table`, `image_only_pdf`, `invoice`, `kpi_dashboard_export`, `low_resolution_image`, `merged_cell_table`, `mixed_text_image_page`, `multi_page_table`, `negative_values`, `operational_report`, `parentheses_negative_values`, `percentages`, `poor_contrast_scan`, `profit_and_loss_statement`, `prompt_injection_text`, `repeated_headers_and_footers`, `reporting_period_changes`, `rotated_page`, `scanned_pdf`, `screenshot`, `skewed_scan`, `spreadsheet_rendered_as_pdf`, `three_column_report`, and `two_column_report`.
 
 ## Cost And Adoption
 
-Authoritative hosted pricing was not returned or configured, so exact cost per page and document is unknown. No class qualifies for a pilot, fallback, shadow rollout, or Production activation. A future qualification must first reconcile the hosted endpoint and response contract, then rerun the frozen synthetic corpus before any accuracy or cost gate can be evaluated.
+Authoritative hosted pricing was not returned or configured, so exact cost per page and document is unknown.
 
-Merging this POC retains only reusable provider-neutral contracts, synthetic fixtures, adapters, validators, the local benchmark harness, tests, and this privacy-safe result. It does not activate NVIDIA or alter active Vaeroex behavior.
+The POC proves that the official hosted integration works and materially improves multiple extraction metrics. It does not pass Vaeroex's global adoption gate and remains isolated shadow infrastructure only. A future qualification would need to eliminate catastrophic business errors and improve reporting-period, currency, bounding-box, heading, and section fidelity before any active rollout is considered.
+
+Merging this POC retains only reusable provider-neutral contracts, synthetic fixtures, the official-client adapter and bridge, validators, the local benchmark harness, tests, and this privacy-safe result. It does not activate NVIDIA or alter active Vaeroex behavior.

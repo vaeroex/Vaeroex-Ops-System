@@ -1,0 +1,3 @@
+# Install through install-nvidia-document-intelligence-poc-client.sh so the
+# upstream development package receives deterministic build-version inputs.
+nemo-retriever[nemotron-parse] @ git+https://github.com/NVIDIA/NeMo-Retriever.git@52886112cafab4c4bca1cda0d4f588785adfe4d3#subdirectory=nemo_retriever
