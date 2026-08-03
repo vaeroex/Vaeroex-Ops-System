@@ -9,6 +9,237 @@ export type Database = {
         Args: Record<string, never>;
         Returns: void;
       };
+      assert_document_extraction_authority_v1: {
+        Args: {
+          p_artifact_fingerprint: string
+          p_classification_fingerprint: string
+          p_file_id: string
+          p_job_id: string
+          p_review_id: string
+          p_review_version: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+
+      authorize_document_extraction_dispatch_v1: {
+        Args: { p_job_id: string; p_worker_id: string }
+        Returns: Json
+      }
+
+      claim_document_extraction_job_v1: {
+        Args: { p_lease_seconds?: number; p_worker_id: string }
+        Returns: {
+          approval_status: string
+          artifact_fingerprint: string | null
+          assessment_fingerprint: string
+          attempts: number
+          billed_page_count: number
+          cache_key: string
+          classification_fingerprint: string | null
+          client_revision: string
+          completed_at: string | null
+          content_hmac: string
+          created_at: string
+          critical_field_manifest_fingerprint: string | null
+          critical_field_manifest_json: Json | null
+          document_class: string
+          extraction_contract_version: string
+          failed_at: string | null
+          failure_class: string | null
+          failure_code: string | null
+          file_id: string
+          heartbeat_at: string | null
+          id: string
+          intake_request_id: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          normalization_version: string
+          page_count: number
+          pages_qualified: number
+          parser_model: string
+          parser_provider: string
+          parser_revision: string
+          provider_dispatched_at: string | null
+          request_id: string
+          requested_by: string | null
+          required_review_version: number
+          reserved_page_count: number
+          review_required: boolean
+          route: string
+          routing_policy_version: string
+          stage: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "document_extraction_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+
+      complete_document_extraction_job_v1: {
+        Args: {
+          p_aad_digest: string
+          p_artifact_fingerprint: string
+          p_authentication_tag: string
+          p_classification_fingerprint: string
+          p_critical_field_manifest_json: Json
+          p_encryption_key_version: string
+          p_encryption_nonce: string
+          p_job_id: string
+          p_payload_ciphertext: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      document_extraction_authority_is_approved_v1: {
+        Args: {
+          p_artifact_fingerprint: string
+          p_classification_fingerprint: string
+          p_file_id: string
+          p_job_id: string
+          p_review_id: string
+          p_review_version: number
+          p_workspace_id: string
+        }
+        Returns: boolean
+      }
+
+      document_extraction_runtime_reason_v1: {
+        Args: {
+          p_document_class: string
+          p_required_pages: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+
+      enqueue_document_extraction_job_v1: {
+        Args: {
+          p_assessment_fingerprint: string
+          p_cache_key: string
+          p_client_revision: string
+          p_content_hmac: string
+          p_document_class: string
+          p_extraction_contract_version: string
+          p_intake_request_id: string
+          p_normalization_version: string
+          p_page_count: number
+          p_parser_model: string
+          p_parser_provider: string
+          p_parser_revision: string
+          p_route: string
+          p_routing_policy_version: string
+        }
+        Returns: Json
+      }
+
+      evaluate_document_extraction_eligibility_v1: {
+        Args: {
+          p_document_class: string
+          p_required_pages?: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+
+      fail_document_extraction_job_v1: {
+        Args: {
+          p_failure_class: string
+          p_failure_code: string
+          p_job_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      heartbeat_document_extraction_job_v1: {
+        Args: {
+          p_job_id: string
+          p_lease_seconds?: number
+          p_worker_id: string
+        }
+        Returns: boolean
+      }
+
+      invalidate_document_extraction_cache_v1: {
+        Args: { p_cache_key: string; p_reason: string; p_workspace_id: string }
+        Returns: Json
+      }
+
+      mutate_document_extraction_review_v1: {
+        Args: {
+          p_action: string
+          p_artifact_fingerprint: string
+          p_classification_fingerprint: string
+          p_decision_summary_json: Json
+          p_extraction_contract_version: string
+          p_file_id: string
+          p_job_id: string
+          p_request_id: string
+          p_review_version: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+
+      record_document_extraction_event_v1: {
+        Args: {
+          p_actor_id: string
+          p_actor_type: string
+          p_artifact_fingerprint: string
+          p_event_type: string
+          p_job_id: string
+          p_metadata_json: Json
+          p_reason_code: string
+          p_request_id: string
+          p_stage: string
+          p_status: string
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+
+      request_document_extraction_intake_v1: {
+        Args: { p_file_id: string; p_request_id: string }
+        Returns: Json
+      }
+
+      resolve_document_extraction_file_authority_v1: {
+        Args: { p_file_id: string; p_workspace_id: string }
+        Returns: Json
+      }
+
+      retry_document_extraction_job_v1: {
+        Args: { p_job_id: string }
+        Returns: Json
+      }
+
+      set_document_extraction_classification_v1: {
+        Args: {
+          p_artifact_fingerprint: string
+          p_classification_fingerprint: string
+          p_job_id: string
+        }
+        Returns: Json
+      }
+
+      validate_document_extraction_critical_field_manifest_v1: {
+        Args: {
+          p_artifact_fingerprint: string
+          p_extraction_contract_version: string
+          p_manifest: Json
+        }
+        Returns: string
+      }
+
       create_workspace_with_signed_agreement: {
         Args: {
           p_workspace_id: string;
@@ -160,6 +391,741 @@ export type Database = {
       };
     };
     Tables: {
+      document_extraction_workspace_settings: {
+        Row: {
+          allowed_document_classes: string[]
+          concurrent_job_limit: number
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          is_enabled: boolean
+          is_entitled: boolean
+          monthly_page_limit: number
+          pages_consumed: number
+          pages_reserved: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          allowed_document_classes?: string[]
+          concurrent_job_limit?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          is_enabled?: boolean
+          is_entitled?: boolean
+          monthly_page_limit?: number
+          pages_consumed?: number
+          pages_reserved?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          allowed_document_classes?: string[]
+          concurrent_job_limit?: number
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          is_enabled?: boolean
+          is_entitled?: boolean
+          monthly_page_limit?: number
+          pages_consumed?: number
+          pages_reserved?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_workspace_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_workspace_settings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: true
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_system_state: {
+        Row: {
+          circuit_opened_at: string | null
+          circuit_state: string
+          consecutive_failures: number
+          globally_enabled: boolean
+          policy_version: string
+          provider_calls_enabled: boolean
+          rolling_failure_count: number
+          singleton_key: string
+          updated_at: string
+          updated_by: string | null
+          worker_enabled: boolean
+        }
+        Insert: {
+          circuit_opened_at?: string | null
+          circuit_state?: string
+          consecutive_failures?: number
+          globally_enabled?: boolean
+          policy_version?: string
+          provider_calls_enabled?: boolean
+          rolling_failure_count?: number
+          singleton_key: string
+          updated_at?: string
+          updated_by?: string | null
+          worker_enabled?: boolean
+        }
+        Update: {
+          circuit_opened_at?: string | null
+          circuit_state?: string
+          consecutive_failures?: number
+          globally_enabled?: boolean
+          policy_version?: string
+          provider_calls_enabled?: boolean
+          rolling_failure_count?: number
+          singleton_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          worker_enabled?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_system_state_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_intake_requests: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          enqueued_at: string | null
+          file_extension: string
+          file_id: string
+          file_size_bytes: number
+          id: string
+          mime_type: string
+          request_id: string
+          requested_by: string
+          source_kind: string
+          status: string
+          storage_bucket: string
+          storage_path: string
+          workspace_id: string
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          enqueued_at?: string | null
+          file_extension: string
+          file_id: string
+          file_size_bytes: number
+          id?: string
+          mime_type: string
+          request_id: string
+          requested_by: string
+          source_kind: string
+          status?: string
+          storage_bucket: string
+          storage_path: string
+          workspace_id: string
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          enqueued_at?: string | null
+          file_extension?: string
+          file_id?: string
+          file_size_bytes?: number
+          id?: string
+          mime_type?: string
+          request_id?: string
+          requested_by?: string
+          source_kind?: string
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_intake_requests_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "file_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_intake_requests_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_intake_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_intake_requests_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_jobs: {
+        Row: {
+          approval_status: string
+          artifact_fingerprint: string | null
+          assessment_fingerprint: string
+          attempts: number
+          billed_page_count: number
+          cache_key: string
+          classification_fingerprint: string | null
+          client_revision: string
+          completed_at: string | null
+          content_hmac: string
+          created_at: string
+          critical_field_manifest_fingerprint: string | null
+          critical_field_manifest_json: Json | null
+          document_class: string
+          extraction_contract_version: string
+          failed_at: string | null
+          failure_class: string | null
+          failure_code: string | null
+          file_id: string
+          heartbeat_at: string | null
+          id: string
+          intake_request_id: string
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          normalization_version: string
+          page_count: number
+          pages_qualified: number
+          parser_model: string
+          parser_provider: string
+          parser_revision: string
+          provider_dispatched_at: string | null
+          request_id: string
+          requested_by: string | null
+          required_review_version: number
+          reserved_page_count: number
+          review_required: boolean
+          route: string
+          routing_policy_version: string
+          stage: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          approval_status?: string
+          artifact_fingerprint?: string | null
+          assessment_fingerprint: string
+          attempts?: number
+          billed_page_count?: number
+          cache_key: string
+          classification_fingerprint?: string | null
+          client_revision: string
+          completed_at?: string | null
+          content_hmac: string
+          created_at?: string
+          critical_field_manifest_fingerprint?: string | null
+          critical_field_manifest_json?: Json | null
+          document_class: string
+          extraction_contract_version: string
+          failed_at?: string | null
+          failure_class?: string | null
+          failure_code?: string | null
+          file_id: string
+          heartbeat_at?: string | null
+          id?: string
+          intake_request_id: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          max_attempts?: number
+          normalization_version: string
+          page_count: number
+          pages_qualified: number
+          parser_model: string
+          parser_provider: string
+          parser_revision: string
+          provider_dispatched_at?: string | null
+          request_id: string
+          requested_by?: string | null
+          required_review_version?: number
+          reserved_page_count?: number
+          review_required?: boolean
+          route: string
+          routing_policy_version: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          approval_status?: string
+          artifact_fingerprint?: string | null
+          assessment_fingerprint?: string
+          attempts?: number
+          billed_page_count?: number
+          cache_key?: string
+          classification_fingerprint?: string | null
+          client_revision?: string
+          completed_at?: string | null
+          content_hmac?: string
+          created_at?: string
+          critical_field_manifest_fingerprint?: string | null
+          critical_field_manifest_json?: Json | null
+          document_class?: string
+          extraction_contract_version?: string
+          failed_at?: string | null
+          failure_class?: string | null
+          failure_code?: string | null
+          file_id?: string
+          heartbeat_at?: string | null
+          id?: string
+          intake_request_id?: string
+          lease_expires_at?: string | null
+          lease_owner?: string | null
+          max_attempts?: number
+          normalization_version?: string
+          page_count?: number
+          pages_qualified?: number
+          parser_model?: string
+          parser_provider?: string
+          parser_revision?: string
+          provider_dispatched_at?: string | null
+          request_id?: string
+          requested_by?: string | null
+          required_review_version?: number
+          reserved_page_count?: number
+          review_required?: boolean
+          route?: string
+          routing_policy_version?: string
+          stage?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_jobs_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "file_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_jobs_intake_request_id_fkey"
+            columns: ["intake_request_id"]
+            isOneToOne: true
+            referencedRelation: "document_extraction_intake_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_jobs_requested_by_fkey"
+            columns: ["requested_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_jobs_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_file_bindings: {
+        Row: {
+          cache_key: string
+          created_at: string
+          created_by: string | null
+          file_id: string
+          id: string
+          is_current: boolean
+          job_id: string
+          superseded_at: string | null
+          workspace_id: string
+        }
+        Insert: {
+          cache_key: string
+          created_at?: string
+          created_by?: string | null
+          file_id: string
+          id?: string
+          is_current?: boolean
+          job_id: string
+          superseded_at?: string | null
+          workspace_id: string
+        }
+        Update: {
+          cache_key?: string
+          created_at?: string
+          created_by?: string | null
+          file_id?: string
+          id?: string
+          is_current?: boolean
+          job_id?: string
+          superseded_at?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_file_bindings_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_bindings_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "file_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_bindings_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_bindings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_bindings_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_cache: {
+        Row: {
+          aad_digest: string
+          artifact_fingerprint: string
+          authentication_tag: string
+          cache_key: string
+          client_revision: string
+          content_hmac: string
+          created_at: string
+          encryption_algorithm: string
+          encryption_key_version: string
+          encryption_nonce: string
+          extraction_contract_version: string
+          id: string
+          invalidated_at: string | null
+          invalidation_reason: string | null
+          last_used_at: string
+          model: string
+          model_revision: string
+          normalization_version: string
+          page_count: number
+          payload_ciphertext: string
+          provider: string
+          routing_policy_version: string
+          source_job_id: string
+          workspace_id: string
+        }
+        Insert: {
+          aad_digest: string
+          artifact_fingerprint: string
+          authentication_tag: string
+          cache_key: string
+          client_revision: string
+          content_hmac: string
+          created_at?: string
+          encryption_algorithm: string
+          encryption_key_version: string
+          encryption_nonce: string
+          extraction_contract_version: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          last_used_at?: string
+          model: string
+          model_revision: string
+          normalization_version: string
+          page_count: number
+          payload_ciphertext: string
+          provider: string
+          routing_policy_version: string
+          source_job_id: string
+          workspace_id: string
+        }
+        Update: {
+          aad_digest?: string
+          artifact_fingerprint?: string
+          authentication_tag?: string
+          cache_key?: string
+          client_revision?: string
+          content_hmac?: string
+          created_at?: string
+          encryption_algorithm?: string
+          encryption_key_version?: string
+          encryption_nonce?: string
+          extraction_contract_version?: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          last_used_at?: string
+          model?: string
+          model_revision?: string
+          normalization_version?: string
+          page_count?: number
+          payload_ciphertext?: string
+          provider?: string
+          routing_policy_version?: string
+          source_job_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_cache_source_job_id_fkey"
+            columns: ["source_job_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_cache_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_cache_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_reviews: {
+        Row: {
+          artifact_fingerprint: string
+          classification_fingerprint: string | null
+          confirmed_field_count: number
+          corrected_field_count: number
+          created_at: string
+          critical_field_count: number
+          critical_field_manifest_fingerprint: string
+          decision_summary_json: Json
+          extraction_contract_version: string
+          file_id: string
+          id: string
+          job_id: string
+          rejected_field_count: number
+          review_version: number
+          reviewed_at: string | null
+          reviewer_id: string | null
+          status: string
+          unresolved_field_count: number
+          updated_at: string
+          workspace_id: string
+        }
+        Insert: {
+          artifact_fingerprint: string
+          classification_fingerprint?: string | null
+          confirmed_field_count?: number
+          corrected_field_count?: number
+          created_at?: string
+          critical_field_count?: number
+          critical_field_manifest_fingerprint: string
+          decision_summary_json?: Json
+          extraction_contract_version: string
+          file_id: string
+          id?: string
+          job_id: string
+          rejected_field_count?: number
+          review_version?: number
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: string
+          unresolved_field_count?: number
+          updated_at?: string
+          workspace_id: string
+        }
+        Update: {
+          artifact_fingerprint?: string
+          classification_fingerprint?: string | null
+          confirmed_field_count?: number
+          corrected_field_count?: number
+          created_at?: string
+          critical_field_count?: number
+          critical_field_manifest_fingerprint?: string
+          decision_summary_json?: Json
+          extraction_contract_version?: string
+          file_id?: string
+          id?: string
+          job_id?: string
+          rejected_field_count?: number
+          review_version?: number
+          reviewed_at?: string | null
+          reviewer_id?: string | null
+          status?: string
+          unresolved_field_count?: number
+          updated_at?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_reviews_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "file_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_reviewer_id_fkey"
+            columns: ["reviewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_reviews_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_events: {
+        Row: {
+          actor_id: string | null
+          actor_type: string
+          artifact_fingerprint: string | null
+          created_at: string
+          event_type: string
+          id: string
+          job_id: string | null
+          metadata_json: Json
+          reason_code: string | null
+          request_id: string
+          stage: string | null
+          status: string | null
+          workspace_id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          actor_type: string
+          artifact_fingerprint?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          job_id?: string | null
+          metadata_json?: Json
+          reason_code?: string | null
+          request_id: string
+          stage?: string | null
+          status?: string | null
+          workspace_id: string
+        }
+        Update: {
+          actor_id?: string | null
+          actor_type?: string
+          artifact_fingerprint?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          job_id?: string | null
+          metadata_json?: Json
+          reason_code?: string | null
+          request_id?: string
+          stage?: string | null
+          status?: string | null
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_events_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_events_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       easter_egg_workspace_settings: {
         Row: {
           workspace_id: string;

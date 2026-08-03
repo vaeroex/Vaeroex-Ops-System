@@ -2,6 +2,10 @@ import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  assertDocumentExtractionAuthority,
+  documentExtractionAuthorityMetadata
+} from "@/lib/document-extraction/approval-guard";
+import {
   EVIDENCE_CANDIDATE_VERSION,
   EVIDENCE_QUERY_VERSION,
   type CandidateRetrievalResult,
@@ -1012,10 +1016,28 @@ export async function indexFileAnalysisEvidence({
   summary?: string | null;
   metadata?: Json;
 }) {
+  // Relational extraction lineage is checked before chunking or embedding.
+  // Editable file metadata cannot downgrade a review-gated source to native.
+  const extractionEligibility = await assertDocumentExtractionAuthority({
+    supabase,
+    workspaceId,
+    fileId: file.id
+  });
+  if (!extractionEligibility.eligible) {
+    return {
+      indexedChunks: 0,
+      error: "Human approval of all extracted critical fields is required before this source can enter Business Memory."
+    };
+  }
+  const extractionAuthority = extractionEligibility.authority;
+
   const normalized = normalizeText(extractedText);
   const chunks = chunkEvidenceText(normalized);
   const startedAt = new Date().toISOString();
   const sourceMetadata = metadataRecord(metadata);
+  const extractionMetadata = extractionAuthority.mode === "reviewed_document_extraction"
+    ? metadataRecord(documentExtractionAuthorityMetadata(extractionAuthority))
+    : {};
   const assessment = assessFileAnalysisEvidence({
     outputJson: sourceMetadata.analysis_output as Json || {},
     extractedSourceText: normalized,
@@ -1124,6 +1146,7 @@ export async function indexFileAnalysisEvidence({
       extraction_outcome: "facts_extracted",
       invalidated_at: null,
       invalidation_reason: null,
+      ...extractionMetadata,
       indexing_method: embedding.embeddings[index] ? "openai_embedding" : "text_only",
       embedding_error: embedding.error || null,
       metadata: metadata || {}
