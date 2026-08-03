@@ -1,0 +1,40 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vaeroex-document-extraction-worker"
+version = "0.1.0"
+description = "Disabled private NVIDIA document extraction worker for Vaeroex"
+requires-python = "~=3.12.0"
+dependencies = [
+  "cryptography==45.0.6",
+  "httpx==0.28.1",
+  "Pillow==12.2.0",
+  "vercel==0.8.1",
+  "nemo-retriever[nemotron-parse] @ git+https://github.com/NVIDIA/NeMo-Retriever.git@52886112cafab4c4bca1cda0d4f588785adfe4d3#subdirectory=nemo_retriever",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy==1.17.1",
+  "pytest==8.4.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/vaeroex_document_worker"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
+
+[[tool.vercel.workflows]]
+entrypoint = "vaeroex_document_worker.workflow:workflows"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+files = ["src", "tests"]

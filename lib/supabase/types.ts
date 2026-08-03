@@ -35,15 +35,21 @@ export type Database = {
           assessment_fingerprint: string
           attempts: number
           billed_page_count: number
+          broker_protocol_version: string | null
           cache_key: string
+          cache_result: string | null
           classification_fingerprint: string | null
           client_revision: string
           completed_at: string | null
           content_hmac: string
+          cost_amount_usd: number | null
+          cost_rate_version: string | null
           created_at: string
           critical_field_manifest_fingerprint: string | null
           critical_field_manifest_json: Json | null
+          dispatch_request_id: string | null
           document_class: string
+          encryption_result: string | null
           extraction_contract_version: string
           failed_at: string | null
           failure_class: string | null
@@ -52,6 +58,7 @@ export type Database = {
           heartbeat_at: string | null
           id: string
           intake_request_id: string
+          last_stage_transition_at: string | null
           lease_expires_at: string | null
           lease_owner: string | null
           max_attempts: number
@@ -61,11 +68,16 @@ export type Database = {
           parser_model: string
           parser_provider: string
           parser_revision: string
+          provider_call_count: number
           provider_dispatched_at: string | null
+          provider_latency_ms: number | null
+          provider_outcome_recorded_at: string | null
+          provider_result_class: string | null
           request_id: string
           requested_by: string | null
           required_review_version: number
           reserved_page_count: number
+          retry_count: number
           review_required: boolean
           route: string
           routing_policy_version: string
@@ -73,6 +85,8 @@ export type Database = {
           started_at: string | null
           status: string
           updated_at: string
+          validation_result: string | null
+          worker_runtime_version: string | null
           workspace_id: string
         }[]
         SetofOptions: {
@@ -240,6 +254,215 @@ export type Database = {
         Returns: string
       }
 
+      consume_document_extraction_worker_assertion_v1: {
+        Args: {
+          p_asserted_at: string
+          p_expires_at: string
+          p_key_version: string
+          p_nonce_hash: string
+          p_request_hash: string
+          p_worker_id: string
+        }
+        Returns: boolean
+      }
+
+      claim_document_extraction_job_v2: {
+        Args: { p_lease_seconds?: number; p_worker_id: string }
+        Returns: {
+          approval_status: string
+          artifact_fingerprint: string | null
+          assessment_fingerprint: string
+          attempts: number
+          billed_page_count: number
+          broker_protocol_version: string | null
+          cache_key: string
+          cache_result: string | null
+          classification_fingerprint: string | null
+          client_revision: string
+          completed_at: string | null
+          content_hmac: string
+          cost_amount_usd: number | null
+          cost_rate_version: string | null
+          created_at: string
+          critical_field_manifest_fingerprint: string | null
+          critical_field_manifest_json: Json | null
+          dispatch_request_id: string | null
+          document_class: string
+          encryption_result: string | null
+          extraction_contract_version: string
+          failed_at: string | null
+          failure_class: string | null
+          failure_code: string | null
+          file_id: string
+          heartbeat_at: string | null
+          id: string
+          intake_request_id: string
+          last_stage_transition_at: string | null
+          lease_expires_at: string | null
+          lease_owner: string | null
+          max_attempts: number
+          normalization_version: string
+          page_count: number
+          pages_qualified: number
+          parser_model: string
+          parser_provider: string
+          parser_revision: string
+          provider_call_count: number
+          provider_dispatched_at: string | null
+          provider_latency_ms: number | null
+          provider_outcome_recorded_at: string | null
+          provider_result_class: string | null
+          request_id: string
+          requested_by: string | null
+          required_review_version: number
+          reserved_page_count: number
+          retry_count: number
+          review_required: boolean
+          route: string
+          routing_policy_version: string
+          stage: string
+          started_at: string | null
+          status: string
+          updated_at: string
+          validation_result: string | null
+          worker_runtime_version: string | null
+          workspace_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "document_extraction_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+
+      advance_document_extraction_job_v2: {
+        Args: {
+          p_expected_stage: string
+          p_job_id: string
+          p_next_stage: string
+          p_request_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      resolve_document_extraction_job_lease_v1: {
+        Args: { p_job_id: string; p_worker_id: string }
+        Returns: Json
+      }
+
+      issue_document_extraction_file_grant_v1: {
+        Args: {
+          p_job_id: string
+          p_token_hash: string
+          p_ttl_seconds?: number
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      consume_document_extraction_file_grant_v1: {
+        Args: { p_grant_id: string; p_token_hash: string; p_worker_id: string }
+        Returns: Json
+      }
+
+      authorize_document_extraction_dispatch_v2: {
+        Args: {
+          p_dispatch_request_id: string
+          p_job_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      record_document_extraction_provider_outcome_v1: {
+        Args: {
+          p_dispatch_request_id: string
+          p_job_id: string
+          p_latency_ms: number
+          p_result_class: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      authorize_document_extraction_retry_dispatch_v1: {
+        Args: {
+          p_job_id: string
+          p_next_dispatch_request_id: string
+          p_prior_dispatch_request_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      complete_document_extraction_job_v2: {
+        Args: {
+          p_aad_digest: string
+          p_artifact_fingerprint: string
+          p_authentication_tag: string
+          p_critical_field_manifest_json: Json
+          p_encryption_key_version: string
+          p_encryption_nonce: string
+          p_job_id: string
+          p_payload_ciphertext: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      fail_document_extraction_job_v2: {
+        Args: {
+          p_failure_class: string
+          p_failure_code: string
+          p_job_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      record_document_extraction_telemetry_v1: {
+        Args: {
+          p_cache_result: string
+          p_cost_amount_usd: number
+          p_cost_rate_version: string
+          p_encryption_result: string
+          p_job_id: string
+          p_job_id_hash: string
+          p_latency_ms: number
+          p_request_id: string
+          p_validation_result: string
+          p_worker_id: string
+          p_workspace_hash: string
+        }
+        Returns: string
+      }
+
+      rotate_document_extraction_cache_envelope_v1: {
+        Args: {
+          p_aad_digest: string
+          p_authentication_tag: string
+          p_cache_id: string
+          p_encryption_nonce: string
+          p_expected_artifact_fingerprint: string
+          p_expected_key_version: string
+          p_new_key_version: string
+          p_payload_ciphertext: string
+        }
+        Returns: boolean
+      }
+
+      invalidate_document_extraction_cache_for_job_v1: {
+        Args: { p_job_id: string; p_reason_code: string }
+        Returns: Json
+      }
+
+      set_document_extraction_circuit_state_v1: {
+        Args: { p_actor_id: string; p_reason_code: string; p_state: string }
+        Returns: Json
+      }
+
       create_workspace_with_signed_agreement: {
         Args: {
           p_workspace_id: string;
@@ -391,6 +614,188 @@ export type Database = {
       };
     };
     Tables: {
+      document_extraction_worker_assertions: {
+        Row: {
+          asserted_at: string
+          consumed_at: string
+          expires_at: string
+          id: string
+          key_version: string
+          nonce_hash: string
+          request_hash: string
+          worker_id: string
+        }
+        Insert: {
+          asserted_at: string
+          consumed_at?: string
+          expires_at: string
+          id?: string
+          key_version: string
+          nonce_hash: string
+          request_hash: string
+          worker_id: string
+        }
+        Update: {
+          asserted_at?: string
+          consumed_at?: string
+          expires_at?: string
+          id?: string
+          key_version?: string
+          nonce_hash?: string
+          request_hash?: string
+          worker_id?: string
+        }
+        Relationships: []
+      }
+
+      document_extraction_file_access_grants: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          expires_at: string
+          file_id: string
+          id: string
+          job_id: string
+          token_hash: string
+          worker_id: string
+          workspace_id: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at: string
+          file_id: string
+          id?: string
+          job_id: string
+          token_hash: string
+          worker_id: string
+          workspace_id: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          expires_at?: string
+          file_id?: string
+          id?: string
+          job_id?: string
+          token_hash?: string
+          worker_id?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_file_access_grants_file_id_fkey"
+            columns: ["file_id"]
+            isOneToOne: false
+            referencedRelation: "file_uploads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_access_grants_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_access_grants_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_file_access_grants_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_operational_telemetry: {
+        Row: {
+          cache_result: string | null
+          circuit_state: string
+          client_revision: string
+          cost_amount_usd: number | null
+          cost_rate_version: string | null
+          created_at: string
+          document_class: string
+          encryption_result: string | null
+          id: string
+          job_id_hash: string
+          latency_ms: number | null
+          model_revision: string
+          pages_dispatched: number
+          pages_qualified: number
+          parser_route: string
+          provider_calls: number
+          provider_result_class: string | null
+          quota_pages_consumed: number
+          quota_pages_reserved: number
+          request_id: string
+          retry_count: number
+          telemetry_version: string
+          validation_result: string | null
+          workspace_hash: string
+        }
+        Insert: {
+          cache_result?: string | null
+          circuit_state: string
+          client_revision: string
+          cost_amount_usd?: number | null
+          cost_rate_version?: string | null
+          created_at?: string
+          document_class: string
+          encryption_result?: string | null
+          id?: string
+          job_id_hash: string
+          latency_ms?: number | null
+          model_revision: string
+          pages_dispatched: number
+          pages_qualified: number
+          parser_route: string
+          provider_calls: number
+          provider_result_class?: string | null
+          quota_pages_consumed: number
+          quota_pages_reserved: number
+          request_id: string
+          retry_count: number
+          telemetry_version: string
+          validation_result?: string | null
+          workspace_hash: string
+        }
+        Update: {
+          cache_result?: string | null
+          circuit_state?: string
+          client_revision?: string
+          cost_amount_usd?: number | null
+          cost_rate_version?: string | null
+          created_at?: string
+          document_class?: string
+          encryption_result?: string | null
+          id?: string
+          job_id_hash?: string
+          latency_ms?: number | null
+          model_revision?: string
+          pages_dispatched?: number
+          pages_qualified?: number
+          parser_route?: string
+          provider_calls?: number
+          provider_result_class?: string | null
+          quota_pages_consumed?: number
+          quota_pages_reserved?: number
+          request_id?: string
+          retry_count?: number
+          telemetry_version?: string
+          validation_result?: string | null
+          workspace_hash?: string
+        }
+        Relationships: []
+      }
+
       document_extraction_workspace_settings: {
         Row: {
           allowed_document_classes: string[]
@@ -455,11 +860,17 @@ export type Database = {
       document_extraction_system_state: {
         Row: {
           circuit_opened_at: string | null
+          circuit_policy_version: string
+          circuit_reason_code: string | null
           circuit_state: string
           consecutive_failures: number
+          failure_window_started_at: string | null
           globally_enabled: boolean
+          half_open_authorized_at: string | null
+          last_provider_result_at: string | null
           policy_version: string
           provider_calls_enabled: boolean
+          provider_success_count: number
           rolling_failure_count: number
           singleton_key: string
           updated_at: string
@@ -468,11 +879,17 @@ export type Database = {
         }
         Insert: {
           circuit_opened_at?: string | null
+          circuit_policy_version?: string
+          circuit_reason_code?: string | null
           circuit_state?: string
           consecutive_failures?: number
+          failure_window_started_at?: string | null
           globally_enabled?: boolean
+          half_open_authorized_at?: string | null
+          last_provider_result_at?: string | null
           policy_version?: string
           provider_calls_enabled?: boolean
+          provider_success_count?: number
           rolling_failure_count?: number
           singleton_key: string
           updated_at?: string
@@ -481,11 +898,17 @@ export type Database = {
         }
         Update: {
           circuit_opened_at?: string | null
+          circuit_policy_version?: string
+          circuit_reason_code?: string | null
           circuit_state?: string
           consecutive_failures?: number
+          failure_window_started_at?: string | null
           globally_enabled?: boolean
+          half_open_authorized_at?: string | null
+          last_provider_result_at?: string | null
           policy_version?: string
           provider_calls_enabled?: boolean
+          provider_success_count?: number
           rolling_failure_count?: number
           singleton_key?: string
           updated_at?: string
@@ -594,15 +1017,21 @@ export type Database = {
           assessment_fingerprint: string
           attempts: number
           billed_page_count: number
+          broker_protocol_version: string | null
           cache_key: string
+          cache_result: string | null
           classification_fingerprint: string | null
           client_revision: string
           completed_at: string | null
           content_hmac: string
+          cost_amount_usd: number | null
+          cost_rate_version: string | null
           created_at: string
           critical_field_manifest_fingerprint: string | null
           critical_field_manifest_json: Json | null
+          dispatch_request_id: string | null
           document_class: string
+          encryption_result: string | null
           extraction_contract_version: string
           failed_at: string | null
           failure_class: string | null
@@ -611,6 +1040,7 @@ export type Database = {
           heartbeat_at: string | null
           id: string
           intake_request_id: string
+          last_stage_transition_at: string | null
           lease_expires_at: string | null
           lease_owner: string | null
           max_attempts: number
@@ -620,11 +1050,16 @@ export type Database = {
           parser_model: string
           parser_provider: string
           parser_revision: string
+          provider_call_count: number
           provider_dispatched_at: string | null
+          provider_latency_ms: number | null
+          provider_outcome_recorded_at: string | null
+          provider_result_class: string | null
           request_id: string
           requested_by: string | null
           required_review_version: number
           reserved_page_count: number
+          retry_count: number
           review_required: boolean
           route: string
           routing_policy_version: string
@@ -632,6 +1067,8 @@ export type Database = {
           started_at: string | null
           status: string
           updated_at: string
+          validation_result: string | null
+          worker_runtime_version: string | null
           workspace_id: string
         }
         Insert: {
@@ -640,15 +1077,21 @@ export type Database = {
           assessment_fingerprint: string
           attempts?: number
           billed_page_count?: number
+          broker_protocol_version?: string | null
           cache_key: string
+          cache_result?: string | null
           classification_fingerprint?: string | null
           client_revision: string
           completed_at?: string | null
           content_hmac: string
+          cost_amount_usd?: number | null
+          cost_rate_version?: string | null
           created_at?: string
           critical_field_manifest_fingerprint?: string | null
           critical_field_manifest_json?: Json | null
+          dispatch_request_id?: string | null
           document_class: string
+          encryption_result?: string | null
           extraction_contract_version: string
           failed_at?: string | null
           failure_class?: string | null
@@ -657,6 +1100,7 @@ export type Database = {
           heartbeat_at?: string | null
           id?: string
           intake_request_id: string
+          last_stage_transition_at?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
           max_attempts?: number
@@ -666,11 +1110,16 @@ export type Database = {
           parser_model: string
           parser_provider: string
           parser_revision: string
+          provider_call_count?: number
           provider_dispatched_at?: string | null
+          provider_latency_ms?: number | null
+          provider_outcome_recorded_at?: string | null
+          provider_result_class?: string | null
           request_id: string
           requested_by?: string | null
           required_review_version?: number
           reserved_page_count?: number
+          retry_count?: number
           review_required?: boolean
           route: string
           routing_policy_version: string
@@ -678,6 +1127,8 @@ export type Database = {
           started_at?: string | null
           status?: string
           updated_at?: string
+          validation_result?: string | null
+          worker_runtime_version?: string | null
           workspace_id: string
         }
         Update: {
@@ -686,15 +1137,21 @@ export type Database = {
           assessment_fingerprint?: string
           attempts?: number
           billed_page_count?: number
+          broker_protocol_version?: string | null
           cache_key?: string
+          cache_result?: string | null
           classification_fingerprint?: string | null
           client_revision?: string
           completed_at?: string | null
           content_hmac?: string
+          cost_amount_usd?: number | null
+          cost_rate_version?: string | null
           created_at?: string
           critical_field_manifest_fingerprint?: string | null
           critical_field_manifest_json?: Json | null
+          dispatch_request_id?: string | null
           document_class?: string
+          encryption_result?: string | null
           extraction_contract_version?: string
           failed_at?: string | null
           failure_class?: string | null
@@ -703,6 +1160,7 @@ export type Database = {
           heartbeat_at?: string | null
           id?: string
           intake_request_id?: string
+          last_stage_transition_at?: string | null
           lease_expires_at?: string | null
           lease_owner?: string | null
           max_attempts?: number
@@ -712,11 +1170,16 @@ export type Database = {
           parser_model?: string
           parser_provider?: string
           parser_revision?: string
+          provider_call_count?: number
           provider_dispatched_at?: string | null
+          provider_latency_ms?: number | null
+          provider_outcome_recorded_at?: string | null
+          provider_result_class?: string | null
           request_id?: string
           requested_by?: string | null
           required_review_version?: number
           reserved_page_count?: number
+          retry_count?: number
           review_required?: boolean
           route?: string
           routing_policy_version?: string
@@ -724,6 +1187,8 @@ export type Database = {
           started_at?: string | null
           status?: string
           updated_at?: string
+          validation_result?: string | null
+          worker_runtime_version?: string | null
           workspace_id?: string
         }
         Relationships: [
