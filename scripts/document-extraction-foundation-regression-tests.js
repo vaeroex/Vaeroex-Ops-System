@@ -32,10 +32,23 @@ const contracts = read("lib/document-extraction/contracts.ts");
 const approvalGuard = read("lib/document-extraction/approval-guard.ts");
 const evidenceIndex = read("lib/ai/evidence-index.ts");
 const fileActions = read("app/app/files/actions.ts");
+const generatedTypes = read("lib/supabase/types.ts");
 const businessNotes = read("app/app/sources/business-notes/actions.ts");
 const snapshotBuilder = read("lib/intelligence/snapshot/v1/builder.ts");
+const functionSection = (name, nextName) => {
+  const start = migration.indexOf(`create or replace function public.${name}`);
+  const end = nextName ? migration.indexOf(`create or replace function public.${nextName}`, start + 1) : migration.length;
+  assert.ok(start >= 0 && end > start, `${name} must be present in the canonical migration`);
+  return migration.slice(start, end);
+};
+const requestIntake = functionSection("request_document_extraction_intake_v1", "enqueue_document_extraction_job_v1");
+const privilegedEnqueue = functionSection("enqueue_document_extraction_job_v1", "claim_document_extraction_job_v1");
+const reviewMutation = functionSection("mutate_document_extraction_review_v1", "document_extraction_authority_is_approved_v1");
+const authorityResolver = functionSection("resolve_document_extraction_file_authority_v1", "protect_document_extraction_file_state_v1");
+const manifestValidator = functionSection("validate_document_extraction_critical_field_manifest_v1", "complete_document_extraction_job_v1");
 
 const requiredTables = [
+  "document_extraction_intake_requests",
   "document_extraction_jobs",
   "document_extraction_file_bindings",
   "document_extraction_cache",
@@ -65,9 +78,20 @@ assert.match(migration, /document_extraction_jobs_one_active_nvidia_per_workspac
 assert.match(migration, /document_extraction_file_bindings_file_id_idx/);
 assert.match(migration, /status = 'dispatch_unknown'/);
 assert.match(migration, /provider_dispatched_at is null/);
-assert.match(migration, /pages_reserved = pages_reserved \+ p_pages_qualified/);
+assert.match(privilegedEnqueue, /pages_reserved = pages_reserved \+ p_page_count/);
 assert.match(migration, /pages_consumed = pages_consumed \+ v_job\.reserved_page_count/);
 assert.match(migration, /cache_hit', v_job\.status = 'completed'/);
+assert.match(privilegedEnqueue, /pg_advisory_xact_lock/);
+assert.match(privilegedEnqueue, /where intake_request_id = v_intake\.id for update/);
+assert.match(privilegedEnqueue, /where workspace_id = v_intake\.workspace_id and cache_key = p_cache_key for update/);
+assert.doesNotMatch(requestIntake, /page_count|pages_qualified|cache_key|parser_provider|parser_model|routing_policy_version|normalization_version/);
+assert.match(requestIntake, /from public\.file_uploads/);
+assert.match(requestIntake, /public\.is_workspace_member\(v_file\.workspace_id\)/);
+assert.match(migration, /grant execute on function public\.request_document_extraction_intake_v1\(uuid, uuid\) to authenticated/);
+assert.match(migration, /grant execute on function public\.enqueue_document_extraction_job_v1[^;]+to service_role/);
+assert.doesNotMatch(migration, /grant execute on function public\.enqueue_document_extraction_job_v1[^;]+to authenticated/);
+assert.match(migration, /grant execute on function public\.assert_document_extraction_authority_v1[^;]+to authenticated/);
+assert.doesNotMatch(migration, /grant execute on function public\.assert_document_extraction_authority_v1[^;]+to authenticated, service_role/);
 
 assert.match(migration, /payload_ciphertext bytea not null/);
 assert.match(migration, /encryption_algorithm text not null check \(encryption_algorithm = 'aes-256-gcm'\)/);
@@ -91,19 +115,35 @@ assert.match(migration, /review\.unresolved_field_count = 0/);
 assert.match(migration, /review\.rejected_field_count = 0/);
 assert.match(migration, /review\.review_version = job\.required_review_version/);
 assert.match(migration, /cache\.invalidated_at is null/);
+assert.match(reviewMutation, /p_action text/);
+assert.doesNotMatch(reviewMutation, /p_status text|p_critical_field_count|p_confirmed_field_count|p_corrected_field_count|p_rejected_field_count|p_unresolved_field_count/);
+assert.match(reviewMutation, /p_action is null or p_action not in/);
+assert.match(reviewMutation, /p_review_version is distinct from v_job\.required_review_version/);
+assert.match(reviewMutation, /v_decision_kind is null/);
+assert.match(reviewMutation, /coalesce\(jsonb_typeof\(p_decision_summary_json -> 'fields'\) <> 'array', true\)/);
+assert.match(reviewMutation, /Exactly one decision is required for every critical field/);
+assert.match(reviewMutation, /Duplicate or invalid critical-field decision/);
+assert.match(reviewMutation, /unknown critical field/);
+assert.match(reviewMutation, /Malformed corrected/);
+assert.match(reviewMutation, /v_status := case when v_corrected_field_count > 0 then 'approved_with_corrections' else 'approved' end/);
+assert.match(reviewMutation, /p_extraction_contract_version is distinct from v_job\.extraction_contract_version/);
+assert.match(reviewMutation, /critical_field_manifest_fingerprint/);
+assert.match(manifestValidator, /manifest_version' is distinct from 'document_extraction_critical_fields_v1'/);
+assert.match(manifestValidator, /coalesce\(jsonb_typeof\(p_manifest -> 'fields'\) <> 'array', true\)/);
 assert.match(migration, /enforce_document_extraction_business_memory_authority/);
 assert.match(migration, /enforce_document_extraction_kpi_authority/);
 assert.match(migration, /enforce_document_extraction_operational_metric_authority/);
-assert.match(
-  migration,
-  /update public\.file_uploads[\s\S]+document_extraction_job_id[\s\S]+document_extraction_authority/,
-  "enqueue must atomically mark files as extraction-controlled before any downstream indexing"
-);
-assert.match(
-  migration,
-  /if p_status in \('approved', 'approved_with_corrections'\)[\s\S]+review_id[\s\S]+classification_fingerprint[\s\S]+review_version/,
-  "authorized review must bind the complete approval envelope to every same-workspace file binding"
-);
+assert.match(authorityResolver, /join public\.document_extraction_jobs job[\s\S]+job\.review_required/);
+assert.match(authorityResolver, /and is_current/);
+assert.match(migration, /protect_document_extraction_file_state/);
+for (const reservedKey of [
+  "document_extraction_job_id",
+  "document_extraction_review_id",
+  "document_extraction_artifact_fingerprint",
+  "document_extraction_classification_fingerprint",
+  "document_extraction_review_version",
+  "document_extraction_authority"
+]) assert.match(migration, new RegExp(`'${reservedKey}'`));
 
 assert.ok(
   evidenceIndex.indexOf("assertDocumentExtractionAuthority") < evidenceIndex.indexOf("const normalized = normalizeText(extractedText)"),
@@ -113,25 +153,50 @@ assert.ok(
   evidenceIndex.indexOf("assertDocumentExtractionAuthority") < evidenceIndex.indexOf("createEmbeddings(chunks)"),
   "authority must be checked before embeddings"
 );
+assert.match(evidenceIndex, /const extractionAuthority = extractionEligibility\.authority/);
 assert.ok(
   evidenceIndex.indexOf("...extractionMetadata") < evidenceIndex.indexOf("business_memory_chunks\").upsert"),
   "reviewed fingerprints must accompany the authoritative Business Memory write"
 );
-assert.equal((fileActions.match(/resolveFileAnalysisExtractionAuthority\(file\.metadata_json\)/g) || []).length, 2, "both current file indexing paths must resolve the persisted extraction marker");
+assert.doesNotMatch(fileActions, /resolveFileAnalysisExtractionAuthority|extractionAuthority:/, "file actions must not interpret client-editable extraction markers");
 assert.doesNotMatch(businessNotes, /document-extraction|document_extraction/, "Business Notes remain on their contextual review path");
 assert.doesNotMatch(snapshotBuilder, /document-extraction|document_extraction/, "unapproved extraction is not a snapshot input");
 
 for (const field of [
   "kpi_name", "current_value", "target", "sign", "decimal", "currency",
   "percentage", "unit", "reporting_period", "page", "source_coordinates"
-]) assert.match(contracts, new RegExp(`\\| \\\"${field}\\\"`));
+]) assert.match(contracts, new RegExp(`\| \"${field}\"`));
 for (const decision of ["confirmed", "corrected", "rejected", "unresolved"]) {
-  assert.match(contracts, new RegExp(`\\\"${decision}\\\"`));
+  assert.match(contracts, new RegExp(`\"${decision}\"`));
 }
 assert.match(approvalGuard, /mode: "existing_native_file_analysis"/);
 assert.match(approvalGuard, /mode: "unapproved_document_extraction"/);
 assert.match(approvalGuard, /mode: "reviewed_document_extraction"/);
-assert.match(approvalGuard, /assert_document_extraction_authority_v1/);
+assert.match(approvalGuard, /resolve_document_extraction_file_authority_v1/);
+assert.doesNotMatch(approvalGuard, /metadata\.document_extraction|record\.document_extraction|pendingDocumentExtractionAuthorityMetadata/);
+assert.match(contracts, /DocumentExtractionCriticalFieldManifestV1/);
+assert.match(contracts, /DocumentExtractionReviewAction = "save" \| "approve" \| "reject"/);
+
+for (const relationship of [
+  "document_extraction_jobs_intake_request_id_fkey",
+  "document_extraction_file_bindings_file_id_fkey",
+  "document_extraction_file_bindings_job_id_fkey",
+  "document_extraction_reviews_job_id_fkey",
+  "document_extraction_cache_source_job_id_fkey"
+]) {
+  assert.match(generatedTypes, new RegExp(`foreignKeyName: "${relationship}"`), `${relationship} must be generated from Preview`);
+}
+assert.match(generatedTypes, /request_document_extraction_intake_v1:\s*\{[\s\S]+p_file_id: string; p_request_id: string/);
+assert.match(generatedTypes, /enqueue_document_extraction_job_v1:\s*\{[\s\S]+p_intake_request_id: string[\s\S]+p_page_count: number/);
+assert.doesNotMatch(
+  generatedTypes.match(/enqueue_document_extraction_job_v1:\s*\{[\s\S]+?Returns: Json\s*\}/)?.[0] ?? "",
+  /p_pages_qualified|p_workspace_id|p_file_id|p_requested_by/
+);
+assert.match(generatedTypes, /mutate_document_extraction_review_v1:\s*\{[\s\S]+p_action: string[\s\S]+p_decision_summary_json: Json/);
+assert.doesNotMatch(
+  generatedTypes.match(/mutate_document_extraction_review_v1:\s*\{[\s\S]+?Returns: Json\s*\}/)?.[0] ?? "",
+  /p_status|p_critical_field_count|p_confirmed_field_count|p_corrected_field_count|p_rejected_field_count|p_unresolved_field_count/
+);
 
 const secret = new Uint8Array(32).fill(17);
 const baseIdentity = {

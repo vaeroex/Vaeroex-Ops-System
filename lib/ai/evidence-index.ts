@@ -3,8 +3,7 @@ import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   assertDocumentExtractionAuthority,
-  documentExtractionAuthorityMetadata,
-  type FileAnalysisExtractionAuthority
+  documentExtractionAuthorityMetadata
 } from "@/lib/document-extraction/approval-guard";
 import {
   EVIDENCE_CANDIDATE_VERSION,
@@ -1006,8 +1005,7 @@ export async function indexFileAnalysisEvidence({
   runId,
   extractedText,
   summary,
-  metadata,
-  extractionAuthority
+  metadata
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
@@ -1017,17 +1015,13 @@ export async function indexFileAnalysisEvidence({
   extractedText: string;
   summary?: string | null;
   metadata?: Json;
-  extractionAuthority: FileAnalysisExtractionAuthority;
 }) {
-  // This check runs before chunking or embedding. Existing native analysis must
-  // opt into its compatibility mode; future extraction jobs must present a
-  // database-verified human-approval envelope.
+  // Relational extraction lineage is checked before chunking or embedding.
+  // Editable file metadata cannot downgrade a review-gated source to native.
   const extractionEligibility = await assertDocumentExtractionAuthority({
     supabase,
     workspaceId,
-    fileId: file.id,
-    authority: extractionAuthority,
-    metadata
+    fileId: file.id
   });
   if (!extractionEligibility.eligible) {
     return {
@@ -1035,6 +1029,7 @@ export async function indexFileAnalysisEvidence({
       error: "Human approval of all extracted critical fields is required before this source can enter Business Memory."
     };
   }
+  const extractionAuthority = extractionEligibility.authority;
 
   const normalized = normalizeText(extractedText);
   const chunks = chunkEvidenceText(normalized);

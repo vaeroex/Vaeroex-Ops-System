@@ -5,7 +5,6 @@ import { revalidatePath } from "next/cache";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 import { assessFileAnalysisEvidence, buildWorkspaceEvidenceContext, evidenceContextAsJson, indexFileAnalysisEvidence, indexWorksheetImportEvidence } from "@/lib/ai/evidence-index";
-import { resolveFileAnalysisExtractionAuthority } from "@/lib/document-extraction/approval-guard";
 import { cleanVaeroexErrorMessage } from "@/lib/ai/errors";
 import { runVaeroexCompletionWithUsage, type VaeroexFileAttachment, type VaeroexRequestSizeMetrics } from "@/lib/ai/vaeroex-client";
 import { recordVaeroexAiUsage } from "@/lib/ai/usage";
@@ -2112,7 +2111,6 @@ async function runFileVaeroexAnalysis({
       runId: data.id,
       extractedText: finalExtraction.textContent || extractedTextFromOutput(outputJson) || summary,
       summary,
-      extractionAuthority: resolveFileAnalysisExtractionAuthority(file.metadata_json),
       metadata: {
         analysis_run_id: data.id,
         source_run_id: data.id,
@@ -2687,7 +2685,6 @@ export async function approveFileAnalysisAction(formData: FormData) {
       runId,
       extractedText,
       summary,
-      extractionAuthority: resolveFileAnalysisExtractionAuthority(file.metadata_json),
       metadata: {
         analysis_run_id: runId,
         source_run_id: runId,

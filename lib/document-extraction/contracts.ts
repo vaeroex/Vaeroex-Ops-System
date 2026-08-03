@@ -55,6 +55,8 @@ export type DocumentExtractionCriticalFieldKind =
   | "page"
   | "source_coordinates";
 export type DocumentExtractionCriticalFieldDecision = "confirmed" | "corrected" | "rejected" | "unresolved";
+export type DocumentExtractionReviewAction = "save" | "approve" | "reject";
+export type DocumentExtractionCriticalFieldValueType = "string" | "number" | "boolean" | "coordinates";
 
 export type DocumentSourceCoordinatesV1 = {
   page: number;
@@ -111,11 +113,23 @@ export type DocumentExtractionCorrectedFieldV1 = {
   reasonCode?: string;
 };
 
+export type DocumentExtractionCriticalFieldManifestV1 = {
+  manifest_version: "document_extraction_critical_fields_v1";
+  artifact_fingerprint: string;
+  extraction_contract_version: typeof DOCUMENT_EXTRACTION_CONTRACT_VERSION;
+  fields: Array<{
+    id: string;
+    kind: DocumentExtractionCriticalFieldKind;
+    value_type: DocumentExtractionCriticalFieldValueType;
+  }>;
+};
+
 export type DocumentExtractionReviewDecisionV1 = {
   reviewVersion: typeof DOCUMENT_EXTRACTION_REVIEW_VERSION;
-  status: DocumentExtractionReviewStatus;
+  action: DocumentExtractionReviewAction;
   artifactFingerprint: string;
   classificationFingerprint: string | null;
+  extractionContractVersion: typeof DOCUMENT_EXTRACTION_CONTRACT_VERSION;
   fields: DocumentExtractionCorrectedFieldV1[];
 };
 
