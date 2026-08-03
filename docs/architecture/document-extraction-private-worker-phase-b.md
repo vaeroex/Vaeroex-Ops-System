@@ -41,11 +41,11 @@ flowchart LR
 
 ### Worker
 
-The worker receives only its Ed25519 private identity, the NVIDIA credential, the protected broker origin, and exact approved provider revisions. It refuses to start if a Supabase service-role key or document-cache encryption key is present. It has no database or bucket credential.
+The worker receives only its Ed25519 private identity, the NVIDIA credential, the protected broker origin, and exact approved provider revisions. It refuses to start when it detects Supabase configuration, database credentials, object-storage credentials, cache-encryption material, broker authority, or unrelated KMS master keys. The denylist is explicit and supplemented by narrowly bounded credential-name patterns; errors identify only the variable and credential category. The worker has no database or bucket credential and does not require even a public Supabase URL.
 
 ### Broker
 
-The Next.js broker verifies every worker request, consumes its nonce in the replay ledger, verifies lease/file capabilities, and calls service-role-only security-definer RPCs. Caller-supplied workspace and file identities are never accepted. The broker is hard-disabled unless the private-worker switch is true.
+The Next.js broker accepts only canonical 44-byte Ed25519 SPKI keys and 64-byte Ed25519 signatures, verifies every worker request, consumes its nonce in the replay ledger, verifies lease/file capabilities, and calls service-role-only security-definer RPCs. RSA, RSA-PSS, EC, X25519, DSA, malformed, and non-canonical keys fail closed. Caller-supplied workspace and file identities are never accepted. The broker is hard-disabled unless the private-worker switch is true.
 
 The broker alone:
 
@@ -94,7 +94,7 @@ Any transition to `dispatch_unknown`, including lease expiry after a provider di
 
 ## Signed file access and cleanup
 
-The worker asks for a single-purpose grant while holding a valid lease. The broker atomically consumes the grant, derives the stored workspace path from the job, creates a 30-second signed URL internally, and proxies no more than 25 MB. The signed URL is never returned to Python or stored.
+The worker asks for a single-purpose grant while holding a valid lease. Grant issuance and consumption independently recheck both application provider gates and the database runtime gates. Disabling the application provider switch therefore blocks a running worker from consuming an outstanding grant. The broker atomically consumes the grant, derives the stored workspace path from the job, creates a 30-second signed URL internally, and proxies no more than 25 MB. The signed URL is never returned to Python or stored.
 
 Temporary directories use mode `0700`; files use `0600`. The source is removed after provider input preparation. The whole directory is removed on success, exception, timeout, SIGINT, and SIGTERM. Startup scavenging removes stale worker-owned run directories after abrupt termination. Filenames and customer identifiers are not sent to NVIDIA.
 
@@ -113,9 +113,11 @@ The client receives a generic temporary PDF path. PDF, PNG, and JPEG are support
 The official client's hidden retries are disabled. The broker authorizes at most one explicit retry.
 Empty normalized output, unknown fields, malformed coordinates, unsupported critical-field kinds, and artifact fingerprint mismatches fail validation and are never cached.
 
+The installation script verifies the deterministic NeMo package version derived from the approved commit and applies the checked-in exact Python 3.12 dependency constraints. Dependency qualification must still pass `pip check`, `pip-audit`, strict mypy, pytest, and official-client imports; a vulnerable upstream constraint blocks deployment rather than being ignored or overridden.
+
 ## Encryption and key rotation
 
-Normalized cache content uses AES-256-GCM with a unique 96-bit nonce and 128-bit tag. Keys are loaded from the deployment's encrypted secret manager. No default or committed key exists. The keyring permits one current key and up to two previous keys.
+Normalized cache content uses AES-256-GCM with a 96-bit random nonce and 128-bit tag. A database unique index on `(encryption_key_version, encryption_nonce)` is the distributed uniqueness boundary. Cache completion inserts the encrypted artifact atomically; a nonce collision stores nothing and permits at most three fresh-nonce attempts. Keys are loaded from the deployment's encrypted secret manager. No default or committed key exists. The keyring permits one current key and up to two previous keys.
 
 Authenticated additional data binds:
 
@@ -132,7 +134,13 @@ Decryption rejects an unavailable key, altered ciphertext/tag, or any metadata m
 
 One explicit retry is allowed only for a clearly classified transport/connect timeout or rate-limit result. Read timeout or uncertain post-dispatch failure is classified as ambiguous and never retried. Unsupported input, malformed output, validation, provider, encryption, and authorization failures are not retried.
 
-The durable circuit opens after three consecutive failures, five failures in a ten-minute window, or an ambiguous dispatch. An open circuit blocks claims, file access, dispatch, completion, and promotion through the shared runtime gate. Circuit recovery is service-role-only and requires a separately authenticated Vaeroex operator path. No automatic stuck-job reclaim or automatic half-open provider call exists.
+Provider outcomes are stored in a private append-only ledger with one outcome per dispatch request. A success resets only the consecutive-failure signal; it does not erase recent failures from the rolling window. The durable circuit opens after three consecutive failures, five failures in a ten-minute window, or an ambiguous dispatch. State changes are recorded in a separate privacy-safe append-only circuit-event ledger. An open circuit blocks claims, file access, dispatch, completion, and promotion through the shared runtime gate. Circuit recovery is service-role-only and requires a separately authenticated Vaeroex operator path. No automatic stuck-job reclaim or automatic half-open provider call exists.
+
+Dispatch and retry authorization are single-use database claims. A replay of a committed dispatch claim returns `dispatch_already_authorized` and never grants provider permission. If the first authorization response is lost, the caller fails closed and the lease follows the documented ambiguous-dispatch recovery path. A qualified retry uses its own atomic retry claim; neither claim can authorize two calls.
+
+## Migration execution
+
+Canonical migrations execute exactly once through the Supabase migration ledger. The Phase B corrective migrations are additionally safe to replay: they replace functions and constraints deterministically, create private ledgers and indexes idempotently, and never enable execution or rewrite customer data. Already-ledgered migration files are not rewritten; schema corrections are additive follow-up migrations.
 
 ## Telemetry and cost
 

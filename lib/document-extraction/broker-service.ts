@@ -27,7 +27,9 @@ import {
   resolveDocumentExtractionLease
 } from "@/lib/document-extraction/broker-store";
 import { createManagedDocumentExtractionEncryptionProvider } from "@/lib/document-extraction/encryption";
+import { persistWithDocumentExtractionNonceRetry } from "@/lib/document-extraction/nonce-retry";
 import {
+  assertDocumentExtractionProviderGateEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
   resolveDocumentExtractionExecutionPolicy
 } from "@/lib/document-extraction/runtime-policy";
@@ -114,6 +116,10 @@ export async function handleDocumentExtractionBrokerOperation({
     };
   }
 
+  // Every non-health operation is admitted only while the application-owned
+  // provider gate remains on. Database gates are independently enforced by RPCs.
+  assertDocumentExtractionProviderGateEnabled(environment);
+
   if (request.operation === "claim") {
     assertDocumentExtractionProviderDispatchEnabled(environment);
     const job = await claimDocumentExtractionJob(workerId, request.leaseSeconds);
@@ -153,6 +159,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "issue_file_access") {
+    assertDocumentExtractionProviderDispatchEnabled(environment);
     const secret = createFileGrantSecret();
     const grant = await issueDocumentExtractionFileGrant({
       jobId: lease.jobId,
@@ -235,13 +242,26 @@ export async function handleDocumentExtractionBrokerOperation({
       throw new Error("document_extraction_artifact_job_mismatch");
     }
     const encryption = createManagedDocumentExtractionEncryptionProvider();
-    const envelope = await encryption.encrypt(artifact, {
-      workspaceId: context.workspace_id,
-      cacheKey: context.cache_key,
-      artifactFingerprint: artifact.artifactFingerprint,
-      extractionContractVersion: context.extraction_contract_version,
-      normalizationVersion: context.normalization_version
-    });
+    const result = await persistWithDocumentExtractionNonceRetry(
+      () => encryption.encrypt(artifact, {
+        workspaceId: context.workspace_id,
+        cacheKey: context.cache_key,
+        artifactFingerprint: artifact.artifactFingerprint,
+        extractionContractVersion: context.extraction_contract_version,
+        normalizationVersion: context.normalization_version
+      }),
+      (envelope) => completeDocumentExtractionJob({
+        jobId: lease.jobId,
+        workerId,
+        artifactFingerprint: artifact.artifactFingerprint,
+        criticalFieldManifest: criticalFieldManifestForArtifact(artifact),
+        ciphertext: envelope.ciphertext,
+        keyVersion: envelope.keyVersion,
+        nonce: envelope.nonce,
+        authenticationTag: envelope.authenticationTag,
+        aadDigest: envelope.aadDigest
+      })
+    );
     await recordFinalTelemetry({
       jobId: lease.jobId,
       workerId,
@@ -253,17 +273,6 @@ export async function handleDocumentExtractionBrokerOperation({
         cacheResult: "store_authorized"
       },
       environment
-    });
-    const result = await completeDocumentExtractionJob({
-      jobId: lease.jobId,
-      workerId,
-      artifactFingerprint: artifact.artifactFingerprint,
-      criticalFieldManifest: criticalFieldManifestForArtifact(artifact),
-      ciphertext: envelope.ciphertext,
-      keyVersion: envelope.keyVersion,
-      nonce: envelope.nonce,
-      authenticationTag: envelope.authenticationTag,
-      aadDigest: envelope.aadDigest
     });
     return { ok: true, ...result };
   }

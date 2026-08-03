@@ -8,6 +8,9 @@ const MAX_CLOCK_SKEW_SECONDS = 15;
 const WORKER_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const KEY_VERSION = /^[A-Za-z0-9._:-]{1,120}$/;
 const NONCE = /^[0-9a-f]{32}$/;
+const ED25519_SIGNATURE_BYTES = 64;
+const ED25519_SPKI_BYTES = 44;
+const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 
 type WorkerPublicKeyRecord = {
   keyVersion: string;
@@ -52,7 +55,24 @@ function parseWorkerKeys(value: string | undefined) {
       throw new Error("document_extraction_worker_keys_invalid");
     }
     const keyBytes = Buffer.from(record.publicKeySpkiBase64, "base64");
-    if (!keyBytes.byteLength || keyBytes.toString("base64") !== record.publicKeySpkiBase64) {
+    if (
+      keyBytes.byteLength !== ED25519_SPKI_BYTES
+      || !keyBytes.subarray(0, ED25519_SPKI_PREFIX.byteLength).equals(ED25519_SPKI_PREFIX)
+      || keyBytes.toString("base64") !== record.publicKeySpkiBase64
+    ) {
+      throw new Error("document_extraction_worker_keys_invalid");
+    }
+    try {
+      const publicKey = createPublicKey({ key: keyBytes, format: "der", type: "spki" });
+      const canonicalSpki = publicKey.export({ format: "der", type: "spki" });
+      if (
+        publicKey.asymmetricKeyType !== "ed25519"
+        || !Buffer.isBuffer(canonicalSpki)
+        || !canonicalSpki.equals(keyBytes)
+      ) {
+        throw new Error("document_extraction_worker_keys_invalid");
+      }
+    } catch {
       throw new Error("document_extraction_worker_keys_invalid");
     }
     keys.set(workerId, {
@@ -150,14 +170,25 @@ export function verifyWorkerAssertion({
   } catch {
     throw new Error("document_extraction_worker_assertion_invalid");
   }
-  if (!signatureBytes.byteLength || signatureBytes.toString("base64") !== signature) {
+  if (
+    signatureBytes.byteLength !== ED25519_SIGNATURE_BYTES
+    || signatureBytes.toString("base64") !== signature
+  ) {
     throw new Error("document_extraction_worker_assertion_invalid");
   }
-  const key = createPublicKey({
-    key: Buffer.from(workerKey.publicKeySpkiBase64, "base64"),
-    format: "der",
-    type: "spki"
-  });
+  let key;
+  try {
+    key = createPublicKey({
+      key: Buffer.from(workerKey.publicKeySpkiBase64, "base64"),
+      format: "der",
+      type: "spki"
+    });
+  } catch {
+    throw new Error("document_extraction_worker_assertion_invalid");
+  }
+  if (key.asymmetricKeyType !== "ed25519") {
+    throw new Error("document_extraction_worker_assertion_invalid");
+  }
   if (!verify(null, Buffer.from(canonical, "utf8"), key, signatureBytes)) {
     throw new Error("document_extraction_worker_assertion_invalid");
   }

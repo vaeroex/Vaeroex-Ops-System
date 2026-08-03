@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
-const { generateKeyPairSync, sign } = require("node:crypto");
+const { createHash, generateKeyPairSync, sign } = require("node:crypto");
 const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
@@ -11,6 +11,8 @@ const migrationName = fs.readdirSync(path.join(root, "supabase/migrations"))
 assert.ok(migrationName, "the canonical Phase B migration must exist");
 const migration = read(`supabase/migrations/${migrationName}`);
 const circuitMigration = read("supabase/migrations/20260803181405_document_extraction_dispatch_unknown_circuit.sql");
+const correctiveMigration = read("supabase/migrations/20260803204552_document_extraction_private_worker_phase_b_security_fixes.sql");
+const dispatchSingleUseMigration = read("supabase/migrations/20260803205520_document_extraction_dispatch_authorization_single_use.sql");
 const route = read("app/api/internal/document-extraction/broker/route.ts");
 const service = read("lib/document-extraction/broker-service.ts");
 const policy = read("lib/document-extraction/runtime-policy.ts");
@@ -20,6 +22,9 @@ const workerProvider = read("services/document-extraction-worker/src/vaeroex_doc
 const workerRunner = read("services/document-extraction-worker/src/vaeroex_document_worker/runner.py");
 const workflow = read("services/document-extraction-worker/src/vaeroex_document_worker/workflow.py");
 const workerProject = read("services/document-extraction-worker/pyproject.toml");
+const dependencyRequirements = read("services/document-extraction-worker/requirements.txt");
+const dependencyLock = read("services/document-extraction-worker/requirements.lock");
+const dependencyInstaller = read("services/document-extraction-worker/install-worker-dependencies.sh");
 const generatedTypes = read("lib/supabase/types.ts");
 
 const loadedTypeScriptModules = new Map();
@@ -66,9 +71,13 @@ const {
   rotateDocumentExtractionEncryption
 } = loadTypeScriptModule("lib/document-extraction/encryption.ts");
 const {
+  assertDocumentExtractionProviderGateEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
   resolveDocumentExtractionExecutionPolicy
 } = loadTypeScriptModule("lib/document-extraction/runtime-policy.ts");
+const {
+  persistWithDocumentExtractionNonceRetry
+} = loadTypeScriptModule("lib/document-extraction/nonce-retry.ts");
 
 for (const table of [
   "document_extraction_worker_assertions",
@@ -131,15 +140,54 @@ assert.match(
 assert.doesNotMatch(circuitMigration, /grant execute/i);
 assert.doesNotMatch(circuitMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
 
+for (const table of [
+  "document_extraction_provider_outcomes",
+  "document_extraction_circuit_events"
+]) {
+  assert.match(correctiveMigration, new RegExp(`create table if not exists public\\.${table}`));
+  assert.match(correctiveMigration, new RegExp(`alter table public\\.${table} enable row level security`));
+  assert.match(correctiveMigration, new RegExp(`revoke all privileges on table public\\.${table}`));
+  assert.doesNotMatch(correctiveMigration, new RegExp(`grant (?:select|insert|update|delete)[^;]+${table}`, "is"));
+}
+for (const stage of [
+  "queued", "leased", "preparing", "dispatching", "provider_dispatched",
+  "extracting", "normalizing", "validating", "encrypting", "awaiting_review",
+  "classifying", "promoting", "terminal"
+]) {
+  assert.match(correctiveMigration, new RegExp(`'${stage}'`));
+}
+assert.match(correctiveMigration, /document_extraction_cache_key_version_nonce_unique_idx/);
+assert.match(correctiveMigration, /encryption_key_version, encryption_nonce/);
+assert.match(correctiveMigration, /result_class <> 'success'[\s\S]+interval '10 minutes'/);
+assert.match(correctiveMigration, /v_consecutive >= 3/);
+assert.match(correctiveMigration, /v_rolling >= 5/);
+assert.match(correctiveMigration, /failure_window_reset_at/);
+assert.match(correctiveMigration, /Document extraction security ledgers are append-only/);
+assert.match(correctiveMigration, /v_constraint = 'document_extraction_cache_key_version_nonce_unique_idx'/);
+assert.match(correctiveMigration, /'completed', false, 'reason', 'nonce_collision'/);
+assert.match(correctiveMigration, /v_reason := public\.document_extraction_runtime_reason_v1[\s\S]+stage = 'provider_dispatched'/);
+assert.doesNotMatch(correctiveMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
+assert.match(dispatchSingleUseMigration, /'authorized', false,[\s\S]+'dispatch_already_authorized'/);
+assert.match(dispatchSingleUseMigration, /'idempotent', true/);
+assert.match(
+  dispatchSingleUseMigration,
+  /revoke execute on function public\.authorize_document_extraction_dispatch_v2\(uuid, text, uuid\)[\s\S]+grant execute[\s\S]+to service_role/
+);
+assert.doesNotMatch(dispatchSingleUseMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
+
 assert.match(route, /verifyWorkerAssertion/);
 assert.match(route, /consumeWorkerAssertion/);
 assert.match(route, /authorization\.startsWith\("Bearer "\)/);
 assert.match(route, /createSignedUrl\(source\.storage_path, 30\)/);
+assert.match(route, /GET[\s\S]+assertDocumentExtractionProviderDispatchEnabled\(\)/);
 assert.doesNotMatch(route, /NVIDIA_API_KEY|nemo_retriever|create_ingestor/);
 assert.match(service, /buildNormalizedDocumentExtractionArtifact/);
 assert.match(service, /createManagedDocumentExtractionEncryptionProvider/);
 assert.match(service, /artifact\.route !== context\.route/);
 assert.match(service, /workspaceId: context\.workspace_id/);
+assert.match(service, /assertDocumentExtractionProviderGateEnabled\(environment\)/);
+assert.match(service, /issue_file_access[\s\S]+assertDocumentExtractionProviderDispatchEnabled\(environment\)/);
+assert.match(service, /persistWithDocumentExtractionNonceRetry/);
 assert.doesNotMatch(service, /console\.(log|error)|JSON\.stringify\(artifact/);
 
 assert.match(policy, /privateWorkerEnabled: false/);
@@ -153,19 +201,43 @@ assert.doesNotMatch(encryption, /fallback|defaultKey|hard.?coded/i);
 
 assert.match(workerConfig, /SUPABASE_SERVICE_ROLE_KEY/);
 assert.match(workerConfig, /DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON/);
+assert.match(workerConfig, /SUPABASE_URL/);
+assert.match(workerConfig, /AWS_SECRET_ACCESS_KEY/);
+assert.match(workerConfig, /AZURE_STORAGE_CONNECTION_STRING/);
+assert.match(workerConfig, /GOOGLE_APPLICATION_CREDENTIALS/);
+assert.match(workerConfig, /VERCEL_BLOB_READ_WRITE_TOKEN/);
 assert.match(workerConfig, /Production document extraction approval is absent/);
 assert.match(workerProvider, /from nemo_retriever import create_ingestor/);
 assert.match(workerProvider, /method="nemotron_parse"/);
 assert.match(workerProvider, /remote_max_retries=0/);
 assert.match(workerProvider, /remote_max_429_retries=0/);
 assert.match(workerRunner, /authorize_dispatch/);
+assert.equal((workerRunner.match(/"operation": "authorize_dispatch"/g) || []).length, 1);
+assert.match(workerRunner, /dispatch_already_authorized/);
 assert.match(workerRunner, /authorize_retry/);
+assert.equal((workerRunner.match(/"operation": "authorize_retry"/g) || []).length, 1);
+assert.match(workerRunner, /retry RPC is the atomic second-call claim/);
 assert.match(workerRunner, /provider_outcome/);
 assert.match(workflow, /Workflows\(namespace="vaeroexdocumentextractionprivatev1"\)/);
 assert.match(workflow, /@workflows\.step\(max_retries=0\)/);
 assert.match(workerProject, /\[\[tool\.vercel\.workflows\]\]/);
 assert.match(workerProject, /entrypoint = "vaeroex_document_worker\.workflow:workflows"/);
-assert.match(workerProject, /Pillow==12\.2\.0/);
+assert.match(dependencyRequirements, /nemo-retriever\[nemotron-parse\].+52886112cafab4c4bca1cda0d4f588785adfe4d3/);
+for (const dependency of [
+  "cryptography==50.0.0",
+  "nltk==3.9.4",
+  "pillow==12.2.0",
+  "ray==2.55.1",
+  "starlette==0.52.1"
+]) {
+  assert.ok(dependencyLock.toLowerCase().split("\n").includes(dependency));
+}
+assert.match(dependencyLock, /nemo-retriever @ git\+https:\/\/github\.com\/NVIDIA\/NeMo-Retriever\.git@52886112cafab4c4bca1cda0d4f588785adfe4d3/);
+assert.match(dependencyInstaller, /client_revision="52886112cafab4c4bca1cda0d4f588785adfe4d3"/);
+assert.match(dependencyInstaller, /client_package_version="2026\.8\.1\.dev52886112"/);
+assert.match(dependencyInstaller, /-c "\$worker_root\/requirements\.lock"/);
+assert.match(dependencyInstaller, /version\("nemo-retriever"\)/);
+assert.match(dependencyInstaller, /installed_client_version.*client_package_version/);
 assert.doesNotMatch([workerConfig, workerProvider, workerRunner].join("\n"), /print\(|logging\.(?:debug|info).*text|raw_response/i);
 
 assert.deepEqual(resolveDocumentExtractionExecutionPolicy({}), {
@@ -180,6 +252,14 @@ assert.equal(resolveDocumentExtractionExecutionPolicy({
   DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED: "true",
   DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED: "true"
 }).providerExecutionEnabled, false);
+assert.throws(
+  () => assertDocumentExtractionProviderGateEnabled({
+    VERCEL_ENV: "preview",
+    DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED: "true",
+    DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED: "false"
+  }),
+  /provider_execution_disabled/
+);
 assert.throws(
   () => assertDocumentExtractionProviderDispatchEnabled({
     VERCEL_ENV: "production",
@@ -200,6 +280,8 @@ assert.doesNotThrow(() => assertDocumentExtractionProviderDispatchEnabled({
 }));
 
 for (const generatedSymbol of [
+  "document_extraction_circuit_events",
+  "document_extraction_provider_outcomes",
   "document_extraction_worker_assertions",
   "document_extraction_file_access_grants",
   "document_extraction_operational_telemetry",
@@ -209,6 +291,7 @@ for (const generatedSymbol of [
 ]) {
   assert.match(generatedTypes, new RegExp(generatedSymbol));
 }
+assert.match(generatedTypes, /failure_window_reset_at: string/);
 
 const normalizedDraft = {
   route: "nvidia_primary",
@@ -276,7 +359,7 @@ const { publicKey, privateKey } = generateKeyPairSync("ed25519");
 const assertionCanonical = canonicalWorkerAssertionPayload({
   method: "POST",
   requestTarget: assertionTarget,
-  bodyDigest: require("node:crypto").createHash("sha256").update(assertionBody).digest("hex"),
+  bodyDigest: createHash("sha256").update(assertionBody).digest("hex"),
   workerId: "preview-worker-1",
   keyVersion: "worker-key-v1",
   timestamp: assertionTimestamp,
@@ -319,6 +402,100 @@ assert.throws(
 assert.throws(
   () => verifyWorkerAssertion({ request: assertionRequest, body: assertionBody, environment: assertionEnvironment, now: assertionNow + 61_000 }),
   /assertion_expired/
+);
+
+function assertionRequestWith(headers) {
+  return new Request(`https://preview.example.test${assertionTarget}`, {
+    method: "POST",
+    headers,
+    body: assertionBody
+  });
+}
+
+function assertionHeaders(overrides = {}) {
+  return {
+    "x-vaeroex-broker-protocol": "document_extraction_broker_v1",
+    "x-vaeroex-worker-id": "preview-worker-1",
+    "x-vaeroex-worker-key-version": "worker-key-v1",
+    "x-vaeroex-worker-timestamp": assertionTimestamp,
+    "x-vaeroex-worker-nonce": assertionNonce,
+    "x-vaeroex-worker-signature": assertionSignature,
+    ...overrides
+  };
+}
+
+for (const [keyType, options] of [
+  ["rsa", { modulusLength: 2048 }],
+  ["rsa-pss", { modulusLength: 2048, hashAlgorithm: "sha256", mgf1HashAlgorithm: "sha256", saltLength: 32 }],
+  ["ec", { namedCurve: "P-256" }],
+  ["x25519", undefined]
+]) {
+  const pair = generateKeyPairSync(keyType, options);
+  const unsupportedEnvironment = {
+    DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON: JSON.stringify({
+      "preview-worker-1": {
+        keyVersion: "worker-key-v1",
+        publicKeySpkiBase64: pair.publicKey.export({ format: "der", type: "spki" }).toString("base64")
+      }
+    })
+  };
+  assert.throws(
+    () => verifyWorkerAssertion({
+      request: assertionRequestWith(assertionHeaders()),
+      body: assertionBody,
+      environment: unsupportedEnvironment,
+      now: assertionNow
+    }),
+    /worker_keys_invalid|assertion_invalid/,
+    `${keyType} worker keys must fail closed`
+  );
+}
+
+assert.throws(
+  () => verifyWorkerAssertion({
+    request: assertionRequestWith(assertionHeaders()),
+    body: assertionBody,
+    environment: {
+      DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON: JSON.stringify({
+        "preview-worker-1": { keyVersion: "worker-key-v1", publicKeySpkiBase64: "not-base64" }
+      })
+    },
+    now: assertionNow
+  }),
+  /worker_keys_invalid/
+);
+const modifiedSignature = Buffer.from(assertionSignature, "base64");
+modifiedSignature[0] ^= 1;
+assert.throws(
+  () => verifyWorkerAssertion({
+    request: assertionRequestWith(assertionHeaders({
+      "x-vaeroex-worker-signature": modifiedSignature.toString("base64")
+    })),
+    body: assertionBody,
+    environment: assertionEnvironment,
+    now: assertionNow
+  }),
+  /assertion_invalid/
+);
+const unsignedHeaders = assertionHeaders();
+delete unsignedHeaders["x-vaeroex-worker-signature"];
+assert.throws(
+  () => verifyWorkerAssertion({
+    request: assertionRequestWith(unsignedHeaders),
+    body: assertionBody,
+    environment: assertionEnvironment,
+    now: assertionNow
+  }),
+  /assertion_invalid/
+);
+assert.throws(
+  () => verifyWorkerAssertion({
+    request: assertionRequestWith(assertionHeaders({ "x-vaeroex-worker-id": "preview-worker-2" })),
+    body: assertionBody,
+    environment: assertionEnvironment,
+    now: assertionNow
+  }),
+  /identity_unknown/
 );
 
 const capabilityEnvironment = {
@@ -474,7 +651,33 @@ async function verifyManagedRotation() {
   );
 }
 
-verifyManagedRotation()
+async function verifyNonceCollisionRetry() {
+  const seen = [];
+  const result = await persistWithDocumentExtractionNonceRetry(
+    async () => {
+      const nonce = seen.length === 0 ? "nonce-collision" : "nonce-fresh";
+      seen.push(nonce);
+      return { nonce };
+    },
+    async (candidate) => candidate.nonce === "nonce-collision"
+      ? { completed: false, reason: "nonce_collision" }
+      : { completed: true, status: "needs_review" }
+  );
+  assert.equal(result.completed, true);
+  assert.deepEqual(seen, ["nonce-collision", "nonce-fresh"]);
+
+  let attempts = 0;
+  await assert.rejects(
+    () => persistWithDocumentExtractionNonceRetry(
+      async () => ({ nonce: `collision-${attempts += 1}` }),
+      async () => ({ completed: false, reason: "nonce_collision" })
+    ),
+    /nonce_collision_retry_exhausted/
+  );
+  assert.equal(attempts, 3);
+}
+
+Promise.all([verifyManagedRotation(), verifyNonceCollisionRetry()])
   .then(() => console.log("Document extraction private-worker Phase B regressions passed."))
   .catch((error) => {
     console.error(error instanceof Error ? error.message : "Phase B regression failed.");

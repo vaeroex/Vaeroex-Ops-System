@@ -61,10 +61,7 @@ export function assertDocumentExtractionBrokerEnabled(
 export function assertDocumentExtractionProviderDispatchEnabled(
   environment: NodeJS.ProcessEnv = process.env
 ) {
-  const policy = assertDocumentExtractionBrokerEnabled(environment);
-  if (!policy.providerExecutionEnabled) {
-    throw new Error("document_extraction_provider_execution_disabled");
-  }
+  const policy = assertDocumentExtractionProviderGateEnabled(environment);
   if (!environment.NVIDIA_API_KEY?.trim()) {
     throw new Error("document_extraction_provider_credential_missing");
   }
@@ -76,6 +73,16 @@ export function assertDocumentExtractionProviderDispatchEnabled(
       !== NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION
   ) {
     throw new Error("document_extraction_provider_contract_mismatch");
+  }
+  return policy;
+}
+
+export function assertDocumentExtractionProviderGateEnabled(
+  environment: NodeJS.ProcessEnv = process.env
+) {
+  const policy = assertDocumentExtractionBrokerEnabled(environment);
+  if (!policy.providerExecutionEnabled) {
+    throw new Error("document_extraction_provider_execution_disabled");
   }
   return policy;
 }

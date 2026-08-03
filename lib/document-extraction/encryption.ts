@@ -33,6 +33,10 @@ export type DocumentExtractionManagedKeyring = {
   keys: ReadonlyMap<string, Uint8Array>;
 };
 
+export type DocumentExtractionEncryptionProviderOptions = {
+  nonceFactory?: () => Uint8Array;
+};
+
 function parseManagedKeyring(value: string | undefined, currentVersion: string | undefined) {
   if (!value?.trim() || !currentVersion?.trim()) {
     throw new Error("Managed document extraction encryption is not configured.");
@@ -75,7 +79,8 @@ export function loadManagedDocumentExtractionKeyring(
 }
 
 export function createManagedDocumentExtractionEncryptionProvider(
-  keyring: DocumentExtractionManagedKeyring = loadManagedDocumentExtractionKeyring()
+  keyring: DocumentExtractionManagedKeyring = loadManagedDocumentExtractionKeyring(),
+  options: DocumentExtractionEncryptionProviderOptions = {}
 ): DocumentExtractionManagedEncryptionProvider {
   return {
     currentKeyVersion: keyring.currentKeyVersion,
@@ -90,7 +95,8 @@ export function createManagedDocumentExtractionEncryptionProvider(
       return encryptDocumentExtractionBytes({
         plaintext,
         key,
-        context: { ...context, encryptionKeyVersion: keyring.currentKeyVersion }
+        context: { ...context, encryptionKeyVersion: keyring.currentKeyVersion },
+        nonce: options.nonceFactory?.()
       });
     },
     async decrypt(envelope, context) {

@@ -614,6 +614,104 @@ export type Database = {
       };
     };
     Tables: {
+      document_extraction_circuit_events: {
+        Row: {
+          actor_id: string | null
+          consecutive_failures: number
+          created_at: string
+          id: string
+          next_state: string
+          previous_state: string
+          reason_code: string
+          rolling_failure_count: number
+          trigger_kind: string
+        }
+        Insert: {
+          actor_id?: string | null
+          consecutive_failures: number
+          created_at?: string
+          id?: string
+          next_state: string
+          previous_state: string
+          reason_code: string
+          rolling_failure_count: number
+          trigger_kind: string
+        }
+        Update: {
+          actor_id?: string | null
+          consecutive_failures?: number
+          created_at?: string
+          id?: string
+          next_state?: string
+          previous_state?: string
+          reason_code?: string
+          rolling_failure_count?: number
+          trigger_kind?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_circuit_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
+      document_extraction_provider_outcomes: {
+        Row: {
+          dispatch_request_id: string
+          job_id: string
+          latency_ms: number
+          outcome_sequence: number
+          recorded_at: string
+          result_class: string
+          workspace_id: string
+        }
+        Insert: {
+          dispatch_request_id: string
+          job_id: string
+          latency_ms: number
+          outcome_sequence?: never
+          recorded_at?: string
+          result_class: string
+          workspace_id: string
+        }
+        Update: {
+          dispatch_request_id?: string
+          job_id?: string
+          latency_ms?: number
+          outcome_sequence?: never
+          recorded_at?: string
+          result_class?: string
+          workspace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_extraction_provider_outcomes_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "document_extraction_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "document_extraction_provider_outcomes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "admin_company_directory_v1"
+            referencedColumns: ["workspace_id"]
+          },
+          {
+            foreignKeyName: "document_extraction_provider_outcomes_workspace_id_fkey"
+            columns: ["workspace_id"]
+            isOneToOne: false
+            referencedRelation: "workspaces"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+
       document_extraction_worker_assertions: {
         Row: {
           asserted_at: string
@@ -864,6 +962,7 @@ export type Database = {
           circuit_reason_code: string | null
           circuit_state: string
           consecutive_failures: number
+          failure_window_reset_at: string
           failure_window_started_at: string | null
           globally_enabled: boolean
           half_open_authorized_at: string | null
@@ -883,6 +982,7 @@ export type Database = {
           circuit_reason_code?: string | null
           circuit_state?: string
           consecutive_failures?: number
+          failure_window_reset_at?: string
           failure_window_started_at?: string | null
           globally_enabled?: boolean
           half_open_authorized_at?: string | null
@@ -902,6 +1002,7 @@ export type Database = {
           circuit_reason_code?: string | null
           circuit_state?: string
           consecutive_failures?: number
+          failure_window_reset_at?: string
           failure_window_started_at?: string | null
           globally_enabled?: boolean
           half_open_authorized_at?: string | null

@@ -13,6 +13,9 @@ class FakeBroker:
     def __init__(self, _config: WorkerConfig) -> None:
         self.operations: list[str] = []
         self.payloads: list[dict[str, Any]] = []
+        self.dispatch_authorizations: list[bool] = []
+        self.dispatch_authorization_responses: list[dict[str, Any]] = []
+        self.retry_authorizations: list[bool] = []
 
     async def __aenter__(self) -> "FakeBroker":
         return self
@@ -41,7 +44,10 @@ class FakeBroker:
         if operation == "advance_stage":
             return {"ok": True}
         if operation == "authorize_dispatch":
-            return {"ok": True, "authorized": True}
+            if self.dispatch_authorization_responses:
+                return self.dispatch_authorization_responses.pop(0)
+            authorized = self.dispatch_authorizations.pop(0) if self.dispatch_authorizations else True
+            return {"ok": authorized, "authorized": authorized}
         if operation == "provider_outcome":
             return {
                 "ok": True,
@@ -49,7 +55,8 @@ class FakeBroker:
                 "retry_permitted": payload["resultClass"] == "transport",
             }
         if operation == "authorize_retry":
-            return {"ok": True, "authorized": True}
+            authorized = self.retry_authorizations.pop(0) if self.retry_authorizations else True
+            return {"ok": authorized, "authorized": authorized}
         if operation == "complete":
             return {"ok": True, "status": "needs_review"}
         if operation == "fail":
@@ -137,3 +144,73 @@ def test_empty_provider_output_is_validation_failure_before_completion(monkeypat
     outcomes = [payload for payload in fake.payloads if payload["operation"] == "provider_outcome"]
     assert len(outcomes) == 1
     assert outcomes[0]["resultClass"] == "validation"
+
+
+def test_provider_gate_is_rechecked_immediately_before_invocation(monkeypatch: Any) -> None:
+    fake = FakeBroker(worker_config())
+    fake.dispatch_authorizations = [False]
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    provider_calls = 0
+
+    def provider(_path: Path, _pages: int) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("provider must not run after the gate closes")
+
+    monkeypatch.setattr(runner, "invoke_official_client", provider)
+    result = asyncio.run(runner.run_one_job(worker_config()))
+
+    assert result.status == "failed"
+    assert result.failure_code == "provider_dispatch_denied"
+    assert provider_calls == 0
+    assert fake.operations.count("authorize_dispatch") == 1
+    assert fake.operations.count("provider_outcome") == 0
+
+
+def test_dispatch_authorization_replay_never_calls_or_fails_shared_job(monkeypatch: Any) -> None:
+    fake = FakeBroker(worker_config())
+    fake.dispatch_authorization_responses = [{
+        "ok": False,
+        "authorized": False,
+        "idempotent": True,
+        "reason": "dispatch_already_authorized",
+    }]
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    provider_calls = 0
+
+    def provider(_path: Path, _pages: int) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("provider must not run for a consumed dispatch claim")
+
+    monkeypatch.setattr(runner, "invoke_official_client", provider)
+    result = asyncio.run(runner.run_one_job(worker_config()))
+
+    assert result.status == "dispatch_in_flight"
+    assert result.failure_code is None
+    assert result.provider_calls == 0
+    assert provider_calls == 0
+    assert fake.operations.count("authorize_dispatch") == 1
+    assert fake.operations.count("provider_outcome") == 0
+    assert fake.operations.count("fail") == 0
+
+
+def test_retry_provider_gate_is_rechecked_before_second_invocation(monkeypatch: Any) -> None:
+    fake = FakeBroker(worker_config())
+    fake.retry_authorizations = [False]
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    provider_calls = 0
+
+    def provider(_path: Path, _pages: int) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise ProviderFailure("transport", "transport", retryable=True)
+
+    monkeypatch.setattr(runner, "invoke_official_client", provider)
+    result = asyncio.run(runner.run_one_job(worker_config()))
+
+    assert result.status == "failed"
+    assert result.failure_code == "transport"
+    assert provider_calls == 1
+    assert fake.operations.count("authorize_dispatch") == 1
+    assert fake.operations.count("authorize_retry") == 1

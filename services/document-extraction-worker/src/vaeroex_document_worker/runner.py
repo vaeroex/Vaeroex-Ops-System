@@ -156,7 +156,31 @@ async def run_one_job(config: WorkerConfig | None = None) -> WorkerRunResult:
                     }
                 )
                 if not authorization.get("authorized"):
-                    raise ProviderFailure("provider_dispatch_denied", "authorization", retryable=False)
+                    if (
+                        authorization.get("idempotent") is True
+                        and authorization.get("reason") == "dispatch_already_authorized"
+                    ):
+                        # A concurrent caller already owns the single-use
+                        # provider dispatch. Do not call the provider and do
+                        # not fail the shared job out from under that caller.
+                        return WorkerRunResult(
+                            status="dispatch_in_flight",
+                            provider_calls=0,
+                            retry_count=0,
+                            failure_code=None,
+                        )
+                    return await _fail_job(
+                        broker,
+                        lease,
+                        ProviderFailure(
+                            "provider_dispatch_denied",
+                            "authorization",
+                            retryable=False,
+                        ),
+                        0,
+                        0,
+                        None,
+                    )
 
                 provider_calls = 0
                 retry_count = 0
@@ -196,6 +220,9 @@ async def run_one_job(config: WorkerConfig | None = None) -> WorkerRunResult:
                                 }
                             )
                             if retry.get("authorized"):
+                                # The retry RPC is the atomic second-call claim.
+                                # Broker admission checks both application and
+                                # database gates immediately before it succeeds.
                                 retry_count = 1
                                 dispatch_request_id = next_dispatch_request_id
                                 lease = await _heartbeat(broker, lease)

@@ -20,11 +20,101 @@ TIMEOUT_SECONDS = 120
 MAX_RETRIES = 1
 
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
-_FORBIDDEN_WORKER_SECRETS = (
-    "SUPABASE_SERVICE_ROLE_KEY",
-    "DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON",
-    "DOCUMENT_EXTRACTION_ENCRYPTION_CURRENT_KEY_VERSION",
+_ALLOWED_WORKER_CREDENTIALS = {
+    "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
+    "NVIDIA_API_KEY",
+}
+
+_FORBIDDEN_WORKER_CREDENTIALS = {
+    # The worker has no database or Supabase client. Even public project URLs are
+    # rejected so adding a database credential later cannot silently expand scope.
+    "SUPABASE_URL": "supabase",
+    "NEXT_PUBLIC_SUPABASE_URL": "supabase",
+    "SUPABASE_SERVICE_ROLE_KEY": "supabase",
+    "SUPABASE_SERVICE_KEY": "supabase",
+    "SUPABASE_SECRET_KEY": "supabase",
+    "SUPABASE_DB_URL": "database",
+    "SUPABASE_DB_PASSWORD": "database",
+    "DATABASE_URL": "database",
+    "DATABASE_ADMIN_URL": "database",
+    "DIRECT_URL": "database",
+    "POSTGRES_URL": "database",
+    "POSTGRES_PRISMA_URL": "database",
+    "POSTGRES_URL_NON_POOLING": "database",
+    "POSTGRES_PASSWORD": "database",
+    "PGPASSWORD": "database",
+    "DB_PASSWORD": "database",
+    "DB_ADMIN_PASSWORD": "database",
+    "AWS_ACCESS_KEY_ID": "aws_storage",
+    "AWS_SECRET_ACCESS_KEY": "aws_storage",
+    "AWS_SESSION_TOKEN": "aws_storage",
+    "AWS_SECURITY_TOKEN": "aws_storage",
+    "AWS_WEB_IDENTITY_TOKEN_FILE": "aws_storage",
+    "AWS_SHARED_CREDENTIALS_FILE": "aws_storage",
+    "AWS_CONTAINER_CREDENTIALS_RELATIVE_URI": "aws_storage",
+    "AWS_CONTAINER_CREDENTIALS_FULL_URI": "aws_storage",
+    "S3_ACCESS_KEY": "s3_storage",
+    "S3_ACCESS_KEY_ID": "s3_storage",
+    "S3_SECRET_KEY": "s3_storage",
+    "S3_SECRET_ACCESS_KEY": "s3_storage",
+    "S3_SESSION_TOKEN": "s3_storage",
+    "MINIO_ACCESS_KEY": "s3_storage",
+    "MINIO_SECRET_KEY": "s3_storage",
+    "MINIO_ROOT_USER": "s3_storage",
+    "MINIO_ROOT_PASSWORD": "s3_storage",
+    "OBJECT_STORAGE_ACCESS_KEY": "object_storage",
+    "OBJECT_STORAGE_SECRET_KEY": "object_storage",
+    "STORAGE_ACCESS_KEY": "object_storage",
+    "STORAGE_SECRET_KEY": "object_storage",
+    "AZURE_STORAGE_ACCOUNT_KEY": "azure_storage",
+    "AZURE_STORAGE_CONNECTION_STRING": "azure_storage",
+    "AZURE_STORAGE_SAS_TOKEN": "azure_storage",
+    "AZURE_CLIENT_SECRET": "azure_service",
+    "AZURE_CLIENT_CERTIFICATE_PASSWORD": "azure_service",
+    "AZURE_FEDERATED_TOKEN_FILE": "azure_service",
+    "GOOGLE_APPLICATION_CREDENTIALS": "gcp_storage",
+    "GOOGLE_CLOUD_SERVICE_ACCOUNT_JSON": "gcp_storage",
+    "GOOGLE_APPLICATION_CREDENTIALS_JSON": "gcp_storage",
+    "GOOGLE_SERVICE_ACCOUNT_KEY": "gcp_storage",
+    "GCP_SERVICE_ACCOUNT_JSON": "gcp_storage",
+    "GCP_CREDENTIALS": "gcp_storage",
+    "GOOGLE_PRIVATE_KEY": "gcp_storage",
+    "GCS_ACCESS_KEY_ID": "gcp_storage",
+    "GCS_SECRET_ACCESS_KEY": "gcp_storage",
+    "BLOB_READ_WRITE_TOKEN": "vercel_blob",
+    "VERCEL_BLOB_READ_WRITE_TOKEN": "vercel_blob",
+    "DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON": "cache_encryption",
+    "DOCUMENT_EXTRACTION_ENCRYPTION_CURRENT_KEY_VERSION": "cache_encryption",
+    "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_SECRET": "broker_authority",
+    "DOCUMENT_EXTRACTION_TELEMETRY_HMAC_SECRET": "broker_authority",
+    "DOCUMENT_EXTRACTION_WORKER_SIGNING_PRIVATE_KEY": "broker_authority",
+    "CACHE_ENCRYPTION_KEY": "cache_encryption",
+    "CACHE_MASTER_KEY": "cache_encryption",
+    "KMS_MASTER_KEY": "kms_master",
+    "KMS_MASTER_KEY_BASE64": "kms_master",
+}
+
+_FORBIDDEN_CREDENTIAL_PATTERNS = (
+    (re.compile(r"^(?:SUPABASE|POSTGRES|PG|DATABASE|DB)_(?:ADMIN_|SERVICE_|ROOT_)?(?:URL|PASSWORD|SECRET|TOKEN|KEY)$"), "database"),
+    (re.compile(r"^(?:AWS|S3|MINIO|OBJECT_STORAGE|STORAGE)_.+(?:ACCESS_KEY|SECRET_KEY|SESSION_TOKEN|CREDENTIALS)$"), "object_storage"),
+    (re.compile(r"^AZURE_.+(?:ACCOUNT_KEY|CONNECTION_STRING|SAS_TOKEN|CLIENT_SECRET)$"), "azure_storage"),
+    (re.compile(r"^(?:GOOGLE|GCP|GCS)_.+(?:SERVICE_ACCOUNT|APPLICATION_CREDENTIALS|PRIVATE_KEY|SECRET_KEY)$"), "gcp_storage"),
+    (re.compile(r"^(?:VERCEL_)?BLOB_.+(?:TOKEN|SECRET|KEY)$"), "vercel_blob"),
+    (re.compile(r"^DOCUMENT_EXTRACTION_.+(?:MASTER_KEY|ENCRYPTION_KEY|CAPABILITY_SECRET|SIGNING_PRIVATE_KEY)$"), "document_authority"),
 )
+
+
+def _forbidden_credential(environment: dict[str, str]) -> tuple[str, str] | None:
+    for name, value in environment.items():
+        if not value or name in _ALLOWED_WORKER_CREDENTIALS:
+            continue
+        category = _FORBIDDEN_WORKER_CREDENTIALS.get(name)
+        if category:
+            return name, category
+        for pattern, pattern_category in _FORBIDDEN_CREDENTIAL_PATTERNS:
+            if pattern.fullmatch(name):
+                return name, pattern_category
+    return None
 
 
 def _enabled(value: str | None) -> bool:
@@ -51,9 +141,10 @@ class WorkerConfig:
     @classmethod
     def from_environment(cls, source: dict[str, str] | None = None) -> "WorkerConfig":
         environment = dict(os.environ if source is None else source)
-        leaked = [name for name in _FORBIDDEN_WORKER_SECRETS if environment.get(name)]
+        leaked = _forbidden_credential(environment)
         if leaked:
-            raise RuntimeError("The private worker was given a forbidden Vaeroex authority secret.")
+            name, category = leaked
+            raise RuntimeError(f"Forbidden private-worker credential: {name} ({category}).")
         if not _enabled(environment.get("DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED")):
             raise RuntimeError("The private document extraction worker is disabled.")
         if not _enabled(environment.get("DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED")):

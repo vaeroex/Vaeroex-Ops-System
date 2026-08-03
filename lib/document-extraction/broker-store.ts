@@ -243,7 +243,13 @@ export async function completeDocumentExtractionJob({
   authenticationTag: Uint8Array;
   aadDigest: string;
 }) {
-  return rpc<{ job_id: string; status: string; approval_status: string }>(
+  return rpc<{
+    completed: boolean;
+    reason?: "nonce_collision";
+    job_id?: string;
+    status?: string;
+    approval_status?: string;
+  }>(
     "complete_document_extraction_job_v2",
     {
       p_job_id: jobId,

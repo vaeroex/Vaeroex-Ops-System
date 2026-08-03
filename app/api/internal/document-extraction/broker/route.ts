@@ -8,7 +8,10 @@ import {
   consumeDocumentExtractionFileGrant,
   consumeWorkerAssertion
 } from "@/lib/document-extraction/broker-store";
-import { assertDocumentExtractionBrokerEnabled } from "@/lib/document-extraction/runtime-policy";
+import {
+  assertDocumentExtractionBrokerEnabled,
+  assertDocumentExtractionProviderDispatchEnabled
+} from "@/lib/document-extraction/runtime-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
@@ -85,7 +88,9 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
   try {
-    assertDocumentExtractionBrokerEnabled();
+    // Re-check the complete application provider contract before consuming the
+    // single-use grant. A running worker cannot fetch content after a kill switch.
+    assertDocumentExtractionProviderDispatchEnabled();
     const assertion = await authenticate(request, new Uint8Array());
     const authorization = request.headers.get("authorization") || "";
     if (!authorization.startsWith("Bearer ")) {
