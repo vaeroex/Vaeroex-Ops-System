@@ -2,6 +2,11 @@ import "server-only";
 import { createHash } from "crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  assertDocumentExtractionAuthority,
+  documentExtractionAuthorityMetadata,
+  type FileAnalysisExtractionAuthority
+} from "@/lib/document-extraction/approval-guard";
+import {
   EVIDENCE_CANDIDATE_VERSION,
   EVIDENCE_QUERY_VERSION,
   type CandidateRetrievalResult,
@@ -1001,7 +1006,8 @@ export async function indexFileAnalysisEvidence({
   runId,
   extractedText,
   summary,
-  metadata
+  metadata,
+  extractionAuthority
 }: {
   supabase: SupabaseClient<Database>;
   workspaceId: string;
@@ -1011,11 +1017,32 @@ export async function indexFileAnalysisEvidence({
   extractedText: string;
   summary?: string | null;
   metadata?: Json;
+  extractionAuthority: FileAnalysisExtractionAuthority;
 }) {
+  // This check runs before chunking or embedding. Existing native analysis must
+  // opt into its compatibility mode; future extraction jobs must present a
+  // database-verified human-approval envelope.
+  const extractionEligibility = await assertDocumentExtractionAuthority({
+    supabase,
+    workspaceId,
+    fileId: file.id,
+    authority: extractionAuthority,
+    metadata
+  });
+  if (!extractionEligibility.eligible) {
+    return {
+      indexedChunks: 0,
+      error: "Human approval of all extracted critical fields is required before this source can enter Business Memory."
+    };
+  }
+
   const normalized = normalizeText(extractedText);
   const chunks = chunkEvidenceText(normalized);
   const startedAt = new Date().toISOString();
   const sourceMetadata = metadataRecord(metadata);
+  const extractionMetadata = extractionAuthority.mode === "reviewed_document_extraction"
+    ? metadataRecord(documentExtractionAuthorityMetadata(extractionAuthority))
+    : {};
   const assessment = assessFileAnalysisEvidence({
     outputJson: sourceMetadata.analysis_output as Json || {},
     extractedSourceText: normalized,
@@ -1124,6 +1151,7 @@ export async function indexFileAnalysisEvidence({
       extraction_outcome: "facts_extracted",
       invalidated_at: null,
       invalidation_reason: null,
+      ...extractionMetadata,
       indexing_method: embedding.embeddings[index] ? "openai_embedding" : "text_only",
       embedding_error: embedding.error || null,
       metadata: metadata || {}

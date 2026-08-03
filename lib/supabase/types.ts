@@ -9,6 +9,106 @@ export type Database = {
         Args: Record<string, never>;
         Returns: void;
       };
+      assert_document_extraction_authority_v1: {
+        Args: {
+          p_workspace_id: string;
+          p_file_id: string;
+          p_job_id: string;
+          p_review_id: string;
+          p_artifact_fingerprint: string;
+          p_classification_fingerprint: string;
+          p_review_version: number;
+        };
+        Returns: Json;
+      };
+      authorize_document_extraction_dispatch_v1: {
+        Args: { p_job_id: string; p_worker_id: string };
+        Returns: Json;
+      };
+      claim_document_extraction_job_v1: {
+        Args: { p_worker_id: string; p_lease_seconds?: number };
+        Returns: Array<Database["public"]["Tables"]["document_extraction_jobs"]["Row"]>;
+      };
+      complete_document_extraction_job_v1: {
+        Args: {
+          p_job_id: string;
+          p_worker_id: string;
+          p_page_count: number;
+          p_artifact_fingerprint: string;
+          p_classification_fingerprint: string | null;
+          p_payload_ciphertext: string;
+          p_encryption_key_version: string;
+          p_encryption_nonce: string;
+          p_authentication_tag: string;
+          p_aad_digest: string;
+        };
+        Returns: Json;
+      };
+      enqueue_document_extraction_job_v1: {
+        Args: {
+          p_workspace_id: string;
+          p_file_id: string;
+          p_requested_by: string;
+          p_request_id: string;
+          p_route: "native" | "nvidia_primary" | "nvidia_fallback";
+          p_document_class: string;
+          p_parser_provider: string;
+          p_parser_model: string;
+          p_parser_revision: string;
+          p_client_revision: string;
+          p_content_hmac: string;
+          p_cache_key: string;
+          p_routing_policy_version: string;
+          p_extraction_contract_version: string;
+          p_normalization_version: string;
+          p_pages_qualified: number;
+          p_max_attempts?: number;
+        };
+        Returns: Json;
+      };
+      evaluate_document_extraction_eligibility_v1: {
+        Args: { p_workspace_id: string; p_document_class: string; p_required_pages?: number };
+        Returns: string;
+      };
+      fail_document_extraction_job_v1: {
+        Args: { p_job_id: string; p_worker_id: string; p_failure_code: string; p_failure_class: string };
+        Returns: Json;
+      };
+      heartbeat_document_extraction_job_v1: {
+        Args: { p_job_id: string; p_worker_id: string; p_lease_seconds?: number };
+        Returns: boolean;
+      };
+      invalidate_document_extraction_cache_v1: {
+        Args: { p_workspace_id: string; p_cache_key: string; p_reason: string };
+        Returns: Json;
+      };
+      mutate_document_extraction_review_v1: {
+        Args: {
+          p_workspace_id: string;
+          p_job_id: string;
+          p_file_id: string;
+          p_status: string;
+          p_artifact_fingerprint: string;
+          p_classification_fingerprint: string | null;
+          p_review_version: number;
+          p_critical_field_count: number;
+          p_confirmed_field_count: number;
+          p_corrected_field_count: number;
+          p_rejected_field_count: number;
+          p_unresolved_field_count: number;
+          p_decision_summary_json: Json;
+          p_request_id: string;
+        };
+        Returns: Json;
+      };
+      retry_document_extraction_job_v1: {
+        Args: { p_job_id: string };
+        Returns: Json;
+      };
+      set_document_extraction_classification_v1: {
+        Args: { p_job_id: string; p_artifact_fingerprint: string; p_classification_fingerprint: string };
+        Returns: Json;
+      };
       create_workspace_with_signed_agreement: {
         Args: {
           p_workspace_id: string;
@@ -160,6 +260,214 @@ export type Database = {
       };
     };
     Tables: {
+      document_extraction_workspace_settings: {
+        Row: {
+          workspace_id: string;
+          is_entitled: boolean;
+          is_enabled: boolean;
+          monthly_page_limit: number;
+          current_period_start: string | null;
+          current_period_end: string | null;
+          pages_reserved: number;
+          pages_consumed: number;
+          concurrent_job_limit: number;
+          allowed_document_classes: string[];
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          workspace_id: string;
+          is_entitled?: boolean;
+          is_enabled?: boolean;
+          monthly_page_limit?: number;
+          current_period_start?: string | null;
+          current_period_end?: string | null;
+          pages_reserved?: number;
+          pages_consumed?: number;
+          concurrent_job_limit?: number;
+          allowed_document_classes?: string[];
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_workspace_settings"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extraction_system_state: {
+        Row: {
+          singleton_key: string;
+          globally_enabled: boolean;
+          worker_enabled: boolean;
+          provider_calls_enabled: boolean;
+          circuit_state: "closed" | "open" | "half_open";
+          circuit_opened_at: string | null;
+          consecutive_failures: number;
+          rolling_failure_count: number;
+          policy_version: string;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          singleton_key: string;
+          globally_enabled?: boolean;
+          worker_enabled?: boolean;
+          provider_calls_enabled?: boolean;
+          circuit_state?: "closed" | "open" | "half_open";
+          circuit_opened_at?: string | null;
+          consecutive_failures?: number;
+          rolling_failure_count?: number;
+          policy_version?: string;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_system_state"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extraction_jobs: {
+        Row: {
+          id: string;
+          workspace_id: string;
+          file_id: string;
+          requested_by: string | null;
+          request_id: string;
+          route: "native" | "nvidia_primary" | "nvidia_fallback";
+          document_class: string;
+          stage: string;
+          status: string;
+          parser_provider: string;
+          parser_model: string;
+          parser_revision: string;
+          client_revision: string;
+          content_hmac: string;
+          cache_key: string;
+          routing_policy_version: string;
+          extraction_contract_version: string;
+          normalization_version: string;
+          page_count: number | null;
+          pages_qualified: number;
+          reserved_page_count: number;
+          billed_page_count: number;
+          attempts: number;
+          max_attempts: number;
+          lease_owner: string | null;
+          lease_expires_at: string | null;
+          heartbeat_at: string | null;
+          provider_dispatched_at: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          failed_at: string | null;
+          failure_code: string | null;
+          failure_class: string | null;
+          review_required: boolean;
+          required_review_version: number;
+          approval_status: string;
+          artifact_fingerprint: string | null;
+          classification_fingerprint: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          workspace_id: string;
+          file_id: string;
+          requested_by?: string | null;
+          request_id: string;
+          route: "native" | "nvidia_primary" | "nvidia_fallback";
+          document_class: string;
+          stage?: string;
+          status?: string;
+          parser_provider: string;
+          parser_model: string;
+          parser_revision: string;
+          client_revision: string;
+          content_hmac: string;
+          cache_key: string;
+          routing_policy_version: string;
+          extraction_contract_version: string;
+          normalization_version: string;
+          page_count?: number | null;
+          pages_qualified: number;
+          reserved_page_count?: number;
+          billed_page_count?: number;
+          attempts?: number;
+          max_attempts?: number;
+          lease_owner?: string | null;
+          lease_expires_at?: string | null;
+          heartbeat_at?: string | null;
+          provider_dispatched_at?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          failed_at?: string | null;
+          failure_code?: string | null;
+          failure_class?: string | null;
+          review_required?: boolean;
+          required_review_version?: number;
+          approval_status?: string;
+          artifact_fingerprint?: string | null;
+          classification_fingerprint?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_jobs"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extraction_file_bindings: {
+        Row: { id: string; workspace_id: string; file_id: string; job_id: string; cache_key: string; created_by: string | null; created_at: string };
+        Insert: { id?: string; workspace_id: string; file_id: string; job_id: string; cache_key: string; created_by?: string | null; created_at?: string };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_file_bindings"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extraction_cache: {
+        Row: {
+          id: string; workspace_id: string; source_job_id: string; cache_key: string; content_hmac: string;
+          provider: string; model: string; model_revision: string; client_revision: string; routing_policy_version: string;
+          extraction_contract_version: string; normalization_version: string; payload_ciphertext: string;
+          encryption_algorithm: "aes-256-gcm"; encryption_key_version: string; encryption_nonce: string;
+          authentication_tag: string; aad_digest: string; artifact_fingerprint: string; page_count: number;
+          created_at: string; last_used_at: string; invalidated_at: string | null; invalidation_reason: string | null;
+        };
+        Insert: {
+          id?: string; workspace_id: string; source_job_id: string; cache_key: string; content_hmac: string;
+          provider: string; model: string; model_revision: string; client_revision: string; routing_policy_version: string;
+          extraction_contract_version: string; normalization_version: string; payload_ciphertext: string;
+          encryption_algorithm: "aes-256-gcm"; encryption_key_version: string; encryption_nonce: string;
+          authentication_tag: string; aad_digest: string; artifact_fingerprint: string; page_count: number;
+          created_at?: string; last_used_at?: string; invalidated_at?: string | null; invalidation_reason?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_cache"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extraction_reviews: {
+        Row: {
+          id: string; workspace_id: string; job_id: string; file_id: string; status: string;
+          reviewer_id: string | null; reviewed_at: string | null; artifact_fingerprint: string;
+          classification_fingerprint: string | null; review_version: number; critical_field_count: number;
+          confirmed_field_count: number; corrected_field_count: number; rejected_field_count: number;
+          unresolved_field_count: number; decision_summary_json: Json; created_at: string; updated_at: string;
+        };
+        Insert: {
+          id?: string; workspace_id: string; job_id: string; file_id: string; status?: string;
+          reviewer_id?: string | null; reviewed_at?: string | null; artifact_fingerprint: string;
+          classification_fingerprint?: string | null; review_version?: number; critical_field_count?: number;
+          confirmed_field_count?: number; corrected_field_count?: number; rejected_field_count?: number;
+          unresolved_field_count?: number; decision_summary_json?: Json; created_at?: string; updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_reviews"]["Insert"]>;
+        Relationships: [];
+      };
+      document_extraction_events: {
+        Row: {
+          id: string; workspace_id: string; job_id: string | null; event_type: string; actor_type: string;
+          actor_id: string | null; stage: string | null; status: string | null; reason_code: string | null;
+          artifact_fingerprint: string | null; metadata_json: Json; request_id: string; created_at: string;
+        };
+        Insert: {
+          id?: string; workspace_id: string; job_id?: string | null; event_type: string; actor_type: string;
+          actor_id?: string | null; stage?: string | null; status?: string | null; reason_code?: string | null;
+          artifact_fingerprint?: string | null; metadata_json?: Json; request_id: string; created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["document_extraction_events"]["Insert"]>;
+        Relationships: [];
+      };
       easter_egg_workspace_settings: {
         Row: {
           workspace_id: string;
