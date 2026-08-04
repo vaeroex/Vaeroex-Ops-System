@@ -15,7 +15,7 @@ signals="$(mktemp "${TMPDIR:-/tmp}/vaeroex-worker-signals.XXXXXX")"
 trap 'rm -f "$signals"' EXIT HUP INT TERM
 chmod 600 "$signals"
 
-filter="resource.type=\"cloud_run_workerpool\" AND resource.labels.location=\"$GCP_REGION\" AND (resource.labels.workerpool_name=\"$WORKER_POOL\" OR resource.labels.worker_pool_name=\"$WORKER_POOL\")"
+filter="resource.type=\"cloud_run_worker_pool\" AND resource.labels.location=\"$GCP_REGION\" AND resource.labels.worker_pool_name=\"$WORKER_POOL\""
 gcloud logging read "$filter" \
   --project "$GCP_PROJECT_ID" \
   --freshness "$SIGNAL_WINDOW" \

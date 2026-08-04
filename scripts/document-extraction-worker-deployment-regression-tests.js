@@ -117,7 +117,8 @@ assert.match(verifyDeployment, /gcloud run worker-pools describe/);
 assert.match(verifyWorker, /worker_pool_environment_scope_invalid/);
 assert.match(verifyWorker, /worker_pool_public_endpoint_unexpected/);
 assert.match(verifyWorker, /secretValuesRead/);
-assert.match(checkSignals, /resource\.type=\\"cloud_run_workerpool\\"/);
+assert.match(checkSignals, /resource\.type=\\"cloud_run_worker_pool\\"/);
+assert.doesNotMatch(checkSignals, /cloud_run_workerpool/);
 assert.match(summarizeSignals, /rawPayloadReturned/);
 assert.doesNotMatch(summarizeSignals, /print\(.+(?:jsonPayload|document_text|raw_response)/i);
 
