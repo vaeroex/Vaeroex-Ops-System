@@ -294,6 +294,90 @@ all pass.
 11. Confirm every successful extraction stops at `awaiting_review`.
 12. Retain only aggregate content-free measurements.
 
+## One-call response-profile diagnostic
+
+The hosted response-contract blocker may be diagnosed once without rerunning
+the corpus. This mode remains part of synthetic qualification, but narrows the
+worker further:
+
+- the only accepted source is committed fixture
+  `synthetic-doc-executive-kpi-review`;
+- the fixture must materialize as exactly one committed rendered page;
+- its rendered PNG remains below the NVCF asset threshold, so asset creation
+  or upload is an immediate stop condition;
+- exactly one synthetic job is seeded in one isolated Preview workspace with a
+  one-page quota;
+- one Worker Pool instance handles the job serially;
+- the runner authorizes one initial dispatch and never requests retry
+  authorization in diagnostic mode; and
+- any missing observer event is classified as inconclusive rather than causing
+  a second call.
+
+The diagnostic requires the ordinary Preview synthetic gates plus
+`DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED=true` and the exact
+confirmation `nemotron-parse-response-profile-one-call-v1`. Worker startup
+rejects this mode outside Preview. The checked-in activation script accepts
+only project `vaeroex-document-worker`, region `us-west1`, and Worker Pool
+`vaeroex-document-extraction-preview`. The broker remains commit-bound,
+private, and callable only through service-level Google IAM/OIDC followed by
+the existing Ed25519 assertion. It receives only isolated Preview Supabase
+configuration. No Vercel share credential or Production resource participates.
+
+Before the call, independently verify the immutable worker and broker images,
+authentication matrix, service-account IAM, exact Preview project references,
+closed Production paths, one seeded job, one page of quota, and zero prior
+dispatches. Open database, broker, workspace, and worker gates only after those
+checks pass. A retry, second dispatch, ambiguous state, authorization failure,
+provider asset operation, or unexpected fixture stops the run immediately.
+
+The observer executes after the bounded HTTP response is read and before the
+unchanged response validator. Observer failure is swallowed. It cannot affect
+acceptance, retry classification, normalization, review state, or authority.
+It emits only these structural fields:
+
+| Retained field | Bounded representation |
+| --- | --- |
+| HTTP status and response content type | integer and validated MIME type |
+| returned model and finish reason | approved identifiers or bounded structural category |
+| assistant content | `null`, `empty`, or `non_empty` only |
+| tool calls | count, bounded type, bounded function name |
+| tool arguments | transport type, UTF-8 byte length, complete-JSON boolean |
+| response shape | allowlisted top-level structural keys |
+| completion state | truncation and token-limit indicators |
+| provider trace | bounded provider request or trace ID |
+| response operation | byte count and latency only |
+
+It never emits document text, extracted values, coordinates, argument contents,
+assistant content, raw requests or responses, image bytes, prompts, credentials,
+or customer, workspace, or user identifiers. Unknown untrusted model, function,
+tool, and response-key strings are omitted or reduced to a fixed category so
+they cannot become a content channel. Raw provider content exists only in the
+existing in-memory validation path and is not written to disk, database,
+telemetry, or operator output.
+
+The operator assigns exactly one structural classification:
+
+1. documented legacy hosted tool-call profile;
+2. Nemotron Parse v1.2 tagged-content profile;
+3. truncated legacy response;
+4. unexpected ordinary assistant-content response;
+5. malformed provider response; or
+6. still inconclusive.
+
+A v1.2 result does not activate auto-detection or relax the hosted validator;
+it requires a separately versioned v1.2 adapter review. A truncated or
+malformed result remains rejected and only its provider request ID and
+structural classification are carried into any support record.
+
+Cleanup starts immediately after the first terminal provider outcome. Close
+database, workspace, broker, provider, synthetic, and diagnostic gates; scale
+the Worker Pool to zero; remove the exact diagnostic confirmation; delete the
+single synthetic job, source, Storage object, review/cache/event rows, and
+ephemeral broker resources; destroy temporary secret versions and IAM grants;
+and confirm no NVCF asset or temporary file remains. The retained Worker Pool
+must finish at zero instances with every gate false. Only approved content-free
+diagnostic metadata may remain in bounded platform logs.
+
 ## Measurements
 
 Record only aggregate values:

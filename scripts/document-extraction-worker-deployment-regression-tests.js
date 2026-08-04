@@ -15,6 +15,7 @@ const deploy = readWorker("ops/deploy-preview-worker.sh");
 const renderer = readWorker("ops/render-worker-pool.py");
 const enable = readWorker("ops/set-preview-qualification-worker.sh");
 const enableAuthentication = readWorker("ops/set-preview-authentication-worker.sh");
+const enableResponseProfileDiagnostic = readWorker("ops/set-preview-response-profile-diagnostic-worker.sh");
 const disable = readWorker("ops/disable-preview-worker.sh");
 const provision = readWorker("ops/provision-preview-secrets.sh");
 const verifySecretFiles = readWorker("ops/verify-secret-files.py");
@@ -31,6 +32,7 @@ const runner = readWorker("src/vaeroex_document_worker/runner.py");
 const daemon = readWorker("src/vaeroex_document_worker/daemon.py");
 const health = readWorker("src/vaeroex_document_worker/health.py");
 const telemetry = readWorker("src/vaeroex_document_worker/telemetry.py");
+const responseProfile = readWorker("src/vaeroex_document_worker/response_profile.py");
 const synthetic = readWorker("src/vaeroex_document_worker/synthetic.py");
 const assetCleanup = readWorker("src/vaeroex_document_worker/asset_cleanup.py");
 const migration = read("supabase/migrations/20260804010000_document_extraction_worker_phase_c1_protocol.sql");
@@ -52,6 +54,7 @@ assert.match(poolTemplate, /manualInstanceCount: "0"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /memory: 2Gi/);
 assert.match(poolTemplate, /mountPath: \/var\/tmp\/vaeroex-document-worker/);
 assert.match(poolTemplate, /name: TMPDIR[\s\S]+value: \/var\/tmp\/vaeroex-document-worker/);
@@ -76,14 +79,14 @@ assert.match(renderer, /BROKER_URL must be an HTTPS Cloud Run origin/);
 assert.match(renderer, /BROKER_AUDIENCE must equal the exact broker origin/);
 assert.match(renderer, /Secret versions must be explicit positive integers/);
 assert.match(renderer, /WORKER_IMAGE_DIGEST must be immutable/);
-for (const mutatingPreviewScript of [deploy, enableAuthentication, enable, disable, provision, provisionRuntime, buildImage]) {
+for (const mutatingPreviewScript of [deploy, enableAuthentication, enable, enableResponseProfileDiagnostic, disable, provision, provisionRuntime, buildImage]) {
   assert.match(mutatingPreviewScript, /vaeroex-document-extraction-phase-c1-preview-only/);
   assert.match(mutatingPreviewScript, /vaeroex-document-worker/);
 }
-for (const regionalPreviewScript of [deploy, enableAuthentication, enable, disable, provisionRuntime, buildImage, verifyDeployment]) {
+for (const regionalPreviewScript of [deploy, enableAuthentication, enable, enableResponseProfileDiagnostic, disable, provisionRuntime, buildImage, verifyDeployment]) {
   assert.match(regionalPreviewScript, /us-west1/);
 }
-for (const workerPoolScript of [deploy, enableAuthentication, enable, disable, verifyDeployment]) {
+for (const workerPoolScript of [deploy, enableAuthentication, enable, enableResponseProfileDiagnostic, disable, verifyDeployment]) {
   assert.match(workerPoolScript, /vaeroex-document-extraction-preview/);
 }
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT[\s\S]+value: preview/);
@@ -99,7 +102,13 @@ assert.match(enableAuthentication, /DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATIO
 assert.match(enableAuthentication, /--instances 1/);
 assert.match(enable, /synthetic-preview-only-12-documents-13-pages/);
 assert.match(enable, /--instances 1/);
+assert.match(enableResponseProfileDiagnostic, /nemotron-parse-response-profile-one-call-v1/);
+assert.match(enableResponseProfileDiagnostic, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED=true/);
+assert.match(enableResponseProfileDiagnostic, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=true/);
+assert.match(enableResponseProfileDiagnostic, /--instances 1/);
 assert.match(disable, /--instances 0[\s\S]+DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=false/);
+assert.match(disable, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED=false/);
+assert.match(disable, /--remove-env-vars "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION"/);
 assert.match(disable, /run\.googleapis\.com\/manualInstanceCount/);
 assert.match(disable, /test "\$instances" = "0"/);
 assert.match(provision, /--data-file/);
@@ -140,6 +149,8 @@ for (const forbidden of [
 assert.match(config, /runtime_environment == "preview"/);
 assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED/);
 assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED/);
+assert.match(config, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED/);
+assert.match(config, /Response-profile diagnostics require the exact Preview-only synthetic confirmation/);
 assert.match(config, /Forbidden private-worker credential/);
 assert.match(config, /DOCUMENT_EXTRACTION_.+TOKEN\|SECRET\|PRIVATE_KEY\|CREDENTIALS/);
 assert.match(config, /google_oidc_v1/);
@@ -160,6 +171,8 @@ assert.match(runner, /lease = future\.result\(timeout=35\)/);
 assert.match(runner, /progress_callback/);
 assert.match(runner, /status="dispatch_in_flight"/);
 assert.match(runner, /status=_required_string\(completion\.get\("status"\)/);
+assert.match(runner, /synthetic_fixture\.document_id != DIAGNOSTIC_FIXTURE_ID/);
+assert.match(runner, /not active_config\.response_profile_diagnostic_enabled[\s\S]+failure\.retryable/);
 assert.match(daemon, /await _verify_broker\(config\)/);
 assert.match(daemon, /max_cycles/);
 assert.match(health, /\/startup/);
@@ -173,6 +186,24 @@ for (const forbiddenTelemetryField of [
 }
 assert.match(telemetry, /_ALLOWED_FIELDS/);
 assert.match(telemetry, /operational_telemetry_field_rejected/);
+assert.match(telemetry, /emit_response_profile_diagnostic/);
+for (const approvedDiagnosticField of [
+  "httpStatus", "responseContentType", "returnedModel", "finishReason",
+  "assistantContentState", "toolCallCount", "toolCallTypes", "functionNames",
+  "argumentsTransportTypes", "argumentsByteLengths", "argumentsCompleteJson",
+  "topLevelResponseKeys", "truncationIndicator", "tokenLimitIndicator",
+  "providerRequestId", "responseByteCount", "latencyMs"
+]) {
+  assert.match(responseProfile, new RegExp(`['"]${approvedDiagnosticField}['"]`));
+}
+for (const prohibitedDiagnosticField of [
+  "documentText", "extractedValues", "boundingBoxes", "toolCallArguments",
+  "assistantContent", "rawRequest", "rawResponse", "imageBytes", "prompt",
+  "credential", "workspaceId", "customerId"
+]) {
+  assert.doesNotMatch(responseProfile, new RegExp(`['"]${prohibitedDiagnosticField}['"]`));
+}
+assert.doesNotMatch(responseProfile, /\bprint\(/);
 
 const fixtureRoot = path.join(workerRoot, "fixtures/synthetic-v1");
 function walk(directory) {
@@ -247,6 +278,7 @@ for (const heading of [
   "Authentication qualification with zero provider calls",
   "Live kill-switch drill",
   "Bounded synthetic qualification",
+  "One-call response-profile diagnostic",
   "Measurements",
   "Mandatory cleanup and rollback",
   "Validation",

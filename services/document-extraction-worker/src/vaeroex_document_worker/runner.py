@@ -13,6 +13,7 @@ from .config import MAX_PAGES, WorkerConfig
 from .provider_types import ProviderFailure, ProviderResult
 from .renderer import render_source
 from .rest_adapter import invoke_rest_adapter
+from .response_profile import DIAGNOSTIC_FIXTURE_ID
 from .synthetic import (
     FrozenSyntheticFixture,
     SyntheticQualificationFailure,
@@ -23,6 +24,7 @@ from .synthetic import (
     materialize_approved_pages,
 )
 from .temporary import SecureTemporaryWorkspace, scavenge_stale_worker_directories
+from .telemetry import emit_response_profile_diagnostic
 
 
 @dataclass(frozen=True)
@@ -243,6 +245,13 @@ async def run_one_job(
                             synthetic_fixture,
                             rendered_directory,
                         )
+                        if active_config.response_profile_diagnostic_enabled and (
+                            synthetic_fixture.document_id != DIAGNOSTIC_FIXTURE_ID
+                            or len(rendered_pages) != 1
+                        ):
+                            raise SyntheticQualificationFailure(
+                                "response_profile_diagnostic_fixture_rejected"
+                            )
                     except SyntheticQualificationFailure as failure:
                         emit_synthetic_failure_once(str(failure))
                         synthetic_fixture = None
@@ -325,14 +334,21 @@ async def run_one_job(
                                     retryable=False,
                                 ) from error
 
+                        provider_options: dict[str, Any] = {
+                            "completed_pages": completed_pages,
+                            "before_provider_boundary": check_provider_boundary,
+                        }
+                        if active_config.response_profile_diagnostic_enabled:
+                            provider_options["response_profile_observer"] = (
+                                emit_response_profile_diagnostic
+                            )
                         result = await asyncio.to_thread(
                             invoke_rest_adapter,
                             rendered_pages,
                             document_sha256,
                             active_config.provider_contract,
                             active_config.nvidia_api_key,
-                            completed_pages=completed_pages,
-                            before_provider_boundary=check_provider_boundary,
+                            **provider_options,
                         )
                         artifact = _draft(result, route, document_class, page_count)
                         _notify(progress_callback, "provider_completed")
@@ -356,7 +372,12 @@ async def run_one_job(
                                 "latencyMs": 0,
                             }
                         )
-                        if failure.retryable and retry_count == 0 and outcome.get("retry_permitted"):
+                        if (
+                            not active_config.response_profile_diagnostic_enabled
+                            and failure.retryable
+                            and retry_count == 0
+                            and outcome.get("retry_permitted")
+                        ):
                             next_dispatch_request_id = _request_id()
                             retry = await broker.post(
                                 {

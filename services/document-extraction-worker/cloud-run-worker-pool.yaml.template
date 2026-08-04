@@ -41,6 +41,8 @@ spec:
               value: "false"
             - name: DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED
               value: "false"
+            - name: DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED
+              value: "false"
             - name: DOCUMENT_EXTRACTION_NVIDIA_MODEL
               value: nvidia/nemotron-parse
             - name: DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION

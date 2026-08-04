@@ -10,9 +10,11 @@ from vaeroex_document_worker.config import (
     CLIENT_REVISION,
     MODEL,
     PARSER_REVISION,
+    PRODUCTION_APPROVAL,
     WorkerConfig,
 )
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
+from vaeroex_document_worker.response_profile import DIAGNOSTIC_CONFIRMATION
 
 
 def environment() -> dict[str, str]:
@@ -143,6 +145,42 @@ def test_synthetic_mode_requires_both_additional_non_production_gates() -> None:
     values["DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED"] = "true"
     config = WorkerConfig.from_environment(values)
     assert config.synthetic_qualification_enabled
+
+
+def test_response_profile_diagnostic_requires_exact_preview_confirmation() -> None:
+    values = environment()
+    values.update(
+        {
+            "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION": DIAGNOSTIC_CONFIRMATION,
+        }
+    )
+
+    config = WorkerConfig.from_environment(values)
+    assert config.response_profile_diagnostic_enabled
+
+    values["DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION"] = "wrong"
+    with pytest.raises(RuntimeError, match="exact Preview-only synthetic confirmation"):
+        WorkerConfig.from_environment(values)
+
+
+def test_response_profile_diagnostic_is_unavailable_in_production() -> None:
+    values = environment()
+    values.update(
+        {
+            "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT": "production",
+            "DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL": PRODUCTION_APPROVAL,
+            "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION": DIAGNOSTIC_CONFIRMATION,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="exact Preview-only synthetic confirmation"):
+        WorkerConfig.from_environment(values)
 
 
 def test_broker_requires_google_oidc_and_exact_cloud_run_audience() -> None:

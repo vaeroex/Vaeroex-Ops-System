@@ -15,6 +15,15 @@ GATES = (
     "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED",
 )
 AUTH_QUALIFICATION_GATE = "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED"
+RESPONSE_PROFILE_DIAGNOSTIC_GATE = (
+    "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED"
+)
+RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION = (
+    "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION"
+)
+EXPECTED_RESPONSE_PROFILE_CONFIRMATION = (
+    "nemotron-parse-response-profile-one-call-v1"
+)
 ALLOWED_ENVIRONMENT = frozenset(
     {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT",
@@ -25,6 +34,7 @@ ALLOWED_ENVIRONMENT = frozenset(
         "DOCUMENT_EXTRACTION_BROKER_AUDIENCE",
         "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE",
         AUTH_QUALIFICATION_GATE,
+        RESPONSE_PROFILE_DIAGNOSTIC_GATE,
         *GATES,
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL",
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION",
@@ -77,7 +87,7 @@ def main() -> int:
     parser.add_argument("--expected-instances", choices=("0", "1"), required=True)
     parser.add_argument(
         "--expected-gate-state",
-        choices=("disabled", "authentication", "qualification"),
+        choices=("disabled", "authentication", "qualification", "diagnostic"),
         required=True,
     )
     arguments = parser.parse_args()
@@ -114,7 +124,12 @@ def main() -> int:
         if not isinstance(name_value, str) or name_value in environment:
             raise SystemExit("worker_pool_environment_invalid")
         environment[name_value] = item
-    if set(environment) != ALLOWED_ENVIRONMENT:
+    optional_environment = {RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION}
+    observed_environment = set(environment)
+    if not (
+        observed_environment.issubset(ALLOWED_ENVIRONMENT | optional_environment)
+        and ALLOWED_ENVIRONMENT.issubset(observed_environment)
+    ):
         raise SystemExit("worker_pool_environment_scope_invalid")
     expected_values = {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT": "preview",
@@ -133,15 +148,26 @@ def main() -> int:
         if environment[name_value].get("value") != expected:
             raise SystemExit("worker_pool_version_or_environment_mismatch")
     expected_gates = {
-        "disabled": ("false", "false", "false", "false", "false"),
-        "authentication": ("true", "false", "false", "false", "true"),
-        "qualification": ("true", "true", "true", "true", "false"),
+        "disabled": ("false", "false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "true", "false"),
+        "qualification": ("true", "true", "true", "true", "false", "false"),
+        "diagnostic": ("true", "true", "true", "true", "false", "true"),
     }[arguments.expected_gate_state]
     observed_gates = tuple(environment[name].get("value") for name in GATES) + (
         environment[AUTH_QUALIFICATION_GATE].get("value"),
+        environment[RESPONSE_PROFILE_DIAGNOSTIC_GATE].get("value"),
     )
     if observed_gates != expected_gates:
         raise SystemExit("worker_pool_gate_state_mismatch")
+    confirmation = environment.get(RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION)
+    if arguments.expected_gate_state == "diagnostic":
+        if (
+            confirmation is None
+            or confirmation.get("value") != EXPECTED_RESPONSE_PROFILE_CONFIRMATION
+        ):
+            raise SystemExit("worker_pool_diagnostic_confirmation_missing")
+    elif confirmation is not None:
+        raise SystemExit("worker_pool_diagnostic_confirmation_unexpected")
     expected_secrets = {
         "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64": (
             arguments.worker_secret_name,

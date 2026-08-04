@@ -8,6 +8,8 @@ import re
 import sys
 from datetime import UTC, datetime
 
+from .response_profile import ResponseProfileDiagnosticV1
+
 _EVENT = re.compile(r"^[a-z0-9._:-]{1,80}$")
 _TEXT = re.compile(r"^[A-Za-z0-9._:-]{1,160}$")
 _ALLOWED_FIELDS = frozenset(
@@ -66,6 +68,23 @@ def emit_operational_event(
     payload.update({name: _safe_value(value) for name, value in fields.items()})
     print(
         json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True),
+        file=sys.stdout,
+        flush=True,
+    )
+
+
+def emit_response_profile_diagnostic(
+    diagnostic: ResponseProfileDiagnosticV1,
+) -> None:
+    """Emit only the response-profile contract's allowlisted structural fields."""
+
+    print(
+        json.dumps(
+            diagnostic.privacy_safe_event(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+        ),
         file=sys.stdout,
         flush=True,
     )

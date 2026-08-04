@@ -9,7 +9,9 @@ from vaeroex_document_worker import runner
 from vaeroex_document_worker.config import WorkerConfig
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 from vaeroex_document_worker.provider_types import ProviderFailure, ProviderResult, RenderedPage
+from vaeroex_document_worker.response_profile import DIAGNOSTIC_FIXTURE_ID
 from vaeroex_document_worker.synthetic import load_frozen_corpus
+from vaeroex_document_worker.telemetry import emit_response_profile_diagnostic
 
 
 class FakeBroker:
@@ -111,6 +113,15 @@ def synthetic_worker_config() -> WorkerConfig:
         **{
             **worker_config().__dict__,
             "synthetic_qualification_enabled": True,
+        }
+    )
+
+
+def diagnostic_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **synthetic_worker_config().__dict__,
+            "response_profile_diagnostic_enabled": True,
         }
     )
 
@@ -474,3 +485,78 @@ def test_corrupt_synthetic_fixture_is_rejected_locally_and_recorded(monkeypatch:
     assert len(emitted) == 1
     assert getattr(emitted[0], "status") == "failed"
     assert getattr(emitted[0], "failure_code") == "synthetic_fixture_locally_invalid"
+
+
+def test_response_profile_diagnostic_is_bound_to_one_committed_fixture(
+    monkeypatch: Any,
+) -> None:
+    fixture = next(
+        item
+        for item in load_frozen_corpus()
+        if item.provider_eligible and item.document_id != DIAGNOSTIC_FIXTURE_ID
+    )
+    config = diagnostic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=len(fixture.rendered_page_paths),
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    provider_calls = 0
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("only the approved one-page diagnostic fixture may run")
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.failure_code == "response_profile_diagnostic_fixture_rejected"
+    assert provider_calls == 0
+    assert fake.operations.count("authorize_dispatch") == 0
+
+
+def test_response_profile_diagnostic_allows_one_attempt_and_zero_retries(
+    monkeypatch: Any,
+) -> None:
+    fixture = next(
+        item for item in load_frozen_corpus() if item.document_id == DIAGNOSTIC_FIXTURE_ID
+    )
+    config = diagnostic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=1,
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    attempts = 0
+
+    def provider(
+        _pages: list[RenderedPage],
+        _document_hash: str,
+        _contract: object,
+        _api_key: str,
+        *,
+        completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: object,
+        response_profile_observer: object,
+    ) -> ProviderResult:
+        nonlocal attempts
+        attempts += 1
+        assert completed_pages == ()
+        assert before_provider_boundary is not None
+        assert response_profile_observer is emit_response_profile_diagnostic
+        raise ProviderFailure("transport", "transport", retryable=True)
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.failure_code == "transport"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert attempts == 1
+    assert fake.operations.count("authorize_retry") == 0
+    assert fake.operations.count("authorize_dispatch") == 1

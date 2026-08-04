@@ -32,6 +32,7 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED": "false",
         "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": gate_value,
+        "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "false",
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": "nvidia/nemotron-parse",
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v1",
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v1",
@@ -233,6 +234,47 @@ def test_deployed_worker_verifier_rejects_wrong_secret_version(
     )
     assert result.returncode != 0
     assert "worker_pool_secret_reference_invalid" in result.stderr
+
+
+def test_deployed_worker_verifier_requires_exact_diagnostic_state(
+    tmp_path: Path,
+) -> None:
+    resource = _description("true", instances=1)
+    environment = resource["template"]["containers"][0]["env"]
+    for item in environment:
+        if item["name"] == "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED":
+            item["value"] = "true"
+    environment.append(
+        {
+            "name": "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION",
+            "value": "nemotron-parse-response-profile-one-call-v1",
+        }
+    )
+    description = tmp_path / "description.json"
+    description.write_text(json.dumps(resource), encoding="utf-8")
+    arguments = _verifier_arguments(description)
+    arguments[arguments.index("0")] = "1"
+    arguments[arguments.index("disabled")] = "diagnostic"
+
+    accepted = subprocess.run(
+        arguments,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert accepted.returncode == 0, accepted.stderr
+    assert json.loads(accepted.stdout)["gateState"] == "diagnostic"
+
+    environment.pop()
+    description.write_text(json.dumps(resource), encoding="utf-8")
+    missing_confirmation = subprocess.run(
+        arguments,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert missing_confirmation.returncode != 0
+    assert "worker_pool_diagnostic_confirmation_missing" in missing_confirmation.stderr
 
 
 def test_signal_summary_never_returns_raw_payloads(tmp_path: Path) -> None:

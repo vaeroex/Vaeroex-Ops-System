@@ -16,6 +16,7 @@ from .provider_contract import (
     ProviderContract,
     active_provider_contract,
 )
+from .response_profile import DIAGNOSTIC_CONFIRMATION
 
 CLIENT_REVISION = REST_ADAPTER_VERSION
 MODEL = HOSTED_MODEL
@@ -159,6 +160,7 @@ class WorkerConfig:
     provider_execution_enabled: bool
     authentication_qualification_enabled: bool
     synthetic_qualification_enabled: bool
+    response_profile_diagnostic_enabled: bool = False
     health_port: int = 8080
     idle_poll_seconds: float = 5.0
 
@@ -245,6 +247,23 @@ class WorkerConfig:
                 )
             )
         )
+        response_profile_diagnostic_enabled = _enabled(
+            environment.get(
+                "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED"
+            )
+        )
+        if response_profile_diagnostic_enabled and (
+            runtime_environment != "preview"
+            or not synthetic_qualification_enabled
+            or environment.get(
+                "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION",
+                "",
+            ).strip()
+            != DIAGNOSTIC_CONFIRMATION
+        ):
+            raise RuntimeError(
+                "Response-profile diagnostics require the exact Preview-only synthetic confirmation."
+            )
         if authentication_qualification_enabled and (
             provider_execution_enabled
             or synthetic_qualification_enabled
@@ -279,6 +298,7 @@ class WorkerConfig:
             provider_execution_enabled=provider_execution_enabled,
             authentication_qualification_enabled=authentication_qualification_enabled,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
+            response_profile_diagnostic_enabled=response_profile_diagnostic_enabled,
             health_port=health_port,
             idle_poll_seconds=idle_poll_seconds,
         )

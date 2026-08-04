@@ -26,6 +26,7 @@ from .provider_contract import (
     ProviderContract,
 )
 from .provider_types import ProviderFailure, ProviderResult, RenderedPage
+from .response_profile import ResponseProfileDiagnosticV1, inspect_response_profile
 
 MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
 MAX_HOSTED_REQUEST_BYTES = 300_000
@@ -40,6 +41,7 @@ TIMEOUT_POLICY_VERSION = "connect_10_read_120_write_30_no_internal_retry_v1"
 NVCF_ASSET_DESCRIPTION = "vaeroex-document-page"
 ProviderBoundary = Literal["asset_create", "asset_upload", "inference"]
 ProviderBoundaryCheck = Callable[[ProviderBoundary], None]
+ResponseProfileObserver = Callable[[ResponseProfileDiagnosticV1], None]
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -435,6 +437,7 @@ class NvidiaNemotronParseRestAdapter:
         *,
         transport: httpx.BaseTransport | None = None,
         before_provider_boundary: ProviderBoundaryCheck | None = None,
+        response_profile_observer: ResponseProfileObserver | None = None,
     ) -> None:
         _validate_contract(contract)
         if contract.sends_nvidia_credential and not api_key:
@@ -442,6 +445,7 @@ class NvidiaNemotronParseRestAdapter:
         self._contract = contract
         self._api_key = api_key
         self._before_provider_boundary = before_provider_boundary or (lambda _boundary: None)
+        self._response_profile_observer = response_profile_observer
         self._client = httpx.Client(
             timeout=httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0),
             follow_redirects=False,
@@ -685,7 +689,8 @@ class NvidiaNemotronParseRestAdapter:
                 payload_mode=binding.payload_mode,
             )
             self._before_provider_boundary("inference")
-            _, response_headers, response_body = self._send(
+            response_started = time.perf_counter()
+            response_status, response_headers, response_body = self._send(
                 "POST",
                 self._contract.endpoint,
                 headers={**self._headers(), **extra_headers},
@@ -698,6 +703,20 @@ class NvidiaNemotronParseRestAdapter:
                     else MAX_SELF_HOSTED_REQUEST_BYTES
                 ),
             )
+            if self._response_profile_observer is not None:
+                try:
+                    diagnostic = inspect_response_profile(
+                        http_status=response_status,
+                        headers=response_headers,
+                        response_body=response_body,
+                        response_byte_count=len(response_body),
+                        latency_ms=round((time.perf_counter() - response_started) * 1_000),
+                    )
+                    self._response_profile_observer(diagnostic)
+                except Exception:
+                    # Diagnostics are observational. They cannot alter provider
+                    # acceptance, retries, normalization, or authority.
+                    pass
             if response_headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
                 raise ProviderFailure("provider_content_type_invalid", "malformed_output", retryable=False)
             normalized = normalize_provider_response(self._contract, page, response_body)
@@ -773,11 +792,13 @@ def invoke_rest_adapter(
     completed_pages: tuple[dict[str, Any], ...] = (),
     transport: httpx.BaseTransport | None = None,
     before_provider_boundary: ProviderBoundaryCheck | None = None,
+    response_profile_observer: ResponseProfileObserver | None = None,
 ) -> ProviderResult:
     with NvidiaNemotronParseRestAdapter(
         contract,
         api_key,
         transport=transport,
         before_provider_boundary=before_provider_boundary,
+        response_profile_observer=response_profile_observer,
     ) as adapter:
         return adapter.invoke(pages, document_sha256, completed_pages=completed_pages)

@@ -19,6 +19,10 @@ from vaeroex_document_worker.provider_contract import (
     V1_2_TASK_PROMPT,
 )
 from vaeroex_document_worker.provider_types import ProviderFailure, RenderedPage
+from vaeroex_document_worker.response_profile import (
+    ResponseProfileDiagnosticV1,
+    classify_response_profile,
+)
 from vaeroex_document_worker.rest_adapter import (
     MAX_PROVIDER_RESPONSE_BYTES,
     invoke_rest_adapter,
@@ -166,6 +170,70 @@ def test_inline_inference_normalizes_without_retaining_raw_response(tmp_path: Pa
     assert result.pages[0]["blocks"][0]["text"] == "Synthetic extraction"
     assert "raw" not in repr(result).lower()
     assert "secret-not-returned" not in repr(result)
+
+
+def test_response_profile_observer_runs_before_fail_closed_validation(
+    tmp_path: Path,
+) -> None:
+    response = json.loads(hosted_response())
+    response["choices"][0]["finish_reason"] = "stop"
+    response["choices"][0]["message"]["content"] = "private provider prose"
+    response["choices"][0]["message"]["tool_calls"] = []
+    body = json.dumps(response).encode("utf-8")
+    observed: list[ResponseProfileDiagnosticV1] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={
+                "content-type": "application/json",
+                "nvcf-reqid": "safe-provider-request-id",
+            },
+            content=body,
+        )
+
+    with pytest.raises(ProviderFailure) as caught:
+        invoke_rest_adapter(
+            [rendered_page(tmp_path)],
+            "d" * 64,
+            HOSTED_CONTRACT,
+            "test-secret",
+            transport=httpx.MockTransport(handler),
+            response_profile_observer=observed.append,
+        )
+
+    assert caught.value.code == "provider_malformed_hosted_profile"
+    assert len(observed) == 1
+    assert classify_response_profile(observed[0]) == 4
+    assert observed[0].provider_request_id == "safe-provider-request-id"
+    assert "private provider prose" not in json.dumps(
+        observed[0].privacy_safe_event()
+    )
+
+
+def test_response_profile_observer_failure_cannot_change_provider_result(
+    tmp_path: Path,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=hosted_response(),
+        )
+
+    def broken_observer(_diagnostic: ResponseProfileDiagnosticV1) -> None:
+        raise RuntimeError("observer failure")
+
+    result = invoke_rest_adapter(
+        [rendered_page(tmp_path)],
+        "d" * 64,
+        HOSTED_CONTRACT,
+        "test-secret",
+        transport=httpx.MockTransport(handler),
+        response_profile_observer=broken_observer,
+    )
+
+    assert result.pages[0]["blocks"][0]["text"] == "Synthetic extraction"
 
 
 @pytest.mark.parametrize(
