@@ -224,6 +224,63 @@ def test_secret_provisioner_streams_only_scoped_preview_values_without_readback(
     assert all("value" not in event for event in events)
 
 
+def test_secret_provisioner_accepts_official_preview_secret_key_after_exact_endpoint_validation(
+    tmp_path: Path,
+) -> None:
+    fake_gcloud, audit = _fake_gcloud(tmp_path)
+    preload = tmp_path / "preview-supabase-fetch.mjs"
+    preload.write_text(
+        """
+globalThis.fetch = async (url, options) => {
+  if (url !== "https://zfpnhvcmuuvtswttmnjd.supabase.co/rest/v1/") throw new Error();
+  if (options?.headers?.apikey !== "sb_secret_synthetic_preview_only") throw new Error();
+  return new Response(null, { status: 200 });
+};
+""",
+        encoding="utf-8",
+    )
+    environment = _secret_environment(fake_gcloud, audit)
+    environment["NODE_OPTIONS"] = f"--import={preload}"
+    result = subprocess.run(
+        ["node", str(PROVISION_SECRETS)],
+        input="sb_secret_synthetic_preview_only",
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "sb_secret" not in result.stdout
+    assert json.loads(result.stdout)["ok"] is True
+    assert len(audit.read_text(encoding="utf-8").splitlines()) == 6
+
+
+def test_secret_provisioner_rejects_unscoped_official_secret_key_before_gcloud(
+    tmp_path: Path,
+) -> None:
+    fake_gcloud, audit = _fake_gcloud(tmp_path)
+    preload = tmp_path / "rejected-supabase-fetch.mjs"
+    preload.write_text(
+        """
+globalThis.fetch = async () => new Response(null, { status: 401 });
+""",
+        encoding="utf-8",
+    )
+    environment = _secret_environment(fake_gcloud, audit)
+    environment["NODE_OPTIONS"] = f"--import={preload}"
+    result = subprocess.run(
+        ["node", str(PROVISION_SECRETS)],
+        input="sb_secret_synthetic_wrong_project",
+        capture_output=True,
+        text=True,
+        check=False,
+        env=environment,
+    )
+    assert result.returncode != 0
+    assert "preview_supabase_service_role_scope_invalid" in result.stderr
+    assert not audit.exists()
+
+
 def test_secret_provisioner_rejects_production_key_before_gcloud(tmp_path: Path) -> None:
     fake_gcloud, audit = _fake_gcloud(tmp_path)
     result = subprocess.run(

@@ -540,6 +540,49 @@ broadly, and raw response content is neither retained nor logged. A future
 qualification still requires independent contract review before any provider
 call.
 
+### One-call response-profile diagnostic (2026-08-04)
+
+The separately approved one-call diagnostic used only the committed one-page
+`synthetic-doc-executive-kpi-review.pdf` fixture. It made exactly one NVIDIA
+inference attempt with zero retries. The unchanged hosted response validator
+rejected the result before normalization, encryption, cache, review, or any
+authority path.
+
+The content-free observer recorded this structural profile:
+
+- HTTP `200` with `application/json`;
+- returned model `nvidia/nemotron-parse`;
+- `finish_reason` `stop`;
+- null assistant content;
+- one `function` tool call named `markdown_bbox`;
+- string arguments, 1,892 bytes, containing complete valid JSON;
+- no truncation or token-limit indication;
+- 2,758 response bytes and 1,169 ms response latency; and
+- provider support request ID `6cf6e948-8c47-4347-b450-50458387eff7`.
+
+No tool arguments, extracted text or values, bounding boxes, assistant content,
+request body, response body, image bytes, prompt, credential, workspace ID, or
+customer identifier was retained. The observer ran before, and could not
+influence, the unchanged fail-closed validator.
+
+**Classification:** `5. malformed provider response`.
+
+The response matches the documented legacy hosted tool-call profile in every
+retained structural respect except its completion marker. The approved hosted
+contract requires `finish_reason: tool_calls` when a tool call is returned;
+NVIDIA returned `stop` while still returning one complete tool call. This is not
+a v1.2 tagged-content response and there is no evidence of truncation. The
+standards-compliant next step is to ask NVIDIA whether `stop` is an intentional
+hosted Nemotron Parse completion contract, using only the support request ID and
+this structural classification. Vaeroex must not accept `stop` without official
+contract evidence and a separate adapter review.
+
+Cleanup closed all database and runtime gates, restored the retained Worker Pool
+to its prior inert revision at zero instances, removed the synthetic Storage and
+database fixtures, deleted the ephemeral broker and secrets, destroyed the
+temporary worker signing-key version, and retained only content-free aggregate
+telemetry. Production and Vercel resources were not addressed.
+
 ## Phase C2 prerequisites
 
 Phase C2 cannot begin until Phase C1 quality and adoption gates pass, all

@@ -303,6 +303,13 @@ assert.match(runbook, /cannot be classified as request error, validator error, p
 assert.match(runbook, /Classification:\*\* Inconclusive due to insufficient content-free evidence\./);
 assert.match(runbook, /profiles therefore remain[\s\S]+separate and are never auto-detected or mixed/i);
 assert.match(runbook, /Every case remains a[\s\S]+malformed-output failure/i);
+assert.match(runbook, /^### One-call response-profile diagnostic \(2026-08-04\)$/m);
+assert.match(runbook, /exactly one NVIDIA[\s\S]+zero retries/i);
+assert.match(runbook, /finish_reason` `stop`/);
+assert.match(runbook, /Classification:\*\* `5\. malformed provider response`/);
+assert.match(runbook, /observer ran before, and could not[\s\S]+unchanged fail-closed validator/i);
+assert.match(runbook, /must not accept `stop` without official[\s\S]+separate adapter review/i);
+assert.match(runbook, /Production and Vercel resources were not addressed/i);
 assert.match(runbook, /Customer[\s\S]+uploads, arbitrary images, public routes, automatic authority/);
 
 process.stdout.write("Document extraction worker deployment Phase C1 regressions passed.\n");

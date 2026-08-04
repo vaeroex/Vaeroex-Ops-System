@@ -87,6 +87,9 @@ for (const mutatingScript of [provisionBroker, provisionBrokerSecrets, cleanupBr
 assert.match(provisionBroker, /unexpected project-level roles/);
 assert.match(provisionBroker, /roles\/secretmanager\.secretAccessor/);
 assert.match(provisionBrokerSecrets, /claims\.ref !== "zfpnhvcmuuvtswttmnjd"/);
+assert.match(provisionBrokerSecrets, /value\.startsWith\("sb_secret_"\)/);
+assert.match(provisionBrokerSecrets, /https:\/\/zfpnhvcmuuvtswttmnjd\.supabase\.co\/rest\/v1\//);
+assert.match(provisionBrokerSecrets, /await response\.body\?\.cancel\(\)/);
 assert.match(provisionBrokerSecrets, /generateKeyPairSync\("ed25519"\)/);
 assert.match(provisionBrokerSecrets, /--data-file=-/);
 assert.doesNotMatch(provisionBrokerSecrets, /console\.log|process\.stderr\.write/);

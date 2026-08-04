@@ -43,14 +43,44 @@ const previewSupabaseServiceRole = Buffer.concat(chunks).toString("utf8").trim()
 if (!previewSupabaseServiceRole || previewSupabaseServiceRole.length > 4_096) {
   throw new Error("preview_supabase_service_role_invalid");
 }
-try {
-  const [header, payload, signature, extra] = previewSupabaseServiceRole.split(".");
-  if (!header || !payload || !signature || extra) throw new Error();
-  const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
-  if (claims.ref !== "zfpnhvcmuuvtswttmnjd" || claims.role !== "service_role") throw new Error();
-} catch {
-  throw new Error("preview_supabase_service_role_scope_invalid");
-}
+
+const validatePreviewSupabaseServiceRole = async (value) => {
+  if (value.startsWith("sb_secret_")) {
+    if (!/^sb_secret_[A-Za-z0-9_-]+$/.test(value)) {
+      throw new Error("preview_supabase_service_role_scope_invalid");
+    }
+    try {
+      const response = await fetch(
+        "https://zfpnhvcmuuvtswttmnjd.supabase.co/rest/v1/",
+        {
+          headers: {
+            accept: "application/openapi+json",
+            apikey: value,
+            "user-agent": "vaeroex-preview-secret-provisioner/1.0"
+          },
+          redirect: "error",
+          signal: AbortSignal.timeout(10_000)
+        }
+      );
+      await response.body?.cancel();
+      if (!response.ok) throw new Error();
+      return;
+    } catch {
+      throw new Error("preview_supabase_service_role_scope_invalid");
+    }
+  }
+
+  try {
+    const [header, payload, signature, extra] = value.split(".");
+    if (!header || !payload || !signature || extra) throw new Error();
+    const claims = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+    if (claims.ref !== "zfpnhvcmuuvtswttmnjd" || claims.role !== "service_role") throw new Error();
+  } catch {
+    throw new Error("preview_supabase_service_role_scope_invalid");
+  }
+};
+
+await validatePreviewSupabaseServiceRole(previewSupabaseServiceRole);
 
 const run = (args, input) => {
   const result = spawnSync(gcloud, args, {
