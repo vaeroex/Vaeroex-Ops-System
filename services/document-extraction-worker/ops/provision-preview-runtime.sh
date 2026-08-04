@@ -9,10 +9,19 @@ if [ "$PHASE_C1_PREVIEW_CONFIRMATION" != "vaeroex-document-extraction-phase-c1-p
   printf '%s\n' "Preview runtime-provisioning confirmation did not match." >&2
   exit 2
 fi
+if [ "$GCP_PROJECT_ID" != "vaeroex-document-worker" ] || [ "$GCP_REGION" != "us-west1" ]; then
+  printf '%s\n' "Only the isolated Phase C1 Google project and region are accepted." >&2
+  exit 2
+fi
 
 SERVICE_ACCOUNT_NAME="${SERVICE_ACCOUNT_NAME:-vaeroex-doc-worker-preview}"
 ARTIFACT_REPOSITORY="${ARTIFACT_REPOSITORY:-vaeroex-document-workers-preview}"
 WORKER_SERVICE_ACCOUNT="$SERVICE_ACCOUNT_NAME@$GCP_PROJECT_ID.iam.gserviceaccount.com"
+if [ "$SERVICE_ACCOUNT_NAME" != "vaeroex-doc-worker-preview" ] \
+  || [ "$ARTIFACT_REPOSITORY" != "vaeroex-document-workers-preview" ]; then
+  printf '%s\n' "The Preview runtime target is outside the approved scope." >&2
+  exit 2
+fi
 
 gcloud services enable \
   run.googleapis.com \

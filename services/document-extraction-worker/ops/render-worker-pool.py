@@ -31,10 +31,9 @@ def main() -> int:
     parser.add_argument("--worker-id", required=True)
     parser.add_argument("--worker-key-version", required=True)
     parser.add_argument("--broker-url", required=True)
+    parser.add_argument("--broker-audience", required=True)
     parser.add_argument("--worker-secret-name", required=True)
     parser.add_argument("--worker-secret-version", required=True)
-    parser.add_argument("--vercel-share-secret-name", required=True)
-    parser.add_argument("--vercel-share-secret-version", required=True)
     parser.add_argument("--nvidia-secret-name", required=True)
     parser.add_argument("--nvidia-secret-version", required=True)
     arguments = parser.parse_args()
@@ -58,7 +57,6 @@ def main() -> int:
         IDENTIFIER.fullmatch(value)
         for value in (
             arguments.worker_secret_name,
-            arguments.vercel_share_secret_name,
             arguments.nvidia_secret_name,
         )
     ):
@@ -67,7 +65,7 @@ def main() -> int:
     if (
         broker.scheme != "https"
         or not broker.hostname
-        or not broker.hostname.endswith(".vercel.app")
+        or not broker.hostname.endswith(".run.app")
         or broker.path not in ("", "/")
         or broker.params
         or broker.query
@@ -75,7 +73,9 @@ def main() -> int:
         or broker.username
         or broker.password
     ):
-        raise SystemExit("BROKER_URL must be an HTTPS Vercel Preview origin.")
+        raise SystemExit("BROKER_URL must be an HTTPS Cloud Run origin.")
+    if arguments.broker_audience.rstrip("/") != arguments.broker_url.rstrip("/"):
+        raise SystemExit("BROKER_AUDIENCE must equal the exact broker origin.")
 
     replacements = {
         "DOCUMENT_EXTRACTION_WORKER_POOL": arguments.worker_pool,
@@ -85,13 +85,10 @@ def main() -> int:
         "DOCUMENT_EXTRACTION_WORKER_ID_VALUE": arguments.worker_id,
         "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION_VALUE": arguments.worker_key_version,
         "DOCUMENT_EXTRACTION_BROKER_URL_VALUE": arguments.broker_url.rstrip("/"),
+        "DOCUMENT_EXTRACTION_BROKER_AUDIENCE_VALUE": arguments.broker_audience.rstrip("/"),
         "DOCUMENT_EXTRACTION_WORKER_SECRET_NAME": arguments.worker_secret_name,
         "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION": _positive_version(
             arguments.worker_secret_version
-        ),
-        "DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_NAME": arguments.vercel_share_secret_name,
-        "DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_VERSION": _positive_version(
-            arguments.vercel_share_secret_version
         ),
         "DOCUMENT_EXTRACTION_NVIDIA_SECRET_NAME": arguments.nvidia_secret_name,
         "DOCUMENT_EXTRACTION_NVIDIA_SECRET_VERSION": _positive_version(

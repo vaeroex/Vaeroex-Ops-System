@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import os
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from urllib.parse import urlparse
 
 from .provider_contract import (
@@ -31,11 +31,8 @@ MAX_RETRIES = 1
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _ALLOWED_WORKER_CREDENTIALS = {
     "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
-    "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
     "NVIDIA_API_KEY",
 }
-
-_VERCEL_SHARE_TOKEN = re.compile(r"^[A-Za-z0-9._~-]{16,256}$")
 
 _FORBIDDEN_WORKER_CREDENTIALS = {
     # The worker has no database or Supabase client. Even public project URLs are
@@ -119,6 +116,7 @@ _FORBIDDEN_CREDENTIAL_PATTERNS = (
     (re.compile(r"^(?:GOOGLE|GCP|GCS)_.+(?:SERVICE_ACCOUNT|APPLICATION_CREDENTIALS|PRIVATE_KEY|SECRET_KEY)$"), "gcp_storage"),
     (re.compile(r"^(?:VERCEL_)?BLOB_.+(?:TOKEN|SECRET|KEY)$"), "vercel_blob"),
     (re.compile(r"^DOCUMENT_EXTRACTION_.+(?:MASTER_KEY|ENCRYPTION_KEY|CAPABILITY_SECRET|SIGNING_PRIVATE_KEY)$"), "document_authority"),
+    (re.compile(r"^DOCUMENT_EXTRACTION_.+(?:TOKEN|SECRET|PRIVATE_KEY|CREDENTIALS?)$"), "document_authority"),
 )
 
 
@@ -149,6 +147,8 @@ def _required(environment: dict[str, str], name: str) -> str:
 @dataclass(frozen=True)
 class WorkerConfig:
     broker_url: str
+    broker_audience: str
+    broker_auth_mode: str
     worker_id: str
     worker_key_version: str
     worker_private_key_der: bytes
@@ -156,8 +156,9 @@ class WorkerConfig:
     provider_contract: ProviderContract
     runtime_environment: str
     deployment_id: str
+    provider_execution_enabled: bool
+    authentication_qualification_enabled: bool
     synthetic_qualification_enabled: bool
-    vercel_share_token: str | None = field(default=None, repr=False, compare=False)
     health_port: int = 8080
     idle_poll_seconds: float = 5.0
 
@@ -170,8 +171,9 @@ class WorkerConfig:
             raise RuntimeError(f"Forbidden private-worker credential: {name} ({category}).")
         if not _enabled(environment.get("DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED")):
             raise RuntimeError("The private document extraction worker is disabled.")
-        if not _enabled(environment.get("DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED")):
-            raise RuntimeError("Document extraction provider execution is disabled.")
+        provider_execution_enabled = _enabled(
+            environment.get("DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED")
+        )
 
         runtime_environment = _required(
             environment, "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT"
@@ -201,8 +203,19 @@ class WorkerConfig:
             or parsed_url.fragment
             or parsed_url.username
             or parsed_url.password
+            or not (parsed_url.hostname or "").lower().endswith(".run.app")
         ):
-            raise RuntimeError("The private broker must use an HTTPS origin URL.")
+            raise RuntimeError("The private broker must use an HTTPS Cloud Run origin URL.")
+        broker_auth_mode = _required(
+            environment, "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE"
+        )
+        if broker_auth_mode != "google_oidc_v1":
+            raise RuntimeError("The private broker authentication mode is not approved.")
+        broker_audience = _required(
+            environment, "DOCUMENT_EXTRACTION_BROKER_AUDIENCE"
+        ).rstrip("/")
+        if broker_audience != broker_url:
+            raise RuntimeError("The private broker audience must match its exact origin.")
         worker_id = _required(environment, "DOCUMENT_EXTRACTION_WORKER_ID")
         worker_key_version = _required(environment, "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION")
         if not _IDENTIFIER.fullmatch(worker_id) or not _IDENTIFIER.fullmatch(worker_key_version):
@@ -220,29 +233,29 @@ class WorkerConfig:
 
         synthetic_qualification_enabled = (
             runtime_environment == "preview"
+            and provider_execution_enabled
             and _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED"))
             and _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED"))
         )
-        vercel_share_token = environment.get(
-            "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN", ""
-        ).strip() or None
-        if vercel_share_token is not None and not _VERCEL_SHARE_TOKEN.fullmatch(
-            vercel_share_token
-        ):
-            raise RuntimeError("The Vercel Preview share credential is malformed.")
-        if runtime_environment == "production" and vercel_share_token is not None:
-            raise RuntimeError("Vercel Preview share access is forbidden in Production.")
-        if synthetic_qualification_enabled and vercel_share_token is None:
-            raise RuntimeError("The bounded Preview share credential is missing.")
-        if vercel_share_token is not None and not synthetic_qualification_enabled:
-            raise RuntimeError("Vercel share access is limited to synthetic Preview qualification.")
-        broker_hostname = (parsed_url.hostname or "").lower()
-        if vercel_share_token is not None and (
-            not broker_hostname.endswith(".vercel.app") or "-git-" in broker_hostname
+        authentication_qualification_enabled = (
+            runtime_environment == "preview"
+            and _enabled(
+                environment.get(
+                    "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED"
+                )
+            )
+        )
+        if authentication_qualification_enabled and (
+            provider_execution_enabled
+            or synthetic_qualification_enabled
+            or _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED"))
+            or _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED"))
         ):
             raise RuntimeError(
-                "Vercel share access requires an immutable Preview deployment origin."
+                "Broker authentication qualification requires every provider gate closed."
             )
+        if not provider_execution_enabled and not authentication_qualification_enabled:
+            raise RuntimeError("Document extraction provider execution is disabled.")
         try:
             health_port = int(environment.get("PORT", "8080"))
             idle_poll_seconds = float(
@@ -254,6 +267,8 @@ class WorkerConfig:
             raise RuntimeError("The private worker runtime limits are outside approved bounds.")
         return cls(
             broker_url=broker_url,
+            broker_audience=broker_audience,
+            broker_auth_mode=broker_auth_mode,
             worker_id=worker_id,
             worker_key_version=worker_key_version,
             worker_private_key_der=private_key,
@@ -261,8 +276,9 @@ class WorkerConfig:
             provider_contract=active_provider_contract(),
             runtime_environment=runtime_environment,
             deployment_id=deployment_id,
+            provider_execution_enabled=provider_execution_enabled,
+            authentication_qualification_enabled=authentication_qualification_enabled,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
-            vercel_share_token=vercel_share_token,
             health_port=health_port,
             idle_poll_seconds=idle_poll_seconds,
         )

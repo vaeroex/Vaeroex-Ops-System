@@ -16,6 +16,7 @@ const dispatchSingleUseMigration = read("supabase/migrations/20260803205520_docu
 const restAdapterMigration = read("supabase/migrations/20260803230226_document_extraction_rest_adapter_contract.sql");
 const phaseC1Migration = read("supabase/migrations/20260804010000_document_extraction_worker_phase_c1_protocol.sql");
 const route = read("app/api/internal/document-extraction/broker/route.ts");
+const brokerHttp = read("lib/document-extraction/broker-http.ts");
 const service = read("lib/document-extraction/broker-service.ts");
 const policy = read("lib/document-extraction/runtime-policy.ts");
 const encryption = read("lib/document-extraction/encryption.ts");
@@ -212,18 +213,19 @@ assert.doesNotMatch(phaseC1Migration, /grant execute[^;]+to (?:anon|authenticate
 assert.doesNotMatch(phaseC1Migration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
 assert.doesNotMatch(phaseC1Migration, /insert into public\.document_extraction_(?:workspace_settings|system_state)/i);
 
-assert.match(route, /verifyWorkerAssertion/);
-assert.match(route, /consumeWorkerAssertion/);
-assert.match(route, /authorization\.startsWith\("Bearer "\)/);
-assert.match(route, /createSignedUrl\(source\.storage_path, 30\)/);
-assert.match(route, /GET[\s\S]+assertDocumentExtractionProviderDispatchEnabled\(\)/);
+assert.match(route, /handleDocumentExtractionBrokerHttpRequest/);
+assert.match(brokerHttp, /verifyWorkerAssertion/);
+assert.match(brokerHttp, /consumeWorkerAssertion/);
+assert.match(brokerHttp, /authorization\.startsWith\("Bearer "\)/);
+assert.match(brokerHttp, /createSignedUrl\(source\.storage_path, 30\)/);
+assert.match(brokerHttp, /handleGet[\s\S]+assertDocumentExtractionProviderDispatchEnabled/);
 assert.doesNotMatch(route, /NVIDIA_API_KEY|nemo_retriever|create_ingestor/);
 assert.match(service, /buildNormalizedDocumentExtractionArtifact/);
 assert.match(service, /createManagedDocumentExtractionEncryptionProvider/);
 assert.match(service, /artifact\.route !== context\.route/);
 assert.match(service, /workspaceId: context\.workspace_id/);
-assert.match(service, /assertDocumentExtractionProviderGateEnabled\(environment\)/);
-assert.match(service, /issue_file_access[\s\S]+assertDocumentExtractionProviderDispatchEnabled\(environment\)/);
+assert.match(service, /assertDocumentExtractionProviderGateEnabled\(environment, runtimeEnvironment\)/);
+assert.match(service, /issue_file_access[\s\S]+assertDocumentExtractionProviderDispatchEnabled\(environment, runtimeEnvironment\)/);
 assert.match(service, /persistWithDocumentExtractionNonceRetry/);
 assert.doesNotMatch(service, /console\.(log|error)|JSON\.stringify\(artifact/);
 
@@ -489,20 +491,43 @@ const assertionRequest = new Request(`https://preview.example.test${assertionTar
   body: assertionBody
 });
 assert.equal(
-  verifyWorkerAssertion({ request: assertionRequest, body: assertionBody, environment: assertionEnvironment, now: assertionNow }).workerId,
+  verifyWorkerAssertion({
+    request: assertionRequest,
+    body: assertionBody,
+    brokerEnvironment: "preview",
+    environment: assertionEnvironment,
+    now: assertionNow
+  }).workerId,
   "preview-worker-1"
 );
 assert.throws(
   () => verifyWorkerAssertion({
     request: assertionRequest,
+    body: assertionBody,
+    brokerEnvironment: "production",
+    environment: assertionEnvironment,
+    now: assertionNow
+  }),
+  /identity_unknown/
+);
+assert.throws(
+  () => verifyWorkerAssertion({
+    request: assertionRequest,
     body: Buffer.from('{"operation":"claim"}', "utf8"),
+    brokerEnvironment: "preview",
     environment: assertionEnvironment,
     now: assertionNow
   }),
   /assertion_invalid/
 );
 assert.throws(
-  () => verifyWorkerAssertion({ request: assertionRequest, body: assertionBody, environment: assertionEnvironment, now: assertionNow + 61_000 }),
+  () => verifyWorkerAssertion({
+    request: assertionRequest,
+    body: assertionBody,
+    brokerEnvironment: "preview",
+    environment: assertionEnvironment,
+    now: assertionNow + 61_000
+  }),
   /assertion_expired/
 );
 
@@ -550,6 +575,7 @@ for (const [keyType, options] of [
     () => verifyWorkerAssertion({
       request: assertionRequestWith(assertionHeaders()),
       body: assertionBody,
+      brokerEnvironment: "preview",
       environment: unsupportedEnvironment,
       now: assertionNow
     }),
@@ -562,6 +588,7 @@ assert.throws(
   () => verifyWorkerAssertion({
     request: assertionRequestWith(assertionHeaders()),
     body: assertionBody,
+    brokerEnvironment: "preview",
     environment: {
       VERCEL_ENV: "preview",
       DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON: JSON.stringify({
@@ -585,6 +612,7 @@ assert.throws(
       "x-vaeroex-worker-signature": modifiedSignature.toString("base64")
     })),
     body: assertionBody,
+    brokerEnvironment: "preview",
     environment: assertionEnvironment,
     now: assertionNow
   }),
@@ -596,6 +624,7 @@ assert.throws(
   () => verifyWorkerAssertion({
     request: assertionRequestWith(unsignedHeaders),
     body: assertionBody,
+    brokerEnvironment: "preview",
     environment: assertionEnvironment,
     now: assertionNow
   }),
@@ -605,6 +634,7 @@ assert.throws(
   () => verifyWorkerAssertion({
     request: assertionRequestWith(assertionHeaders({ "x-vaeroex-worker-id": "preview-worker-2" })),
     body: assertionBody,
+    brokerEnvironment: "preview",
     environment: assertionEnvironment,
     now: assertionNow
   }),

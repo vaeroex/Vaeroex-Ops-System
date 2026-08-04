@@ -33,7 +33,8 @@ import {
   assertDocumentExtractionBrokerEnabled,
   assertDocumentExtractionProviderGateEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
-  resolveDocumentExtractionExecutionPolicy
+  resolveDocumentExtractionExecutionPolicy,
+  type DocumentExtractionRuntimeEnvironment
 } from "@/lib/document-extraction/runtime-policy";
 
 function sha256(value: string) {
@@ -102,14 +103,16 @@ async function recordFinalTelemetry({
 export async function handleDocumentExtractionBrokerOperation({
   request,
   workerId,
+  runtimeEnvironment,
   environment = process.env
 }: {
   request: DocumentExtractionBrokerRequest;
   workerId: string;
+  runtimeEnvironment: DocumentExtractionRuntimeEnvironment;
   environment?: NodeJS.ProcessEnv;
 }): Promise<Record<string, unknown>> {
   if (request.operation === "health") {
-    const policy = resolveDocumentExtractionExecutionPolicy(environment);
+    const policy = resolveDocumentExtractionExecutionPolicy(environment, runtimeEnvironment);
     return {
       ok: true,
       brokerEnabled: policy.brokerEnabled,
@@ -118,10 +121,10 @@ export async function handleDocumentExtractionBrokerOperation({
     };
   }
 
-  assertDocumentExtractionBrokerEnabled(environment);
+  assertDocumentExtractionBrokerEnabled(environment, runtimeEnvironment);
 
   if (request.operation === "claim") {
-    assertDocumentExtractionProviderDispatchEnabled(environment);
+    assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     const job = await claimDocumentExtractionJob(workerId, request.leaseSeconds);
     if (!job) return { ok: true, claimed: false };
     return {
@@ -159,7 +162,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "issue_file_access") {
-    assertDocumentExtractionProviderDispatchEnabled(environment);
+    assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     const secret = createFileGrantSecret();
     const grant = await issueDocumentExtractionFileGrant({
       jobId: lease.jobId,
@@ -186,7 +189,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "advance_stage") {
-    assertDocumentExtractionProviderGateEnabled(environment);
+    assertDocumentExtractionProviderGateEnabled(environment, runtimeEnvironment);
     const result = await advanceDocumentExtractionStage({
       jobId: lease.jobId,
       workerId,
@@ -198,7 +201,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "authorize_dispatch") {
-    assertDocumentExtractionProviderDispatchEnabled(environment);
+    assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     const result = await authorizeDocumentExtractionDispatch({
       jobId: lease.jobId,
       workerId,
@@ -208,7 +211,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "check_provider_boundary") {
-    assertDocumentExtractionProviderDispatchEnabled(environment);
+    assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     const result = await checkDocumentExtractionProviderBoundary({
       jobId: lease.jobId,
       workerId,
@@ -241,7 +244,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "authorize_retry") {
-    assertDocumentExtractionProviderDispatchEnabled(environment);
+    assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     const result = await authorizeDocumentExtractionRetry({
       jobId: lease.jobId,
       workerId,
@@ -253,7 +256,7 @@ export async function handleDocumentExtractionBrokerOperation({
 
   const context = await resolveDocumentExtractionLease(lease.jobId, workerId);
   if (request.operation === "complete") {
-    assertDocumentExtractionProviderGateEnabled(environment);
+    assertDocumentExtractionProviderGateEnabled(environment, runtimeEnvironment);
     if (context.stage !== "encrypting") throw new Error("document_extraction_completion_stage_invalid");
     const artifact = buildNormalizedDocumentExtractionArtifact(
       request.artifact as NormalizedDocumentExtractionArtifactDraftV1

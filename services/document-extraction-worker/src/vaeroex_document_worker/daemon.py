@@ -22,7 +22,7 @@ async def _verify_broker(config: WorkerConfig) -> None:
     if (
         response.get("ok") is not True
         or response.get("brokerEnabled") is not True
-        or response.get("providerExecutionEnabled") is not True
+        or response.get("providerExecutionEnabled") is not config.provider_execution_enabled
         or response.get("environment") != config.runtime_environment
     ):
         raise BrokerFailure("broker_health_contract_rejected")
@@ -55,6 +55,18 @@ async def run_worker(config: WorkerConfig, *, max_cycles: int | None = None) -> 
             runtime_version=WORKER_RUNTIME_VERSION,
             broker_connectivity="healthy",
         )
+        if config.authentication_qualification_enabled:
+            emit_operational_event(
+                "broker_auth_qualification_passed",
+                deployment_version=config.deployment_id,
+                runtime_version=WORKER_RUNTIME_VERSION,
+                broker_connectivity="healthy",
+                provider_calls=0,
+            )
+            if max_cycles is not None:
+                return
+            await stop.wait()
+            return
         backoff = config.idle_poll_seconds
         completed_cycles = 0
         while not stop.is_set():

@@ -24,9 +24,12 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID": "phase-c1-preview-1",
         "DOCUMENT_EXTRACTION_WORKER_ID": "preview-worker-1",
         "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION": "worker-key-v1",
-        "DOCUMENT_EXTRACTION_BROKER_URL": "https://preview-branch.vercel.app",
+        "DOCUMENT_EXTRACTION_BROKER_URL": "https://preview-broker.us-west1.run.app",
+        "DOCUMENT_EXTRACTION_BROKER_AUDIENCE": "https://preview-broker.us-west1.run.app",
+        "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE": "google_oidc_v1",
         "DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED": gate_value,
+        "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED": "false",
         "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": "nvidia/nemotron-parse",
@@ -41,12 +44,21 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
     environment.extend(
         {
             "name": name,
-            "valueSource": {"secretKeyRef": {"secret": f"preview-{name.lower()}"}},
+            "valueSource": {
+                "secretKeyRef": {"secret": secret, "version": version}
+            },
         }
-        for name in (
-            "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
-            "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
-            "NVIDIA_API_KEY",
+        for name, secret, version in (
+            (
+                "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
+                "vaeroex-document-worker-preview-ed25519",
+                "2",
+            ),
+            (
+                "NVIDIA_API_KEY",
+                "vaeroex-document-worker-preview-nvidia",
+                "1",
+            ),
         )
     )
     return environment
@@ -88,6 +100,16 @@ def _verifier_arguments(description: Path) -> list[str]:
         "preview-worker-1",
         "--worker-key-version",
         "worker-key-v1",
+        "--broker-url",
+        "https://preview-broker.us-west1.run.app",
+        "--worker-secret-name",
+        "vaeroex-document-worker-preview-ed25519",
+        "--worker-secret-version",
+        "2",
+        "--nvidia-secret-name",
+        "vaeroex-document-worker-preview-nvidia",
+        "--nvidia-secret-version",
+        "1",
         "--expected-instances",
         "0",
         "--expected-gate-state",
@@ -120,14 +142,12 @@ def test_manifest_renderer_keeps_preview_worker_inert_and_secret_referenced(
             "--worker-key-version",
             "worker-key-v1",
             "--broker-url",
-            "https://preview-branch.vercel.app",
+            "https://preview-broker.us-west1.run.app",
+            "--broker-audience",
+            "https://preview-broker.us-west1.run.app",
             "--worker-secret-name",
             "vaeroex-document-worker-preview-ed25519",
             "--worker-secret-version",
-            "1",
-            "--vercel-share-secret-name",
-            "vaeroex-document-worker-preview-vercel-share",
-            "--vercel-share-secret-version",
             "1",
             "--nvidia-secret-name",
             "vaeroex-document-worker-preview-nvidia",
@@ -149,7 +169,8 @@ def test_manifest_renderer_keeps_preview_worker_inert_and_secret_referenced(
     assert "@sha256:" in rendered
     assert 'key: "1"' in rendered
     assert 'key: "2"' in rendered
-    assert "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN" in rendered
+    assert "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE" in rendered
+    assert "google_oidc_v1" in rendered
     assert "DOCUMENT_EXTRACTION_IMAGE_DIGEST" not in rendered
 
 
@@ -193,6 +214,25 @@ def test_deployed_worker_verifier_rejects_unapproved_environment_scope(
     )
     assert result.returncode != 0
     assert "worker_pool_environment_scope_invalid" in result.stderr
+
+
+def test_deployed_worker_verifier_rejects_wrong_secret_version(
+    tmp_path: Path,
+) -> None:
+    resource = _description()
+    for item in resource["template"]["containers"][0]["env"]:
+        if item["name"] == "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64":
+            item["valueSource"]["secretKeyRef"]["version"] = "3"
+    description = tmp_path / "description.json"
+    description.write_text(json.dumps(resource), encoding="utf-8")
+    result = subprocess.run(
+        _verifier_arguments(description),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "worker_pool_secret_reference_invalid" in result.stderr
 
 
 def test_signal_summary_never_returns_raw_payloads(tmp_path: Path) -> None:

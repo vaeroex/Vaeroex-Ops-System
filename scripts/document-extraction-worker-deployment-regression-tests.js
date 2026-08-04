@@ -14,6 +14,7 @@ const poolTemplate = readWorker("cloud-run-worker-pool.yaml.template");
 const deploy = readWorker("ops/deploy-preview-worker.sh");
 const renderer = readWorker("ops/render-worker-pool.py");
 const enable = readWorker("ops/set-preview-qualification-worker.sh");
+const enableAuthentication = readWorker("ops/set-preview-authentication-worker.sh");
 const disable = readWorker("ops/disable-preview-worker.sh");
 const provision = readWorker("ops/provision-preview-secrets.sh");
 const verifySecretFiles = readWorker("ops/verify-secret-files.py");
@@ -63,25 +64,39 @@ assert.doesNotMatch(poolTemplate, /^\s*(?:ingress|loadBalancer|autoscaling):/m);
 
 assert.match(deploy, /WORKER_IMAGE_DIGEST must be immutable/);
 assert.match(deploy, /WORKER_SECRET_VERSION/);
-assert.match(deploy, /VERCEL_SHARE_SECRET_VERSION/);
+assert.match(deploy, /BROKER_AUDIENCE/);
 assert.match(deploy, /NVIDIA_SECRET_VERSION/);
+assert.doesNotMatch(deploy, /VERCEL_SHARE/);
 assert.doesNotMatch(deploy, /:latest/);
 assert.match(deploy, /gcloud run worker-pools replace/);
 assert.match(deploy, /render-worker-pool\.py/);
 assert.match(deploy, /verify-worker-pool\.py/);
 assert.doesNotMatch(deploy, /--startup-probe|--liveness-probe/);
-assert.match(renderer, /BROKER_URL must be an HTTPS Vercel Preview origin/);
+assert.match(renderer, /BROKER_URL must be an HTTPS Cloud Run origin/);
+assert.match(renderer, /BROKER_AUDIENCE must equal the exact broker origin/);
 assert.match(renderer, /Secret versions must be explicit positive integers/);
 assert.match(renderer, /WORKER_IMAGE_DIGEST must be immutable/);
-for (const mutatingPreviewScript of [deploy, enable, disable, provision, provisionRuntime, buildImage]) {
+for (const mutatingPreviewScript of [deploy, enableAuthentication, enable, disable, provision, provisionRuntime, buildImage]) {
   assert.match(mutatingPreviewScript, /vaeroex-document-extraction-phase-c1-preview-only/);
+  assert.match(mutatingPreviewScript, /vaeroex-document-worker/);
+}
+for (const regionalPreviewScript of [deploy, enableAuthentication, enable, disable, provisionRuntime, buildImage, verifyDeployment]) {
+  assert.match(regionalPreviewScript, /us-west1/);
+}
+for (const workerPoolScript of [deploy, enableAuthentication, enable, disable, verifyDeployment]) {
+  assert.match(workerPoolScript, /vaeroex-document-extraction-preview/);
 }
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT[\s\S]+value: preview/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /secretKeyRef:[\s\S]+DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION/);
-assert.match(poolTemplate, /DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN[\s\S]+secretKeyRef:[\s\S]+DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_VERSION/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_BROKER_AUTH_MODE[\s\S]+google_oidc_v1/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_BROKER_AUDIENCE/);
+assert.match(enableAuthentication, /cloud-run-broker-auth-zero-provider-calls/);
+assert.match(enableAuthentication, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=false/);
+assert.match(enableAuthentication, /DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=true/);
+assert.match(enableAuthentication, /--instances 1/);
 assert.match(enable, /synthetic-preview-only-12-documents-13-pages/);
 assert.match(enable, /--instances 1/);
 assert.match(disable, /--instances 0[\s\S]+DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=false/);
@@ -123,8 +138,9 @@ assert.match(config, /runtime_environment == "preview"/);
 assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED/);
 assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED/);
 assert.match(config, /Forbidden private-worker credential/);
-assert.match(config, /Vercel Preview share access is forbidden in Production/);
-assert.match(config, /immutable Preview deployment origin/);
+assert.match(config, /DOCUMENT_EXTRACTION_.+TOKEN\|SECRET\|PRIVATE_KEY\|CREDENTIALS/);
+assert.match(config, /google_oidc_v1/);
+assert.match(config, /Cloud Run origin/);
 
 assert.match(broker, /Ed25519PrivateKey/);
 assert.match(broker, /x-vaeroex-worker-environment/);
@@ -132,8 +148,8 @@ assert.match(broker, /x-vaeroex-worker-deployment-id/);
 assert.match(broker, /secrets\.token_hex\(16\)/);
 assert.match(broker, /follow_redirects=False/);
 assert.match(broker, /trust_env=False/);
-assert.match(broker, /_bootstrap_vercel_share/);
-assert.match(broker, /vercel_share_redirect_rejected/);
+assert.match(broker, /GoogleIdentityTokenProvider/);
+assert.match(broker, /x-serverless-authorization/);
 assert.match(runner, /approved_fixture_for_source/);
 assert.match(runner, /materialize_approved_pages/);
 assert.match(runner, /check_provider_boundary/);
@@ -217,29 +233,31 @@ assert.equal(fs.existsSync(path.join(workerRoot, "src/vaeroex_document_worker/wo
 assert.equal(fs.existsSync(path.join(workerRoot, "api/health.py")), false);
 
 assert.match(runbook, /^# Document Extraction Worker Deployment and Synthetic Qualification - Phase C1$/m);
-assert.match(runbook, /```mermaid[\s\S]+Cloud Run control plane[\s\S]+Awaiting human review[\s\S]+```/);
+assert.match(runbook, /```mermaid[\s\S]+Google Cloud control plane[\s\S]+Ephemeral Cloud Run broker[\s\S]+Awaiting human review[\s\S]+```/);
 for (const heading of [
-  "Deployment target",
+  "Deployment targets",
+  "Shared broker implementation",
   "Topology and authority boundary",
-  "Private broker authentication",
-  "Secrets and environment scope",
-  "Rotation and emergency revocation",
-  "Resource and concurrency controls",
-  "Health, monitoring, and privacy",
-  "Operator recovery runbook",
-  "Kill-switch drill",
-  "Synthetic Preview qualification",
-  "Post-qualification cleanup",
-  "Deployment and rollback commands",
+  "Two-layer broker authentication",
+  "Secret and IAM scope",
+  "Gates and bounded activation",
+  "Authentication qualification with zero provider calls",
+  "Live kill-switch drill",
+  "Bounded synthetic qualification",
+  "Measurements",
+  "Mandatory cleanup and rollback",
+  "Validation",
+  "Qualification record",
   "Phase C2 prerequisites"
 ]) {
   assert.match(runbook, new RegExp(`^## ${heading}$`, "m"));
 }
-assert.match(runbook, /provider may have occurred/i);
-assert.match(runbook, /manual review mandatory/i);
+assert.match(runbook, /valid Google token cannot bypass Ed25519/i);
+assert.match(runbook, /valid Ed25519 assertion cannot\s+bypass Cloud Run IAM/i);
+assert.match(runbook, /provider call, dispatch, and file-grant counts must remain zero/i);
 assert.match(runbook, /zero instances/i);
-assert.match(runbook, /cost is reported as unknown/i);
+assert.match(runbook, /NVIDIA cost remains unknown/i);
 assert.match(runbook, /Production remained untouched/i);
-assert.match(runbook, /Customer uploads, arbitrary images, public routes, Production provider calls/);
+assert.match(runbook, /Customer[\s\S]+uploads, arbitrary images, public routes, automatic authority/);
 
 process.stdout.write("Document extraction worker deployment Phase C1 regressions passed.\n");

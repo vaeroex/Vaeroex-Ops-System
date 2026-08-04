@@ -15,6 +15,13 @@ if [ "$PHASE_C1_PREVIEW_CONFIRMATION" != "vaeroex-document-extraction-phase-c1-p
   printf '%s\n' "Preview secret-provisioning confirmation did not match." >&2
   exit 2
 fi
+if [ "$GCP_PROJECT_ID" != "vaeroex-document-worker" ] \
+  || [ "$WORKER_SERVICE_ACCOUNT" != "vaeroex-doc-worker-preview@$GCP_PROJECT_ID.iam.gserviceaccount.com" ] \
+  || [ "$WORKER_SECRET_NAME" != "vaeroex-document-worker-preview-ed25519" ] \
+  || [ "$NVIDIA_SECRET_NAME" != "vaeroex-document-worker-preview-nvidia" ]; then
+  printf '%s\n' "The Preview secret target is outside the approved scope." >&2
+  exit 2
+fi
 
 python3 "$script_dir/verify-secret-files.py" \
   "$WORKER_PRIVATE_KEY_FILE" \

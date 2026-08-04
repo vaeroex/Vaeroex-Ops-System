@@ -91,6 +91,8 @@ class FakeBroker:
 def worker_config() -> WorkerConfig:
     return WorkerConfig(
         broker_url="https://preview.example.test",
+        broker_audience="https://preview.example.test",
+        broker_auth_mode="google_oidc_v1",
         worker_id="worker-1",
         worker_key_version="key-v1",
         worker_private_key_der=b"unused-by-fake",
@@ -98,6 +100,8 @@ def worker_config() -> WorkerConfig:
         provider_contract=HOSTED_CONTRACT,
         runtime_environment="preview",
         deployment_id="phase-c1-preview-1",
+        provider_execution_enabled=True,
+        authentication_qualification_enabled=False,
         synthetic_qualification_enabled=False,
     )
 

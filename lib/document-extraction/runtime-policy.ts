@@ -11,23 +11,42 @@ function enabled(value: string | undefined) {
   return value?.trim().toLowerCase() === "true";
 }
 
+export type DocumentExtractionRuntimeEnvironment = "production" | "preview" | "development";
+
 export type DocumentExtractionExecutionPolicy = {
-  environment: "production" | "preview" | "development";
+  environment: DocumentExtractionRuntimeEnvironment;
   brokerEnabled: boolean;
   providerExecutionEnabled: boolean;
   syntheticQualificationEnabled: boolean;
   productionApprovalValid: boolean;
 };
 
-export function resolveDocumentExtractionExecutionPolicy(
+export function resolveVercelDocumentExtractionRuntimeEnvironment(
   environment: NodeJS.ProcessEnv = process.env
-): DocumentExtractionExecutionPolicy {
-  const vercelEnvironment = environment.VERCEL_ENV;
-  const runtimeEnvironment = vercelEnvironment === "production"
+): DocumentExtractionRuntimeEnvironment {
+  return environment.VERCEL_ENV === "production"
     ? "production"
-    : vercelEnvironment === "preview"
+    : environment.VERCEL_ENV === "preview"
       ? "preview"
       : "development";
+}
+
+export function resolveBrokerDocumentExtractionRuntimeEnvironment(
+  environment: NodeJS.ProcessEnv = process.env
+): Exclude<DocumentExtractionRuntimeEnvironment, "development"> {
+  const value = environment.DOCUMENT_EXTRACTION_BROKER_RUNTIME_ENVIRONMENT?.trim().toLowerCase();
+  if (value !== "preview" && value !== "production") {
+    throw new Error("document_extraction_broker_environment_invalid");
+  }
+  return value;
+}
+
+export function resolveDocumentExtractionExecutionPolicy(
+  environment: NodeJS.ProcessEnv = process.env,
+  runtimeEnvironment: DocumentExtractionRuntimeEnvironment = resolveVercelDocumentExtractionRuntimeEnvironment(
+    environment
+  )
+): DocumentExtractionExecutionPolicy {
   const productionApprovalValid = runtimeEnvironment !== "production"
     || environment.DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL?.trim()
       === DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION;
@@ -49,9 +68,10 @@ export function resolveDocumentExtractionExecutionPolicy(
 }
 
 export function assertDocumentExtractionBrokerEnabled(
-  environment: NodeJS.ProcessEnv = process.env
+  environment: NodeJS.ProcessEnv = process.env,
+  runtimeEnvironment?: DocumentExtractionRuntimeEnvironment
 ) {
-  const policy = resolveDocumentExtractionExecutionPolicy(environment);
+  const policy = resolveDocumentExtractionExecutionPolicy(environment, runtimeEnvironment);
   if (!policy.brokerEnabled) {
     throw new Error("document_extraction_broker_disabled");
   }
@@ -59,9 +79,10 @@ export function assertDocumentExtractionBrokerEnabled(
 }
 
 export function assertDocumentExtractionProviderDispatchEnabled(
-  environment: NodeJS.ProcessEnv = process.env
+  environment: NodeJS.ProcessEnv = process.env,
+  runtimeEnvironment?: DocumentExtractionRuntimeEnvironment
 ) {
-  const policy = assertDocumentExtractionProviderGateEnabled(environment);
+  const policy = assertDocumentExtractionProviderGateEnabled(environment, runtimeEnvironment);
   if (
     environment.DOCUMENT_EXTRACTION_NVIDIA_MODEL?.trim() !== NVIDIA_DOCUMENT_EXTRACTION_MODEL
     || environment.DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION?.trim()
@@ -75,9 +96,10 @@ export function assertDocumentExtractionProviderDispatchEnabled(
 }
 
 export function assertDocumentExtractionProviderGateEnabled(
-  environment: NodeJS.ProcessEnv = process.env
+  environment: NodeJS.ProcessEnv = process.env,
+  runtimeEnvironment?: DocumentExtractionRuntimeEnvironment
 ) {
-  const policy = assertDocumentExtractionBrokerEnabled(environment);
+  const policy = assertDocumentExtractionBrokerEnabled(environment, runtimeEnvironment);
   if (!policy.providerExecutionEnabled) {
     throw new Error("document_extraction_provider_execution_disabled");
   }

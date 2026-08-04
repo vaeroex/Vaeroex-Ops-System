@@ -11,6 +11,11 @@ if [ "$PHASE_C1_PREVIEW_CONFIRMATION" != "vaeroex-document-extraction-phase-c1-p
   printf '%s\n' "Preview qualification environment confirmation did not match." >&2
   exit 2
 fi
+if [ "$GCP_PROJECT_ID" != "vaeroex-document-worker" ] || [ "$GCP_REGION" != "us-west1" ] \
+  || [ "$WORKER_POOL" != "vaeroex-document-extraction-preview" ]; then
+  printf '%s\n' "Only the isolated Preview worker may enter qualification mode." >&2
+  exit 2
+fi
 if [ "$QUALIFICATION_CONFIRMATION" != "synthetic-preview-only-12-documents-13-pages" ]; then
   printf '%s\n' "Synthetic qualification confirmation did not match." >&2
   exit 2
@@ -19,7 +24,7 @@ fi
 gcloud run worker-pools update "$WORKER_POOL" \
   --project "$GCP_PROJECT_ID" \
   --region "$GCP_REGION" \
-  --update-env-vars "DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=true,DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=true,DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED=true,DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=true" \
+  --update-env-vars "DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=true,DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=true,DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=false,DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED=true,DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=true" \
   --instances 1 \
   --quiet >/dev/null
 

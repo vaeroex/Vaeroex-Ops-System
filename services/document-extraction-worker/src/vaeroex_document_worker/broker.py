@@ -10,7 +10,6 @@ import secrets
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import urljoin, urlparse
 
 import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -18,6 +17,7 @@ from cryptography.hazmat.primitives.serialization import load_der_private_key
 
 from . import BROKER_PROTOCOL_VERSION
 from .config import MAX_FILE_BYTES, WorkerConfig
+from .google_identity import GoogleIdentityTokenProvider
 
 BROKER_PATH = "/api/internal/document-extraction/broker"
 
@@ -32,12 +32,21 @@ class BrokerFailure(RuntimeError):
 
 
 class BrokerClient:
-    def __init__(self, config: WorkerConfig, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        config: WorkerConfig,
+        transport: httpx.AsyncBaseTransport | None = None,
+        identity_transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self._config = config
         private_key = load_der_private_key(config.worker_private_key_der, password=None)
         if not isinstance(private_key, Ed25519PrivateKey):
             raise RuntimeError("The private worker signing key is not Ed25519.")
         self._private_key = private_key
+        self._identity = GoogleIdentityTokenProvider(
+            config.broker_audience,
+            transport=identity_transport,
+        )
         self._client = httpx.AsyncClient(
             base_url=config.broker_url,
             timeout=httpx.Timeout(30.0),
@@ -47,57 +56,17 @@ class BrokerClient:
         )
 
     async def __aenter__(self) -> "BrokerClient":
-        if self._config.vercel_share_token is not None:
-            await self._bootstrap_vercel_share()
+        # Fail closed at startup before any broker operation, job claim, file
+        # grant, or provider boundary can run.
+        await self._identity.token()
         return self
 
     async def __aexit__(self, *_: object) -> None:
-        self._client.cookies.clear()
         await self._client.aclose()
+        await self._identity.close()
 
-    async def _bootstrap_vercel_share(self) -> None:
-        token = self._config.vercel_share_token
-        if token is None:
-            return
-        try:
-            response = await self._client.get(
-                "/",
-                params={"_vercel_share": token},
-                headers={"accept": "text/html"},
-            )
-        except httpx.TimeoutException as error:
-            raise BrokerFailure("vercel_share_timeout") from error
-        except httpx.TransportError as error:
-            raise BrokerFailure("vercel_share_transport") from error
-        if response.status_code not in (200, 301, 302, 303, 307, 308):
-            raise BrokerFailure("vercel_share_rejected", response.status_code)
-        location = response.headers.get("location")
-        if location:
-            target = urlparse(urljoin(str(response.request.url), location))
-            expected = urlparse(self._config.broker_url)
-            if (
-                target.scheme != expected.scheme
-                or target.hostname != expected.hostname
-                or target.port != expected.port
-                or token in location
-            ):
-                raise BrokerFailure("vercel_share_redirect_rejected")
-        expected_hostname = (urlparse(self._config.broker_url).hostname or "").lower()
-        cookies = tuple(self._client.cookies.jar)
-        if not cookies or any(
-            not cookie.secure
-            or not (
-                expected_hostname == cookie.domain.lstrip(".").lower()
-                or expected_hostname.endswith(
-                    "." + cookie.domain.lstrip(".").lower()
-                )
-            )
-            for cookie in cookies
-        ):
-            self._client.cookies.clear()
-            raise BrokerFailure("vercel_share_cookie_rejected")
-
-    def _headers(self, method: str, target: str, body: bytes) -> dict[str, str]:
+    async def _headers(self, method: str, target: str, body: bytes) -> dict[str, str]:
+        google_identity_token = await self._identity.token()
         timestamp = str(int(time.time()))
         nonce = secrets.token_hex(16)
         body_digest = hashlib.sha256(body).hexdigest()
@@ -117,6 +86,7 @@ class BrokerClient:
         ).encode("utf-8")
         signature = base64.b64encode(self._private_key.sign(canonical)).decode("ascii")
         return {
+            "x-serverless-authorization": f"Bearer {google_identity_token}",
             "x-vaeroex-broker-protocol": BROKER_PROTOCOL_VERSION,
             "x-vaeroex-worker-id": self._config.worker_id,
             "x-vaeroex-worker-key-version": self._config.worker_key_version,
@@ -129,7 +99,7 @@ class BrokerClient:
 
     async def post(self, payload: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-        headers = self._headers("POST", BROKER_PATH, body)
+        headers = await self._headers("POST", BROKER_PATH, body)
         headers["content-type"] = "application/json"
         try:
             response = await self._client.post(BROKER_PATH, content=body, headers=headers)
@@ -148,7 +118,7 @@ class BrokerClient:
         return value
 
     async def download(self, file_capability: str, destination: Path, expected_bytes: int | None = None) -> int:
-        headers = self._headers("GET", BROKER_PATH, b"")
+        headers = await self._headers("GET", BROKER_PATH, b"")
         headers["authorization"] = f"Bearer {file_capability}"
         total = 0
         try:

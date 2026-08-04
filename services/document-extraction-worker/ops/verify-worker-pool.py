@@ -14,6 +14,7 @@ GATES = (
     "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED",
     "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED",
 )
+AUTH_QUALIFICATION_GATE = "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED"
 ALLOWED_ENVIRONMENT = frozenset(
     {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT",
@@ -21,13 +22,15 @@ ALLOWED_ENVIRONMENT = frozenset(
         "DOCUMENT_EXTRACTION_WORKER_ID",
         "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION",
         "DOCUMENT_EXTRACTION_BROKER_URL",
+        "DOCUMENT_EXTRACTION_BROKER_AUDIENCE",
+        "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE",
+        AUTH_QUALIFICATION_GATE,
         *GATES,
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL",
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION",
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION",
         "DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS",
         "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
-        "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
         "NVIDIA_API_KEY",
         "TMPDIR",
     }
@@ -66,8 +69,17 @@ def main() -> int:
     parser.add_argument("--deployment-id", required=True)
     parser.add_argument("--worker-id", required=True)
     parser.add_argument("--worker-key-version", required=True)
+    parser.add_argument("--broker-url", required=True)
+    parser.add_argument("--worker-secret-name", required=True)
+    parser.add_argument("--worker-secret-version", required=True)
+    parser.add_argument("--nvidia-secret-name", required=True)
+    parser.add_argument("--nvidia-secret-version", required=True)
     parser.add_argument("--expected-instances", choices=("0", "1"), required=True)
-    parser.add_argument("--expected-gate-state", choices=("disabled", "qualification"), required=True)
+    parser.add_argument(
+        "--expected-gate-state",
+        choices=("disabled", "authentication", "qualification"),
+        required=True,
+    )
     arguments = parser.parse_args()
 
     try:
@@ -109,6 +121,9 @@ def main() -> int:
         "DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID": arguments.deployment_id,
         "DOCUMENT_EXTRACTION_WORKER_ID": arguments.worker_id,
         "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION": arguments.worker_key_version,
+        "DOCUMENT_EXTRACTION_BROKER_URL": arguments.broker_url.rstrip("/"),
+        "DOCUMENT_EXTRACTION_BROKER_AUDIENCE": arguments.broker_url.rstrip("/"),
+        "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE": "google_oidc_v1",
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": "nvidia/nemotron-parse",
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v1",
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v1",
@@ -117,16 +132,34 @@ def main() -> int:
     for name_value, expected in expected_values.items():
         if environment[name_value].get("value") != expected:
             raise SystemExit("worker_pool_version_or_environment_mismatch")
-    gate_value = "true" if arguments.expected_gate_state == "qualification" else "false"
-    if any(environment[name].get("value") != gate_value for name in GATES):
+    expected_gates = {
+        "disabled": ("false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "true"),
+        "qualification": ("true", "true", "true", "true", "false"),
+    }[arguments.expected_gate_state]
+    observed_gates = tuple(environment[name].get("value") for name in GATES) + (
+        environment[AUTH_QUALIFICATION_GATE].get("value"),
+    )
+    if observed_gates != expected_gates:
         raise SystemExit("worker_pool_gate_state_mismatch")
-    for name_value in (
-        "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
-        "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
-        "NVIDIA_API_KEY",
-    ):
+    expected_secrets = {
+        "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64": (
+            arguments.worker_secret_name,
+            arguments.worker_secret_version,
+        ),
+        "NVIDIA_API_KEY": (
+            arguments.nvidia_secret_name,
+            arguments.nvidia_secret_version,
+        ),
+    }
+    for name_value, (expected_secret, expected_version) in expected_secrets.items():
         item = environment[name_value]
-        if "value" in item or not _secret_reference(item):
+        reference = _secret_reference(item)
+        if "value" in item or not reference:
+            raise SystemExit("worker_pool_secret_reference_invalid")
+        secret_name = reference.get("name") or reference.get("secret")
+        secret_version = reference.get("key") or reference.get("version")
+        if secret_name != expected_secret or str(secret_version or "") != expected_version:
             raise SystemExit("worker_pool_secret_reference_invalid")
 
     startup = _mapping(container.get("startupProbe"), "worker_pool_startup_probe_missing")

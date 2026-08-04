@@ -27,9 +27,15 @@ spec:
               value: DOCUMENT_EXTRACTION_WORKER_KEY_VERSION_VALUE
             - name: DOCUMENT_EXTRACTION_BROKER_URL
               value: DOCUMENT_EXTRACTION_BROKER_URL_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_AUDIENCE
+              value: DOCUMENT_EXTRACTION_BROKER_AUDIENCE_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_AUTH_MODE
+              value: google_oidc_v1
             - name: DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED
               value: "false"
             - name: DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED
               value: "false"
             - name: DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED
               value: "false"
@@ -50,11 +56,6 @@ spec:
                 secretKeyRef:
                   key: "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION"
                   name: DOCUMENT_EXTRACTION_WORKER_SECRET_NAME
-            - name: DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  key: "DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_VERSION"
-                  name: DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_NAME
             - name: NVIDIA_API_KEY
               valueFrom:
                 secretKeyRef:

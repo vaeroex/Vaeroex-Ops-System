@@ -2,6 +2,7 @@ import "server-only";
 
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION } from "@/lib/document-extraction/contracts";
+import type { DocumentExtractionRuntimeEnvironment } from "@/lib/document-extraction/runtime-policy";
 
 const ASSERTION_TTL_SECONDS = 60;
 const MAX_CLOCK_SKEW_SECONDS = 15;
@@ -131,11 +132,13 @@ export function canonicalWorkerAssertionPayload({
 export function verifyWorkerAssertion({
   request,
   body,
+  brokerEnvironment,
   environment = process.env,
   now = Date.now()
 }: {
   request: Request;
   body: Uint8Array;
+  brokerEnvironment: DocumentExtractionRuntimeEnvironment;
   environment?: NodeJS.ProcessEnv;
   now?: number;
 }): VerifiedWorkerAssertion {
@@ -168,16 +171,12 @@ export function verifyWorkerAssertion({
     throw new Error("document_extraction_worker_assertion_expired");
   }
   const workerKey = parseWorkerKeys(environment.DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON).get(workerId);
-  const brokerEnvironment = environment.VERCEL_ENV === "production"
-    ? "production"
-    : environment.VERCEL_ENV === "preview"
-      ? "preview"
-      : null;
   if (
     !workerKey
     || workerKey.keyVersion !== keyVersion
     || workerKey.environment !== workerEnvironment
     || workerKey.deploymentId !== deploymentId
+    || brokerEnvironment === "development"
     || brokerEnvironment !== workerEnvironment
   ) {
     throw new Error("document_extraction_worker_identity_unknown");

@@ -42,6 +42,8 @@
     "test:document-extraction-foundation": "node scripts/document-extraction-foundation-regression-tests.js",
     "test:document-extraction-worker": "node scripts/document-extraction-private-worker-regression-tests.js",
     "test:document-extraction-worker-deployment": "node scripts/document-extraction-worker-deployment-regression-tests.js",
+    "test:document-extraction-cloud-run-broker": "node scripts/document-extraction-cloud-run-broker-regression-tests.js",
+    "build:document-extraction-cloud-run-broker": "ncc build services/document-extraction-broker/src/server.ts -o services/document-extraction-broker/dist --minify --no-cache --license licenses.txt --external server-only",
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js && node scripts/gpt56-business-health-routing-regression-tests.js",
     "test:business-health-formula-v2": "node scripts/business-health-formula-v2-regression-tests.js",
     "test:trust-layer-v1": "node scripts/trust-layer-v1-regression-tests.js",
@@ -84,9 +86,11 @@
     "phaser": "3.90.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
+    "server-only": "0.0.1",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@vercel/ncc": "0.44.1",
     "@eslint/eslintrc": "^3.2.0",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
