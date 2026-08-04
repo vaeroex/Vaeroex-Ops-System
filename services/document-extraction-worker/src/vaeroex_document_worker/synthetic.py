@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import sys
 from dataclasses import dataclass
 
 from .config import CLIENT_REVISION, MODEL, PARSER_REVISION
-from .official_client import invoke_official_client, prepare_provider_input
+from .provider_contract import active_provider_contract
+from .renderer import render_source
+from .rest_adapter import invoke_rest_adapter
 from .temporary import SecureTemporaryWorkspace
 
 SYNTHETIC_CONTRACT_VERSION = "document_extraction_phase_b_synthetic_v1"
@@ -74,11 +77,17 @@ def run_synthetic_fixture(fixture_id: str) -> SyntheticResult:
     _assert_synthetic_mode(fixture_id)
     with SecureTemporaryWorkspace() as temporary:
         source = temporary.file("synthetic.png")
-        provider_input = temporary.file("synthetic.pdf")
+        rendered_directory = temporary.file("rendered-pages")
         _render_fixture(source)
-        prepare_provider_input(source, provider_input)
+        document_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+        rendered_pages = render_source(source, rendered_directory, 1)
         source.unlink(missing_ok=True)
-        result = invoke_official_client(provider_input, 1)
+        result = invoke_rest_adapter(
+            rendered_pages,
+            document_sha256,
+            active_provider_contract(),
+            os.environ["NVIDIA_API_KEY"],
+        )
         return SyntheticResult(
             contract_version=SYNTHETIC_CONTRACT_VERSION,
             fixture_id=fixture_id,

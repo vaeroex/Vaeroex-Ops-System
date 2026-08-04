@@ -13,12 +13,19 @@ export const DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION =
 export const NVIDIA_DOCUMENT_EXTRACTION_PROVIDER = "nvidia" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MODEL = "nvidia/nemotron-parse" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION =
-  "52886112cafab4c4bca1cda0d4f588785adfe4d3" as const;
+  "vaeroex_nemotron_parse_rest_v1" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION =
-  "nemo_retriever_multimodal_extraction_v1" as const;
+  "nemotron_parse_hosted_tool_call_rest_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION =
+  "nvidia_build_nemotron_parse_hosted_tool_call_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_MODEL = "nvidia/nemotron-parse-v1.2" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_PARSER_REVISION =
+  "nemotron_parse_v1_2_tagged_rest_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_ENDPOINT_CONTRACT_VERSION =
+  "nemotron_parse_v1_2_openai_chat_v1" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MAX_FILE_BYTES = 25_000_000 as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MAX_PAGES = 16 as const;
-export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RENDERED_DIMENSION = 2_400 as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RENDERED_DIMENSION = 2_048 as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_TIMEOUT_SECONDS = 120 as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RETRIES = 1 as const;
 

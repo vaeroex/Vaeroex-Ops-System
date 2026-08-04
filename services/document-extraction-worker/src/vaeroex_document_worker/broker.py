@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 import secrets
 import time
 from pathlib import Path
@@ -121,4 +122,5 @@ class BrokerClient:
         if total <= 0 or (expected_bytes is not None and total != expected_bytes):
             destination.unlink(missing_ok=True)
             raise BrokerFailure("file_size_mismatch")
+        os.chmod(destination, 0o600)
         return total

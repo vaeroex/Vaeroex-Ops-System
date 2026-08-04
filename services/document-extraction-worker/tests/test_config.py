@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
 
 from vaeroex_document_worker.config import CLIENT_REVISION, MODEL, PARSER_REVISION, WorkerConfig
+from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 
 
 def environment() -> dict[str, str]:
@@ -93,6 +94,7 @@ def test_worker_allows_only_intended_credentials_and_harmless_public_config() ->
     )
     config = WorkerConfig.from_environment(values)
     assert config.nvidia_api_key == "test-only-placeholder"
+    assert config.provider_contract == HOSTED_CONTRACT
     assert config.worker_private_key_der
 
 

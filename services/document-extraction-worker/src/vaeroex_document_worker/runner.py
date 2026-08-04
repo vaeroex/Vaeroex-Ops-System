@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from .broker import BrokerClient, BrokerFailure
 from .config import MAX_PAGES, WorkerConfig
-from .official_client import ProviderFailure, ProviderResult, invoke_official_client, prepare_provider_input
+from .provider_types import ProviderFailure, ProviderResult
+from .renderer import render_source
+from .rest_adapter import invoke_rest_adapter
 from .temporary import SecureTemporaryWorkspace, scavenge_stale_worker_directories
 
 
@@ -136,13 +139,19 @@ async def run_one_job(config: WorkerConfig | None = None) -> WorkerRunResult:
         try:
             with SecureTemporaryWorkspace() as temporary:
                 source = temporary.file("source.bin")
-                provider_input = temporary.file("provider-input.pdf")
+                rendered_directory = temporary.file("rendered-pages")
                 grant = await broker.post(
                     {"operation": "issue_file_access", "leaseCapability": lease, "ttlSeconds": 60}
                 )
                 file_capability = _required_string(grant.get("fileCapability"), "file_capability_missing")
                 await broker.download(file_capability, source)
-                prepare_provider_input(source, provider_input)
+                document_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
+                rendered_pages = await asyncio.to_thread(
+                    render_source,
+                    source,
+                    rendered_directory,
+                    page_count,
+                )
                 source.unlink(missing_ok=True)
                 lease = await _heartbeat(broker, lease)
                 await _advance(broker, lease, "preparing", "dispatching")
@@ -184,10 +193,18 @@ async def run_one_job(config: WorkerConfig | None = None) -> WorkerRunResult:
 
                 provider_calls = 0
                 retry_count = 0
+                completed_pages: tuple[dict[str, Any], ...] = ()
                 while True:
                     provider_calls += 1
                     try:
-                        result = await asyncio.to_thread(invoke_official_client, provider_input, page_count)
+                        result = await asyncio.to_thread(
+                            invoke_rest_adapter,
+                            rendered_pages,
+                            document_sha256,
+                            active_config.provider_contract,
+                            active_config.nvidia_api_key,
+                            completed_pages=completed_pages,
+                        )
                         artifact = _draft(result, route, document_class, page_count)
                         await broker.post(
                             {
@@ -225,6 +242,7 @@ async def run_one_job(config: WorkerConfig | None = None) -> WorkerRunResult:
                                 # database gates immediately before it succeeds.
                                 retry_count = 1
                                 dispatch_request_id = next_dispatch_request_id
+                                completed_pages = failure.completed_pages
                                 lease = await _heartbeat(broker, lease)
                                 continue
                         return await _fail_job(

@@ -8,14 +8,23 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlparse
 
-CLIENT_REVISION = "52886112cafab4c4bca1cda0d4f588785adfe4d3"
-MODEL = "nvidia/nemotron-parse"
-PARSER_REVISION = "nemo_retriever_multimodal_extraction_v1"
+from .provider_contract import (
+    HOSTED_ENDPOINT,
+    HOSTED_MODEL,
+    HOSTED_PARSER_REVISION,
+    REST_ADAPTER_VERSION,
+    ProviderContract,
+    active_provider_contract,
+)
+
+CLIENT_REVISION = REST_ADAPTER_VERSION
+MODEL = HOSTED_MODEL
+PARSER_REVISION = HOSTED_PARSER_REVISION
 PRODUCTION_APPROVAL = "document_extraction_production_pilot_v1"
-ENDPOINT = "https://integrate.api.nvidia.com/v1/chat/completions"
+ENDPOINT = HOSTED_ENDPOINT
 MAX_FILE_BYTES = 25_000_000
 MAX_PAGES = 16
-MAX_RENDERED_DIMENSION = 2_400
+MAX_RENDERED_DIMENSION = 2_048
 TIMEOUT_SECONDS = 120
 MAX_RETRIES = 1
 
@@ -135,6 +144,7 @@ class WorkerConfig:
     worker_key_version: str
     worker_private_key_der: bytes
     nvidia_api_key: str
+    provider_contract: ProviderContract
     vercel_environment: str
     synthetic_qualification_enabled: bool
 
@@ -190,6 +200,7 @@ class WorkerConfig:
             worker_key_version=worker_key_version,
             worker_private_key_der=private_key,
             nvidia_api_key=_required(environment, "NVIDIA_API_KEY"),
+            provider_contract=active_provider_contract(),
             vercel_environment=vercel_environment,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
         )

@@ -13,18 +13,26 @@ const migration = read(`supabase/migrations/${migrationName}`);
 const circuitMigration = read("supabase/migrations/20260803181405_document_extraction_dispatch_unknown_circuit.sql");
 const correctiveMigration = read("supabase/migrations/20260803204552_document_extraction_private_worker_phase_b_security_fixes.sql");
 const dispatchSingleUseMigration = read("supabase/migrations/20260803205520_document_extraction_dispatch_authorization_single_use.sql");
+const restAdapterMigration = read("supabase/migrations/20260803230226_document_extraction_rest_adapter_contract.sql");
 const route = read("app/api/internal/document-extraction/broker/route.ts");
 const service = read("lib/document-extraction/broker-service.ts");
 const policy = read("lib/document-extraction/runtime-policy.ts");
 const encryption = read("lib/document-extraction/encryption.ts");
 const workerConfig = read("services/document-extraction-worker/src/vaeroex_document_worker/config.py");
-const workerProvider = read("services/document-extraction-worker/src/vaeroex_document_worker/official_client.py");
+const workerProviderContract = read("services/document-extraction-worker/src/vaeroex_document_worker/provider_contract.py");
+const workerProvider = read("services/document-extraction-worker/src/vaeroex_document_worker/rest_adapter.py");
+const workerRenderer = read("services/document-extraction-worker/src/vaeroex_document_worker/renderer.py");
+const workerRendererSubprocess = read("services/document-extraction-worker/src/vaeroex_document_worker/renderer_subprocess.py");
 const workerRunner = read("services/document-extraction-worker/src/vaeroex_document_worker/runner.py");
 const workflow = read("services/document-extraction-worker/src/vaeroex_document_worker/workflow.py");
 const workerProject = read("services/document-extraction-worker/pyproject.toml");
 const dependencyRequirements = read("services/document-extraction-worker/requirements.txt");
 const dependencyLock = read("services/document-extraction-worker/requirements.lock");
+const buildRequirements = read("services/document-extraction-worker/build-requirements.txt");
+const buildLock = read("services/document-extraction-worker/build-requirements.lock");
 const dependencyInstaller = read("services/document-extraction-worker/install-worker-dependencies.sh");
+const dependencyLicenses = read("services/document-extraction-worker/THIRD_PARTY_LICENSES.md");
+const dependencySbom = JSON.parse(read("services/document-extraction-worker/sbom.cdx.json"));
 const generatedTypes = read("lib/supabase/types.ts");
 
 const loadedTypeScriptModules = new Map();
@@ -174,6 +182,21 @@ assert.match(
   /revoke execute on function public\.authorize_document_extraction_dispatch_v2\(uuid, text, uuid\)[\s\S]+grant execute[\s\S]+to service_role/
 );
 assert.doesNotMatch(dispatchSingleUseMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
+assert.match(restAdapterMigration, /job\.parser_revision = 'nemotron_parse_hosted_tool_call_rest_v1'/);
+assert.match(restAdapterMigration, /job\.client_revision = 'vaeroex_nemotron_parse_rest_v1'/);
+assert.match(restAdapterMigration, /v_job\.parser_revision <> 'nemotron_parse_hosted_tool_call_rest_v1'/);
+assert.match(restAdapterMigration, /v_job\.client_revision <> 'vaeroex_nemotron_parse_rest_v1'/);
+assert.match(restAdapterMigration, /security definer[\s\S]+set search_path = ''/);
+assert.match(
+  restAdapterMigration,
+  /revoke execute on function public\.claim_document_extraction_job_v2\(text, integer\)[\s\S]+grant execute[\s\S]+to service_role/
+);
+assert.match(
+  restAdapterMigration,
+  /revoke execute on function public\.authorize_document_extraction_dispatch_v2\(uuid, text, uuid\)[\s\S]+grant execute[\s\S]+to service_role/
+);
+assert.doesNotMatch(restAdapterMigration, /insert into public\.document_extraction_workspace_settings/i);
+assert.doesNotMatch(restAdapterMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
 
 assert.match(route, /verifyWorkerAssertion/);
 assert.match(route, /consumeWorkerAssertion/);
@@ -207,10 +230,23 @@ assert.match(workerConfig, /AZURE_STORAGE_CONNECTION_STRING/);
 assert.match(workerConfig, /GOOGLE_APPLICATION_CREDENTIALS/);
 assert.match(workerConfig, /VERCEL_BLOB_READ_WRITE_TOKEN/);
 assert.match(workerConfig, /Production document extraction approval is absent/);
-assert.match(workerProvider, /from nemo_retriever import create_ingestor/);
-assert.match(workerProvider, /method="nemotron_parse"/);
-assert.match(workerProvider, /remote_max_retries=0/);
-assert.match(workerProvider, /remote_max_429_retries=0/);
+assert.match(workerProviderContract, /REST_ADAPTER_VERSION = "vaeroex_nemotron_parse_rest_v1"/);
+assert.match(workerProviderContract, /HOSTED_CONTRACT_VERSION = "nvidia_build_nemotron_parse_hosted_tool_call_v1"/);
+assert.match(workerProviderContract, /V1_2_CONTRACT_VERSION = "nemotron_parse_v1_2_openai_chat_v1"/);
+assert.match(workerProviderContract, /return HOSTED_CONTRACT/);
+assert.match(workerProvider, /class NvidiaNemotronParseRestAdapter/);
+assert.match(workerProvider, /NVCF-INPUT-ASSET-REFERENCES/);
+assert.match(workerProvider, /"tools".*"markdown_bbox"/s);
+assert.match(workerProvider, /trust_env=False/);
+assert.match(workerProvider, /follow_redirects=False/);
+assert.match(workerProvider, /provider_pending_without_approved_poll_contract/);
+assert.match(workerProvider, /provider_dispatch_ambiguous/);
+assert.match(workerProvider, /MAX_PROVIDER_RESPONSE_BYTES/);
+assert.match(workerRenderer, /subprocess\.run/);
+assert.match(workerRenderer, /RLIMIT_CPU/);
+assert.match(workerRenderer, /RLIMIT_AS/);
+assert.match(workerRendererSubprocess, /pypdfium2/);
+assert.match(workerRendererSubprocess, /Image\.DecompressionBombWarning/);
 assert.match(workerRunner, /authorize_dispatch/);
 assert.equal((workerRunner.match(/"operation": "authorize_dispatch"/g) || []).length, 1);
 assert.match(workerRunner, /dispatch_already_authorized/);
@@ -222,23 +258,68 @@ assert.match(workflow, /Workflows\(namespace="vaeroexdocumentextractionprivatev1
 assert.match(workflow, /@workflows\.step\(max_retries=0\)/);
 assert.match(workerProject, /\[\[tool\.vercel\.workflows\]\]/);
 assert.match(workerProject, /entrypoint = "vaeroex_document_worker\.workflow:workflows"/);
-assert.match(dependencyRequirements, /nemo-retriever\[nemotron-parse\].+52886112cafab4c4bca1cda0d4f588785adfe4d3/);
 for (const dependency of [
   "cryptography==50.0.0",
-  "nltk==3.9.4",
-  "pillow==12.2.0",
-  "ray==2.55.1",
-  "starlette==0.52.1"
+  "httpx==0.28.1",
+  "Pillow==12.3.0",
+  "pypdfium2==5.12.1",
+  "vercel==0.8.1"
 ]) {
-  assert.ok(dependencyLock.toLowerCase().split("\n").includes(dependency));
+  assert.match(dependencyRequirements, new RegExp(`^${dependency.replace(".", "\\.")}$`, "m"));
 }
-assert.match(dependencyLock, /nemo-retriever @ git\+https:\/\/github\.com\/NVIDIA\/NeMo-Retriever\.git@52886112cafab4c4bca1cda0d4f588785adfe4d3/);
-assert.match(dependencyInstaller, /client_revision="52886112cafab4c4bca1cda0d4f588785adfe4d3"/);
-assert.match(dependencyInstaller, /client_package_version="2026\.8\.1\.dev52886112"/);
-assert.match(dependencyInstaller, /-c "\$worker_root\/requirements\.lock"/);
-assert.match(dependencyInstaller, /version\("nemo-retriever"\)/);
-assert.match(dependencyInstaller, /installed_client_version.*client_package_version/);
-assert.doesNotMatch([workerConfig, workerProvider, workerRunner].join("\n"), /print\(|logging\.(?:debug|info).*text|raw_response/i);
+for (const dependency of [
+  "cryptography==50.0.0",
+  "pillow==12.3.0",
+  "pypdfium2==5.12.1",
+  "websockets==16.1.1"
+]) {
+  assert.match(dependencyLock.toLowerCase(), new RegExp(`^${dependency.replace(".", "\\.")}\\b`, "m"));
+}
+for (const removed of ["nemo-retriever", "ray", "starlette", "nltk", "open-clip", "torch"]) {
+  assert.doesNotMatch(`${workerProject}\n${dependencyRequirements}\n${dependencyLock}`.toLowerCase(), new RegExp(`(^|[^a-z0-9_-])${removed}([^a-z0-9_-]|$)`));
+}
+assert.match(dependencyInstaller, /--require-hashes/);
+assert.match(dependencyInstaller, /requirements\.lock/);
+assert.match(dependencyInstaller, /build-requirements\.lock/);
+assert.match(dependencyInstaller, /pip check/);
+assert.deepEqual(
+  buildRequirements.split("\n").map((line) => line.trim()).filter((line) => line && !line.startsWith("#")),
+  ["pip==26.2"]
+);
+assert.match(buildLock, /^pip==26\.2 \\/m);
+assert.match(buildLock, /--hash=sha256:/);
+assert.ok(
+  dependencyInstaller.indexOf("build-requirements.lock") < dependencyInstaller.indexOf("requirements.lock"),
+  "patched hash-locked build tooling must install before runtime dependencies"
+);
+
+const normalizePackageName = (name) => name.toLowerCase().replace(/[_.-]+/g, "-");
+const lockedPackages = new Map(
+  [...`${dependencyLock}\n${buildLock}`.matchAll(/^([A-Za-z0-9_.-]+)==([^\s\\]+)/gm)]
+    .map((match) => [normalizePackageName(match[1]), match[2]])
+);
+const sbomPackages = new Map(
+  dependencySbom.components.map((component) => [normalizePackageName(component.name), component.version])
+);
+assert.equal(dependencySbom.specVersion, "1.6");
+assert.equal(dependencySbom.metadata.component.name, "vaeroex-document-extraction-worker");
+assert.deepEqual([...sbomPackages.entries()].sort(), [...lockedPackages.entries()].sort());
+for (const [name, version] of lockedPackages) {
+  const escapedVersion = version.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  assert.match(
+    dependencyLicenses,
+    new RegExp(`^\\| ${name.replace(/-/g, "[-_]")} \\| ${escapedVersion} \\|`, "mi")
+  );
+}
+assert.equal(fs.existsSync(path.join(root, "services/document-extraction-worker/src/vaeroex_document_worker/official_client.py")), false);
+assert.doesNotMatch(
+  [workerConfig, workerProviderContract, workerProvider, workerRenderer, workerRendererSubprocess, workerRunner].join("\n"),
+  /nemo_retriever|create_ingestor|_resolve_nemotron_parse_contract|\bimport ray\b|\bimport nltk\b|\bimport torch\b/
+);
+assert.doesNotMatch(
+  [workerConfig, workerProvider, workerRunner].join("\n"),
+  /^\s*print\(|logging\.(?:debug|info).*text|raw_response/im
+);
 
 assert.deepEqual(resolveDocumentExtractionExecutionPolicy({}), {
   environment: "development",
@@ -274,8 +355,8 @@ assert.doesNotThrow(() => assertDocumentExtractionProviderDispatchEnabled({
   DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED: "true",
   DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL: "document_extraction_production_pilot_v1",
   DOCUMENT_EXTRACTION_NVIDIA_MODEL: "nvidia/nemotron-parse",
-  DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION: "52886112cafab4c4bca1cda0d4f588785adfe4d3",
-  DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION: "nemo_retriever_multimodal_extraction_v1",
+  DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION: "vaeroex_nemotron_parse_rest_v1",
+  DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION: "nemotron_parse_hosted_tool_call_rest_v1",
   NVIDIA_API_KEY: "test-only-placeholder"
 }));
 
