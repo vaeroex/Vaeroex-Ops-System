@@ -16,9 +16,13 @@ from urllib.parse import urlsplit
 import httpx
 
 from .provider_contract import (
+    HOSTED_CONTRACT,
+    HOSTED_ENDPOINT,
     NVCF_ASSET_ENDPOINT,
     NVCF_INLINE_IMAGE_LIMIT_BYTES,
     REST_ADAPTER_VERSION,
+    V1_2_NIM_CONTRACT,
+    V1_2_NIM_ENDPOINT,
     ProviderContract,
 )
 from .provider_types import ProviderFailure, ProviderResult, RenderedPage
@@ -36,6 +40,7 @@ TIMEOUT_POLICY_VERSION = "connect_10_read_120_write_30_no_internal_retry_v1"
 NVCF_ASSET_DESCRIPTION = "vaeroex-document-page"
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 _TAGGED_ELEMENT = re.compile(
     r"<x_(\d+(?:\.\d+)?)><y_(\d+(?:\.\d+)?)>(.*?)"
     r"<x_(\d+(?:\.\d+)?)><y_(\d+(?:\.\d+)?)><class_([^>]+)>",
@@ -63,6 +68,16 @@ _ALLOWED_LABELS = frozenset(
         "Header_footer",
     }
 )
+
+
+def _validate_contract(contract: ProviderContract) -> None:
+    if contract in (HOSTED_CONTRACT, V1_2_NIM_CONTRACT):
+        return
+    if contract.response_profile == "hosted_tool_call" and contract.endpoint != HOSTED_ENDPOINT:
+        raise ProviderFailure("provider_endpoint_contract_mismatch", "validation", retryable=False)
+    if contract.response_profile == "v1_2_tagged" and contract.endpoint != V1_2_NIM_ENDPOINT:
+        raise ProviderFailure("provider_endpoint_contract_mismatch", "validation", retryable=False)
+    raise ProviderFailure("provider_contract_unsupported", "validation", retryable=False)
 
 
 @dataclass(frozen=True)
@@ -94,6 +109,7 @@ def request_binding(
     page: RenderedPage,
     document_sha256: str,
 ) -> ProviderRequestBindingV1:
+    _validate_contract(contract)
     if not _SHA256.fullmatch(document_sha256) or not _SHA256.fullmatch(page.content_sha256):
         raise ProviderFailure("provider_request_identity_invalid", "validation", retryable=False)
     payload_mode = (
@@ -123,6 +139,7 @@ def serialize_provider_request(
     *,
     payload_mode: str,
 ) -> bytes:
+    _validate_contract(contract)
     del page
     if payload_mode not in ("inline_base64", "nvcf_asset_reference"):
         raise ProviderFailure("provider_payload_mode_invalid", "validation", retryable=False)
@@ -296,6 +313,7 @@ def normalize_provider_response(
     page: RenderedPage,
     response_body: bytes,
 ) -> dict[str, Any]:
+    _validate_contract(contract)
     if len(response_body) > MAX_PROVIDER_RESPONSE_BYTES:
         raise ProviderFailure("provider_response_oversized", "malformed_output", retryable=False)
     try:
@@ -337,6 +355,7 @@ def normalize_provider_response(
         raise ProviderFailure("provider_page_output_empty", "malformed_output", retryable=False)
     total_text = 0
     seen: set[tuple[object, ...]] = set()
+    seen_coordinates: set[tuple[float, float, float, float]] = set()
     blocks: list[dict[str, Any]] = []
     for index, (label, text, coordinates) in enumerate(elements, start=1):
         total_text += len(text)
@@ -353,6 +372,15 @@ def normalize_provider_response(
         if identity in seen:
             raise ProviderFailure("provider_duplicate_element", "malformed_output", retryable=False)
         seen.add(identity)
+        geometry = (
+            coordinates["x"],
+            coordinates["y"],
+            coordinates["width"],
+            coordinates["height"],
+        )
+        if geometry in seen_coordinates:
+            raise ProviderFailure("provider_duplicate_coordinates", "malformed_output", retryable=False)
+        seen_coordinates.add(geometry)
         blocks.append(
             {
                 "id": f"page-{page.page}-element-{index}",
@@ -389,14 +417,7 @@ class NvidiaNemotronParseRestAdapter:
         *,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
-        if contract.response_profile == "hosted_tool_call" and contract.endpoint != (
-            "https://integrate.api.nvidia.com/v1/chat/completions"
-        ):
-            raise ProviderFailure("provider_endpoint_contract_mismatch", "validation", retryable=False)
-        if contract.response_profile == "v1_2_tagged" and contract.endpoint != (
-            "http://127.0.0.1:8000/v1/chat/completions"
-        ):
-            raise ProviderFailure("provider_endpoint_contract_mismatch", "validation", retryable=False)
+        _validate_contract(contract)
         if contract.sends_nvidia_credential and not api_key:
             raise ProviderFailure("provider_credential_missing", "authorization", retryable=False)
         self._contract = contract
@@ -590,7 +611,7 @@ class NvidiaNemotronParseRestAdapter:
 
     def _validated_page_bytes(self, page: RenderedPage) -> bytes:
         if (
-            page.mime_type not in ("image/png", "image/jpeg")
+            page.mime_type != "image/png"
             or not 1 <= page.width <= MAX_RENDERED_WIDTH
             or not 1 <= page.height <= MAX_RENDERED_HEIGHT
             or not 1 <= page.byte_length <= MAX_RENDERED_PAGE_BYTES
@@ -603,6 +624,15 @@ class NvidiaNemotronParseRestAdapter:
             raise ProviderFailure("provider_page_input_unavailable", "validation", retryable=False) from error
         if len(content) != page.byte_length or hashlib.sha256(content).hexdigest() != page.content_sha256:
             raise ProviderFailure("provider_page_identity_mismatch", "validation", retryable=False)
+        if (
+            len(content) < 24
+            or content[:8] != _PNG_SIGNATURE
+            or content[8:12] != b"\x00\x00\x00\r"
+            or content[12:16] != b"IHDR"
+            or int.from_bytes(content[16:20], "big") != page.width
+            or int.from_bytes(content[20:24], "big") != page.height
+        ):
+            raise ProviderFailure("provider_page_dimensions_mismatch", "validation", retryable=False)
         return content
 
     def _invoke_page(

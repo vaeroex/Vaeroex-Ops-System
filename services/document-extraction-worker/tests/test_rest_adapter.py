@@ -9,6 +9,7 @@ from typing import Any
 
 import httpx
 import pytest
+from PIL import Image
 
 from vaeroex_document_worker.provider_contract import (
     HOSTED_CONTRACT,
@@ -35,8 +36,17 @@ def rendered_page(
     height: int = 100,
 ) -> RenderedPage:
     path = tmp_path / "page.png"
-    content = b"P" * byte_length
-    path.write_bytes(content)
+    if byte_length > 180_000:
+        width = max(width, 300)
+        height = max(height, 300)
+        image = Image.new("RGB", (width, height), "white")
+        image.save(path, "PNG", compress_level=0)
+        image.close()
+    else:
+        image = Image.new("RGB", (width, height), "white")
+        image.save(path, "PNG")
+        image.close()
+    content = path.read_bytes()
     return RenderedPage(
         page=1,
         path=path,
@@ -262,6 +272,101 @@ def test_unsupported_endpoint_version_fails_closed_before_request(tmp_path: Path
     invalid = replace(HOSTED_CONTRACT, endpoint="https://example.test/v1/chat/completions")
     with pytest.raises(ProviderFailure, match="provider_endpoint_contract_mismatch"):
         invoke_rest_adapter([page], "d" * 64, invalid, "test-secret")
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    (
+        replace(HOSTED_CONTRACT, endpoint_contract_version="unknown-contract-v99"),
+        replace(HOSTED_CONTRACT, model="nvidia/unknown-model"),
+        replace(
+            HOSTED_CONTRACT,
+            response_profile="unknown-profile",
+            endpoint="https://example.test/v1/chat/completions",
+        ),
+    ),
+)
+def test_unknown_contract_values_fail_before_any_request(
+    tmp_path: Path,
+    invalid: object,
+) -> None:
+    page = rendered_page(tmp_path)
+    requests = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(500)
+
+    with pytest.raises(ProviderFailure, match="provider_contract_unsupported"):
+        invoke_rest_adapter(
+            [page],
+            "d" * 64,
+            invalid,  # type: ignore[arg-type]
+            "must-not-leave-process",
+            transport=httpx.MockTransport(handler),
+        )
+    assert requests == 0
+
+
+def test_forged_page_dimensions_fail_before_any_request(tmp_path: Path) -> None:
+    page = rendered_page(tmp_path)
+    forged = replace(page, width=page.width + 1)
+    requests = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        return httpx.Response(500)
+
+    with pytest.raises(ProviderFailure, match="provider_page_dimensions_mismatch"):
+        invoke_rest_adapter(
+            [forged],
+            "d" * 64,
+            HOSTED_CONTRACT,
+            "test-secret",
+            transport=httpx.MockTransport(handler),
+        )
+    assert requests == 0
+
+
+def test_duplicate_bounding_box_fails_closed(tmp_path: Path) -> None:
+    arguments = json.dumps(
+        [
+            {
+                "type": "Text",
+                "text": "First value",
+                "bbox": {"xmin": 0.1, "ymin": 0.2, "xmax": 0.8, "ymax": 0.4},
+            },
+            {
+                "type": "Text",
+                "text": "Different value",
+                "bbox": {"xmin": 0.1, "ymin": 0.2, "xmax": 0.8, "ymax": 0.4},
+            },
+        ]
+    )
+    response = json.dumps(
+        {
+            "model": HOSTED_CONTRACT.model,
+            "choices": [
+                {
+                    "finish_reason": "tool_calls",
+                    "message": {
+                        "content": None,
+                        "tool_calls": [
+                            {
+                                "type": "function",
+                                "function": {"name": "markdown_bbox", "arguments": arguments},
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+    ).encode("utf-8")
+
+    with pytest.raises(ProviderFailure, match="provider_duplicate_coordinates"):
+        normalize_provider_response(HOSTED_CONTRACT, rendered_page(tmp_path), response)
 
 
 @pytest.mark.parametrize(
