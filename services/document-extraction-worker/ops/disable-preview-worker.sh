@@ -28,5 +28,11 @@ instances="$(gcloud run worker-pools describe "$WORKER_POOL" \
   --project "$GCP_PROJECT_ID" \
   --region "$GCP_REGION" \
   --format 'value(scaling.manualInstanceCount)')"
+if [ -z "$instances" ]; then
+  instances="$(gcloud run worker-pools describe "$WORKER_POOL" \
+    --project "$GCP_PROJECT_ID" \
+    --region "$GCP_REGION" \
+    --format "value(metadata.annotations['run.googleapis.com/manualInstanceCount'])")"
+fi
 test "$instances" = "0"
 printf '%s\n' "Preview worker disabled and scaled to zero."

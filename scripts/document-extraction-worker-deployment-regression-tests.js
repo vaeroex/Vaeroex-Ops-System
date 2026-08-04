@@ -100,6 +100,8 @@ assert.match(enableAuthentication, /--instances 1/);
 assert.match(enable, /synthetic-preview-only-12-documents-13-pages/);
 assert.match(enable, /--instances 1/);
 assert.match(disable, /--instances 0[\s\S]+DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=false/);
+assert.match(disable, /run\.googleapis\.com\/manualInstanceCount/);
+assert.match(disable, /test "\$instances" = "0"/);
 assert.match(provision, /--data-file/);
 assert.match(provision, /verify-secret-files\.py/);
 assert.match(provision, /roles\/secretmanager\.secretAccessor/);
