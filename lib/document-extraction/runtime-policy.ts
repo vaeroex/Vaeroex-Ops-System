@@ -62,9 +62,6 @@ export function assertDocumentExtractionProviderDispatchEnabled(
   environment: NodeJS.ProcessEnv = process.env
 ) {
   const policy = assertDocumentExtractionProviderGateEnabled(environment);
-  if (!environment.NVIDIA_API_KEY?.trim()) {
-    throw new Error("document_extraction_provider_credential_missing");
-  }
   if (
     environment.DOCUMENT_EXTRACTION_NVIDIA_MODEL?.trim() !== NVIDIA_DOCUMENT_EXTRACTION_MODEL
     || environment.DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION?.trim()

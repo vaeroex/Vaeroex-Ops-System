@@ -52,6 +52,11 @@ export const documentExtractionBrokerRequestSchema = z.discriminatedUnion("opera
     dispatchRequestId: uuid
   }).strict(),
   z.object({
+    operation: z.literal("check_provider_boundary"),
+    leaseCapability,
+    boundary: z.enum(["asset_create", "asset_upload", "inference"])
+  }).strict(),
+  z.object({
     operation: z.literal("provider_outcome"),
     leaseCapability,
     dispatchRequestId: uuid,

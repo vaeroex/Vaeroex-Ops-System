@@ -14,6 +14,7 @@ const circuitMigration = read("supabase/migrations/20260803181405_document_extra
 const correctiveMigration = read("supabase/migrations/20260803204552_document_extraction_private_worker_phase_b_security_fixes.sql");
 const dispatchSingleUseMigration = read("supabase/migrations/20260803205520_document_extraction_dispatch_authorization_single_use.sql");
 const restAdapterMigration = read("supabase/migrations/20260803230226_document_extraction_rest_adapter_contract.sql");
+const phaseC1Migration = read("supabase/migrations/20260804010000_document_extraction_worker_phase_c1_protocol.sql");
 const route = read("app/api/internal/document-extraction/broker/route.ts");
 const service = read("lib/document-extraction/broker-service.ts");
 const policy = read("lib/document-extraction/runtime-policy.ts");
@@ -24,7 +25,8 @@ const workerProvider = read("services/document-extraction-worker/src/vaeroex_doc
 const workerRenderer = read("services/document-extraction-worker/src/vaeroex_document_worker/renderer.py");
 const workerRendererSubprocess = read("services/document-extraction-worker/src/vaeroex_document_worker/renderer_subprocess.py");
 const workerRunner = read("services/document-extraction-worker/src/vaeroex_document_worker/runner.py");
-const workflow = read("services/document-extraction-worker/src/vaeroex_document_worker/workflow.py");
+const workerDaemon = read("services/document-extraction-worker/src/vaeroex_document_worker/daemon.py");
+const workerDockerfile = read("services/document-extraction-worker/Dockerfile");
 const workerProject = read("services/document-extraction-worker/pyproject.toml");
 const dependencyRequirements = read("services/document-extraction-worker/requirements.txt");
 const dependencyLock = read("services/document-extraction-worker/requirements.lock");
@@ -197,6 +199,18 @@ assert.match(
 );
 assert.doesNotMatch(restAdapterMigration, /insert into public\.document_extraction_workspace_settings/i);
 assert.doesNotMatch(restAdapterMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
+assert.match(phaseC1Migration, /broker_protocol_version = 'document_extraction_broker_v2'/);
+assert.match(phaseC1Migration, /worker_runtime_version = 'document_extraction_worker_v2'/);
+assert.match(phaseC1Migration, /create or replace function public\.check_document_extraction_provider_boundary_v1/);
+assert.match(phaseC1Migration, /p_boundary not in \('asset_create', 'asset_upload', 'inference'\)/);
+assert.match(phaseC1Migration, /security definer[\s\S]+set search_path = ''/);
+assert.match(
+  phaseC1Migration,
+  /revoke execute on function public\.check_document_extraction_provider_boundary_v1\(uuid, text, text\)[\s\S]+grant execute[\s\S]+to service_role/
+);
+assert.doesNotMatch(phaseC1Migration, /grant execute[^;]+to (?:anon|authenticated)/i);
+assert.doesNotMatch(phaseC1Migration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
+assert.doesNotMatch(phaseC1Migration, /insert into public\.document_extraction_(?:workspace_settings|system_state)/i);
 
 assert.match(route, /verifyWorkerAssertion/);
 assert.match(route, /consumeWorkerAssertion/);
@@ -254,24 +268,24 @@ assert.match(workerRunner, /authorize_retry/);
 assert.equal((workerRunner.match(/"operation": "authorize_retry"/g) || []).length, 1);
 assert.match(workerRunner, /retry RPC is the atomic second-call claim/);
 assert.match(workerRunner, /provider_outcome/);
-assert.match(workflow, /Workflows\(namespace="vaeroexdocumentextractionprivatev1"\)/);
-assert.match(workflow, /@workflows\.step\(max_retries=0\)/);
-assert.match(workerProject, /\[\[tool\.vercel\.workflows\]\]/);
-assert.match(workerProject, /entrypoint = "vaeroex_document_worker\.workflow:workflows"/);
+assert.match(workerRunner, /check_provider_boundary/);
+assert.match(workerDaemon, /Single-concurrency Cloud Run worker-pool process/);
+assert.match(workerDaemon, /await run_one_job\([\s\S]+config,[\s\S]+progress_callback=/);
+assert.match(workerDockerfile, /python:3\.12\.11-slim-bookworm@sha256:/);
+assert.match(workerDockerfile, /USER 10001:10001/);
+assert.doesNotMatch(workerProject, /tool\.vercel|workflow/i);
 for (const dependency of [
   "cryptography==50.0.0",
   "httpx==0.28.1",
   "Pillow==12.3.0",
-  "pypdfium2==5.12.1",
-  "vercel==0.8.1"
+  "pypdfium2==5.12.1"
 ]) {
   assert.match(dependencyRequirements, new RegExp(`^${dependency.replace(".", "\\.")}$`, "m"));
 }
 for (const dependency of [
   "cryptography==50.0.0",
   "pillow==12.3.0",
-  "pypdfium2==5.12.1",
-  "websockets==16.1.1"
+  "pypdfium2==5.12.1"
 ]) {
   assert.match(dependencyLock.toLowerCase(), new RegExp(`^${dependency.replace(".", "\\.")}\\b`, "m"));
 }
@@ -443,24 +457,31 @@ const assertionCanonical = canonicalWorkerAssertionPayload({
   bodyDigest: createHash("sha256").update(assertionBody).digest("hex"),
   workerId: "preview-worker-1",
   keyVersion: "worker-key-v1",
+  workerEnvironment: "preview",
+  deploymentId: "phase-c1-preview-1",
   timestamp: assertionTimestamp,
   nonce: assertionNonce
 });
 const assertionSignature = sign(null, Buffer.from(assertionCanonical, "utf8"), privateKey).toString("base64");
 const assertionEnvironment = {
+  VERCEL_ENV: "preview",
   DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON: JSON.stringify({
     "preview-worker-1": {
       keyVersion: "worker-key-v1",
-      publicKeySpkiBase64: publicKey.export({ format: "der", type: "spki" }).toString("base64")
+      publicKeySpkiBase64: publicKey.export({ format: "der", type: "spki" }).toString("base64"),
+      environment: "preview",
+      deploymentId: "phase-c1-preview-1"
     }
   })
 };
 const assertionRequest = new Request(`https://preview.example.test${assertionTarget}`, {
   method: "POST",
   headers: {
-    "x-vaeroex-broker-protocol": "document_extraction_broker_v1",
+    "x-vaeroex-broker-protocol": "document_extraction_broker_v2",
     "x-vaeroex-worker-id": "preview-worker-1",
     "x-vaeroex-worker-key-version": "worker-key-v1",
+    "x-vaeroex-worker-environment": "preview",
+    "x-vaeroex-worker-deployment-id": "phase-c1-preview-1",
     "x-vaeroex-worker-timestamp": assertionTimestamp,
     "x-vaeroex-worker-nonce": assertionNonce,
     "x-vaeroex-worker-signature": assertionSignature
@@ -495,9 +516,11 @@ function assertionRequestWith(headers) {
 
 function assertionHeaders(overrides = {}) {
   return {
-    "x-vaeroex-broker-protocol": "document_extraction_broker_v1",
+    "x-vaeroex-broker-protocol": "document_extraction_broker_v2",
     "x-vaeroex-worker-id": "preview-worker-1",
     "x-vaeroex-worker-key-version": "worker-key-v1",
+    "x-vaeroex-worker-environment": "preview",
+    "x-vaeroex-worker-deployment-id": "phase-c1-preview-1",
     "x-vaeroex-worker-timestamp": assertionTimestamp,
     "x-vaeroex-worker-nonce": assertionNonce,
     "x-vaeroex-worker-signature": assertionSignature,
@@ -513,10 +536,13 @@ for (const [keyType, options] of [
 ]) {
   const pair = generateKeyPairSync(keyType, options);
   const unsupportedEnvironment = {
+    VERCEL_ENV: "preview",
     DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON: JSON.stringify({
       "preview-worker-1": {
         keyVersion: "worker-key-v1",
-        publicKeySpkiBase64: pair.publicKey.export({ format: "der", type: "spki" }).toString("base64")
+        publicKeySpkiBase64: pair.publicKey.export({ format: "der", type: "spki" }).toString("base64"),
+        environment: "preview",
+        deploymentId: "phase-c1-preview-1"
       }
     })
   };
@@ -537,8 +563,14 @@ assert.throws(
     request: assertionRequestWith(assertionHeaders()),
     body: assertionBody,
     environment: {
+      VERCEL_ENV: "preview",
       DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON: JSON.stringify({
-        "preview-worker-1": { keyVersion: "worker-key-v1", publicKeySpkiBase64: "not-base64" }
+        "preview-worker-1": {
+          keyVersion: "worker-key-v1",
+          publicKeySpkiBase64: "not-base64",
+          environment: "preview",
+          deploymentId: "phase-c1-preview-1"
+        }
       })
     },
     now: assertionNow
@@ -580,7 +612,11 @@ assert.throws(
 );
 
 const capabilityEnvironment = {
-  DOCUMENT_EXTRACTION_BROKER_CAPABILITY_SECRET: Buffer.alloc(32, 7).toString("base64")
+  DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON: JSON.stringify({
+    "broker-key-v1": Buffer.alloc(32, 6).toString("base64"),
+    "broker-key-v2": Buffer.alloc(32, 7).toString("base64")
+  }),
+  DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION: "broker-key-v2"
 };
 const capabilityExpiry = new Date(assertionNow + 60_000).toISOString();
 const leaseToken = createLeaseCapability({
@@ -626,6 +662,43 @@ assert.equal(
     now: assertionNow
   }).kind,
   "file"
+);
+const priorCapabilityEnvironment = {
+  ...capabilityEnvironment,
+  DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION: "broker-key-v1"
+};
+const priorLeaseToken = createLeaseCapability({
+  jobId: "33333333-3333-4333-8333-333333333333",
+  workerId: "preview-worker-1",
+  expiresAt: capabilityExpiry,
+  environment: priorCapabilityEnvironment
+});
+assert.equal(
+  verifyBrokerCapability({
+    token: priorLeaseToken,
+    workerId: "preview-worker-1",
+    expectedKind: "lease",
+    environment: capabilityEnvironment,
+    now: assertionNow
+  }).keyVersion,
+  "broker-key-v1",
+  "a retained prior broker key must verify during rotation overlap"
+);
+assert.throws(
+  () => verifyBrokerCapability({
+    token: priorLeaseToken,
+    workerId: "preview-worker-1",
+    expectedKind: "lease",
+    environment: {
+      DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON: JSON.stringify({
+        "broker-key-v2": Buffer.alloc(32, 7).toString("base64")
+      }),
+      DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION: "broker-key-v2"
+    },
+    now: assertionNow
+  }),
+  /expired_or_invalid/,
+  "a retired broker key must fail closed"
 );
 
 const key = Uint8Array.from({ length: 32 }, (_, index) => index);

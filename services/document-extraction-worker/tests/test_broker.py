@@ -24,7 +24,8 @@ def _config(private_key: Ed25519PrivateKey) -> WorkerConfig:
         worker_private_key_der=private_key.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption()),
         nvidia_api_key="test-only-placeholder",
         provider_contract=HOSTED_CONTRACT,
-        vercel_environment="preview",
+        runtime_environment="preview",
+        deployment_id="phase-c1-preview-1",
         synthetic_qualification_enabled=False,
     )
 
@@ -46,6 +47,8 @@ def test_broker_requests_are_signed_and_nonces_are_not_reused() -> None:
                 hashlib.sha256(body).hexdigest(),
                 "preview-worker-1",
                 "worker-key-v1",
+                "preview",
+                "phase-c1-preview-1",
                 timestamp,
                 nonce,
             )

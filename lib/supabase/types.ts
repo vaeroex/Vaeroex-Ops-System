@@ -376,6 +376,15 @@ export type Database = {
         Returns: Json
       }
 
+      check_document_extraction_provider_boundary_v1: {
+        Args: {
+          p_boundary: string
+          p_job_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
       record_document_extraction_provider_outcome_v1: {
         Args: {
           p_dispatch_request_id: string

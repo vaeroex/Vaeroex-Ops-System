@@ -222,17 +222,18 @@ workspace identities, users, keys, and tokens.
 
 | Measure | Full NeMo worker | Minimal REST worker |
 | --- | ---: | ---: |
-| Direct runtime dependencies | 6 | 5 |
-| Locked runtime packages | 193 | 31 |
+| Direct runtime dependencies | 6 | 4 |
+| Locked runtime packages | 193 | 12 |
 | Known vulnerable packages | 7 | 0 |
 | Known advisories | 33 | 0 |
-| Installed Python 3.12 site-packages | Not retained as a releasable artifact | 69.8 MiB |
+| Installed Python 3.12 site-packages | Not retained as a releasable artifact | Measured during release qualification |
 | NVIDIA/private-framework imports | NeMo Retriever plus framework graph | 0 |
 
 The prior graph never produced a supply-chain-qualified release artifact, so an
 exact historical installed byte size is not claimed. Its 193-package lock and
-the removed import surface are repository-verifiable. The new installed size is
-measured from a clean hash-locked environment and includes patched pip `26.2`.
+the removed import surface are repository-verifiable. The minimal runtime has
+12 locked packages; patched pip `26.2` is isolated as build tooling and appears
+as the thirteenth component in the combined SBOM.
 
 Runtime dependencies are exact pins with hashes. Build tooling is separately
 hash-locked. A clean installation runs `pip check`; `pip-audit` reports zero

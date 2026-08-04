@@ -13,7 +13,8 @@ from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 def environment() -> dict[str, str]:
     key = Ed25519PrivateKey.generate().private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
     return {
-        "VERCEL_ENV": "preview",
+        "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT": "preview",
+        "DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID": "phase-c1-preview-1",
         "DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED": "true",
         "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED": "true",
         "DOCUMENT_EXTRACTION_BROKER_URL": "https://preview.example.test",
@@ -41,6 +42,9 @@ def test_configuration_is_disabled_without_every_gate() -> None:
         "SUPABASE_SERVICE_KEY",
         "SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "SUPABASE_ANON_KEY",
+        "SUPABASE_PUBLISHABLE_KEY",
         "SUPABASE_DB_PASSWORD",
         "DATABASE_URL",
         "POSTGRES_PASSWORD",
@@ -67,6 +71,9 @@ def test_configuration_is_disabled_without_every_gate() -> None:
         "DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON",
         "DOCUMENT_EXTRACTION_ENCRYPTION_CURRENT_KEY_VERSION",
         "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_SECRET",
+        "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON",
+        "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION",
+        "DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON",
         "DOCUMENT_EXTRACTION_TELEMETRY_HMAC_SECRET",
         "KMS_MASTER_KEY",
         "CACHE_MASTER_KEY",
@@ -96,11 +103,13 @@ def test_worker_allows_only_intended_credentials_and_harmless_public_config() ->
     assert config.nvidia_api_key == "test-only-placeholder"
     assert config.provider_contract == HOSTED_CONTRACT
     assert config.worker_private_key_der
+    assert config.runtime_environment == "preview"
+    assert config.deployment_id == "phase-c1-preview-1"
 
 
 def test_production_requires_application_owned_approval() -> None:
     values = environment()
-    values["VERCEL_ENV"] = "production"
+    values["DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT"] = "production"
     with pytest.raises(RuntimeError, match="approval"):
         WorkerConfig.from_environment(values)
 

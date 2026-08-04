@@ -18,6 +18,7 @@ import {
   authorizeDocumentExtractionDispatch,
   authorizeDocumentExtractionRetry,
   claimDocumentExtractionJob,
+  checkDocumentExtractionProviderBoundary,
   completeDocumentExtractionJob,
   failDocumentExtractionJob,
   heartbeatDocumentExtractionJob,
@@ -29,6 +30,7 @@ import {
 import { createManagedDocumentExtractionEncryptionProvider } from "@/lib/document-extraction/encryption";
 import { persistWithDocumentExtractionNonceRetry } from "@/lib/document-extraction/nonce-retry";
 import {
+  assertDocumentExtractionBrokerEnabled,
   assertDocumentExtractionProviderGateEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
   resolveDocumentExtractionExecutionPolicy
@@ -116,9 +118,7 @@ export async function handleDocumentExtractionBrokerOperation({
     };
   }
 
-  // Every non-health operation is admitted only while the application-owned
-  // provider gate remains on. Database gates are independently enforced by RPCs.
-  assertDocumentExtractionProviderGateEnabled(environment);
+  assertDocumentExtractionBrokerEnabled(environment);
 
   if (request.operation === "claim") {
     assertDocumentExtractionProviderDispatchEnabled(environment);
@@ -186,6 +186,7 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "advance_stage") {
+    assertDocumentExtractionProviderGateEnabled(environment);
     const result = await advanceDocumentExtractionStage({
       jobId: lease.jobId,
       workerId,
@@ -204,6 +205,28 @@ export async function handleDocumentExtractionBrokerOperation({
       dispatchRequestId: request.dispatchRequestId
     });
     return { ok: result.authorized, ...result };
+  }
+
+  if (request.operation === "check_provider_boundary") {
+    assertDocumentExtractionProviderDispatchEnabled(environment);
+    const result = await checkDocumentExtractionProviderBoundary({
+      jobId: lease.jobId,
+      workerId,
+      boundary: request.boundary
+    });
+    if (!result.allowed || !result.lease_expires_at) {
+      return { ok: false, ...result };
+    }
+    return {
+      ok: true,
+      ...result,
+      leaseCapability: createLeaseCapability({
+        jobId: lease.jobId,
+        workerId,
+        expiresAt: result.lease_expires_at,
+        environment
+      })
+    };
   }
 
   if (request.operation === "provider_outcome") {
@@ -230,6 +253,7 @@ export async function handleDocumentExtractionBrokerOperation({
 
   const context = await resolveDocumentExtractionLease(lease.jobId, workerId);
   if (request.operation === "complete") {
+    assertDocumentExtractionProviderGateEnabled(environment);
     if (context.stage !== "encrypting") throw new Error("document_extraction_completion_stage_invalid");
     const artifact = buildNormalizedDocumentExtractionArtifact(
       request.artifact as NormalizedDocumentExtractionArtifactDraftV1

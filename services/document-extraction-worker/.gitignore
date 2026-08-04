@@ -1,2 +1,6 @@
 __pycache__/
 *.pyc
+.mypy_cache/
+.pytest_cache/
+.venv/
+worker-pool.rendered.yaml

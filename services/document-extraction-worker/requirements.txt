@@ -3,4 +3,3 @@ cryptography==50.0.0
 httpx==0.28.1
 Pillow==12.3.0
 pypdfium2==5.12.1
-vercel==0.8.1

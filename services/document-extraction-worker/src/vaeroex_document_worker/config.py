@@ -39,6 +39,9 @@ _FORBIDDEN_WORKER_CREDENTIALS = {
     # rejected so adding a database credential later cannot silently expand scope.
     "SUPABASE_URL": "supabase",
     "NEXT_PUBLIC_SUPABASE_URL": "supabase",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "supabase",
+    "SUPABASE_ANON_KEY": "supabase",
+    "SUPABASE_PUBLISHABLE_KEY": "supabase",
     "SUPABASE_SERVICE_ROLE_KEY": "supabase",
     "SUPABASE_SERVICE_KEY": "supabase",
     "SUPABASE_SECRET_KEY": "supabase",
@@ -95,6 +98,9 @@ _FORBIDDEN_WORKER_CREDENTIALS = {
     "DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON": "cache_encryption",
     "DOCUMENT_EXTRACTION_ENCRYPTION_CURRENT_KEY_VERSION": "cache_encryption",
     "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_SECRET": "broker_authority",
+    "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON": "broker_authority",
+    "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION": "broker_authority",
+    "DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON": "broker_authority",
     "DOCUMENT_EXTRACTION_TELEMETRY_HMAC_SECRET": "broker_authority",
     "DOCUMENT_EXTRACTION_WORKER_SIGNING_PRIVATE_KEY": "broker_authority",
     "CACHE_ENCRYPTION_KEY": "cache_encryption",
@@ -145,8 +151,11 @@ class WorkerConfig:
     worker_private_key_der: bytes
     nvidia_api_key: str
     provider_contract: ProviderContract
-    vercel_environment: str
+    runtime_environment: str
+    deployment_id: str
     synthetic_qualification_enabled: bool
+    health_port: int = 8080
+    idle_poll_seconds: float = 5.0
 
     @classmethod
     def from_environment(cls, source: dict[str, str] | None = None) -> "WorkerConfig":
@@ -160,8 +169,12 @@ class WorkerConfig:
         if not _enabled(environment.get("DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED")):
             raise RuntimeError("Document extraction provider execution is disabled.")
 
-        vercel_environment = environment.get("VERCEL_ENV", "development").strip().lower()
-        if vercel_environment == "production" and (
+        runtime_environment = _required(
+            environment, "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT"
+        ).lower()
+        if runtime_environment not in ("preview", "production"):
+            raise RuntimeError("The private-worker environment is not approved.")
+        if runtime_environment == "production" and (
             environment.get("DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL", "").strip()
             != PRODUCTION_APPROVAL
         ):
@@ -181,6 +194,9 @@ class WorkerConfig:
         worker_key_version = _required(environment, "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION")
         if not _IDENTIFIER.fullmatch(worker_id) or not _IDENTIFIER.fullmatch(worker_key_version):
             raise RuntimeError("The private worker identity is malformed.")
+        deployment_id = _required(environment, "DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID")
+        if not _IDENTIFIER.fullmatch(deployment_id):
+            raise RuntimeError("The private worker deployment identity is malformed.")
         encoded_private_key = _required(environment, "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64")
         try:
             private_key = base64.b64decode(encoded_private_key, validate=True)
@@ -190,10 +206,19 @@ class WorkerConfig:
             raise RuntimeError("The private worker signing key is malformed.")
 
         synthetic_qualification_enabled = (
-            vercel_environment != "production"
+            runtime_environment == "preview"
             and _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED"))
             and _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED"))
         )
+        try:
+            health_port = int(environment.get("PORT", "8080"))
+            idle_poll_seconds = float(
+                environment.get("DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS", "5")
+            )
+        except ValueError as error:
+            raise RuntimeError("The private worker runtime limits are malformed.") from error
+        if not 1_024 <= health_port <= 65_535 or not 1 <= idle_poll_seconds <= 60:
+            raise RuntimeError("The private worker runtime limits are outside approved bounds.")
         return cls(
             broker_url=broker_url,
             worker_id=worker_id,
@@ -201,6 +226,9 @@ class WorkerConfig:
             worker_private_key_der=private_key,
             nvidia_api_key=_required(environment, "NVIDIA_API_KEY"),
             provider_contract=active_provider_contract(),
-            vercel_environment=vercel_environment,
+            runtime_environment=runtime_environment,
+            deployment_id=deployment_id,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
+            health_port=health_port,
+            idle_poll_seconds=idle_poll_seconds,
         )

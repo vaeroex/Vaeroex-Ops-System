@@ -41,6 +41,7 @@ class BrokerClient:
             base_url=config.broker_url,
             timeout=httpx.Timeout(30.0),
             follow_redirects=False,
+            trust_env=False,
             transport=transport,
         )
 
@@ -62,6 +63,8 @@ class BrokerClient:
                 body_digest,
                 self._config.worker_id,
                 self._config.worker_key_version,
+                self._config.runtime_environment,
+                self._config.deployment_id,
                 timestamp,
                 nonce,
             )
@@ -71,6 +74,8 @@ class BrokerClient:
             "x-vaeroex-broker-protocol": BROKER_PROTOCOL_VERSION,
             "x-vaeroex-worker-id": self._config.worker_id,
             "x-vaeroex-worker-key-version": self._config.worker_key_version,
+            "x-vaeroex-worker-environment": self._config.runtime_environment,
+            "x-vaeroex-worker-deployment-id": self._config.deployment_id,
             "x-vaeroex-worker-timestamp": timestamp,
             "x-vaeroex-worker-nonce": nonce,
             "x-vaeroex-worker-signature": signature,

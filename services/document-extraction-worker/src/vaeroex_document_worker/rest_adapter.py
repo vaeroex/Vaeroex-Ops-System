@@ -10,7 +10,7 @@ import re
 import time
 import uuid
 from dataclasses import asdict, dataclass
-from typing import Any, Iterable, NoReturn
+from typing import Any, Callable, Iterable, Literal, NoReturn
 from urllib.parse import urlsplit
 
 import httpx
@@ -38,6 +38,8 @@ MAX_ELEMENT_TEXT_LENGTH = 50_000
 MAX_PAGE_TEXT_LENGTH = 250_000
 TIMEOUT_POLICY_VERSION = "connect_10_read_120_write_30_no_internal_retry_v1"
 NVCF_ASSET_DESCRIPTION = "vaeroex-document-page"
+ProviderBoundary = Literal["asset_create", "asset_upload", "inference"]
+ProviderBoundaryCheck = Callable[[ProviderBoundary], None]
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
@@ -416,12 +418,14 @@ class NvidiaNemotronParseRestAdapter:
         api_key: str,
         *,
         transport: httpx.BaseTransport | None = None,
+        before_provider_boundary: ProviderBoundaryCheck | None = None,
     ) -> None:
         _validate_contract(contract)
         if contract.sends_nvidia_credential and not api_key:
             raise ProviderFailure("provider_credential_missing", "authorization", retryable=False)
         self._contract = contract
         self._api_key = api_key
+        self._before_provider_boundary = before_provider_boundary or (lambda _boundary: None)
         self._client = httpx.Client(
             timeout=httpx.Timeout(connect=10.0, read=120.0, write=30.0, pool=10.0),
             follow_redirects=False,
@@ -648,7 +652,9 @@ class NvidiaNemotronParseRestAdapter:
         page_bytes = self._validated_page_bytes(page)
         try:
             if binding.payload_mode == "nvcf_asset_reference":
+                self._before_provider_boundary("asset_create")
                 asset_id, upload_url = self._create_asset(page, completed_pages)
+                self._before_provider_boundary("asset_upload")
                 self._upload_asset(page, page_bytes, upload_url, completed_pages)
                 image_reference = f"data:image/{content_type};asset_id,{asset_id}"
                 extra_headers = {"NVCF-INPUT-ASSET-REFERENCES": asset_id}
@@ -662,6 +668,7 @@ class NvidiaNemotronParseRestAdapter:
                 image_reference,
                 payload_mode=binding.payload_mode,
             )
+            self._before_provider_boundary("inference")
             _, response_headers, response_body = self._send(
                 "POST",
                 self._contract.endpoint,
@@ -749,6 +756,12 @@ def invoke_rest_adapter(
     *,
     completed_pages: tuple[dict[str, Any], ...] = (),
     transport: httpx.BaseTransport | None = None,
+    before_provider_boundary: ProviderBoundaryCheck | None = None,
 ) -> ProviderResult:
-    with NvidiaNemotronParseRestAdapter(contract, api_key, transport=transport) as adapter:
+    with NvidiaNemotronParseRestAdapter(
+        contract,
+        api_key,
+        transport=transport,
+        before_provider_boundary=before_provider_boundary,
+    ) as adapter:
         return adapter.invoke(pages, document_sha256, completed_pages=completed_pages)

@@ -171,6 +171,25 @@ export async function authorizeDocumentExtractionDispatch({
   );
 }
 
+export async function checkDocumentExtractionProviderBoundary({
+  jobId,
+  workerId,
+  boundary
+}: {
+  jobId: string;
+  workerId: string;
+  boundary: "asset_create" | "asset_upload" | "inference";
+}) {
+  return rpc<{ allowed: boolean; reason: string; boundary: string; lease_expires_at: string | null }>(
+    "check_document_extraction_provider_boundary_v1",
+    {
+      p_job_id: jobId,
+      p_worker_id: workerId,
+      p_boundary: boundary
+    }
+  );
+}
+
 export async function recordDocumentExtractionProviderOutcome({
   jobId,
   workerId,
