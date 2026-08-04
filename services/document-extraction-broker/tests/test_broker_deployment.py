@@ -58,13 +58,16 @@ def _environment() -> list[dict[str, object]]:
 
 def _description() -> dict[str, object]:
     return {
-        "metadata": {"name": SERVICE},
+        "metadata": {
+            "name": SERVICE,
+            "annotations": {"run.googleapis.com/maxScale": "1"},
+        },
         "spec": {
             "template": {
                 "metadata": {
                     "annotations": {
                         "autoscaling.knative.dev/minScale": "0",
-                        "autoscaling.knative.dev/maxScale": "1",
+                        "autoscaling.knative.dev/maxScale": "20",
                     }
                 },
                 "spec": {
@@ -113,6 +116,15 @@ def test_broker_verifier_accepts_exact_inert_preview_service(tmp_path: Path) -> 
     result = _run(tmp_path, _description(), policy)
     assert result.returncode == 0, result.stderr
     assert json.loads(result.stdout)["exactInvoker"] is True
+
+
+def test_broker_verifier_rejects_service_level_scaling_above_one(tmp_path: Path) -> None:
+    description = _description()
+    description["metadata"]["annotations"]["run.googleapis.com/maxScale"] = "2"  # type: ignore[index]
+    policy = {"bindings": [{"role": "roles/run.invoker", "members": [f"serviceAccount:{WORKER_SA}"]}]}
+    result = _run(tmp_path, description, policy)
+    assert result.returncode != 0
+    assert "broker_scaling_invalid" in result.stderr
 
 
 def test_broker_verifier_rejects_public_or_additional_invokers(tmp_path: Path) -> None:

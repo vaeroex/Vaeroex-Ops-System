@@ -99,11 +99,24 @@ def main() -> int:
     concurrency = template_spec.get("containerConcurrency") or template_spec.get("maxInstanceRequestConcurrency")
     if str(concurrency) != "1":
         raise SystemExit("broker_concurrency_invalid")
+    service_metadata = _mapping(resource.get("metadata") or {}, "broker_service_metadata_invalid")
+    service_annotations = _mapping(
+        service_metadata.get("annotations") or {}, "broker_service_metadata_invalid"
+    )
     template_metadata = _mapping(template.get("metadata") or {}, "broker_template_metadata_invalid")
     annotations = _mapping(template_metadata.get("annotations") or {}, "broker_template_metadata_invalid")
     scaling = template.get("scaling") if isinstance(template.get("scaling"), dict) else {}
-    maximum = scaling.get("maxInstanceCount") or annotations.get("autoscaling.knative.dev/maxScale")
-    minimum = scaling.get("minInstanceCount") or annotations.get("autoscaling.knative.dev/minScale") or 0
+    maximum = (
+        service_annotations.get("run.googleapis.com/maxScale")
+        or scaling.get("maxInstanceCount")
+        or annotations.get("autoscaling.knative.dev/maxScale")
+    )
+    minimum = (
+        service_annotations.get("run.googleapis.com/minScale")
+        or scaling.get("minInstanceCount")
+        or annotations.get("autoscaling.knative.dev/minScale")
+        or 0
+    )
     if str(maximum) != "1" or str(minimum) != "0":
         raise SystemExit("broker_scaling_invalid")
 
