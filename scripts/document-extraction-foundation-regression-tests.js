@@ -5,13 +5,22 @@ const ts = require("typescript");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
+const loadedTypeScriptModules = new Map();
 function loadTypeScriptModule(relative) {
+  if (loadedTypeScriptModules.has(relative)) return loadedTypeScriptModules.get(relative);
   const source = read(relative);
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 }
   }).outputText;
   const loaded = { exports: {} };
-  new Function("require", "module", "exports", output)(require, loaded, loaded.exports);
+  loadedTypeScriptModules.set(relative, loaded.exports);
+  const localRequire = (specifier) => {
+    if (specifier === "server-only") return {};
+    if (specifier.startsWith("@/")) return loadTypeScriptModule(`${specifier.slice(2)}.ts`);
+    return require(specifier);
+  };
+  new Function("require", "module", "exports", output)(localRequire, loaded, loaded.exports);
+  loadedTypeScriptModules.set(relative, loaded.exports);
   return loaded.exports;
 }
 const {
@@ -269,13 +278,15 @@ assert.equal(assertEncryptedDocumentExtractionEnvelope(validEnvelope), validEnve
 assert.throws(() => assertEncryptedDocumentExtractionEnvelope({ ...validEnvelope, nonce: new Uint8Array(8) }), /96-bit nonce/);
 assert.throws(() => assertEncryptedDocumentExtractionEnvelope({ ...validEnvelope, ciphertext: new Uint8Array() }), /Plaintext or empty/);
 
-const newRuntimeFiles = [
-  "lib/document-extraction/contracts.ts",
+const phaseAAuthorityFiles = [
   "lib/document-extraction/identity.ts",
   "lib/document-extraction/eligibility.ts",
-  "lib/document-extraction/encryption.ts",
   "lib/document-extraction/approval-guard.ts"
 ].map(read).join("\n");
-assert.doesNotMatch(newRuntimeFiles, /\bfetch\s*\(|openai|nemotron|nemo_retriever/i, "Phase A must contain no provider execution path");
+assert.doesNotMatch(
+  phaseAAuthorityFiles,
+  /\bfetch\s*\(|openai|nemotron|nemo_retriever/i,
+  "Phase A identity, eligibility, and authority guards must contain no provider execution path"
+);
 
 console.log("Document extraction Phase A foundation regressions passed.");

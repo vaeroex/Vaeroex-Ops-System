@@ -1,0 +1,2 @@
+# Build/install tooling is isolated from the worker runtime dependency graph.
+pip==26.2

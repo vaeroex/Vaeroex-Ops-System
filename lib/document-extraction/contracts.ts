@@ -4,6 +4,30 @@ export const DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION = "document_extraction_r
 export const DOCUMENT_EXTRACTION_CONTRACT_VERSION = "document_extraction_artifact_v1" as const;
 export const DOCUMENT_EXTRACTION_NORMALIZATION_VERSION = "document_extraction_normalization_v1" as const;
 export const DOCUMENT_EXTRACTION_REVIEW_VERSION = 1 as const;
+export const DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION = "document_extraction_broker_v1" as const;
+export const DOCUMENT_EXTRACTION_WORKER_RUNTIME_VERSION = "document_extraction_worker_v1" as const;
+export const DOCUMENT_EXTRACTION_CIRCUIT_POLICY_VERSION = "document_extraction_circuit_v1" as const;
+export const DOCUMENT_EXTRACTION_TELEMETRY_VERSION = "document_extraction_telemetry_v1" as const;
+export const DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION =
+  "document_extraction_production_pilot_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_PROVIDER = "nvidia" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_MODEL = "nvidia/nemotron-parse" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION =
+  "vaeroex_nemotron_parse_rest_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION =
+  "nemotron_parse_hosted_tool_call_rest_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION =
+  "nvidia_build_nemotron_parse_hosted_tool_call_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_MODEL = "nvidia/nemotron-parse-v1.2" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_PARSER_REVISION =
+  "nemotron_parse_v1_2_tagged_rest_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_ENDPOINT_CONTRACT_VERSION =
+  "nemotron_parse_v1_2_openai_chat_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_MAX_FILE_BYTES = 25_000_000 as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_MAX_PAGES = 16 as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RENDERED_DIMENSION = 2_048 as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_TIMEOUT_SECONDS = 120 as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RETRIES = 1 as const;
 
 export type DocumentExtractionRoute = "native" | "nvidia_primary" | "nvidia_fallback";
 export type DocumentExtractionDocumentClass =
@@ -18,9 +42,13 @@ export type DocumentExtractionDocumentClass =
 export type DocumentExtractionStage =
   | "queued"
   | "leased"
+  | "preparing"
+  | "dispatching"
+  | "provider_dispatched"
   | "extracting"
   | "normalizing"
   | "validating"
+  | "encrypting"
   | "awaiting_review"
   | "classifying"
   | "promoting"
