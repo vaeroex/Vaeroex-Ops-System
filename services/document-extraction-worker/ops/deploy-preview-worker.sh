@@ -30,7 +30,8 @@ esac
 script_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 worker_root="$(dirname "$script_directory")"
 rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/vaeroex-worker-pool.XXXXXX")"
-trap 'rm -f "$rendered_manifest"' EXIT HUP INT TERM
+deployed_description="$(mktemp "${TMPDIR:-/tmp}/vaeroex-worker-pool-description.XXXXXX")"
+trap 'rm -f "$rendered_manifest" "$deployed_description"' EXIT HUP INT TERM
 
 python3 "$script_directory/render-worker-pool.py" \
   --template "$worker_root/cloud-run-worker-pool.yaml.template" \
@@ -51,9 +52,20 @@ CLOUDSDK_RUN_REGION="$GCP_REGION" gcloud run worker-pools replace "$rendered_man
   --project "$GCP_PROJECT_ID" \
   --quiet >/dev/null
 
-instances="$(gcloud run worker-pools describe "$WORKER_POOL" \
+gcloud run worker-pools describe "$WORKER_POOL" \
   --project "$GCP_PROJECT_ID" \
   --region "$GCP_REGION" \
-  --format 'value(scaling.manualInstanceCount)')"
-test "$instances" = "0"
+  --format json >"$deployed_description"
+
+python3 "$script_directory/verify-worker-pool.py" \
+  --description-file "$deployed_description" \
+  --worker-pool "$WORKER_POOL" \
+  --service-account "$WORKER_SERVICE_ACCOUNT" \
+  --image-digest "$WORKER_IMAGE_DIGEST" \
+  --deployment-id "$WORKER_DEPLOYMENT_ID" \
+  --worker-id "$WORKER_ID" \
+  --worker-key-version "$WORKER_KEY_VERSION" \
+  --expected-instances 0 \
+  --expected-gate-state disabled >/dev/null
+
 printf '%s\n' "Preview worker revision deployed inert at zero instances."

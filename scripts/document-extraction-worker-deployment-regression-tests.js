@@ -46,6 +46,7 @@ assert.match(dockerignore, /^tests$/m);
 assert.match(dockerignore, /^sbom\.cdx\.json$/m);
 
 assert.match(poolTemplate, /kind: WorkerPool/);
+assert.match(poolTemplate, /scalingMode: manual/);
 assert.match(poolTemplate, /manualInstanceCount: "0"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED[\s\S]+value: "false"/);
@@ -53,6 +54,7 @@ assert.match(poolTemplate, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED[
 assert.match(poolTemplate, /memory: 2Gi/);
 assert.match(poolTemplate, /mountPath: \/var\/tmp\/vaeroex-document-worker/);
 assert.match(poolTemplate, /name: TMPDIR[\s\S]+value: \/var\/tmp\/vaeroex-document-worker/);
+assert.doesNotMatch(poolTemplate, /name: PORT/);
 assert.match(poolTemplate, /emptyDir:[\s\S]+medium: Memory[\s\S]+sizeLimit: 768Mi/);
 assert.match(poolTemplate, /startupProbe:[\s\S]+\/startup/);
 assert.match(poolTemplate, /livenessProbe:[\s\S]+\/health/);
@@ -65,6 +67,7 @@ assert.match(deploy, /NVIDIA_SECRET_VERSION/);
 assert.doesNotMatch(deploy, /:latest/);
 assert.match(deploy, /gcloud run worker-pools replace/);
 assert.match(deploy, /render-worker-pool\.py/);
+assert.match(deploy, /verify-worker-pool\.py/);
 assert.doesNotMatch(deploy, /--startup-probe|--liveness-probe/);
 assert.match(renderer, /BROKER_URL must be an HTTPS Vercel Preview origin/);
 assert.match(renderer, /Secret versions must be explicit positive integers/);

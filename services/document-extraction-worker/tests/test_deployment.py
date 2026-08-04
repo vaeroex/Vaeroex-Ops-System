@@ -33,7 +33,6 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v1",
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v1",
         "DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS": "5",
-        "PORT": "8080",
         "TMPDIR": "/var/tmp/vaeroex-document-worker",
     }
     environment: list[dict[str, Any]] = [
@@ -136,11 +135,15 @@ def test_manifest_renderer_keeps_preview_worker_inert_and_secret_referenced(
     )
     assert result.returncode == 0, result.stderr
     rendered = output.read_text(encoding="ascii")
+    assert "run.googleapis.com/scalingMode: manual" in rendered
     assert 'run.googleapis.com/manualInstanceCount: "0"' in rendered
     assert 'value: "false"' in rendered
     assert "value: /var/tmp/vaeroex-document-worker" in rendered
     assert "sizeLimit: 768Mi" in rendered
+    assert "name: PORT" not in rendered
     assert "@sha256:" in rendered
+    assert 'key: "1"' in rendered
+    assert 'key: "2"' in rendered
     assert "DOCUMENT_EXTRACTION_IMAGE_DIGEST" not in rendered
 
 

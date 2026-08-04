@@ -4,6 +4,7 @@ metadata:
   name: DOCUMENT_EXTRACTION_WORKER_POOL
   annotations:
     run.googleapis.com/description: Vaeroex document extraction Preview worker; disabled at zero instances by default.
+    run.googleapis.com/scalingMode: manual
     run.googleapis.com/manualInstanceCount: "0"
 spec:
   template:
@@ -42,19 +43,17 @@ spec:
               value: nemotron_parse_hosted_tool_call_rest_v1
             - name: DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS
               value: "5"
-            - name: PORT
-              value: "8080"
             - name: TMPDIR
               value: /var/tmp/vaeroex-document-worker
             - name: DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64
               valueFrom:
                 secretKeyRef:
-                  key: DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION
+                  key: "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION"
                   name: DOCUMENT_EXTRACTION_WORKER_SECRET_NAME
             - name: NVIDIA_API_KEY
               valueFrom:
                 secretKeyRef:
-                  key: DOCUMENT_EXTRACTION_NVIDIA_SECRET_VERSION
+                  key: "DOCUMENT_EXTRACTION_NVIDIA_SECRET_VERSION"
                   name: DOCUMENT_EXTRACTION_NVIDIA_SECRET_NAME
           resources:
             limits:
