@@ -332,8 +332,24 @@ def normalize_provider_response(
         raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
     finish_reason = choices[0].get("finish_reason")
     if contract.response_profile == "hosted_tool_call":
-        if finish_reason != "tool_calls" or message.get("content") not in (None, ""):
-            raise ProviderFailure("provider_output_incomplete", "malformed_output", retryable=False)
+        content_value = message.get("content")
+        has_content = content_value not in (None, "")
+        if finish_reason == "length":
+            raise ProviderFailure("provider_malformed_output_truncated", "malformed_output", retryable=False)
+        if finish_reason == "stop" and has_content:
+            raise ProviderFailure(
+                "provider_malformed_hosted_profile",
+                "malformed_output",
+                retryable=False,
+            )
+        if finish_reason == "stop":
+            raise ProviderFailure("provider_malformed_hosted_finish_stop", "malformed_output", retryable=False)
+        if finish_reason is None:
+            raise ProviderFailure("provider_malformed_hosted_finish_missing", "malformed_output", retryable=False)
+        if finish_reason != "tool_calls":
+            raise ProviderFailure("provider_malformed_hosted_finish_invalid", "malformed_output", retryable=False)
+        if has_content:
+            raise ProviderFailure("provider_malformed_hosted_content", "malformed_output", retryable=False)
         tool_calls = message.get("tool_calls")
         if not isinstance(tool_calls, list) or len(tool_calls) != 1 or not isinstance(tool_calls[0], dict):
             raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)

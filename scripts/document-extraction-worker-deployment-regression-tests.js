@@ -266,6 +266,11 @@ assert.match(runbook, /first provider-eligible fixture made exactly one inferenc
 assert.match(runbook, /provider successes, retries, ambiguous dispatches, authentication failures,[\s\S]+were all zero/i);
 assert.match(runbook, /provider-contract qualification blocker/i);
 assert.match(runbook, /complete frozen corpus can be rerun from the beginning/i);
+assert.match(runbook, /^### Hosted response contract audit$/m);
+assert.match(runbook, /cannot be classified as request error, validator error, provider drift, or[\s\S]+without guessing/i);
+assert.match(runbook, /Classification:\*\* Inconclusive due to insufficient content-free evidence\./);
+assert.match(runbook, /profiles therefore remain[\s\S]+separate and are never auto-detected or mixed/i);
+assert.match(runbook, /Every case remains a[\s\S]+malformed-output failure/i);
 assert.match(runbook, /Customer[\s\S]+uploads, arbitrary images, public routes, automatic authority/);
 
 process.stdout.write("Document extraction worker deployment Phase C1 regressions passed.\n");

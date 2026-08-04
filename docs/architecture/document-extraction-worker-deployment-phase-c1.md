@@ -424,6 +424,38 @@ isolation, or authority-boundary failure. Phase C1 must remain disabled until a
 separately reviewed change resolves the officially hosted response-contract
 mismatch and the complete frozen corpus can be rerun from the beginning.
 
+### Hosted response contract audit
+
+The retained content-free evidence proves that the hosted request received an
+HTTP success with JSON content, valid top-level JSON, the expected model, one
+choice, and a message object. It then failed the hosted completion-shape guard
+before tool-call arguments, elements, or coordinates were inspected. The
+original `provider_output_incomplete` code combined two predicates: the finish
+reason was not `tool_calls`, the message contained unexpected content, or both.
+No retained field distinguishes those cases, so the single historical response
+cannot be classified as request error, validator error, provider drift, or
+malformed provider output without guessing.
+
+**Classification:** Inconclusive due to insufficient content-free evidence.
+
+NVIDIA's Nemotron Parse 1.5 documentation supports the selected hosted request:
+one image, model `nvidia/nemotron-parse`, and one `markdown_bbox` function tool.
+Its documented element payload is a JSON list whose bounding boxes use
+normalized `xmin`, `ymin`, `xmax`, and `ymax` coordinates. NVIDIA's newer
+Nemotron-Parse-v1.2 contract is explicitly different: model
+`nvidia/nemotron-parse-v1.2`, control-token text input, tagged assistant content,
+and no `markdown_bbox` tool call. NVIDIA's 1.7 release notes state that the API
+changed between these model generations. The profiles therefore remain
+separate and are never auto-detected or mixed.
+
+The parser now emits a bounded content-free diagnostic code for truncation,
+`stop`, missing or other finish states, unexpected tool-call content, and the
+specific `stop` plus content profile-mismatch shape. Every case remains a
+non-retryable malformed-output failure. No provider response is accepted more
+broadly, and raw response content is neither retained nor logged. A future
+qualification still requires independent contract review before any provider
+call.
+
 ## Phase C2 prerequisites
 
 Phase C2 cannot begin until Phase C1 quality and adoption gates pass, all

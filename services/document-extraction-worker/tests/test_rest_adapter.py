@@ -168,6 +168,44 @@ def test_inline_inference_normalizes_without_retaining_raw_response(tmp_path: Pa
     assert "secret-not-returned" not in repr(result)
 
 
+@pytest.mark.parametrize(
+    ("finish_reason", "content", "expected_code"),
+    (
+        ("length", None, "provider_malformed_output_truncated"),
+        ("stop", None, "provider_malformed_hosted_finish_stop"),
+        (
+            "stop",
+            "<x_0.1><y_0.1>synthetic<x_0.2><y_0.2><class_Text>",
+            "provider_malformed_hosted_profile",
+        ),
+        (None, None, "provider_malformed_hosted_finish_missing"),
+        ("content_filter", None, "provider_malformed_hosted_finish_invalid"),
+        ("tool_calls", "synthetic parallel content", "provider_malformed_hosted_content"),
+    ),
+)
+def test_hosted_completion_shape_fails_closed_with_content_free_diagnostics(
+    tmp_path: Path,
+    finish_reason: object,
+    content: object,
+    expected_code: str,
+) -> None:
+    response = json.loads(hosted_response())
+    response["choices"][0]["finish_reason"] = finish_reason
+    response["choices"][0]["message"]["content"] = content
+
+    with pytest.raises(ProviderFailure) as caught:
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
+
+    assert caught.value.code == expected_code
+    assert caught.value.result_class == "malformed_output"
+    assert caught.value.retryable is False
+    assert "synthetic" not in caught.value.code
+
+
 def test_large_page_uses_bounded_nvcf_asset_flow_and_deletes_asset(tmp_path: Path) -> None:
     page = rendered_page(tmp_path, byte_length=180_001)
     asset_id = str(uuid.uuid4())
