@@ -62,7 +62,10 @@ assert.match(workerManifest, /DOCUMENT_EXTRACTION_BROKER_AUTH_MODE/);
 
 assert.match(brokerDockerfile, /node:22\.23\.1-bookworm-slim@sha256:[0-9a-f]{64}/);
 assert.match(brokerDockerfile, /gcr\.io\/distroless\/nodejs22-debian12@sha256:[0-9a-f]{64}/);
-assert.match(brokerDockerfile, /pnpm exec ncc build/);
+assert.match(brokerDockerfile, /cd services\/document-extraction-broker/);
+assert.match(brokerDockerfile, /\/app\/node_modules\/\.bin\/ncc build src\/server\.ts/);
+assert.match(brokerDockerfile, /! grep -Fq '@\/lib\/' dist\/index\.js/);
+assert.match(brokerDockerfile, /require\("\.\/dist\/index\.js"\)/);
 assert.match(brokerDockerfile, /COPY services\/document-extraction-broker\/package\.json services\/document-extraction-broker\/pnpm-lock\.yaml/);
 assert.doesNotMatch(brokerDockerfile, /COPY package\.json pnpm-lock\.yaml/);
 assert.match(brokerDockerfile, /--external server-only/);

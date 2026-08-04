@@ -13,12 +13,16 @@ COPY lib ./lib
 COPY services/document-extraction-broker/src ./services/document-extraction-broker/src
 COPY services/document-extraction-broker/tsconfig.json ./services/document-extraction-broker/tsconfig.json
 
-RUN pnpm exec ncc build services/document-extraction-broker/src/server.ts \
-  -o services/document-extraction-broker/dist \
-  --minify \
-  --no-cache \
-  --license licenses.txt \
-  --external server-only
+RUN cd services/document-extraction-broker && \
+  /app/node_modules/.bin/ncc build src/server.ts \
+    -o dist \
+    --minify \
+    --no-cache \
+    --license licenses.txt \
+    --external server-only && \
+  ! grep -Fq '@/lib/' dist/index.js && \
+  PORT=18080 node --conditions=react-server -e \
+    'require("./dist/index.js"); setTimeout(() => process.exit(0), 100)'
 
 FROM gcr.io/distroless/nodejs22-debian12@sha256:13593b7570658e8477de39e2f4a1dd25db2f836d68a0ba771251572d23bb4f8e AS runtime
 
