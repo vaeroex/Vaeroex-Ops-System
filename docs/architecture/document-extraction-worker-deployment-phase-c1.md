@@ -383,6 +383,47 @@ operator record must include:
 - cleanup proof; and
 - confirmation that Vercel and Production remained untouched.
 
+### Isolated Preview outcome (2026-08-04)
+
+The Cloud Run broker authentication redesign passed its zero-provider
+qualification. The exact Preview worker identity reached the private broker
+through service-level Google IAM/OIDC and the required Ed25519 assertion.
+Unauthenticated access was denied, the bounded authorization matrix passed,
+and the live database kill-switch matrix denied all ten guarded states before
+returning only the eligible control state.
+
+The synthetic provider qualification then stopped at the first approved hard
+failure boundary:
+
+- two one-page synthetic fixtures were attempted;
+- the intentionally corrupt fixture failed local validation with zero provider
+  calls;
+- the first provider-eligible fixture made exactly one inference attempt;
+- the provider result was classified as `malformed_output` and rejected with
+  `provider_output_incomplete`;
+- provider successes, retries, ambiguous dispatches, authentication failures,
+  timeouts, and NVCF asset flows were all zero;
+- no normalization, encryption, cache, review, or authority-promotion step was
+  reached;
+- no quality score is reported because no provider result passed the response
+  contract; and
+- execution stopped before a second provider-eligible fixture was enqueued.
+
+Cleanup completed immediately. Database, workspace, provider, broker, and
+worker gates were closed; the Worker Pool was restored to its prior inert
+revision at zero instances; synthetic database and Storage fixtures were
+removed; the ephemeral broker, seeder, service account, service-level IAM
+grant, image, and temporary secrets were deleted; and the temporary worker
+signing-key version was destroyed. The original Worker Pool and approved
+long-term Preview secrets remain. Vercel Preview, Vercel Production, Supabase
+Production, customer workspaces, and customer documents were never modified or
+addressed.
+
+This is a provider-contract qualification blocker, not an authentication,
+isolation, or authority-boundary failure. Phase C1 must remain disabled until a
+separately reviewed change resolves the officially hosted response-contract
+mismatch and the complete frozen corpus can be rerun from the beginning.
+
 ## Phase C2 prerequisites
 
 Phase C2 cannot begin until Phase C1 quality and adoption gates pass, all

@@ -261,6 +261,11 @@ assert.match(runbook, /provider call, dispatch, and file-grant counts must remai
 assert.match(runbook, /zero instances/i);
 assert.match(runbook, /NVIDIA cost remains unknown/i);
 assert.match(runbook, /Production remained untouched/i);
+assert.match(runbook, /^### Isolated Preview outcome \(2026-08-04\)$/m);
+assert.match(runbook, /first provider-eligible fixture made exactly one inference attempt/i);
+assert.match(runbook, /provider successes, retries, ambiguous dispatches, authentication failures,[\s\S]+were all zero/i);
+assert.match(runbook, /provider-contract qualification blocker/i);
+assert.match(runbook, /complete frozen corpus can be rerun from the beginning/i);
 assert.match(runbook, /Customer[\s\S]+uploads, arbitrary images, public routes, automatic authority/);
 
 process.stdout.write("Document extraction worker deployment Phase C1 regressions passed.\n");
