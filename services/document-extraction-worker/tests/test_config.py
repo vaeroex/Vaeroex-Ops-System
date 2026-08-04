@@ -6,7 +6,13 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat
 
-from vaeroex_document_worker.config import CLIENT_REVISION, MODEL, PARSER_REVISION, WorkerConfig
+from vaeroex_document_worker.config import (
+    CLIENT_REVISION,
+    MODEL,
+    PARSER_REVISION,
+    PRODUCTION_APPROVAL,
+    WorkerConfig,
+)
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 
 
@@ -119,4 +125,50 @@ def test_synthetic_mode_requires_both_additional_non_production_gates() -> None:
     values["DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED"] = "true"
     assert not WorkerConfig.from_environment(values).synthetic_qualification_enabled
     values["DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED"] = "true"
-    assert WorkerConfig.from_environment(values).synthetic_qualification_enabled
+    with pytest.raises(RuntimeError, match="share credential is missing"):
+        WorkerConfig.from_environment(values)
+    values["DOCUMENT_EXTRACTION_BROKER_URL"] = (
+        "https://vaeroex-ops-system-abc123-team.vercel.app"
+    )
+    values["DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN"] = (
+        "preview-share-token-1234567890"
+    )
+    config = WorkerConfig.from_environment(values)
+    assert config.synthetic_qualification_enabled
+    assert config.vercel_share_token == "preview-share-token-1234567890"
+    assert "preview-share-token-1234567890" not in repr(config)
+
+
+def test_vercel_share_access_is_rejected_outside_synthetic_preview() -> None:
+    values = environment()
+    values["DOCUMENT_EXTRACTION_BROKER_URL"] = (
+        "https://vaeroex-ops-system-abc123-team.vercel.app"
+    )
+    values["DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN"] = (
+        "preview-share-token-1234567890"
+    )
+    with pytest.raises(RuntimeError, match="limited to synthetic Preview"):
+        WorkerConfig.from_environment(values)
+
+    values["DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT"] = "production"
+    values["DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL"] = PRODUCTION_APPROVAL
+    with pytest.raises(RuntimeError, match="forbidden in Production"):
+        WorkerConfig.from_environment(values)
+
+
+def test_vercel_share_access_rejects_moving_branch_alias() -> None:
+    values = environment()
+    values.update(
+        {
+            "DOCUMENT_EXTRACTION_BROKER_URL": (
+                "https://vaeroex-ops-system-git-codex-docu-team.vercel.app"
+            ),
+            "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN": (
+                "preview-share-token-1234567890"
+            ),
+        }
+    )
+    with pytest.raises(RuntimeError, match="immutable Preview deployment"):
+        WorkerConfig.from_environment(values)

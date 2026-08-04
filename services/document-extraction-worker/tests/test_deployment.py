@@ -45,6 +45,7 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
         }
         for name in (
             "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
+            "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
             "NVIDIA_API_KEY",
         )
     )
@@ -124,6 +125,10 @@ def test_manifest_renderer_keeps_preview_worker_inert_and_secret_referenced(
             "vaeroex-document-worker-preview-ed25519",
             "--worker-secret-version",
             "1",
+            "--vercel-share-secret-name",
+            "vaeroex-document-worker-preview-vercel-share",
+            "--vercel-share-secret-version",
+            "1",
             "--nvidia-secret-name",
             "vaeroex-document-worker-preview-nvidia",
             "--nvidia-secret-version",
@@ -144,6 +149,7 @@ def test_manifest_renderer_keeps_preview_worker_inert_and_secret_referenced(
     assert "@sha256:" in rendered
     assert 'key: "1"' in rendered
     assert 'key: "2"' in rendered
+    assert "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN" in rendered
     assert "DOCUMENT_EXTRACTION_IMAGE_DIGEST" not in rendered
 
 

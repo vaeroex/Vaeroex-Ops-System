@@ -50,6 +50,11 @@ spec:
                 secretKeyRef:
                   key: "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION"
                   name: DOCUMENT_EXTRACTION_WORKER_SECRET_NAME
+            - name: DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  key: "DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_VERSION"
+                  name: DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_NAME
             - name: NVIDIA_API_KEY
               valueFrom:
                 secretKeyRef:

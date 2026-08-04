@@ -10,11 +10,13 @@ set -eu
 : "${WORKER_ID:?WORKER_ID is required}"
 : "${WORKER_KEY_VERSION:?WORKER_KEY_VERSION is required}"
 : "${WORKER_SECRET_VERSION:?WORKER_SECRET_VERSION is required}"
+: "${VERCEL_SHARE_SECRET_VERSION:?VERCEL_SHARE_SECRET_VERSION is required}"
 : "${NVIDIA_SECRET_VERSION:?NVIDIA_SECRET_VERSION is required}"
 : "${BROKER_URL:?BROKER_URL is required}"
 
 WORKER_POOL="${WORKER_POOL:-vaeroex-document-extraction-preview}"
 WORKER_SECRET_NAME="${WORKER_SECRET_NAME:-vaeroex-document-worker-preview-ed25519}"
+VERCEL_SHARE_SECRET_NAME="${VERCEL_SHARE_SECRET_NAME:-vaeroex-document-worker-preview-vercel-share}"
 NVIDIA_SECRET_NAME="${NVIDIA_SECRET_NAME:-vaeroex-document-worker-preview-nvidia}"
 
 if [ "$PHASE_C1_PREVIEW_CONFIRMATION" != "vaeroex-document-extraction-phase-c1-preview-only" ]; then
@@ -45,6 +47,8 @@ python3 "$script_directory/render-worker-pool.py" \
   --broker-url "$BROKER_URL" \
   --worker-secret-name "$WORKER_SECRET_NAME" \
   --worker-secret-version "$WORKER_SECRET_VERSION" \
+  --vercel-share-secret-name "$VERCEL_SHARE_SECRET_NAME" \
+  --vercel-share-secret-version "$VERCEL_SHARE_SECRET_VERSION" \
   --nvidia-secret-name "$NVIDIA_SECRET_NAME" \
   --nvidia-secret-version "$NVIDIA_SECRET_VERSION"
 

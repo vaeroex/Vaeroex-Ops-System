@@ -5,7 +5,7 @@ from __future__ import annotations
 import base64
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from urllib.parse import urlparse
 
 from .provider_contract import (
@@ -31,8 +31,11 @@ MAX_RETRIES = 1
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
 _ALLOWED_WORKER_CREDENTIALS = {
     "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
+    "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
     "NVIDIA_API_KEY",
 }
+
+_VERCEL_SHARE_TOKEN = re.compile(r"^[A-Za-z0-9._~-]{16,256}$")
 
 _FORBIDDEN_WORKER_CREDENTIALS = {
     # The worker has no database or Supabase client. Even public project URLs are
@@ -154,6 +157,7 @@ class WorkerConfig:
     runtime_environment: str
     deployment_id: str
     synthetic_qualification_enabled: bool
+    vercel_share_token: str | None = field(default=None, repr=False, compare=False)
     health_port: int = 8080
     idle_poll_seconds: float = 5.0
 
@@ -188,7 +192,16 @@ class WorkerConfig:
 
         broker_url = _required(environment, "DOCUMENT_EXTRACTION_BROKER_URL").rstrip("/")
         parsed_url = urlparse(broker_url)
-        if parsed_url.scheme != "https" or not parsed_url.netloc or parsed_url.path not in ("", "/"):
+        if (
+            parsed_url.scheme != "https"
+            or not parsed_url.netloc
+            or parsed_url.path not in ("", "/")
+            or parsed_url.params
+            or parsed_url.query
+            or parsed_url.fragment
+            or parsed_url.username
+            or parsed_url.password
+        ):
             raise RuntimeError("The private broker must use an HTTPS origin URL.")
         worker_id = _required(environment, "DOCUMENT_EXTRACTION_WORKER_ID")
         worker_key_version = _required(environment, "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION")
@@ -210,6 +223,26 @@ class WorkerConfig:
             and _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED"))
             and _enabled(environment.get("DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED"))
         )
+        vercel_share_token = environment.get(
+            "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN", ""
+        ).strip() or None
+        if vercel_share_token is not None and not _VERCEL_SHARE_TOKEN.fullmatch(
+            vercel_share_token
+        ):
+            raise RuntimeError("The Vercel Preview share credential is malformed.")
+        if runtime_environment == "production" and vercel_share_token is not None:
+            raise RuntimeError("Vercel Preview share access is forbidden in Production.")
+        if synthetic_qualification_enabled and vercel_share_token is None:
+            raise RuntimeError("The bounded Preview share credential is missing.")
+        if vercel_share_token is not None and not synthetic_qualification_enabled:
+            raise RuntimeError("Vercel share access is limited to synthetic Preview qualification.")
+        broker_hostname = (parsed_url.hostname or "").lower()
+        if vercel_share_token is not None and (
+            not broker_hostname.endswith(".vercel.app") or "-git-" in broker_hostname
+        ):
+            raise RuntimeError(
+                "Vercel share access requires an immutable Preview deployment origin."
+            )
         try:
             health_port = int(environment.get("PORT", "8080"))
             idle_poll_seconds = float(
@@ -229,6 +262,7 @@ class WorkerConfig:
             runtime_environment=runtime_environment,
             deployment_id=deployment_id,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
+            vercel_share_token=vercel_share_token,
             health_port=health_port,
             idle_poll_seconds=idle_poll_seconds,
         )

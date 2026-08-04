@@ -33,6 +33,8 @@ def main() -> int:
     parser.add_argument("--broker-url", required=True)
     parser.add_argument("--worker-secret-name", required=True)
     parser.add_argument("--worker-secret-version", required=True)
+    parser.add_argument("--vercel-share-secret-name", required=True)
+    parser.add_argument("--vercel-share-secret-version", required=True)
     parser.add_argument("--nvidia-secret-name", required=True)
     parser.add_argument("--nvidia-secret-version", required=True)
     arguments = parser.parse_args()
@@ -52,8 +54,13 @@ def main() -> int:
         )
     ):
         raise SystemExit("A WorkerPool identity value is malformed.")
-    if not IDENTIFIER.fullmatch(arguments.worker_secret_name) or not IDENTIFIER.fullmatch(
-        arguments.nvidia_secret_name
+    if not all(
+        IDENTIFIER.fullmatch(value)
+        for value in (
+            arguments.worker_secret_name,
+            arguments.vercel_share_secret_name,
+            arguments.nvidia_secret_name,
+        )
     ):
         raise SystemExit("A WorkerPool secret name is malformed.")
     broker = urlparse(arguments.broker_url)
@@ -81,6 +88,10 @@ def main() -> int:
         "DOCUMENT_EXTRACTION_WORKER_SECRET_NAME": arguments.worker_secret_name,
         "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION": _positive_version(
             arguments.worker_secret_version
+        ),
+        "DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_NAME": arguments.vercel_share_secret_name,
+        "DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_VERSION": _positive_version(
+            arguments.vercel_share_secret_version
         ),
         "DOCUMENT_EXTRACTION_NVIDIA_SECRET_NAME": arguments.nvidia_secret_name,
         "DOCUMENT_EXTRACTION_NVIDIA_SECRET_VERSION": _positive_version(

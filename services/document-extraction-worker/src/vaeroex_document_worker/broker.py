@@ -10,6 +10,7 @@ import secrets
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin, urlparse
 
 import httpx
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -46,10 +47,55 @@ class BrokerClient:
         )
 
     async def __aenter__(self) -> "BrokerClient":
+        if self._config.vercel_share_token is not None:
+            await self._bootstrap_vercel_share()
         return self
 
     async def __aexit__(self, *_: object) -> None:
+        self._client.cookies.clear()
         await self._client.aclose()
+
+    async def _bootstrap_vercel_share(self) -> None:
+        token = self._config.vercel_share_token
+        if token is None:
+            return
+        try:
+            response = await self._client.get(
+                "/",
+                params={"_vercel_share": token},
+                headers={"accept": "text/html"},
+            )
+        except httpx.TimeoutException as error:
+            raise BrokerFailure("vercel_share_timeout") from error
+        except httpx.TransportError as error:
+            raise BrokerFailure("vercel_share_transport") from error
+        if response.status_code not in (200, 301, 302, 303, 307, 308):
+            raise BrokerFailure("vercel_share_rejected", response.status_code)
+        location = response.headers.get("location")
+        if location:
+            target = urlparse(urljoin(str(response.request.url), location))
+            expected = urlparse(self._config.broker_url)
+            if (
+                target.scheme != expected.scheme
+                or target.hostname != expected.hostname
+                or target.port != expected.port
+                or token in location
+            ):
+                raise BrokerFailure("vercel_share_redirect_rejected")
+        expected_hostname = (urlparse(self._config.broker_url).hostname or "").lower()
+        cookies = tuple(self._client.cookies.jar)
+        if not cookies or any(
+            not cookie.secure
+            or not (
+                expected_hostname == cookie.domain.lstrip(".").lower()
+                or expected_hostname.endswith(
+                    "." + cookie.domain.lstrip(".").lower()
+                )
+            )
+            for cookie in cookies
+        ):
+            self._client.cookies.clear()
+            raise BrokerFailure("vercel_share_cookie_rejected")
 
     def _headers(self, method: str, target: str, body: bytes) -> dict[str, str]:
         timestamp = str(int(time.time()))

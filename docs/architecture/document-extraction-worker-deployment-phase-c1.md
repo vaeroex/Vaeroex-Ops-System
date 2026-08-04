@@ -142,18 +142,33 @@ surface to probe or reuse.
 
 ## Secrets and environment scope
 
-Worker Secret Manager access is limited to two secret resources:
+Worker Secret Manager access is limited to three exact Preview secret resources
+during the bounded qualification window:
 
 | Secret | Scope | Consumer | Readback policy |
 | --- | --- | --- | --- |
 | Ed25519 PKCS#8 private key | isolated Preview worker revision | worker only | exact version reference; never printed or read back by scripts |
+| Deployment-scoped Vercel Shareable Link token | one immutable PR Preview deployment, maximum one hour | worker broker bootstrap only | exact version reference; revoked and destroyed immediately after qualification |
 | NVIDIA API credential | isolated Preview worker revision | worker only | exact version reference; never printed or read back by scripts |
 
 The runtime service account must have no project-level role. It receives
-`roles/secretmanager.secretAccessor` only on those two secret resources. It has
+`roles/secretmanager.secretAccessor` only on those three secret resources during
+qualification. The Vercel grant and secret version are removed during mandatory
+cleanup. It has
 no database, Supabase, bucket, cache-encryption, KMS, broker-authority, or
 unrelated cloud credential. Startup rejects known forbidden credential names,
 including public/anonymous Supabase keys, even if injected accidentally.
+
+The Vercel credential is a URL/deployment-specific Shareable Link created only
+for the final immutable PR deployment with a TTL no greater than 3,600 seconds.
+It is not the project-wide Protection Bypass for Automation, is never stored in
+Vercel environment variables, and cannot be used by Production or unrelated
+Preview deployments. The worker accepts it only when both synthetic Preview
+gates are true, the runtime environment is `preview`, and the broker origin is
+an immutable `vercel.app` deployment rather than a moving Git branch alias. It
+uses the credential for one same-origin cookie bootstrap per broker client,
+rejects cross-origin redirects and insecure cookies, clears cookies at close,
+and never sends the credential or cookie to NVIDIA.
 
 The Vercel Preview broker may hold only the public worker-key record, broker
 capability keyring/current version, telemetry HMAC secret, managed cache
@@ -319,13 +334,18 @@ Qualification is permitted only after local validation, Preview migration
 review, secret-scope verification, inert deployment verification, health,
 broker-authentication, rotation, and kill-switch drills pass.
 
-1. Confirm Supabase reference `zfpnhvcmuuvtswttmnjd`, a non-Production Vercel
-   Preview origin, the isolated GCP project/region, and exact operator phrases.
+1. Confirm Supabase reference `zfpnhvcmuuvtswttmnjd`, the exact immutable
+   non-Production Vercel Preview deployment, the isolated GCP project/region,
+   and exact operator phrases. Prove the deployment-scoped Vercel credential is
+   rejected by Production and unrelated Preview deployments before opening any
+   execution gate.
 2. Apply only `20260804010000_document_extraction_worker_phase_c1_protocol.sql`
    through the canonical Preview migration workflow after checking the ledger.
 3. Build the pinned image and deploy its digest at zero instances with all four
-   worker gates false. Verify identity, env allowlist, secret references,
-   probes, resources, no URI, and zero instances without reading secrets.
+   worker gates false. Bind the broker to the immutable Preview origin and the
+   exact-version temporary Vercel share secret. Verify identity, env allowlist,
+   secret references, probes, resources, no URI, and zero instances without
+   reading secrets.
 4. Seed or enqueue only the twelve committed synthetic fixture IDs. Arbitrary
    uploads, paths, customer files, and customer routes remain unavailable.
 5. Open the application/database synthetic qualification window, then use the
@@ -364,9 +384,11 @@ Cleanup is mandatory even when qualification fails:
    reviews, bindings, cache envelopes, intake rows, and temporary qualification
    configuration in dependency-safe order. Retain only the approved aggregate
    content-free report.
-6. Delete local mode `0600` credential/identity inputs, temporary manifests,
-   logs, and rendered files. Retire qualification-only secret versions if they
-   are not retained for an inert revision.
+6. Revoke the exact Vercel Shareable Link without regeneration, destroy its
+   temporary Secret Manager version, remove its per-secret IAM grant, and
+   restore the prior known inert Worker Pool revision at zero instances. Delete
+   local mode `0600` credential/identity inputs, temporary manifests, logs, and
+   rendered files.
 7. Confirm no customer workspace setting or entitlement exists, no Production
    resource changed, and no extraction became Evidence, Business Memory, KPI,
    Business Health, or snapshot input.

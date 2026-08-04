@@ -27,6 +27,7 @@ ALLOWED_ENVIRONMENT = frozenset(
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION",
         "DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS",
         "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
+        "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
         "NVIDIA_API_KEY",
         "TMPDIR",
     }
@@ -119,7 +120,11 @@ def main() -> int:
     gate_value = "true" if arguments.expected_gate_state == "qualification" else "false"
     if any(environment[name].get("value") != gate_value for name in GATES):
         raise SystemExit("worker_pool_gate_state_mismatch")
-    for name_value in ("DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64", "NVIDIA_API_KEY"):
+    for name_value in (
+        "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64",
+        "DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN",
+        "NVIDIA_API_KEY",
+    ):
         item = environment[name_value]
         if "value" in item or not _secret_reference(item):
             raise SystemExit("worker_pool_secret_reference_invalid")

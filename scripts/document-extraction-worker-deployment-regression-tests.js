@@ -63,6 +63,7 @@ assert.doesNotMatch(poolTemplate, /^\s*(?:ingress|loadBalancer|autoscaling):/m);
 
 assert.match(deploy, /WORKER_IMAGE_DIGEST must be immutable/);
 assert.match(deploy, /WORKER_SECRET_VERSION/);
+assert.match(deploy, /VERCEL_SHARE_SECRET_VERSION/);
 assert.match(deploy, /NVIDIA_SECRET_VERSION/);
 assert.doesNotMatch(deploy, /:latest/);
 assert.match(deploy, /gcloud run worker-pools replace/);
@@ -80,6 +81,7 @@ assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED[\s\S]+val
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED[\s\S]+value: "false"/);
 assert.match(poolTemplate, /secretKeyRef:[\s\S]+DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_VERCEL_SHARE_TOKEN[\s\S]+secretKeyRef:[\s\S]+DOCUMENT_EXTRACTION_VERCEL_SHARE_SECRET_VERSION/);
 assert.match(enable, /synthetic-preview-only-12-documents-13-pages/);
 assert.match(enable, /--instances 1/);
 assert.match(disable, /--instances 0[\s\S]+DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=false/);
@@ -121,6 +123,8 @@ assert.match(config, /runtime_environment == "preview"/);
 assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED/);
 assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED/);
 assert.match(config, /Forbidden private-worker credential/);
+assert.match(config, /Vercel Preview share access is forbidden in Production/);
+assert.match(config, /immutable Preview deployment origin/);
 
 assert.match(broker, /Ed25519PrivateKey/);
 assert.match(broker, /x-vaeroex-worker-environment/);
@@ -128,6 +132,8 @@ assert.match(broker, /x-vaeroex-worker-deployment-id/);
 assert.match(broker, /secrets\.token_hex\(16\)/);
 assert.match(broker, /follow_redirects=False/);
 assert.match(broker, /trust_env=False/);
+assert.match(broker, /_bootstrap_vercel_share/);
+assert.match(broker, /vercel_share_redirect_rejected/);
 assert.match(runner, /approved_fixture_for_source/);
 assert.match(runner, /materialize_approved_pages/);
 assert.match(runner, /check_provider_boundary/);
