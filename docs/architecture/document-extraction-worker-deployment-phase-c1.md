@@ -732,6 +732,103 @@ database completion path remains `awaiting_review` / `needs_review` /
 metric, Business Health, snapshot, Trust, or Saved Analysis authority is
 granted before the existing authorized human-review path.
 
+### Final hosted V2 diagnostic and provider decision (2026-08-05)
+
+The final approved one-page diagnostic exercised `hosted_tool_call_v2` exactly
+once with zero retries. It returned HTTP `200`, `application/json`, the exact
+`nvidia/nemotron-parse` model, `finish_reason: stop`, null assistant content,
+and one `markdown_bbox` function call. The argument transport was a complete
+JSON string, and the content-free field-path observer found ten elements with
+the exact `bbox`, `text`, and `type` keys, numeric normalized coordinates, no
+unknown or missing fields, no mixed-profile markers, and no truncation signal.
+The response was 2,758 bytes, completed in 1,758 ms, used no NVCF asset flow,
+and produced one provider outcome with zero retries or ambiguous dispatches.
+
+The unchanged strict V2 validator still rejected the response as
+`provider_output_schema_mismatch` before normalization. The one-item nested
+argument list was not the cause: the existing parser already admits that exact
+historical compatibility shape. The remaining rejection therefore comes from
+an unobserved response-envelope condition that NVIDIA's hosted schema does not
+currently document. Identifying it would require another diagnostic or raw
+provider content, neither of which is authorized by the final-diagnostic
+decision rule.
+
+Vaeroex will not broaden the hosted parser, add profile auto-detection, or infer
+another compatibility exception. Historical hosted v1, hosted v2, and the
+separate v1.2 tagged-content profile remain unchanged and fail closed. Hosted
+Nemotron Parse qualification is blocked pending an explicit, stable NVIDIA
+response contract.
+
+Cleanup removed the synthetic Storage and database fixtures, provider outcome,
+diagnostic telemetry, ephemeral broker, broker secrets, temporary IAM, build
+artifacts, and temporary worker signing-key version. All extraction gates are
+false, the retained Worker Pool is at zero instances, the Preview ledger is
+unchanged, and Production was never addressed.
+
+### Inert Google Document AI alternative
+
+The worker now contains a separately versioned, inactive Google Document AI
+Enterprise Document OCR adapter as the provider-neutral alternative. It is not
+selected by `active_provider_contract()`, is not imported by the runner, has no
+environment switch, adds no migration, and cannot dispatch from any deployed
+worker.
+
+The contract is pinned to:
+
+- the GA `OCR_PROCESSOR` type;
+- stable processor version `pretrained-ocr-v2.1-2024-08-07`;
+- an exact numeric Google project, `us` location, processor ID, and immutable
+  processor-version resource;
+- the regional v1 `processors.process` REST method;
+- serializer `google_document_ai_process_request_v1`;
+- validator `google_document_ai_process_response_v1`;
+- normalization `google_document_ai_layout_normalization_v1`; and
+- normalized-vertex coordinate contract
+  `normalized_vertices_unit_interval_v1`.
+
+Each request sends one already-rendered PNG as `rawDocument`, sets
+`imagelessMode`, and requests only `mimeType`, document text, page identity,
+lines, and tables through the documented top-level/page field mask. It sends no
+workspace label or customer identifier. The request fingerprint binds the
+adapter, provider profile, exact processor resource and version, serializer,
+validator, normalization, coordinate contract, document/page hashes, rendered
+dimensions, MIME type, field mask, payload mode, and timeout policy. OAuth
+tokens and runtime request metadata never participate in identity.
+
+Authentication is designed for the Cloud Run service account's metadata
+service. Tokens remain in memory, static Google key files remain forbidden by
+the worker configuration, and future activation must grant only online-process
+permission on the exact processor resource. No Google SDK dependency or
+credential-chain fallback is added.
+
+The response parser is fail closed. It requires the selected document fields,
+one provider page per rendered page, bounded text anchors, normalized four-point
+polygons, documented line/table shapes, non-overlapping ranges, and exact MIME
+and page identity. Table-contained line duplicates are deterministically
+removed; all other overlaps, pixel-only coordinates, unknown fields, malformed
+anchors, duplicate keys, oversized responses, and ambiguous transport failures
+are rejected. A documented redundant pixel-vertex polygon may accompany the
+required normalized polygon but never controls normalized output. Provider
+confidence is validated for shape but never enters
+Vaeroex confidence or authority.
+
+Successful parsing still returns only the existing provider-neutral normalized
+page draft. Encryption, review-provenance binding, mandatory human review, and
+all downstream authority guards remain outside and after the adapter. Before
+activation, a separate reviewed change must provision the API and exact
+processor, grant least-privilege IAM, add an explicit provider profile to the
+database and runner, qualify caching/review identities, and pass the frozen
+synthetic corpus. This PR performs none of those actions.
+
+Official contract references:
+
+- [Document AI `processors.process` REST method](https://docs.cloud.google.com/document-ai/docs/reference/rest/v1/projects.locations.processors/process)
+- [Document AI processor list and stable Enterprise OCR versions](https://docs.cloud.google.com/document-ai/docs/processors-list)
+- [Document AI IAM roles](https://docs.cloud.google.com/document-ai/docs/access-control/iam-roles)
+- [Document response, text-anchor, line, table, and bounding-polygon schema](https://docs.cloud.google.com/document-ai/docs/reference/rest/v1/Document)
+- [Cloud Run service identity](https://docs.cloud.google.com/run/docs/securing/service-identity)
+- [REST access tokens from the metadata server](https://docs.cloud.google.com/docs/authentication/rest)
+
 ## Phase C2 prerequisites
 
 Phase C2 cannot begin until Phase C1 quality and adoption gates pass, all
