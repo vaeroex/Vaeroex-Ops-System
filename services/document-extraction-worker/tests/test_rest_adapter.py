@@ -11,6 +11,8 @@ import httpx
 import pytest
 from PIL import Image
 
+from vaeroex_document_worker import rest_adapter
+from vaeroex_document_worker.field_path_diagnostic import FieldPathDiagnosticV1
 from vaeroex_document_worker.provider_contract import (
     HOSTED_ACCEPTED_FINISH_REASONS,
     HOSTED_COMPATIBILITY_CONTRACT_VERSION,
@@ -24,7 +26,11 @@ from vaeroex_document_worker.provider_contract import (
     V1_2_NIM_CONTRACT,
     V1_2_TASK_PROMPT,
 )
-from vaeroex_document_worker.provider_types import ProviderFailure, RenderedPage
+from vaeroex_document_worker.provider_types import (
+    MAX_PROVIDER_LATENCY_MS,
+    ProviderFailure,
+    RenderedPage,
+)
 from vaeroex_document_worker.response_profile import (
     ResponseProfileDiagnosticV1,
     classify_response_profile,
@@ -387,6 +393,225 @@ def test_response_profile_observer_failure_cannot_change_provider_result(
     )
 
     assert result.pages[0]["blocks"][0]["text"] == "Synthetic extraction"
+
+
+class AdvancingClock:
+    def __init__(self, step: float = 0.025) -> None:
+        self.value = 100.0
+        self.step = step
+
+    def __call__(self) -> float:
+        self.value += self.step
+        return self.value
+
+
+def test_field_path_observer_runs_before_unchanged_schema_rejection(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    response = hosted_stop_envelope()
+    set_hosted_arguments(
+        response,
+        json.dumps(
+            [
+                {
+                    "class": "private-class-value",
+                    "text": "private extracted value",
+                    "bbox": [0.1, 0.2, 0.8, 0.4],
+                }
+            ]
+        ),
+    )
+    body = json.dumps(response).encode("utf-8")
+    observed: list[FieldPathDiagnosticV1] = []
+    monkeypatch.setattr(
+        "vaeroex_document_worker.rest_adapter.time.perf_counter",
+        AdvancingClock(),
+    )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={
+                "content-type": "application/json",
+                "nvcf-reqid": "safe-provider-request-id",
+            },
+            content=body,
+        )
+
+    with pytest.raises(ProviderFailure) as caught:
+        invoke_rest_adapter(
+            [rendered_page(tmp_path)],
+            "d" * 64,
+            HOSTED_CONTRACT,
+            "test-secret",
+            transport=httpx.MockTransport(handler),
+            field_path_observer=observed.append,
+        )
+
+    assert caught.value.code == "provider_output_schema_mismatch"
+    assert caught.value.provider_request_started
+    assert caught.value.latency_ms is not None and caught.value.latency_ms > 0
+    assert len(observed) == 1
+    assert observed[0].first_failure_class == "missing_required_key"
+    event = json.dumps(observed[0].privacy_safe_event(), sort_keys=True)
+    assert "private extracted value" not in event
+    assert "private-class-value" not in event
+    assert "0.1" not in event
+
+
+def test_field_path_observer_reports_valid_shape_without_changing_acceptance(
+    tmp_path: Path,
+) -> None:
+    response = hosted_stop_envelope()
+    observed: list[FieldPathDiagnosticV1] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=json.dumps(response).encode("utf-8"),
+        )
+
+    result = invoke_rest_adapter(
+        [rendered_page(tmp_path)],
+        "d" * 64,
+        HOSTED_CONTRACT,
+        "test-secret",
+        transport=httpx.MockTransport(handler),
+        field_path_observer=observed.append,
+    )
+
+    assert result.pages[0]["blocks"][0]["text"] == "Synthetic extraction"
+    assert len(observed) == 1
+    assert observed[0].first_failure_class is None
+
+
+def test_field_path_observer_failure_cannot_change_provider_result(
+    tmp_path: Path,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=hosted_response(),
+        )
+
+    def broken_observer(_diagnostic: FieldPathDiagnosticV1) -> None:
+        raise RuntimeError("provider-controlled private exception text")
+
+    result = invoke_rest_adapter(
+        [rendered_page(tmp_path)],
+        "d" * 64,
+        HOSTED_CONTRACT,
+        "test-secret",
+        transport=httpx.MockTransport(handler),
+        field_path_observer=broken_observer,
+    )
+
+    assert result.pages[0]["blocks"][0]["text"] == "Synthetic extraction"
+
+
+def test_field_path_observer_rejects_every_non_v2_contract_before_network() -> None:
+    with pytest.raises(ValueError, match="exact hosted_tool_call_v2 contract"):
+        invoke_rest_adapter(
+            [],
+            "d" * 64,
+            LEGACY_HOSTED_CONTRACT,
+            "test-secret",
+            field_path_observer=lambda _diagnostic: None,
+        )
+
+
+def test_success_schema_failure_malformed_json_and_timeout_record_bounded_latency(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setattr(
+        "vaeroex_document_worker.rest_adapter.time.perf_counter",
+        AdvancingClock(),
+    )
+
+    def success(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "application/json"},
+            content=hosted_response(),
+        )
+
+    result = invoke_rest_adapter(
+        [rendered_page(tmp_path)],
+        "d" * 64,
+        HOSTED_CONTRACT,
+        "test-secret",
+        transport=httpx.MockTransport(success),
+    )
+    assert 0 < result.latency_ms <= MAX_PROVIDER_LATENCY_MS
+
+    for body, expected_code in (
+        (b"{", "provider_output_malformed"),
+        (
+            json.dumps(
+                {
+                    "model": HOSTED_CONTRACT.model,
+                    "choices": [{"finish_reason": "stop", "message": {}}],
+                }
+            ).encode("utf-8"),
+            "provider_output_schema_mismatch",
+        ),
+    ):
+        with pytest.raises(ProviderFailure) as caught:
+            invoke_rest_adapter(
+                [rendered_page(tmp_path)],
+                "d" * 64,
+                HOSTED_CONTRACT,
+                "test-secret",
+                transport=httpx.MockTransport(
+                    lambda _request, payload=body: httpx.Response(
+                        200,
+                        headers={"content-type": "application/json"},
+                        content=payload,
+                    )
+                ),
+            )
+        assert caught.value.code == expected_code
+        assert caught.value.provider_request_started
+        assert caught.value.latency_ms is not None and caught.value.latency_ms > 0
+
+    def timeout(request: httpx.Request) -> httpx.Response:
+        raise httpx.ReadTimeout("private provider timeout text", request=request)
+
+    with pytest.raises(ProviderFailure) as timed_out:
+        invoke_rest_adapter(
+            [rendered_page(tmp_path)],
+            "d" * 64,
+            HOSTED_CONTRACT,
+            "test-secret",
+            transport=httpx.MockTransport(timeout),
+        )
+    assert timed_out.value.provider_request_started
+    assert timed_out.value.latency_ms is not None and timed_out.value.latency_ms > 0
+    assert "private provider timeout text" not in str(timed_out.value)
+
+
+def test_pre_network_rejection_and_elapsed_bounds_are_explicit(
+    monkeypatch: Any,
+) -> None:
+    with pytest.raises(ProviderFailure) as rejected:
+        invoke_rest_adapter([], "d" * 64, HOSTED_CONTRACT, "test-secret")
+    assert rejected.value.latency_ms is None
+    assert not rejected.value.provider_request_started
+
+    monkeypatch.setattr(
+        "vaeroex_document_worker.rest_adapter.time.perf_counter",
+        lambda: 9.0,
+    )
+    assert rest_adapter._bounded_elapsed_ms(10.0) == 0
+    monkeypatch.setattr(
+        "vaeroex_document_worker.rest_adapter.time.perf_counter",
+        lambda: 1_000.0,
+    )
+    assert rest_adapter._bounded_elapsed_ms(0.0) == MAX_PROVIDER_LATENCY_MS
 
 
 @pytest.mark.parametrize(

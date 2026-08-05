@@ -5,13 +5,23 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from vaeroex_document_worker import runner
 from vaeroex_document_worker.config import WorkerConfig
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
-from vaeroex_document_worker.provider_types import ProviderFailure, ProviderResult, RenderedPage
+from vaeroex_document_worker.provider_types import (
+    MAX_PROVIDER_LATENCY_MS,
+    ProviderFailure,
+    ProviderResult,
+    RenderedPage,
+)
 from vaeroex_document_worker.response_profile import DIAGNOSTIC_FIXTURE_ID
 from vaeroex_document_worker.synthetic import load_frozen_corpus
-from vaeroex_document_worker.telemetry import emit_response_profile_diagnostic
+from vaeroex_document_worker.telemetry import (
+    emit_field_path_diagnostic,
+    emit_response_profile_diagnostic,
+)
 
 
 class FakeBroker:
@@ -122,6 +132,7 @@ def diagnostic_worker_config() -> WorkerConfig:
         **{
             **synthetic_worker_config().__dict__,
             "response_profile_diagnostic_enabled": True,
+            "field_path_diagnostic_enabled": True,
         }
     )
 
@@ -518,6 +529,29 @@ def test_response_profile_diagnostic_is_bound_to_one_committed_fixture(
     assert fake.operations.count("authorize_dispatch") == 0
 
 
+def test_field_path_diagnostic_direct_config_cannot_bypass_preview_boundary(
+    monkeypatch: Any,
+) -> None:
+    config = WorkerConfig(
+        **{
+            **diagnostic_worker_config().__dict__,
+            "runtime_environment": "production",
+        }
+    )
+    broker_opened = False
+
+    def broker(_config: WorkerConfig) -> FakeBroker:
+        nonlocal broker_opened
+        broker_opened = True
+        return FakeBroker(_config)
+
+    monkeypatch.setattr(runner, "BrokerClient", broker)
+
+    with pytest.raises(RuntimeError, match="not authorized"):
+        asyncio.run(runner.run_one_job(config))
+    assert not broker_opened
+
+
 def test_response_profile_diagnostic_allows_one_attempt_and_zero_retries(
     monkeypatch: Any,
 ) -> None:
@@ -542,13 +576,21 @@ def test_response_profile_diagnostic_allows_one_attempt_and_zero_retries(
         completed_pages: tuple[dict[str, Any], ...],
         before_provider_boundary: object,
         response_profile_observer: object,
+        field_path_observer: object,
     ) -> ProviderResult:
         nonlocal attempts
         attempts += 1
         assert completed_pages == ()
         assert before_provider_boundary is not None
         assert response_profile_observer is emit_response_profile_diagnostic
-        raise ProviderFailure("transport", "transport", retryable=True)
+        assert field_path_observer is emit_field_path_diagnostic
+        raise ProviderFailure(
+            "transport",
+            "transport",
+            retryable=True,
+            latency_ms=1_220,
+            provider_request_started=True,
+        )
 
     monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
     result = asyncio.run(runner.run_one_job(config))
@@ -560,3 +602,69 @@ def test_response_profile_diagnostic_allows_one_attempt_and_zero_retries(
     assert attempts == 1
     assert fake.operations.count("authorize_retry") == 0
     assert fake.operations.count("authorize_dispatch") == 1
+    outcome = next(
+        payload for payload in fake.payloads if payload["operation"] == "provider_outcome"
+    )
+    terminal = next(payload for payload in fake.payloads if payload["operation"] == "fail")
+    assert outcome["latencyMs"] == 1_220
+    assert terminal["telemetry"]["latencyMs"] == 1_220
+
+
+@pytest.mark.parametrize(
+    ("observed_latency", "expected_latency"),
+    (
+        (-1, 0),
+        (MAX_PROVIDER_LATENCY_MS + 99_999, MAX_PROVIDER_LATENCY_MS),
+    ),
+)
+def test_runner_bounds_failure_latency_before_any_persistence(
+    monkeypatch: Any,
+    observed_latency: int,
+    expected_latency: int,
+) -> None:
+    fixture = next(
+        item for item in load_frozen_corpus() if item.document_id == DIAGNOSTIC_FIXTURE_ID
+    )
+    config = diagnostic_worker_config()
+    fake = FakeBroker(config, page_count=1, source_bytes=fixture.source_path.read_bytes())
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        raise ProviderFailure(
+            "transport",
+            "transport",
+            retryable=False,
+            latency_ms=observed_latency,
+            provider_request_started=True,
+        )
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    outcome = next(
+        payload for payload in fake.payloads if payload["operation"] == "provider_outcome"
+    )
+    terminal = next(payload for payload in fake.payloads if payload["operation"] == "fail")
+    assert outcome["latencyMs"] == expected_latency
+    assert terminal["telemetry"]["latencyMs"] == expected_latency
+
+
+def test_runner_bounds_success_latency_before_provider_outcome(
+    monkeypatch: Any,
+) -> None:
+    fake = FakeBroker(worker_config())
+    install_boundaries(monkeypatch, fake)
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: result_for(1, latency_ms=-10),
+    )
+
+    result = asyncio.run(runner.run_one_job(worker_config()))
+
+    assert result.status == "needs_review"
+    outcome = next(
+        payload for payload in fake.payloads if payload["operation"] == "provider_outcome"
+    )
+    assert outcome["latencyMs"] == 0

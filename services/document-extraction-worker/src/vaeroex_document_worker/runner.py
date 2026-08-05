@@ -10,7 +10,8 @@ from typing import Any, Callable
 
 from .broker import BrokerClient, BrokerFailure
 from .config import MAX_PAGES, WorkerConfig
-from .provider_types import ProviderFailure, ProviderResult
+from .provider_contract import HOSTED_RESPONSE_PROFILE
+from .provider_types import MAX_PROVIDER_LATENCY_MS, ProviderFailure, ProviderResult
 from .renderer import render_source
 from .rest_adapter import invoke_rest_adapter
 from .response_profile import DIAGNOSTIC_FIXTURE_ID
@@ -24,7 +25,7 @@ from .synthetic import (
     materialize_approved_pages,
 )
 from .temporary import SecureTemporaryWorkspace, scavenge_stale_worker_directories
-from .telemetry import emit_response_profile_diagnostic
+from .telemetry import emit_field_path_diagnostic, emit_response_profile_diagnostic
 
 
 @dataclass(frozen=True)
@@ -33,6 +34,12 @@ class WorkerRunResult:
     provider_calls: int
     retry_count: int
     failure_code: str | None
+
+
+def _bounded_provider_latency(value: object) -> int:
+    if type(value) is not int:
+        return 0
+    return max(0, min(value, MAX_PROVIDER_LATENCY_MS))
 
 
 ProgressCallback = Callable[[str], None]
@@ -188,6 +195,13 @@ async def run_one_job(
     progress_callback: ProgressCallback | None = None,
 ) -> WorkerRunResult:
     active_config = config or WorkerConfig.from_environment()
+    if active_config.field_path_diagnostic_enabled and (
+        active_config.runtime_environment != "preview"
+        or not active_config.provider_execution_enabled
+        or not active_config.synthetic_qualification_enabled
+        or active_config.provider_contract.response_profile != HOSTED_RESPONSE_PROFILE
+    ):
+        raise RuntimeError("Field-path diagnostics are not authorized for this runtime.")
     scavenge_stale_worker_directories()
     async with BrokerClient(active_config) as broker:
         claim = await broker.post({"operation": "claim", "leaseSeconds": 300})
@@ -245,12 +259,20 @@ async def run_one_job(
                             synthetic_fixture,
                             rendered_directory,
                         )
-                        if active_config.response_profile_diagnostic_enabled and (
+                        diagnostic_enabled = (
+                            active_config.response_profile_diagnostic_enabled
+                            or active_config.field_path_diagnostic_enabled
+                        )
+                        if diagnostic_enabled and (
                             synthetic_fixture.document_id != DIAGNOSTIC_FIXTURE_ID
                             or len(rendered_pages) != 1
                         ):
                             raise SyntheticQualificationFailure(
-                                "response_profile_diagnostic_fixture_rejected"
+                                (
+                                    "response_profile_diagnostic_fixture_rejected"
+                                    if active_config.response_profile_diagnostic_enabled
+                                    else "field_path_diagnostic_fixture_rejected"
+                                )
                             )
                     except SyntheticQualificationFailure as failure:
                         emit_synthetic_failure_once(str(failure))
@@ -312,6 +334,7 @@ async def run_one_job(
                 completed_pages: tuple[dict[str, Any], ...] = ()
                 while True:
                     provider_calls += 1
+                    attempt_latency_ms = 0
                     try:
                         event_loop = asyncio.get_running_loop()
 
@@ -342,6 +365,10 @@ async def run_one_job(
                             provider_options["response_profile_observer"] = (
                                 emit_response_profile_diagnostic
                             )
+                        if active_config.field_path_diagnostic_enabled:
+                            provider_options["field_path_observer"] = (
+                                emit_field_path_diagnostic
+                            )
                         result = await asyncio.to_thread(
                             invoke_rest_adapter,
                             rendered_pages,
@@ -350,6 +377,7 @@ async def run_one_job(
                             active_config.nvidia_api_key,
                             **provider_options,
                         )
+                        attempt_latency_ms = _bounded_provider_latency(result.latency_ms)
                         artifact = _draft(result, route, document_class, page_count)
                         _notify(progress_callback, "provider_completed")
                         await broker.post(
@@ -358,22 +386,28 @@ async def run_one_job(
                                 "leaseCapability": lease,
                                 "dispatchRequestId": dispatch_request_id,
                                 "resultClass": "success",
-                                "latencyMs": result.latency_ms,
+                                "latencyMs": attempt_latency_ms,
                             }
                         )
                         break
                     except ProviderFailure as failure:
+                        failure_latency_ms = _bounded_provider_latency(
+                            failure.latency_ms
+                            if failure.latency_ms is not None
+                            else attempt_latency_ms
+                        )
                         outcome = await broker.post(
                             {
                                 "operation": "provider_outcome",
                                 "leaseCapability": lease,
                                 "dispatchRequestId": dispatch_request_id,
                                 "resultClass": failure.result_class,
-                                "latencyMs": 0,
+                                "latencyMs": failure_latency_ms,
                             }
                         )
                         if (
                             not active_config.response_profile_diagnostic_enabled
+                            and not active_config.field_path_diagnostic_enabled
                             and failure.retryable
                             and retry_count == 0
                             and outcome.get("retry_permitted")
@@ -398,7 +432,12 @@ async def run_one_job(
                                 continue
                         emit_synthetic_failure_once(failure.code)
                         return await _fail_job(
-                            broker, lease, failure, provider_calls, retry_count, 0
+                            broker,
+                            lease,
+                            failure,
+                            provider_calls,
+                            retry_count,
+                            failure_latency_ms,
                         )
 
                 await _advance(broker, lease, "provider_dispatched", "extracting")

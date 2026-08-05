@@ -33,6 +33,7 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "false",
+        "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED": "false",
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": "nvidia/nemotron-parse",
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v2",
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v2",
@@ -244,11 +245,19 @@ def test_deployed_worker_verifier_requires_exact_diagnostic_state(
     for item in environment:
         if item["name"] == "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED":
             item["value"] = "true"
-    environment.append(
-        {
-            "name": "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION",
-            "value": "nemotron-parse-response-profile-one-call-v1",
-        }
+        if item["name"] == "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED":
+            item["value"] = "true"
+    environment.extend(
+        [
+            {
+                "name": "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION",
+                "value": "nemotron-parse-response-profile-one-call-v1",
+            },
+            {
+                "name": "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION",
+                "value": "nemotron-parse-field-path-one-call-v1",
+            },
+        ]
     )
     description = tmp_path / "description.json"
     description.write_text(json.dumps(resource), encoding="utf-8")
@@ -274,7 +283,7 @@ def test_deployed_worker_verifier_requires_exact_diagnostic_state(
         text=True,
     )
     assert missing_confirmation.returncode != 0
-    assert "worker_pool_diagnostic_confirmation_missing" in missing_confirmation.stderr
+    assert "worker_pool_field_path_confirmation_missing" in missing_confirmation.stderr
 
 
 def test_signal_summary_never_returns_raw_payloads(tmp_path: Path) -> None:

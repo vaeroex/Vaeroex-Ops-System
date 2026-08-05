@@ -21,9 +21,14 @@ RESPONSE_PROFILE_DIAGNOSTIC_GATE = (
 RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION = (
     "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION"
 )
+FIELD_PATH_DIAGNOSTIC_GATE = "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED"
+FIELD_PATH_DIAGNOSTIC_CONFIRMATION = (
+    "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION"
+)
 EXPECTED_RESPONSE_PROFILE_CONFIRMATION = (
     "nemotron-parse-response-profile-one-call-v1"
 )
+EXPECTED_FIELD_PATH_CONFIRMATION = "nemotron-parse-field-path-one-call-v1"
 ALLOWED_ENVIRONMENT = frozenset(
     {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT",
@@ -35,6 +40,7 @@ ALLOWED_ENVIRONMENT = frozenset(
         "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE",
         AUTH_QUALIFICATION_GATE,
         RESPONSE_PROFILE_DIAGNOSTIC_GATE,
+        FIELD_PATH_DIAGNOSTIC_GATE,
         *GATES,
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL",
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION",
@@ -124,7 +130,10 @@ def main() -> int:
         if not isinstance(name_value, str) or name_value in environment:
             raise SystemExit("worker_pool_environment_invalid")
         environment[name_value] = item
-    optional_environment = {RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION}
+    optional_environment = {
+        RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION,
+        FIELD_PATH_DIAGNOSTIC_CONFIRMATION,
+    }
     observed_environment = set(environment)
     if not (
         observed_environment.issubset(ALLOWED_ENVIRONMENT | optional_environment)
@@ -148,25 +157,33 @@ def main() -> int:
         if environment[name_value].get("value") != expected:
             raise SystemExit("worker_pool_version_or_environment_mismatch")
     expected_gates = {
-        "disabled": ("false", "false", "false", "false", "false", "false"),
-        "authentication": ("true", "false", "false", "false", "true", "false"),
-        "qualification": ("true", "true", "true", "true", "false", "false"),
-        "diagnostic": ("true", "true", "true", "true", "false", "true"),
+        "disabled": ("false", "false", "false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "true", "false", "false"),
+        "qualification": ("true", "true", "true", "true", "false", "false", "false"),
+        "diagnostic": ("true", "true", "true", "true", "false", "true", "true"),
     }[arguments.expected_gate_state]
     observed_gates = tuple(environment[name].get("value") for name in GATES) + (
         environment[AUTH_QUALIFICATION_GATE].get("value"),
         environment[RESPONSE_PROFILE_DIAGNOSTIC_GATE].get("value"),
+        environment[FIELD_PATH_DIAGNOSTIC_GATE].get("value"),
     )
     if observed_gates != expected_gates:
         raise SystemExit("worker_pool_gate_state_mismatch")
     confirmation = environment.get(RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION)
+    field_path_confirmation = environment.get(FIELD_PATH_DIAGNOSTIC_CONFIRMATION)
     if arguments.expected_gate_state == "diagnostic":
         if (
             confirmation is None
             or confirmation.get("value") != EXPECTED_RESPONSE_PROFILE_CONFIRMATION
         ):
             raise SystemExit("worker_pool_diagnostic_confirmation_missing")
-    elif confirmation is not None:
+        if (
+            field_path_confirmation is None
+            or field_path_confirmation.get("value")
+            != EXPECTED_FIELD_PATH_CONFIRMATION
+        ):
+            raise SystemExit("worker_pool_field_path_confirmation_missing")
+    elif confirmation is not None or field_path_confirmation is not None:
         raise SystemExit("worker_pool_diagnostic_confirmation_unexpected")
     expected_secrets = {
         "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64": (

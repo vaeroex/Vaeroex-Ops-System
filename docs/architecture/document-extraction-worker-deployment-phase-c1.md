@@ -378,6 +378,73 @@ and confirm no NVCF asset or temporary file remains. The retained Worker Pool
 must finish at zero instances with every gate false. Only approved content-free
 diagnostic metadata may remain in bounded platform logs.
 
+## One-call field-path diagnostic
+
+The response-profile replay proved the hosted compatibility envelope but did
+not retain enough structure to identify why the strict `markdown_bbox`
+arguments validator returned `provider_output_schema_mismatch`. A separate
+`nemotron_parse_field_path_diagnostic_v1` observer is therefore available for
+one later, independently approved synthetic call. It does not alter the
+validator or its workflow-visible failure code.
+
+The observer is wired only when the worker is in Preview synthetic
+qualification mode and both of these field-path settings match exactly:
+
+- `DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED=true`; and
+- `DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION=`
+  `nemotron-parse-field-path-one-call-v1`.
+
+The existing response-profile diagnostic has its own independent gate and
+confirmation. The checked-in diagnostic activation script enables both for a
+single replay, while every inert, authentication-only, and ordinary synthetic
+configuration explicitly disables the field-path gate. Worker startup rejects
+the field-path gate outside Preview or without the existing two synthetic
+qualification gates. The adapter additionally rejects a field-path observer
+unless the exact `hosted_tool_call_v2` contract is selected. The runner accepts
+only committed fixture `synthetic-doc-executive-kpi-review`, requires exactly
+one rendered page, and disables retry authorization whenever either diagnostic
+observer is active.
+
+The observer parses the in-memory argument string with duplicate-key
+preservation and emits only bounded structural categories: root JSON type,
+allowlisted structural key names, array and element counts, JSON value types,
+bbox container/key/type shape, canonical structural paths, missing/unknown/
+duplicate/type-mismatch paths, first structural failure class, bounded
+additional-failure count, exact approved profile/model category, provider
+request ID, finish reason, byte counts, parse result, and measured latency.
+Unknown key names collapse to the literal `unknown_key`; provider-controlled
+values and exception strings are never copied. The observer has no recursive
+serializer.
+
+Hard limits are eight distinct element schemas, 32 observed names per object,
+12 paths per category, 48 total failures, 160 characters per path, 500
+elements, 1,000,000 argument bytes, 12,000 telemetry bytes, and 180,000 ms.
+Crossing any structural or payload bound replaces the entire event with the
+fixed `diagnostic_structure_limit_exceeded` marker. It never retains extracted
+text or values, coordinate values, semantic labels, page values, element IDs,
+raw arguments or responses, content previews, prompts, images, paths, URLs,
+workspace/customer/file/job identities, credentials, assertions, signatures,
+keys, or NVCF asset identifiers.
+
+The observer executes before strict normalization but is wrapped independently:
+its failure is swallowed and cannot affect acceptance, retry classification,
+normalization, encryption, cache writes, review creation, provenance, or any
+downstream authority. A rejected response remains rejected and cannot create a
+normalized artifact or review row.
+
+Provider elapsed time now starts at the first authorized external provider
+boundary and uses a monotonic local clock through response observation and
+schema validation. Success and post-network failure durations are clamped to a
+nonnegative 180,000 ms maximum before broker outcome and terminal telemetry are
+recorded. Pre-network rejection remains explicitly zero/absent. Provider
+latency fields and provider-controlled exception text are never trusted.
+
+No field-path diagnostic has been executed. A live replay remains separately
+approval-gated and must use one committed page, one job, one provider attempt,
+zero retries, the private broker path, and the full cleanup sequence documented
+above. Its output may diagnose the mismatch but cannot automatically relax or
+modify the hosted schema.
+
 ## Measurements
 
 Record only aggregate values:

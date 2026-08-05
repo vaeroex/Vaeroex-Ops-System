@@ -16,6 +16,7 @@ from .provider_contract import (
     ProviderContract,
     active_provider_contract,
 )
+from .field_path_diagnostic import FIELD_PATH_DIAGNOSTIC_CONFIRMATION
 from .response_profile import DIAGNOSTIC_CONFIRMATION
 
 CLIENT_REVISION = REST_ADAPTER_VERSION
@@ -161,6 +162,7 @@ class WorkerConfig:
     authentication_qualification_enabled: bool
     synthetic_qualification_enabled: bool
     response_profile_diagnostic_enabled: bool = False
+    field_path_diagnostic_enabled: bool = False
     health_port: int = 8080
     idle_poll_seconds: float = 5.0
 
@@ -264,6 +266,21 @@ class WorkerConfig:
             raise RuntimeError(
                 "Response-profile diagnostics require the exact Preview-only synthetic confirmation."
             )
+        field_path_diagnostic_enabled = _enabled(
+            environment.get("DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED")
+        )
+        if field_path_diagnostic_enabled and (
+            runtime_environment != "preview"
+            or not synthetic_qualification_enabled
+            or environment.get(
+                "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION",
+                "",
+            ).strip()
+            != FIELD_PATH_DIAGNOSTIC_CONFIRMATION
+        ):
+            raise RuntimeError(
+                "Field-path diagnostics require the exact Preview-only synthetic confirmation."
+            )
         if authentication_qualification_enabled and (
             provider_execution_enabled
             or synthetic_qualification_enabled
@@ -299,6 +316,7 @@ class WorkerConfig:
             authentication_qualification_enabled=authentication_qualification_enabled,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
             response_profile_diagnostic_enabled=response_profile_diagnostic_enabled,
+            field_path_diagnostic_enabled=field_path_diagnostic_enabled,
             health_port=health_port,
             idle_poll_seconds=idle_poll_seconds,
         )

@@ -13,6 +13,9 @@ from vaeroex_document_worker.config import (
     PRODUCTION_APPROVAL,
     WorkerConfig,
 )
+from vaeroex_document_worker.field_path_diagnostic import (
+    FIELD_PATH_DIAGNOSTIC_CONFIRMATION,
+)
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 from vaeroex_document_worker.response_profile import DIAGNOSTIC_CONFIRMATION
 
@@ -176,6 +179,43 @@ def test_response_profile_diagnostic_is_unavailable_in_production() -> None:
             "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
             "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "true",
             "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION": DIAGNOSTIC_CONFIRMATION,
+        }
+    )
+
+    with pytest.raises(RuntimeError, match="exact Preview-only synthetic confirmation"):
+        WorkerConfig.from_environment(values)
+
+
+def test_field_path_diagnostic_requires_its_own_exact_preview_confirmation() -> None:
+    values = environment()
+    values.update(
+        {
+            "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION": FIELD_PATH_DIAGNOSTIC_CONFIRMATION,
+        }
+    )
+
+    config = WorkerConfig.from_environment(values)
+    assert config.field_path_diagnostic_enabled
+    assert not config.response_profile_diagnostic_enabled
+
+    values["DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION"] = "wrong"
+    with pytest.raises(RuntimeError, match="exact Preview-only synthetic confirmation"):
+        WorkerConfig.from_environment(values)
+
+
+def test_field_path_diagnostic_is_unavailable_in_production() -> None:
+    values = environment()
+    values.update(
+        {
+            "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT": "production",
+            "DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL": PRODUCTION_APPROVAL,
+            "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED": "true",
+            "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION": FIELD_PATH_DIAGNOSTIC_CONFIRMATION,
         }
     )
 
