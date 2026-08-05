@@ -1,0 +1,96 @@
+apiVersion: run.googleapis.com/v1
+kind: WorkerPool
+metadata:
+  name: DOCUMENT_EXTRACTION_WORKER_POOL
+  annotations:
+    run.googleapis.com/description: Vaeroex Google Document AI Preview worker; disabled at zero instances by default.
+    run.googleapis.com/scalingMode: manual
+    run.googleapis.com/manualInstanceCount: "0"
+spec:
+  template:
+    spec:
+      serviceAccountName: DOCUMENT_EXTRACTION_SERVICE_ACCOUNT
+      containers:
+        - name: document-extraction-worker
+          image: DOCUMENT_EXTRACTION_IMAGE_DIGEST
+          volumeMounts:
+            - name: bounded-temporary-storage
+              mountPath: /var/tmp/vaeroex-document-worker
+          env:
+            - name: DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT
+              value: preview
+            - name: DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID
+              value: DOCUMENT_EXTRACTION_DEPLOYMENT_ID
+            - name: DOCUMENT_EXTRACTION_WORKER_ID
+              value: DOCUMENT_EXTRACTION_WORKER_ID_VALUE
+            - name: DOCUMENT_EXTRACTION_WORKER_KEY_VERSION
+              value: DOCUMENT_EXTRACTION_WORKER_KEY_VERSION_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_URL
+              value: DOCUMENT_EXTRACTION_BROKER_URL_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_AUDIENCE
+              value: DOCUMENT_EXTRACTION_BROKER_AUDIENCE_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_AUTH_MODE
+              value: google_oidc_v1
+            - name: DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE
+              value: google_document_ai_enterprise_ocr_v1
+            - name: DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER
+              value: DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER_VALUE
+            - name: DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID
+              value: DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID_VALUE
+            - name: DOCUMENT_EXTRACTION_GOOGLE_LOCATION
+              value: us
+            - name: DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_VERSION
+              value: pretrained-ocr-v2.1-2024-08-07
+            - name: DOCUMENT_EXTRACTION_GOOGLE_MODEL
+              value: pretrained-ocr-v2.1-2024-08-07
+            - name: DOCUMENT_EXTRACTION_GOOGLE_CLIENT_REVISION
+              value: vaeroex_google_document_ai_rest_v1
+            - name: DOCUMENT_EXTRACTION_GOOGLE_PARSER_REVISION
+              value: google_document_ai_enterprise_ocr_v1
+            - name: DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS
+              value: "5"
+            - name: TMPDIR
+              value: /var/tmp/vaeroex-document-worker
+            - name: DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64
+              valueFrom:
+                secretKeyRef:
+                  key: "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION"
+                  name: DOCUMENT_EXTRACTION_WORKER_SECRET_NAME
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /startup
+              port: 8080
+            initialDelaySeconds: 0
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            timeoutSeconds: 2
+            periodSeconds: 30
+            failureThreshold: 12
+      volumes:
+        - name: bounded-temporary-storage
+          emptyDir:
+            medium: Memory
+            sizeLimit: 768Mi
