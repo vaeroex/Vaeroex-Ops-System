@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, createHmac } from "node:crypto";
 import {
   buildNormalizedDocumentExtractionArtifact,
-  criticalFieldManifestForArtifact,
+  criticalFieldManifestForArtifactWithProvenance,
   type NormalizedDocumentExtractionArtifactDraftV1
 } from "@/lib/document-extraction/artifact";
 import {
@@ -29,6 +29,15 @@ import {
 } from "@/lib/document-extraction/broker-store";
 import { createManagedDocumentExtractionEncryptionProvider } from "@/lib/document-extraction/encryption";
 import { persistWithDocumentExtractionNonceRetry } from "@/lib/document-extraction/nonce-retry";
+import {
+  NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION
+} from "@/lib/document-extraction/contracts";
+import { buildDocumentExtractionReviewProvenance } from "@/lib/document-extraction/review-provenance";
 import {
   assertDocumentExtractionBrokerEnabled,
   assertDocumentExtractionProviderGateEnabled,
@@ -268,6 +277,27 @@ export async function handleDocumentExtractionBrokerOperation({
     ) {
       throw new Error("document_extraction_artifact_job_mismatch");
     }
+    const reviewProvenance = buildDocumentExtractionReviewProvenance({
+      workspaceId: context.workspace_id,
+      jobId: context.job_id,
+      cacheKey: context.cache_key,
+      contentFingerprint: artifact.artifactFingerprint,
+      pageCount: context.page_count,
+      parserRevision: context.parser_revision,
+      clientRevision: context.client_revision,
+      providerProfile: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+      endpointContractVersion: NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION,
+      requestSerializerVersion: NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
+      responseValidatorVersion: NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION,
+      providerNormalizationVersion: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
+      compatibilityPolicyVersion: NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+      modelAlias: context.parser_model
+    });
+    const criticalFieldManifest = criticalFieldManifestForArtifactWithProvenance(
+      artifact,
+      reviewProvenance.provenance,
+      reviewProvenance.reviewProvenanceFingerprint
+    );
     const encryption = createManagedDocumentExtractionEncryptionProvider();
     const result = await persistWithDocumentExtractionNonceRetry(
       () => encryption.encrypt(artifact, {
@@ -281,7 +311,7 @@ export async function handleDocumentExtractionBrokerOperation({
         jobId: lease.jobId,
         workerId,
         artifactFingerprint: artifact.artifactFingerprint,
-        criticalFieldManifest: criticalFieldManifestForArtifact(artifact),
+        criticalFieldManifest,
         ciphertext: envelope.ciphertext,
         keyVersion: envelope.keyVersion,
         nonce: envelope.nonce,

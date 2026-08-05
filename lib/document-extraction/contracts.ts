@@ -4,6 +4,14 @@ export const DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION = "document_extraction_r
 export const DOCUMENT_EXTRACTION_CONTRACT_VERSION = "document_extraction_artifact_v1" as const;
 export const DOCUMENT_EXTRACTION_NORMALIZATION_VERSION = "document_extraction_normalization_v1" as const;
 export const DOCUMENT_EXTRACTION_REVIEW_VERSION = 1 as const;
+export const DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION =
+  "document_extraction_review_provenance_v1" as const;
+export const DOCUMENT_EXTRACTION_PAGE_IDENTITY_VERSION =
+  "document_extraction_page_identity_v1" as const;
+export const DOCUMENT_EXTRACTION_WORKSPACE_BINDING_VERSION =
+  "document_extraction_workspace_binding_v1" as const;
+export const DOCUMENT_EXTRACTION_JOB_BINDING_VERSION =
+  "document_extraction_job_binding_v1" as const;
 export const DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION = "document_extraction_broker_v2" as const;
 export const DOCUMENT_EXTRACTION_WORKER_RUNTIME_VERSION = "document_extraction_worker_v2" as const;
 export const DOCUMENT_EXTRACTION_CIRCUIT_POLICY_VERSION = "document_extraction_circuit_v1" as const;
@@ -18,8 +26,15 @@ export const NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION =
   "nemotron_parse_hosted_tool_call_rest_v2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION =
   "nvidia_build_nemotron_parse_hosted_tool_call_v2" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE = "hosted_tool_call_v2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION =
   "hosted_tool_call_v2" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION =
+  "nemotron_parse_hosted_request_v1" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION =
+  "nemotron_parse_hosted_response_v2" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION =
+  "nemotron_parse_hosted_normalization_v1" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_MODEL = "nvidia/nemotron-parse-v1.2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_PARSER_REVISION =
   "nemotron_parse_v1_2_tagged_rest_v1" as const;
@@ -153,6 +168,38 @@ export type DocumentExtractionCriticalFieldManifestV1 = {
     value_type: DocumentExtractionCriticalFieldValueType;
   }>;
 };
+
+export type DocumentExtractionReviewProvenanceV1 = {
+  review_provenance_version: typeof DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION;
+  content_fingerprint: string;
+  parser_revision: string;
+  client_revision: string;
+  provider_profile: string;
+  endpoint_contract_version: string;
+  request_serializer_version: string;
+  response_validator_version: string;
+  provider_normalization_version: string;
+  artifact_normalization_version: typeof DOCUMENT_EXTRACTION_NORMALIZATION_VERSION;
+  compatibility_policy_version: string;
+  model_alias: string;
+  page_identity_fingerprint: string;
+  workspace_binding_fingerprint: string;
+  job_binding_fingerprint: string;
+  review_version: typeof DOCUMENT_EXTRACTION_REVIEW_VERSION;
+};
+
+export type DocumentExtractionCriticalFieldManifestV2 = {
+  manifest_version: "document_extraction_critical_fields_v2";
+  artifact_fingerprint: string;
+  extraction_contract_version: typeof DOCUMENT_EXTRACTION_CONTRACT_VERSION;
+  review_provenance_fingerprint: string;
+  review_provenance: DocumentExtractionReviewProvenanceV1;
+  fields: DocumentExtractionCriticalFieldManifestV1["fields"];
+};
+
+export type DocumentExtractionCriticalFieldManifest =
+  | DocumentExtractionCriticalFieldManifestV1
+  | DocumentExtractionCriticalFieldManifestV2;
 
 export type DocumentExtractionReviewDecisionV1 = {
   reviewVersion: typeof DOCUMENT_EXTRACTION_REVIEW_VERSION;

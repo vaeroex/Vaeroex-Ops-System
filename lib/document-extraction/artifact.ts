@@ -7,8 +7,10 @@ import {
   NVIDIA_DOCUMENT_EXTRACTION_MAX_PAGES,
   type DocumentExtractionCriticalFieldKind,
   type DocumentExtractionCriticalFieldManifestV1,
+  type DocumentExtractionCriticalFieldManifestV2,
   type DocumentExtractionCriticalFieldValueType,
   type DocumentExtractionDocumentClass,
+  type DocumentExtractionReviewProvenanceV1,
   type DocumentExtractionRoute,
   type DocumentSourceCoordinatesV1,
   type NormalizedDocumentExtractionArtifactV1
@@ -353,6 +355,28 @@ export function criticalFieldManifestForArtifact(
       kind: field.kind,
       value_type: fieldValueType(field.kind, field.normalizedValue)
     }))
+  };
+}
+
+export function criticalFieldManifestForArtifactWithProvenance(
+  artifact: NormalizedDocumentExtractionArtifactV1,
+  provenance: DocumentExtractionReviewProvenanceV1,
+  reviewProvenanceFingerprint: string
+): DocumentExtractionCriticalFieldManifestV2 {
+  if (
+    provenance.content_fingerprint !== artifact.artifactFingerprint
+    || !/^[0-9a-f]{64}$/.test(reviewProvenanceFingerprint)
+  ) {
+    throw new Error("The review provenance does not match the normalized extraction artifact.");
+  }
+  const historicalManifest = criticalFieldManifestForArtifact(artifact);
+  return {
+    manifest_version: "document_extraction_critical_fields_v2",
+    artifact_fingerprint: artifact.artifactFingerprint,
+    extraction_contract_version: DOCUMENT_EXTRACTION_CONTRACT_VERSION,
+    review_provenance_fingerprint: reviewProvenanceFingerprint,
+    review_provenance: provenance,
+    fields: historicalManifest.fields
   };
 }
 

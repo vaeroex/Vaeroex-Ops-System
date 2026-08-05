@@ -24,10 +24,18 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
+from .provider_contract import (
+    HOSTED_CONTRACT,
+    REST_ADAPTER_VERSION,
+)
 from .provider_types import ProviderResult, RenderedPage
 
-SYNTHETIC_CONTRACT_VERSION = "document_extraction_phase_c1_synthetic_v1"
-BENCHMARK_VERSION = "document_intelligence_benchmark_v1"
+SYNTHETIC_CONTRACT_VERSION = "document_extraction_phase_c1_synthetic_v2"
+BENCHMARK_VERSION = "document_intelligence_benchmark_profile_v2"
+BENCHMARK_EVENT = "document_extraction_synthetic_fixture_v2"
+BENCHMARK_IDENTITY_VERSION = "document_extraction_benchmark_identity_v2"
+FIXTURE_IDENTITY_VERSION = "document_extraction_fixture_identity_v1"
+BENCHMARK_RECORD_IDENTITY_VERSION = "document_extraction_benchmark_record_identity_v1"
 FIXTURE_SOURCE_COMMIT = "cc3c125b01ac41513b3b92213b6daa39fa5ba91f"
 FIXTURE_CORPUS_SHA256 = "c0e6b1aa615e3674e5aa418436a84555889d8766d4d8a1e3401685dbe2495dec"
 FIXTURE_COUNT = 12
@@ -130,6 +138,44 @@ class SyntheticQualificationFailure(RuntimeError):
     """A content-free, fail-closed qualification error."""
 
 
+def _canonical_fingerprint(value: JsonObject) -> str:
+    serialized = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(serialized.encode("ascii")).hexdigest()
+
+
+def benchmark_profile_identity() -> JsonObject:
+    contract = HOSTED_CONTRACT
+    required = {
+        "providerProfile": contract.response_profile,
+        "endpointContractVersion": contract.endpoint_contract_version,
+        "requestSerializerVersion": contract.request_serializer_version,
+        "responseValidatorVersion": contract.response_validator_version,
+        "normalizationVersion": contract.normalization_version,
+        "compatibilityPolicyVersion": contract.compatibility_contract_version,
+        "modelAlias": contract.model,
+    }
+    if any(not isinstance(value, str) or not value for value in required.values()):
+        raise SyntheticQualificationFailure("synthetic_benchmark_profile_incomplete")
+    return {
+        "identityVersion": BENCHMARK_IDENTITY_VERSION,
+        "syntheticContractVersion": SYNTHETIC_CONTRACT_VERSION,
+        "benchmarkVersion": BENCHMARK_VERSION,
+        "fixtureCorpusIdentity": {
+            "sourceCommit": FIXTURE_SOURCE_COMMIT,
+            "corpusSha256": FIXTURE_CORPUS_SHA256,
+            "fixtureCount": FIXTURE_COUNT,
+            "pageCount": PAGE_COUNT,
+        },
+        "parserRevision": contract.parser_revision,
+        "clientRevision": REST_ADAPTER_VERSION,
+        **required,
+    }
+
+
+def benchmark_profile_fingerprint(identity: JsonObject | None = None) -> str:
+    return _canonical_fingerprint(identity or benchmark_profile_identity())
+
+
 @dataclass(frozen=True)
 class FrozenSyntheticFixture:
     fixture_index: int
@@ -167,10 +213,25 @@ class SyntheticEvaluation:
     failure_code: str | None
 
     def privacy_safe_record(self) -> JsonObject:
+        profile_identity = benchmark_profile_identity()
+        profile_fingerprint = benchmark_profile_fingerprint(profile_identity)
+        fixture_identity_fingerprint = _fixture_identity_fingerprint(
+            self.fixture_index,
+            self.page_count,
+        )
         return {
-            "event": "document_extraction_synthetic_fixture_v1",
+            "event": BENCHMARK_EVENT,
             "contractVersion": SYNTHETIC_CONTRACT_VERSION,
             "benchmarkVersion": BENCHMARK_VERSION,
+            "benchmarkIdentity": profile_identity,
+            "benchmarkProfileFingerprint": profile_fingerprint,
+            "fixtureIdentityFingerprint": fixture_identity_fingerprint,
+            "benchmarkRecordFingerprint": _benchmark_record_fingerprint(
+                profile_fingerprint=profile_fingerprint,
+                fixture_identity_fingerprint=fixture_identity_fingerprint,
+                fixture_index=self.fixture_index,
+                page_count=self.page_count,
+            ),
             "syntheticOnly": True,
             "fixtureIndex": self.fixture_index,
             "documentClasses": list(self.document_classes),
@@ -282,6 +343,46 @@ def load_frozen_corpus() -> tuple[FrozenSyntheticFixture, ...]:
     if sum(len(fixture.rendered_page_paths) for fixture in fixtures if fixture.provider_eligible) != EXPECTED_PROVIDER_PAGE_CALLS:
         raise SyntheticQualificationFailure("synthetic_fixture_provider_call_bound_mismatch")
     return tuple(fixtures)
+
+
+def _fixture_identity_fingerprint(fixture_index: int, page_count: int) -> str:
+    fixtures = load_frozen_corpus()
+    if not 1 <= fixture_index <= len(fixtures):
+        raise SyntheticQualificationFailure("synthetic_fixture_identity_invalid")
+    fixture = fixtures[fixture_index - 1]
+    if fixture.fixture_index != fixture_index or len(fixture.rendered_page_paths) != page_count:
+        raise SyntheticQualificationFailure("synthetic_fixture_identity_invalid")
+    return _canonical_fingerprint(
+        {
+            "identityVersion": FIXTURE_IDENTITY_VERSION,
+            "corpusSha256": FIXTURE_CORPUS_SHA256,
+            "fixtureIndex": fixture_index,
+            "sourceSha256": fixture.source_sha256,
+            "pageSha256": [
+                hashlib.sha256(path.read_bytes()).hexdigest()
+                for path in fixture.rendered_page_paths
+            ],
+            "pageCount": page_count,
+        }
+    )
+
+
+def _benchmark_record_fingerprint(
+    *,
+    profile_fingerprint: str,
+    fixture_identity_fingerprint: str,
+    fixture_index: int,
+    page_count: int,
+) -> str:
+    return _canonical_fingerprint(
+        {
+            "identityVersion": BENCHMARK_RECORD_IDENTITY_VERSION,
+            "benchmarkProfileFingerprint": profile_fingerprint,
+            "fixtureIdentityFingerprint": fixture_identity_fingerprint,
+            "fixtureIndex": fixture_index,
+            "pageCount": page_count,
+        }
+    )
 
 
 def approved_fixture_for_source(document_sha256: str, expected_pages: int) -> FrozenSyntheticFixture:
@@ -790,17 +891,38 @@ def aggregate_synthetic_records(records: Sequence[JsonObject]) -> JsonObject:
     fixtures = load_frozen_corpus()
     if len(records) != FIXTURE_COUNT:
         raise SyntheticQualificationFailure("synthetic_qualification_record_count_invalid")
+    expected_profile = benchmark_profile_identity()
+    expected_profile_fingerprint = benchmark_profile_fingerprint(expected_profile)
     by_index: dict[int, JsonObject] = {}
     for record in records:
         index = record.get("fixtureIndex")
         if (
-            record.get("event") != "document_extraction_synthetic_fixture_v1"
+            record.get("event") != BENCHMARK_EVENT
             or record.get("contractVersion") != SYNTHETIC_CONTRACT_VERSION
+            or record.get("benchmarkVersion") != BENCHMARK_VERSION
+            or record.get("benchmarkIdentity") != expected_profile
+            or record.get("benchmarkProfileFingerprint") != expected_profile_fingerprint
             or not isinstance(index, int)
             or not 1 <= index <= FIXTURE_COUNT
             or index in by_index
         ):
             raise SyntheticQualificationFailure("synthetic_qualification_record_invalid")
+        fixture = fixtures[index - 1]
+        expected_page_count = len(fixture.rendered_page_paths)
+        expected_fixture_fingerprint = _fixture_identity_fingerprint(index, expected_page_count)
+        expected_record_fingerprint = _benchmark_record_fingerprint(
+            profile_fingerprint=expected_profile_fingerprint,
+            fixture_identity_fingerprint=expected_fixture_fingerprint,
+            fixture_index=index,
+            page_count=expected_page_count,
+        )
+        if (
+            record.get("fixtureIdentityFingerprint") != expected_fixture_fingerprint
+            or record.get("benchmarkRecordFingerprint") != expected_record_fingerprint
+            or record.get("pageCount") != expected_page_count
+            or record.get("documentClasses") != list(fixture.document_classes)
+        ):
+            raise SyntheticQualificationFailure("synthetic_qualification_identity_mismatch")
         by_index[index] = record
     ordered = [by_index[index] for index in range(1, FIXTURE_COUNT + 1)]
     try:
@@ -855,6 +977,12 @@ def aggregate_synthetic_records(records: Sequence[JsonObject]) -> JsonObject:
     return {
         "benchmarkVersion": BENCHMARK_VERSION,
         "qualificationContractVersion": SYNTHETIC_CONTRACT_VERSION,
+        "benchmarkIdentity": expected_profile,
+        "benchmarkProfileFingerprint": expected_profile_fingerprint,
+        "fixtureIdentityFingerprints": [
+            ordered[index - 1]["fixtureIdentityFingerprint"]
+            for index in range(1, FIXTURE_COUNT + 1)
+        ],
         "fixtureSourceCommit": FIXTURE_SOURCE_COMMIT,
         "syntheticOnly": True,
         "fixtureCount": FIXTURE_COUNT,
@@ -914,7 +1042,7 @@ def _load_records(path: Path) -> list[JsonObject]:
             value = json.loads(raw_line)
         except json.JSONDecodeError:
             continue
-        if isinstance(value, dict) and value.get("event") == "document_extraction_synthetic_fixture_v1":
+        if isinstance(value, dict) and value.get("event") == BENCHMARK_EVENT:
             records.append(value)
     return records
 

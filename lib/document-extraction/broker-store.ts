@@ -2,7 +2,7 @@ import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { VerifiedWorkerAssertion } from "@/lib/document-extraction/broker-auth";
-import type { DocumentExtractionCriticalFieldManifestV1 } from "@/lib/document-extraction/contracts";
+import type { DocumentExtractionCriticalFieldManifestV2 } from "@/lib/document-extraction/contracts";
 
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 type RpcClient = {
@@ -24,6 +24,9 @@ export type DocumentExtractionLeaseContext = {
   document_class: string;
   page_count: number;
   cache_key: string;
+  parser_model: string;
+  parser_revision: string;
+  client_revision: string;
   extraction_contract_version: string;
   normalization_version: string;
   stage: string;
@@ -255,7 +258,7 @@ export async function completeDocumentExtractionJob({
   jobId: string;
   workerId: string;
   artifactFingerprint: string;
-  criticalFieldManifest: DocumentExtractionCriticalFieldManifestV1;
+  criticalFieldManifest: DocumentExtractionCriticalFieldManifestV2;
   ciphertext: Uint8Array;
   keyVersion: string;
   nonce: Uint8Array;
@@ -269,7 +272,7 @@ export async function completeDocumentExtractionJob({
     status?: string;
     approval_status?: string;
   }>(
-    "complete_document_extraction_job_v2",
+    "complete_document_extraction_job_v3",
     {
       p_job_id: jobId,
       p_worker_id: workerId,

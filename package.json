@@ -42,6 +42,7 @@
     "test:document-extraction-foundation": "node scripts/document-extraction-foundation-regression-tests.js",
     "test:document-extraction-worker": "node scripts/document-extraction-private-worker-regression-tests.js",
     "test:document-extraction-worker-deployment": "node scripts/document-extraction-worker-deployment-regression-tests.js",
+    "test:document-extraction-profile-identity": "node scripts/document-extraction-profile-identity-regression-tests.js && cd services/document-extraction-worker && PYTHONPATH=src python3 -m pytest tests/test_synthetic_identity.py",
     "test:document-extraction-cloud-run-broker": "node scripts/document-extraction-cloud-run-broker-regression-tests.js",
     "build:document-extraction-cloud-run-broker": "ncc build services/document-extraction-broker/src/server.ts -o services/document-extraction-broker/dist --minify --no-cache --license licenses.txt --external server-only",
     "test:business-health-explanation": "node scripts/business-health-explanation-regression-tests.js && node scripts/gpt56-business-health-routing-regression-tests.js",

@@ -630,10 +630,34 @@ Historical v1 remains a separately testable contract and still rejects
 `finish_reason: stop`. The v1.2 tagged-content adapter is unchanged. The v2
 client revision participates in the workspace-scoped cache identity, and each
 page request fingerprint additionally binds the full compatibility policy.
-Historical cache rows, normalized artifacts, review fingerprints, Saved
-Analyses, and benchmark records are neither rewritten nor confused with v2.
+Historical cache rows, normalized artifacts, Saved Analyses, and benchmark
+records are not rewritten. Normalized-content fingerprints intentionally
+remain provider-neutral content-equality identifiers.
 The forward migration admits only v2 parser and client identities to claim and
 dispatch; it creates no rows and enables no gate.
+
+### Profile-bound benchmark and review identity
+
+New synthetic qualification records use
+`document_extraction_benchmark_identity_v2`. Every fixture record binds the
+frozen corpus hash, source commit, fixture/page identity, parser and client
+revisions, provider profile, endpoint contract, request serializer, response
+validator, provider normalization, compatibility policy, and model alias. The
+aggregate recomputes those identities from the committed corpus and fails
+closed if even one record differs. Historical v1 benchmark records remain v1
+and are ineligible for v2 aggregation.
+
+New hosted tool-call v2 completions keep the existing normalized-content
+fingerprint and add a separate
+`document_extraction_review_provenance_v1` fingerprint. That review identity
+binds content, workspace/job/page identities, parser/client/provider contract,
+model, normalization, compatibility policy, and review version. New critical
+field manifests use `document_extraction_critical_fields_v2`; historical v1
+manifests and review rows retain their original fingerprint and null provenance
+column. The provenance value is not authority: completion still stops at
+`awaiting_review` / `needs_review` / `pending`, and a leadership review request
+must present the exact current provenance before the existing authority guard
+can admit the reviewed artifact.
 
 Structural acceptance still produces only an encrypted extraction draft. The
 database completion path remains `awaiting_review` / `needs_review` /
