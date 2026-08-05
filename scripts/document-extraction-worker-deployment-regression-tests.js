@@ -283,6 +283,7 @@ for (const heading of [
   "Mandatory cleanup and rollback",
   "Validation",
   "Qualification record",
+  "Hosted tool-call compatibility v2",
   "Phase C2 prerequisites"
 ]) {
   assert.match(runbook, new RegExp(`^## ${heading}$`, "m"));
@@ -306,9 +307,14 @@ assert.match(runbook, /Every case remains a[\s\S]+malformed-output failure/i);
 assert.match(runbook, /^### One-call response-profile diagnostic \(2026-08-04\)$/m);
 assert.match(runbook, /exactly one NVIDIA[\s\S]+zero retries/i);
 assert.match(runbook, /finish_reason` `stop`/);
-assert.match(runbook, /Classification:\*\* `5\. malformed provider response`/);
+assert.match(runbook, /Historical v1 diagnostic classification:\*\* `5\. malformed provider response`/);
 assert.match(runbook, /observer ran before, and could not[\s\S]+unchanged fail-closed validator/i);
-assert.match(runbook, /must not accept `stop` without official[\s\S]+separate adapter review/i);
+assert.match(runbook, /official hosted Nemotron Parse cookbook/i);
+assert.match(runbook, /does not explicitly define[\s\S]+finish_reason/i);
+assert.match(runbook, /application-owned compatibility[\s\S]+content-free observation/i);
+assert.match(runbook, /Historical v1 remains[\s\S]+still rejects[\s\S]+finish_reason: stop/i);
+assert.match(runbook, /v1\.2 tagged-content adapter is unchanged/i);
+assert.match(runbook, /awaiting_review` \/ `needs_review` \/[\s\S]+`pending`/i);
 assert.match(runbook, /Production and Vercel resources were not addressed/i);
 assert.match(runbook, /Customer[\s\S]+uploads, arbitrary images, public routes, automatic authority/);
 

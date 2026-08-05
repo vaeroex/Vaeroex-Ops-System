@@ -15,6 +15,7 @@ const correctiveMigration = read("supabase/migrations/20260803204552_document_ex
 const dispatchSingleUseMigration = read("supabase/migrations/20260803205520_document_extraction_dispatch_authorization_single_use.sql");
 const restAdapterMigration = read("supabase/migrations/20260803230226_document_extraction_rest_adapter_contract.sql");
 const phaseC1Migration = read("supabase/migrations/20260804010000_document_extraction_worker_phase_c1_protocol.sql");
+const hostedCompatibilityMigration = read("supabase/migrations/20260804160932_document_extraction_hosted_tool_call_v2.sql");
 const route = read("app/api/internal/document-extraction/broker/route.ts");
 const brokerHttp = read("lib/document-extraction/broker-http.ts");
 const service = read("lib/document-extraction/broker-service.ts");
@@ -212,6 +213,22 @@ assert.match(
 assert.doesNotMatch(phaseC1Migration, /grant execute[^;]+to (?:anon|authenticated)/i);
 assert.doesNotMatch(phaseC1Migration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
 assert.doesNotMatch(phaseC1Migration, /insert into public\.document_extraction_(?:workspace_settings|system_state)/i);
+assert.match(hostedCompatibilityMigration, /job\.parser_revision = 'nemotron_parse_hosted_tool_call_rest_v2'/);
+assert.match(hostedCompatibilityMigration, /job\.client_revision = 'vaeroex_nemotron_parse_rest_v2'/);
+assert.match(hostedCompatibilityMigration, /v_job\.parser_revision <> 'nemotron_parse_hosted_tool_call_rest_v2'/);
+assert.match(hostedCompatibilityMigration, /v_job\.client_revision <> 'vaeroex_nemotron_parse_rest_v2'/);
+assert.match(hostedCompatibilityMigration, /security definer[\s\S]+set search_path = ''/);
+assert.match(
+  hostedCompatibilityMigration,
+  /revoke execute on function public\.claim_document_extraction_job_v2\(text, integer\)[\s\S]+grant execute[\s\S]+to service_role/
+);
+assert.match(
+  hostedCompatibilityMigration,
+  /revoke execute on function public\.authorize_document_extraction_dispatch_v2\(uuid, text, uuid\)[\s\S]+grant execute[\s\S]+to service_role/
+);
+assert.doesNotMatch(hostedCompatibilityMigration, /grant execute[^;]+to (?:anon|authenticated)/i);
+assert.doesNotMatch(hostedCompatibilityMigration, /insert into public\.document_extraction_(?:workspace_settings|system_state)/i);
+assert.doesNotMatch(hostedCompatibilityMigration, /\b(delete|truncate)\s+(?:table\s+)?public\./i);
 
 assert.match(route, /handleDocumentExtractionBrokerHttpRequest/);
 assert.match(brokerHttp, /verifyWorkerAssertion/);
@@ -246,13 +263,20 @@ assert.match(workerConfig, /AZURE_STORAGE_CONNECTION_STRING/);
 assert.match(workerConfig, /GOOGLE_APPLICATION_CREDENTIALS/);
 assert.match(workerConfig, /VERCEL_BLOB_READ_WRITE_TOKEN/);
 assert.match(workerConfig, /Production document extraction approval is absent/);
-assert.match(workerProviderContract, /REST_ADAPTER_VERSION = "vaeroex_nemotron_parse_rest_v1"/);
-assert.match(workerProviderContract, /HOSTED_CONTRACT_VERSION = "nvidia_build_nemotron_parse_hosted_tool_call_v1"/);
+assert.match(workerProviderContract, /REST_ADAPTER_VERSION = "vaeroex_nemotron_parse_rest_v2"/);
+assert.match(workerProviderContract, /HOSTED_CONTRACT_VERSION = "nvidia_build_nemotron_parse_hosted_tool_call_v2"/);
+assert.match(workerProviderContract, /HOSTED_COMPATIBILITY_CONTRACT_VERSION = "hosted_tool_call_v2"/);
+assert.match(workerProviderContract, /LEGACY_HOSTED_CONTRACT_VERSION = "nvidia_build_nemotron_parse_hosted_tool_call_v1"/);
 assert.match(workerProviderContract, /V1_2_CONTRACT_VERSION = "nemotron_parse_v1_2_openai_chat_v1"/);
 assert.match(workerProviderContract, /return HOSTED_CONTRACT/);
 assert.match(workerProvider, /class NvidiaNemotronParseRestAdapter/);
 assert.match(workerProvider, /NVCF-INPUT-ASSET-REFERENCES/);
-assert.match(workerProvider, /"tools".*"markdown_bbox"/s);
+assert.match(workerProvider, /"tools"[\s\S]+contract\.tool_name or HOSTED_TOOL_NAME/);
+assert.match(workerProvider, /finish_reason not in contract\.accepted_finish_reasons/);
+assert.match(workerProvider, /_legacy_elements\(function\["arguments"\], strict_hosted_v2=True\)/);
+assert.match(workerProvider, /provider_mixed_response_profile/);
+assert.match(workerProvider, /MAX_HOSTED_ARGUMENT_BYTES/);
+assert.match(workerProvider, /LEGACY_HOSTED_CONTRACT/);
 assert.match(workerProvider, /trust_env=False/);
 assert.match(workerProvider, /follow_redirects=False/);
 assert.match(workerProvider, /provider_pending_without_approved_poll_contract/);
@@ -371,8 +395,8 @@ assert.doesNotThrow(() => assertDocumentExtractionProviderDispatchEnabled({
   DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED: "true",
   DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL: "document_extraction_production_pilot_v1",
   DOCUMENT_EXTRACTION_NVIDIA_MODEL: "nvidia/nemotron-parse",
-  DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION: "vaeroex_nemotron_parse_rest_v1",
-  DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION: "nemotron_parse_hosted_tool_call_rest_v1",
+  DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION: "vaeroex_nemotron_parse_rest_v2",
+  DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION: "nemotron_parse_hosted_tool_call_rest_v2",
   NVIDIA_API_KEY: "test-only-placeholder"
 }));
 

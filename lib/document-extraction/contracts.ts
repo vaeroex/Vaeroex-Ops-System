@@ -13,11 +13,13 @@ export const DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION =
 export const NVIDIA_DOCUMENT_EXTRACTION_PROVIDER = "nvidia" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MODEL = "nvidia/nemotron-parse" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION =
-  "vaeroex_nemotron_parse_rest_v1" as const;
+  "vaeroex_nemotron_parse_rest_v2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION =
-  "nemotron_parse_hosted_tool_call_rest_v1" as const;
+  "nemotron_parse_hosted_tool_call_rest_v2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION =
-  "nvidia_build_nemotron_parse_hosted_tool_call_v1" as const;
+  "nvidia_build_nemotron_parse_hosted_tool_call_v2" as const;
+export const NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION =
+  "hosted_tool_call_v2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_MODEL = "nvidia/nemotron-parse-v1.2" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_V1_2_PARSER_REVISION =
   "nemotron_parse_v1_2_tagged_rest_v1" as const;

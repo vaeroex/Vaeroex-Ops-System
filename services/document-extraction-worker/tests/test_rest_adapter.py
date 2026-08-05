@@ -12,8 +12,14 @@ import pytest
 from PIL import Image
 
 from vaeroex_document_worker.provider_contract import (
+    HOSTED_ACCEPTED_FINISH_REASONS,
+    HOSTED_COMPATIBILITY_CONTRACT_VERSION,
     HOSTED_CONTRACT,
     HOSTED_ENDPOINT,
+    HOSTED_ENDPOINT_PROFILE,
+    HOSTED_RESPONSE_PROFILE,
+    HOSTED_TOOL_NAME,
+    LEGACY_HOSTED_CONTRACT,
     NVCF_ASSET_ENDPOINT,
     V1_2_NIM_CONTRACT,
     V1_2_TASK_PROMPT,
@@ -24,7 +30,9 @@ from vaeroex_document_worker.response_profile import (
     classify_response_profile,
 )
 from vaeroex_document_worker.rest_adapter import (
+    MAX_HOSTED_ARGUMENT_BYTES,
     MAX_PROVIDER_RESPONSE_BYTES,
+    HostedProviderRequestBindingV2,
     invoke_rest_adapter,
     normalize_provider_response,
     request_binding,
@@ -93,6 +101,16 @@ def hosted_response(text: str = "Synthetic extraction") -> bytes:
     ).encode("utf-8")
 
 
+def hosted_stop_envelope() -> dict[str, Any]:
+    response: dict[str, Any] = json.loads(hosted_response())
+    response["choices"][0]["finish_reason"] = "stop"
+    return response
+
+
+def set_hosted_arguments(response: dict[str, Any], value: object) -> None:
+    response["choices"][0]["message"]["tool_calls"][0]["function"]["arguments"] = value
+
+
 def test_hosted_request_serialization_matches_pinned_contract(tmp_path: Path) -> None:
     page = rendered_page(tmp_path)
     body = serialize_provider_request(
@@ -117,6 +135,49 @@ def test_hosted_request_serialization_matches_pinned_contract(tmp_path: Path) ->
         "temperature": 0.0,
         "tools": [{"function": {"name": "markdown_bbox"}, "type": "function"}],
     }
+
+
+def test_hosted_v2_request_binding_seals_the_complete_compatibility_policy(
+    tmp_path: Path,
+) -> None:
+    binding = request_binding(HOSTED_CONTRACT, rendered_page(tmp_path), "d" * 64)
+
+    assert isinstance(binding, HostedProviderRequestBindingV2)
+    assert binding.endpoint_profile == HOSTED_ENDPOINT_PROFILE
+    assert binding.compatibility_contract_version == HOSTED_COMPATIBILITY_CONTRACT_VERSION
+    assert binding.accepted_finish_reasons == HOSTED_ACCEPTED_FINISH_REASONS
+    assert binding.tool_name == HOSTED_TOOL_NAME
+    assert binding.request_serializer_version == "nemotron_parse_hosted_request_v1"
+    assert binding.response_validator_version == "nemotron_parse_hosted_response_v2"
+    assert binding.normalization_version == "nemotron_parse_hosted_normalization_v1"
+    assert binding.coordinate_contract_version == "normalized_xyxy_unit_interval_v1"
+    assert binding.compatibility_rationale.endswith("observed_stop_v1")
+
+
+def test_hosted_v2_request_identity_is_distinct_from_historical_v1(
+    tmp_path: Path,
+) -> None:
+    page = rendered_page(tmp_path)
+    current = request_binding(HOSTED_CONTRACT, page, "d" * 64)
+    historical = request_binding(LEGACY_HOSTED_CONTRACT, page, "d" * 64)
+
+    assert current.fingerprint() != historical.fingerprint()
+    assert current.adapter_version == "vaeroex_nemotron_parse_rest_v2"
+    assert historical.adapter_version == "vaeroex_nemotron_parse_rest_v1"
+
+
+def test_historical_hosted_v1_keeps_its_original_stop_rejection(
+    tmp_path: Path,
+) -> None:
+    response = json.loads(hosted_response())
+    response["choices"][0]["finish_reason"] = "stop"
+
+    with pytest.raises(ProviderFailure, match="provider_malformed_hosted_finish_stop"):
+        normalize_provider_response(
+            LEGACY_HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
 
 
 def test_v1_2_request_and_response_profile_is_explicitly_distinct(tmp_path: Path) -> None:
@@ -172,6 +233,98 @@ def test_inline_inference_normalizes_without_retaining_raw_response(tmp_path: Pa
     assert "secret-not-returned" not in repr(result)
 
 
+@pytest.mark.parametrize("content", (None, ""))
+def test_hosted_v2_accepts_complete_tool_payload_for_both_approved_finish_reasons(
+    tmp_path: Path,
+    content: object,
+) -> None:
+    for finish_reason in HOSTED_ACCEPTED_FINISH_REASONS:
+        response = json.loads(hosted_response())
+        response["choices"][0]["finish_reason"] = finish_reason
+        response["choices"][0]["message"]["content"] = content
+
+        normalized = normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
+
+        assert normalized["blocks"][0]["text"] == "Synthetic extraction"
+
+
+def test_observed_content_free_stop_envelope_is_accepted_only_by_hosted_v2(
+    tmp_path: Path,
+) -> None:
+    element = {
+        "type": "Text",
+        "text": "",
+        "bbox": {"xmin": 0.1, "ymin": 0.2, "xmax": 0.8, "ymax": 0.4},
+    }
+    base = json.dumps([element], separators=(",", ":"))
+    element["text"] = "S" * (1_892 - len(base.encode("utf-8")))
+    arguments = json.dumps([element], separators=(",", ":"))
+    assert len(arguments.encode("utf-8")) == 1_892
+    response = {
+        "id": "chatcmpl-content-free-test",
+        "object": "chat.completion",
+        "created": 1,
+        "model": HOSTED_CONTRACT.model,
+        "choices": [
+            {
+                "index": 0,
+                "finish_reason": "stop",
+                "logprobs": None,
+                "message": {
+                    "role": "assistant",
+                    "content": None,
+                    "refusal": None,
+                    "tool_calls": [
+                        {
+                            "id": "call_content_free_test",
+                            "type": "function",
+                            "function": {
+                                "name": "markdown_bbox",
+                                "arguments": arguments,
+                            },
+                        }
+                    ],
+                },
+            }
+        ],
+        "usage": {"completion_tokens": 512},
+    }
+    body = json.dumps(response).encode("utf-8")
+    observed: list[ResponseProfileDiagnosticV1] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={
+                "content-type": "application/json",
+                "nvcf-reqid": "6cf6e948-8c47-4347-b450-50458387eff7",
+            },
+            content=body,
+        )
+
+    result = invoke_rest_adapter(
+        [rendered_page(tmp_path)],
+        "d" * 64,
+        HOSTED_CONTRACT,
+        "test-secret",
+        transport=httpx.MockTransport(handler),
+        response_profile_observer=observed.append,
+    )
+
+    assert len(result.pages[0]["blocks"][0]["text"]) > 1_700
+    assert observed[0].finish_reason == "stop"
+    assert observed[0].arguments_byte_lengths == (1_892,)
+    assert observed[0].arguments_complete_json == (True,)
+    assert observed[0].provider_request_id == "6cf6e948-8c47-4347-b450-50458387eff7"
+    # Historical diagnostics remain comparable; only the new v2 validator
+    # interprets this complete envelope as accepted extraction.
+    assert classify_response_profile(observed[0]) == 5
+
+
 def test_response_profile_observer_runs_before_fail_closed_validation(
     tmp_path: Path,
 ) -> None:
@@ -202,7 +355,7 @@ def test_response_profile_observer_runs_before_fail_closed_validation(
             response_profile_observer=observed.append,
         )
 
-    assert caught.value.code == "provider_malformed_hosted_profile"
+    assert caught.value.code == "provider_malformed_hosted_content"
     assert len(observed) == 1
     assert classify_response_profile(observed[0]) == 4
     assert observed[0].provider_request_id == "safe-provider-request-id"
@@ -240,11 +393,10 @@ def test_response_profile_observer_failure_cannot_change_provider_result(
     ("finish_reason", "content", "expected_code"),
     (
         ("length", None, "provider_malformed_output_truncated"),
-        ("stop", None, "provider_malformed_hosted_finish_stop"),
         (
             "stop",
             "<x_0.1><y_0.1>synthetic<x_0.2><y_0.2><class_Text>",
-            "provider_malformed_hosted_profile",
+            "provider_malformed_hosted_content",
         ),
         (None, None, "provider_malformed_hosted_finish_missing"),
         ("content_filter", None, "provider_malformed_hosted_finish_invalid"),
@@ -272,6 +424,185 @@ def test_hosted_completion_shape_fails_closed_with_content_free_diagnostics(
     assert caught.value.result_class == "malformed_output"
     assert caught.value.retryable is False
     assert "synthetic" not in caught.value.code
+
+
+@pytest.mark.parametrize(
+    ("variant", "expected_code"),
+    (
+        ("no_tool_call", "provider_output_schema_mismatch"),
+        ("ordinary_content_only", "provider_malformed_hosted_content"),
+        ("conflicting_content", "provider_malformed_hosted_content"),
+        ("multiple_tool_calls", "provider_output_schema_mismatch"),
+        ("wrong_tool_type", "provider_output_schema_mismatch"),
+        ("wrong_function", "provider_output_schema_mismatch"),
+        ("arguments_not_string", "provider_output_schema_mismatch"),
+        ("unknown_envelope_key", "provider_output_schema_mismatch"),
+        ("unknown_tool_key", "provider_output_schema_mismatch"),
+    ),
+)
+def test_hosted_v2_stop_rejects_every_unapproved_envelope_shape(
+    tmp_path: Path,
+    variant: str,
+    expected_code: str,
+) -> None:
+    response = hosted_stop_envelope()
+    message = response["choices"][0]["message"]
+    tool_call = message["tool_calls"][0]
+    if variant == "no_tool_call":
+        message["tool_calls"] = []
+    elif variant == "ordinary_content_only":
+        message["tool_calls"] = []
+        message["content"] = "ordinary assistant content"
+    elif variant == "conflicting_content":
+        message["content"] = "conflicting assistant content"
+    elif variant == "multiple_tool_calls":
+        message["tool_calls"].append(dict(tool_call))
+    elif variant == "wrong_tool_type":
+        tool_call["type"] = "text"
+    elif variant == "wrong_function":
+        tool_call["function"]["name"] = "other_tool"
+    elif variant == "arguments_not_string":
+        tool_call["function"]["arguments"] = []
+    elif variant == "unknown_envelope_key":
+        response["provider_extension"] = True
+    elif variant == "unknown_tool_key":
+        tool_call["provider_extension"] = True
+
+    with pytest.raises(ProviderFailure) as caught:
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
+
+    assert caught.value.code == expected_code
+    assert caught.value.result_class == "malformed_output"
+    assert caught.value.retryable is False
+
+
+@pytest.mark.parametrize(
+    ("arguments", "expected_code"),
+    (
+        ("[", "provider_output_malformed"),
+        ('[{"type":"Text"', "provider_output_malformed"),
+        ("{}", "provider_output_schema_mismatch"),
+        (
+            '[{"type":"Text","text":"value"}]',
+            "provider_output_schema_mismatch",
+        ),
+        (
+            '[{"id":"provider-id","type":"Text","text":"value","bbox":{"xmin":0.1,"ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_output_schema_mismatch",
+        ),
+        (
+            '[{"page":2,"type":"Text","text":"value","bbox":{"xmin":0.1,"ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_output_schema_mismatch",
+        ),
+        (
+            '[{"order":2,"type":"Text","text":"value","bbox":{"xmin":0.1,"ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_output_schema_mismatch",
+        ),
+        (
+            '[{"type":"Text","text":"value","bbox":{"xmin":0.1,"ymin":0.1,"xmax":1.1,"ymax":0.2}}]',
+            "provider_coordinates_invalid",
+        ),
+        (
+            '[{"type":"Text","text":"value","bbox":{"xmin":NaN,"ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_output_malformed",
+        ),
+        (
+            '[{"type":"Text","text":"value","bbox":{"xmin":"0.1","ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_coordinates_invalid",
+        ),
+        (
+            '[{"type":"Text","text":"value","bbox":{"xmin":true,"ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_coordinates_invalid",
+        ),
+        (
+            '[{"type":"Text","text":"<x_0.1><y_0.1>mixed<x_0.2><y_0.2><class_Text>","bbox":{"xmin":0.1,"ymin":0.1,"xmax":0.2,"ymax":0.2}}]',
+            "provider_mixed_response_profile",
+        ),
+    ),
+)
+def test_hosted_v2_stop_rejects_malformed_schema_bounds_and_mixed_profiles(
+    tmp_path: Path,
+    arguments: str,
+    expected_code: str,
+) -> None:
+    response = hosted_stop_envelope()
+    set_hosted_arguments(response, arguments)
+
+    with pytest.raises(ProviderFailure) as caught:
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
+
+    assert caught.value.code == expected_code
+    assert caught.value.result_class == "malformed_output"
+
+
+def test_hosted_v2_stop_rejects_oversized_tool_arguments_before_json_parsing(
+    tmp_path: Path,
+) -> None:
+    response = hosted_stop_envelope()
+    set_hosted_arguments(response, "[" + ("x" * MAX_HOSTED_ARGUMENT_BYTES) + "]")
+
+    with pytest.raises(ProviderFailure, match="provider_arguments_oversized"):
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
+
+
+@pytest.mark.parametrize(
+    "signal",
+    ("response_truncated", "choice_incomplete", "message_truncated", "token_limit"),
+)
+def test_hosted_v2_rejects_explicit_truncation_or_token_limit_signals(
+    tmp_path: Path,
+    signal: str,
+) -> None:
+    response = hosted_stop_envelope()
+    if signal == "response_truncated":
+        response["truncated"] = True
+    elif signal == "choice_incomplete":
+        response["choices"][0]["incomplete"] = True
+    elif signal == "message_truncated":
+        response["choices"][0]["message"]["truncated"] = True
+    else:
+        response["usage"] = {"completion_tokens": 8_192}
+
+    with pytest.raises(ProviderFailure, match="provider_malformed_output_truncated"):
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(response).encode("utf-8"),
+        )
+
+
+def test_profile_responses_cannot_cross_adapter_contracts(tmp_path: Path) -> None:
+    page = rendered_page(tmp_path, width=1_664, height=2_048)
+    tagged = json.dumps(
+        {
+            "model": HOSTED_CONTRACT.model,
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {
+                        "content": "<x_0.1><y_0.1>Heading<x_0.5><y_0.2><class_Title>"
+                    },
+                }
+            ],
+        }
+    ).encode("utf-8")
+
+    with pytest.raises(ProviderFailure):
+        normalize_provider_response(HOSTED_CONTRACT, page, tagged)
+    with pytest.raises(ProviderFailure):
+        normalize_provider_response(V1_2_NIM_CONTRACT, page, hosted_response())
 
 
 def test_large_page_uses_bounded_nvcf_asset_flow_and_deletes_asset(tmp_path: Path) -> None:
@@ -456,7 +787,7 @@ def test_duplicate_bounding_box_fails_closed(tmp_path: Path) -> None:
             "model": HOSTED_CONTRACT.model,
             "choices": [
                 {
-                    "finish_reason": "tool_calls",
+                    "finish_reason": "stop",
                     "message": {
                         "content": None,
                         "tool_calls": [
@@ -473,6 +804,42 @@ def test_duplicate_bounding_box_fails_closed(tmp_path: Path) -> None:
 
     with pytest.raises(ProviderFailure, match="provider_duplicate_coordinates"):
         normalize_provider_response(HOSTED_CONTRACT, rendered_page(tmp_path), response)
+
+
+def test_hosted_v2_generates_unique_ordered_ids_and_authoritative_page_references(
+    tmp_path: Path,
+) -> None:
+    response = hosted_stop_envelope()
+    set_hosted_arguments(
+        response,
+        json.dumps(
+            [
+                {
+                    "type": "Title",
+                    "text": "First",
+                    "bbox": {"xmin": 0.1, "ymin": 0.1, "xmax": 0.8, "ymax": 0.2},
+                },
+                {
+                    "type": "Text",
+                    "text": "Second",
+                    "bbox": {"xmin": 0.1, "ymin": 0.3, "xmax": 0.8, "ymax": 0.4},
+                },
+            ]
+        ),
+    )
+
+    normalized = normalize_provider_response(
+        HOSTED_CONTRACT,
+        rendered_page(tmp_path),
+        json.dumps(response).encode("utf-8"),
+    )
+
+    assert [block["id"] for block in normalized["blocks"]] == [
+        "page-1-element-1",
+        "page-1-element-2",
+    ]
+    assert [block["text"] for block in normalized["blocks"]] == ["First", "Second"]
+    assert {block["coordinates"]["page"] for block in normalized["blocks"]} == {1}
 
 
 @pytest.mark.parametrize(
@@ -514,6 +881,43 @@ def test_oversized_response_fails_closed(tmp_path: Path) -> None:
             HOSTED_CONTRACT,
             rendered_page(tmp_path),
             b"{" + (b" " * MAX_PROVIDER_RESPONSE_BYTES) + b"}",
+        )
+
+
+def test_wrong_model_and_truncated_response_fail_closed(tmp_path: Path) -> None:
+    wrong_model = hosted_stop_envelope()
+    wrong_model["model"] = "nvidia/other-model"
+    with pytest.raises(ProviderFailure, match="provider_output_contract_mismatch"):
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            json.dumps(wrong_model).encode("utf-8"),
+        )
+    with pytest.raises(ProviderFailure, match="provider_output_malformed"):
+        normalize_provider_response(
+            HOSTED_CONTRACT,
+            rendered_page(tmp_path),
+            b'{"model":"nvidia/nemotron-parse","choices":[',
+        )
+
+
+def test_content_type_mismatch_rejects_before_hosted_v2_normalization(
+    tmp_path: Path,
+) -> None:
+    def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/plain"},
+            content=hosted_response(),
+        )
+
+    with pytest.raises(ProviderFailure, match="provider_content_type_invalid"):
+        invoke_rest_adapter(
+            [rendered_page(tmp_path)],
+            "d" * 64,
+            HOSTED_CONTRACT,
+            "test-secret",
+            transport=httpx.MockTransport(handler),
         )
 
 

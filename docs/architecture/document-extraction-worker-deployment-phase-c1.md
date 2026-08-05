@@ -565,23 +565,81 @@ request body, response body, image bytes, prompt, credential, workspace ID, or
 customer identifier was retained. The observer ran before, and could not
 influence, the unchanged fail-closed validator.
 
-**Classification:** `5. malformed provider response`.
+**Historical v1 diagnostic classification:** `5. malformed provider response`.
 
-The response matches the documented legacy hosted tool-call profile in every
-retained structural respect except its completion marker. The approved hosted
-contract requires `finish_reason: tool_calls` when a tool call is returned;
-NVIDIA returned `stop` while still returning one complete tool call. This is not
-a v1.2 tagged-content response and there is no evidence of truncation. The
-standards-compliant next step is to ask NVIDIA whether `stop` is an intentional
-hosted Nemotron Parse completion contract, using only the support request ID and
-this structural classification. Vaeroex must not accept `stop` without official
-contract evidence and a separate adapter review.
+The frozen v1 validator required `finish_reason: tool_calls`, so its diagnostic
+classifier correctly assigned class 5 at the time. The response nevertheless
+matches the legacy hosted tool-call transport in every retained structural
+respect except its completion marker. It is not a v1.2 tagged-content response,
+and no retained evidence indicates truncation.
 
 Cleanup closed all database and runtime gates, restored the retained Worker Pool
 to its prior inert revision at zero instances, removed the synthetic Storage and
 database fixtures, deleted the ephemeral broker and secrets, destroyed the
 temporary worker signing-key version, and retained only content-free aggregate
 telemetry. Production and Vercel resources were not addressed.
+
+## Hosted tool-call compatibility v2
+
+The follow-up primary-source audit established a narrow compatibility basis for
+the legacy hosted endpoint:
+
+- [NVIDIA's official hosted Nemotron Parse cookbook](https://github.com/NVIDIA/GenerativeAIExamples/blob/da30b390663f39e01be7e8b5304945a4e43052ca/oss_tutorials/Nemotron_Parse_StepFun_Document_Intelligence/stepfun_doc_intelligence_with_parse.ipynb)
+  calls `integrate.api.nvidia.com`, requests the `markdown_bbox` function, and
+  directly parses `message.tool_calls[0].function.arguments` without a
+  `finish_reason` gate.
+- [NVIDIA NIM 1.5's Nemotron Parse API example](https://docs.nvidia.com/nim/vision-language-models/1.5.0/examples/nemotron-parse/api.html)
+  consumes the same tool-call argument payload and documents normalized
+  `xmin`, `ymin`, `xmax`, and `ymax` element coordinates without defining a
+  completion-marker gate for extraction validity.
+- [NVIDIA's hosted API reference](https://docs.api.nvidia.com/nim/reference/nvidia-nemotron-parse-infer)
+  identifies the hosted endpoint and model but does not explicitly define
+  model-specific `finish_reason` semantics for this extraction response.
+- [NVIDIA NIM 1.7's v1.2 API example](https://docs.nvidia.com/nim/vision-language-models/1.7.0/examples/nemotron-parse/api.html)
+  and [release notes](https://docs.nvidia.com/nim/vision-language-models/1.7.0/release-notes.html)
+  establish a different tagged assistant-content profile. It remains separate
+  and is never auto-detected by the hosted adapter.
+
+These sources do not explicitly state that `finish_reason: stop` is valid for
+hosted Nemotron Parse. Vaeroex therefore does not attribute that rule to
+NVIDIA. Instead, `hosted_tool_call_v2` is an application-owned compatibility
+policy based on NVIDIA's payload-consuming examples plus the single retained,
+content-free observation of a structurally complete `stop` response.
+
+The active contract is bound to:
+
+- endpoint profile `hosted_tool_call` at the exact hosted URL;
+- model `nvidia/nemotron-parse`;
+- one `markdown_bbox` function tool;
+- accepted completion markers `tool_calls` and `stop`;
+- request serializer `nemotron_parse_hosted_request_v1`;
+- response validator `nemotron_parse_hosted_response_v2`;
+- normalization `nemotron_parse_hosted_normalization_v1`;
+- coordinate contract `normalized_xyxy_unit_interval_v1`; and
+- the stable compatibility rationale recorded in the request binding.
+
+`stop` is not a generic fallback. It succeeds only when one choice contains one
+exact function tool call with complete, bounded JSON matching the strict
+`markdown_bbox` schema; the assistant content is null or empty; the exact model
+and hosted profile match; no truncation or token-limit signal exists; every
+semantic class and coordinate passes validation; generated element IDs and page
+references are valid; and no v1.2 tagged marker or unapproved response field is
+present. Every other shape fails closed as `malformed_output`.
+
+Historical v1 remains a separately testable contract and still rejects
+`finish_reason: stop`. The v1.2 tagged-content adapter is unchanged. The v2
+client revision participates in the workspace-scoped cache identity, and each
+page request fingerprint additionally binds the full compatibility policy.
+Historical cache rows, normalized artifacts, review fingerprints, Saved
+Analyses, and benchmark records are neither rewritten nor confused with v2.
+The forward migration admits only v2 parser and client identities to claim and
+dispatch; it creates no rows and enables no gate.
+
+Structural acceptance still produces only an encrypted extraction draft. The
+database completion path remains `awaiting_review` / `needs_review` /
+`pending`, and no Evidence, Business Memory, embedding, KPI, operational
+metric, Business Health, snapshot, Trust, or Saved Analysis authority is
+granted before the existing authorized human-review path.
 
 ## Phase C2 prerequisites
 

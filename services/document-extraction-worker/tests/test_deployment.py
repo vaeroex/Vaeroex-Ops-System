@@ -34,8 +34,8 @@ def _environment(gate_value: str = "false") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": gate_value,
         "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "false",
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": "nvidia/nemotron-parse",
-        "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v1",
-        "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v1",
+        "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v2",
+        "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v2",
         "DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS": "5",
         "TMPDIR": "/var/tmp/vaeroex-document-worker",
     }

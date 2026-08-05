@@ -140,8 +140,8 @@ def main() -> int:
         "DOCUMENT_EXTRACTION_BROKER_AUDIENCE": arguments.broker_url.rstrip("/"),
         "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE": "google_oidc_v1",
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": "nvidia/nemotron-parse",
-        "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v1",
-        "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v1",
+        "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": "vaeroex_nemotron_parse_rest_v2",
+        "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": "nemotron_parse_hosted_tool_call_rest_v2",
         "TMPDIR": "/var/tmp/vaeroex-document-worker",
     }
     for name_value, expected in expected_values.items():

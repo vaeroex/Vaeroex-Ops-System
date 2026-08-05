@@ -1,5 +1,10 @@
 # Document Extraction Private Worker - Phase B
 
+> Historical contract note: this document records the original hosted
+> tool-call v1 boundary. Runtime identity advances to the separately versioned
+> `hosted_tool_call_v2` compatibility policy in Phase C1; v1 remains unchanged
+> for historical cache, artifact, and benchmark comparison.
+
 ## Status
 
 Phase B is a disabled execution foundation. It does not deploy a worker, enable

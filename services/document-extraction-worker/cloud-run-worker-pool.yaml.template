@@ -46,9 +46,9 @@ spec:
             - name: DOCUMENT_EXTRACTION_NVIDIA_MODEL
               value: nvidia/nemotron-parse
             - name: DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION
-              value: vaeroex_nemotron_parse_rest_v1
+              value: vaeroex_nemotron_parse_rest_v2
             - name: DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION
-              value: nemotron_parse_hosted_tool_call_rest_v1
+              value: nemotron_parse_hosted_tool_call_rest_v2
             - name: DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS
               value: "5"
             - name: TMPDIR

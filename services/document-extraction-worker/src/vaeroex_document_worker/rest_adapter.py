@@ -16,8 +16,15 @@ from urllib.parse import urlsplit
 import httpx
 
 from .provider_contract import (
+    HOSTED_ACCEPTED_FINISH_REASONS,
+    HOSTED_COMPATIBILITY_CONTRACT_VERSION,
     HOSTED_CONTRACT,
     HOSTED_ENDPOINT,
+    HOSTED_ENDPOINT_PROFILE,
+    HOSTED_RESPONSE_PROFILE,
+    HOSTED_TOOL_NAME,
+    LEGACY_HOSTED_CONTRACT,
+    LEGACY_REST_ADAPTER_VERSION,
     NVCF_ASSET_ENDPOINT,
     NVCF_INLINE_IMAGE_LIMIT_BYTES,
     REST_ADAPTER_VERSION,
@@ -29,6 +36,7 @@ from .provider_types import ProviderFailure, ProviderResult, RenderedPage
 from .response_profile import ResponseProfileDiagnosticV1, inspect_response_profile
 
 MAX_PROVIDER_RESPONSE_BYTES = 2_000_000
+MAX_HOSTED_ARGUMENT_BYTES = 1_000_000
 MAX_HOSTED_REQUEST_BYTES = 300_000
 MAX_SELF_HOSTED_REQUEST_BYTES = 16_500_000
 MAX_RENDERED_PAGE_BYTES = 12_000_000
@@ -37,6 +45,7 @@ MAX_RENDERED_HEIGHT = 2_048
 MAX_ELEMENTS_PER_PAGE = 500
 MAX_ELEMENT_TEXT_LENGTH = 50_000
 MAX_PAGE_TEXT_LENGTH = 250_000
+MAX_PROVIDER_COMPLETION_TOKENS = 8_192
 TIMEOUT_POLICY_VERSION = "connect_10_read_120_write_30_no_internal_retry_v1"
 NVCF_ASSET_DESCRIPTION = "vaeroex-document-page"
 ProviderBoundary = Literal["asset_create", "asset_upload", "inference"]
@@ -51,6 +60,32 @@ _TAGGED_ELEMENT = re.compile(
     re.DOTALL,
 )
 _TAG_SEPARATOR = re.compile(r"(?:\s|</?s>)*")
+_NORMALIZED_BLOCK_ID = re.compile(r"^page-[1-9][0-9]*-element-[1-9][0-9]*$")
+_TOOL_CALL_ID = re.compile(r"^[A-Za-z0-9._:-]{1,200}$")
+_HOSTED_TOP_LEVEL_KEYS = frozenset(
+    {
+        "choices",
+        "created",
+        "id",
+        "incomplete",
+        "model",
+        "object",
+        "service_tier",
+        "system_fingerprint",
+        "truncated",
+        "usage",
+    }
+)
+_HOSTED_CHOICE_KEYS = frozenset(
+    {"finish_reason", "incomplete", "index", "logprobs", "message", "truncated"}
+)
+_HOSTED_MESSAGE_KEYS = frozenset(
+    {"content", "incomplete", "refusal", "role", "tool_calls", "truncated"}
+)
+_HOSTED_TOOL_CALL_KEYS = frozenset({"function", "id", "type"})
+_HOSTED_FUNCTION_KEYS = frozenset({"arguments", "name"})
+_HOSTED_ELEMENT_KEYS = frozenset({"bbox", "text", "type"})
+_HOSTED_BBOX_KEYS = frozenset({"xmax", "xmin", "ymax", "ymin"})
 _ALLOWED_LABELS = frozenset(
     {
         "Text",
@@ -75,9 +110,12 @@ _ALLOWED_LABELS = frozenset(
 
 
 def _validate_contract(contract: ProviderContract) -> None:
-    if contract in (HOSTED_CONTRACT, V1_2_NIM_CONTRACT):
+    if contract in (LEGACY_HOSTED_CONTRACT, HOSTED_CONTRACT, V1_2_NIM_CONTRACT):
         return
-    if contract.response_profile == "hosted_tool_call" and contract.endpoint != HOSTED_ENDPOINT:
+    if (
+        contract.response_profile in (HOSTED_ENDPOINT_PROFILE, HOSTED_RESPONSE_PROFILE)
+        and contract.endpoint != HOSTED_ENDPOINT
+    ):
         raise ProviderFailure("provider_endpoint_contract_mismatch", "validation", retryable=False)
     if contract.response_profile == "v1_2_tagged" and contract.endpoint != V1_2_NIM_ENDPOINT:
         raise ProviderFailure("provider_endpoint_contract_mismatch", "validation", retryable=False)
@@ -108,11 +146,24 @@ class ProviderRequestBindingV1:
         return hashlib.sha256(payload).hexdigest()
 
 
+@dataclass(frozen=True)
+class HostedProviderRequestBindingV2(ProviderRequestBindingV1):
+    endpoint_profile: str
+    compatibility_contract_version: str
+    accepted_finish_reasons: tuple[str, ...]
+    tool_name: str
+    request_serializer_version: str
+    response_validator_version: str
+    normalization_version: str
+    coordinate_contract_version: str
+    compatibility_rationale: str
+
+
 def request_binding(
     contract: ProviderContract,
     page: RenderedPage,
     document_sha256: str,
-) -> ProviderRequestBindingV1:
+) -> ProviderRequestBindingV1 | HostedProviderRequestBindingV2:
     _validate_contract(contract)
     if not _SHA256.fullmatch(document_sha256) or not _SHA256.fullmatch(page.content_sha256):
         raise ProviderFailure("provider_request_identity_invalid", "validation", retryable=False)
@@ -121,8 +172,13 @@ def request_binding(
         if contract.supports_nvcf_assets and page.byte_length > NVCF_INLINE_IMAGE_LIMIT_BYTES
         else "inline_base64"
     )
-    return ProviderRequestBindingV1(
-        adapter_version=REST_ADAPTER_VERSION,
+    adapter_version = (
+        REST_ADAPTER_VERSION
+        if contract.response_profile == HOSTED_RESPONSE_PROFILE
+        else LEGACY_REST_ADAPTER_VERSION
+    )
+    base = ProviderRequestBindingV1(
+        adapter_version=adapter_version,
         endpoint_contract_version=contract.endpoint_contract_version,
         model=contract.model,
         document_sha256=document_sha256,
@@ -133,6 +189,42 @@ def request_binding(
         rendered_height=page.height,
         payload_mode=payload_mode,
         timeout_policy_version=TIMEOUT_POLICY_VERSION,
+    )
+    if contract.response_profile != HOSTED_RESPONSE_PROFILE:
+        return base
+    if (
+        contract.endpoint_profile != HOSTED_ENDPOINT_PROFILE
+        or contract.compatibility_contract_version != HOSTED_COMPATIBILITY_CONTRACT_VERSION
+        or contract.accepted_finish_reasons != HOSTED_ACCEPTED_FINISH_REASONS
+        or contract.tool_name != HOSTED_TOOL_NAME
+        or contract.request_serializer_version is None
+        or contract.response_validator_version is None
+        or contract.normalization_version is None
+        or contract.coordinate_contract_version is None
+        or contract.compatibility_rationale is None
+    ):
+        raise ProviderFailure("provider_contract_unsupported", "validation", retryable=False)
+    return HostedProviderRequestBindingV2(
+        adapter_version=base.adapter_version,
+        endpoint_contract_version=base.endpoint_contract_version,
+        model=base.model,
+        document_sha256=base.document_sha256,
+        page_sha256=base.page_sha256,
+        page_index=base.page_index,
+        mime_type=base.mime_type,
+        rendered_width=base.rendered_width,
+        rendered_height=base.rendered_height,
+        payload_mode=base.payload_mode,
+        timeout_policy_version=base.timeout_policy_version,
+        endpoint_profile=contract.endpoint_profile,
+        compatibility_contract_version=contract.compatibility_contract_version,
+        accepted_finish_reasons=contract.accepted_finish_reasons,
+        tool_name=contract.tool_name,
+        request_serializer_version=contract.request_serializer_version,
+        response_validator_version=contract.response_validator_version,
+        normalization_version=contract.normalization_version,
+        coordinate_contract_version=contract.coordinate_contract_version,
+        compatibility_rationale=contract.compatibility_rationale,
     )
 
 
@@ -158,11 +250,14 @@ def serialize_provider_request(
         "model": contract.model,
         "messages": [{"role": "user", "content": content}],
         "temperature": 0.0,
-        "max_tokens": 8_192,
+        "max_tokens": MAX_PROVIDER_COMPLETION_TOKENS,
     }
-    if contract.response_profile == "hosted_tool_call":
+    if contract.response_profile in (HOSTED_ENDPOINT_PROFILE, HOSTED_RESPONSE_PROFILE):
         body["tools"] = [
-            {"type": "function", "function": {"name": "markdown_bbox"}}
+            {
+                "type": "function",
+                "function": {"name": contract.tool_name or HOSTED_TOOL_NAME},
+            }
         ]
     else:
         body.update(
@@ -175,7 +270,7 @@ def serialize_provider_request(
     serialized = json.dumps(body, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     request_limit = (
         MAX_HOSTED_REQUEST_BYTES
-        if contract.response_profile == "hosted_tool_call"
+        if contract.response_profile in (HOSTED_ENDPOINT_PROFILE, HOSTED_RESPONSE_PROFILE)
         else MAX_SELF_HOSTED_REQUEST_BYTES
     )
     if len(serialized) > request_limit:
@@ -263,7 +358,13 @@ def _kind(label: str) -> str:
     return "text"
 
 
-def _legacy_elements(arguments: str) -> list[tuple[str, str, dict[str, float]]]:
+def _legacy_elements(
+    arguments: str,
+    *,
+    strict_hosted_v2: bool = False,
+) -> list[tuple[str, str, dict[str, float]]]:
+    if strict_hosted_v2 and len(arguments.encode("utf-8")) > MAX_HOSTED_ARGUMENT_BYTES:
+        raise ProviderFailure("provider_arguments_oversized", "malformed_output", retryable=False)
     try:
         parsed = _strict_json(arguments)
     except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
@@ -276,18 +377,103 @@ def _legacy_elements(arguments: str) -> list[tuple[str, str, dict[str, float]]]:
         raise ProviderFailure("provider_element_limit_exceeded", "malformed_output", retryable=False)
     elements: list[tuple[str, str, dict[str, float]]] = []
     for raw in parsed:
+        if strict_hosted_v2 and set(raw) != _HOSTED_ELEMENT_KEYS:
+            raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
         label = _normalized_label(raw.get("type"))
-        text = _clean_text(raw.get("text"))
+        raw_text = raw.get("text")
+        if strict_hosted_v2 and isinstance(raw_text, str) and _TAGGED_ELEMENT.search(raw_text):
+            raise ProviderFailure("provider_mixed_response_profile", "malformed_output", retryable=False)
+        text = _clean_text(raw_text)
         bbox = raw.get("bbox")
         if not isinstance(bbox, dict):
             raise ProviderFailure("provider_coordinates_invalid", "malformed_output", retryable=False)
-        coordinates = _coordinates(
-            (bbox.get("xmin"), bbox.get("ymin"), bbox.get("xmax"), bbox.get("ymax"))
+        if strict_hosted_v2 and set(bbox) != _HOSTED_BBOX_KEYS:
+            raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+        raw_coordinates = (
+            bbox.get("xmin"),
+            bbox.get("ymin"),
+            bbox.get("xmax"),
+            bbox.get("ymax"),
         )
+        if strict_hosted_v2 and any(
+            type(value) not in (int, float) for value in raw_coordinates
+        ):
+            raise ProviderFailure("provider_coordinates_invalid", "malformed_output", retryable=False)
+        coordinates = _coordinates(raw_coordinates)
         if coordinates is None:
             raise ProviderFailure("provider_coordinates_invalid", "malformed_output", retryable=False)
         elements.append((label, text, coordinates))
     return elements
+
+
+def _hosted_v2_has_truncation_signal(
+    response: dict[str, Any],
+    choice: dict[str, Any],
+    message: dict[str, Any],
+) -> bool:
+    if any(
+        container.get(key) is True
+        for container in (response, choice, message)
+        for key in ("incomplete", "truncated")
+    ):
+        return True
+    usage = response.get("usage")
+    if usage is None:
+        return False
+    if not isinstance(usage, dict):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    completion_tokens = usage.get("completion_tokens")
+    if completion_tokens is None:
+        return False
+    if type(completion_tokens) is not int or completion_tokens < 0:
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    return completion_tokens >= MAX_PROVIDER_COMPLETION_TOKENS
+
+
+def _hosted_v2_elements(
+    contract: ProviderContract,
+    response: dict[str, Any],
+    choice: dict[str, Any],
+    message: dict[str, Any],
+) -> list[tuple[str, str, dict[str, float]]]:
+    if (
+        set(response) - _HOSTED_TOP_LEVEL_KEYS
+        or set(choice) - _HOSTED_CHOICE_KEYS
+        or set(message) - _HOSTED_MESSAGE_KEYS
+    ):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    if response.get("object") not in (None, "chat.completion"):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    if choice.get("index") not in (None, 0) or choice.get("logprobs") is not None:
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    if message.get("role") not in (None, "assistant") or message.get("refusal") not in (None, ""):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    finish_reason = choice.get("finish_reason")
+    if finish_reason == "length" or _hosted_v2_has_truncation_signal(response, choice, message):
+        raise ProviderFailure("provider_malformed_output_truncated", "malformed_output", retryable=False)
+    if finish_reason is None:
+        raise ProviderFailure("provider_malformed_hosted_finish_missing", "malformed_output", retryable=False)
+    if finish_reason not in contract.accepted_finish_reasons:
+        raise ProviderFailure("provider_malformed_hosted_finish_invalid", "malformed_output", retryable=False)
+    if message.get("content") not in (None, ""):
+        raise ProviderFailure("provider_malformed_hosted_content", "malformed_output", retryable=False)
+    tool_calls = message.get("tool_calls")
+    if not isinstance(tool_calls, list) or len(tool_calls) != 1 or not isinstance(tool_calls[0], dict):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    tool_call = tool_calls[0]
+    if set(tool_call) - _HOSTED_TOOL_CALL_KEYS or tool_call.get("type") != "function":
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    tool_call_id = tool_call.get("id")
+    if tool_call_id is not None and (
+        not isinstance(tool_call_id, str) or _TOOL_CALL_ID.fullmatch(tool_call_id) is None
+    ):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    function = tool_call.get("function")
+    if not isinstance(function, dict) or set(function) != _HOSTED_FUNCTION_KEYS:
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    if function.get("name") != contract.tool_name or not isinstance(function.get("arguments"), str):
+        raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
+    return _legacy_elements(function["arguments"], strict_hosted_v2=True)
 
 
 def _tagged_elements(content: str, page: RenderedPage) -> list[tuple[str, str, dict[str, float]]]:
@@ -333,7 +519,7 @@ def normalize_provider_response(
     if not isinstance(message, dict):
         raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
     finish_reason = choices[0].get("finish_reason")
-    if contract.response_profile == "hosted_tool_call":
+    if contract.response_profile == HOSTED_ENDPOINT_PROFILE:
         content_value = message.get("content")
         has_content = content_value not in (None, "")
         if finish_reason == "length":
@@ -364,6 +550,8 @@ def normalize_provider_response(
         ):
             raise ProviderFailure("provider_output_schema_mismatch", "malformed_output", retryable=False)
         elements = _legacy_elements(function["arguments"])
+    elif contract.response_profile == HOSTED_RESPONSE_PROFILE:
+        elements = _hosted_v2_elements(contract, response, choices[0], message)
     elif contract.response_profile == "v1_2_tagged":
         content_value = message.get("content")
         if finish_reason != "stop" or message.get("tool_calls") not in (None, []) or not isinstance(content_value, str):
@@ -376,6 +564,7 @@ def normalize_provider_response(
     total_text = 0
     seen: set[tuple[object, ...]] = set()
     seen_coordinates: set[tuple[float, float, float, float]] = set()
+    seen_block_ids: set[str] = set()
     blocks: list[dict[str, Any]] = []
     for index, (label, text, coordinates) in enumerate(elements, start=1):
         total_text += len(text)
@@ -401,9 +590,13 @@ def normalize_provider_response(
         if geometry in seen_coordinates:
             raise ProviderFailure("provider_duplicate_coordinates", "malformed_output", retryable=False)
         seen_coordinates.add(geometry)
+        block_id = f"page-{page.page}-element-{index}"
+        if _NORMALIZED_BLOCK_ID.fullmatch(block_id) is None or block_id in seen_block_ids:
+            raise ProviderFailure("provider_element_id_invalid", "malformed_output", retryable=False)
+        seen_block_ids.add(block_id)
         blocks.append(
             {
-                "id": f"page-{page.page}-element-{index}",
+                "id": block_id,
                 "kind": _kind(label),
                 "text": text,
                 "coordinates": {"page": page.page, **coordinates},
@@ -662,7 +855,7 @@ class NvidiaNemotronParseRestAdapter:
     def _invoke_page(
         self,
         page: RenderedPage,
-        binding: ProviderRequestBindingV1,
+        binding: ProviderRequestBindingV1 | HostedProviderRequestBindingV2,
         completed_pages: tuple[dict[str, Any], ...],
     ) -> dict[str, Any]:
         content_type = page.mime_type.split("/", 1)[1]
@@ -699,7 +892,8 @@ class NvidiaNemotronParseRestAdapter:
                 completed_pages=completed_pages,
                 request_limit=(
                     MAX_HOSTED_REQUEST_BYTES
-                    if self._contract.response_profile == "hosted_tool_call"
+                    if self._contract.response_profile
+                    in (HOSTED_ENDPOINT_PROFILE, HOSTED_RESPONSE_PROFILE)
                     else MAX_SELF_HOSTED_REQUEST_BYTES
                 ),
             )

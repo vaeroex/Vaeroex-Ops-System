@@ -12,3 +12,5 @@ __pycache__/
 work
 outputs
 .visual-qa/
+.vercel
+.env*
