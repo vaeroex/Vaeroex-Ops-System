@@ -768,10 +768,10 @@ unchanged, and Production was never addressed.
 ### Inert Google Document AI alternative
 
 The worker now contains a separately versioned, inactive Google Document AI
-Enterprise Document OCR adapter as the provider-neutral alternative. It is not
-selected by `active_provider_contract()`, is not imported by the runner, has no
-environment switch, adds no migration, and cannot dispatch from any deployed
-worker.
+Enterprise Document OCR adapter as the provider-neutral printed-document
+alternative. It is not selected by `active_provider_contract()`, is not
+imported by the runner, has no deployed environment switch, and cannot dispatch
+from any deployed worker.
 
 The contract is pinned to:
 
@@ -781,8 +781,10 @@ The contract is pinned to:
   processor-version resource;
 - the regional v1 `processors.process` REST method;
 - serializer `google_document_ai_process_request_v1`;
-- validator `google_document_ai_process_response_v1`;
-- normalization `google_document_ai_layout_normalization_v1`; and
+- validator `google_document_ai_process_response_v2`;
+- normalization `google_document_ai_layout_normalization_v2`;
+- artifact contract `document_extraction_artifact_v2`;
+- artifact normalization `document_extraction_normalization_v2`; and
 - normalized-vertex coordinate contract
   `normalized_vertices_unit_interval_v1`.
 
@@ -812,13 +814,23 @@ required normalized polygon but never controls normalized output. Provider
 confidence is validated for shape but never enters
 Vaeroex confidence or authority.
 
-Successful parsing still returns only the existing provider-neutral normalized
-page draft. Encryption, review-provenance binding, mandatory human review, and
-all downstream authority guards remain outside and after the adapter. Before
-activation, a separate reviewed change must provision the API and exact
-processor, grant least-privilege IAM, add an explicit provider profile to the
-database and runner, qualify caching/review identities, and pass the frozen
-synthetic corpus. This PR performs none of those actions.
+Successful parsing still returns only a provider-neutral normalized page draft.
+The V2 artifact and cache identities bind the exact Google processor and
+contract versions; AES-256-GCM encryption and V3 review provenance remain
+mandatory. The committed migration
+`20260805163333_google_document_ai_enterprise_ocr_v1.sql` adds only inert schema
+support: no gate, row, grant, provider RPC, worker selection, or deployment is
+created. It is not applied by this work.
+
+The active runner and broker remain NVIDIA-only. Before activation, a separate
+reviewed change must replay the migration in isolated Preview, regenerate
+Supabase types, provision the API and exact processor, grant least-privilege
+IAM, and implement Google-specific claim, dispatch, completion, and V3 review
+RPCs. Those paths must preserve encryption, single-use dispatch, workspace
+isolation, mandatory human review, and zero downstream authority. The exact
+contract, routing matrix, privacy analysis, pricing, blockers, and bounded
+qualification plan are documented in
+[`google-document-ai-enterprise-ocr-v1.md`](./google-document-ai-enterprise-ocr-v1.md).
 
 Official contract references:
 

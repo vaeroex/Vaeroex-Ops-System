@@ -3,9 +3,13 @@ import type { Json } from "@/lib/supabase/types";
 export const DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION = "document_extraction_routing_v1" as const;
 export const DOCUMENT_EXTRACTION_CONTRACT_VERSION = "document_extraction_artifact_v1" as const;
 export const DOCUMENT_EXTRACTION_NORMALIZATION_VERSION = "document_extraction_normalization_v1" as const;
+export const DOCUMENT_EXTRACTION_CONTRACT_VERSION_V2 = "document_extraction_artifact_v2" as const;
+export const DOCUMENT_EXTRACTION_NORMALIZATION_VERSION_V2 = "document_extraction_normalization_v2" as const;
 export const DOCUMENT_EXTRACTION_REVIEW_VERSION = 1 as const;
 export const DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION =
   "document_extraction_review_provenance_v1" as const;
+export const DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION_V2 =
+  "document_extraction_review_provenance_v2" as const;
 export const DOCUMENT_EXTRACTION_PAGE_IDENTITY_VERSION =
   "document_extraction_page_identity_v1" as const;
 export const DOCUMENT_EXTRACTION_WORKSPACE_BINDING_VERSION =
@@ -45,8 +49,44 @@ export const NVIDIA_DOCUMENT_EXTRACTION_MAX_PAGES = 16 as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RENDERED_DIMENSION = 2_048 as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_TIMEOUT_SECONDS = 120 as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MAX_RETRIES = 1 as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PROVIDER = "google_document_ai" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_MODEL = "pretrained-ocr-v2.1-2024-08-07" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_CLIENT_REVISION =
+  "vaeroex_google_document_ai_rest_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PARSER_REVISION =
+  "google_document_ai_enterprise_ocr_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE =
+  "google_document_ai_enterprise_ocr_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION =
+  "google_document_ai_processor_version_process_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION =
+  "google_document_ai_process_request_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION =
+  "google_document_ai_process_response_v2" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION =
+  "google_document_ai_layout_normalization_v2" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_COMPATIBILITY_POLICY_VERSION =
+  "google_document_ai_enterprise_ocr_strict_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_TABLE_POLICY_VERSION =
+  "tables_if_present_strict_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_CONFIDENCE_POLICY_VERSION =
+  "preserve_for_review_never_authority_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_SELECTION_MARK_POLICY_VERSION =
+  "disabled_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_TYPE = "OCR_PROCESSOR" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_VERSION =
+  "pretrained-ocr-v2.1-2024-08-07" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_LOCATION = "us" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_MAX_FILE_BYTES = 25_000_000 as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_MAX_PAGES = 15 as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_MAX_RETRIES = 0 as const;
 
-export type DocumentExtractionRoute = "native" | "nvidia_primary" | "nvidia_fallback";
+export type DocumentExtractionRoute =
+  | "native"
+  | "nvidia_primary"
+  | "nvidia_fallback"
+  | "google_primary"
+  | "google_fallback";
 export type DocumentExtractionDocumentClass =
   | "digital_pdf"
   | "digital_docx"
@@ -55,7 +95,18 @@ export type DocumentExtractionDocumentClass =
   | "png"
   | "jpeg"
   | "screenshot"
-  | "phone_photo";
+  | "phone_photo"
+  | "printed_document_photo"
+  | "typed_form"
+  | "invoice_like"
+  | "receipt_like"
+  | "printed_table_document";
+export type DocumentExtractionAssessedSourceClass = DocumentExtractionDocumentClass
+  | "csv"
+  | "xlsx"
+  | "whiteboard"
+  | "highly_handwritten_note"
+  | "mixed_scene_photo";
 export type DocumentExtractionStage =
   | "queued"
   | "leased"
@@ -132,7 +183,7 @@ export type DocumentExtractionValidationFindingV1 = {
 export type NormalizedDocumentExtractionArtifactV1 = {
   contractVersion: typeof DOCUMENT_EXTRACTION_CONTRACT_VERSION;
   normalizationVersion: typeof DOCUMENT_EXTRACTION_NORMALIZATION_VERSION;
-  route: DocumentExtractionRoute;
+  route: "nvidia_primary" | "nvidia_fallback";
   documentClass: DocumentExtractionDocumentClass;
   pageCount: number;
   pages: Array<{
@@ -148,6 +199,81 @@ export type NormalizedDocumentExtractionArtifactV1 = {
   validationFindings: DocumentExtractionValidationFindingV1[];
   artifactFingerprint: string;
 };
+
+export type DocumentExtractionDetectedLanguageV1 = {
+  languageCode: string;
+  confidence: number | null;
+};
+
+export type DocumentExtractionTextSegmentV1 = { start: number; end: number };
+
+export type DocumentExtractionLayoutV1 = {
+  text: string;
+  textSegments: DocumentExtractionTextSegmentV1[];
+  confidence: number | null;
+  orientation: "ORIENTATION_UNSPECIFIED" | "PAGE_DOWN" | "PAGE_LEFT" | "PAGE_RIGHT" | "PAGE_UP" | null;
+  coordinates: DocumentSourceCoordinatesV1;
+  polygon: Array<{ x: number; y: number }>;
+};
+
+export type DocumentExtractionStructuralElementV1 = {
+  id: string;
+  kind: "block" | "paragraph" | "line" | "token";
+  layout: DocumentExtractionLayoutV1;
+  detectedLanguages: DocumentExtractionDetectedLanguageV1[];
+  detectedBreak?: "TYPE_UNSPECIFIED" | "SPACE" | "WIDE_SPACE" | "HYPHEN" | null;
+};
+
+export type DocumentExtractionTableCellV1 = {
+  id: string;
+  layout: DocumentExtractionLayoutV1;
+  rowSpan: number;
+  colSpan: number;
+  detectedLanguages: DocumentExtractionDetectedLanguageV1[];
+};
+
+export type DocumentExtractionTableV1 = {
+  id: string;
+  kind: "table";
+  layout: DocumentExtractionLayoutV1;
+  detectedLanguages: DocumentExtractionDetectedLanguageV1[];
+  headerRows: Array<{ id: string; cells: DocumentExtractionTableCellV1[] }>;
+  bodyRows: Array<{ id: string; cells: DocumentExtractionTableCellV1[] }>;
+};
+
+export type DocumentExtractionPageStructureV1 = {
+  structureVersion: "provider_neutral_document_structure_v1";
+  pageLayout: DocumentExtractionLayoutV1;
+  detectedLanguages: DocumentExtractionDetectedLanguageV1[];
+  blocks: DocumentExtractionStructuralElementV1[];
+  paragraphs: DocumentExtractionStructuralElementV1[];
+  lines: DocumentExtractionStructuralElementV1[];
+  tokens: DocumentExtractionStructuralElementV1[];
+  tables: DocumentExtractionTableV1[];
+  selectionMarks: [];
+  imageQuality: {
+    qualityScore: number;
+    detectedDefects: Array<{ type: string; confidence: number | null }>;
+  };
+};
+
+export type NormalizedDocumentExtractionArtifactV2 = {
+  contractVersion: typeof DOCUMENT_EXTRACTION_CONTRACT_VERSION_V2;
+  normalizationVersion: typeof DOCUMENT_EXTRACTION_NORMALIZATION_VERSION_V2;
+  route: "google_primary" | "google_fallback";
+  documentClass: DocumentExtractionDocumentClass;
+  pageCount: number;
+  pages: Array<NormalizedDocumentExtractionArtifactV1["pages"][number] & {
+    structure: DocumentExtractionPageStructureV1;
+  }>;
+  criticalFields: DocumentExtractionCriticalFieldV1[];
+  validationFindings: DocumentExtractionValidationFindingV1[];
+  artifactFingerprint: string;
+};
+
+export type NormalizedDocumentExtractionArtifact =
+  | NormalizedDocumentExtractionArtifactV1
+  | NormalizedDocumentExtractionArtifactV2;
 
 export type DocumentExtractionCorrectedFieldV1 = {
   fieldId: string;
@@ -188,6 +314,33 @@ export type DocumentExtractionReviewProvenanceV1 = {
   review_version: typeof DOCUMENT_EXTRACTION_REVIEW_VERSION;
 };
 
+export type DocumentExtractionReviewProvenanceV2 = {
+  review_provenance_version: typeof DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION_V2;
+  content_fingerprint: string;
+  parser_provider: typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER;
+  parser_revision: typeof GOOGLE_DOCUMENT_EXTRACTION_PARSER_REVISION;
+  client_revision: typeof GOOGLE_DOCUMENT_EXTRACTION_CLIENT_REVISION;
+  provider_profile: typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
+  processor_type: typeof GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_TYPE;
+  processor_resource: string;
+  processor_location: typeof GOOGLE_DOCUMENT_EXTRACTION_LOCATION;
+  processor_version: typeof GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_VERSION;
+  endpoint_contract_version: typeof GOOGLE_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION;
+  request_serializer_version: typeof GOOGLE_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION;
+  response_validator_version: typeof GOOGLE_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION;
+  provider_normalization_version: typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION;
+  artifact_normalization_version: typeof DOCUMENT_EXTRACTION_NORMALIZATION_VERSION_V2;
+  compatibility_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_COMPATIBILITY_POLICY_VERSION;
+  table_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_TABLE_POLICY_VERSION;
+  confidence_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_CONFIDENCE_POLICY_VERSION;
+  selection_mark_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_SELECTION_MARK_POLICY_VERSION;
+  model_alias: typeof GOOGLE_DOCUMENT_EXTRACTION_MODEL;
+  page_identity_fingerprint: string;
+  workspace_binding_fingerprint: string;
+  job_binding_fingerprint: string;
+  review_version: typeof DOCUMENT_EXTRACTION_REVIEW_VERSION;
+};
+
 export type DocumentExtractionCriticalFieldManifestV2 = {
   manifest_version: "document_extraction_critical_fields_v2";
   artifact_fingerprint: string;
@@ -197,9 +350,19 @@ export type DocumentExtractionCriticalFieldManifestV2 = {
   fields: DocumentExtractionCriticalFieldManifestV1["fields"];
 };
 
+export type DocumentExtractionCriticalFieldManifestV3 = {
+  manifest_version: "document_extraction_critical_fields_v3";
+  artifact_fingerprint: string;
+  extraction_contract_version: typeof DOCUMENT_EXTRACTION_CONTRACT_VERSION_V2;
+  review_provenance_fingerprint: string;
+  review_provenance: DocumentExtractionReviewProvenanceV2;
+  fields: DocumentExtractionCriticalFieldManifestV1["fields"];
+};
+
 export type DocumentExtractionCriticalFieldManifest =
   | DocumentExtractionCriticalFieldManifestV1
-  | DocumentExtractionCriticalFieldManifestV2;
+  | DocumentExtractionCriticalFieldManifestV2
+  | DocumentExtractionCriticalFieldManifestV3;
 
 export type DocumentExtractionReviewDecisionV1 = {
   reviewVersion: typeof DOCUMENT_EXTRACTION_REVIEW_VERSION;
