@@ -35,6 +35,8 @@ spec:
               value: "false"
             - name: DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED
               value: "false"
+            - name: DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE
+              value: "hosted_tool_call_v2"
             - name: DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED
               value: "false"
             - name: DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED

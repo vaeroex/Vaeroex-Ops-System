@@ -8,6 +8,8 @@ from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption,
 
 from vaeroex_document_worker.config import (
     CLIENT_REVISION,
+    GOOGLE_PREVIEW_APPROVAL,
+    GOOGLE_PRODUCTION_APPROVAL,
     MODEL,
     PARSER_REVISION,
     PRODUCTION_APPROVAL,
@@ -17,6 +19,12 @@ from vaeroex_document_worker.field_path_diagnostic import (
     FIELD_PATH_DIAGNOSTIC_CONFIRMATION,
 )
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
+from vaeroex_document_worker.google_document_ai_contract import (
+    GOOGLE_DOCUMENT_AI_ADAPTER_VERSION,
+    GOOGLE_DOCUMENT_AI_LOCATION,
+    GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION,
+    GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+)
 from vaeroex_document_worker.response_profile import DIAGNOSTIC_CONFIRMATION
 
 
@@ -33,11 +41,34 @@ def environment() -> dict[str, str]:
         "DOCUMENT_EXTRACTION_WORKER_ID": "preview-worker-1",
         "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION": "worker-key-v1",
         "DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64": base64.b64encode(key).decode("ascii"),
+        "DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE": HOSTED_CONTRACT.response_profile,
         "DOCUMENT_EXTRACTION_NVIDIA_MODEL": MODEL,
         "DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION": CLIENT_REVISION,
         "DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION": PARSER_REVISION,
         "NVIDIA_API_KEY": "test-only-placeholder",
     }
+
+
+def google_environment() -> dict[str, str]:
+    values = environment()
+    values.pop("NVIDIA_API_KEY")
+    values.pop("DOCUMENT_EXTRACTION_NVIDIA_MODEL")
+    values.pop("DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION")
+    values.pop("DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION")
+    values.update(
+        {
+            "DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE": GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+            "DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER": "123456789012",
+            "DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID": "abcdef1234567890",
+            "DOCUMENT_EXTRACTION_GOOGLE_LOCATION": GOOGLE_DOCUMENT_AI_LOCATION,
+            "DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_VERSION": GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION,
+            "DOCUMENT_EXTRACTION_GOOGLE_MODEL": GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION,
+            "DOCUMENT_EXTRACTION_GOOGLE_CLIENT_REVISION": GOOGLE_DOCUMENT_AI_ADAPTER_VERSION,
+            "DOCUMENT_EXTRACTION_GOOGLE_PARSER_REVISION": GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+            "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL": GOOGLE_PREVIEW_APPROVAL,
+        }
+    )
+    return values
 
 
 def test_configuration_is_disabled_without_every_gate() -> None:
@@ -138,6 +169,57 @@ def test_production_requires_application_owned_approval() -> None:
     values = environment()
     values["DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT"] = "production"
     with pytest.raises(RuntimeError, match="approval"):
+        WorkerConfig.from_environment(values)
+
+
+def test_google_profile_is_exact_default_off_and_credential_separated() -> None:
+    values = google_environment()
+    config = WorkerConfig.from_environment(values)
+    assert config.provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
+    assert config.google_provider_contract is not None
+    assert config.provider_contract is None
+    assert config.nvidia_api_key is None
+
+    values["NVIDIA_API_KEY"] = "must-not-be-used"
+    with pytest.raises(RuntimeError, match="forbidden for the Google"):
+        WorkerConfig.from_environment(values)
+
+
+@pytest.mark.parametrize(
+    "name,value",
+    (
+        ("DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER", "project-name"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID", "wrong"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_LOCATION", "eu"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_VERSION", "latest"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_MODEL", "latest"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_CLIENT_REVISION", "v2"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_PARSER_REVISION", "v2"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL", "wrong"),
+    ),
+)
+def test_google_profile_mismatch_fails_before_worker_start(name: str, value: str) -> None:
+    values = google_environment()
+    values[name] = value
+    with pytest.raises(RuntimeError):
+        WorkerConfig.from_environment(values)
+
+
+def test_google_production_requires_both_separate_approvals() -> None:
+    values = google_environment()
+    values["DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT"] = "production"
+    values["DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL"] = PRODUCTION_APPROVAL
+    values.pop("DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL")
+    with pytest.raises(RuntimeError, match="Google Document AI Production approval"):
+        WorkerConfig.from_environment(values)
+    values["DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL"] = GOOGLE_PRODUCTION_APPROVAL
+    assert WorkerConfig.from_environment(values).provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
+
+
+def test_google_profile_is_not_selected_implicitly() -> None:
+    values = google_environment()
+    values.pop("DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE")
+    with pytest.raises(RuntimeError, match="ACTIVE_PROVIDER_PROFILE"):
         WorkerConfig.from_environment(values)
 
 

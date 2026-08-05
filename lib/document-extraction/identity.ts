@@ -21,6 +21,7 @@ type DocumentExtractionIdentityInput = {
 export type DocumentExtractionProviderIdentityV2 = {
   providerProfile: string;
   processorType: string;
+  processorId: string;
   processorResource: string;
   processorLocation: string;
   processorVersion: string;
@@ -85,6 +86,7 @@ export function buildDocumentExtractionIdentityV2(input: DocumentExtractionIdent
   const providerIdentity = {
     providerProfile: requireBoundedIdentityPart("providerProfile", input.providerIdentity.providerProfile),
     processorType: requireBoundedIdentityPart("processorType", input.providerIdentity.processorType),
+    processorId: requireBoundedIdentityPart("processorId", input.providerIdentity.processorId),
     processorResource: requireBoundedIdentityPart(
       "processorResource",
       input.providerIdentity.processorResource,

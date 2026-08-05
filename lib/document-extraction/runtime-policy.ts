@@ -2,10 +2,11 @@ import "server-only";
 
 import {
   DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION,
-  NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION,
-  NVIDIA_DOCUMENT_EXTRACTION_MODEL,
-  NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION
+  GOOGLE_DOCUMENT_EXTRACTION_PREVIEW_APPROVAL_VERSION,
+  GOOGLE_DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION,
+  GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
 } from "@/lib/document-extraction/contracts";
+import { resolveDocumentExtractionProviderRuntimeContract } from "@/lib/document-extraction/provider-profile";
 
 function enabled(value: string | undefined) {
   return value?.trim().toLowerCase() === "true";
@@ -47,13 +48,32 @@ export function resolveDocumentExtractionExecutionPolicy(
     environment
   )
 ): DocumentExtractionExecutionPolicy {
+  const isGoogle = environment.DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE?.trim()
+    === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
   const productionApprovalValid = runtimeEnvironment !== "production"
-    || environment.DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL?.trim()
-      === DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION;
+    || (
+      environment.DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL?.trim()
+        === DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION
+      && (!isGoogle || environment.DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL?.trim()
+        === GOOGLE_DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION)
+    );
+  const providerProfileApprovalValid = !isGoogle
+    || runtimeEnvironment === "development"
+    || (
+      runtimeEnvironment === "preview"
+      && environment.DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL?.trim()
+        === GOOGLE_DOCUMENT_EXTRACTION_PREVIEW_APPROVAL_VERSION
+    )
+    || (
+      runtimeEnvironment === "production"
+      && environment.DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL?.trim()
+        === GOOGLE_DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION
+    );
   const brokerEnabled = enabled(environment.DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED);
   const providerExecutionEnabled = brokerEnabled
     && enabled(environment.DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED)
-    && productionApprovalValid;
+    && productionApprovalValid
+    && providerProfileApprovalValid;
   const syntheticQualificationEnabled = runtimeEnvironment !== "production"
     && providerExecutionEnabled
     && enabled(environment.DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED)
@@ -83,15 +103,7 @@ export function assertDocumentExtractionProviderDispatchEnabled(
   runtimeEnvironment?: DocumentExtractionRuntimeEnvironment
 ) {
   const policy = assertDocumentExtractionProviderGateEnabled(environment, runtimeEnvironment);
-  if (
-    environment.DOCUMENT_EXTRACTION_NVIDIA_MODEL?.trim() !== NVIDIA_DOCUMENT_EXTRACTION_MODEL
-    || environment.DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION?.trim()
-      !== NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION
-    || environment.DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION?.trim()
-      !== NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION
-  ) {
-    throw new Error("document_extraction_provider_contract_mismatch");
-  }
+  resolveDocumentExtractionProviderRuntimeContract(environment);
   return policy;
 }
 

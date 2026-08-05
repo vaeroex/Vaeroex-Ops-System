@@ -8,8 +8,10 @@ provider-neutral artifact normalization, cache identity, encryption boundary,
 review provenance, static migration, and regression harness are implemented.
 
 Google execution is not active. The migration is committed but unapplied, the
-active worker remains bound to NVIDIA, no Google processor or IAM grant is
-provisioned, and no Preview or Production gate is enabled. Printed-document
+checked-in deployment templates remain bound to NVIDIA, no Google processor or
+IAM grant is provisioned, and no Preview or Production gate is enabled. The
+compiled broker and worker can recognize only the exact, explicitly selected
+Google profile described below; they cannot auto-select it. Printed-document
 ingestion through Google remains blocked until the activation prerequisites and
 the separately approved one-page qualification are complete.
 
@@ -219,31 +221,39 @@ unapplied migration. It widens existing source-class and route constraints,
 adds nullable provider-profile identity columns, adds exact Google contract
 checks for new Google rows, extends the one-active-provider-per-workspace
 invariant, and introduces an internal `document_extraction_runtime_reason_v2`
-gate function. It inserts or updates no rows, enables no gate, grants no
-execution privilege, and defines no enqueue, claim, dispatch, completion, or
-review mutation path.
+gate function. It also defines separate service-role-only Google enqueue,
+claim, lease, file-grant, dispatch, provider-boundary, outcome, failure,
+encrypted-completion, and telemetry RPCs plus a V3 authorized human-review
+mutation. It inserts or updates no rows while unapplied, enables no gate, and
+grants no provider output direct authority.
 
-The active runner and broker remain NVIDIA-only. This is deliberate: the
-existing database claim, completion, and review-provenance RPCs are bound to the
-historical NVIDIA contracts. Reusing them for Google without a separately
-reviewed V3 database path would weaken profile identity and review authority.
+The compiled runner and broker use explicit profile dispatch. Historical
+`hosted_tool_call_v2` calls continue through their existing RPCs and adapter.
+`google_document_ai_enterprise_ocr_v1` calls use only the separately named
+Google RPCs and adapter. Missing, mixed, or unknown profiles fail before network
+access; there is no profile auto-detection, provider fallback, or Google retry.
+Google Preview execution additionally requires
+`google_document_ai_preview_qualification_v1`. Production requires both the
+general document-extraction approval and the separate absent-by-default
+`google_document_ai_production_pilot_v1` approval.
 
 ## Activation blockers
 
 All of the following must be completed in later, separately approved work:
 
-1. Replay the migration on a clean isolated Preview database and regenerate
+1. Independently audit and replay the migration on a clean isolated Preview
+   database, then regenerate
    Supabase types from that exact schema.
 2. Provision the Document AI API, one Preview-only `OCR_PROCESSOR`, and the
    exact pinned processor version in `us`.
 3. Add least-privilege processor-level IAM to the existing worker service
    account, with metadata-service OAuth only.
-4. Implement and independently audit Google-specific enqueue, claim, dispatch,
-   completion, and V3 review-provenance database paths. They must bind every
-   provider identity field and remain single-use, encrypted, workspace-scoped,
-   and mandatory-review only.
-5. Select the Google adapter in the private runner only through explicit,
-   default-off provider and workspace gates. Keep the initial qualification at
+4. Re-verify the committed Google-specific enqueue, claim, dispatch,
+   completion, and V3 review-provenance paths against the live Preview schema.
+   They must bind every provider identity field and remain single-use,
+   encrypted, workspace-scoped, and mandatory-review only.
+5. Configure the exact Google profile and its separate Preview approval only
+   for a separately approved qualification. Keep the initial qualification at
    one provider attempt and zero retries.
 6. Re-verify quota reservation, cache identity, ambiguous dispatch handling,
    cleanup, audit logging, retention terms, and no downstream authority.

@@ -22,6 +22,10 @@ export const DOCUMENT_EXTRACTION_CIRCUIT_POLICY_VERSION = "document_extraction_c
 export const DOCUMENT_EXTRACTION_TELEMETRY_VERSION = "document_extraction_telemetry_v1" as const;
 export const DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION =
   "document_extraction_production_pilot_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PREVIEW_APPROVAL_VERSION =
+  "google_document_ai_preview_qualification_v1" as const;
+export const GOOGLE_DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION =
+  "google_document_ai_production_pilot_v1" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_PROVIDER = "nvidia" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_MODEL = "nvidia/nemotron-parse" as const;
 export const NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION =
@@ -322,6 +326,7 @@ export type DocumentExtractionReviewProvenanceV2 = {
   client_revision: typeof GOOGLE_DOCUMENT_EXTRACTION_CLIENT_REVISION;
   provider_profile: typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
   processor_type: typeof GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_TYPE;
+  processor_id: string;
   processor_resource: string;
   processor_location: typeof GOOGLE_DOCUMENT_EXTRACTION_LOCATION;
   processor_version: typeof GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_VERSION;
@@ -334,6 +339,7 @@ export type DocumentExtractionReviewProvenanceV2 = {
   table_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_TABLE_POLICY_VERSION;
   confidence_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_CONFIDENCE_POLICY_VERSION;
   selection_mark_policy_version: typeof GOOGLE_DOCUMENT_EXTRACTION_SELECTION_MARK_POLICY_VERSION;
+  routing_policy_version: typeof DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION;
   model_alias: typeof GOOGLE_DOCUMENT_EXTRACTION_MODEL;
   page_identity_fingerprint: string;
   workspace_binding_fingerprint: string;

@@ -43,6 +43,7 @@ export type DocumentExtractionProviderRuntimeContract = {
   clientRevision: string;
   providerProfile: string;
   processorType: string | null;
+  processorId: string | null;
   processorResource: string | null;
   processorLocation: string | null;
   processorVersion: string | null;
@@ -96,6 +97,7 @@ export function resolveDocumentExtractionProviderRuntimeContract(
       clientRevision: NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION,
       providerProfile: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
       processorType: null,
+      processorId: null,
       processorResource: null,
       processorLocation: null,
       processorVersion: null,
@@ -141,6 +143,7 @@ export function resolveDocumentExtractionProviderRuntimeContract(
       clientRevision: GOOGLE_DOCUMENT_EXTRACTION_CLIENT_REVISION,
       providerProfile: GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
       processorType: GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_TYPE,
+      processorId,
       processorResource: googleProcessorResource(projectNumber, processorId),
       processorLocation: GOOGLE_DOCUMENT_EXTRACTION_LOCATION,
       processorVersion: GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_VERSION,

@@ -12,17 +12,27 @@ from .provider_contract import (
     HOSTED_ENDPOINT,
     HOSTED_MODEL,
     HOSTED_PARSER_REVISION,
+    HOSTED_RESPONSE_PROFILE,
     REST_ADAPTER_VERSION,
     ProviderContract,
     active_provider_contract,
 )
 from .field_path_diagnostic import FIELD_PATH_DIAGNOSTIC_CONFIRMATION
+from .google_document_ai_contract import (
+    GOOGLE_DOCUMENT_AI_ADAPTER_VERSION,
+    GOOGLE_DOCUMENT_AI_LOCATION,
+    GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION,
+    GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+    GoogleDocumentAiContract,
+)
 from .response_profile import DIAGNOSTIC_CONFIRMATION
 
 CLIENT_REVISION = REST_ADAPTER_VERSION
 MODEL = HOSTED_MODEL
 PARSER_REVISION = HOSTED_PARSER_REVISION
 PRODUCTION_APPROVAL = "document_extraction_production_pilot_v1"
+GOOGLE_PRODUCTION_APPROVAL = "google_document_ai_production_pilot_v1"
+GOOGLE_PREVIEW_APPROVAL = "google_document_ai_preview_qualification_v1"
 ENDPOINT = HOSTED_ENDPOINT
 MAX_FILE_BYTES = 25_000_000
 MAX_PAGES = 16
@@ -154,17 +164,26 @@ class WorkerConfig:
     worker_id: str
     worker_key_version: str
     worker_private_key_der: bytes
-    nvidia_api_key: str
-    provider_contract: ProviderContract
+    nvidia_api_key: str | None
+    provider_contract: ProviderContract | None
     runtime_environment: str
     deployment_id: str
     provider_execution_enabled: bool
     authentication_qualification_enabled: bool
     synthetic_qualification_enabled: bool
+    google_provider_contract: GoogleDocumentAiContract | None = None
     response_profile_diagnostic_enabled: bool = False
     field_path_diagnostic_enabled: bool = False
     health_port: int = 8080
     idle_poll_seconds: float = 5.0
+
+    @property
+    def provider_profile(self) -> str:
+        if self.google_provider_contract is not None and self.provider_contract is None:
+            return self.google_provider_contract.provider_profile
+        if self.provider_contract is not None and self.google_provider_contract is None:
+            return self.provider_contract.response_profile
+        raise RuntimeError("Exactly one document extraction provider profile is required.")
 
     @classmethod
     def from_environment(cls, source: dict[str, str] | None = None) -> "WorkerConfig":
@@ -189,12 +208,61 @@ class WorkerConfig:
             != PRODUCTION_APPROVAL
         ):
             raise RuntimeError("Production document extraction approval is absent.")
-        if environment.get("DOCUMENT_EXTRACTION_NVIDIA_MODEL", "").strip() != MODEL:
-            raise RuntimeError("The configured NVIDIA model is not approved.")
-        if environment.get("DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION", "").strip() != CLIENT_REVISION:
-            raise RuntimeError("The configured NVIDIA client revision is not approved.")
-        if environment.get("DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION", "").strip() != PARSER_REVISION:
-            raise RuntimeError("The configured NVIDIA parser revision is not approved.")
+        active_profile = _required(
+            environment, "DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE"
+        )
+        provider_contract: ProviderContract | None = None
+        google_provider_contract: GoogleDocumentAiContract | None = None
+        nvidia_api_key: str | None = None
+        if active_profile == HOSTED_RESPONSE_PROFILE:
+            if environment.get("DOCUMENT_EXTRACTION_NVIDIA_MODEL", "").strip() != MODEL:
+                raise RuntimeError("The configured NVIDIA model is not approved.")
+            if environment.get("DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION", "").strip() != CLIENT_REVISION:
+                raise RuntimeError("The configured NVIDIA client revision is not approved.")
+            if environment.get("DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION", "").strip() != PARSER_REVISION:
+                raise RuntimeError("The configured NVIDIA parser revision is not approved.")
+            provider_contract = active_provider_contract()
+            nvidia_api_key = _required(environment, "NVIDIA_API_KEY")
+        elif active_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE:
+            if environment.get("NVIDIA_API_KEY", "").strip():
+                raise RuntimeError("NVIDIA credentials are forbidden for the Google provider profile.")
+            if environment.get("DOCUMENT_EXTRACTION_GOOGLE_LOCATION", "").strip() != GOOGLE_DOCUMENT_AI_LOCATION:
+                raise RuntimeError("The configured Google location is not approved.")
+            if environment.get("DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_VERSION", "").strip() != GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION:
+                raise RuntimeError("The configured Google processor version is not approved.")
+            if environment.get("DOCUMENT_EXTRACTION_GOOGLE_CLIENT_REVISION", "").strip() != GOOGLE_DOCUMENT_AI_ADAPTER_VERSION:
+                raise RuntimeError("The configured Google client revision is not approved.")
+            if environment.get("DOCUMENT_EXTRACTION_GOOGLE_PARSER_REVISION", "").strip() != GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE:
+                raise RuntimeError("The configured Google parser revision is not approved.")
+            if environment.get("DOCUMENT_EXTRACTION_GOOGLE_MODEL", "").strip() != GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION:
+                raise RuntimeError("The configured Google model is not approved.")
+            try:
+                google_provider_contract = GoogleDocumentAiContract(
+                    project_number=_required(
+                        environment, "DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER"
+                    ),
+                    processor_id=_required(
+                        environment, "DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID"
+                    ),
+                )
+            except ValueError as error:
+                raise RuntimeError("The configured Google processor identity is not approved.") from error
+            if runtime_environment == "production" and (
+                environment.get(
+                    "DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL", ""
+                ).strip()
+                != GOOGLE_PRODUCTION_APPROVAL
+            ):
+                raise RuntimeError("Google Document AI Production approval is absent.")
+            if runtime_environment == "preview" and provider_execution_enabled and (
+                environment.get(
+                    "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL", ""
+                ).strip()
+                != GOOGLE_PREVIEW_APPROVAL
+            ):
+                raise RuntimeError("Google Document AI Preview approval is absent.")
+        else:
+            raise RuntimeError("The configured provider profile is not approved.")
 
         broker_url = _required(environment, "DOCUMENT_EXTRACTION_BROKER_URL").rstrip("/")
         parsed_url = urlparse(broker_url)
@@ -266,6 +334,8 @@ class WorkerConfig:
             raise RuntimeError(
                 "Response-profile diagnostics require the exact Preview-only synthetic confirmation."
             )
+        if response_profile_diagnostic_enabled and active_profile != HOSTED_RESPONSE_PROFILE:
+            raise RuntimeError("Response-profile diagnostics are NVIDIA-only.")
         field_path_diagnostic_enabled = _enabled(
             environment.get("DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED")
         )
@@ -281,6 +351,8 @@ class WorkerConfig:
             raise RuntimeError(
                 "Field-path diagnostics require the exact Preview-only synthetic confirmation."
             )
+        if field_path_diagnostic_enabled and active_profile != HOSTED_RESPONSE_PROFILE:
+            raise RuntimeError("Field-path diagnostics are NVIDIA-only.")
         if authentication_qualification_enabled and (
             provider_execution_enabled
             or synthetic_qualification_enabled
@@ -308,13 +380,14 @@ class WorkerConfig:
             worker_id=worker_id,
             worker_key_version=worker_key_version,
             worker_private_key_der=private_key,
-            nvidia_api_key=_required(environment, "NVIDIA_API_KEY"),
-            provider_contract=active_provider_contract(),
+            nvidia_api_key=nvidia_api_key,
+            provider_contract=provider_contract,
             runtime_environment=runtime_environment,
             deployment_id=deployment_id,
             provider_execution_enabled=provider_execution_enabled,
             authentication_qualification_enabled=authentication_qualification_enabled,
             synthetic_qualification_enabled=synthetic_qualification_enabled,
+            google_provider_contract=google_provider_contract,
             response_profile_diagnostic_enabled=response_profile_diagnostic_enabled,
             field_path_diagnostic_enabled=field_path_diagnostic_enabled,
             health_port=health_port,

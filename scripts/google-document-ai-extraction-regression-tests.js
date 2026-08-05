@@ -43,6 +43,9 @@ const {
 const {
   resolveDocumentExtractionProviderRuntimeContract
 } = loadTypeScriptModule("lib/document-extraction/provider-profile.ts");
+const {
+  resolveDocumentExtractionExecutionPolicy
+} = loadTypeScriptModule("lib/document-extraction/runtime-policy.ts");
 const { routeDocumentExtraction } = loadTypeScriptModule("lib/document-extraction/routing.ts");
 
 const googleEnvironment = {
@@ -63,6 +66,7 @@ assert.deepEqual(googleRuntime, {
   clientRevision: "vaeroex_google_document_ai_rest_v1",
   providerProfile: "google_document_ai_enterprise_ocr_v1",
   processorType: "OCR_PROCESSOR",
+  processorId: "0123456789abcdef",
   processorResource: "projects/123456789012/locations/us/processors/0123456789abcdef/processorVersions/pretrained-ocr-v2.1-2024-08-07",
   processorLocation: "us",
   processorVersion: "pretrained-ocr-v2.1-2024-08-07",
@@ -78,10 +82,15 @@ assert.deepEqual(googleRuntime, {
   artifactNormalizationVersion: "document_extraction_normalization_v2"
 });
 for (const override of [
+  { DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER: "" },
+  { DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER: "project-name" },
+  { DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID: "" },
   { DOCUMENT_EXTRACTION_GOOGLE_LOCATION: "eu" },
   { DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_VERSION: "latest" },
   { DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID: "invalid" },
   { DOCUMENT_EXTRACTION_GOOGLE_MODEL: "unbound-model" },
+  { DOCUMENT_EXTRACTION_GOOGLE_CLIENT_REVISION: "vaeroex_google_document_ai_rest_v2" },
+  { DOCUMENT_EXTRACTION_GOOGLE_PARSER_REVISION: "google_document_ai_enterprise_ocr_v2" },
   { DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE: "google_document_ai_auto" }
 ]) {
   assert.throws(
@@ -89,6 +98,33 @@ for (const override of [
     /document_extraction_provider_(?:contract_mismatch|profile_not_approved)/
   );
 }
+
+const googleBrokerGates = {
+  ...googleEnvironment,
+  DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED: "true",
+  DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED: "true"
+};
+assert.equal(
+  resolveDocumentExtractionExecutionPolicy(googleBrokerGates, "preview").providerExecutionEnabled,
+  false
+);
+assert.equal(resolveDocumentExtractionExecutionPolicy({
+  ...googleBrokerGates,
+  DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL:
+    contracts.GOOGLE_DOCUMENT_EXTRACTION_PREVIEW_APPROVAL_VERSION
+}, "preview").providerExecutionEnabled, true);
+assert.equal(resolveDocumentExtractionExecutionPolicy({
+  ...googleBrokerGates,
+  DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL:
+    contracts.DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION
+}, "production").providerExecutionEnabled, false);
+assert.equal(resolveDocumentExtractionExecutionPolicy({
+  ...googleBrokerGates,
+  DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL:
+    contracts.DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION,
+  DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL:
+    contracts.GOOGLE_DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL_VERSION
+}, "production").providerExecutionEnabled, true);
 
 const routingBase = {
   sourceByteLength: 100_000,
@@ -299,6 +335,7 @@ const identityInput = {
   providerIdentity: {
     providerProfile: googleRuntime.providerProfile,
     processorType: googleRuntime.processorType,
+    processorId: googleRuntime.processorId,
     processorResource: googleRuntime.processorResource,
     processorLocation: googleRuntime.processorLocation,
     processorVersion: googleRuntime.processorVersion,
@@ -329,7 +366,9 @@ const reviewInput = {
   cacheKey: identity.cacheKey,
   contentFingerprint: artifact.artifactFingerprint,
   pageCount: 1,
-  processorResource: googleRuntime.processorResource
+  processorId: googleRuntime.processorId,
+  processorResource: googleRuntime.processorResource,
+  routingPolicyVersion: contracts.DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION
 };
 const review = buildDocumentExtractionReviewProvenanceV2(reviewInput);
 assert.deepEqual(buildDocumentExtractionReviewProvenanceV2(reviewInput), review);
@@ -337,8 +376,13 @@ assert.notEqual(buildDocumentExtractionReviewProvenanceV2({
   ...reviewInput,
   jobId: "44444444-4444-4444-8444-444444444444"
 }).reviewProvenanceFingerprint, review.reviewProvenanceFingerprint);
+assert.throws(() => buildDocumentExtractionReviewProvenanceV2({
+  ...reviewInput,
+  processorResource: reviewInput.processorResource.replace("0123456789abcdef", "fedcba9876543210")
+}), /review identity/);
 assert.notEqual(buildDocumentExtractionReviewProvenanceV2({
   ...reviewInput,
+  processorId: "fedcba9876543210",
   processorResource: reviewInput.processorResource.replace("0123456789abcdef", "fedcba9876543210")
 }).reviewProvenanceFingerprint, review.reviewProvenanceFingerprint);
 const manifest = criticalFieldManifestForArtifactV2WithProvenance(
@@ -371,13 +415,35 @@ for (const invariant of [
   /max_attempts = 1/,
   /and review_required/,
   /document_extraction_jobs_one_active_provider_per_workspace_idx/,
+  /enqueue_google_document_extraction_job_v1/,
+  /claim_google_document_extraction_job_v1/,
+  /authorize_google_document_extraction_dispatch_v1/,
+  /complete_google_document_extraction_job_v1/,
+  /mutate_document_extraction_review_v3/,
+  /record_google_document_extraction_telemetry_v1/,
+  /document_extraction_critical_fields_v3/,
+  /document_extraction_review_provenance_v2/,
+  /provider_call_count <> 1/,
+  /retry_count <> 0/,
   /security definer[\s\S]+set search_path = ''/,
   /revoke execute on function public[.]document_extraction_runtime_reason_v2[\s\S]+from public, anon, authenticated, service_role/
 ]) assert.match(migration, invariant);
-assert.doesNotMatch(migration, /\b(?:drop table|drop column|truncate|delete from|update public[.]|insert into public[.])\b/i);
-assert.doesNotMatch(migration, /grant\s+(?:execute|select|insert|update|delete)/i);
+assert.doesNotMatch(migration, /\b(?:drop table|drop column|truncate|delete from)\b/i);
+const clientExecuteGrants = [
+  ...migration.matchAll(
+    /grant\s+execute\s+on\s+function\s+([^;(]+)[^;]+\s+to\s+(public|anon|authenticated)\s*;/gi
+  )
+].map((match) => [match[1].trim(), match[2].toLowerCase()]);
+assert.deepEqual(clientExecuteGrants, [["public.mutate_document_extraction_review_v3", "authenticated"]]);
+assert.match(migration, /grant execute on function public[.]claim_google_document_extraction_job_v1[\s\S]+to service_role/);
 assert.doesNotMatch(migration, /(?:globally_enabled|worker_enabled|provider_calls_enabled|is_entitled|is_enabled)\s*=\s*true/i);
-assert.doesNotMatch(migration, /create or replace function public[.](?:enqueue|claim|authorize|complete|mutate)_document_extraction/i);
+for (const manifestVersion of [
+  "document_extraction_critical_fields_v1",
+  "document_extraction_critical_fields_v2",
+  "document_extraction_critical_fields_v3"
+]) {
+  assert.match(migration, new RegExp(`manifest_version'[\\s\\S]{0,80}'${manifestVersion}'`));
+}
 
 const architectureDoc = read("docs/architecture/google-document-ai-enterprise-ocr-v1.md");
 assert.match(architectureDoc, /first 1,000 Enterprise OCR pages per account[\s\S]+at no charge/);
@@ -387,8 +453,26 @@ assert.doesNotMatch(architectureDoc, /one-page qualification is therefore approx
 const activeRunner = read("services/document-extraction-worker/src/vaeroex_document_worker/runner.py");
 const activeContract = read("services/document-extraction-worker/src/vaeroex_document_worker/provider_contract.py");
 const brokerService = read("lib/document-extraction/broker-service.ts");
-assert.doesNotMatch(activeRunner, /google_document_ai/);
-assert.doesNotMatch(brokerService, /google_document_ai|google_primary|google_fallback/);
+const brokerStore = read("lib/document-extraction/broker-store.ts");
+const runtimePolicy = read("lib/document-extraction/runtime-policy.ts");
+const workerPoolTemplate = read("services/document-extraction-worker/cloud-run-worker-pool.yaml.template");
+const brokerDeployment = read("services/document-extraction-broker/ops/deploy-preview-broker.sh");
+assert.match(activeRunner, /GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE/);
+assert.match(activeRunner, /GoogleMetadataAccessTokenProvider/);
+assert.match(activeRunner, /invoke_google_document_ai_adapter/);
+assert.match(activeRunner, /active_config[.]provider_profile == HOSTED_RESPONSE_PROFILE[\s\S]+failure[.]retryable/);
+assert.doesNotMatch(activeRunner, /auto.?detect|fallback_provider/);
+assert.match(brokerService, /request[.]providerProfile !== activeProviderProfile/);
+assert.match(brokerService, /buildNormalizedDocumentExtractionArtifactV2/);
+assert.match(brokerService, /criticalFieldManifestForArtifactV2WithProvenance/);
+assert.match(brokerStore, /document_extraction_google_retry_not_permitted/);
+assert.match(brokerStore, /claim_google_document_extraction_job_v1/);
+assert.match(runtimePolicy, /DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL/);
+assert.match(runtimePolicy, /DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL/);
+assert.match(workerPoolTemplate, /DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE[\s\S]+hosted_tool_call_v2/);
+assert.doesNotMatch(workerPoolTemplate, /GOOGLE_(?:PREVIEW|PRODUCTION)_APPROVAL/);
+assert.match(brokerDeployment, /DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE=hosted_tool_call_v2/);
+assert.doesNotMatch(brokerDeployment, /GOOGLE_(?:PREVIEW|PRODUCTION)_APPROVAL/);
 assert.match(activeContract, /return HOSTED_CONTRACT/);
 assert.doesNotMatch(activeContract, /GoogleDocumentAiContract/);
 for (const authorityFile of [

@@ -10,7 +10,35 @@ from typing import Any, Callable
 
 from .broker import BrokerClient, BrokerFailure
 from .config import MAX_PAGES, WorkerConfig
-from .provider_contract import HOSTED_RESPONSE_PROFILE
+from .google_access_token import (
+    GoogleAccessTokenFailure,
+    GoogleMetadataAccessTokenProvider,
+)
+from .google_document_ai_adapter import invoke_google_document_ai_adapter
+from .google_document_ai_contract import (
+    GOOGLE_DOCUMENT_AI_ADAPTER_VERSION,
+    GOOGLE_DOCUMENT_AI_ARTIFACT_CONTRACT_VERSION,
+    GOOGLE_DOCUMENT_AI_ARTIFACT_NORMALIZATION_VERSION,
+    GOOGLE_DOCUMENT_AI_COMPATIBILITY_POLICY_VERSION,
+    GOOGLE_DOCUMENT_AI_CONFIDENCE_POLICY_VERSION,
+    GOOGLE_DOCUMENT_AI_MAX_PAGES,
+    GOOGLE_DOCUMENT_AI_NORMALIZATION_VERSION,
+    GOOGLE_DOCUMENT_AI_PROCESSOR_TYPE,
+    GOOGLE_DOCUMENT_AI_PROVIDER,
+    GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+    GOOGLE_DOCUMENT_AI_REQUEST_SERIALIZER_VERSION,
+    GOOGLE_DOCUMENT_AI_RESPONSE_VALIDATOR_VERSION,
+    GOOGLE_DOCUMENT_AI_SELECTION_MARK_POLICY_VERSION,
+    GOOGLE_DOCUMENT_AI_TABLE_POLICY_VERSION,
+)
+from .provider_contract import (
+    HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+    HOSTED_NORMALIZATION_VERSION,
+    HOSTED_REQUEST_SERIALIZER_VERSION,
+    HOSTED_RESPONSE_PROFILE,
+    HOSTED_RESPONSE_VALIDATOR_VERSION,
+    REST_ADAPTER_VERSION,
+)
 from .provider_types import MAX_PROVIDER_LATENCY_MS, ProviderFailure, ProviderResult
 from .renderer import render_source
 from .rest_adapter import invoke_rest_adapter
@@ -59,6 +87,88 @@ def _required_int(value: object, code: str) -> int:
     if not isinstance(value, int):
         raise RuntimeError(code)
     return value
+
+
+def _expected_claim_identity(config: WorkerConfig) -> dict[str, object]:
+    if config.provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE:
+        google_contract = config.google_provider_contract
+        if (
+            google_contract is None
+            or config.provider_contract is not None
+            or config.nvidia_api_key is not None
+        ):
+            raise RuntimeError("google_document_ai_worker_profile_invalid")
+        return {
+            "providerProfile": GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+            "parserProvider": GOOGLE_DOCUMENT_AI_PROVIDER,
+            "parserModel": google_contract.processor_version,
+            "parserRevision": GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
+            "clientRevision": GOOGLE_DOCUMENT_AI_ADAPTER_VERSION,
+            "processorType": GOOGLE_DOCUMENT_AI_PROCESSOR_TYPE,
+            "processorId": google_contract.processor_id,
+            "processorResource": google_contract.processor_resource,
+            "processorLocation": google_contract.location,
+            "processorVersion": google_contract.processor_version,
+            "endpointContractVersion": "google_document_ai_processor_version_process_v1",
+            "requestSerializerVersion": GOOGLE_DOCUMENT_AI_REQUEST_SERIALIZER_VERSION,
+            "responseValidatorVersion": GOOGLE_DOCUMENT_AI_RESPONSE_VALIDATOR_VERSION,
+            "providerNormalizationVersion": GOOGLE_DOCUMENT_AI_NORMALIZATION_VERSION,
+            "compatibilityPolicyVersion": GOOGLE_DOCUMENT_AI_COMPATIBILITY_POLICY_VERSION,
+            "tablePolicyVersion": GOOGLE_DOCUMENT_AI_TABLE_POLICY_VERSION,
+            "confidencePolicyVersion": GOOGLE_DOCUMENT_AI_CONFIDENCE_POLICY_VERSION,
+            "selectionMarkPolicyVersion": GOOGLE_DOCUMENT_AI_SELECTION_MARK_POLICY_VERSION,
+            "routingPolicyVersion": "document_extraction_routing_v1",
+            "reviewProvenanceVersion": "document_extraction_review_provenance_v2",
+            "extractionContractVersion": GOOGLE_DOCUMENT_AI_ARTIFACT_CONTRACT_VERSION,
+            "normalizationVersion": GOOGLE_DOCUMENT_AI_ARTIFACT_NORMALIZATION_VERSION,
+        }
+    nvidia_contract = config.provider_contract
+    if (
+        config.provider_profile != HOSTED_RESPONSE_PROFILE
+        or nvidia_contract is None
+        or config.google_provider_contract is not None
+        or not config.nvidia_api_key
+    ):
+        raise RuntimeError("nvidia_document_extraction_worker_profile_invalid")
+    return {
+        "providerProfile": HOSTED_RESPONSE_PROFILE,
+        "parserProvider": "nvidia",
+        "parserModel": nvidia_contract.model,
+        "parserRevision": nvidia_contract.parser_revision,
+        "clientRevision": REST_ADAPTER_VERSION,
+        "processorType": None,
+        "processorId": None,
+        "processorResource": None,
+        "processorLocation": None,
+        "processorVersion": None,
+        "endpointContractVersion": nvidia_contract.endpoint_contract_version,
+        "requestSerializerVersion": HOSTED_REQUEST_SERIALIZER_VERSION,
+        "responseValidatorVersion": HOSTED_RESPONSE_VALIDATOR_VERSION,
+        "providerNormalizationVersion": HOSTED_NORMALIZATION_VERSION,
+        "compatibilityPolicyVersion": HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+        "tablePolicyVersion": None,
+        "confidencePolicyVersion": None,
+        "selectionMarkPolicyVersion": None,
+        "routingPolicyVersion": "document_extraction_routing_v1",
+        "reviewProvenanceVersion": "document_extraction_review_provenance_v1",
+        "extractionContractVersion": "document_extraction_artifact_v1",
+        "normalizationVersion": "document_extraction_normalization_v1",
+    }
+
+
+def _assert_claim_identity(raw_job: dict[str, Any], config: WorkerConfig) -> None:
+    expected = _expected_claim_identity(config)
+    if any(raw_job.get(key) != value for key, value in expected.items()):
+        raise BrokerFailure("claim_provider_identity_mismatch")
+    route = raw_job.get("route")
+    if (
+        config.provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
+        and route not in ("google_primary", "google_fallback")
+    ) or (
+        config.provider_profile == HOSTED_RESPONSE_PROFILE
+        and route not in ("nvidia_primary", "nvidia_fallback")
+    ):
+        raise BrokerFailure("claim_provider_route_mismatch")
 
 
 async def _advance(
@@ -152,8 +262,14 @@ async def _fail_job(
     )
 
 
-def _draft(result: ProviderResult, route: str, document_class: str, page_count: int) -> dict[str, Any]:
-    if len(result.pages) != page_count or not 1 <= page_count <= MAX_PAGES:
+def _draft(
+    result: ProviderResult,
+    route: str,
+    document_class: str,
+    page_count: int,
+    max_pages: int,
+) -> dict[str, Any]:
+    if len(result.pages) != page_count or not 1 <= page_count <= max_pages:
         raise ProviderFailure("normalized_page_count_mismatch", "validation", retryable=False)
     block_count = sum(len(page.get("blocks", [])) for page in result.pages)
     if block_count == 0:
@@ -199,17 +315,24 @@ async def run_one_job(
         active_config.runtime_environment != "preview"
         or not active_config.provider_execution_enabled
         or not active_config.synthetic_qualification_enabled
-        or active_config.provider_contract.response_profile != HOSTED_RESPONSE_PROFILE
+        or active_config.provider_profile != HOSTED_RESPONSE_PROFILE
     ):
         raise RuntimeError("Field-path diagnostics are not authorized for this runtime.")
     scavenge_stale_worker_directories()
     async with BrokerClient(active_config) as broker:
-        claim = await broker.post({"operation": "claim", "leaseSeconds": 300})
+        claim = await broker.post(
+            {
+                "operation": "claim",
+                "providerProfile": active_config.provider_profile,
+                "leaseSeconds": 300,
+            }
+        )
         if not claim.get("claimed"):
             return WorkerRunResult(status="idle", provider_calls=0, retry_count=0, failure_code=None)
         raw_job = claim.get("job")
         if not isinstance(raw_job, dict):
             raise BrokerFailure("claim_response_invalid")
+        _assert_claim_identity(raw_job, active_config)
         lease = _required_string(raw_job.get("leaseCapability"), "claim_lease_missing")
         route = _required_string(raw_job.get("route"), "claim_route_missing")
         document_class = _required_string(raw_job.get("documentClass"), "claim_document_class_missing")
@@ -369,16 +492,60 @@ async def run_one_job(
                             provider_options["field_path_observer"] = (
                                 emit_field_path_diagnostic
                             )
-                        result = await asyncio.to_thread(
-                            invoke_rest_adapter,
-                            rendered_pages,
-                            document_sha256,
-                            active_config.provider_contract,
-                            active_config.nvidia_api_key,
-                            **provider_options,
-                        )
+                        if active_config.provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE:
+                            google_contract = active_config.google_provider_contract
+                            if google_contract is None:
+                                raise ProviderFailure(
+                                    "google_document_ai_contract_missing",
+                                    "authorization",
+                                    retryable=False,
+                                )
+
+                            def invoke_google() -> ProviderResult:
+                                try:
+                                    with GoogleMetadataAccessTokenProvider() as token_provider:
+                                        return invoke_google_document_ai_adapter(
+                                            rendered_pages,
+                                            document_sha256,
+                                            google_contract,
+                                            token_provider.token,
+                                            completed_pages=completed_pages,
+                                            before_provider_boundary=check_provider_boundary,
+                                        )
+                                except GoogleAccessTokenFailure as error:
+                                    raise ProviderFailure(
+                                        str(error),
+                                        "provider",
+                                        retryable=False,
+                                    ) from error
+
+                            result = await asyncio.to_thread(invoke_google)
+                            max_pages = GOOGLE_DOCUMENT_AI_MAX_PAGES
+                        else:
+                            nvidia_contract = active_config.provider_contract
+                            if nvidia_contract is None or not active_config.nvidia_api_key:
+                                raise ProviderFailure(
+                                    "nvidia_document_extraction_contract_missing",
+                                    "authorization",
+                                    retryable=False,
+                                )
+                            result = await asyncio.to_thread(
+                                invoke_rest_adapter,
+                                rendered_pages,
+                                document_sha256,
+                                nvidia_contract,
+                                active_config.nvidia_api_key,
+                                **provider_options,
+                            )
+                            max_pages = MAX_PAGES
                         attempt_latency_ms = _bounded_provider_latency(result.latency_ms)
-                        artifact = _draft(result, route, document_class, page_count)
+                        artifact = _draft(
+                            result,
+                            route,
+                            document_class,
+                            page_count,
+                            max_pages,
+                        )
                         _notify(progress_callback, "provider_completed")
                         await broker.post(
                             {
@@ -408,6 +575,7 @@ async def run_one_job(
                         if (
                             not active_config.response_profile_diagnostic_enabled
                             and not active_config.field_path_diagnostic_enabled
+                            and active_config.provider_profile == HOSTED_RESPONSE_PROFILE
                             and failure.retryable
                             and retry_count == 0
                             and outcome.get("retry_permitted")

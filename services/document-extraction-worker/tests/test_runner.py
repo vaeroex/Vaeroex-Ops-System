@@ -8,7 +8,9 @@ from typing import Any
 import pytest
 
 from vaeroex_document_worker import runner
+from vaeroex_document_worker.broker import BrokerFailure
 from vaeroex_document_worker.config import WorkerConfig
+from vaeroex_document_worker.google_document_ai_contract import GoogleDocumentAiContract
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 from vaeroex_document_worker.provider_types import (
     MAX_PROVIDER_LATENCY_MS,
@@ -32,6 +34,7 @@ class FakeBroker:
         page_count: int = 1,
         source_bytes: bytes = b"synthetic-source",
     ) -> None:
+        self.config = _config
         self.page_count = page_count
         self.source_bytes = source_bytes
         self.operations: list[str] = []
@@ -51,13 +54,15 @@ class FakeBroker:
         self.operations.append(operation)
         self.payloads.append(payload)
         if operation == "claim":
+            google = self.config.google_provider_contract is not None
             return {
                 "claimed": True,
                 "job": {
                     "leaseCapability": "lease-token",
-                    "route": "nvidia_primary",
-                    "documentClass": "scanned_pdf",
+                    "route": "google_primary" if google else "nvidia_primary",
+                    "documentClass": "printed_document_photo" if google else "scanned_pdf",
                     "pageCount": self.page_count,
+                    **runner._expected_claim_identity(self.config),
                 },
             }
         if operation == "heartbeat":
@@ -127,6 +132,20 @@ def synthetic_worker_config() -> WorkerConfig:
     )
 
 
+def google_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **worker_config().__dict__,
+            "nvidia_api_key": None,
+            "provider_contract": None,
+            "google_provider_contract": GoogleDocumentAiContract(
+                project_number="123456789012",
+                processor_id="abcdef1234567890",
+            ),
+        }
+    )
+
+
 def diagnostic_worker_config() -> WorkerConfig:
     return WorkerConfig(
         **{
@@ -149,6 +168,132 @@ def normalized_page(page: int) -> dict[str, Any]:
             }
         ],
     }
+
+
+class FakeGoogleTokenProvider:
+    def __enter__(self) -> "FakeGoogleTokenProvider":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def token(self) -> str:
+        return "memory-only-test-token"
+
+
+def test_google_profile_uses_one_exact_adapter_without_retry_or_fallback(monkeypatch: Any) -> None:
+    config = google_worker_config()
+    fake = FakeBroker(config)
+    install_boundaries(monkeypatch, fake)
+    calls = 0
+
+    def provider(
+        _pages: list[RenderedPage],
+        _document_hash: str,
+        contract: object,
+        token_provider: object,
+        *,
+        completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: Any,
+    ) -> ProviderResult:
+        nonlocal calls
+        calls += 1
+        assert contract == config.google_provider_contract
+        assert callable(token_provider)
+        assert completed_pages == ()
+        before_provider_boundary("inference")
+        return result_for(1)
+
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(runner, "invoke_google_document_ai_adapter", provider)
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: pytest.fail("NVIDIA fallback must not run"),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+    assert result.status == "needs_review"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert calls == 1
+    assert fake.operations.count("authorize_retry") == 0
+    assert fake.payloads[0]["providerProfile"] == "google_document_ai_enterprise_ocr_v1"
+
+
+def test_google_retryable_failure_still_makes_one_attempt(monkeypatch: Any) -> None:
+    config = google_worker_config()
+    fake = FakeBroker(config)
+    install_boundaries(monkeypatch, fake)
+    calls = 0
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        nonlocal calls
+        calls += 1
+        raise ProviderFailure("transport", "transport", retryable=True)
+
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(runner, "invoke_google_document_ai_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+    assert result.status == "failed"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert calls == 1
+    assert fake.operations.count("authorize_retry") == 0
+
+
+@pytest.mark.parametrize(
+    ("identity_field", "invalid_value"),
+    (
+        ("providerProfile", "google_document_ai_enterprise_ocr_v2"),
+        ("parserProvider", "nvidia"),
+        ("parserModel", "latest"),
+        ("parserRevision", "google_document_ai_enterprise_ocr_v2"),
+        ("clientRevision", "vaeroex_google_document_ai_rest_v2"),
+        ("processorType", "FORM_PARSER_PROCESSOR"),
+        ("processorId", "fedcba9876543210"),
+        ("processorResource", "projects/123456789012/locations/us/processors/fedcba9876543210/processorVersions/pretrained-ocr-v2.1-2024-08-07"),
+        ("processorLocation", "eu"),
+        ("processorVersion", "latest"),
+        ("endpointContractVersion", "google_document_ai_processor_process_v2"),
+        ("requestSerializerVersion", "google_document_ai_process_request_v2"),
+        ("responseValidatorVersion", "google_document_ai_process_response_v3"),
+        ("providerNormalizationVersion", "google_document_ai_layout_normalization_v3"),
+        ("compatibilityPolicyVersion", "google_document_ai_permissive_v1"),
+        ("tablePolicyVersion", "tables_inferred_v1"),
+        ("confidencePolicyVersion", "provider_confidence_authoritative_v1"),
+        ("selectionMarkPolicyVersion", "enabled_v1"),
+        ("routingPolicyVersion", "document_extraction_routing_v2"),
+        ("reviewProvenanceVersion", "document_extraction_review_provenance_v1"),
+        ("extractionContractVersion", "document_extraction_artifact_v1"),
+        ("normalizationVersion", "document_extraction_normalization_v1"),
+        ("route", "nvidia_primary"),
+    ),
+)
+def test_google_claim_identity_mismatch_fails_before_file_or_provider(
+    monkeypatch: Any,
+    identity_field: str,
+    invalid_value: str,
+) -> None:
+    config = google_worker_config()
+
+    class MismatchedBroker(FakeBroker):
+        async def post(self, payload: dict[str, Any]) -> dict[str, Any]:
+            response = await super().post(payload)
+            if payload["operation"] == "claim":
+                response["job"][identity_field] = invalid_value
+            return response
+
+    fake = MismatchedBroker(config)
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(
+        runner,
+        "invoke_google_document_ai_adapter",
+        lambda *_args, **_kwargs: pytest.fail("Provider must not run"),
+    )
+    with pytest.raises(BrokerFailure, match="claim_provider_(?:identity|route)_mismatch"):
+        asyncio.run(runner.run_one_job(config))
+    assert fake.operations == ["claim"]
 
 
 def install_boundaries(monkeypatch: Any, fake: FakeBroker) -> None:

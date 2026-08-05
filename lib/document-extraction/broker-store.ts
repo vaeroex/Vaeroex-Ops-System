@@ -2,7 +2,25 @@ import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { VerifiedWorkerAssertion } from "@/lib/document-extraction/broker-auth";
-import type { DocumentExtractionCriticalFieldManifestV2 } from "@/lib/document-extraction/contracts";
+import {
+  DOCUMENT_EXTRACTION_CONTRACT_VERSION,
+  DOCUMENT_EXTRACTION_NORMALIZATION_VERSION,
+  DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION,
+  DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION,
+  GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION,
+  NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_MODEL,
+  NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION,
+  type DocumentExtractionCriticalFieldManifestV2,
+  type DocumentExtractionCriticalFieldManifestV3
+} from "@/lib/document-extraction/contracts";
 
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 type RpcClient = {
@@ -11,7 +29,7 @@ type RpcClient = {
 
 export type ClaimedDocumentExtractionJob = {
   id: string;
-  route: "nvidia_primary" | "nvidia_fallback";
+  route: "nvidia_primary" | "nvidia_fallback" | "google_primary" | "google_fallback";
   document_class: string;
   page_count: number;
   lease_expires_at: string;
@@ -20,19 +38,40 @@ export type ClaimedDocumentExtractionJob = {
 export type DocumentExtractionLeaseContext = {
   job_id: string;
   workspace_id: string;
-  route: "nvidia_primary" | "nvidia_fallback";
+  route: "nvidia_primary" | "nvidia_fallback" | "google_primary" | "google_fallback";
   document_class: string;
   page_count: number;
   cache_key: string;
+  parser_provider: string;
   parser_model: string;
   parser_revision: string;
   client_revision: string;
+  provider_profile: string;
+  processor_type: string | null;
+  processor_id: string | null;
+  processor_resource: string | null;
+  processor_location: string | null;
+  processor_version: string | null;
+  endpoint_contract_version: string;
+  request_serializer_version: string;
+  response_validator_version: string;
+  provider_normalization_version: string;
+  compatibility_policy_version: string;
+  table_policy_version: string | null;
+  confidence_policy_version: string | null;
+  selection_mark_policy_version: string | null;
+  routing_policy_version: string;
+  review_provenance_version: string;
   extraction_contract_version: string;
   normalization_version: string;
   stage: string;
   status: string;
   lease_expires_at: string;
 };
+
+export type DocumentExtractionProviderProfile =
+  | typeof NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+  | typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
 
 export type ConsumedFileGrant = {
   storage_bucket: string;
@@ -58,6 +97,16 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
   return result.data as T;
 }
 
+function providerRpc(
+  providerProfile: DocumentExtractionProviderProfile,
+  nvidiaRpc: string,
+  googleRpc: string
+) {
+  if (providerProfile === NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) return nvidiaRpc;
+  if (providerProfile === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) return googleRpc;
+  throw new Error("document_extraction_provider_profile_not_approved");
+}
+
 export async function consumeWorkerAssertion(assertion: VerifiedWorkerAssertion) {
   return rpc<boolean>("consume_document_extraction_worker_assertion_v1", {
     p_worker_id: assertion.workerId,
@@ -69,8 +118,16 @@ export async function consumeWorkerAssertion(assertion: VerifiedWorkerAssertion)
   });
 }
 
-export async function claimDocumentExtractionJob(workerId: string, leaseSeconds = 120) {
-  const rows = await rpc<ClaimedDocumentExtractionJob[]>("claim_document_extraction_job_v2", {
+export async function claimDocumentExtractionJob(
+  workerId: string,
+  providerProfile: DocumentExtractionProviderProfile,
+  leaseSeconds = 120
+) {
+  const rows = await rpc<ClaimedDocumentExtractionJob[]>(providerRpc(
+    providerProfile,
+    "claim_document_extraction_job_v2",
+    "claim_google_document_extraction_job_v1"
+  ), {
     p_worker_id: workerId,
     p_lease_seconds: leaseSeconds
   });
@@ -85,11 +142,45 @@ export async function heartbeatDocumentExtractionJob(jobId: string, workerId: st
   });
 }
 
-export async function resolveDocumentExtractionLease(jobId: string, workerId: string) {
-  return rpc<DocumentExtractionLeaseContext>("resolve_document_extraction_job_lease_v1", {
+export async function resolveDocumentExtractionLease(
+  jobId: string,
+  workerId: string,
+  providerProfile: DocumentExtractionProviderProfile
+) {
+  const context = await rpc<DocumentExtractionLeaseContext>(providerRpc(
+    providerProfile,
+    "resolve_document_extraction_job_lease_v1",
+    "resolve_google_document_extraction_job_lease_v1"
+  ), {
     p_job_id: jobId,
     p_worker_id: workerId
   });
+  if (providerProfile === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) return context;
+  return {
+    ...context,
+    parser_provider: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER,
+    parser_model: NVIDIA_DOCUMENT_EXTRACTION_MODEL,
+    parser_revision: NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION,
+    client_revision: NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION,
+    provider_profile: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+    processor_type: null,
+    processor_id: null,
+    processor_resource: null,
+    processor_location: null,
+    processor_version: null,
+    endpoint_contract_version: NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION,
+    request_serializer_version: NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
+    response_validator_version: NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION,
+    provider_normalization_version: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
+    compatibility_policy_version: NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+    table_policy_version: null,
+    confidence_policy_version: null,
+    selection_mark_policy_version: null,
+    routing_policy_version: DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION,
+    review_provenance_version: DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION,
+    extraction_contract_version: DOCUMENT_EXTRACTION_CONTRACT_VERSION,
+    normalization_version: DOCUMENT_EXTRACTION_NORMALIZATION_VERSION
+  };
 }
 
 export async function advanceDocumentExtractionStage({
@@ -97,16 +188,22 @@ export async function advanceDocumentExtractionStage({
   workerId,
   expectedStage,
   nextStage,
-  requestId
+  requestId,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   expectedStage: string;
   nextStage: string;
   requestId: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ advanced: boolean; reason?: string; stage?: string; status?: string }>(
-    "advance_document_extraction_job_v2",
+    providerRpc(
+      providerProfile,
+      "advance_document_extraction_job_v2",
+      "advance_google_document_extraction_job_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -121,15 +218,21 @@ export async function issueDocumentExtractionFileGrant({
   jobId,
   workerId,
   tokenHash,
-  ttlSeconds
+  ttlSeconds,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   tokenHash: string;
   ttlSeconds: number;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ issued: boolean; reason?: string; grant_id?: string; expires_at?: string; page_count?: number }>(
-    "issue_document_extraction_file_grant_v1",
+    providerRpc(
+      providerProfile,
+      "issue_document_extraction_file_grant_v1",
+      "issue_google_document_extraction_file_grant_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -142,13 +245,19 @@ export async function issueDocumentExtractionFileGrant({
 export async function consumeDocumentExtractionFileGrant({
   grantId,
   workerId,
-  tokenHash
+  tokenHash,
+  providerProfile
 }: {
   grantId: string;
   workerId: string;
   tokenHash: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
-  return rpc<ConsumedFileGrant>("consume_document_extraction_file_grant_v1", {
+  return rpc<ConsumedFileGrant>(providerRpc(
+    providerProfile,
+    "consume_document_extraction_file_grant_v1",
+    "consume_google_document_extraction_file_grant_v1"
+  ), {
     p_grant_id: grantId,
     p_worker_id: workerId,
     p_token_hash: tokenHash
@@ -158,14 +267,20 @@ export async function consumeDocumentExtractionFileGrant({
 export async function authorizeDocumentExtractionDispatch({
   jobId,
   workerId,
-  dispatchRequestId
+  dispatchRequestId,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   dispatchRequestId: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ authorized: boolean; reason: string; idempotent?: boolean }>(
-    "authorize_document_extraction_dispatch_v2",
+    providerRpc(
+      providerProfile,
+      "authorize_document_extraction_dispatch_v2",
+      "authorize_google_document_extraction_dispatch_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -177,14 +292,20 @@ export async function authorizeDocumentExtractionDispatch({
 export async function checkDocumentExtractionProviderBoundary({
   jobId,
   workerId,
-  boundary
+  boundary,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   boundary: "asset_create" | "asset_upload" | "inference";
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ allowed: boolean; reason: string; boundary: string; lease_expires_at: string | null }>(
-    "check_document_extraction_provider_boundary_v1",
+    providerRpc(
+      providerProfile,
+      "check_document_extraction_provider_boundary_v1",
+      "check_google_document_extraction_provider_boundary_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -198,16 +319,22 @@ export async function recordDocumentExtractionProviderOutcome({
   workerId,
   dispatchRequestId,
   resultClass,
-  latencyMs
+  latencyMs,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   dispatchRequestId: string;
   resultClass: string;
   latencyMs: number;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ recorded: boolean; idempotent: boolean; circuit_state: string | null; retry_permitted?: boolean }>(
-    "record_document_extraction_provider_outcome_v1",
+    providerRpc(
+      providerProfile,
+      "record_document_extraction_provider_outcome_v1",
+      "record_google_document_extraction_provider_outcome_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -222,13 +349,18 @@ export async function authorizeDocumentExtractionRetry({
   jobId,
   workerId,
   priorDispatchRequestId,
-  nextDispatchRequestId
+  nextDispatchRequestId,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   priorDispatchRequestId: string;
   nextDispatchRequestId: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
+  if (providerProfile === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) {
+    throw new Error("document_extraction_google_retry_not_permitted");
+  }
   return rpc<{ authorized: boolean; reason: string }>(
     "authorize_document_extraction_retry_dispatch_v1",
     {
@@ -253,17 +385,21 @@ export async function completeDocumentExtractionJob({
   keyVersion,
   nonce,
   authenticationTag,
-  aadDigest
+  aadDigest,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   artifactFingerprint: string;
-  criticalFieldManifest: DocumentExtractionCriticalFieldManifestV2;
+  criticalFieldManifest:
+    | DocumentExtractionCriticalFieldManifestV2
+    | DocumentExtractionCriticalFieldManifestV3;
   ciphertext: Uint8Array;
   keyVersion: string;
   nonce: Uint8Array;
   authenticationTag: Uint8Array;
   aadDigest: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{
     completed: boolean;
@@ -272,7 +408,11 @@ export async function completeDocumentExtractionJob({
     status?: string;
     approval_status?: string;
   }>(
-    "complete_document_extraction_job_v3",
+    providerRpc(
+      providerProfile,
+      "complete_document_extraction_job_v3",
+      "complete_google_document_extraction_job_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -291,15 +431,21 @@ export async function failDocumentExtractionJob({
   jobId,
   workerId,
   failureCode,
-  failureClass
+  failureClass,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   failureCode: string;
   failureClass: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ job_id: string; status: string; retryable: boolean }>(
-    "fail_document_extraction_job_v2",
+    providerRpc(
+      providerProfile,
+      "fail_document_extraction_job_v2",
+      "fail_google_document_extraction_job_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -321,8 +467,13 @@ export async function recordDocumentExtractionTelemetry(args: {
   cacheResult: string | null;
   costRateVersion: string | null;
   costAmountUsd: number | null;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
-  return rpc<string>("record_document_extraction_telemetry_v1", {
+  return rpc<string>(providerRpc(
+    args.providerProfile,
+    "record_document_extraction_telemetry_v1",
+    "record_google_document_extraction_telemetry_v1"
+  ), {
     p_job_id: args.jobId,
     p_worker_id: args.workerId,
     p_request_id: args.requestId,
@@ -334,6 +485,73 @@ export async function recordDocumentExtractionTelemetry(args: {
     p_cache_result: args.cacheResult,
     p_cost_rate_version: args.costRateVersion,
     p_cost_amount_usd: args.costAmountUsd
+  });
+}
+
+export async function enqueueGoogleDocumentExtractionJob(args: {
+  intakeRequestId: string;
+  route: "google_primary" | "google_fallback";
+  documentClass: string;
+  assessmentFingerprint: string;
+  pageCount: number;
+  parserProvider: string;
+  parserModel: string;
+  parserRevision: string;
+  clientRevision: string;
+  contentHmac: string;
+  cacheKey: string;
+  routingPolicyVersion: string;
+  extractionContractVersion: string;
+  normalizationVersion: string;
+  providerProfile: typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
+  processorType: string;
+  processorId: string;
+  processorResource: string;
+  processorLocation: string;
+  processorVersion: string;
+  endpointContractVersion: string;
+  requestSerializerVersion: string;
+  responseValidatorVersion: string;
+  providerNormalizationVersion: string;
+  compatibilityPolicyVersion: string;
+  tablePolicyVersion: string;
+  confidencePolicyVersion: string;
+  selectionMarkPolicyVersion: string;
+  reviewProvenanceVersion: string;
+}) {
+  if (args.providerProfile !== GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) {
+    throw new Error("document_extraction_provider_profile_not_approved");
+  }
+  return rpc<Record<string, unknown>>("enqueue_google_document_extraction_job_v1", {
+    p_intake_request_id: args.intakeRequestId,
+    p_route: args.route,
+    p_document_class: args.documentClass,
+    p_assessment_fingerprint: args.assessmentFingerprint,
+    p_page_count: args.pageCount,
+    p_parser_provider: args.parserProvider,
+    p_parser_model: args.parserModel,
+    p_parser_revision: args.parserRevision,
+    p_client_revision: args.clientRevision,
+    p_content_hmac: args.contentHmac,
+    p_cache_key: args.cacheKey,
+    p_routing_policy_version: args.routingPolicyVersion,
+    p_extraction_contract_version: args.extractionContractVersion,
+    p_normalization_version: args.normalizationVersion,
+    p_provider_profile: args.providerProfile,
+    p_processor_type: args.processorType,
+    p_processor_id: args.processorId,
+    p_processor_resource: args.processorResource,
+    p_processor_location: args.processorLocation,
+    p_processor_version: args.processorVersion,
+    p_endpoint_contract_version: args.endpointContractVersion,
+    p_request_serializer_version: args.requestSerializerVersion,
+    p_response_validator_version: args.responseValidatorVersion,
+    p_provider_normalization_version: args.providerNormalizationVersion,
+    p_compatibility_policy_version: args.compatibilityPolicyVersion,
+    p_table_policy_version: args.tablePolicyVersion,
+    p_confidence_policy_version: args.confidencePolicyVersion,
+    p_selection_mark_policy_version: args.selectionMarkPolicyVersion,
+    p_review_provenance_version: args.reviewProvenanceVersion
   });
 }
 

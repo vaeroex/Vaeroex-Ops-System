@@ -1,7 +1,15 @@
 import { z } from "zod";
+import {
+  GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+} from "@/lib/document-extraction/contracts";
 
 const uuid = z.string().uuid();
 const leaseCapability = z.string().min(80).max(2_000);
+const providerProfile = z.enum([
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+]);
 const stage = z.enum([
   "leased",
   "preparing",
@@ -27,6 +35,7 @@ export const documentExtractionBrokerRequestSchema = z.discriminatedUnion("opera
   }).strict(),
   z.object({
     operation: z.literal("claim"),
+    providerProfile,
     leaseSeconds: z.number().int().min(30).max(300).default(120)
   }).strict(),
   z.object({

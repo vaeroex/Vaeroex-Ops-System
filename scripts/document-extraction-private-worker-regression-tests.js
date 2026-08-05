@@ -250,7 +250,7 @@ assert.match(policy, /privateWorkerEnabled: false/);
 assert.match(policy, /providerExecutionEnabled: false/);
 assert.match(policy, /syntheticQualificationEnabled: false/);
 assert.match(policy, /DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL/);
-assert.match(policy, /DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION/);
+assert.match(policy, /resolveDocumentExtractionProviderRuntimeContract/);
 assert.match(encryption, /DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON/);
 assert.match(encryption, /keys\.length > 3|entries\.length > 3/);
 assert.doesNotMatch(encryption, /fallback|defaultKey|hard.?coded/i);
@@ -394,6 +394,7 @@ assert.doesNotThrow(() => assertDocumentExtractionProviderDispatchEnabled({
   DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED: "true",
   DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED: "true",
   DOCUMENT_EXTRACTION_PRODUCTION_APPROVAL: "document_extraction_production_pilot_v1",
+  DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE: "hosted_tool_call_v2",
   DOCUMENT_EXTRACTION_NVIDIA_MODEL: "nvidia/nemotron-parse",
   DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION: "vaeroex_nemotron_parse_rest_v2",
   DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION: "nemotron_parse_hosted_tool_call_rest_v2",

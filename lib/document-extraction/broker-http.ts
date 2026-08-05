@@ -9,6 +9,11 @@ import {
   consumeDocumentExtractionFileGrant,
   consumeWorkerAssertion
 } from "@/lib/document-extraction/broker-store";
+import { resolveDocumentExtractionProviderRuntimeContract } from "@/lib/document-extraction/provider-profile";
+import {
+  GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+} from "@/lib/document-extraction/contracts";
 import {
   assertDocumentExtractionBrokerEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
@@ -140,10 +145,18 @@ async function handleGet({
     environment
   });
   if (capability.kind !== "file") throw new Error("document_extraction_file_capability_invalid");
+  const providerContract = resolveDocumentExtractionProviderRuntimeContract(environment);
+  if (
+    providerContract.providerProfile !== NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+    && providerContract.providerProfile !== GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+  ) {
+    throw new Error("document_extraction_provider_profile_not_approved");
+  }
   const source = await consumeDocumentExtractionFileGrant({
     grantId: capability.grantId,
     workerId: assertion.workerId,
-    tokenHash: createHash("sha256").update(capability.secret).digest("hex")
+    tokenHash: createHash("sha256").update(capability.secret).digest("hex"),
+    providerProfile: providerContract.providerProfile
   });
   const supabase = createSupabaseAdminClient();
   if (!supabase) throw new Error("document_extraction_storage_unavailable");

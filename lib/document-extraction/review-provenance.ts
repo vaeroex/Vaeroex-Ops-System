@@ -9,6 +9,7 @@ import {
   DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION,
   DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION_V2,
   DOCUMENT_EXTRACTION_REVIEW_VERSION,
+  DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION,
   DOCUMENT_EXTRACTION_WORKSPACE_BINDING_VERSION,
   GOOGLE_DOCUMENT_EXTRACTION_CLIENT_REVISION,
   GOOGLE_DOCUMENT_EXTRACTION_COMPATIBILITY_POLICY_VERSION,
@@ -58,7 +59,9 @@ export type DocumentExtractionReviewProvenanceInputV2 = {
   cacheKey: string;
   contentFingerprint: string;
   pageCount: number;
+  processorId: string;
   processorResource: string;
+  routingPolicyVersion: string;
 };
 
 function sha256Components(components: Array<string | number>) {
@@ -109,6 +112,7 @@ export function documentExtractionReviewProvenanceFingerprintV2(
     provenance.client_revision,
     provenance.provider_profile,
     provenance.processor_type,
+    provenance.processor_id,
     provenance.processor_resource,
     provenance.processor_location,
     provenance.processor_version,
@@ -121,6 +125,7 @@ export function documentExtractionReviewProvenanceFingerprintV2(
     provenance.table_policy_version,
     provenance.confidence_policy_version,
     provenance.selection_mark_policy_version,
+    provenance.routing_policy_version,
     provenance.model_alias,
     provenance.page_identity_fingerprint,
     provenance.workspace_binding_fingerprint,
@@ -204,6 +209,13 @@ export function buildDocumentExtractionReviewProvenanceV2(
   if (!PROCESSOR_RESOURCE.test(input.processorResource)) {
     throw new Error("Invalid Google Document AI processor resource.");
   }
+  if (
+    !/^[a-f0-9]{8,64}$/.test(input.processorId)
+    || !input.processorResource.includes(`/processors/${input.processorId}/`)
+    || input.routingPolicyVersion !== DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION
+  ) {
+    throw new Error("Invalid Google Document AI review identity.");
+  }
   const workspaceBindingFingerprint = sha256Components([
     DOCUMENT_EXTRACTION_WORKSPACE_BINDING_VERSION,
     workspaceId
@@ -228,6 +240,7 @@ export function buildDocumentExtractionReviewProvenanceV2(
     client_revision: GOOGLE_DOCUMENT_EXTRACTION_CLIENT_REVISION,
     provider_profile: GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
     processor_type: GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_TYPE,
+    processor_id: input.processorId,
     processor_resource: input.processorResource,
     processor_location: GOOGLE_DOCUMENT_EXTRACTION_LOCATION,
     processor_version: GOOGLE_DOCUMENT_EXTRACTION_PROCESSOR_VERSION,
@@ -240,6 +253,7 @@ export function buildDocumentExtractionReviewProvenanceV2(
     table_policy_version: GOOGLE_DOCUMENT_EXTRACTION_TABLE_POLICY_VERSION,
     confidence_policy_version: GOOGLE_DOCUMENT_EXTRACTION_CONFIDENCE_POLICY_VERSION,
     selection_mark_policy_version: GOOGLE_DOCUMENT_EXTRACTION_SELECTION_MARK_POLICY_VERSION,
+    routing_policy_version: DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION,
     model_alias: GOOGLE_DOCUMENT_EXTRACTION_MODEL,
     page_identity_fingerprint: pageIdentityFingerprint,
     workspace_binding_fingerprint: workspaceBindingFingerprint,
