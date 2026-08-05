@@ -179,13 +179,15 @@ Official references:
 
 ## Cost and latency
 
-As of 2026-08-05, Google lists Enterprise OCR at $1.50 per 1,000 pages through
-five million pages per month and $0.60 per 1,000 pages above that tier.
-Optional add-ons cost $6 per 1,000 pages and are disabled by this contract. One
-successful one-page qualification is therefore approximately $0.0015, excluding
-any broader Google Cloud infrastructure cost. Google states that failed 4xx and
-5xx requests are not billed. Prices and account-specific terms must be
-reconfirmed immediately before qualification and rollout.
+As of 2026-08-05, Google lists the first 1,000 Enterprise OCR pages per account
+and month at no charge, $1.50 per 1,000 pages from 1,000 through five million,
+and $0.60 per 1,000 pages above that tier. Optional add-ons cost $6 per 1,000
+pages and are disabled by this contract. A successful one-page qualification
+is therefore $0 while the account's monthly free tier remains available, with
+a marginal paid-tier cost of approximately $0.0015 otherwise, excluding any
+broader Google Cloud infrastructure cost. Google states that failed 4xx and 5xx
+requests are not billed. Prices, free-tier availability, and account-specific
+terms must be reconfirmed immediately before qualification and rollout.
 
 No latency or accuracy claim is made before a live qualification. The adapter
 records bounded request latency and response size without retaining provider

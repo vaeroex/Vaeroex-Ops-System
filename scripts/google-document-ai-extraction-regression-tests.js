@@ -379,6 +379,11 @@ assert.doesNotMatch(migration, /grant\s+(?:execute|select|insert|update|delete)/
 assert.doesNotMatch(migration, /(?:globally_enabled|worker_enabled|provider_calls_enabled|is_entitled|is_enabled)\s*=\s*true/i);
 assert.doesNotMatch(migration, /create or replace function public[.](?:enqueue|claim|authorize|complete|mutate)_document_extraction/i);
 
+const architectureDoc = read("docs/architecture/google-document-ai-enterprise-ocr-v1.md");
+assert.match(architectureDoc, /first 1,000 Enterprise OCR pages per account[\s\S]+at no charge/);
+assert.match(architectureDoc, /marginal paid-tier cost of approximately \$0[.]0015/);
+assert.doesNotMatch(architectureDoc, /one-page qualification is therefore approximately \$0[.]0015/);
+
 const activeRunner = read("services/document-extraction-worker/src/vaeroex_document_worker/runner.py");
 const activeContract = read("services/document-extraction-worker/src/vaeroex_document_worker/provider_contract.py");
 const brokerService = read("lib/document-extraction/broker-service.ts");
