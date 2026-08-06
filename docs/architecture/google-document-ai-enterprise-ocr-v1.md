@@ -241,6 +241,33 @@ Google Preview execution additionally requires
 general document-extraction approval and the separate absent-by-default
 `google_document_ai_production_pilot_v1` approval.
 
+The frozen-corpus execution correction adds the unapplied migration
+`20260806180609_document_extraction_google_frozen_qualification_controller.sql`
+and the Preview-only controller
+`google_frozen_corpus_qualification_controller_v1`. The controller consumes the
+approved Google plan before broker job creation. It records fixtures 5, 8, 9,
+and 12 locally with no intake binding or job, and creates execution work only
+for the 8 eligible documents and 9 eligible pages.
+
+For those pages, a qualification-specific service-role RPC is the atomic
+pre-network boundary. It locks the exact run, item, and job; rechecks the active
+controller, immutable Google profile and processor, workspace/runtime gates,
+lease, single dispatch, zero retry, page order, and nine-page budget; and allows
+only one unresolved page reservation. Page outcomes can never exceed
+reservations. Any failed or ambiguous page outcome latches the entire run to
+`stopped`, and the one-shot controller does not enqueue another fixture. This
+stricter synthetic stop policy does not alter ordinary Google customer job
+semantics or any historical NVIDIA profile.
+
+The new tables contain only committed synthetic identity hashes, bounded local
+reason codes, opaque synthetic intake/job bindings for eligible fixtures, and
+content-free counts/status. They contain no document text, extracted values,
+coordinates, raw payloads, credentials, raw workspace ID, or authority-bearing
+review content. RLS is enabled, table access is revoked, RPC execution is
+service-role-only, and all security-definer functions use an empty
+`search_path`. The migration remains unapplied until independent review and an
+isolated Preview migration/concurrency replay.
+
 ## Activation blockers
 
 The isolated migration replay, Preview processor provisioning, zero-call
@@ -250,15 +277,20 @@ separately approved work is:
 
 1. Recreate the same one-permission Preview IAM binding only for a separately
    approved frozen-corpus run.
-2. Run the immutable 12-document, 13-page corpus through the separate Google
+2. Independently audit and replay the frozen-controller migration in isolated
+   Preview with every execution gate false and worker scale zero. Race the page
+   reservation RPC in two sessions and prove the row locks and active-page
+   unique index permit only one pre-network claimant.
+3. Run the immutable 12-document, 13-page corpus through the separate Google
    benchmark contract. Fixtures 5, 8, 9, and 12 must fail locally before job
-   creation; the remaining 8 documents and 9 pages have exactly 9 permitted
-   provider attempts, zero retries, no fallback, and concurrency one.
-3. Verify corpus-level quality, latency, cost, quota, cache, review, cleanup,
+   creation; the controller seeds only the remaining 8 documents and 9 pages,
+   with exactly 9 permitted provider attempts, zero retries, no fallback, and
+   concurrency one.
+4. Verify corpus-level quality, latency, cost, quota, cache, review, cleanup,
    and zero-authority results against the approved thresholds.
-4. Complete an independent Production-readiness review, including current
+5. Complete an independent Production-readiness review, including current
    privacy terms, retention, IAM, quotas, alerting, rollback, and kill switch.
-5. Obtain a separate Production activation approval. Production approval must
+6. Obtain a separate Production activation approval. Production approval must
    remain absent until then.
 
 The Google benchmark identity is

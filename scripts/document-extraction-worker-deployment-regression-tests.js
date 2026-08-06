@@ -174,7 +174,7 @@ assert.match(broker, /x-serverless-authorization/);
 assert.match(runner, /approved_fixture_for_source/);
 assert.match(runner, /materialize_approved_pages/);
 assert.match(runner, /check_provider_boundary/);
-assert.match(runner, /lease = future\.result\(timeout=35\)/);
+assert.match(runner, /lease, reservation_id = future\.result\(timeout=35\)/);
 assert.match(runner, /progress_callback/);
 assert.match(runner, /status="dispatch_in_flight"/);
 assert.match(runner, /status=_required_string\(completion\.get\("status"\)/);

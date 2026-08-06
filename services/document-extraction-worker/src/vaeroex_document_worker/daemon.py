@@ -10,6 +10,7 @@ from . import WORKER_RUNTIME_VERSION
 from .broker import BrokerClient, BrokerFailure
 from .config import WorkerConfig
 from .health import WorkerHealthState, start_health_server
+from .google_qualification_controller import run_google_frozen_qualification
 from .resources import assert_runtime_resources
 from .runner import run_one_job
 from .telemetry import emit_operational_event
@@ -66,6 +67,24 @@ async def run_worker(config: WorkerConfig, *, max_cycles: int | None = None) -> 
             if max_cycles is not None:
                 return
             await stop.wait()
+            return
+        if config.google_frozen_qualification_controller_enabled:
+            health.progress(busy=True)
+            qualification_result = await run_google_frozen_qualification(
+                config,
+                progress_callback=lambda _stage: health.progress(busy=True),
+            )
+            health.success()
+            health.progress(busy=False)
+            emit_operational_event(
+                "google_frozen_qualification_result",
+                status=qualification_result.status,
+                failure_code=qualification_result.failure_code,
+                eligible_documents=qualification_result.eligible_documents,
+                eligible_pages=qualification_result.eligible_pages,
+                provider_calls=qualification_result.provider_calls,
+                retry_count=qualification_result.retry_count,
+            )
             return
         backoff = config.idle_poll_seconds
         completed_cycles = 0

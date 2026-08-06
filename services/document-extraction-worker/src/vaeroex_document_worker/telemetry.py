@@ -21,6 +21,8 @@ _ALLOWED_FIELDS = frozenset(
         "consecutive_failures",
         "cost_rate_version",
         "deployment_version",
+        "eligible_documents",
+        "eligible_pages",
         "failure_code",
         "latency_ms",
         "nvcf_cleanup_result",

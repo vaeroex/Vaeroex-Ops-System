@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from typing import Any
 
 from vaeroex_document_worker import daemon
 from vaeroex_document_worker.config import WorkerConfig
+from vaeroex_document_worker.google_document_ai_contract import GoogleDocumentAiContract
+from vaeroex_document_worker.google_qualification_controller import (
+    GoogleFrozenQualificationResult,
+)
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
 from vaeroex_document_worker.runner import WorkerRunResult
 
@@ -103,5 +108,69 @@ def test_authentication_qualification_never_enters_job_runner(monkeypatch: Any) 
     assert any(event == "broker_auth_qualification_passed" for event, _ in events)
     qualification = next(fields for event, fields in events if event == "broker_auth_qualification_passed")
     assert qualification["provider_calls"] == 0
+    assert server.shutdown_called
+    assert server.close_called
+
+
+def test_google_frozen_controller_runs_once_without_entering_polling_daemon(
+    monkeypatch: Any,
+) -> None:
+    server = FakeServer()
+    config = replace(
+        worker_config(),
+        nvidia_api_key=None,
+        provider_contract=None,
+        google_provider_contract=GoogleDocumentAiContract(
+            project_number="123456789012",
+            processor_id="0123456789abcdef",
+        ),
+        synthetic_qualification_enabled=True,
+        google_frozen_qualification_controller_enabled=True,
+        google_frozen_intake_bindings_json="[]",
+    )
+    controller_calls = 0
+    events: list[tuple[str, dict[str, object]]] = []
+
+    async def verify(_config: object) -> None:
+        return None
+
+    async def run_controller(
+        _config: WorkerConfig,
+        *,
+        progress_callback: Any = None,
+    ) -> GoogleFrozenQualificationResult:
+        nonlocal controller_calls
+        controller_calls += 1
+        assert progress_callback is not None
+        return GoogleFrozenQualificationResult("completed", 8, 9, 9, 0, None)
+
+    monkeypatch.setattr(daemon, "assert_runtime_resources", lambda: None)
+    monkeypatch.setattr(daemon, "scavenge_stale_worker_directories", lambda: 0)
+    monkeypatch.setattr(daemon, "start_health_server", lambda _state, _port: server)
+    monkeypatch.setattr(daemon, "_verify_broker", verify)
+    monkeypatch.setattr(daemon, "run_google_frozen_qualification", run_controller)
+    monkeypatch.setattr(
+        daemon,
+        "run_one_job",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("frozen qualification cannot enter ordinary polling")
+        ),
+    )
+    monkeypatch.setattr(
+        daemon,
+        "emit_operational_event",
+        lambda event, **fields: events.append((event, fields)),
+    )
+
+    asyncio.run(daemon.run_worker(config, max_cycles=5))
+
+    assert controller_calls == 1
+    result = next(
+        fields
+        for event, fields in events
+        if event == "google_frozen_qualification_result"
+    )
+    assert result["provider_calls"] == 9
+    assert result["retry_count"] == 0
     assert server.shutdown_called
     assert server.close_called

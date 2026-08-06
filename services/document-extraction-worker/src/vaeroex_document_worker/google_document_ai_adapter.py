@@ -112,6 +112,7 @@ _LANGUAGE_CODE = re.compile(r"^[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,3}$")
 
 ProviderBoundary = Literal["inference"]
 ProviderBoundaryCheck = Callable[[ProviderBoundary], None]
+ProviderPageOutcome = Callable[[int, bool, str, bool], None]
 AccessTokenProvider = Callable[[], str]
 
 
@@ -1276,10 +1277,12 @@ class GoogleDocumentAiRestAdapter:
         *,
         transport: httpx.BaseTransport | None = None,
         before_provider_boundary: ProviderBoundaryCheck | None = None,
+        provider_page_outcome: ProviderPageOutcome | None = None,
     ) -> None:
         self._contract = contract
         self._access_token_provider = access_token_provider
         self._before_provider_boundary = before_provider_boundary or (lambda _boundary: None)
+        self._provider_page_outcome = provider_page_outcome
         self._client = httpx.Client(
             timeout=httpx.Timeout(120.0, connect=10.0, write=30.0, pool=10.0),
             follow_redirects=False,
@@ -1445,7 +1448,20 @@ class GoogleDocumentAiRestAdapter:
             request_hashes.append(binding.fingerprint())
             if page.page <= len(completed_pages):
                 continue
-            normalized_pages.append(self._invoke_page(page, tuple(normalized_pages)))
+            try:
+                normalized_page = self._invoke_page(page, tuple(normalized_pages))
+            except ProviderFailure as failure:
+                if self._provider_page_outcome is not None:
+                    self._provider_page_outcome(
+                        page.page,
+                        False,
+                        failure.result_class,
+                        failure.provider_request_started,
+                    )
+                raise
+            if self._provider_page_outcome is not None:
+                self._provider_page_outcome(page.page, True, "success", True)
+            normalized_pages.append(normalized_page)
         return ProviderResult(
             pages=normalized_pages,
             latency_ms=_bounded_elapsed_ms(started),
@@ -1463,12 +1479,14 @@ def invoke_google_document_ai_adapter(
     completed_pages: tuple[dict[str, Any], ...] = (),
     transport: httpx.BaseTransport | None = None,
     before_provider_boundary: ProviderBoundaryCheck | None = None,
+    provider_page_outcome: ProviderPageOutcome | None = None,
 ) -> ProviderResult:
     with GoogleDocumentAiRestAdapter(
         contract,
         access_token_provider,
         transport=transport,
         before_provider_boundary=before_provider_boundary,
+        provider_page_outcome=provider_page_outcome,
     ) as adapter:
         return adapter.invoke(
             pages,

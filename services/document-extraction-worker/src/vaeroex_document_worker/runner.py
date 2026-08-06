@@ -208,23 +208,37 @@ async def _check_provider_boundary(
     broker: BrokerClient,
     lease: str,
     boundary: str,
-) -> str:
-    response = await broker.post(
-        {
-            "operation": "check_provider_boundary",
-            "leaseCapability": lease,
-            "boundary": boundary,
-        }
-    )
+    *,
+    qualification_page_index: int | None = None,
+) -> tuple[str, str | None]:
+    payload: dict[str, Any] = {
+        "operation": "check_provider_boundary",
+        "leaseCapability": lease,
+        "boundary": boundary,
+    }
+    if qualification_page_index is not None:
+        payload["qualificationPageIndex"] = qualification_page_index
+        payload["qualificationReservationRequestId"] = _request_id()
+    response = await broker.post(payload)
     if not response.get("allowed"):
         raise ProviderFailure(
             "provider_boundary_denied",
             "authorization",
             retryable=False,
         )
-    return _required_string(
-        response.get("leaseCapability"),
-        "provider_boundary_lease_missing",
+    reservation_id = response.get("qualificationReservationId")
+    if reservation_id is not None and not isinstance(reservation_id, str):
+        raise ProviderFailure(
+            "qualification_reservation_identity_invalid",
+            "authorization",
+            retryable=False,
+        )
+    return (
+        _required_string(
+            response.get("leaseCapability"),
+            "provider_boundary_lease_missing",
+        ),
+        reservation_id,
     )
 
 
@@ -488,16 +502,41 @@ async def run_one_job(
                     attempt_latency_ms = 0
                     try:
                         event_loop = asyncio.get_running_loop()
+                        qualification_page_cursor = 0
+                        qualification_reservations: dict[int, str] = {}
 
                         def check_provider_boundary(boundary: str) -> None:
-                            nonlocal lease
+                            nonlocal lease, qualification_page_cursor
                             _notify(progress_callback, boundary)
+                            page_index: int | None = None
+                            if active_config.google_frozen_qualification_controller_enabled:
+                                if boundary != "inference":
+                                    raise ProviderFailure(
+                                        "qualification_unexpected_network_route",
+                                        "authorization",
+                                        retryable=False,
+                                    )
+                                qualification_page_cursor += 1
+                                page_index = qualification_page_cursor
                             future = asyncio.run_coroutine_threadsafe(
-                                _check_provider_boundary(broker, lease, boundary),
+                                _check_provider_boundary(
+                                    broker,
+                                    lease,
+                                    boundary,
+                                    qualification_page_index=page_index,
+                                ),
                                 event_loop,
                             )
                             try:
-                                lease = future.result(timeout=35)
+                                lease, reservation_id = future.result(timeout=35)
+                                if page_index is not None:
+                                    if not reservation_id:
+                                        raise ProviderFailure(
+                                            "qualification_reservation_missing",
+                                            "authorization",
+                                            retryable=False,
+                                        )
+                                    qualification_reservations[page_index] = reservation_id
                                 _notify(progress_callback, f"{boundary}_authorized")
                             except ProviderFailure:
                                 raise
@@ -507,6 +546,47 @@ async def run_one_job(
                                     "authorization",
                                     retryable=False,
                                 ) from error
+
+                        def record_provider_page_outcome(
+                            page_index: int,
+                            succeeded: bool,
+                            result_class: str,
+                            provider_request_started: bool,
+                        ) -> None:
+                            reservation_id = qualification_reservations.pop(page_index, None)
+                            if not reservation_id:
+                                raise ProviderFailure(
+                                    "qualification_reservation_missing",
+                                    "authorization",
+                                    retryable=False,
+                                )
+                            future = asyncio.run_coroutine_threadsafe(
+                                broker.post(
+                                    {
+                                        "operation": "qualification_page_outcome",
+                                        "leaseCapability": lease,
+                                        "reservationId": reservation_id,
+                                        "succeeded": succeeded,
+                                        "resultClass": result_class,
+                                        "providerRequestStarted": provider_request_started,
+                                    }
+                                ),
+                                event_loop,
+                            )
+                            try:
+                                outcome = future.result(timeout=35)
+                            except Exception as error:
+                                raise ProviderFailure(
+                                    "qualification_page_outcome_unavailable",
+                                    "authorization",
+                                    retryable=False,
+                                ) from error
+                            if outcome.get("recorded") is not True:
+                                raise ProviderFailure(
+                                    "qualification_page_outcome_rejected",
+                                    "authorization",
+                                    retryable=False,
+                                )
 
                         provider_options: dict[str, Any] = {
                             "completed_pages": completed_pages,
@@ -532,6 +612,11 @@ async def run_one_job(
                             def invoke_google() -> ProviderResult:
                                 try:
                                     with GoogleMetadataAccessTokenProvider() as token_provider:
+                                        google_options: dict[str, Any] = {}
+                                        if active_config.google_frozen_qualification_controller_enabled:
+                                            google_options["provider_page_outcome"] = (
+                                                record_provider_page_outcome
+                                            )
                                         return invoke_google_document_ai_adapter(
                                             rendered_pages,
                                             document_sha256,
@@ -539,6 +624,7 @@ async def run_one_job(
                                             token_provider.token,
                                             completed_pages=completed_pages,
                                             before_provider_boundary=check_provider_boundary,
+                                            **google_options,
                                         )
                                 except GoogleAccessTokenFailure as error:
                                     raise ProviderFailure(

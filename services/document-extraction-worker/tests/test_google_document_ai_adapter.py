@@ -422,6 +422,154 @@ def test_adapter_has_no_internal_retry(tmp_path: Path) -> None:
     assert caught.value.retryable
 
 
+def test_page_reservation_and_outcome_callbacks_are_strictly_serial(
+    tmp_path: Path,
+) -> None:
+    first = rendered_page(tmp_path, page_number=1)
+    second_directory = tmp_path / "second-page"
+    second_directory.mkdir()
+    second = rendered_page(second_directory, page_number=2)
+    events: list[tuple[object, ...]] = []
+    next_page = 0
+
+    def boundary(boundary_name: str) -> None:
+        nonlocal next_page
+        next_page += 1
+        events.append(("reservation", next_page, boundary_name))
+
+    def outcome(
+        page_index: int,
+        succeeded: bool,
+        result_class: str,
+        provider_request_started: bool,
+    ) -> None:
+        events.append(
+            (
+                "outcome",
+                page_index,
+                succeeded,
+                result_class,
+                provider_request_started,
+            )
+        )
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        page_number = 1 + sum(1 for event in events if event[0] == "outcome")
+        response = process_response()
+        events.append(("network", page_number))
+        return httpx.Response(
+            200,
+            content=response_bytes(response),
+            headers={"Content-Type": "application/json"},
+        )
+
+    result = invoke_google_document_ai_adapter(
+        [first, second],
+        "d" * 64,
+        contract(),
+        lambda: "token",
+        transport=httpx.MockTransport(handler),
+        before_provider_boundary=boundary,
+        provider_page_outcome=outcome,
+    )
+
+    assert len(result.pages) == 2
+    assert events == [
+        ("reservation", 1, "inference"),
+        ("network", 1),
+        ("outcome", 1, True, "success", True),
+        ("reservation", 2, "inference"),
+        ("network", 2),
+        ("outcome", 2, True, "success", True),
+    ]
+
+
+def test_reserved_page_records_pre_network_token_failure(
+    tmp_path: Path,
+) -> None:
+    calls = 0
+    boundaries: list[str] = []
+    outcomes: list[tuple[int, bool, str, bool]] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(200, content=response_bytes())
+
+    def token_provider() -> str:
+        raise RuntimeError("credential unavailable")
+
+    def record_outcome(
+        page_index: int,
+        succeeded: bool,
+        result_class: str,
+        provider_request_started: bool,
+    ) -> None:
+        outcomes.append(
+            (page_index, succeeded, result_class, provider_request_started)
+        )
+
+    with pytest.raises(
+        ProviderFailure,
+        match="google_document_ai_access_token_unavailable",
+    ):
+        invoke_google_document_ai_adapter(
+            [rendered_page(tmp_path)],
+            "d" * 64,
+            contract(),
+            token_provider,
+            transport=httpx.MockTransport(handler),
+            before_provider_boundary=boundaries.append,
+            provider_page_outcome=record_outcome,
+        )
+
+    assert calls == 0
+    assert boundaries == ["inference"]
+    assert outcomes == [(1, False, "authorization", False)]
+
+
+def test_reserved_page_records_malformed_provider_output_once(
+    tmp_path: Path,
+) -> None:
+    calls = 0
+    outcomes: list[tuple[int, bool, str, bool]] = []
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            content=b'{"unexpected":true}',
+            headers={"Content-Type": "application/json"},
+        )
+
+    def record_outcome(
+        page_index: int,
+        succeeded: bool,
+        result_class: str,
+        provider_request_started: bool,
+    ) -> None:
+        outcomes.append(
+            (page_index, succeeded, result_class, provider_request_started)
+        )
+
+    with pytest.raises(ProviderFailure):
+        invoke_google_document_ai_adapter(
+            [rendered_page(tmp_path)],
+            "d" * 64,
+            contract(),
+            lambda: "token",
+            transport=httpx.MockTransport(handler),
+            before_provider_boundary=lambda boundary: (
+                None if boundary == "inference" else pytest.fail("unexpected boundary")
+            ),
+            provider_page_outcome=record_outcome,
+        )
+
+    assert calls == 1
+    assert outcomes == [(1, False, "malformed_output", True)]
+
+
 @pytest.mark.parametrize(
     ("status", "code", "retryable"),
     (

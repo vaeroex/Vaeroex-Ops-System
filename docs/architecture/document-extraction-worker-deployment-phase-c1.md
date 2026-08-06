@@ -28,6 +28,10 @@ Repository and environment boundaries:
 The Preview migration ledger contains the canonical Phase A and Phase B
 migrations. The Phase C1 protocol migration is additive and may be applied only
 to the isolated Preview project through the canonical migration workflow.
+The later frozen-corpus controller migration
+`20260806180609_document_extraction_google_frozen_qualification_controller.sql`
+is committed but deliberately unapplied. It must pass an independent static
+audit and isolated Preview replay before any corpus execution.
 
 ## Deployment targets
 
@@ -301,6 +305,43 @@ all pass.
 11. Confirm every successful extraction stops at `awaiting_review`.
 12. Retain only aggregate content-free measurements.
 
+### Frozen-corpus execution controller
+
+The frozen Google run does not use the ordinary continuously polling daemon.
+The versioned `google_frozen_corpus_qualification_controller_v1` mode computes
+`google_qualification_plan` before opening a broker connection. It sends all 12
+committed fixture identities to the database, but fixtures 5, 8, 9, and 12 have
+only local, content-free result rows. Their table shape forbids an intake ID,
+route, document class, job ID, cache key, file binding, reservation, or call
+count. Only fixtures 1, 2, 3, 4, 6, 7, 10, and 11 can enter `planned` state.
+
+The controller then enqueues exactly one planned fixture, waits for its one
+worker execution to reach the encrypted `needs_review` / `awaiting_review`
+boundary, verifies exact cumulative page accounting, and only then enqueues the
+next fixture. It never resumes automatically. Provider failure, malformed
+output, identity or lease mismatch, ambiguous dispatch, retry state, provenance
+or authority failure, privacy failure, or controller uncertainty latches the
+run to `stopped`; no later fixture can be claimed.
+
+Each rendered page obtains one database reservation immediately before the
+Google request. The reservation function locks the run, item, and job; verifies
+the active Preview-only controller state, exact Google profile and immutable
+processor resource, workspace runtime gates, current lease and dispatch,
+zero-retry state, page sequence, and remaining budget; and then increments the
+bounded reservation count. A partial unique index permits only one unresolved
+page reservation for a run. Counts are constrained to nine reservations and no
+more calls than reservations, so a tenth or concurrent second reservation fails
+before token acquisition or network access. Normal customer and historical
+NVIDIA execution continue through their existing claim and provider-boundary
+RPCs.
+
+The migration is additive, default-disabled, RLS-protected, and exposes only
+narrow `service_role` RPCs with empty `search_path`. It stores no document text,
+values, coordinates, payloads, credentials, raw workspace ID, or customer
+identity. It grants no downstream authority. Applying and racing the SQL in
+isolated Preview remains a required qualification step; repository tests do
+not represent that unapplied migration as live proof.
+
 ### Provider-specific benchmark identity
 
 The historical NVIDIA benchmark event, identity, record fingerprint, serialized
@@ -532,6 +573,8 @@ Required validation includes:
 - Google OIDC and Ed25519 tests;
 - replay, wrong-audience, and IAM isolation tests;
 - kill-switch and zero-provider authentication tests;
+- frozen-controller pre-job exclusion, serial-stop, page reservation, and
+  database concurrency replay tests;
 - Python compile, strict mypy, pytest, pip check, pip-audit, SBOM, and licenses;
 - Phase A, Phase B, and Phase C1 regressions;
 - file ingestion, Evidence, Business Notes, KPI semantics, Formula V2,

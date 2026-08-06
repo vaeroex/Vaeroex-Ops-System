@@ -366,6 +366,7 @@ assert.deepEqual(resolveDocumentExtractionExecutionPolicy({}), {
   brokerEnabled: false,
   providerExecutionEnabled: false,
   syntheticQualificationEnabled: false,
+  googleFrozenQualificationControllerEnabled: false,
   productionApprovalValid: true
 });
 assert.equal(resolveDocumentExtractionExecutionPolicy({

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -28,11 +29,29 @@ DEPLOYMENT_ID = "phase-c1-pr265-abc1234-google-v1"
 WORKER_KEY_VERSION = "pr265-worker-key-google-v1"
 
 
+def _bindings_json() -> str:
+    return json.dumps(
+        [
+            {
+                "sourceSha256": f"{index:064x}",
+                "intakeRequestId": str(uuid.UUID(int=index)),
+                "assessmentFingerprint": f"{index + 20:064x}",
+                "contentHmac": f"{index + 40:064x}",
+                "cacheKey": f"{index + 60:064x}",
+            }
+            for index in range(1, 9)
+        ],
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+
+
 def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
     gate_values = {
-        "disabled": ("false", "false", "false", "false", "false"),
-        "authentication": ("true", "false", "false", "false", "true"),
-        "qualification": ("true", "true", "true", "true", "false"),
+        "disabled": ("false", "false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "false", "true"),
+        "qualification": ("true", "true", "true", "true", "false", "false"),
+        "frozen-corpus": ("true", "true", "true", "true", "true", "false"),
     }[mode]
     values = {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT": "preview",
@@ -46,7 +65,8 @@ def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED": gate_values[1],
         "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": gate_values[2],
         "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": gate_values[3],
-        "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED": gate_values[4],
+        "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED": gate_values[4],
+        "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED": gate_values[5],
         "DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE": "google_document_ai_enterprise_ocr_v1",
         "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED": "false",
         "DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED": "false",
@@ -60,9 +80,16 @@ def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
         "DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS": "5",
         "TMPDIR": "/var/tmp/vaeroex-document-worker",
     }
-    if mode == "qualification":
+    if mode in ("qualification", "frozen-corpus"):
         values["DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"] = (
             "google_document_ai_preview_qualification_v1"
+        )
+    if mode == "frozen-corpus":
+        values["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"] = (
+            "google_frozen_corpus_controller_v1"
+        )
+        values["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"] = (
+            _bindings_json()
         )
     return [
         *({"name": key, "value": value} for key, value in values.items()),
@@ -239,6 +266,7 @@ def test_google_manifest_is_inert_and_has_no_provider_secret(tmp_path: Path) -> 
     assert "GOOGLE_APPLICATION_CREDENTIALS" not in rendered
     assert "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL" not in rendered
     assert "DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL" not in rendered
+    assert "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED" in rendered
 
 
 def test_google_verifier_accepts_disabled_authentication_and_qualification(
@@ -248,6 +276,7 @@ def test_google_verifier_accepts_disabled_authentication_and_qualification(
         ("disabled", 0),
         ("authentication", 1),
         ("qualification", 1),
+        ("frozen-corpus", 1),
     ):
         result = _run_verifier(
             tmp_path,
@@ -292,12 +321,42 @@ def test_google_verifier_rejects_qualification_without_exact_preview_approval(
     assert "worker_pool_preview_approval_invalid" in result.stderr
 
 
+def test_google_verifier_rejects_malformed_or_duplicate_frozen_bindings(
+    tmp_path: Path,
+) -> None:
+    for mutation in ("missing_key", "duplicate_source", "invalid_uuid"):
+        description = _description("frozen-corpus", 1)
+        environment = description["template"]["containers"][0]["env"]
+        item = next(
+            candidate
+            for candidate in environment
+            if candidate["name"]
+            == "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"
+        )
+        bindings = json.loads(item["value"])
+        if mutation == "missing_key":
+            bindings[0].pop("cacheKey")
+        elif mutation == "duplicate_source":
+            bindings[1]["sourceSha256"] = bindings[0]["sourceSha256"]
+        else:
+            bindings[0]["intakeRequestId"] = "not-a-uuid"
+        item["value"] = json.dumps(bindings, separators=(",", ":"))
+        result = _run_verifier(
+            tmp_path,
+            description,
+            "frozen-corpus",
+            1,
+        )
+        assert result.returncode != 0
+        assert "worker_pool_controller_bindings_invalid" in result.stderr
+
+
 def test_google_mode_script_has_bounded_confirmations_and_removes_approval() -> None:
     script = (OPS / "set-google-document-ai-preview-worker-mode.sh").read_text(
         encoding="ascii"
     )
     assert "google-document-ai-one-page-one-call-zero-retry" in script
-    assert "google-document-ai-frozen-corpus-12-documents-13-pages-zero-retry" in script
+    assert "google-document-ai-frozen-corpus-8-documents-9-pages-zero-retry" in script
     assert "worker-pools replace" in script
     assert "worker-pools update" not in script
     assert "render-google-document-ai-worker-mode.py" in script
@@ -318,19 +377,22 @@ def test_google_mode_renderer_replaces_complete_v1_resource_and_verifies_modes(
     }
     for mode, (instances, private_worker, provider, approval) in expected.items():
         output = tmp_path / f"{mode}.json"
+        command = [
+            sys.executable,
+            str(RENDER_MODE),
+            "--description-file",
+            str(source),
+            "--output",
+            str(output),
+            "--worker-pool",
+            WORKER_POOL,
+            "--mode",
+            mode,
+        ]
+        if mode == "frozen-corpus":
+            command.extend(("--frozen-intake-bindings-json", _bindings_json()))
         rendered = subprocess.run(
-            [
-                sys.executable,
-                str(RENDER_MODE),
-                "--description-file",
-                str(source),
-                "--output",
-                str(output),
-                "--worker-pool",
-                WORKER_POOL,
-                "--mode",
-                mode,
-            ],
+            command,
             capture_output=True,
             text=True,
             check=False,
@@ -354,6 +416,9 @@ def test_google_mode_renderer_replaces_complete_v1_resource_and_verifies_modes(
         assert environment["DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED"]["value"] == private_worker
         assert environment["DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED"]["value"] == provider
         assert ("DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL" in environment) is approval
+        assert environment[
+            "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED"
+        ]["value"] == ("true" if mode == "frozen-corpus" else "false")
         verified = subprocess.run(
             [
                 sys.executable,

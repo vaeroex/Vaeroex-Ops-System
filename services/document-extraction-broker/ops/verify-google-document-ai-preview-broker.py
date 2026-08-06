@@ -14,9 +14,12 @@ GATES = (
     "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED",
     "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED",
     "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED",
+    "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED",
 )
 PREVIEW_APPROVAL = "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"
 PREVIEW_APPROVAL_VALUE = "google_document_ai_preview_qualification_v1"
+CONTROLLER_CONFIRMATION = "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"
+CONTROLLER_CONFIRMATION_VALUE = "google_frozen_corpus_controller_v1"
 PLAIN_ENVIRONMENT = frozenset(
     {
         "DOCUMENT_EXTRACTION_BROKER_RUNTIME_ENVIRONMENT",
@@ -89,7 +92,7 @@ def main() -> int:
     parser.add_argument("--google-processor-id", required=True)
     parser.add_argument(
         "--expected-mode",
-        choices=("inert", "authentication", "qualification"),
+        choices=("inert", "authentication", "qualification", "frozen-corpus"),
         required=True,
     )
     arguments = parser.parse_args()
@@ -174,8 +177,10 @@ def main() -> int:
             raise SystemExit("broker_environment_invalid")
         environment[key] = item
     expected_environment = set(PLAIN_ENVIRONMENT | SECRET_ENVIRONMENT)
-    if arguments.expected_mode == "qualification":
+    if arguments.expected_mode in ("qualification", "frozen-corpus"):
         expected_environment.add(PREVIEW_APPROVAL)
+    if arguments.expected_mode == "frozen-corpus":
+        expected_environment.add(CONTROLLER_CONFIRMATION)
     if set(environment) != expected_environment or set(environment).intersection(
         FORBIDDEN_KEYS
     ):
@@ -210,15 +215,20 @@ def main() -> int:
     if "mdiianhfrojmxqpwrflh" in json.dumps(resource):
         raise SystemExit("broker_production_reference_detected")
     expected_gates = {
-        "inert": ("false", "false", "false", "false"),
-        "authentication": ("true", "false", "false", "false"),
-        "qualification": ("true", "true", "true", "true"),
+        "inert": ("false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "false"),
+        "qualification": ("true", "true", "true", "true", "false"),
+        "frozen-corpus": ("true", "true", "true", "true", "true"),
     }[arguments.expected_mode]
     if tuple(environment[key].get("value") for key in GATES) != expected_gates:
         raise SystemExit("broker_gate_state_mismatch")
-    if arguments.expected_mode == "qualification":
+    if arguments.expected_mode in ("qualification", "frozen-corpus"):
         if environment[PREVIEW_APPROVAL].get("value") != PREVIEW_APPROVAL_VALUE:
             raise SystemExit("broker_preview_approval_invalid")
+    if arguments.expected_mode == "frozen-corpus" and environment[
+        CONTROLLER_CONFIRMATION
+    ].get("value") != CONTROLLER_CONFIRMATION_VALUE:
+        raise SystemExit("broker_controller_confirmation_invalid")
 
     invoker_members: set[str] = set()
     for binding in policy.get("bindings", []):

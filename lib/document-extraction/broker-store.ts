@@ -134,6 +134,116 @@ export async function claimDocumentExtractionJob(
   return rows[0] || null;
 }
 
+export async function prepareGoogleFrozenQualification(args: {
+  requestId: string;
+  benchmarkProfileFingerprint: string;
+  processorId: string;
+  processorResource: string;
+  items: Array<Record<string, unknown>>;
+}) {
+  return rpc<Record<string, unknown>>("prepare_google_frozen_qualification_v1", {
+    p_request_id: args.requestId,
+    p_preview_project_ref: "zfpnhvcmuuvtswttmnjd",
+    p_confirmation: "prepare-google-frozen-corpus-controller-v1",
+    p_benchmark_profile_fingerprint: args.benchmarkProfileFingerprint,
+    p_processor_id: args.processorId,
+    p_processor_resource: args.processorResource,
+    p_items: args.items
+  });
+}
+
+export async function enqueueNextGoogleFrozenQualificationItem(runId: string, requestId: string) {
+  return rpc<Record<string, unknown>>("enqueue_next_google_frozen_qualification_item_v1", {
+    p_run_id: runId,
+    p_request_id: requestId
+  });
+}
+
+export async function claimGoogleFrozenQualificationJob(workerId: string, leaseSeconds = 120) {
+  const rows = await rpc<ClaimedDocumentExtractionJob[]>(
+    "claim_google_frozen_qualification_job_v1",
+    { p_worker_id: workerId, p_lease_seconds: leaseSeconds }
+  );
+  return rows[0] || null;
+}
+
+export async function assertGoogleFrozenQualificationJob(
+  jobId: string,
+  workerId: string,
+  operation: string
+) {
+  return rpc<Record<string, unknown>>("assert_google_frozen_qualification_job_v1", {
+    p_job_id: jobId,
+    p_worker_id: workerId,
+    p_operation: operation
+  });
+}
+
+export async function reserveGoogleFrozenQualificationPage(args: {
+  jobId: string;
+  workerId: string;
+  pageIndex: number;
+  reservationRequestId: string;
+}) {
+  return rpc<Record<string, unknown>>("reserve_google_frozen_qualification_page_v1", {
+    p_job_id: args.jobId,
+    p_worker_id: args.workerId,
+    p_page_index: args.pageIndex,
+    p_reservation_request_id: args.reservationRequestId
+  });
+}
+
+export async function recordGoogleFrozenQualificationPageOutcome(args: {
+  reservationId: string;
+  jobId: string;
+  workerId: string;
+  succeeded: boolean;
+  resultClass: string;
+  providerRequestStarted: boolean;
+}) {
+  return rpc<Record<string, unknown>>("record_google_frozen_qualification_page_outcome_v1", {
+    p_reservation_id: args.reservationId,
+    p_job_id: args.jobId,
+    p_worker_id: args.workerId,
+    p_succeeded: args.succeeded,
+    p_result_class: args.resultClass,
+    p_provider_request_started: args.providerRequestStarted
+  });
+}
+
+export async function finishGoogleFrozenQualificationItem(runId: string, jobId: string) {
+  return rpc<Record<string, unknown>>("finish_google_frozen_qualification_item_v1", {
+    p_run_id: runId,
+    p_job_id: jobId
+  });
+}
+
+export async function stopGoogleFrozenQualification(runId: string, reason: string) {
+  return rpc<Record<string, unknown>>("stop_google_frozen_qualification_v1", {
+    p_run_id: runId,
+    p_reason: reason
+  });
+}
+
+export async function completeGoogleFrozenQualification(runId: string) {
+  return rpc<Record<string, unknown>>("complete_google_frozen_qualification_v1", {
+    p_run_id: runId
+  });
+}
+
+export async function getGoogleFrozenQualificationStatus(runId: string) {
+  return rpc<Record<string, unknown>>("get_google_frozen_qualification_status_v1", {
+    p_run_id: runId
+  });
+}
+
+export async function cleanupGoogleFrozenQualification(runId: string, confirmation: string) {
+  return rpc<Record<string, unknown>>("cleanup_google_frozen_qualification_v1", {
+    p_run_id: runId,
+    p_confirmation: confirmation
+  });
+}
+
 export async function heartbeatDocumentExtractionJob(jobId: string, workerId: string, leaseSeconds = 120) {
   return rpc<boolean>("heartbeat_document_extraction_job_v1", {
     p_job_id: jobId,

@@ -20,15 +20,26 @@ import {
   advanceDocumentExtractionStage,
   authorizeDocumentExtractionDispatch,
   authorizeDocumentExtractionRetry,
+  assertGoogleFrozenQualificationJob,
   claimDocumentExtractionJob,
+  claimGoogleFrozenQualificationJob,
   checkDocumentExtractionProviderBoundary,
+  cleanupGoogleFrozenQualification,
+  completeGoogleFrozenQualification,
   completeDocumentExtractionJob,
+  enqueueNextGoogleFrozenQualificationItem,
   failDocumentExtractionJob,
+  finishGoogleFrozenQualificationItem,
+  getGoogleFrozenQualificationStatus,
   heartbeatDocumentExtractionJob,
   issueDocumentExtractionFileGrant,
+  prepareGoogleFrozenQualification,
+  recordGoogleFrozenQualificationPageOutcome,
   recordDocumentExtractionProviderOutcome,
   recordDocumentExtractionTelemetry,
+  reserveGoogleFrozenQualificationPage,
   resolveDocumentExtractionLease,
+  stopGoogleFrozenQualification,
   type DocumentExtractionLeaseContext,
   type DocumentExtractionProviderProfile
 } from "@/lib/document-extraction/broker-store";
@@ -56,6 +67,7 @@ import {
 } from "@/lib/document-extraction/provider-profile";
 import {
   assertDocumentExtractionBrokerEnabled,
+  assertGoogleFrozenQualificationControllerEnabled,
   assertDocumentExtractionProviderGateEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
   resolveDocumentExtractionExecutionPolicy,
@@ -224,17 +236,91 @@ export async function handleDocumentExtractionBrokerOperation({
   assertDocumentExtractionBrokerEnabled(environment, runtimeEnvironment);
   const providerContract = resolveDocumentExtractionProviderRuntimeContract(environment);
   const activeProviderProfile = providerProfile(providerContract);
+  const policy = resolveDocumentExtractionExecutionPolicy(environment, runtimeEnvironment);
+
+  const assertQualificationController = () => {
+    assertGoogleFrozenQualificationControllerEnabled(environment, runtimeEnvironment);
+    if (activeProviderProfile !== GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) {
+      throw new Error("document_extraction_google_qualification_profile_mismatch");
+    }
+  };
+  if (request.operation === "qualification_prepare") {
+    assertQualificationController();
+    const items = request.items.map((item) => item.providerEligible ? {
+        fixture_index: item.fixtureIndex,
+        source_sha256: item.sourceSha256,
+        fixture_identity_fingerprint: item.fixtureIdentityFingerprint,
+        page_identity_fingerprints: item.pageIdentityFingerprints,
+        provider_eligible: true,
+        local_rejection_reason: null,
+        document_class: item.documentClass,
+        intake_request_id: item.intakeRequestId,
+        assessment_fingerprint: item.assessmentFingerprint,
+        content_hmac: item.contentHmac,
+        cache_key: item.cacheKey
+      } : {
+        fixture_index: item.fixtureIndex,
+        source_sha256: item.sourceSha256,
+        fixture_identity_fingerprint: item.fixtureIdentityFingerprint,
+        page_identity_fingerprints: item.pageIdentityFingerprints,
+        provider_eligible: false,
+        local_rejection_reason: item.localRejectionReason,
+        document_class: null
+      });
+    return { ok: true, ...(await prepareGoogleFrozenQualification({
+      requestId: request.requestId,
+      benchmarkProfileFingerprint: request.benchmarkProfileFingerprint,
+      processorId: request.processorId,
+      processorResource: request.processorResource,
+      items
+    })) };
+  }
+  if (request.operation === "qualification_enqueue_next") {
+    assertQualificationController();
+    return { ok: true, ...(await enqueueNextGoogleFrozenQualificationItem(
+      request.runId,
+      request.requestId
+    )) };
+  }
+  if (request.operation === "qualification_status") {
+    assertQualificationController();
+    return { ok: true, ...(await getGoogleFrozenQualificationStatus(request.runId)) };
+  }
+  if (request.operation === "qualification_finish_item") {
+    assertQualificationController();
+    return { ok: true, ...(await finishGoogleFrozenQualificationItem(
+      request.runId,
+      request.jobId
+    )) };
+  }
+  if (request.operation === "qualification_stop") {
+    assertQualificationController();
+    return { ok: true, ...(await stopGoogleFrozenQualification(request.runId, request.reason)) };
+  }
+  if (request.operation === "qualification_complete") {
+    assertQualificationController();
+    return { ok: true, ...(await completeGoogleFrozenQualification(request.runId)) };
+  }
+  if (request.operation === "qualification_cleanup") {
+    assertQualificationController();
+    return { ok: true, ...(await cleanupGoogleFrozenQualification(
+      request.runId,
+      request.confirmation
+    )) };
+  }
 
   if (request.operation === "claim") {
     assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     if (request.providerProfile !== activeProviderProfile) {
       throw new Error("document_extraction_provider_profile_mismatch");
     }
-    const job = await claimDocumentExtractionJob(
-      workerId,
-      activeProviderProfile,
-      request.leaseSeconds
-    );
+    const job = policy.googleFrozenQualificationControllerEnabled
+      ? await claimGoogleFrozenQualificationJob(workerId, request.leaseSeconds)
+      : await claimDocumentExtractionJob(
+        workerId,
+        activeProviderProfile,
+        request.leaseSeconds
+      );
     if (!job) return { ok: true, claimed: false };
     const context = await resolveExactLease(job.id, workerId, providerContract);
     return {
@@ -279,6 +365,20 @@ export async function handleDocumentExtractionBrokerOperation({
 
   const lease = leaseFor(request.leaseCapability, workerId, environment);
   let context = await resolveExactLease(lease.jobId, workerId, providerContract);
+  if (policy.googleFrozenQualificationControllerEnabled) {
+    const qualificationOperation = request.operation === "qualification_page_outcome"
+      ? "provider_outcome"
+      : request.operation === "issue_file_access"
+        ? "file_access"
+        : request.operation === "advance_stage"
+          ? "advance"
+          : request.operation === "authorize_dispatch"
+            ? "dispatch"
+            : request.operation === "check_provider_boundary"
+              ? "provider_boundary"
+              : request.operation;
+    await assertGoogleFrozenQualificationJob(lease.jobId, workerId, qualificationOperation);
+  }
   if (request.operation === "heartbeat") {
     const extended = await heartbeatDocumentExtractionJob(lease.jobId, workerId, request.leaseSeconds);
     if (!extended) throw new Error("document_extraction_heartbeat_denied");
@@ -348,18 +448,59 @@ export async function handleDocumentExtractionBrokerOperation({
 
   if (request.operation === "check_provider_boundary") {
     assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
-    const result = await checkDocumentExtractionProviderBoundary({
-      jobId: lease.jobId,
-      workerId,
-      boundary: request.boundary,
-      providerProfile: activeProviderProfile
-    });
+    let qualificationReservationId: string | undefined;
+    let result: {
+      allowed: boolean;
+      reason: string;
+      boundary: string;
+      lease_expires_at: string | null;
+    };
+    if (policy.googleFrozenQualificationControllerEnabled) {
+      if (
+        request.boundary !== "inference"
+        || request.qualificationPageIndex === undefined
+        || request.qualificationReservationRequestId === undefined
+      ) {
+        throw new Error("document_extraction_google_qualification_page_binding_missing");
+      }
+      const reservation = await reserveGoogleFrozenQualificationPage({
+        jobId: lease.jobId,
+        workerId,
+        pageIndex: request.qualificationPageIndex,
+        reservationRequestId: request.qualificationReservationRequestId
+      });
+      if (reservation.authorized !== true || typeof reservation.reservation_id !== "string") {
+        return { ok: false, ...reservation };
+      }
+      qualificationReservationId = reservation.reservation_id;
+      result = {
+        allowed: true,
+        reason: "eligible",
+        boundary: "inference",
+        lease_expires_at: typeof reservation.lease_expires_at === "string"
+          ? reservation.lease_expires_at
+          : null
+      };
+    } else if (
+      request.qualificationPageIndex !== undefined
+      || request.qualificationReservationRequestId !== undefined
+    ) {
+      throw new Error("document_extraction_google_qualification_not_enabled");
+    } else {
+      result = await checkDocumentExtractionProviderBoundary({
+        jobId: lease.jobId,
+        workerId,
+        boundary: request.boundary,
+        providerProfile: activeProviderProfile
+      });
+    }
     if (!result.allowed || !result.lease_expires_at) {
       return { ok: false, ...result };
     }
     return {
       ok: true,
       ...result,
+      qualificationReservationId,
       leaseCapability: createLeaseCapability({
         jobId: lease.jobId,
         workerId,
@@ -367,6 +508,18 @@ export async function handleDocumentExtractionBrokerOperation({
         environment
       })
     };
+  }
+
+  if (request.operation === "qualification_page_outcome") {
+    const result = await recordGoogleFrozenQualificationPageOutcome({
+      reservationId: request.reservationId,
+      jobId: lease.jobId,
+      workerId,
+      succeeded: request.succeeded,
+      resultClass: request.resultClass,
+      providerRequestStarted: request.providerRequestStarted
+    });
+    return { ok: result.recorded === true, ...result };
   }
 
   if (request.operation === "provider_outcome") {

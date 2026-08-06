@@ -12,6 +12,9 @@ function enabled(value: string | undefined) {
   return value?.trim().toLowerCase() === "true";
 }
 
+const GOOGLE_FROZEN_QUALIFICATION_CONTROLLER_CONFIRMATION =
+  "google_frozen_corpus_controller_v1";
+
 export type DocumentExtractionRuntimeEnvironment = "production" | "preview" | "development";
 
 export type DocumentExtractionExecutionPolicy = {
@@ -19,6 +22,7 @@ export type DocumentExtractionExecutionPolicy = {
   brokerEnabled: boolean;
   providerExecutionEnabled: boolean;
   syntheticQualificationEnabled: boolean;
+  googleFrozenQualificationControllerEnabled: boolean;
   productionApprovalValid: boolean;
 };
 
@@ -78,13 +82,31 @@ export function resolveDocumentExtractionExecutionPolicy(
     && providerExecutionEnabled
     && enabled(environment.DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED)
     && enabled(environment.DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED);
+  const googleFrozenQualificationControllerEnabled = runtimeEnvironment === "preview"
+    && syntheticQualificationEnabled
+    && isGoogle
+    && enabled(environment.DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED)
+    && environment.DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION?.trim()
+      === GOOGLE_FROZEN_QUALIFICATION_CONTROLLER_CONFIRMATION;
   return {
     environment: runtimeEnvironment,
     brokerEnabled,
     providerExecutionEnabled,
     syntheticQualificationEnabled,
+    googleFrozenQualificationControllerEnabled,
     productionApprovalValid
   };
+}
+
+export function assertGoogleFrozenQualificationControllerEnabled(
+  environment: NodeJS.ProcessEnv = process.env,
+  runtimeEnvironment?: DocumentExtractionRuntimeEnvironment
+) {
+  const policy = assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
+  if (!policy.googleFrozenQualificationControllerEnabled) {
+    throw new Error("document_extraction_google_frozen_controller_disabled");
+  }
+  return policy;
 }
 
 export function assertDocumentExtractionBrokerEnabled(
@@ -122,5 +144,6 @@ export const DOCUMENT_EXTRACTION_RUNTIME_DEFAULTS = Object.freeze({
   privateWorkerEnabled: false,
   providerExecutionEnabled: false,
   syntheticQualificationEnabled: false,
-  syntheticProviderCallsEnabled: false
+  syntheticProviderCallsEnabled: false,
+  googleFrozenQualificationControllerEnabled: false
 });

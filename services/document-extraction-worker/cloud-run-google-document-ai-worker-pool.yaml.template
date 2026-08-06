@@ -43,6 +43,8 @@ spec:
               value: "false"
             - name: DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED
               value: "false"
+            - name: DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED
+              value: "false"
             - name: DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED
               value: "false"
             - name: DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED

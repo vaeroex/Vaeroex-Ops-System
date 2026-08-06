@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -13,10 +15,14 @@ GATES = (
     "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED",
     "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED",
     "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED",
+    "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED",
 )
 AUTH_GATE = "DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED"
 PREVIEW_APPROVAL = "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"
 PREVIEW_APPROVAL_VALUE = "google_document_ai_preview_qualification_v1"
+CONTROLLER_CONFIRMATION = "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"
+CONTROLLER_CONFIRMATION_VALUE = "google_frozen_corpus_controller_v1"
+CONTROLLER_BINDINGS = "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"
 BASE_ENVIRONMENT = frozenset(
     {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT",
@@ -79,6 +85,49 @@ def _secret_reference(item: dict[str, Any]) -> dict[str, Any] | None:
     return reference if isinstance(reference, dict) else None
 
 
+def _validate_controller_bindings(raw: str) -> None:
+    try:
+        bindings = json.loads(raw)
+    except json.JSONDecodeError as error:
+        raise SystemExit("worker_pool_controller_bindings_invalid") from error
+    expected_keys = {
+        "sourceSha256",
+        "intakeRequestId",
+        "assessmentFingerprint",
+        "contentHmac",
+        "cacheKey",
+    }
+    if not isinstance(bindings, list) or len(bindings) != 8:
+        raise SystemExit("worker_pool_controller_bindings_invalid")
+    source_hashes: set[str] = set()
+    intake_ids: set[str] = set()
+    for binding in bindings:
+        if not isinstance(binding, dict) or set(binding) != expected_keys:
+            raise SystemExit("worker_pool_controller_bindings_invalid")
+        if not all(isinstance(binding[key], str) for key in expected_keys):
+            raise SystemExit("worker_pool_controller_bindings_invalid")
+        if any(
+            not re.fullmatch(r"[0-9a-f]{64}", binding[key])
+            for key in (
+                "sourceSha256",
+                "assessmentFingerprint",
+                "contentHmac",
+                "cacheKey",
+            )
+        ):
+            raise SystemExit("worker_pool_controller_bindings_invalid")
+        try:
+            intake_id = str(uuid.UUID(binding["intakeRequestId"]))
+        except ValueError as error:
+            raise SystemExit("worker_pool_controller_bindings_invalid") from error
+        if intake_id != binding["intakeRequestId"].lower():
+            raise SystemExit("worker_pool_controller_bindings_invalid")
+        if binding["sourceSha256"] in source_hashes or intake_id in intake_ids:
+            raise SystemExit("worker_pool_controller_bindings_invalid")
+        source_hashes.add(binding["sourceSha256"])
+        intake_ids.add(intake_id)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--description-file", type=Path, required=True)
@@ -96,7 +145,7 @@ def main() -> int:
     parser.add_argument("--expected-instances", choices=("0", "1"), required=True)
     parser.add_argument(
         "--expected-mode",
-        choices=("disabled", "authentication", "qualification"),
+        choices=("disabled", "authentication", "qualification", "frozen-corpus"),
         required=True,
     )
     arguments = parser.parse_args()
@@ -145,8 +194,10 @@ def main() -> int:
         environment[key] = item
     observed = set(environment)
     expected = set(BASE_ENVIRONMENT)
-    if arguments.expected_mode == "qualification":
+    if arguments.expected_mode in ("qualification", "frozen-corpus"):
         expected.add(PREVIEW_APPROVAL)
+    if arguments.expected_mode == "frozen-corpus":
+        expected.update((CONTROLLER_CONFIRMATION, CONTROLLER_BINDINGS))
     if observed != expected or observed.intersection(FORBIDDEN_KEYS):
         raise SystemExit("worker_pool_environment_scope_invalid")
 
@@ -174,18 +225,25 @@ def main() -> int:
         if environment[key].get("value") != value:
             raise SystemExit("worker_pool_version_or_environment_mismatch")
     expected_gates = {
-        "disabled": ("false", "false", "false", "false", "false"),
-        "authentication": ("true", "false", "false", "false", "true"),
-        "qualification": ("true", "true", "true", "true", "false"),
+        "disabled": ("false", "false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "false", "true"),
+        "qualification": ("true", "true", "true", "true", "false", "false"),
+        "frozen-corpus": ("true", "true", "true", "true", "true", "false"),
     }[arguments.expected_mode]
     observed_gates = tuple(environment[key].get("value") for key in GATES) + (
         environment[AUTH_GATE].get("value"),
     )
     if observed_gates != expected_gates:
         raise SystemExit("worker_pool_gate_state_mismatch")
-    if arguments.expected_mode == "qualification":
+    if arguments.expected_mode in ("qualification", "frozen-corpus"):
         if environment[PREVIEW_APPROVAL].get("value") != PREVIEW_APPROVAL_VALUE:
             raise SystemExit("worker_pool_preview_approval_invalid")
+    if arguments.expected_mode == "frozen-corpus":
+        if environment[CONTROLLER_CONFIRMATION].get("value") != CONTROLLER_CONFIRMATION_VALUE:
+            raise SystemExit("worker_pool_controller_confirmation_invalid")
+        _validate_controller_bindings(
+            str(environment[CONTROLLER_BINDINGS].get("value") or "")
+        )
 
     secret_item = environment["DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64"]
     reference = _secret_reference(secret_item)

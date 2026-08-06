@@ -22,9 +22,10 @@ PROCESSOR_ID = "948f589143795629"
 
 def _environment(mode: str = "inert") -> list[dict[str, object]]:
     gates = {
-        "inert": ("false", "false", "false", "false"),
-        "authentication": ("true", "false", "false", "false"),
-        "qualification": ("true", "true", "true", "true"),
+        "inert": ("false", "false", "false", "false", "false"),
+        "authentication": ("true", "false", "false", "false", "false"),
+        "qualification": ("true", "true", "true", "true", "false"),
+        "frozen-corpus": ("true", "true", "true", "true", "true"),
     }[mode]
     plain = {
         "DOCUMENT_EXTRACTION_BROKER_RUNTIME_ENVIRONMENT": "preview",
@@ -32,6 +33,7 @@ def _environment(mode: str = "inert") -> list[dict[str, object]]:
         "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED": gates[1],
         "DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED": gates[2],
         "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": gates[3],
+        "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED": gates[4],
         "DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE": "google_document_ai_enterprise_ocr_v1",
         "DOCUMENT_EXTRACTION_GOOGLE_PROJECT_NUMBER": PROJECT_NUMBER,
         "DOCUMENT_EXTRACTION_GOOGLE_PROCESSOR_ID": PROCESSOR_ID,
@@ -44,9 +46,13 @@ def _environment(mode: str = "inert") -> list[dict[str, object]]:
         "DOCUMENT_EXTRACTION_ENCRYPTION_CURRENT_KEY_VERSION": "cache-encryption-pr265-v1",
         "NEXT_PUBLIC_SUPABASE_URL": "https://zfpnhvcmuuvtswttmnjd.supabase.co",
     }
-    if mode == "qualification":
+    if mode in ("qualification", "frozen-corpus"):
         plain["DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"] = (
             "google_document_ai_preview_qualification_v1"
+        )
+    if mode == "frozen-corpus":
+        plain["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"] = (
+            "google_frozen_corpus_controller_v1"
         )
     secret_names = {
         "SUPABASE_SERVICE_ROLE_KEY": "supabase-service-role",
@@ -145,7 +151,7 @@ def _run(
 
 
 def test_google_broker_verifier_accepts_exact_modes(tmp_path: Path) -> None:
-    for mode in ("inert", "authentication", "qualification"):
+    for mode in ("inert", "authentication", "qualification", "frozen-corpus"):
         result = _run(tmp_path, _description(mode), mode)
         assert result.returncode == 0, result.stderr
         evidence = json.loads(result.stdout)
@@ -201,8 +207,11 @@ def test_google_broker_mode_script_is_bounded_and_revokes_preview_approval() -> 
         BROKER_ROOT / "ops" / "set-google-document-ai-preview-broker-mode.sh"
     ).read_text(encoding="ascii")
     assert "google-document-ai-one-page-one-call-zero-retry" in script
-    assert "google-document-ai-frozen-corpus-12-documents-13-pages-zero-retry" in script
-    assert '--remove-env-vars "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"' in script
+    assert "google-document-ai-frozen-corpus-8-documents-9-pages-zero-retry" in script
+    assert (
+        'remove_vars="DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL,'
+        'DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"'
+    ) in script
     assert "DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL" not in script
     assert "NVIDIA_API_KEY" not in script
 
