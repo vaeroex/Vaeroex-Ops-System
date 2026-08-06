@@ -23,46 +23,49 @@ fi
 case "$WORKER_MODE" in
   disabled)
     test "$GOOGLE_QUALIFICATION_CONFIRMATION" = "disable-google-document-ai-preview"
-    values="DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=false,DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=false,DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=false,DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED=false,DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=false"
-    instances=0
-    remove_approval=true
     ;;
   authentication)
     test "$GOOGLE_QUALIFICATION_CONFIRMATION" = "google-document-ai-auth-zero-provider-calls"
-    values="DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=true,DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=false,DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=true,DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED=false,DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=false"
-    instances=1
-    remove_approval=true
     ;;
   one-page)
     test "$GOOGLE_QUALIFICATION_CONFIRMATION" = "google-document-ai-one-page-one-call-zero-retry"
-    values="DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=true,DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=true,DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=false,DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED=true,DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=true,DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL=google_document_ai_preview_qualification_v1"
-    instances=1
-    remove_approval=false
     ;;
   frozen-corpus)
     test "$GOOGLE_QUALIFICATION_CONFIRMATION" = "google-document-ai-frozen-corpus-12-documents-13-pages-zero-retry"
-    values="DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=true,DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=true,DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=false,DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED=true,DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=true,DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL=google_document_ai_preview_qualification_v1"
-    instances=1
-    remove_approval=false
     ;;
   *) printf '%s\n' "WORKER_MODE is invalid." >&2; exit 2 ;;
 esac
 
-if [ "$remove_approval" = true ]; then
-  gcloud run worker-pools update "$WORKER_POOL" \
-    --project "$GCP_PROJECT_ID" \
-    --region "$GCP_REGION" \
-    --instances "$instances" \
-    --update-env-vars "$values" \
-    --remove-env-vars "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL" \
-    --quiet >/dev/null
-else
-  gcloud run worker-pools update "$WORKER_POOL" \
-    --project "$GCP_PROJECT_ID" \
-    --region "$GCP_REGION" \
-    --instances "$instances" \
-    --update-env-vars "$values" \
-    --quiet >/dev/null
-fi
+script_directory="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+current_description="$(mktemp "${TMPDIR:-/tmp}/vaeroex-google-worker-current.XXXXXX")"
+rendered_manifest="$(mktemp "${TMPDIR:-/tmp}/vaeroex-google-worker-mode.XXXXXX")"
+deployed_description="$(mktemp "${TMPDIR:-/tmp}/vaeroex-google-worker-deployed.XXXXXX")"
+trap 'rm -f "$current_description" "$rendered_manifest" "$deployed_description"' EXIT HUP INT TERM
+
+gcloud run worker-pools describe "$WORKER_POOL" \
+  --project "$GCP_PROJECT_ID" \
+  --region "$GCP_REGION" \
+  --format json >"$current_description"
+
+python3 "$script_directory/render-google-document-ai-worker-mode.py" \
+  --description-file "$current_description" \
+  --output "$rendered_manifest" \
+  --worker-pool "$WORKER_POOL" \
+  --mode "$WORKER_MODE"
+
+CLOUDSDK_RUN_REGION="$GCP_REGION" gcloud run worker-pools replace "$rendered_manifest" \
+  --project "$GCP_PROJECT_ID" \
+  --quiet >/dev/null
+
+gcloud run worker-pools describe "$WORKER_POOL" \
+  --project "$GCP_PROJECT_ID" \
+  --region "$GCP_REGION" \
+  --format json >"$deployed_description"
+
+python3 "$script_directory/render-google-document-ai-worker-mode.py" \
+  --description-file "$deployed_description" \
+  --worker-pool "$WORKER_POOL" \
+  --mode "$WORKER_MODE" \
+  --verify-only
 
 printf '%s\n' "Google Document AI Preview worker mode updated: $WORKER_MODE."

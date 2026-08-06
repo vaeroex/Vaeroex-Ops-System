@@ -9,6 +9,7 @@ from typing import Any
 WORKER_ROOT = Path(__file__).resolve().parents[1]
 OPS = WORKER_ROOT / "ops"
 VERIFY = OPS / "verify-google-document-ai-worker-pool.py"
+RENDER_MODE = OPS / "render-google-document-ai-worker-mode.py"
 IMAGE = (
     "us-west1-docker.pkg.dev/vaeroex-document-worker/"
     "vaeroex-document-workers-preview/document-extraction-worker@sha256:"
@@ -18,9 +19,13 @@ SERVICE_ACCOUNT = (
     "vaeroex-doc-worker-preview@vaeroex-document-worker.iam.gserviceaccount.com"
 )
 WORKER_POOL = "vaeroex-document-extraction-preview"
-BROKER_URL = "https://vaeroex-doc-broker-pr265-abc1234-uw.a.run.app"
+BROKER_URL = (
+    "https://vaeroex-doc-broker-pr265-abc1234-626856681952.us-west1.run.app"
+)
 PROJECT_NUMBER = "626856681952"
 PROCESSOR_ID = "948f589143795629"
+DEPLOYMENT_ID = "phase-c1-pr265-abc1234-google-v1"
+WORKER_KEY_VERSION = "pr265-worker-key-google-v1"
 
 
 def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
@@ -31,9 +36,9 @@ def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
     }[mode]
     values = {
         "DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT": "preview",
-        "DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID": "phase-c1-pr265-google",
-        "DOCUMENT_EXTRACTION_WORKER_ID": "preview-worker-google",
-        "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION": "worker-key-google-v1",
+        "DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID": DEPLOYMENT_ID,
+        "DOCUMENT_EXTRACTION_WORKER_ID": WORKER_POOL,
+        "DOCUMENT_EXTRACTION_WORKER_KEY_VERSION": WORKER_KEY_VERSION,
         "DOCUMENT_EXTRACTION_BROKER_URL": BROKER_URL,
         "DOCUMENT_EXTRACTION_BROKER_AUDIENCE": BROKER_URL,
         "DOCUMENT_EXTRACTION_BROKER_AUTH_MODE": "google_oidc_v1",
@@ -91,6 +96,52 @@ def _description(mode: str = "disabled", instances: int = 0) -> dict[str, Any]:
     }
 
 
+def _v1_description(mode: str = "disabled", instances: int = 0) -> dict[str, Any]:
+    environment = _environment(mode)
+    secret = environment[-1]
+    reference = secret.pop("valueSource")["secretKeyRef"]
+    secret["valueFrom"] = {
+        "secretKeyRef": {
+            "name": reference["secret"],
+            "key": reference["version"],
+        }
+    }
+    return {
+        "apiVersion": "run.googleapis.com/v1",
+        "kind": "WorkerPool",
+        "metadata": {
+            "name": WORKER_POOL,
+            "annotations": {
+                "run.googleapis.com/manualInstanceCount": str(instances),
+                "run.googleapis.com/scalingMode": "manual",
+            },
+            "creationTimestamp": "2026-08-06T00:00:00Z",
+            "resourceVersion": "server-managed",
+        },
+        "spec": {
+            "template": {
+                "spec": {
+                    "serviceAccountName": SERVICE_ACCOUNT,
+                    "containers": [
+                        {
+                            "name": "document-extraction-worker",
+                            "image": IMAGE,
+                            "env": environment,
+                            "startupProbe": {
+                                "httpGet": {"path": "/startup", "port": 8080}
+                            },
+                            "livenessProbe": {
+                                "httpGet": {"path": "/health", "port": 8080}
+                            },
+                        }
+                    ],
+                }
+            }
+        },
+        "status": {"conditions": [{"type": "Ready", "status": "True"}]},
+    }
+
+
 def _run_verifier(
     tmp_path: Path,
     description: dict[str, Any],
@@ -112,11 +163,11 @@ def _run_verifier(
             "--image-digest",
             IMAGE,
             "--deployment-id",
-            "phase-c1-pr265-google",
+            DEPLOYMENT_ID,
             "--worker-id",
-            "preview-worker-google",
+            WORKER_POOL,
             "--worker-key-version",
-            "worker-key-google-v1",
+            WORKER_KEY_VERSION,
             "--broker-url",
             BROKER_URL,
             "--worker-secret-name",
@@ -182,6 +233,7 @@ def test_google_manifest_is_inert_and_has_no_provider_secret(tmp_path: Path) -> 
     assert 'run.googleapis.com/manualInstanceCount: "0"' in rendered
     assert "google_document_ai_enterprise_ocr_v1" in rendered
     assert PROJECT_NUMBER in rendered
+    assert f'value: "{PROJECT_NUMBER}"' in rendered
     assert PROCESSOR_ID in rendered
     assert "NVIDIA_API_KEY" not in rendered
     assert "GOOGLE_APPLICATION_CREDENTIALS" not in rendered
@@ -246,6 +298,116 @@ def test_google_mode_script_has_bounded_confirmations_and_removes_approval() -> 
     )
     assert "google-document-ai-one-page-one-call-zero-retry" in script
     assert "google-document-ai-frozen-corpus-12-documents-13-pages-zero-retry" in script
-    assert '--remove-env-vars "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"' in script
+    assert "worker-pools replace" in script
+    assert "worker-pools update" not in script
+    assert "render-google-document-ai-worker-mode.py" in script
     assert "DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL" not in script
     assert "NVIDIA_API_KEY" not in script
+
+
+def test_google_mode_renderer_replaces_complete_v1_resource_and_verifies_modes(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "source.json"
+    source.write_text(json.dumps(_v1_description()), encoding="utf-8")
+    expected = {
+        "disabled": ("0", "false", "false", False),
+        "authentication": ("1", "true", "false", False),
+        "one-page": ("1", "true", "true", True),
+        "frozen-corpus": ("1", "true", "true", True),
+    }
+    for mode, (instances, private_worker, provider, approval) in expected.items():
+        output = tmp_path / f"{mode}.json"
+        rendered = subprocess.run(
+            [
+                sys.executable,
+                str(RENDER_MODE),
+                "--description-file",
+                str(source),
+                "--output",
+                str(output),
+                "--worker-pool",
+                WORKER_POOL,
+                "--mode",
+                mode,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert rendered.returncode == 0, rendered.stderr
+        manifest = json.loads(output.read_text(encoding="ascii"))
+        assert "status" not in manifest
+        assert "creationTimestamp" not in manifest["metadata"]
+        assert (
+            manifest["metadata"]["annotations"][
+                "run.googleapis.com/manualInstanceCount"
+            ]
+            == instances
+        )
+        environment = {
+            item["name"]: item
+            for item in manifest["spec"]["template"]["spec"]["containers"][0][
+                "env"
+            ]
+        }
+        assert environment["DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED"]["value"] == private_worker
+        assert environment["DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED"]["value"] == provider
+        assert ("DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL" in environment) is approval
+        verified = subprocess.run(
+            [
+                sys.executable,
+                str(RENDER_MODE),
+                "--description-file",
+                str(output),
+                "--worker-pool",
+                WORKER_POOL,
+                "--mode",
+                mode,
+                "--verify-only",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert verified.returncode == 0, verified.stderr
+
+
+def test_google_mode_renderer_rejects_mixed_or_production_profiles(
+    tmp_path: Path,
+) -> None:
+    for key, value in (
+        ("DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE", "hosted_tool_call_v2"),
+        ("DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL", "forbidden"),
+        ("NVIDIA_API_KEY", "forbidden"),
+    ):
+        description = _v1_description()
+        environment = description["spec"]["template"]["spec"]["containers"][0][
+            "env"
+        ]
+        existing = next((item for item in environment if item["name"] == key), None)
+        if existing:
+            existing["value"] = value
+        else:
+            environment.append({"name": key, "value": value})
+        source = tmp_path / f"{key}.json"
+        output = tmp_path / f"{key}.rendered.json"
+        source.write_text(json.dumps(description), encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(RENDER_MODE),
+                "--description-file",
+                str(source),
+                "--output",
+                str(output),
+                "--worker-pool",
+                WORKER_POOL,
+                "--mode",
+                "disabled",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode != 0

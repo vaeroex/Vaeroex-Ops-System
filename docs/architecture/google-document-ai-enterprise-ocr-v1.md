@@ -7,13 +7,16 @@ contract in Draft PR #265. The adapter, deterministic routing policy,
 provider-neutral artifact normalization, cache identity, encryption boundary,
 review provenance, static migration, and regression harness are implemented.
 
-Google execution is not active. The migration is committed but unapplied, the
-checked-in deployment templates remain bound to NVIDIA, no Google processor or
-IAM grant is provisioned, and no Preview or Production gate is enabled. The
-compiled broker and worker can recognize only the exact, explicitly selected
-Google profile described below; they cannot auto-select it. Printed-document
-ingestion through Google remains blocked until the activation prerequisites and
-the separately approved one-page qualification are complete.
+Google execution is not active. The migration is committed and has been replayed
+only on isolated Preview Supabase project `zfpnhvcmuuvtswttmnjd`; Production has
+not been addressed. A Preview-only OCR processor exists in the dedicated
+`vaeroex-document-worker` Google project, but its qualification IAM grant is
+revoked, the Worker Pool is at zero instances, no broker exists, and every
+database and runtime gate is false. The compiled broker and worker recognize
+only the exact, explicitly selected Google profile described below; they cannot
+auto-select it. The bounded one-page qualification passed, but customer
+printed-document ingestion remains blocked pending the frozen-corpus
+qualification and Production-readiness review.
 
 Hosted Nemotron Parse remains blocked. Its strict historical validators and
 profiles are unchanged: the final hosted response passed the content-free
@@ -216,16 +219,17 @@ failure.
 
 ## Committed migration and inactive runtime
 
-`20260805163333_google_document_ai_enterprise_ocr_v1.sql` is a forward-only,
-unapplied migration. It widens existing source-class and route constraints,
-adds nullable provider-profile identity columns, adds exact Google contract
-checks for new Google rows, extends the one-active-provider-per-workspace
-invariant, and introduces an internal `document_extraction_runtime_reason_v2`
-gate function. It also defines separate service-role-only Google enqueue,
+`20260805163333_google_document_ai_enterprise_ocr_v1.sql` is a forward-only
+migration applied only to isolated Preview. It widens existing source-class and
+route constraints, adds nullable provider-profile identity columns, adds exact
+Google contract checks for new Google rows, extends the
+one-active-provider-per-workspace invariant, and introduces an internal
+`document_extraction_runtime_reason_v2` gate function. It also defines separate
+service-role-only Google enqueue,
 claim, lease, file-grant, dispatch, provider-boundary, outcome, failure,
 encrypted-completion, and telemetry RPCs plus a V3 authorized human-review
-mutation. It inserts or updates no rows while unapplied, enables no gate, and
-grants no provider output direct authority.
+mutation. Applying it inserted or updated no runtime row, enabled no gate, and
+granted no provider output direct authority. Production remains unapplied.
 
 The compiled runner and broker use explicit profile dispatch. Historical
 `hosted_tool_call_v2` calls continue through their existing RPCs and adapter.
@@ -239,25 +243,20 @@ general document-extraction approval and the separate absent-by-default
 
 ## Activation blockers
 
-All of the following must be completed in later, separately approved work:
+The isolated migration replay, Preview processor provisioning, zero-call
+authentication proof, and one-page qualification are complete. The remaining
+separately approved work is:
 
-1. Independently audit and replay the migration on a clean isolated Preview
-   database, then regenerate
-   Supabase types from that exact schema.
-2. Provision the Document AI API, one Preview-only `OCR_PROCESSOR`, and the
-   exact pinned processor version in `us`.
-3. Add least-privilege processor-level IAM to the existing worker service
-   account, with metadata-service OAuth only.
-4. Re-verify the committed Google-specific enqueue, claim, dispatch,
-   completion, and V3 review-provenance paths against the live Preview schema.
-   They must bind every provider identity field and remain single-use,
-   encrypted, workspace-scoped, and mandatory-review only.
-5. Configure the exact Google profile and its separate Preview approval only
-   for a separately approved qualification. Keep the initial qualification at
-   one provider attempt and zero retries.
-6. Re-verify quota reservation, cache identity, ambiguous dispatch handling,
-   cleanup, audit logging, retention terms, and no downstream authority.
-7. Complete an independent read-only audit before any provider call.
+1. Recreate the same one-permission Preview IAM binding only for a separately
+   approved frozen-corpus run.
+2. Run the frozen 12-document, 13-page corpus with the existing zero-retry,
+   exact-profile, fail-closed bounds.
+3. Verify corpus-level quality, latency, cost, quota, cache, review, cleanup,
+   and zero-authority results against the approved thresholds.
+4. Complete an independent Production-readiness review, including current
+   privacy terms, retention, IAM, quotas, alerting, rollback, and kill switch.
+5. Obtain a separate Production activation approval. Production approval must
+   remain absent until then.
 
 Until those items pass, paper ingestion through Google remains unavailable.
 
@@ -286,12 +285,57 @@ the ephemeral broker and IAM grants, remove all synthetic database and storage
 records, and prove no provider assets, credentials, active leases, or
 content-bearing telemetry remain. Production must never be addressed.
 
+## One-page qualification result
+
+The approved 2026-08-06 qualification used the committed one-page synthetic
+fixture at SHA-256
+`e99132d7be25bc71b3fdc43faf765072b6c5c837d6d693728fc614905d9e66ec`
+in one disposable isolated-Preview workspace. The execution tree was
+`3e969d209f058b9c5de4a8d8eec94ffa07bf6760`; the broker and worker used
+immutable image digests. Preview Supabase migration ledger 26 contained
+`20260805205047_google_document_ai_enterprise_ocr_v1`. Google IAM/OIDC plus
+Ed25519 broker authentication passed before provider execution with zero
+provider calls.
+
+The provider run made exactly one Enterprise OCR attempt for one page, with
+zero retries and zero ambiguous dispatches. It matched profile
+`google_document_ai_enterprise_ocr_v1` and processor/model
+`pretrained-ocr-v2.1-2024-08-07`. Provider latency was 1,844 ms and the bounded
+workflow completed in 6.464 seconds. Strict response validation passed,
+normalization completed, the provider-neutral artifact was stored only as an
+AES-256-GCM encrypted cache entry, and the exact review-provenance fingerprint
+was bound to a pending V3 review. The job stopped at `needs_review` /
+`awaiting_review`; no human decision or downstream authority was created.
+
+The database recorded one provider outcome, one billed page, one consumed
+single-use file grant, one cache row, and one pending review. Runtime cost
+telemetry intentionally carried no inferred dollar amount. Based on the
+published Enterprise OCR rate, one page is free if the account's monthly free
+tier remains available and otherwise has a marginal provider price of about
+$0.0015; billing remains the final cost authority.
+
+Cleanup removed the synthetic Storage object, file, workspace, job, outcome,
+cache, review, events, access grant, binding, intake, telemetry, and worker
+assertions. The broker service, ephemeral broker account, five temporary
+secrets, temporary worker signing-key version, and Document AI execution IAM
+grant were removed. The Worker Pool returned to zero, all gates are false,
+Preview ledger remains 26, and a content-free NVCF asset check found zero
+assets. Production Supabase, Vercel Production, customer records, and customer
+documents were never addressed.
+
+Qualification exposed two deployment-tooling defects without changing the
+provider or authority contract: the numeric Google project number required an
+explicit YAML string, and the installed `gcloud` Worker Pool update path could
+not reliably apply bounded mode changes. The checked-in operator now renders a
+strictly validated complete v1 WorkerPool resource, applies it with
+`worker-pools replace`, and verifies the resulting mode. Unknown environment
+keys, mixed providers, Production approval, mutable images, wrong broker or
+processor identity, and invalid gate combinations fail before replacement.
+
 ## Rollback
 
-Before activation, rollback is simply to leave the migration unapplied and the
-provider absent from the active runner. After a future Preview migration replay,
-operational rollback remains gate-first: disable global, worker, provider,
-workspace, and synthetic gates; scale the worker to zero; remove ephemeral
-broker and processor IAM; invalidate synthetic artifacts; and retain migration
-history and encrypted review records for audit. No customer data rewrite is
-required.
+Before activation, operational rollback remains gate-first: disable global,
+worker, provider, workspace, and synthetic gates; scale the worker to zero;
+remove ephemeral broker and processor IAM; invalidate synthetic artifacts; and
+retain Preview migration history and encrypted review records for audit. No
+customer data rewrite is required.
