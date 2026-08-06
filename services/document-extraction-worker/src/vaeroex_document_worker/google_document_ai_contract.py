@@ -11,6 +11,9 @@ GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE = "google_document_ai_enterprise_ocr_v1"
 GOOGLE_DOCUMENT_AI_API_VERSION = "v1"
 GOOGLE_DOCUMENT_AI_PROCESSOR_TYPE = "OCR_PROCESSOR"
 GOOGLE_DOCUMENT_AI_PROCESSOR_VERSION = "pretrained-ocr-v2.1-2024-08-07"
+GOOGLE_DOCUMENT_AI_ENDPOINT_CONTRACT_VERSION = (
+    "google_document_ai_processor_version_process_v1"
+)
 GOOGLE_DOCUMENT_AI_REQUEST_SERIALIZER_VERSION = "google_document_ai_process_request_v1"
 GOOGLE_DOCUMENT_AI_RESPONSE_VALIDATOR_VERSION = "google_document_ai_process_response_v2"
 GOOGLE_DOCUMENT_AI_NORMALIZATION_VERSION = "google_document_ai_layout_normalization_v2"
@@ -27,6 +30,10 @@ GOOGLE_DOCUMENT_AI_SELECTION_MARK_POLICY_VERSION = "disabled_v1"
 GOOGLE_DOCUMENT_AI_ARTIFACT_CONTRACT_VERSION = "document_extraction_artifact_v2"
 GOOGLE_DOCUMENT_AI_ARTIFACT_NORMALIZATION_VERSION = (
     "document_extraction_normalization_v2"
+)
+GOOGLE_DOCUMENT_AI_ROUTING_POLICY_VERSION = "document_extraction_routing_v1"
+GOOGLE_DOCUMENT_AI_REVIEW_PROVENANCE_VERSION = (
+    "document_extraction_review_provenance_v2"
 )
 GOOGLE_DOCUMENT_AI_SUPPORTED_MIME_TYPES = ("image/png",)
 GOOGLE_DOCUMENT_AI_MAX_PAGES = 15

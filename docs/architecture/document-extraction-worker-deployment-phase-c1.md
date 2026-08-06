@@ -22,7 +22,8 @@ Repository and environment boundaries:
 - isolated Preview Supabase project: `zfpnhvcmuuvtswttmnjd`
 - Production Supabase project: `mdiianhfrojmxqpwrflh`, never addressed
 - frozen corpus: 12 synthetic documents and 13 rendered pages
-- expected provider attempts: 12; absolute architectural ceiling: 24
+- Google printed-document eligibility: 8 documents and 9 rendered pages
+- Google expected provider attempts and absolute ceiling: 9, with zero retries
 
 The Preview migration ledger contains the canonical Phase A and Phase B
 migrations. The Phase C1 protocol migration is additive and may be applied only
@@ -106,15 +107,15 @@ flowchart LR
   B -->|"service-role-only RPC"| D["Isolated Preview Supabase"]
   B -->|"single-use file grant"| F["Synthetic source bytes"]
   F --> W
-  W -->|"bounded inference"| N["NVIDIA hosted extraction"]
-  N -->|"untrusted response"| W
+  W -->|"bounded inference"| P["Explicitly selected extraction provider"]
+  P -->|"untrusted response"| W
   W -->|"provider-neutral draft"| B
   B -->|"AES-256-GCM envelope"| D
   D --> R["Awaiting human review"]
   R -. "Phase C2 only" .-> A["Authoritative ingestion"]
 ```
 
-NVIDIA extracts only. The worker cannot read or write Supabase, Storage,
+The selected provider extracts only. The worker cannot read or write Supabase, Storage,
 encryption keys, Business Memory, Evidence, KPIs, Business Health, or
 `IntelligenceSnapshotV1`. The broker validates identity, owns database access,
 encrypts normalized drafts, and stops successful work at `awaiting_review`.
@@ -281,18 +282,39 @@ all pass.
    immutable digests with broker minimum zero and worker instances zero.
 5. Prove Google IAM/OIDC and Ed25519 with provider calls fixed at zero.
 6. Complete the kill-switch matrix with provider calls fixed at zero.
-7. Seed only the committed synthetic fixture IDs in one isolated synthetic
-   workspace. No arbitrary upload or customer file path is available.
+7. Compute the exact provider-specific eligibility plan from the immutable
+   corpus. For Google, fixtures 5, 8, 9, and 12 produce content-free local
+   rejection records and are never seeded as jobs, claimed, granted, reserved,
+   or dispatched. Seed only the remaining committed fixture identities in one
+   isolated synthetic workspace. No arbitrary upload or customer file path is
+   available.
 8. Open the approved application/database gates, then the broker and worker
    qualification modes, and scale exactly one worker instance.
-9. Process the frozen 12-document, 13-page corpus serially. One intentionally
-   corrupt fixture fails locally, leaving 11 provider-eligible documents and 12
-   expected page inference attempts. The absolute architectural ceiling is 24.
+9. Evaluate the immutable 12-document, 13-page corpus serially under the exact
+   Google benchmark contract. Four unsupported or corrupt fixtures fail locally,
+   leaving 8 provider-eligible documents, 9 provider-eligible pages, exactly 9
+   expected page inference attempts, and an absolute ceiling of 9. Retries,
+   fallback, and concurrency above one are forbidden.
 10. Stop immediately on any retry, ambiguous dispatch, auth or isolation
     failure, provider-schema mismatch, unexpected NVCF asset flow, bound
     violation, cross-workspace result, or authority-boundary violation.
 11. Confirm every successful extraction stops at `awaiting_review`.
 12. Retain only aggregate content-free measurements.
+
+### Provider-specific benchmark identity
+
+The historical NVIDIA benchmark event, identity, record fingerprint, serialized
+fields, and aggregate remain unchanged. Google qualification uses the separate
+`document_extraction_phase_c1_google_enterprise_ocr_v1` contract and binds every
+record to the immutable corpus, fixture and page fingerprints, exact provider
+profile, processor resource and version, region, serializer, validator,
+normalization, routing, compatibility, and review-provenance identities.
+
+Google and NVIDIA records are mutually ineligible for aggregation. There is no
+profile auto-detection. A mixed provider, profile, processor, corpus, fixture,
+or page identity fails closed. Google aggregation reports provider-neutral
+quality, reliability, latency, eligibility, and cost-evidence fields; correctly
+rejected local fixtures are reported separately from provider failures.
 
 ## One-call response-profile diagnostic
 

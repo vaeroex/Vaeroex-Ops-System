@@ -250,14 +250,25 @@ separately approved work is:
 
 1. Recreate the same one-permission Preview IAM binding only for a separately
    approved frozen-corpus run.
-2. Run the frozen 12-document, 13-page corpus with the existing zero-retry,
-   exact-profile, fail-closed bounds.
+2. Run the immutable 12-document, 13-page corpus through the separate Google
+   benchmark contract. Fixtures 5, 8, 9, and 12 must fail locally before job
+   creation; the remaining 8 documents and 9 pages have exactly 9 permitted
+   provider attempts, zero retries, no fallback, and concurrency one.
 3. Verify corpus-level quality, latency, cost, quota, cache, review, cleanup,
    and zero-authority results against the approved thresholds.
 4. Complete an independent Production-readiness review, including current
    privacy terms, retention, IAM, quotas, alerting, rollback, and kill switch.
 5. Obtain a separate Production activation approval. Production approval must
    remain absent until then.
+
+The Google benchmark identity is
+`document_extraction_phase_c1_google_enterprise_ocr_v1`. It is separate from
+the historical NVIDIA benchmark identity and binds the exact corpus source
+commit and digest, fixture and rendered-page fingerprints, Google provider
+profile, processor type, processor ID and immutable processor-version resource,
+location, serializer, validator, normalization, routing, compatibility, review
+provenance, and model identity. Neither provider's records can enter the other
+provider's aggregate, and no benchmark profile is auto-detected.
 
 Until those items pass, paper ingestion through Google remains unavailable.
 

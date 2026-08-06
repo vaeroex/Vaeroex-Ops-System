@@ -146,6 +146,15 @@ def google_worker_config() -> WorkerConfig:
     )
 
 
+def google_synthetic_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **google_worker_config().__dict__,
+            "synthetic_qualification_enabled": True,
+        }
+    )
+
+
 def diagnostic_worker_config() -> WorkerConfig:
     return WorkerConfig(
         **{
@@ -590,6 +599,100 @@ def test_synthetic_qualification_accepts_only_exact_frozen_source(monkeypatch: A
     assert getattr(evaluation, "fixture_index") == fixture.fixture_index
     assert getattr(evaluation, "status") == "success"
     assert fake.operations.count("complete") == 1
+
+
+def test_google_synthetic_qualification_uses_google_identity_and_emitter(
+    monkeypatch: Any,
+) -> None:
+    fixture = load_frozen_corpus()[0]
+    config = google_synthetic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=len(fixture.rendered_page_paths),
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(
+        runner,
+        "render_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Google qualification must use committed rendered pages")
+        ),
+    )
+    emitted: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        runner,
+        "emit_google_synthetic_evaluation",
+        lambda evaluation, google_contract: emitted.append(
+            (evaluation, google_contract)
+        ),
+    )
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(
+        runner,
+        "invoke_google_document_ai_adapter",
+        lambda *_args, **_kwargs: result_for(len(fixture.rendered_page_paths)),
+    )
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: pytest.fail("NVIDIA fallback must not run"),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "needs_review"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert len(emitted) == 1
+    assert getattr(emitted[0][0], "fixture_index") == fixture.fixture_index
+    assert emitted[0][1] == config.google_provider_contract
+    assert fake.operations.count("authorize_retry") == 0
+    assert fake.operations.count("complete") == 1
+
+
+def test_google_synthetic_failure_reports_actual_page_requests(
+    monkeypatch: Any,
+) -> None:
+    fixture = load_frozen_corpus()[6]
+    assert len(fixture.rendered_page_paths) == 2
+    config = google_synthetic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=2,
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(
+        runner,
+        "invoke_google_document_ai_adapter",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ProviderFailure(
+                "google_document_ai_request_rejected",
+                "validation",
+                retryable=False,
+                completed_pages=(normalized_page(1),),
+                provider_request_started=True,
+            )
+        ),
+    )
+    emitted: list[object] = []
+    monkeypatch.setattr(
+        runner,
+        "emit_google_synthetic_evaluation",
+        lambda evaluation, _contract: emitted.append(evaluation),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert len(emitted) == 1
+    assert getattr(emitted[0], "provider_calls") == 2
+    assert getattr(emitted[0], "retry_count") == 0
+    assert fake.operations.count("authorize_retry") == 0
 
 
 def test_synthetic_qualification_rejects_arbitrary_source_before_provider(monkeypatch: Any) -> None:

@@ -21,15 +21,22 @@ from .google_document_ai_contract import (
     GOOGLE_DOCUMENT_AI_ARTIFACT_NORMALIZATION_VERSION,
     GOOGLE_DOCUMENT_AI_COMPATIBILITY_POLICY_VERSION,
     GOOGLE_DOCUMENT_AI_CONFIDENCE_POLICY_VERSION,
+    GOOGLE_DOCUMENT_AI_ENDPOINT_CONTRACT_VERSION,
     GOOGLE_DOCUMENT_AI_MAX_PAGES,
     GOOGLE_DOCUMENT_AI_NORMALIZATION_VERSION,
     GOOGLE_DOCUMENT_AI_PROCESSOR_TYPE,
     GOOGLE_DOCUMENT_AI_PROVIDER,
     GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE,
     GOOGLE_DOCUMENT_AI_REQUEST_SERIALIZER_VERSION,
+    GOOGLE_DOCUMENT_AI_REVIEW_PROVENANCE_VERSION,
+    GOOGLE_DOCUMENT_AI_ROUTING_POLICY_VERSION,
     GOOGLE_DOCUMENT_AI_RESPONSE_VALIDATOR_VERSION,
     GOOGLE_DOCUMENT_AI_SELECTION_MARK_POLICY_VERSION,
     GOOGLE_DOCUMENT_AI_TABLE_POLICY_VERSION,
+)
+from .google_synthetic import (
+    emit_google_synthetic_evaluation,
+    google_approved_fixture_for_source,
 )
 from .provider_contract import (
     HOSTED_COMPATIBILITY_CONTRACT_VERSION,
@@ -109,7 +116,7 @@ def _expected_claim_identity(config: WorkerConfig) -> dict[str, object]:
             "processorResource": google_contract.processor_resource,
             "processorLocation": google_contract.location,
             "processorVersion": google_contract.processor_version,
-            "endpointContractVersion": "google_document_ai_processor_version_process_v1",
+            "endpointContractVersion": GOOGLE_DOCUMENT_AI_ENDPOINT_CONTRACT_VERSION,
             "requestSerializerVersion": GOOGLE_DOCUMENT_AI_REQUEST_SERIALIZER_VERSION,
             "responseValidatorVersion": GOOGLE_DOCUMENT_AI_RESPONSE_VALIDATOR_VERSION,
             "providerNormalizationVersion": GOOGLE_DOCUMENT_AI_NORMALIZATION_VERSION,
@@ -117,8 +124,8 @@ def _expected_claim_identity(config: WorkerConfig) -> dict[str, object]:
             "tablePolicyVersion": GOOGLE_DOCUMENT_AI_TABLE_POLICY_VERSION,
             "confidencePolicyVersion": GOOGLE_DOCUMENT_AI_CONFIDENCE_POLICY_VERSION,
             "selectionMarkPolicyVersion": GOOGLE_DOCUMENT_AI_SELECTION_MARK_POLICY_VERSION,
-            "routingPolicyVersion": "document_extraction_routing_v1",
-            "reviewProvenanceVersion": "document_extraction_review_provenance_v2",
+            "routingPolicyVersion": GOOGLE_DOCUMENT_AI_ROUTING_POLICY_VERSION,
+            "reviewProvenanceVersion": GOOGLE_DOCUMENT_AI_REVIEW_PROVENANCE_VERSION,
             "extractionContractVersion": GOOGLE_DOCUMENT_AI_ARTIFACT_CONTRACT_VERSION,
             "normalizationVersion": GOOGLE_DOCUMENT_AI_ARTIFACT_NORMALIZATION_VERSION,
         }
@@ -288,6 +295,7 @@ def _draft(
 
 def _emit_synthetic_failure(
     fixture: FrozenSyntheticFixture | None,
+    config: WorkerConfig,
     *,
     provider_calls: int,
     retry_count: int,
@@ -295,14 +303,19 @@ def _emit_synthetic_failure(
 ) -> None:
     if fixture is None:
         return
-    emit_synthetic_evaluation(
-        failed_synthetic_evaluation(
-            fixture,
-            provider_calls=provider_calls,
-            retry_count=retry_count,
-            failure_code=failure_code,
-        )
+    evaluation = failed_synthetic_evaluation(
+        fixture,
+        provider_calls=provider_calls,
+        retry_count=retry_count,
+        failure_code=failure_code,
     )
+    if config.provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE:
+        contract = config.google_provider_contract
+        if contract is None:
+            raise RuntimeError("google_document_ai_contract_missing")
+        emit_google_synthetic_evaluation(evaluation, contract)
+    else:
+        emit_synthetic_evaluation(evaluation)
 
 
 async def run_one_job(
@@ -338,6 +351,7 @@ async def run_one_job(
         document_class = _required_string(raw_job.get("documentClass"), "claim_document_class_missing")
         page_count = _required_int(raw_job.get("pageCount"), "claim_page_count_missing")
         provider_calls = 0
+        observed_google_page_calls = 0
         retry_count = 0
         synthetic_fixture: FrozenSyntheticFixture | None = None
         synthetic_report_emitted = False
@@ -349,7 +363,13 @@ async def run_one_job(
                 return
             _emit_synthetic_failure(
                 synthetic_fixture,
-                provider_calls=provider_calls,
+                active_config,
+                provider_calls=(
+                    observed_google_page_calls
+                    if active_config.provider_profile
+                    == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
+                    else provider_calls
+                ),
                 retry_count=retry_count,
                 failure_code=failure_code,
             )
@@ -373,9 +393,17 @@ async def run_one_job(
                 document_sha256 = hashlib.sha256(source.read_bytes()).hexdigest()
                 if active_config.synthetic_qualification_enabled:
                     try:
-                        synthetic_fixture = approved_fixture_for_source(
-                            document_sha256,
-                            page_count,
+                        synthetic_fixture = (
+                            google_approved_fixture_for_source(
+                                document_sha256,
+                                page_count,
+                            )
+                            if active_config.provider_profile
+                            == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
+                            else approved_fixture_for_source(
+                                document_sha256,
+                                page_count,
+                            )
                         )
                         rendered_pages = await asyncio.to_thread(
                             materialize_approved_pages,
@@ -520,6 +548,9 @@ async def run_one_job(
                                     ) from error
 
                             result = await asyncio.to_thread(invoke_google)
+                            observed_google_page_calls = len(
+                                result.request_contract_hashes
+                            )
                             max_pages = GOOGLE_DOCUMENT_AI_MAX_PAGES
                         else:
                             nvidia_contract = active_config.provider_contract
@@ -558,6 +589,15 @@ async def run_one_job(
                         )
                         break
                     except ProviderFailure as failure:
+                        if (
+                            active_config.provider_profile
+                            == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
+                        ):
+                            observed_google_page_calls = max(
+                                observed_google_page_calls,
+                                len(failure.completed_pages)
+                                + int(failure.provider_request_started),
+                            )
                         failure_latency_ms = _bounded_provider_latency(
                             failure.latency_ms
                             if failure.latency_ms is not None
@@ -648,7 +688,16 @@ async def run_one_job(
                 if not completion.get("ok"):
                     raise BrokerFailure("completion_failed")
                 if synthetic_evaluation is not None:
-                    emit_synthetic_evaluation(synthetic_evaluation)
+                    if active_config.provider_profile == GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE:
+                        emission_contract = active_config.google_provider_contract
+                        if emission_contract is None:
+                            raise RuntimeError("google_document_ai_contract_missing")
+                        emit_google_synthetic_evaluation(
+                            synthetic_evaluation,
+                            emission_contract,
+                        )
+                    else:
+                        emit_synthetic_evaluation(synthetic_evaluation)
                     synthetic_report_emitted = True
                 _notify(progress_callback, "completed")
                 return WorkerRunResult(
