@@ -14,8 +14,8 @@ not been addressed. A Preview-only OCR processor exists in the dedicated
 revoked, the Worker Pool is at zero instances, no broker exists, and every
 database and runtime gate is false. The compiled broker and worker recognize
 only the exact, explicitly selected Google profile described below; they cannot
-auto-select it. The bounded one-page qualification passed, but customer
-printed-document ingestion remains blocked pending the frozen-corpus
+auto-select it. The bounded Google Document AI one-page qualification passed,
+but customer printed-document ingestion remains blocked pending the frozen-corpus
 qualification and Production-readiness review.
 
 Hosted Nemotron Parse remains blocked. Its strict historical validators and
@@ -244,7 +244,8 @@ general document-extraction approval and the separate absent-by-default
 ## Activation blockers
 
 The isolated migration replay, Preview processor provisioning, zero-call
-authentication proof, and one-page qualification are complete. The remaining
+authentication proof, and Google Document AI one-page qualification are
+complete. The remaining
 separately approved work is:
 
 1. Recreate the same one-permission Preview IAM binding only for a separately
@@ -260,7 +261,7 @@ separately approved work is:
 
 Until those items pass, paper ingestion through Google remains unavailable.
 
-## Exact one-page qualification plan
+## Exact Google Document AI one-page qualification plan
 
 The first provider qualification requires a separate explicit approval. It is
 bounded to one committed, non-sensitive, one-page printed synthetic fixture,
@@ -285,7 +286,7 @@ the ephemeral broker and IAM grants, remove all synthetic database and storage
 records, and prove no provider assets, credentials, active leases, or
 content-bearing telemetry remain. Production must never be addressed.
 
-## One-page qualification result
+## Google Document AI one-page qualification result
 
 The approved 2026-08-06 qualification used the committed one-page synthetic
 fixture at SHA-256
