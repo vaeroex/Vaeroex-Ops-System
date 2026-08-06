@@ -52,7 +52,7 @@ def _environment(mode: str = "inert") -> list[dict[str, object]]:
         )
     if mode == "frozen-corpus":
         plain["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"] = (
-            "google_frozen_corpus_controller_v1"
+            "google_frozen_corpus_controller_v2"
         )
     secret_names = {
         "SUPABASE_SERVICE_ROLE_KEY": "supabase-service-role",

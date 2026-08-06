@@ -7,7 +7,6 @@ import argparse
 import copy
 import json
 import re
-import uuid
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -26,8 +25,7 @@ WORKER_KEY_VERSION = re.compile(r"^pr265-worker-key-[A-Za-z0-9._-]{1,96}$")
 PREVIEW_APPROVAL = "DOCUMENT_EXTRACTION_GOOGLE_PREVIEW_APPROVAL"
 PREVIEW_APPROVAL_VALUE = "google_document_ai_preview_qualification_v1"
 CONTROLLER_CONFIRMATION = "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"
-CONTROLLER_CONFIRMATION_VALUE = "google_frozen_corpus_controller_v1"
-CONTROLLER_BINDINGS = "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"
+CONTROLLER_CONFIRMATION_VALUE = "google_frozen_corpus_controller_v2"
 GATE_NAMES = (
     "DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED",
     "DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED",
@@ -91,44 +89,6 @@ FORBIDDEN_NAMES = frozenset(
 )
 
 
-def _validate_controller_bindings(raw: str) -> None:
-    try:
-        bindings = json.loads(raw)
-    except json.JSONDecodeError as error:
-        raise SystemExit("worker_mode_controller_bindings_invalid") from error
-    expected_keys = {
-        "sourceSha256",
-        "intakeRequestId",
-        "assessmentFingerprint",
-        "contentHmac",
-        "cacheKey",
-    }
-    if not isinstance(bindings, list) or len(bindings) != 8:
-        raise SystemExit("worker_mode_controller_bindings_invalid")
-    source_hashes: set[str] = set()
-    intake_ids: set[str] = set()
-    for binding in bindings:
-        if not isinstance(binding, dict) or set(binding) != expected_keys:
-            raise SystemExit("worker_mode_controller_bindings_invalid")
-        if not all(isinstance(binding[key], str) for key in expected_keys):
-            raise SystemExit("worker_mode_controller_bindings_invalid")
-        if any(
-            not re.fullmatch(r"[0-9a-f]{64}", binding[key])
-            for key in ("sourceSha256", "assessmentFingerprint", "contentHmac", "cacheKey")
-        ):
-            raise SystemExit("worker_mode_controller_bindings_invalid")
-        try:
-            parsed_intake = str(uuid.UUID(binding["intakeRequestId"]))
-        except ValueError as error:
-            raise SystemExit("worker_mode_controller_bindings_invalid") from error
-        if parsed_intake != binding["intakeRequestId"].lower():
-            raise SystemExit("worker_mode_controller_bindings_invalid")
-        if binding["sourceSha256"] in source_hashes or parsed_intake in intake_ids:
-            raise SystemExit("worker_mode_controller_bindings_invalid")
-        source_hashes.add(binding["sourceSha256"])
-        intake_ids.add(parsed_intake)
-
-
 def _mapping(value: object, code: str) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise SystemExit(code)
@@ -182,7 +142,7 @@ def _environment(resource: dict[str, Any]) -> tuple[dict[str, Any], dict[str, di
     if observed.intersection(FORBIDDEN_NAMES) or observed not in (
         set(BASE_NAMES),
         {*BASE_NAMES, PREVIEW_APPROVAL},
-        {*BASE_NAMES, PREVIEW_APPROVAL, CONTROLLER_CONFIRMATION, CONTROLLER_BINDINGS},
+        {*BASE_NAMES, PREVIEW_APPROVAL, CONTROLLER_CONFIRMATION},
     ):
         raise SystemExit("worker_mode_environment_scope_invalid")
     for name, value in BASE_VALUES.items():
@@ -247,16 +207,13 @@ def _observed_mode(environment: dict[str, dict[str, Any]]) -> str:
         and approval.get("value") == PREVIEW_APPROVAL_VALUE
         and environment.get(CONTROLLER_CONFIRMATION, {}).get("value")
         == CONTROLLER_CONFIRMATION_VALUE
-        and isinstance(environment.get(CONTROLLER_BINDINGS, {}).get("value"), str)
     ):
-        _validate_controller_bindings(environment[CONTROLLER_BINDINGS]["value"])
         return "frozen-corpus"
     if (
         gates == MODE_VALUES["one-page"]
         and approval is not None
         and approval.get("value") == PREVIEW_APPROVAL_VALUE
         and CONTROLLER_CONFIRMATION not in environment
-        and CONTROLLER_BINDINGS not in environment
     ):
         return "one-page"
     raise SystemExit("worker_mode_gate_state_invalid")
@@ -279,7 +236,6 @@ def main() -> int:
     parser.add_argument("--worker-pool", required=True)
     parser.add_argument("--mode", choices=tuple(MODE_VALUES), required=True)
     parser.add_argument("--verify-only", action="store_true")
-    parser.add_argument("--frozen-intake-bindings-json")
     arguments = parser.parse_args()
     if arguments.worker_pool != WORKER_POOL:
         raise SystemExit("worker_mode_identity_invalid")
@@ -301,7 +257,7 @@ def main() -> int:
     updated_environment: list[dict[str, Any]] = []
     for item in rendered_environment:
         name = item["name"]
-        if name in (PREVIEW_APPROVAL, CONTROLLER_CONFIRMATION, CONTROLLER_BINDINGS):
+        if name in (PREVIEW_APPROVAL, CONTROLLER_CONFIRMATION):
             continue
         updated_environment.append(
             {"name": name, "value": mode_values[name]}
@@ -313,17 +269,9 @@ def main() -> int:
             {"name": PREVIEW_APPROVAL, "value": PREVIEW_APPROVAL_VALUE}
         )
     if arguments.mode == "frozen-corpus":
-        if not arguments.frozen_intake_bindings_json:
-            raise SystemExit("worker_mode_controller_bindings_missing")
-        _validate_controller_bindings(arguments.frozen_intake_bindings_json)
-        updated_environment.extend(
-            (
-                {"name": CONTROLLER_CONFIRMATION, "value": CONTROLLER_CONFIRMATION_VALUE},
-                {"name": CONTROLLER_BINDINGS, "value": arguments.frozen_intake_bindings_json},
-            )
+        updated_environment.append(
+            {"name": CONTROLLER_CONFIRMATION, "value": CONTROLLER_CONFIRMATION_VALUE}
         )
-    elif arguments.frozen_intake_bindings_json:
-        raise SystemExit("worker_mode_controller_bindings_unexpected")
     rendered_spec["containers"][0]["env"] = updated_environment
     manifest = {
         "apiVersion": "run.googleapis.com/v1",

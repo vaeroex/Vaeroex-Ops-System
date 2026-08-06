@@ -52,11 +52,7 @@ const eligibleQualificationItem = z.object({
   localRejectionReason: z.null(),
   documentClass: z.enum([
     "digital_pdf", "scanned_pdf", "image_only_pdf", "printed_document_photo"
-  ]),
-  intakeRequestId: uuid,
-  assessmentFingerprint: sha256,
-  contentHmac: sha256,
-  cacheKey: sha256
+  ])
 }).strict();
 const qualificationItem = z.discriminatedUnion("providerEligible", [
   eligibleQualificationItem,
@@ -76,8 +72,6 @@ export const documentExtractionBrokerRequestSchema = z.discriminatedUnion("opera
     operation: z.literal("qualification_prepare"),
     requestId: uuid,
     benchmarkProfileFingerprint: sha256,
-    processorId: z.string().regex(/^[a-f0-9]{8,64}$/),
-    processorResource: z.string().min(1).max(500),
     items: z.array(qualificationItem).length(12)
   }).strict(),
   z.object({
@@ -135,7 +129,8 @@ export const documentExtractionBrokerRequestSchema = z.discriminatedUnion("opera
     leaseCapability,
     boundary: z.enum(["asset_create", "asset_upload", "inference"]),
     qualificationPageIndex: z.number().int().min(1).max(2).optional(),
-    qualificationReservationRequestId: uuid.optional()
+    qualificationReservationRequestId: uuid.optional(),
+    qualificationDispatchRequestId: uuid.optional()
   }).strict(),
   z.object({
     operation: z.literal("qualification_page_outcome"),

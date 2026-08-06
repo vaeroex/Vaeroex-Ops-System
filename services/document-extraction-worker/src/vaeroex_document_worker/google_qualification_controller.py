@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 import uuid
 from dataclasses import dataclass
@@ -23,8 +22,7 @@ from .google_synthetic import (
 from .runner import WorkerRunResult, run_one_job
 from .synthetic import load_frozen_corpus
 
-CONTROLLER_VERSION = "google_frozen_corpus_qualification_controller_v1"
-_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+CONTROLLER_VERSION = "google_frozen_corpus_qualification_controller_v2"
 _DOCUMENT_CLASS = {
     1: "digital_pdf",
     2: "image_only_pdf",
@@ -126,50 +124,11 @@ async def _fetch_status(config: WorkerConfig, run_id: str) -> _QualificationStat
     return _status(response)
 
 
-def _binding_map(raw: str | None) -> dict[str, dict[str, str]]:
-    try:
-        value = json.loads(raw or "")
-    except json.JSONDecodeError as error:
-        raise RuntimeError("google_qualification_intake_bindings_invalid") from error
-    if not isinstance(value, list) or len(value) != 8:
-        raise RuntimeError("google_qualification_intake_bindings_invalid")
-    result: dict[str, dict[str, str]] = {}
-    keys = {
-        "sourceSha256",
-        "intakeRequestId",
-        "assessmentFingerprint",
-        "contentHmac",
-        "cacheKey",
-    }
-    for item in value:
-        if not isinstance(item, dict) or set(item) != keys:
-            raise RuntimeError("google_qualification_intake_bindings_invalid")
-        if not all(isinstance(item[key], str) for key in keys):
-            raise RuntimeError("google_qualification_intake_bindings_invalid")
-        source_sha256 = item["sourceSha256"]
-        if source_sha256 in result or not _SHA256.fullmatch(source_sha256):
-            raise RuntimeError("google_qualification_intake_bindings_invalid")
-        try:
-            uuid.UUID(item["intakeRequestId"])
-        except ValueError as error:
-            raise RuntimeError("google_qualification_intake_bindings_invalid") from error
-        if any(
-            not _SHA256.fullmatch(item[key])
-            for key in ("assessmentFingerprint", "contentHmac", "cacheKey")
-        ):
-            raise RuntimeError("google_qualification_intake_bindings_invalid")
-        result[source_sha256] = item
-    return result
-
-
 def qualification_items(
     plan: GoogleQualificationPlan,
-    bindings_json: str | None,
 ) -> list[dict[str, object]]:
-    bindings = _binding_map(bindings_json)
     eligible_indices = {fixture.fixture_index for fixture in plan.eligible_fixtures}
     items: list[dict[str, object]] = []
-    used_bindings: set[str] = set()
     for fixture in load_frozen_corpus():
         eligibility = google_fixture_eligibility(fixture)
         source_sha256 = hashlib.sha256(fixture.source_path.read_bytes()).hexdigest()
@@ -182,24 +141,9 @@ def qualification_items(
             "localRejectionReason": eligibility.local_rejection_reason,
             "documentClass": _DOCUMENT_CLASS.get(fixture.fixture_index),
         }
-        if eligibility.provider_eligible:
-            binding = bindings.get(source_sha256)
-            if binding is None or fixture.fixture_index not in eligible_indices:
-                raise RuntimeError("google_qualification_intake_binding_missing")
-            used_bindings.add(source_sha256)
-            base.update(
-                {
-                    "intakeRequestId": binding["intakeRequestId"],
-                    "assessmentFingerprint": binding["assessmentFingerprint"],
-                    "contentHmac": binding["contentHmac"],
-                    "cacheKey": binding["cacheKey"],
-                }
-            )
-        elif source_sha256 in bindings:
-            raise RuntimeError("google_qualification_local_exclusion_has_binding")
+        if eligibility.provider_eligible != (fixture.fixture_index in eligible_indices):
+            raise RuntimeError("google_qualification_plan_identity_mismatch")
         items.append(base)
-    if used_bindings != set(bindings):
-        raise RuntimeError("google_qualification_intake_binding_unapproved")
     return items
 
 
@@ -226,7 +170,7 @@ async def run_google_frozen_qualification(
 
     # Planning and local exclusion happen before the broker can create a job.
     plan = google_qualification_plan(config.google_provider_contract)
-    items = qualification_items(plan, config.google_frozen_intake_bindings_json)
+    items = qualification_items(plan)
     request_id = str(uuid.uuid4())
     run_id: str | None = None
     async with BrokerClient(config) as broker:
@@ -235,8 +179,6 @@ async def run_google_frozen_qualification(
                 "operation": "qualification_prepare",
                 "requestId": request_id,
                 "benchmarkProfileFingerprint": plan.benchmark_profile_fingerprint,
-                "processorId": config.google_provider_contract.processor_id,
-                "processorResource": config.google_provider_contract.processor_resource,
                 "items": items,
             }
         )

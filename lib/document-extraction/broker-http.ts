@@ -7,6 +7,7 @@ import { documentExtractionBrokerRequestSchema } from "@/lib/document-extraction
 import { handleDocumentExtractionBrokerOperation } from "@/lib/document-extraction/broker-service";
 import {
   consumeDocumentExtractionFileGrant,
+  consumeGoogleFrozenQualificationFileGrant,
   consumeWorkerAssertion
 } from "@/lib/document-extraction/broker-store";
 import { resolveDocumentExtractionProviderRuntimeContract } from "@/lib/document-extraction/provider-profile";
@@ -17,6 +18,7 @@ import {
 import {
   assertDocumentExtractionBrokerEnabled,
   assertDocumentExtractionProviderDispatchEnabled,
+  resolveDocumentExtractionExecutionPolicy,
   type DocumentExtractionRuntimeEnvironment
 } from "@/lib/document-extraction/runtime-policy";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -152,12 +154,20 @@ async function handleGet({
   ) {
     throw new Error("document_extraction_provider_profile_not_approved");
   }
-  const source = await consumeDocumentExtractionFileGrant({
-    grantId: capability.grantId,
-    workerId: assertion.workerId,
-    tokenHash: createHash("sha256").update(capability.secret).digest("hex"),
-    providerProfile: providerContract.providerProfile
-  });
+  const tokenHash = createHash("sha256").update(capability.secret).digest("hex");
+  const policy = resolveDocumentExtractionExecutionPolicy(environment, runtimeEnvironment);
+  const source = policy.googleFrozenQualificationControllerEnabled
+    ? await consumeGoogleFrozenQualificationFileGrant({
+      grantId: capability.grantId,
+      workerId: assertion.workerId,
+      tokenHash
+    })
+    : await consumeDocumentExtractionFileGrant({
+      grantId: capability.grantId,
+      workerId: assertion.workerId,
+      tokenHash,
+      providerProfile: providerContract.providerProfile
+    });
   const supabase = createSupabaseAdminClient();
   if (!supabase) throw new Error("document_extraction_storage_unavailable");
   const { data, error } = await supabase.storage

@@ -4,7 +4,6 @@ const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
 const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
-
 const migration = read(
   "supabase/migrations/20260806180609_document_extraction_google_frozen_qualification_controller.sql"
 );
@@ -18,127 +17,209 @@ const adapter = read(
   "services/document-extraction-worker/src/vaeroex_document_worker/google_document_ai_adapter.py"
 );
 const brokerService = read("lib/document-extraction/broker-service.ts");
+const brokerStore = read("lib/document-extraction/broker-store.ts");
 const brokerContracts = read("lib/document-extraction/broker-contracts.ts");
 const runtimePolicy = read("lib/document-extraction/runtime-policy.ts");
 
 assert.doesNotMatch(migration, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
-assert.doesNotMatch(migration, /\bdelete\s+from\s+public\.(?!document_extraction_google_qualification_runs\b)/i);
-assert.doesNotMatch(migration, /mdiianhfrojmxqpwrflh/);
+assert.doesNotMatch(migration, /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i);
 assert.match(migration, /enabled boolean not null default false/);
-assert.match(migration, /p_preview_project_ref <> 'zfpnhvcmuuvtswttmnjd'/);
-assert.match(migration, /controller_version = 'google_frozen_corpus_qualification_controller_v1'/);
+assert.match(migration, /google_frozen_corpus_qualification_controller_v2/);
+
+// Environment, processor, workspace, and source bytes are owner-installed
+// database bindings. RPC callers cannot manufacture or mutate them.
+assert.match(migration, /supabase_project_ref text not null[\s\S]*?zfpnhvcmuuvtswttmnjd/);
+assert.match(migration, /production_project_ref_exclusion text not null[\s\S]*?mdiianhfrojmxqpwrflh/);
+assert.match(migration, /synthetic_workspace_id uuid not null unique/);
+assert.match(migration, /processor_id text not null check \(processor_id = '948f589143795629'\)/);
+assert.match(
+  migration,
+  /processor_resource = 'projects\/626856681952\/locations\/us\/processors\/948f589143795629\/processorVersions\/pretrained-ocr-v2[.]1-2024-08-07'/
+);
+assert.match(migration, /verification_version = 'trusted_storage_sha256_v1'/);
+assert.match(migration, /source_sha256 text not null check \(source_sha256 ~ '\^\[0-9a-f\]\{64\}\$'\)/);
+assert.doesNotMatch(
+  migration,
+  /insert into public\.document_extraction_google_qualification_environment/
+);
 
 for (const table of [
   "document_extraction_google_qualification_state",
+  "document_extraction_google_qualification_environment",
+  "document_extraction_google_qualification_sources",
   "document_extraction_google_qualification_runs",
   "document_extraction_google_qualification_items",
-  "document_extraction_google_qualification_page_reservations"
+  "document_extraction_google_qualification_page_reservations",
+  "document_extraction_google_qualification_job_bindings",
+  "document_extraction_google_qualification_cleanup_audits"
 ]) {
   assert.match(migration, new RegExp(`create table if not exists public\\.${table}`));
   assert.match(migration, new RegExp(`alter table public\\.${table} enable row level security`));
+}
+assert.match(
+  migration,
+  /revoke all on table public\.document_extraction_google_qualification_state,[\s\S]*?from public, anon, authenticated, service_role/
+);
+
+// Qualification identity is a separate, exact database class.
+for (const field of [
+  "run_id", "item_id", "source_binding_id", "job_id", "intake_request_id",
+  "file_id", "workspace_id", "corpus_contract_version", "corpus_sha256",
+  "fixture_identity_fingerprint", "source_sha256", "page_identity_fingerprints",
+  "provider_profile", "processor_id", "processor_resource", "processor_version",
+  "preview_project_ref", "controller_version"
+]) {
   assert.match(
-    migration,
-    new RegExp(`revoke all on table public\\.${table}[\\s\\S]*?from public, anon, authenticated, service_role`)
+    migration.slice(
+      migration.indexOf("create table if not exists public.document_extraction_google_qualification_job_bindings"),
+      migration.indexOf("create table if not exists public.document_extraction_google_qualification_cleanup_audits")
+    ),
+    new RegExp(`\\b${field}\\b`)
   );
 }
+assert.match(migration, /insert into public\.document_extraction_google_qualification_job_bindings/);
+assert.match(migration, /select public\.enqueue_google_document_extraction_job_base_v1/);
 
-const securityDefinerFunctions = [
-  "set_google_frozen_qualification_enabled_v1",
-  "prepare_google_frozen_qualification_v1",
-  "enqueue_next_google_frozen_qualification_item_v1",
-  "claim_google_frozen_qualification_job_v1",
-  "assert_google_frozen_qualification_job_v1",
-  "reserve_google_frozen_qualification_page_v1",
-  "record_google_frozen_qualification_page_outcome_v1",
-  "finish_google_frozen_qualification_item_v1",
-  "stop_google_frozen_qualification_v1",
-  "complete_google_frozen_qualification_v1",
-  "get_google_frozen_qualification_status_v1",
-  "cleanup_google_frozen_qualification_v1"
-];
-for (const name of securityDefinerFunctions) {
-  const declaration = new RegExp(
-    `create or replace function public\\.${name}\\([\\s\\S]*?security definer[\\s\\S]*?set search_path = ''`
-  );
-  assert.match(migration, declaration);
+// The ordinary enqueue cannot even return a qualification job idempotently.
+assert.match(
+  migration,
+  /Qualification sources require the qualification enqueue path[.]?'/
+);
+assert.match(
+  migration,
+  /revoke execute on function public\.enqueue_google_document_extraction_job_base_v1\([\s\S]*?from public, anon, authenticated, service_role/
+);
+
+// Ordinary service-role paths fail closed at the database boundary.
+const ordinaryClaim = migration.slice(
+  migration.indexOf("create or replace function public.claim_google_document_extraction_job_v1"),
+  migration.indexOf("create or replace function public.resolve_google_document_extraction_job_lease_v1")
+);
+assert.match(ordinaryClaim, /not exists \([\s\S]*?document_extraction_google_qualification_job_bindings/);
+const ordinaryLease = migration.slice(
+  migration.indexOf("create or replace function public.resolve_google_document_extraction_job_lease_v1"),
+  migration.indexOf("create or replace function public.resolve_google_frozen_qualification_job_lease_v1")
+);
+assert.match(ordinaryLease, /exists \([\s\S]*?document_extraction_google_qualification_job_bindings/);
+const ordinaryBoundary = migration.slice(
+  migration.indexOf("create or replace function public.check_google_document_extraction_provider_boundary_v1"),
+  migration.indexOf("create or replace function public.reserve_google_frozen_qualification_page_v1")
+);
+assert.match(ordinaryBoundary, /Qualification jobs require the qualification provider boundary/);
+
+for (const protectedTable of [
+  "document_extraction_jobs", "document_extraction_file_bindings",
+  "document_extraction_cache", "document_extraction_reviews",
+  "document_extraction_events", "document_extraction_file_access_grants",
+  "document_extraction_provider_outcomes", "document_extraction_intake_requests",
+  "file_uploads", "document_extraction_workspace_settings", "workspace_members",
+  "workspaces"
+]) {
   assert.match(
     migration,
-    new RegExp(`grant execute on function public\\.${name}\\([\\s\\S]*?to service_role`)
-  );
-  assert.match(
-    migration,
-    new RegExp(`revoke execute on function public\\.${name}\\([\\s\\S]*?from public, anon, authenticated, service_role`)
+    new RegExp(`on public\\.${protectedTable};[\\s\\S]*?enforce_google_frozen_qualification_mutation_v1`)
   );
 }
+assert.match(
+  migration,
+  /revoke execute on function public\.begin_google_frozen_qualification_mutation_v1\(uuid, text\)[\s\S]*?from public, anon, authenticated, service_role/
+);
 
+// The worker can submit only immutable corpus identity, never execution state.
+assert.match(migration, /\(select count\(\*\) from jsonb_object_keys\(v_item\)\) <> 7/);
+for (const forbidden of [
+  "intakeRequestId", "fileId", "workspaceId", "assessmentFingerprint",
+  "contentHmac", "cacheKey", "processorResource", "previewProjectRef"
+]) {
+  assert.doesNotMatch(controller, new RegExp(`['\"]${forbidden}['\"]`));
+}
+assert.doesNotMatch(controller, /GOOGLE_FROZEN_INTAKE_BINDINGS_JSON/);
+
+// Qualification reservation is serial, bounded, and precedes dispatch.
 assert.match(migration, /eligible_document_limit integer not null default 8 check \(eligible_document_limit = 8\)/);
 assert.match(migration, /eligible_page_limit integer not null default 9 check \(eligible_page_limit = 9\)/);
 assert.match(migration, /provider_reservation_limit integer not null default 9 check \(provider_reservation_limit = 9\)/);
 assert.match(migration, /provider_call_limit integer not null default 9 check \(provider_call_limit = 9\)/);
 assert.match(migration, /retry_limit integer not null default 0 check \(retry_limit = 0\)/);
 assert.match(migration, /concurrency_limit integer not null default 1 check \(concurrency_limit = 1\)/);
-assert.equal((migration.match(/^\s*\((?:[1-9]|1[0-2]), '[0-9a-f]{64}'/gm) || []).length, 12);
-for (const fixtureIndex of [5, 8, 9, 12]) {
-  assert.match(
-    migration,
-    new RegExp(`\\(${fixtureIndex}, '[0-9a-f]{64}', '[0-9a-f]{64}', array\\[[^\\n]+, 1, false,`)
-  );
-}
-assert.match(migration, /not provider_eligible[\s\S]*?intake_request_id is null[\s\S]*?job_id is null[\s\S]*?provider_reservation_count = 0[\s\S]*?provider_call_count = 0/);
-assert.match(migration, /where run_id = v_run\.id and provider_eligible and status = 'planned'/);
-assert.match(migration, /v_eligible_documents <> 8 or v_eligible_pages <> 9/);
-
-assert.match(migration, /for update of run/);
 assert.match(migration, /document_extraction_google_qualification_one_active_page_idx[\s\S]*?where status = 'reserved'/);
-assert.match(migration, /p_page_index <> v_item\.provider_reservation_count \+ 1/);
-assert.match(migration, /v_run\.provider_reservation_count >= v_run\.provider_reservation_limit[\s\S]*?v_run\.provider_call_count >= v_run\.provider_call_limit/);
-assert.match(migration, /qualification_duplicate_provider_reservation/);
-assert.match(migration, /qualification_call_budget_exceeded/);
-assert.match(migration, /set status = 'stopped', stop_reason = coalesce\(stop_reason, v_reason\)/);
-assert.match(migration, /provider_call_count < provider_call_limit/);
-assert.match(migration, /provider_call_count < provider_reservation_count/);
-assert.match(migration, /v_job\.retry_count <> 0 or v_run\.retry_count <> 0/);
-assert.match(migration, /v_job\.status <> 'needs_review'[\s\S]*?v_job\.stage <> 'awaiting_review'[\s\S]*?v_job\.approval_status <> 'pending'/);
-
-const runController = controller.slice(
-  controller.indexOf("async def run_google_frozen_qualification")
+const reserve = migration.slice(
+  migration.indexOf("create or replace function public.reserve_google_frozen_qualification_page_v1"),
+  migration.indexOf("create or replace function public.record_google_frozen_qualification_page_outcome_v1")
 );
 assert.ok(
-  runController.indexOf("plan = google_qualification_plan")
-    < runController.indexOf("async with BrokerClient(config) as broker")
+  reserve.indexOf("insert into public.document_extraction_google_qualification_page_reservations")
+    < reserve.indexOf("authorize_google_document_extraction_dispatch_v1")
 );
-assert.match(runController, /expected_fixtures = \[[\s\S]*?fixture\.fixture_index for fixture in plan\.eligible_fixtures/);
-assert.match(runController, /before\.active_fixture_index is not None/);
-assert.match(runController, /result\.status != "needs_review" or result\.retry_count != 0/);
-assert.match(runController, /"operation": "qualification_stop"/);
-assert.doesNotMatch(runController, /nvidia|fallback/i);
+assert.ok(
+  reserve.indexOf("qualification_call_budget_exceeded")
+    < reserve.indexOf("authorize_google_document_extraction_dispatch_v1")
+);
+assert.match(reserve, /p_page_index <> v_item\.provider_reservation_count \+ 1/);
+assert.match(reserve, /qualification_duplicate_provider_reservation/);
+assert.match(reserve, /p_dispatch_request_id/);
+for (const binding of [
+  "reservation_number", "dispatch_request_id", "worker_id", "lease_expires_at",
+  "provider", "provider_profile", "processor_id", "processor_resource",
+  "processor_version", "controller_version", "qualification_state_updated_at"
+]) {
+  assert.match(
+    migration.slice(
+      migration.indexOf("create table if not exists public.document_extraction_google_qualification_page_reservations"),
+      migration.indexOf("create unique index if not exists document_extraction_google_qualification_one_active_page_idx")
+    ),
+    new RegExp(`\\b${binding}\\b`)
+  );
+}
+assert.match(reserve, /v_run\.provider_reservation_count \+ 1/);
+assert.match(reserve, /v_qualification_state_updated_at/);
+assert.match(reserve, /v_job\.lease_expires_at, 'google_document_ai', v_run\.provider_profile/);
+assert.match(brokerService, /document_extraction_qualification_dispatch_requires_page_reservation/);
+assert.match(runner, /if not active_config\.google_frozen_qualification_controller_enabled:[\s\S]*?"operation": "authorize_dispatch"/);
+assert.match(runner, /qualification_dispatch_request_id=\([\s\S]*?dispatch_request_id/);
 
-assert.match(runtimePolicy, /google_frozen_corpus_controller_v1/);
+// A stopped run cannot reach any qualification execution entry point.
+assert.match(migration, /p_operation not in \('provider_outcome', 'fail'\)[\s\S]*?Google qualification job operation is not authorized/);
+assert.match(reserve, /v_run\.status <> 'active'[\s\S]*?qualification_not_active/);
+assert.match(migration, /where run\.status = 'active' and run\.active_fixture_index is not null/);
+
+// Cleanup is two-phase, storage-verified, bounded, idempotent, and refuses
+// unexpected references before deleting workspace/file records.
+for (const name of [
+  "cleanup_google_frozen_qualification_v1",
+  "verify_google_frozen_qualification_storage_cleanup_v1",
+  "finalize_google_frozen_qualification_cleanup_v1",
+  "assert_google_frozen_qualification_no_fk_references_v1"
+]) {
+  assert.match(migration, new RegExp(`create or replace function public\\.${name}`));
+}
+assert.match(migration, /storage_obligations/);
+assert.match(migration, /storage_cleanup_verified_at is null/);
+assert.match(migration, /Qualification cleanup found an unowned foreign-key reference/);
+assert.match(migration, /document_extraction_google_qualification_cleanup_audits/);
+for (const relation of [
+  "document_extraction_file_access_grants", "document_extraction_provider_outcomes",
+  "document_extraction_reviews", "document_extraction_file_bindings",
+  "document_extraction_cache", "document_extraction_events",
+  "document_extraction_jobs", "document_extraction_intake_requests",
+  "file_uploads", "document_extraction_workspace_settings", "workspace_members",
+  "workspaces"
+]) {
+  assert.match(migration, new RegExp(`(?:delete|update) from public\\.${relation}`));
+}
+assert.match(brokerStore, /storage[\s\S]*?\.remove\(\[obligation\.storagePath\]\)/);
+assert.match(brokerStore, /\.list\(pathParts\.join\("\/"\), \{ limit: 2, search: objectName \}\)/);
+assert.match(brokerStore, /document_extraction_qualification_storage_cleanup_unverified/);
+assert.match(brokerStore, /verify_google_frozen_qualification_storage_cleanup_v1/);
+assert.match(brokerStore, /finalize_google_frozen_qualification_cleanup_v1/);
+
+// Existing provider, normalization, encryption, and review boundaries remain.
+assert.match(runtimePolicy, /google_frozen_corpus_controller_v2/);
 assert.match(runtimePolicy, /runtimeEnvironment === "preview"/);
-assert.match(runtimePolicy, /GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE/);
-assert.match(brokerContracts, /qualificationPageIndex: z\.number\(\)\.int\(\)\.min\(1\)\.max\(2\)\.optional\(\)/);
-assert.match(brokerContracts, /qualificationReservationRequestId: uuid\.optional\(\)/);
-
-const qualificationBoundaryStart = brokerService.indexOf(
-  "if (policy.googleFrozenQualificationControllerEnabled) {",
-  brokerService.indexOf('request.operation === "check_provider_boundary"')
-);
-const qualificationBoundaryEnd = brokerService.indexOf("} else if (", qualificationBoundaryStart);
-const qualificationBoundary = brokerService.slice(
-  qualificationBoundaryStart,
-  qualificationBoundaryEnd
-);
-assert.match(qualificationBoundary, /reserveGoogleFrozenQualificationPage/);
-assert.doesNotMatch(qualificationBoundary, /checkDocumentExtractionProviderBoundary/);
-assert.match(
-  brokerService.slice(qualificationBoundaryEnd, brokerService.indexOf("if \(!result.allowed", qualificationBoundaryEnd)),
-  /checkDocumentExtractionProviderBoundary/
-);
-
-assert.match(runner, /google_frozen_qualification_controller_enabled[\s\S]*?qualification_page_cursor \+= 1/);
-assert.match(runner, /qualification_page_outcome/);
+assert.match(brokerContracts, /qualificationDispatchRequestId: uuid\.optional\(\)/);
 assert.match(adapter, /self\._before_provider_boundary\("inference"\)[\s\S]*?_access_token/);
 assert.match(adapter, /self\._provider_page_outcome\(page\.page, True, "success", True\)/);
-assert.match(adapter, /self\._provider_page_outcome\([\s\S]*?failure\.provider_request_started/);
+assert.match(migration, /v_job\.status <> 'needs_review'[\s\S]*?v_job\.stage <> 'awaiting_review'[\s\S]*?v_job\.approval_status <> 'pending'/);
+assert.doesNotMatch(migration, /\b(?:evidence|business_memory|business_health|intelligence_snapshot|saved_analysis)\b/i);
 
-process.stdout.write("Google frozen qualification controller regressions passed.\n");
+process.stdout.write("Google frozen qualification controller isolation regressions passed.\n");

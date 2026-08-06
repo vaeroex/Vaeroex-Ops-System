@@ -18,6 +18,7 @@ import {
 import type { DocumentExtractionBrokerRequest } from "@/lib/document-extraction/broker-contracts";
 import {
   advanceDocumentExtractionStage,
+  advanceGoogleFrozenQualificationStage,
   authorizeDocumentExtractionDispatch,
   authorizeDocumentExtractionRetry,
   assertGoogleFrozenQualificationJob,
@@ -26,19 +27,25 @@ import {
   checkDocumentExtractionProviderBoundary,
   cleanupGoogleFrozenQualification,
   completeGoogleFrozenQualification,
+  completeGoogleFrozenQualificationJob,
   completeDocumentExtractionJob,
   enqueueNextGoogleFrozenQualificationItem,
   failDocumentExtractionJob,
+  failGoogleFrozenQualificationJob,
   finishGoogleFrozenQualificationItem,
   getGoogleFrozenQualificationStatus,
   heartbeatDocumentExtractionJob,
+  heartbeatGoogleFrozenQualificationJob,
   issueDocumentExtractionFileGrant,
+  issueGoogleFrozenQualificationFileGrant,
   prepareGoogleFrozenQualification,
   recordGoogleFrozenQualificationPageOutcome,
+  recordGoogleFrozenQualificationJobOutcome,
   recordDocumentExtractionProviderOutcome,
   recordDocumentExtractionTelemetry,
   reserveGoogleFrozenQualificationPage,
   resolveDocumentExtractionLease,
+  resolveGoogleFrozenQualificationLease,
   stopGoogleFrozenQualification,
   type DocumentExtractionLeaseContext,
   type DocumentExtractionProviderProfile
@@ -55,7 +62,8 @@ import {
   NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
   NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
   NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
-  NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION
+  NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION,
+  type DocumentExtractionCriticalFieldManifestV3
 } from "@/lib/document-extraction/contracts";
 import {
   buildDocumentExtractionReviewProvenance,
@@ -202,13 +210,16 @@ function assertLeaseIdentity(
 async function resolveExactLease(
   jobId: string,
   workerId: string,
-  contract: DocumentExtractionProviderRuntimeContract
+  contract: DocumentExtractionProviderRuntimeContract,
+  qualification = false
 ) {
-  const context = await resolveDocumentExtractionLease(
-    jobId,
-    workerId,
-    providerProfile(contract)
-  );
+  const context = qualification
+    ? await resolveGoogleFrozenQualificationLease(jobId, workerId)
+    : await resolveDocumentExtractionLease(
+      jobId,
+      workerId,
+      providerProfile(contract)
+    );
   return assertLeaseIdentity(context, contract);
 }
 
@@ -253,11 +264,7 @@ export async function handleDocumentExtractionBrokerOperation({
         page_identity_fingerprints: item.pageIdentityFingerprints,
         provider_eligible: true,
         local_rejection_reason: null,
-        document_class: item.documentClass,
-        intake_request_id: item.intakeRequestId,
-        assessment_fingerprint: item.assessmentFingerprint,
-        content_hmac: item.contentHmac,
-        cache_key: item.cacheKey
+        document_class: item.documentClass
       } : {
         fixture_index: item.fixtureIndex,
         source_sha256: item.sourceSha256,
@@ -270,8 +277,6 @@ export async function handleDocumentExtractionBrokerOperation({
     return { ok: true, ...(await prepareGoogleFrozenQualification({
       requestId: request.requestId,
       benchmarkProfileFingerprint: request.benchmarkProfileFingerprint,
-      processorId: request.processorId,
-      processorResource: request.processorResource,
       items
     })) };
   }
@@ -322,7 +327,12 @@ export async function handleDocumentExtractionBrokerOperation({
         request.leaseSeconds
       );
     if (!job) return { ok: true, claimed: false };
-    const context = await resolveExactLease(job.id, workerId, providerContract);
+    const context = await resolveExactLease(
+      job.id,
+      workerId,
+      providerContract,
+      policy.googleFrozenQualificationControllerEnabled
+    );
     return {
       ok: true,
       claimed: true,
@@ -364,7 +374,12 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   const lease = leaseFor(request.leaseCapability, workerId, environment);
-  let context = await resolveExactLease(lease.jobId, workerId, providerContract);
+  let context = await resolveExactLease(
+    lease.jobId,
+    workerId,
+    providerContract,
+    policy.googleFrozenQualificationControllerEnabled
+  );
   if (policy.googleFrozenQualificationControllerEnabled) {
     const qualificationOperation = request.operation === "qualification_page_outcome"
       ? "provider_outcome"
@@ -380,9 +395,20 @@ export async function handleDocumentExtractionBrokerOperation({
     await assertGoogleFrozenQualificationJob(lease.jobId, workerId, qualificationOperation);
   }
   if (request.operation === "heartbeat") {
-    const extended = await heartbeatDocumentExtractionJob(lease.jobId, workerId, request.leaseSeconds);
+    const extended = policy.googleFrozenQualificationControllerEnabled
+      ? await heartbeatGoogleFrozenQualificationJob(
+        lease.jobId, workerId, request.leaseSeconds
+      )
+      : await heartbeatDocumentExtractionJob(
+        lease.jobId, workerId, request.leaseSeconds
+      );
     if (!extended) throw new Error("document_extraction_heartbeat_denied");
-    context = await resolveExactLease(lease.jobId, workerId, providerContract);
+    context = await resolveExactLease(
+      lease.jobId,
+      workerId,
+      providerContract,
+      policy.googleFrozenQualificationControllerEnabled
+    );
     return {
       ok: true,
       leaseCapability: createLeaseCapability({
@@ -397,13 +423,20 @@ export async function handleDocumentExtractionBrokerOperation({
   if (request.operation === "issue_file_access") {
     assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
     const secret = createFileGrantSecret();
-    const grant = await issueDocumentExtractionFileGrant({
-      jobId: lease.jobId,
-      workerId,
-      tokenHash: sha256(secret),
-      ttlSeconds: request.ttlSeconds,
-      providerProfile: activeProviderProfile
-    });
+    const grant = policy.googleFrozenQualificationControllerEnabled
+      ? await issueGoogleFrozenQualificationFileGrant({
+        jobId: lease.jobId,
+        workerId,
+        tokenHash: sha256(secret),
+        ttlSeconds: request.ttlSeconds
+      })
+      : await issueDocumentExtractionFileGrant({
+        jobId: lease.jobId,
+        workerId,
+        tokenHash: sha256(secret),
+        ttlSeconds: request.ttlSeconds,
+        providerProfile: activeProviderProfile
+      });
     if (!grant.issued || !grant.grant_id || !grant.expires_at) {
       return { ok: false, issued: false, reason: grant.reason || "file_access_denied" };
     }
@@ -424,19 +457,30 @@ export async function handleDocumentExtractionBrokerOperation({
 
   if (request.operation === "advance_stage") {
     assertDocumentExtractionProviderGateEnabled(environment, runtimeEnvironment);
-    const result = await advanceDocumentExtractionStage({
-      jobId: lease.jobId,
-      workerId,
-      expectedStage: request.expectedStage,
-      nextStage: request.nextStage,
-      requestId: request.requestId,
-      providerProfile: activeProviderProfile
-    });
+    const result = policy.googleFrozenQualificationControllerEnabled
+      ? await advanceGoogleFrozenQualificationStage({
+        jobId: lease.jobId,
+        workerId,
+        expectedStage: request.expectedStage,
+        nextStage: request.nextStage,
+        requestId: request.requestId
+      })
+      : await advanceDocumentExtractionStage({
+        jobId: lease.jobId,
+        workerId,
+        expectedStage: request.expectedStage,
+        nextStage: request.nextStage,
+        requestId: request.requestId,
+        providerProfile: activeProviderProfile
+      });
     return { ok: result.advanced, ...result };
   }
 
   if (request.operation === "authorize_dispatch") {
     assertDocumentExtractionProviderDispatchEnabled(environment, runtimeEnvironment);
+    if (policy.googleFrozenQualificationControllerEnabled) {
+      throw new Error("document_extraction_qualification_dispatch_requires_page_reservation");
+    }
     const result = await authorizeDocumentExtractionDispatch({
       jobId: lease.jobId,
       workerId,
@@ -460,6 +504,7 @@ export async function handleDocumentExtractionBrokerOperation({
         request.boundary !== "inference"
         || request.qualificationPageIndex === undefined
         || request.qualificationReservationRequestId === undefined
+        || request.qualificationDispatchRequestId === undefined
       ) {
         throw new Error("document_extraction_google_qualification_page_binding_missing");
       }
@@ -467,7 +512,8 @@ export async function handleDocumentExtractionBrokerOperation({
         jobId: lease.jobId,
         workerId,
         pageIndex: request.qualificationPageIndex,
-        reservationRequestId: request.qualificationReservationRequestId
+        reservationRequestId: request.qualificationReservationRequestId,
+        dispatchRequestId: request.qualificationDispatchRequestId
       });
       if (reservation.authorized !== true || typeof reservation.reservation_id !== "string") {
         return { ok: false, ...reservation };
@@ -484,6 +530,7 @@ export async function handleDocumentExtractionBrokerOperation({
     } else if (
       request.qualificationPageIndex !== undefined
       || request.qualificationReservationRequestId !== undefined
+      || request.qualificationDispatchRequestId !== undefined
     ) {
       throw new Error("document_extraction_google_qualification_not_enabled");
     } else {
@@ -523,14 +570,22 @@ export async function handleDocumentExtractionBrokerOperation({
   }
 
   if (request.operation === "provider_outcome") {
-    const result = await recordDocumentExtractionProviderOutcome({
-      jobId: lease.jobId,
-      workerId,
-      dispatchRequestId: request.dispatchRequestId,
-      resultClass: request.resultClass,
-      latencyMs: request.latencyMs,
-      providerProfile: activeProviderProfile
-    });
+    const result = policy.googleFrozenQualificationControllerEnabled
+      ? await recordGoogleFrozenQualificationJobOutcome({
+        jobId: lease.jobId,
+        workerId,
+        dispatchRequestId: request.dispatchRequestId,
+        resultClass: request.resultClass,
+        latencyMs: request.latencyMs
+      })
+      : await recordDocumentExtractionProviderOutcome({
+        jobId: lease.jobId,
+        workerId,
+        dispatchRequestId: request.dispatchRequestId,
+        resultClass: request.resultClass,
+        latencyMs: request.latencyMs,
+        providerProfile: activeProviderProfile
+      });
     return { ok: result.recorded, ...result };
   }
 
@@ -612,20 +667,32 @@ export async function handleDocumentExtractionBrokerOperation({
         extractionContractVersion: context.extraction_contract_version,
         normalizationVersion: context.normalization_version
       }),
-      (envelope) => completeDocumentExtractionJob({
-        jobId: lease.jobId,
-        workerId,
-        artifactFingerprint: artifact.artifactFingerprint,
-        criticalFieldManifest,
-        ciphertext: envelope.ciphertext,
-        keyVersion: envelope.keyVersion,
-        nonce: envelope.nonce,
-        authenticationTag: envelope.authenticationTag,
-        aadDigest: envelope.aadDigest,
-        providerProfile: activeProviderProfile
-      })
+      (envelope) => policy.googleFrozenQualificationControllerEnabled
+        ? completeGoogleFrozenQualificationJob({
+          jobId: lease.jobId,
+          workerId,
+          artifactFingerprint: artifact.artifactFingerprint,
+          criticalFieldManifest: criticalFieldManifest as DocumentExtractionCriticalFieldManifestV3,
+          ciphertext: envelope.ciphertext,
+          keyVersion: envelope.keyVersion,
+          nonce: envelope.nonce,
+          authenticationTag: envelope.authenticationTag,
+          aadDigest: envelope.aadDigest
+        })
+        : completeDocumentExtractionJob({
+          jobId: lease.jobId,
+          workerId,
+          artifactFingerprint: artifact.artifactFingerprint,
+          criticalFieldManifest,
+          ciphertext: envelope.ciphertext,
+          keyVersion: envelope.keyVersion,
+          nonce: envelope.nonce,
+          authenticationTag: envelope.authenticationTag,
+          aadDigest: envelope.aadDigest,
+          providerProfile: activeProviderProfile
+        })
     );
-    await recordFinalTelemetry({
+    if (!policy.googleFrozenQualificationControllerEnabled) await recordFinalTelemetry({
       jobId: lease.jobId,
       workerId,
       workspaceId: context.workspace_id,
@@ -641,7 +708,7 @@ export async function handleDocumentExtractionBrokerOperation({
     return { ok: true, ...result };
   }
 
-  await recordFinalTelemetry({
+  if (!policy.googleFrozenQualificationControllerEnabled) await recordFinalTelemetry({
     jobId: lease.jobId,
     workerId,
     workspaceId: context.workspace_id,
@@ -654,12 +721,19 @@ export async function handleDocumentExtractionBrokerOperation({
     providerProfile: activeProviderProfile,
     environment
   });
-  const result = await failDocumentExtractionJob({
-    jobId: lease.jobId,
-    workerId,
-    failureCode: request.failureCode,
-    failureClass: request.failureClass,
-    providerProfile: activeProviderProfile
-  });
+  const result = policy.googleFrozenQualificationControllerEnabled
+    ? await failGoogleFrozenQualificationJob({
+      jobId: lease.jobId,
+      workerId,
+      failureCode: request.failureCode,
+      failureClass: request.failureClass
+    })
+    : await failDocumentExtractionJob({
+      jobId: lease.jobId,
+      workerId,
+      failureCode: request.failureCode,
+      failureClass: request.failureClass,
+      providerProfile: activeProviderProfile
+    });
   return { ok: true, ...result };
 }

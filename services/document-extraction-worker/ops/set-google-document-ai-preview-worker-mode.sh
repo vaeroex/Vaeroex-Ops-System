@@ -32,7 +32,6 @@ case "$WORKER_MODE" in
     ;;
   frozen-corpus)
     test "$GOOGLE_QUALIFICATION_CONFIRMATION" = "google-document-ai-frozen-corpus-8-documents-9-pages-zero-retry"
-    : "${GOOGLE_FROZEN_INTAKE_BINDINGS_JSON:?GOOGLE_FROZEN_INTAKE_BINDINGS_JSON is required}"
     ;;
   *) printf '%s\n' "WORKER_MODE is invalid." >&2; exit 2 ;;
 esac
@@ -53,9 +52,6 @@ set -- \
   --output "$rendered_manifest" \
   --worker-pool "$WORKER_POOL" \
   --mode "$WORKER_MODE"
-if [ "$WORKER_MODE" = "frozen-corpus" ]; then
-  set -- "$@" --frozen-intake-bindings-json "$GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"
-fi
 python3 "$script_directory/render-google-document-ai-worker-mode.py" "$@"
 
 CLOUDSDK_RUN_REGION="$GCP_REGION" gcloud run worker-pools replace "$rendered_manifest" \

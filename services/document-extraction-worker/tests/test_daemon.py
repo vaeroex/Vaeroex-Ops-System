@@ -126,7 +126,6 @@ def test_google_frozen_controller_runs_once_without_entering_polling_daemon(
         ),
         synthetic_qualification_enabled=True,
         google_frozen_qualification_controller_enabled=True,
-        google_frozen_intake_bindings_json="[]",
     )
     controller_calls = 0
     events: list[tuple[str, dict[str, object]]] = []

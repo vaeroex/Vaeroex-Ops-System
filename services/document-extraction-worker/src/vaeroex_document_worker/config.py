@@ -173,7 +173,6 @@ class WorkerConfig:
     synthetic_qualification_enabled: bool
     google_provider_contract: GoogleDocumentAiContract | None = None
     google_frozen_qualification_controller_enabled: bool = False
-    google_frozen_intake_bindings_json: str | None = None
     response_profile_diagnostic_enabled: bool = False
     field_path_diagnostic_enabled: bool = False
     health_port: int = 8080
@@ -314,9 +313,6 @@ class WorkerConfig:
         google_frozen_qualification_controller_enabled = _enabled(
             environment.get("DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED")
         )
-        google_frozen_intake_bindings_json = environment.get(
-            "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"
-        )
         if google_frozen_qualification_controller_enabled and (
             runtime_environment != "preview"
             or active_profile != GOOGLE_DOCUMENT_AI_PROVIDER_PROFILE
@@ -324,16 +320,13 @@ class WorkerConfig:
             or environment.get(
                 "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION", ""
             ).strip()
-            != "google_frozen_corpus_controller_v1"
-            or not google_frozen_intake_bindings_json
-            or len(google_frozen_intake_bindings_json.encode("utf-8")) > 32_768
+            != "google_frozen_corpus_controller_v2"
         ):
             raise RuntimeError(
                 "The Google frozen-corpus controller requires its exact Preview-only binding."
             )
         if not google_frozen_qualification_controller_enabled and (
-            google_frozen_intake_bindings_json
-            or environment.get(
+            environment.get(
                 "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION", ""
             ).strip()
         ):
@@ -421,11 +414,6 @@ class WorkerConfig:
             google_provider_contract=google_provider_contract,
             google_frozen_qualification_controller_enabled=(
                 google_frozen_qualification_controller_enabled
-            ),
-            google_frozen_intake_bindings_json=(
-                google_frozen_intake_bindings_json
-                if google_frozen_qualification_controller_enabled
-                else None
             ),
             response_profile_diagnostic_enabled=response_profile_diagnostic_enabled,
             field_path_diagnostic_enabled=field_path_diagnostic_enabled,

@@ -308,12 +308,21 @@ all pass.
 ### Frozen-corpus execution controller
 
 The frozen Google run does not use the ordinary continuously polling daemon.
-The versioned `google_frozen_corpus_qualification_controller_v1` mode computes
+The versioned `google_frozen_corpus_qualification_controller_v2` mode computes
 `google_qualification_plan` before opening a broker connection. It sends all 12
 committed fixture identities to the database, but fixtures 5, 8, 9, and 12 have
 only local, content-free result rows. Their table shape forbids an intake ID,
 route, document class, job ID, cache key, file binding, reservation, or call
 count. Only fixtures 1, 2, 3, 4, 6, 7, 10, and 11 can enter `planned` state.
+
+Execution identity is installed by the database owner before a qualification;
+it is not accepted from the worker. The absent-by-default environment binding
+pins isolated Preview project `zfpnhvcmuuvtswttmnjd`, excludes Production,
+pins the dedicated synthetic workspace and exact approved processor/version,
+and binds each eligible intake and file to the trusted storage digest plus the
+committed fixture and rendered-page fingerprints. The worker submits only the
+seven immutable corpus fields. It cannot select a workspace, intake, file,
+processor, cache identity, HMAC, or Preview identity.
 
 The controller then enqueues exactly one planned fixture, waits for its one
 worker execution to reach the encrypted `needs_review` / `awaiting_review`
@@ -323,17 +332,37 @@ output, identity or lease mismatch, ambiguous dispatch, retry state, provenance
 or authority failure, privacy failure, or controller uncertainty latches the
 run to `stopped`; no later fixture can be claimed.
 
+Each eligible job receives a transactionally created qualification binding and
+is excluded explicitly from ordinary enqueue, claim, lease, file-grant,
+dispatch, provider-boundary, completion, and failure mutations. Internal
+qualification wrappers install a transaction-local cryptographic mutation
+guard before reusing canonical job primitives; the guard helper is not callable
+by `service_role`.
+
 Each rendered page obtains one database reservation immediately before the
 Google request. The reservation function locks the run, item, and job; verifies
 the active Preview-only controller state, exact Google profile and immutable
 processor resource, workspace runtime gates, current lease and dispatch,
 zero-retry state, page sequence, and remaining budget; and then increments the
-bounded reservation count. A partial unique index permits only one unresolved
+bounded reservation count before dispatch authorization or provider-call
+accounting. The reservation row independently records its run-wide reservation
+number, request and dispatch IDs, worker and lease snapshot, exact provider,
+profile, processor/version, controller version, and active-state revision. A
+partial unique index permits only one unresolved
 page reservation for a run. Counts are constrained to nine reservations and no
 more calls than reservations, so a tenth or concurrent second reservation fails
 before token acquisition or network access. Normal customer and historical
 NVIDIA execution continue through their existing claim and provider-boundary
 RPCs.
+
+Cleanup is a two-phase fail-closed protocol. The database first latches the run
+to `cleaning`, terminates leases, and emits at most eight exact storage deletion
+obligations. The broker removes only those objects and records object-absence
+proofs. Finalization then rejects unknown foreign-key references and removes the
+qualification-owned grants, outcomes, reviews, bindings, cache rows, events,
+jobs, intakes, file metadata, settings, members, workspace, source bindings,
+environment binding, items, reservations, and run. A content-free hash audit
+makes repeated cleanup idempotent without retaining raw identifiers.
 
 The migration is additive, default-disabled, RLS-protected, and exposes only
 narrow `service_role` RPCs with empty `search_path`. It stores no document text,

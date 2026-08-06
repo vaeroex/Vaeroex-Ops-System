@@ -244,20 +244,40 @@ general document-extraction approval and the separate absent-by-default
 The frozen-corpus execution correction adds the unapplied migration
 `20260806180609_document_extraction_google_frozen_qualification_controller.sql`
 and the Preview-only controller
-`google_frozen_corpus_qualification_controller_v1`. The controller consumes the
+`google_frozen_corpus_qualification_controller_v2`. The controller consumes the
 approved Google plan before broker job creation. It records fixtures 5, 8, 9,
 and 12 locally with no intake binding or job, and creates execution work only
 for the 8 eligible documents and 9 eligible pages.
+
+The V2 controller does not accept workspace, intake, file, cache, HMAC,
+processor, or environment identity from the worker. A database-owner-installed,
+absent-by-default binding pins the isolated Preview project, explicitly excludes
+Production, identifies one dedicated synthetic workspace, pins the approved
+processor resource/version, and binds trusted storage digests to the committed
+fixture and page fingerprints. Each created job receives a separate immutable
+qualification binding in the same transaction.
 
 For those pages, a qualification-specific service-role RPC is the atomic
 pre-network boundary. It locks the exact run, item, and job; rechecks the active
 controller, immutable Google profile and processor, workspace/runtime gates,
 lease, single dispatch, zero retry, page order, and nine-page budget; and allows
-only one unresolved page reservation. Page outcomes can never exceed
+only one unresolved page reservation. The persisted reservation binds its
+run-wide sequence, worker, lease snapshot, dispatch request, provider/profile,
+processor/version, controller version, and active-state revision. It commits
+the bounded reservation before
+reusing canonical dispatch accounting, so an exhausted tenth reservation cannot
+change dispatch or provider-call state. Page outcomes can never exceed
 reservations. Any failed or ambiguous page outcome latches the entire run to
 `stopped`, and the one-shot controller does not enqueue another fixture. This
 stricter synthetic stop policy does not alter ordinary Google customer job
 semantics or any historical NVIDIA profile.
+
+Qualification-bound jobs are excluded at the ordinary claim query and rejected
+by ordinary enqueue, lease, provider-boundary, and guarded mutation paths even
+for direct `service_role` RPC calls. Cleanup is storage-aware and two-phase: it
+must verify every exact storage obligation and reject unknown references before
+removing the complete synthetic graph. Its final content-free hash record makes
+the operation idempotent without preserving raw workspace, file, or run IDs.
 
 The new tables contain only committed synthetic identity hashes, bounded local
 reason codes, opaque synthetic intake/job bindings for eligible fixtures, and

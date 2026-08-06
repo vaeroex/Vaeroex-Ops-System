@@ -13,7 +13,7 @@ function enabled(value: string | undefined) {
 }
 
 const GOOGLE_FROZEN_QUALIFICATION_CONTROLLER_CONFIRMATION =
-  "google_frozen_corpus_controller_v1";
+  "google_frozen_corpus_controller_v2";
 
 export type DocumentExtractionRuntimeEnvironment = "production" | "preview" | "development";
 

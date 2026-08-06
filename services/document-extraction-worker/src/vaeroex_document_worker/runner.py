@@ -210,6 +210,7 @@ async def _check_provider_boundary(
     boundary: str,
     *,
     qualification_page_index: int | None = None,
+    qualification_dispatch_request_id: str | None = None,
 ) -> tuple[str, str | None]:
     payload: dict[str, Any] = {
         "operation": "check_provider_boundary",
@@ -217,8 +218,15 @@ async def _check_provider_boundary(
         "boundary": boundary,
     }
     if qualification_page_index is not None:
+        if qualification_dispatch_request_id is None:
+            raise ProviderFailure(
+                "qualification_dispatch_identity_missing",
+                "authorization",
+                retryable=False,
+            )
         payload["qualificationPageIndex"] = qualification_page_index
         payload["qualificationReservationRequestId"] = _request_id()
+        payload["qualificationDispatchRequestId"] = qualification_dispatch_request_id
     response = await broker.post(payload)
     if not response.get("allowed"):
         raise ProviderFailure(
@@ -461,40 +469,41 @@ async def run_one_job(
                 _notify(progress_callback, "dispatching")
 
                 dispatch_request_id = _request_id()
-                authorization = await broker.post(
-                    {
-                        "operation": "authorize_dispatch",
-                        "leaseCapability": lease,
-                        "dispatchRequestId": dispatch_request_id,
-                    }
-                )
-                if not authorization.get("authorized"):
-                    if (
-                        authorization.get("idempotent") is True
-                        and authorization.get("reason") == "dispatch_already_authorized"
-                    ):
-                        # A concurrent caller already owns the single-use
-                        # provider dispatch. Do not call the provider and do
-                        # not fail the shared job out from under that caller.
-                        return WorkerRunResult(
-                            status="dispatch_in_flight",
-                            provider_calls=0,
-                            retry_count=0,
-                            failure_code=None,
-                        )
-                    emit_synthetic_failure_once("provider_dispatch_denied")
-                    return await _fail_job(
-                        broker,
-                        lease,
-                        ProviderFailure(
-                            "provider_dispatch_denied",
-                            "authorization",
-                            retryable=False,
-                        ),
-                        0,
-                        0,
-                        None,
+                if not active_config.google_frozen_qualification_controller_enabled:
+                    authorization = await broker.post(
+                        {
+                            "operation": "authorize_dispatch",
+                            "leaseCapability": lease,
+                            "dispatchRequestId": dispatch_request_id,
+                        }
                     )
+                    if not authorization.get("authorized"):
+                        if (
+                            authorization.get("idempotent") is True
+                            and authorization.get("reason") == "dispatch_already_authorized"
+                        ):
+                            # A concurrent caller already owns the single-use
+                            # provider dispatch. Do not call the provider and do
+                            # not fail the shared job out from under that caller.
+                            return WorkerRunResult(
+                                status="dispatch_in_flight",
+                                provider_calls=0,
+                                retry_count=0,
+                                failure_code=None,
+                            )
+                        emit_synthetic_failure_once("provider_dispatch_denied")
+                        return await _fail_job(
+                            broker,
+                            lease,
+                            ProviderFailure(
+                                "provider_dispatch_denied",
+                                "authorization",
+                                retryable=False,
+                            ),
+                            0,
+                            0,
+                            None,
+                        )
 
                 completed_pages: tuple[dict[str, Any], ...] = ()
                 while True:
@@ -524,6 +533,11 @@ async def run_one_job(
                                     lease,
                                     boundary,
                                     qualification_page_index=page_index,
+                                    qualification_dispatch_request_id=(
+                                        dispatch_request_id
+                                        if page_index is not None
+                                        else None
+                                    ),
                                 ),
                                 event_loop,
                             )

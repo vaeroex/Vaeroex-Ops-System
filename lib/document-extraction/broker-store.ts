@@ -137,17 +137,12 @@ export async function claimDocumentExtractionJob(
 export async function prepareGoogleFrozenQualification(args: {
   requestId: string;
   benchmarkProfileFingerprint: string;
-  processorId: string;
-  processorResource: string;
   items: Array<Record<string, unknown>>;
 }) {
   return rpc<Record<string, unknown>>("prepare_google_frozen_qualification_v1", {
     p_request_id: args.requestId,
-    p_preview_project_ref: "zfpnhvcmuuvtswttmnjd",
     p_confirmation: "prepare-google-frozen-corpus-controller-v1",
     p_benchmark_profile_fingerprint: args.benchmarkProfileFingerprint,
-    p_processor_id: args.processorId,
-    p_processor_resource: args.processorResource,
     p_items: args.items
   });
 }
@@ -184,12 +179,14 @@ export async function reserveGoogleFrozenQualificationPage(args: {
   workerId: string;
   pageIndex: number;
   reservationRequestId: string;
+  dispatchRequestId: string;
 }) {
   return rpc<Record<string, unknown>>("reserve_google_frozen_qualification_page_v1", {
     p_job_id: args.jobId,
     p_worker_id: args.workerId,
     p_page_index: args.pageIndex,
-    p_reservation_request_id: args.reservationRequestId
+    p_reservation_request_id: args.reservationRequestId,
+    p_dispatch_request_id: args.dispatchRequestId
   });
 }
 
@@ -238,10 +235,155 @@ export async function getGoogleFrozenQualificationStatus(runId: string) {
 }
 
 export async function cleanupGoogleFrozenQualification(runId: string, confirmation: string) {
-  return rpc<Record<string, unknown>>("cleanup_google_frozen_qualification_v1", {
+  const prepared = await rpc<{
+    cleaned?: boolean;
+    storage_obligations?: Array<{
+      sourceBindingId: string;
+      storageBucket: string;
+      storagePath: string;
+      fileSizeBytes: number;
+    }>;
+  }>("cleanup_google_frozen_qualification_v1", {
     p_run_id: runId,
     p_confirmation: confirmation
   });
+  if (prepared.cleaned === true) return prepared;
+  const obligations = prepared.storage_obligations || [];
+  if (obligations.length > 8) {
+    throw new Error("document_extraction_qualification_cleanup_bound_exceeded");
+  }
+  const supabase = client();
+  for (const obligation of obligations) {
+    if (
+      !obligation.sourceBindingId
+      || !obligation.storageBucket
+      || !obligation.storagePath
+      || !Number.isInteger(obligation.fileSizeBytes)
+      || obligation.fileSizeBytes <= 0
+    ) {
+      throw new Error("document_extraction_qualification_cleanup_obligation_invalid");
+    }
+    const removed = await supabase.storage
+      .from(obligation.storageBucket)
+      .remove([obligation.storagePath]);
+    if (removed.error) {
+      throw new Error("document_extraction_qualification_storage_cleanup_failed");
+    }
+    const pathParts = obligation.storagePath.split("/");
+    const objectName = pathParts.pop();
+    if (
+      !objectName
+      || pathParts.some((part) => !part || part === "." || part === "..")
+    ) {
+      throw new Error("document_extraction_qualification_cleanup_obligation_invalid");
+    }
+    const verified = await supabase.storage
+      .from(obligation.storageBucket)
+      .list(pathParts.join("/"), { limit: 2, search: objectName });
+    if (
+      verified.error
+      || (verified.data || []).some((item) => item.name === objectName)
+    ) {
+      throw new Error("document_extraction_qualification_storage_cleanup_unverified");
+    }
+    await rpc<boolean>("verify_google_frozen_qualification_storage_cleanup_v1", {
+      p_run_id: runId,
+      p_source_binding_id: obligation.sourceBindingId,
+      p_storage_bucket: obligation.storageBucket,
+      p_storage_path: obligation.storagePath,
+      p_confirmation: "storage-object-absent-google-frozen-corpus-v2"
+    });
+  }
+  return rpc<Record<string, unknown>>("finalize_google_frozen_qualification_cleanup_v1", {
+    p_run_id: runId,
+    p_confirmation: "finalize-google-frozen-corpus-cleanup-v2"
+  });
+}
+
+export async function resolveGoogleFrozenQualificationLease(jobId: string, workerId: string) {
+  return rpc<DocumentExtractionLeaseContext>(
+    "resolve_google_frozen_qualification_job_lease_v1",
+    { p_job_id: jobId, p_worker_id: workerId }
+  );
+}
+
+export async function heartbeatGoogleFrozenQualificationJob(
+  jobId: string,
+  workerId: string,
+  leaseSeconds = 120
+) {
+  return rpc<boolean>("heartbeat_google_frozen_qualification_job_v1", {
+    p_job_id: jobId,
+    p_worker_id: workerId,
+    p_lease_seconds: leaseSeconds
+  });
+}
+
+export async function advanceGoogleFrozenQualificationStage(args: {
+  jobId: string;
+  workerId: string;
+  expectedStage: string;
+  nextStage: string;
+  requestId: string;
+}) {
+  return rpc<{ advanced: boolean; reason?: string; stage?: string; status?: string }>(
+    "advance_google_frozen_qualification_job_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_expected_stage: args.expectedStage,
+      p_next_stage: args.nextStage,
+      p_request_id: args.requestId
+    }
+  );
+}
+
+export async function issueGoogleFrozenQualificationFileGrant(args: {
+  jobId: string;
+  workerId: string;
+  tokenHash: string;
+  ttlSeconds: number;
+}) {
+  return rpc<{ issued: boolean; reason?: string; grant_id?: string; expires_at?: string; page_count?: number }>(
+    "issue_google_frozen_qualification_file_grant_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_token_hash: args.tokenHash,
+      p_ttl_seconds: args.ttlSeconds
+    }
+  );
+}
+
+export async function consumeGoogleFrozenQualificationFileGrant(args: {
+  grantId: string;
+  workerId: string;
+  tokenHash: string;
+}) {
+  return rpc<ConsumedFileGrant>("consume_google_frozen_qualification_file_grant_v1", {
+    p_grant_id: args.grantId,
+    p_worker_id: args.workerId,
+    p_token_hash: args.tokenHash
+  });
+}
+
+export async function recordGoogleFrozenQualificationJobOutcome(args: {
+  jobId: string;
+  workerId: string;
+  dispatchRequestId: string;
+  resultClass: string;
+  latencyMs: number;
+}) {
+  return rpc<{ recorded: boolean; idempotent: boolean; circuit_state: null; retry_permitted: false }>(
+    "record_google_frozen_qualification_job_outcome_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_dispatch_request_id: args.dispatchRequestId,
+      p_result_class: args.resultClass,
+      p_latency_ms: args.latencyMs
+    }
+  );
 }
 
 export async function heartbeatDocumentExtractionJob(jobId: string, workerId: string, leaseSeconds = 120) {
@@ -537,6 +679,46 @@ export async function completeDocumentExtractionJob({
   );
 }
 
+export async function completeGoogleFrozenQualificationJob({
+  jobId,
+  workerId,
+  artifactFingerprint,
+  criticalFieldManifest,
+  ciphertext,
+  keyVersion,
+  nonce,
+  authenticationTag,
+  aadDigest
+}: {
+  jobId: string;
+  workerId: string;
+  artifactFingerprint: string;
+  criticalFieldManifest: DocumentExtractionCriticalFieldManifestV3;
+  ciphertext: Uint8Array;
+  keyVersion: string;
+  nonce: Uint8Array;
+  authenticationTag: Uint8Array;
+  aadDigest: string;
+}) {
+  return rpc<{
+    completed: boolean;
+    reason?: "nonce_collision";
+    job_id?: string;
+    status?: string;
+    approval_status?: string;
+  }>("complete_google_frozen_qualification_job_v1", {
+    p_job_id: jobId,
+    p_worker_id: workerId,
+    p_artifact_fingerprint: artifactFingerprint,
+    p_critical_field_manifest_json: criticalFieldManifest,
+    p_payload_ciphertext: bytea(ciphertext),
+    p_encryption_key_version: keyVersion,
+    p_encryption_nonce: bytea(nonce),
+    p_authentication_tag: bytea(authenticationTag),
+    p_aad_digest: aadDigest
+  });
+}
+
 export async function failDocumentExtractionJob({
   jobId,
   workerId,
@@ -561,6 +743,23 @@ export async function failDocumentExtractionJob({
       p_worker_id: workerId,
       p_failure_code: failureCode,
       p_failure_class: failureClass
+    }
+  );
+}
+
+export async function failGoogleFrozenQualificationJob(args: {
+  jobId: string;
+  workerId: string;
+  failureCode: string;
+  failureClass: string;
+}) {
+  return rpc<{ job_id: string; status: string; retryable: boolean }>(
+    "fail_google_frozen_qualification_job_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_failure_code: args.failureCode,
+      p_failure_class: args.failureClass
     }
   );
 }

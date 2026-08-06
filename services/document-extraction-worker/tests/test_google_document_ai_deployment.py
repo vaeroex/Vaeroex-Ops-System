@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
-import uuid
 from pathlib import Path
 from typing import Any
 
@@ -27,23 +26,6 @@ PROJECT_NUMBER = "626856681952"
 PROCESSOR_ID = "948f589143795629"
 DEPLOYMENT_ID = "phase-c1-pr265-abc1234-google-v1"
 WORKER_KEY_VERSION = "pr265-worker-key-google-v1"
-
-
-def _bindings_json() -> str:
-    return json.dumps(
-        [
-            {
-                "sourceSha256": f"{index:064x}",
-                "intakeRequestId": str(uuid.UUID(int=index)),
-                "assessmentFingerprint": f"{index + 20:064x}",
-                "contentHmac": f"{index + 40:064x}",
-                "cacheKey": f"{index + 60:064x}",
-            }
-            for index in range(1, 9)
-        ],
-        sort_keys=True,
-        separators=(",", ":"),
-    )
 
 
 def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
@@ -86,10 +68,7 @@ def _environment(mode: str = "disabled") -> list[dict[str, Any]]:
         )
     if mode == "frozen-corpus":
         values["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"] = (
-            "google_frozen_corpus_controller_v1"
-        )
-        values["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"] = (
-            _bindings_json()
+            "google_frozen_corpus_controller_v2"
         )
     return [
         *({"name": key, "value": value} for key, value in values.items()),
@@ -321,34 +300,19 @@ def test_google_verifier_rejects_qualification_without_exact_preview_approval(
     assert "worker_pool_preview_approval_invalid" in result.stderr
 
 
-def test_google_verifier_rejects_malformed_or_duplicate_frozen_bindings(
+def test_google_verifier_rejects_obsolete_caller_supplied_frozen_bindings(
     tmp_path: Path,
 ) -> None:
-    for mutation in ("missing_key", "duplicate_source", "invalid_uuid"):
-        description = _description("frozen-corpus", 1)
-        environment = description["template"]["containers"][0]["env"]
-        item = next(
-            candidate
-            for candidate in environment
-            if candidate["name"]
-            == "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"
-        )
-        bindings = json.loads(item["value"])
-        if mutation == "missing_key":
-            bindings[0].pop("cacheKey")
-        elif mutation == "duplicate_source":
-            bindings[1]["sourceSha256"] = bindings[0]["sourceSha256"]
-        else:
-            bindings[0]["intakeRequestId"] = "not-a-uuid"
-        item["value"] = json.dumps(bindings, separators=(",", ":"))
-        result = _run_verifier(
-            tmp_path,
-            description,
-            "frozen-corpus",
-            1,
-        )
-        assert result.returncode != 0
-        assert "worker_pool_controller_bindings_invalid" in result.stderr
+    description = _description("frozen-corpus", 1)
+    description["template"]["containers"][0]["env"].append(
+        {
+            "name": "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON",
+            "value": "[]",
+        }
+    )
+    result = _run_verifier(tmp_path, description, "frozen-corpus", 1)
+    assert result.returncode != 0
+    assert "worker_pool_environment_scope_invalid" in result.stderr
 
 
 def test_google_mode_script_has_bounded_confirmations_and_removes_approval() -> None:
@@ -389,8 +353,6 @@ def test_google_mode_renderer_replaces_complete_v1_resource_and_verifies_modes(
             "--mode",
             mode,
         ]
-        if mode == "frozen-corpus":
-            command.extend(("--frozen-intake-bindings-json", _bindings_json()))
         rendered = subprocess.run(
             command,
             capture_output=True,

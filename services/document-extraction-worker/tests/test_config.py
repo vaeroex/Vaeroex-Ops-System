@@ -1,9 +1,6 @@
 from __future__ import annotations
 
 import base64
-import hashlib
-import json
-import uuid
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
@@ -72,25 +69,6 @@ def google_environment() -> dict[str, str]:
         }
     )
     return values
-
-
-def google_frozen_bindings() -> str:
-    return json.dumps(
-        [
-            {
-                "sourceSha256": hashlib.sha256(f"source-{index}".encode()).hexdigest(),
-                "intakeRequestId": str(uuid.UUID(int=index)),
-                "assessmentFingerprint": hashlib.sha256(
-                    f"assessment-{index}".encode()
-                ).hexdigest(),
-                "contentHmac": hashlib.sha256(f"content-{index}".encode()).hexdigest(),
-                "cacheKey": hashlib.sha256(f"cache-{index}".encode()).hexdigest(),
-            }
-            for index in range(1, 9)
-        ],
-        sort_keys=True,
-        separators=(",", ":"),
-    )
 
 
 def test_configuration_is_disabled_without_every_gate() -> None:
@@ -253,10 +231,7 @@ def test_google_frozen_controller_requires_exact_preview_only_binding() -> None:
             "DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED": "true",
             "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_ENABLED": "true",
             "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION": (
-                "google_frozen_corpus_controller_v1"
-            ),
-            "DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON": (
-                google_frozen_bindings()
+                "google_frozen_corpus_controller_v2"
             ),
         }
     )
@@ -267,7 +242,6 @@ def test_google_frozen_controller_requires_exact_preview_only_binding() -> None:
 
     for name, value in (
         ("DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION", "wrong"),
-        ("DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON", ""),
         ("DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED", "false"),
         ("DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE", HOSTED_CONTRACT.response_profile),
     ):
@@ -297,8 +271,8 @@ def test_google_frozen_controller_requires_exact_preview_only_binding() -> None:
 
 def test_google_frozen_controller_state_is_rejected_while_disabled() -> None:
     values = google_environment()
-    values["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_INTAKE_BINDINGS_JSON"] = (
-        google_frozen_bindings()
+    values["DOCUMENT_EXTRACTION_GOOGLE_FROZEN_CONTROLLER_CONFIRMATION"] = (
+        "google_frozen_corpus_controller_v2"
     )
     with pytest.raises(RuntimeError, match="state is present while disabled"):
         WorkerConfig.from_environment(values)

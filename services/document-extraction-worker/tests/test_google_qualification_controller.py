@@ -1,8 +1,6 @@
 from __future__ import annotations
 
 import asyncio
-import hashlib
-import json
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
@@ -32,32 +30,6 @@ def contract() -> GoogleDocumentAiContract:
     )
 
 
-def bindings_json() -> str:
-    plan = google_qualification_plan(contract())
-    return json.dumps(
-        [
-            {
-                "sourceSha256": hashlib.sha256(
-                    fixture.source_path.read_bytes()
-                ).hexdigest(),
-                "intakeRequestId": str(uuid.UUID(int=fixture.fixture_index)),
-                "assessmentFingerprint": hashlib.sha256(
-                    f"assessment-{fixture.fixture_index}".encode()
-                ).hexdigest(),
-                "contentHmac": hashlib.sha256(
-                    f"content-{fixture.fixture_index}".encode()
-                ).hexdigest(),
-                "cacheKey": hashlib.sha256(
-                    f"cache-{fixture.fixture_index}".encode()
-                ).hexdigest(),
-            }
-            for fixture in plan.eligible_fixtures
-        ],
-        sort_keys=True,
-        separators=(",", ":"),
-    )
-
-
 def worker_config() -> WorkerConfig:
     return WorkerConfig(
         broker_url="https://preview-broker.run.app",
@@ -75,7 +47,6 @@ def worker_config() -> WorkerConfig:
         synthetic_qualification_enabled=True,
         google_provider_contract=contract(),
         google_frozen_qualification_controller_enabled=True,
-        google_frozen_intake_bindings_json=bindings_json(),
     )
 
 
@@ -324,26 +295,31 @@ def test_controller_rejects_non_google_and_production_configuration() -> None:
             asyncio.run(controller.run_google_frozen_qualification(invalid))
 
 
-def test_binding_substitution_and_local_exclusion_binding_fail_closed() -> None:
+def test_items_expose_only_frozen_identity_without_execution_bindings() -> None:
     plan = google_qualification_plan(contract())
-    bindings = json.loads(bindings_json())
-    bindings[0]["sourceSha256"] = "f" * 64
-    with pytest.raises(RuntimeError, match="intake_binding_missing"):
-        controller.qualification_items(
-            plan,
-            json.dumps(bindings, separators=(",", ":")),
-        )
-
-    excluded = load_frozen_corpus()[4]
-    bindings = json.loads(bindings_json())
-    bindings[-1]["sourceSha256"] = hashlib.sha256(
-        excluded.source_path.read_bytes()
-    ).hexdigest()
-    with pytest.raises(RuntimeError, match="local_exclusion_has_binding"):
-        controller.qualification_items(
-            plan,
-            json.dumps(bindings, separators=(",", ":")),
-        )
+    items = controller.qualification_items(plan)
+    assert len(items) == 12
+    for item in items:
+        assert set(item) == {
+            "fixtureIndex",
+            "sourceSha256",
+            "fixtureIdentityFingerprint",
+            "pageIdentityFingerprints",
+            "providerEligible",
+            "localRejectionReason",
+            "documentClass",
+        }
+        assert not {
+            "workspaceId",
+            "intakeRequestId",
+            "fileId",
+            "assessmentFingerprint",
+            "contentHmac",
+            "cacheKey",
+            "processorId",
+            "processorResource",
+            "previewProjectRef",
+        }.intersection(item)
 
 
 def test_status_rejects_call_overrun_retry_or_parallelism() -> None:
