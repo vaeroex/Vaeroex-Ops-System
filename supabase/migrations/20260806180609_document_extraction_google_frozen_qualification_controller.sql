@@ -677,10 +677,10 @@ begin
   select * into v_environment
   from public.document_extraction_google_qualification_environment
   where singleton_key = 'google_frozen_corpus_v1';
-  if p_confirmation <> case when p_enabled
+  if p_confirmation <> (case when p_enabled
       then 'enable-google-frozen-corpus-controller-v1'
       else 'disable-google-frozen-corpus-controller-v1'
-    end
+    end)
     or (
       p_enabled and (
         v_environment.id is null

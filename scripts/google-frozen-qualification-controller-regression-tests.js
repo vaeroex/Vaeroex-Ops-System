@@ -25,6 +25,10 @@ assert.doesNotMatch(migration, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
 assert.doesNotMatch(migration, /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i);
 assert.match(migration, /enabled boolean not null default false/);
 assert.match(migration, /google_frozen_corpus_qualification_controller_v2/);
+assert.match(
+  migration,
+  /p_confirmation <> \(case when p_enabled[\s\S]*?end\)/
+);
 
 // Environment, processor, workspace, and source bytes are owner-installed
 // database bindings. RPC callers cannot manufacture or mutate them.

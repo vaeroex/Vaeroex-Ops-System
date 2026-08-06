@@ -120,6 +120,22 @@ insert into public.document_extraction_google_qualification_environment (
   'google_document_ai_enterprise_ocr_v1',
   'google_frozen_corpus_qualification_controller_v2', repeat('4', 64)
 );
+select ok(
+  public.set_google_frozen_qualification_enabled_v1(
+    false,
+    'zfpnhvcmuuvtswttmnjd',
+    'disable-google-frozen-corpus-controller-v1'
+  ),
+  'the qualification controller disable path compiles and accepts the exact Preview binding'
+);
+select ok(
+  public.set_google_frozen_qualification_enabled_v1(
+    true,
+    'zfpnhvcmuuvtswttmnjd',
+    'enable-google-frozen-corpus-controller-v1'
+  ),
+  'the qualification controller enable path compiles and accepts the exact Preview binding'
+);
 insert into public.document_extraction_google_qualification_sources (
   id, environment_id, fixture_index, workspace_id, intake_request_id, file_id,
   source_sha256, fixture_identity_fingerprint, page_identity_fingerprints,
