@@ -16,6 +16,9 @@ const claimPhaseFix = read(
 const cleanupOrderFix = read(
   "supabase/migrations/20260807185224_document_extraction_google_qualification_cleanup_order_fix.sql"
 );
+const processingCleanupProof = read(
+  "supabase/migrations/20260807195152_document_extraction_google_qualification_processing_cleanup_proof.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
 );
@@ -122,6 +125,65 @@ assert.match(
   cleanupOrderFix,
   /revoke execute on function public\.finalize_google_frozen_qualification_cleanup_v1\(uuid, text\)[\s\S]*?from public, anon, authenticated;[\s\S]*?grant execute[\s\S]*?to service_role;/
 );
+assert.doesNotMatch(processingCleanupProof, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(processingCleanupProof, /\bon delete cascade\b/i);
+assert.doesNotMatch(processingCleanupProof, /create\s+(?:table|index|trigger)\b/i);
+assert.doesNotMatch(
+  processingCleanupProof,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(
+  processingCleanupProof,
+  /create or replace function public\.begin_google_frozen_qualification_processing_cleanup_v1/
+);
+for (const identity of [
+  "run_id", "item_id", "job_id", "file_processing_job_id", "file_id",
+  "intake_request_id", "workspace_id", "fixture_index",
+  "page_identity_fingerprints"
+]) {
+  assert.match(processingCleanupProof, new RegExp(`'${identity}'`));
+}
+assert.match(
+  processingCleanupProof,
+  /google_qualification_processing_cleanup_proof_v1/
+);
+assert.match(
+  processingCleanupProof,
+  /execution_guard_secret[\s\S]*?txid_current\(\)/
+);
+assert.match(
+  processingCleanupProof,
+  /v_processing_binding\.run_id <> v_run\.id[\s\S]*?v_processing_binding\.item_id <> v_item\.id[\s\S]*?v_processing_binding\.source_binding_id <> v_source\.id/
+);
+const captureIndex = processingCleanupProof.indexOf(
+  "perform public.begin_google_frozen_qualification_processing_cleanup_v1"
+);
+const processingBindingDeleteIndex = processingCleanupProof.indexOf(
+  "delete from public.document_extraction_google_qualification_processing_job_bindings binding",
+  captureIndex
+);
+const provenProcessingDeleteIndex = processingCleanupProof.indexOf(
+  "delete from public.file_processing_jobs processing_job",
+  processingBindingDeleteIndex
+);
+const provenItemClearIndex = processingCleanupProof.indexOf(
+  "set job_id = null, status = 'failed'",
+  provenProcessingDeleteIndex
+);
+assert.ok(captureIndex >= 0);
+assert.ok(processingBindingDeleteIndex > captureIndex);
+assert.ok(provenProcessingDeleteIndex > processingBindingDeleteIndex);
+assert.ok(provenItemClearIndex > provenProcessingDeleteIndex);
+assert.match(
+  processingCleanupProof,
+  /tg_table_name = 'file_processing_jobs'[\s\S]*?tg_op = 'DELETE'[\s\S]*?v_context_processing_job_id = v_processing_job_id/
+);
+assert.match(processingCleanupProof, /and not coalesce\(\([\s\S]*?\), false\)/);
+assert.match(processingCleanupProof, /security definer\s+set search_path = ''/);
+assert.match(
+  processingCleanupProof,
+  /revoke execute on function[\s\S]*?begin_google_frozen_qualification_processing_cleanup_v1\(uuid\)[\s\S]*?from public, anon, authenticated, service_role/
+);
 assert.match(controller, /restart_latched/);
 assert.match(controller, /qualification_worker_restarted/);
 assert.match(controller, /qualification_controller_failure/);
@@ -152,6 +214,11 @@ assert.match(databaseTest, /three qualification executions receive distinct rand
 assert.match(databaseTest, /deliberate reuse of a cleaned run identity fails closed/);
 assert.match(databaseTest, /clearing item job identity before processing-row deletion fails closed/);
 assert.match(databaseTest, /failed premature cleanup preserves the authoritative item job binding/);
+assert.match(databaseTest, /intact binding graph produces the exact transaction-signed cleanup proof/);
+assert.match(databaseTest, /missing processing cleanup proof fails closed/);
+assert.match(databaseTest, /substituted cleanup proof run identity fails closed/);
+assert.match(databaseTest, /substituted cleanup proof processing identity fails closed/);
+assert.match(databaseTest, /substituted cleanup proof page identity fails closed/);
 assert.doesNotMatch(databaseTest, /f2650000-0000-4000-8000-000000000003/);
 for (const reason of [
   "qualification_run_mismatch",

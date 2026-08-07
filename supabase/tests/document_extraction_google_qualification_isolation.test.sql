@@ -58,6 +58,146 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.processing_cleanup_proof_matches(
+  p_processing_binding_id uuid,
+  p_run_id uuid,
+  p_item_id uuid,
+  p_job_id uuid,
+  p_processing_job_id uuid,
+  p_file_id uuid,
+  p_intake_request_id uuid,
+  p_workspace_id uuid,
+  p_fixture_index integer,
+  p_page_identity_fingerprints text[]
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_context jsonb;
+begin
+  perform public.begin_google_frozen_qualification_processing_cleanup_v1(
+    p_processing_binding_id
+  );
+  v_context := current_setting('vaeroex.google_qualification_guard_context', true)::jsonb;
+  return exists (
+    select 1
+    from public.document_extraction_google_qualification_processing_job_bindings binding
+    where binding.id = p_processing_binding_id
+      and binding.run_id = p_run_id
+      and binding.item_id = p_item_id
+      and binding.file_processing_job_id = p_processing_job_id
+  )
+    and (v_context ->> 'run_id')::uuid = p_run_id
+    and (v_context ->> 'item_id')::uuid = p_item_id
+    and (v_context ->> 'job_id')::uuid = p_job_id
+    and (v_context ->> 'file_processing_job_id')::uuid = p_processing_job_id
+    and (v_context ->> 'file_id')::uuid = p_file_id
+    and (v_context ->> 'intake_request_id')::uuid = p_intake_request_id
+    and (v_context ->> 'workspace_id')::uuid = p_workspace_id
+    and (v_context ->> 'fixture_index')::integer = p_fixture_index
+    and v_context -> 'page_identity_fingerprints'
+      = to_jsonb(p_page_identity_fingerprints)
+    and v_context ->> 'cleanup_proof_version'
+      = 'google_qualification_processing_cleanup_proof_v1';
+end;
+$$;
+
+create or replace function pg_temp.processing_cleanup_proof_capture_fails(
+  p_processing_binding_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform public.begin_google_frozen_qualification_processing_cleanup_v1(
+      p_processing_binding_id
+    );
+    raise exception 'Invalid processing cleanup proof unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
+create or replace function pg_temp.processing_cleanup_without_proof_fails(
+  p_processing_binding_id uuid,
+  p_intake_request_id uuid,
+  p_processing_job_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    perform public.begin_google_frozen_qualification_mutation_v1(
+      p_intake_request_id,
+      'cleanup'
+    );
+    delete from public.document_extraction_google_qualification_processing_job_bindings
+    where id = p_processing_binding_id;
+    delete from public.file_processing_jobs
+    where id = p_processing_job_id;
+    raise exception 'Proofless processing cleanup unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
+create or replace function pg_temp.processing_cleanup_proof_substitution_fails(
+  p_processing_binding_id uuid,
+  p_processing_job_id uuid,
+  p_field text,
+  p_value jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_context jsonb;
+begin
+  if p_field not in (
+    'run_id', 'item_id', 'job_id', 'file_processing_job_id', 'file_id',
+    'intake_request_id', 'workspace_id', 'fixture_index',
+    'page_identity_fingerprints'
+  ) then
+    return false;
+  end if;
+  begin
+    perform public.begin_google_frozen_qualification_processing_cleanup_v1(
+      p_processing_binding_id
+    );
+    v_context := current_setting('vaeroex.google_qualification_guard_context', true)::jsonb;
+    v_context := jsonb_set(v_context, array[p_field], p_value, false);
+    perform set_config(
+      'vaeroex.google_qualification_guard_context',
+      v_context::text,
+      true
+    );
+    delete from public.document_extraction_google_qualification_processing_job_bindings
+    where id = p_processing_binding_id;
+    delete from public.file_processing_jobs
+    where id = p_processing_job_id;
+    raise exception 'Substituted processing cleanup proof unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
 -- Persistent qualification executions must never reuse an execution UUID.
 -- Corpus, fixture, and page identities remain deterministic and separate.
 create or replace function pg_temp.assert_google_qualification_run_id_unused(
@@ -740,6 +880,174 @@ select is(
   ) ->> 'cleanup_version',
   'google_frozen_corpus_cleanup_v2',
   'cleanup latches the graph and emits bounded storage obligations'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_matches(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
+    'f2650000-0000-4000-8000-000000000004',
+    'e2650000-0000-4000-8000-000000000001',
+    'c2650000-0000-4000-8000-000000000011',
+    'c2650000-0000-4000-8000-000000000001',
+    'd2650000-0000-4000-8000-000000000001',
+    'b2650000-0000-4000-8000-000000000001',
+    1,
+    array['d11271f3e2088235d16db17305b074f88944b493692887fc8302887326b03ec1']::text[]
+  ),
+  'intact binding graph produces the exact transaction-signed cleanup proof'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_capture_fails(
+    'f2650000-0000-4000-8000-000000000099'
+  ),
+  'missing processing ownership binding fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_without_proof_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'd2650000-0000-4000-8000-000000000001',
+    'c2650000-0000-4000-8000-000000000011'
+  ),
+  'missing processing cleanup proof fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'run_id',
+    to_jsonb((select replay_run_id::text from pg_temp.google_qualification_test_execution_ids))
+  ),
+  'substituted cleanup proof run identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'item_id',
+    to_jsonb('f2650000-0000-4000-8000-000000000099'::text)
+  ),
+  'substituted cleanup proof item identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'job_id',
+    to_jsonb('e2650000-0000-4000-8000-000000000099'::text)
+  ),
+  'substituted cleanup proof extraction-job identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'file_processing_job_id',
+    to_jsonb('c2650000-0000-4000-8000-000000000012'::text)
+  ),
+  'substituted cleanup proof processing identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'file_id',
+    to_jsonb('c2650000-0000-4000-8000-000000000002'::text)
+  ),
+  'substituted cleanup proof file identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'intake_request_id',
+    to_jsonb('d2650000-0000-4000-8000-000000000099'::text)
+  ),
+  'substituted cleanup proof intake identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'workspace_id',
+    to_jsonb('b2650000-0000-4000-8000-000000000002'::text)
+  ),
+  'substituted cleanup proof workspace identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'fixture_index',
+    '2'::jsonb
+  ),
+  'substituted cleanup proof fixture identity fails closed'
+);
+select ok(
+  pg_temp.processing_cleanup_proof_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    ),
+    'c2650000-0000-4000-8000-000000000011',
+    'page_identity_fingerprints',
+    jsonb_build_array(repeat('0', 64))
+  ),
+  'substituted cleanup proof page identity fails closed'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    format(
+      'select public.begin_google_frozen_qualification_processing_cleanup_v1(%L::uuid)',
+      (
+        select id
+        from public.document_extraction_google_qualification_processing_job_bindings
+        where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+      )::text
+    ),
+    '42501'
+  ),
+  'service role cannot invoke the owner-only processing cleanup proof helper'
 );
 select ok(
   pg_temp.premature_processing_cleanup_fails(
