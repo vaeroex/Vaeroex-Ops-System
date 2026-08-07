@@ -16,6 +16,114 @@ exception when others then
 end;
 $$;
 
+-- PostgREST executes each RPC in its own transaction. This test intentionally
+-- keeps all synthetic state in one rollback transaction, so it must explicitly
+-- end the transaction-local mutation capability after each simulated RPC.
+create or replace function pg_temp.finish_google_qualification_rpc()
+returns void
+language plpgsql
+as $$
+begin
+  perform set_config('vaeroex.google_qualification_guard', '', true);
+end;
+$$;
+
+-- Content-free test-only classifier for the otherwise intentionally generic
+-- 42501 assertion contract. It reports only bounded invariant classes.
+create or replace function pg_temp.google_qualification_assertion_reason(
+  p_job_id uuid,
+  p_worker_id text,
+  p_operation text
+)
+returns text
+language plpgsql
+stable
+as $$
+declare
+  v_run public.document_extraction_google_qualification_runs%rowtype;
+  v_item public.document_extraction_google_qualification_items%rowtype;
+  v_job public.document_extraction_jobs%rowtype;
+  v_binding public.document_extraction_google_qualification_job_bindings%rowtype;
+  v_environment public.document_extraction_google_qualification_environment%rowtype;
+begin
+  select run.* into v_run
+  from public.document_extraction_google_qualification_runs run
+  join public.document_extraction_google_qualification_items item
+    on item.run_id = run.id and item.job_id = p_job_id
+  where run.active_fixture_index = item.fixture_index;
+  select * into v_item
+  from public.document_extraction_google_qualification_items
+  where run_id = v_run.id and job_id = p_job_id;
+  if v_run.id is null or v_item.id is null then
+    return 'qualification_run_mismatch';
+  end if;
+
+  select * into v_environment
+  from public.document_extraction_google_qualification_environment
+  where id = v_run.environment_id;
+  if v_environment.id is null
+    or v_environment.environment <> 'preview'
+    or v_environment.supabase_project_ref <> 'zfpnhvcmuuvtswttmnjd'
+    or v_environment.production_project_ref_exclusion <> 'mdiianhfrojmxqpwrflh'
+    or v_run.status <> 'active'
+    or (
+      p_operation not in ('provider_outcome', 'fail')
+      and not exists (
+        select 1 from public.document_extraction_google_qualification_state
+        where singleton_key = 'google_frozen_corpus_v1' and enabled
+      )
+    ) then
+    return 'environment_binding_mismatch';
+  end if;
+
+  select * into v_job from public.document_extraction_jobs where id = p_job_id;
+  select * into v_binding
+  from public.document_extraction_google_qualification_job_bindings
+  where job_id = p_job_id;
+  if v_job.id is null or v_binding.id is null then
+    return 'job_identity_mismatch';
+  end if;
+  if v_run.workspace_id <> v_environment.synthetic_workspace_id
+    or v_binding.workspace_id <> v_job.workspace_id then
+    return 'workspace_binding_mismatch';
+  end if;
+  if v_binding.run_id <> v_run.id
+    or v_binding.item_id <> v_item.id
+    or v_binding.source_binding_id <> v_item.source_binding_id
+    or v_binding.intake_request_id <> v_job.intake_request_id
+    or v_binding.file_id <> v_job.file_id
+    or v_binding.fixture_identity_fingerprint <> v_item.fixture_identity_fingerprint
+    or v_binding.source_sha256 <> v_item.source_sha256
+    or v_binding.page_identity_fingerprints <> v_item.page_identity_fingerprints
+    or v_binding.corpus_sha256 <> v_run.corpus_sha256
+    or v_binding.preview_project_ref <> v_environment.supabase_project_ref
+    or v_binding.controller_version <> v_run.controller_version then
+    return 'fixture_binding_mismatch';
+  end if;
+  if v_run.provider_profile <> v_job.provider_profile
+    or v_run.processor_id <> v_job.processor_id
+    or v_run.processor_resource <> v_job.processor_resource
+    or v_environment.processor_id <> v_job.processor_id
+    or v_environment.processor_resource <> v_job.processor_resource
+    or v_environment.processor_version <> v_job.processor_version
+    or v_binding.provider_profile <> v_run.provider_profile
+    or v_binding.processor_resource <> v_run.processor_resource then
+    return 'processor_identity_mismatch';
+  end if;
+  if not public.document_extraction_google_job_identity_is_exact_v1(v_job) then
+    return 'job_identity_mismatch';
+  end if;
+  if not v_item.provider_eligible or v_item.status <> 'processing'
+    or v_job.status <> 'processing' then
+    return 'job_state_mismatch';
+  end if;
+  if v_job.lease_owner <> p_worker_id or v_job.lease_expires_at <= now() then
+    return 'lease_state_mismatch';
+  end if;
+  return 'authorized';
+end;
+$$;
+
 -- This graph is intentionally synthetic and transaction-scoped. The job is
 -- inserted before the owner-only source binding so the test can exercise the
 -- qualification class without bypassing its runtime mutation guard.
@@ -223,23 +331,25 @@ select is(
   0,
   'ordinary Google claim cannot receive a qualification-bound job'
 );
-select throws_ok(
-  $$select public.enqueue_google_document_extraction_job_v1(
-    'd2650000-0000-4000-8000-000000000001', 'google_primary', 'digital_pdf',
-    repeat('3', 64), 1, 'google_document_ai', 'pretrained-ocr-v2.1-2024-08-07',
-    'google_document_ai_enterprise_ocr_v1', 'vaeroex_google_document_ai_rest_v1',
-    repeat('1', 64), repeat('2', 64), 'document_extraction_routing_v1',
-    'document_extraction_artifact_v2', 'document_extraction_normalization_v2',
-    'google_document_ai_enterprise_ocr_v1', 'OCR_PROCESSOR', '948f589143795629',
-    'projects/626856681952/locations/us/processors/948f589143795629/processorVersions/pretrained-ocr-v2.1-2024-08-07',
-    'us', 'pretrained-ocr-v2.1-2024-08-07',
-    'google_document_ai_processor_version_process_v1',
-    'google_document_ai_process_request_v1', 'google_document_ai_process_response_v2',
-    'google_document_ai_layout_normalization_v2',
-    'google_document_ai_enterprise_ocr_strict_v1', 'tables_if_present_strict_v1',
-    'preserve_for_review_never_authority_v1', 'disabled_v1',
-    'document_extraction_review_provenance_v2')$$,
-  '42501',
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.enqueue_google_document_extraction_job_v1(
+      'd2650000-0000-4000-8000-000000000001', 'google_primary', 'digital_pdf',
+      repeat('3', 64), 1, 'google_document_ai', 'pretrained-ocr-v2.1-2024-08-07',
+      'google_document_ai_enterprise_ocr_v1', 'vaeroex_google_document_ai_rest_v1',
+      repeat('1', 64), repeat('2', 64), 'document_extraction_routing_v1',
+      'document_extraction_artifact_v2', 'document_extraction_normalization_v2',
+      'google_document_ai_enterprise_ocr_v1', 'OCR_PROCESSOR', '948f589143795629',
+      'projects/626856681952/locations/us/processors/948f589143795629/processorVersions/pretrained-ocr-v2.1-2024-08-07',
+      'us', 'pretrained-ocr-v2.1-2024-08-07',
+      'google_document_ai_processor_version_process_v1',
+      'google_document_ai_process_request_v1', 'google_document_ai_process_response_v2',
+      'google_document_ai_layout_normalization_v2',
+      'google_document_ai_enterprise_ocr_strict_v1', 'tables_if_present_strict_v1',
+      'preserve_for_review_never_authority_v1', 'disabled_v1',
+      'document_extraction_review_provenance_v2')$$,
+    '42501'
+  ),
   'ordinary enqueue rejects a qualification-owned source even idempotently'
 );
 select is(
@@ -247,10 +357,110 @@ select is(
   1,
   'the exact qualification claim receives the bound job once'
 );
-select throws_ok(
-  $$select public.resolve_google_document_extraction_job_lease_v1(
-    'e2650000-0000-4000-8000-000000000001', 'qualification-worker')$$,
-  '42501',
+select pg_temp.finish_google_qualification_rpc();
+reset role;
+select is(
+  pg_temp.google_qualification_assertion_reason(
+    'e2650000-0000-4000-8000-000000000001',
+    'qualification-worker',
+    'advance'
+  ),
+  'authorized',
+  'the legitimate first qualification advance satisfies every assertion predicate'
+);
+select is(
+  pg_temp.google_qualification_assertion_reason(
+    'e2650000-0000-4000-8000-000000000001',
+    'wrong-worker',
+    'advance'
+  ),
+  'lease_state_mismatch',
+  'the content-free classifier identifies a wrong worker lease'
+);
+select is(
+  pg_temp.google_qualification_assertion_reason(
+    'e2650000-0000-4000-8000-000000000099',
+    'qualification-worker',
+    'advance'
+  ),
+  'qualification_run_mismatch',
+  'an unrelated job cannot enter the qualification assertion'
+);
+
+update public.document_extraction_google_qualification_job_bindings
+set workspace_id = 'b2650000-0000-4000-8000-000000000002'
+where job_id = 'e2650000-0000-4000-8000-000000000001';
+select is(
+  pg_temp.google_qualification_assertion_reason(
+    'e2650000-0000-4000-8000-000000000001',
+    'qualification-worker',
+    'advance'
+  ),
+  'workspace_binding_mismatch',
+  'a substituted workspace binding fails closed'
+);
+update public.document_extraction_google_qualification_job_bindings
+set workspace_id = 'b2650000-0000-4000-8000-000000000001'
+where job_id = 'e2650000-0000-4000-8000-000000000001';
+
+update public.document_extraction_google_qualification_job_bindings
+set fixture_identity_fingerprint = repeat('0', 64)
+where job_id = 'e2650000-0000-4000-8000-000000000001';
+select is(
+  pg_temp.google_qualification_assertion_reason(
+    'e2650000-0000-4000-8000-000000000001',
+    'qualification-worker',
+    'advance'
+  ),
+  'fixture_binding_mismatch',
+  'a substituted fixture binding fails closed'
+);
+update public.document_extraction_google_qualification_job_bindings
+set fixture_identity_fingerprint =
+  '7122901f3e5576868e1dc47205a8d033419699ecb9cb88d220d00f0560d2c6f1'
+where job_id = 'e2650000-0000-4000-8000-000000000001';
+
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update public.document_extraction_google_qualification_environment
+      set supabase_project_ref = 'mdiianhfrojmxqpwrflh'
+      where id = 'f2650000-0000-4000-8000-000000000001'$$,
+    '23514'
+  ),
+  'the Preview environment constraint rejects Production substitution'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update public.document_extraction_google_qualification_job_bindings
+      set processor_version = 'wrong-processor-version'
+      where job_id = 'e2650000-0000-4000-8000-000000000001'$$,
+    '23514'
+  ),
+  'the processor-version constraint rejects substitution'
+);
+
+select public.begin_google_frozen_qualification_mutation_v1(
+  'd2650000-0000-4000-8000-000000000001',
+  'advance'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update public.document_extraction_jobs
+      set parser_model = 'synthetic-wrong-model'
+      where id = 'e2650000-0000-4000-8000-000000000001'$$,
+    '23514'
+  ),
+  'the canonical Google job constraint rejects model substitution'
+);
+select pg_temp.finish_google_qualification_rpc();
+
+set local role service_role;
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.resolve_google_document_extraction_job_lease_v1(
+      'e2650000-0000-4000-8000-000000000001', 'qualification-worker')$$,
+    '42501'
+  ),
   'ordinary lease resolution rejects the qualification job'
 );
 select ok(
@@ -300,6 +510,7 @@ select is(
   'preparing',
   'qualification stage wrapper preserves the canonical lease transition'
 );
+select pg_temp.finish_google_qualification_rpc();
 select is(
   public.advance_google_frozen_qualification_job_v1(
     'e2650000-0000-4000-8000-000000000001', 'qualification-worker',
@@ -308,6 +519,7 @@ select is(
   'dispatching',
   'qualification job reaches dispatching without ordinary dispatch authorization'
 );
+select pg_temp.finish_google_qualification_rpc();
 select ok(
   pg_temp.raises_sqlstate(
     $$select public.authorize_google_document_extraction_dispatch_v1(

@@ -7,6 +7,9 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const migration = read(
   "supabase/migrations/20260806180609_document_extraction_google_frozen_qualification_controller.sql"
 );
+const databaseTest = read(
+  "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
+);
 const controller = read(
   "services/document-extraction-worker/src/vaeroex_document_worker/google_qualification_controller.py"
 );
@@ -29,6 +32,20 @@ assert.match(
   migration,
   /p_confirmation <> \(case when p_enabled[\s\S]*?end\)/
 );
+assert.match(databaseTest, /create or replace function pg_temp\.google_qualification_assertion_reason/);
+assert.match(databaseTest, /create or replace function pg_temp\.finish_google_qualification_rpc/);
+for (const reason of [
+  "qualification_run_mismatch",
+  "environment_binding_mismatch",
+  "workspace_binding_mismatch",
+  "fixture_binding_mismatch",
+  "job_identity_mismatch",
+  "job_state_mismatch",
+  "lease_state_mismatch",
+  "processor_identity_mismatch"
+]) {
+  assert.match(databaseTest, new RegExp(reason));
+}
 
 // Environment, processor, workspace, and source bytes are owner-installed
 // database bindings. RPC callers cannot manufacture or mutate them.
