@@ -36,6 +36,8 @@ create or replace function pg_temp.premature_processing_cleanup_fails(
 )
 returns boolean
 language plpgsql
+security definer
+set search_path = ''
 as $$
 begin
   begin
@@ -747,6 +749,7 @@ select ok(
   ),
   'clearing item job identity before processing-row deletion fails closed'
 );
+reset role;
 select is(
   (
     select job_id
@@ -756,6 +759,7 @@ select is(
   'e2650000-0000-4000-8000-000000000001'::uuid,
   'failed premature cleanup preserves the authoritative item job binding'
 );
+set local role service_role;
 select ok(
   public.verify_google_frozen_qualification_storage_cleanup_v1(
     (select run_id from pg_temp.google_qualification_test_execution_ids),
