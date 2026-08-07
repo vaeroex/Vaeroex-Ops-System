@@ -28,6 +28,74 @@ begin
 end;
 $$;
 
+-- Persistent qualification executions must never reuse an execution UUID.
+-- Corpus, fixture, and page identities remain deterministic and separate.
+create or replace function pg_temp.assert_google_qualification_run_id_unused(
+  p_run_id uuid
+)
+returns void
+language plpgsql
+as $$
+begin
+  if p_run_id is null or exists (
+    select 1
+    from public.document_extraction_google_qualification_cleanup_audits
+    where run_id_hash = encode(
+      extensions.digest(convert_to(p_run_id::text, 'UTF8'), 'sha256'),
+      'hex'
+    )
+  ) then
+    raise exception 'Qualification run identity was already used.'
+      using errcode = '23505';
+  end if;
+end;
+$$;
+
+create or replace function pg_temp.new_google_qualification_run_id()
+returns uuid
+language plpgsql
+as $$
+declare
+  v_run_id uuid;
+begin
+  for v_attempt in 1..16 loop
+    v_run_id := gen_random_uuid();
+    if not exists (
+      select 1
+      from public.document_extraction_google_qualification_cleanup_audits
+      where run_id_hash = encode(
+        extensions.digest(convert_to(v_run_id::text, 'UTF8'), 'sha256'),
+        'hex'
+      )
+    ) then
+      return v_run_id;
+    end if;
+  end loop;
+  raise exception 'Unable to allocate a fresh qualification run identity.'
+    using errcode = '55000';
+end;
+$$;
+
+create temporary table google_qualification_test_execution_ids (
+  run_id uuid primary key,
+  replay_run_id uuid not null unique,
+  third_run_id uuid not null unique,
+  request_id uuid not null unique,
+  check (run_id <> replay_run_id),
+  check (run_id <> third_run_id),
+  check (replay_run_id <> third_run_id)
+) on commit drop;
+grant select on pg_temp.google_qualification_test_execution_ids to service_role;
+
+insert into pg_temp.google_qualification_test_execution_ids (
+  run_id, replay_run_id, third_run_id, request_id
+) values (
+  pg_temp.new_google_qualification_run_id(),
+  pg_temp.new_google_qualification_run_id(),
+  pg_temp.new_google_qualification_run_id(),
+  gen_random_uuid()
+);
+
 -- Content-free test-only classifier for the otherwise intentionally generic
 -- 42501 assertion contract. It reports only bounded invariant classes.
 create or replace function pg_temp.google_qualification_assertion_reason(
@@ -269,10 +337,11 @@ insert into public.document_extraction_google_qualification_runs (
   fixture_source_commit, corpus_sha256, provider_profile, processor_id,
   processor_resource, processor_version, active_fixture_index
 ) values (
-  'f2650000-0000-4000-8000-000000000003',
+  (select run_id from pg_temp.google_qualification_test_execution_ids),
   'f2650000-0000-4000-8000-000000000001',
   'b2650000-0000-4000-8000-000000000001',
-  'f2650000-0000-4000-8000-000000000013', repeat('5', 64),
+  (select request_id from pg_temp.google_qualification_test_execution_ids),
+  repeat('5', 64),
   'google_frozen_corpus_qualification_controller_v2',
   'document_extraction_phase_c1_google_enterprise_ocr_v1', repeat('6', 64),
   'cc3c125b01ac41513b3b92213b6daa39fa5ba91f',
@@ -288,7 +357,7 @@ insert into public.document_extraction_google_qualification_items (
   content_hmac, cache_key, job_id, status
 ) values (
   'f2650000-0000-4000-8000-000000000004',
-  'f2650000-0000-4000-8000-000000000003', 1,
+  (select run_id from pg_temp.google_qualification_test_execution_ids), 1,
   '7122901f3e5576868e1dc47205a8d033419699ecb9cb88d220d00f0560d2c6f1',
   'e99132d7be25bc71b3fdc43faf765072b6c5c837d6d693728fc614905d9e66ec',
   array['d11271f3e2088235d16db17305b074f88944b493692887fc8302887326b03ec1']::text[],
@@ -305,7 +374,7 @@ insert into public.document_extraction_google_qualification_job_bindings (
   page_count, provider_profile, processor_id, processor_resource,
   processor_version, preview_project_ref, controller_version
 ) values (
-  'f2650000-0000-4000-8000-000000000003',
+  (select run_id from pg_temp.google_qualification_test_execution_ids),
   'f2650000-0000-4000-8000-000000000004',
   'f2650000-0000-4000-8000-000000000002',
   'e2650000-0000-4000-8000-000000000001',
@@ -572,7 +641,7 @@ reset role;
 
 update public.document_extraction_google_qualification_runs
 set provider_reservation_count = 9
-where id = 'f2650000-0000-4000-8000-000000000003';
+where id = (select run_id from pg_temp.google_qualification_test_execution_ids);
 set local role service_role;
 select is(
   public.reserve_google_frozen_qualification_page_v1(
@@ -613,7 +682,7 @@ set enabled = false where singleton_key = 'google_frozen_corpus_v1';
 set local role service_role;
 select is(
   public.cleanup_google_frozen_qualification_v1(
-    'f2650000-0000-4000-8000-000000000003',
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
     'cleanup-google-frozen-corpus-controller-v1'
   ) ->> 'cleanup_version',
   'google_frozen_corpus_cleanup_v2',
@@ -621,7 +690,7 @@ select is(
 );
 select ok(
   public.verify_google_frozen_qualification_storage_cleanup_v1(
-    'f2650000-0000-4000-8000-000000000003',
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
     'f2650000-0000-4000-8000-000000000002',
     'workspace-files',
     'b2650000-0000-4000-8000-000000000001/fixture-01.pdf',
@@ -631,7 +700,7 @@ select ok(
 );
 select is(
   public.finalize_google_frozen_qualification_cleanup_v1(
-    'f2650000-0000-4000-8000-000000000003',
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
     'finalize-google-frozen-corpus-cleanup-v2'
   ) ->> 'cleaned',
   'true',
@@ -639,13 +708,48 @@ select is(
 );
 select is(
   public.finalize_google_frozen_qualification_cleanup_v1(
-    'f2650000-0000-4000-8000-000000000003',
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
     'finalize-google-frozen-corpus-cleanup-v2'
   ) ->> 'idempotent',
   'true',
   'cleanup finalization is idempotent'
 );
 reset role;
+
+select is(
+  (
+    select count(*)::integer
+    from public.document_extraction_google_qualification_cleanup_audits
+    where run_id_hash = encode(
+      extensions.digest(convert_to(
+        (select run_id from pg_temp.google_qualification_test_execution_ids)::text,
+        'UTF8'
+      ), 'sha256'),
+      'hex'
+    )
+  ),
+  1,
+  'cleanup retains one append-only audit for the fresh execution identity'
+);
+select is(
+  (
+    select count(distinct run_identity)::integer
+    from pg_temp.google_qualification_test_execution_ids ids,
+    lateral unnest(array[ids.run_id, ids.replay_run_id, ids.third_run_id]) run_identity
+  ),
+  3,
+  'three qualification executions receive distinct random run identities'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    format(
+      'select pg_temp.assert_google_qualification_run_id_unused(%L::uuid)',
+      (select run_id from pg_temp.google_qualification_test_execution_ids)::text
+    ),
+    '23505'
+  ),
+  'deliberate reuse of a cleaned run identity fails closed without deleting evidence'
+);
 
 select is(
   (select count(*)::integer from public.document_extraction_google_qualification_runs),

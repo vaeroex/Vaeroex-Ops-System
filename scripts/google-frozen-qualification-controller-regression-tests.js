@@ -34,6 +34,13 @@ assert.match(
 );
 assert.match(databaseTest, /create or replace function pg_temp\.google_qualification_assertion_reason/);
 assert.match(databaseTest, /create or replace function pg_temp\.finish_google_qualification_rpc/);
+assert.match(databaseTest, /create or replace function pg_temp\.new_google_qualification_run_id/);
+assert.match(databaseTest, /create or replace function pg_temp\.assert_google_qualification_run_id_unused/);
+assert.match(databaseTest, /v_run_id := gen_random_uuid\(\)/);
+assert.match(databaseTest, /document_extraction_google_qualification_cleanup_audits/);
+assert.match(databaseTest, /three qualification executions receive distinct random run identities/);
+assert.match(databaseTest, /deliberate reuse of a cleaned run identity fails closed/);
+assert.doesNotMatch(databaseTest, /f2650000-0000-4000-8000-000000000003/);
 for (const reason of [
   "qualification_run_mismatch",
   "environment_binding_mismatch",
