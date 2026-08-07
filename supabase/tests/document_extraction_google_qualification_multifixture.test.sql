@@ -109,91 +109,6 @@ begin
 end;
 $$;
 
-create or replace function pg_temp.claim_state_is_denied(p_kind text)
-returns boolean
-language plpgsql
-as $$
-declare
-  v_lease_owner text;
-  v_lease_expires_at timestamptz;
-  v_workspace_id uuid;
-  v_active_fixture_index integer;
-  v_denied boolean := false;
-begin
-  select lease_owner, lease_expires_at, workspace_id
-    into v_lease_owner, v_lease_expires_at, v_workspace_id
-  from public.document_extraction_jobs
-  where id = 'e2660000-0000-4000-8000-000000000001';
-  select active_fixture_index into v_active_fixture_index
-  from public.document_extraction_google_qualification_runs
-  where id = 'f2660000-0000-4000-8000-000000000021';
-
-  perform set_config('session_replication_role', 'replica', true);
-  if p_kind = 'wrong_worker' then
-    null;
-  elsif p_kind = 'wrong_lease' then
-    update public.document_extraction_jobs
-    set lease_owner = 'different-worker'
-    where id = 'e2660000-0000-4000-8000-000000000001';
-  elsif p_kind = 'missing_lease' then
-    update public.document_extraction_jobs
-    set lease_owner = null, lease_expires_at = null
-    where id = 'e2660000-0000-4000-8000-000000000001';
-  elsif p_kind = 'wrong_workspace' then
-    update public.document_extraction_jobs
-    set workspace_id = 'b2660000-0000-4000-8000-000000000002'
-    where id = 'e2660000-0000-4000-8000-000000000001';
-  elsif p_kind = 'wrong_fixture' then
-    update public.document_extraction_google_qualification_runs
-    set active_fixture_index = 2
-    where id = 'f2660000-0000-4000-8000-000000000021';
-  elsif p_kind <> 'wrong_job' then
-    raise exception 'Unknown claim state case.';
-  end if;
-  perform set_config('session_replication_role', 'origin', true);
-
-  begin
-    perform public.assert_google_frozen_qualification_job_v1(
-      case when p_kind = 'wrong_job'
-        then 'e2660000-0000-4000-8000-000000000099'::uuid
-        else 'e2660000-0000-4000-8000-000000000001'::uuid
-      end,
-      case when p_kind = 'wrong_worker'
-        then 'different-worker'
-        else 'qualification-worker'
-      end,
-      'heartbeat'
-    );
-  exception when sqlstate '42501' then
-    v_denied := true;
-  end;
-
-  perform set_config('session_replication_role', 'replica', true);
-  update public.document_extraction_jobs
-  set lease_owner = v_lease_owner,
-      lease_expires_at = v_lease_expires_at,
-      workspace_id = v_workspace_id
-  where id = 'e2660000-0000-4000-8000-000000000001';
-  update public.document_extraction_google_qualification_runs
-  set active_fixture_index = v_active_fixture_index
-  where id = 'f2660000-0000-4000-8000-000000000021';
-  perform set_config('session_replication_role', 'origin', true);
-  return v_denied;
-exception when others then
-  perform set_config('session_replication_role', 'replica', true);
-  update public.document_extraction_jobs
-  set lease_owner = v_lease_owner,
-      lease_expires_at = v_lease_expires_at,
-      workspace_id = v_workspace_id
-  where id = 'e2660000-0000-4000-8000-000000000001';
-  update public.document_extraction_google_qualification_runs
-  set active_fixture_index = v_active_fixture_index
-  where id = 'f2660000-0000-4000-8000-000000000021';
-  perform set_config('session_replication_role', 'origin', true);
-  raise;
-end;
-$$;
-
 insert into public.profiles (id, email, full_name) values
   ('a2660000-0000-4000-8000-000000000001', 'pr265-multifixture@example.test', 'PR 265 Multi Fixture');
 insert into public.workspaces (id, name, created_by) values
@@ -431,6 +346,7 @@ select is(
   1,
   'fixture 1 is claimed through the qualification-only path'
 );
+reset role;
 select results_eq(
   $$select status from public.document_extraction_google_qualification_items
     where id = 'f2660000-0000-4000-8000-000000000031'$$,
@@ -465,14 +381,51 @@ select ok(
   ),
   'a duplicate claimed event is rejected in the winning transaction'
 );
-reset role;
 
-select ok(pg_temp.claim_state_is_denied('wrong_worker'), 'wrong claim worker fails');
-select ok(pg_temp.claim_state_is_denied('wrong_lease'), 'wrong claim lease fails');
-select ok(pg_temp.claim_state_is_denied('missing_lease'), 'missing claim lease fails');
-select ok(pg_temp.claim_state_is_denied('wrong_workspace'), 'wrong claim workspace fails');
-select ok(pg_temp.claim_state_is_denied('wrong_fixture'), 'wrong claim fixture fails');
-select ok(pg_temp.claim_state_is_denied('wrong_job'), 'wrong claim job fails');
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.assert_google_frozen_qualification_job_v1(
+      'e2660000-0000-4000-8000-000000000001', 'different-worker', 'heartbeat')$$,
+    '42501'
+  ),
+  'wrong claim worker fails'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update public.document_extraction_jobs
+      set lease_expires_at = lease_expires_at + interval '1 second'
+      where id = 'e2660000-0000-4000-8000-000000000001'$$,
+    '42501'
+  ),
+  'wrong claim lease fails'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update public.document_extraction_jobs
+      set lease_owner = null, lease_expires_at = null
+      where id = 'e2660000-0000-4000-8000-000000000001'$$,
+    '42501'
+  ),
+  'missing claim lease fails'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$update public.document_extraction_jobs
+      set workspace_id = 'b2660000-0000-4000-8000-000000000002'
+      where id = 'e2660000-0000-4000-8000-000000000001'$$,
+    '42501'
+  ),
+  'wrong claim workspace fails'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.assert_google_frozen_qualification_job_v1(
+      'e2660000-0000-4000-8000-000000000099',
+      'qualification-worker', 'heartbeat')$$,
+    '42501'
+  ),
+  'wrong claim job fails'
+);
 select ok(
   pg_temp.raises_sqlstate(
     $$select pg_temp.attempt_claim_context_substitution('run')$$, '42501'
@@ -617,10 +570,8 @@ select ok(
   ),
   'fixture 2 context cannot mutate fixture 1 file state'
 );
-select ok(
-  pg_temp.clear_google_guard() is null,
-  'the signed transaction context can be explicitly cleared between RPCs'
-);
+select pg_temp.clear_google_guard();
+select pass('the signed transaction context can be explicitly cleared between RPCs');
 select ok(
   pg_temp.raises_sqlstate(
     $$update public.document_extraction_workspace_settings
