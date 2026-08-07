@@ -22,6 +22,9 @@ const processingCleanupProof = read(
 const claimCleanupMerge = read(
   "supabase/migrations/20260807203645_document_extraction_google_qualification_claim_cleanup_merge.sql"
 );
+const dispatchQuotaGuard = read(
+  "supabase/migrations/20260807215440_document_extraction_google_qualification_dispatch_quota_guard.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
 );
@@ -199,7 +202,7 @@ const mutationGuardMigrations = fs
   );
 assert.equal(
   mutationGuardMigrations.at(-1)?.name,
-  "20260807203645_document_extraction_google_qualification_claim_cleanup_merge.sql"
+  "20260807215440_document_extraction_google_qualification_dispatch_quota_guard.sql"
 );
 const finalMutationGuard = mutationGuardMigrations.at(-1)?.sql ?? "";
 assert.match(finalMutationGuard, /v_claim_worker_id text/);
@@ -219,6 +222,41 @@ assert.match(
 );
 assert.match(finalMutationGuard, /v_context_processing_binding_id uuid/);
 assert.match(finalMutationGuard, /v_context_processing_job_id uuid/);
+assert.match(finalMutationGuard, /v_dispatch_job public\.document_extraction_jobs%rowtype/);
+assert.match(
+  finalMutationGuard,
+  /tg_table_name = 'document_extraction_workspace_settings'[\s\S]*?v_operation = 'dispatch'/
+);
+assert.match(
+  finalMutationGuard,
+  /v_dispatch_job\.lease_owner <> v_reservation\.worker_id/
+);
+assert.match(
+  finalMutationGuard,
+  /v_dispatch_job\.lease_expires_at <> v_reservation\.lease_expires_at/
+);
+assert.match(
+  finalMutationGuard,
+  /v_dispatch_binding\.controller_version <> v_run\.controller_version/
+);
+assert.match(
+  finalMutationGuard,
+  /new\.pages_reserved <>[\s\S]*?old\.pages_reserved - v_dispatch_job\.reserved_page_count/
+);
+assert.match(
+  finalMutationGuard,
+  /new\.pages_consumed <>[\s\S]*?old\.pages_consumed \+ v_dispatch_job\.reserved_page_count/
+);
+for (const unchangedField of [
+  "is_entitled", "is_enabled", "monthly_page_limit", "current_period_start",
+  "current_period_end", "concurrent_job_limit", "allowed_document_classes",
+  "created_at"
+]) {
+  assert.match(
+    finalMutationGuard,
+    new RegExp(`new\\.${unchangedField} is distinct from old\\.${unchangedField}`)
+  );
+}
 assert.match(
   finalMutationGuard,
   /revoke execute on function public\.enforce_google_frozen_qualification_mutation_v1\(\)[\s\S]*?from public, anon, authenticated, service_role/
@@ -229,6 +267,23 @@ assert.doesNotMatch(claimCleanupMerge, /create\s+(?:table|index|trigger)\b/i);
 assert.doesNotMatch(
   claimCleanupMerge,
   /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.doesNotMatch(dispatchQuotaGuard, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(dispatchQuotaGuard, /\bon delete cascade\b/i);
+assert.doesNotMatch(dispatchQuotaGuard, /create\s+(?:table|index|trigger)\b/i);
+assert.doesNotMatch(
+  dispatchQuotaGuard,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(dispatchQuotaGuard, /v_claim_worker_id text/);
+assert.match(dispatchQuotaGuard, /google_qualification_job_claimed/);
+assert.match(
+  dispatchQuotaGuard,
+  /google_qualification_processing_cleanup_proof_v1/
+);
+assert.match(
+  dispatchQuotaGuard,
+  /v_operation not in \('enqueue', 'dispatch'\)/
 );
 assert.match(controller, /restart_latched/);
 assert.match(controller, /qualification_worker_restarted/);

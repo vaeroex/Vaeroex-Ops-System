@@ -38,6 +38,24 @@ select ok(
   ) > 0,
   'final migration chain retains transaction-signed processing cleanup proof'
 );
+select ok(
+  position(
+    'v_dispatch_job.lease_owner <> v_reservation.worker_id' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0
+  and position(
+    'new.pages_reserved <>' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0
+  and position(
+    'new.pages_consumed <>' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0,
+  'final migration chain retains exact reservation-bound dispatch quota mutation'
+);
 
 create or replace function pg_temp.raises_sqlstate(p_sql text, p_expected text)
 returns boolean
@@ -61,6 +79,215 @@ as $$
 begin
   perform set_config('vaeroex.google_qualification_guard', '', true);
   perform set_config('vaeroex.google_qualification_guard_context', '', true);
+end;
+$$;
+
+create or replace function pg_temp.reservation_nine_dispatch_succeeds(
+  p_run_id uuid,
+  p_item_id uuid,
+  p_job_id uuid,
+  p_worker_id text,
+  p_reservation_request_id uuid,
+  p_dispatch_request_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_result jsonb;
+  v_ok boolean := false;
+begin
+  begin
+    update public.document_extraction_google_qualification_runs
+    set provider_reservation_count = 8
+    where id = p_run_id;
+    select public.reserve_google_frozen_qualification_page_v1(
+      p_job_id,
+      p_worker_id,
+      1,
+      p_reservation_request_id,
+      p_dispatch_request_id
+    ) into v_result;
+    v_ok := coalesce((v_result ->> 'authorized')::boolean, false)
+      and (select provider_reservation_count = 9
+        and provider_call_count = 0
+        and retry_count = 0
+        from public.document_extraction_google_qualification_runs
+        where id = p_run_id)
+      and (select provider_reservation_count = 1
+        and provider_call_count = 0
+        from public.document_extraction_google_qualification_items
+        where id = p_item_id)
+      and (select count(*) = 1
+        and min(reservation_number) = 9
+        and bool_and(status = 'reserved')
+        from public.document_extraction_google_qualification_page_reservations
+        where run_id = p_run_id)
+      and (select stage = 'provider_dispatched'
+        and provider_call_count = 1
+        and provider_dispatched_at is not null
+        and dispatch_request_id = p_dispatch_request_id
+        and billed_page_count = 1
+        and reserved_page_count = 0
+        and retry_count = 0
+        from public.document_extraction_jobs
+        where id = p_job_id)
+      and (select pages_reserved = 0 and pages_consumed = 1
+        from public.document_extraction_workspace_settings settings
+        join public.document_extraction_google_qualification_runs run
+          on run.workspace_id = settings.workspace_id
+        where run.id = p_run_id)
+      and not exists (
+        select 1 from public.document_extraction_provider_outcomes outcome
+        where outcome.job_id = p_job_id
+      );
+    raise exception 'rollback reservation-nine proof' using errcode = 'P0001';
+  exception
+    when sqlstate 'P0001' then return v_ok;
+    when others then return false;
+  end;
+end;
+$$;
+
+create or replace function pg_temp.dispatch_quota_mutation_rejects(
+  p_run_id uuid,
+  p_item_id uuid,
+  p_job_id uuid,
+  p_intake_request_id uuid,
+  p_case text
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_context jsonb;
+  v_reservation_id uuid := 'f2650000-0000-4000-8000-000000000031';
+begin
+  if p_case not in (
+    'no_reservation', 'wrong_reservation', 'wrong_page', 'wrong_job',
+    'wrong_run', 'wrong_workspace', 'wrong_fixture', 'wrong_worker',
+    'wrong_lease', 'stopped', 'retry', 'fallback', 'wrong_processor',
+    'unrelated_field'
+  ) then
+    return false;
+  end if;
+  begin
+    update public.document_extraction_google_qualification_runs
+    set provider_reservation_count = 9
+    where id = p_run_id;
+    update public.document_extraction_google_qualification_items
+    set provider_reservation_count = 1
+    where id = p_item_id;
+    insert into public.document_extraction_google_qualification_page_reservations (
+      id, run_id, item_id, job_id, fixture_index, page_index,
+      reservation_number, reservation_request_id, dispatch_request_id,
+      worker_id, lease_expires_at, provider, provider_profile, processor_id,
+      processor_resource, processor_version, controller_version,
+      qualification_state_updated_at
+    )
+    select
+      v_reservation_id, run.id, item.id, job.id, item.fixture_index, 1,
+      9, 'f2650000-0000-4000-8000-000000000032',
+      'f2650000-0000-4000-8000-000000000033', job.lease_owner,
+      job.lease_expires_at, 'google_document_ai', run.provider_profile,
+      run.processor_id, run.processor_resource, run.processor_version,
+      run.controller_version, state.updated_at
+    from public.document_extraction_google_qualification_runs run
+    join public.document_extraction_google_qualification_items item
+      on item.run_id = run.id and item.id = p_item_id
+    join public.document_extraction_jobs job on job.id = p_job_id
+    join public.document_extraction_google_qualification_state state
+      on state.singleton_key = 'google_frozen_corpus_v1'
+    where run.id = p_run_id;
+    perform public.begin_google_frozen_qualification_mutation_v1(
+      p_intake_request_id,
+      'dispatch'
+    );
+
+    if p_case = 'no_reservation' then
+      delete from public.document_extraction_google_qualification_page_reservations
+      where id = v_reservation_id;
+    elsif p_case = 'wrong_page' then
+      update public.document_extraction_google_qualification_page_reservations
+      set page_index = 2 where id = v_reservation_id;
+    elsif p_case = 'wrong_worker' then
+      update public.document_extraction_google_qualification_page_reservations
+      set worker_id = 'qualification-other-worker' where id = v_reservation_id;
+    elsif p_case = 'wrong_lease' then
+      update public.document_extraction_google_qualification_page_reservations
+      set lease_expires_at = lease_expires_at + interval '1 second'
+      where id = v_reservation_id;
+    elsif p_case = 'stopped' then
+      update public.document_extraction_google_qualification_runs
+      set status = 'stopped', stop_reason = 'test_stop', stopped_at = now()
+      where id = p_run_id;
+    elsif p_case = 'retry' then
+      update public.document_extraction_jobs
+      set retry_count = 1 where id = p_job_id;
+    elsif p_case = 'fallback' then
+      update public.document_extraction_jobs
+      set route = 'google_fallback' where id = p_job_id;
+    elsif p_case = 'wrong_processor' then
+      update public.document_extraction_jobs
+      set processor_id = repeat('a', 16) where id = p_job_id;
+    elsif p_case = 'unrelated_field' then
+      update public.document_extraction_workspace_settings
+      set monthly_page_limit = monthly_page_limit + 1,
+          pages_reserved = pages_reserved - 1,
+          pages_consumed = pages_consumed + 1,
+          updated_at = now()
+      where workspace_id = (
+        select workspace_id
+        from public.document_extraction_google_qualification_runs
+        where id = p_run_id
+      );
+      raise exception 'Unrelated dispatch quota mutation unexpectedly succeeded.'
+        using errcode = 'P0001';
+    else
+      v_context := current_setting(
+        'vaeroex.google_qualification_guard_context', true
+      )::jsonb;
+      v_context := jsonb_set(
+        v_context,
+        case p_case
+          when 'wrong_reservation' then array['reservation_id']
+          when 'wrong_job' then array['job_id']
+          when 'wrong_run' then array['run_id']
+          when 'wrong_workspace' then array['workspace_id']
+          else array['fixture_index']
+        end,
+        case p_case
+          when 'wrong_fixture' then to_jsonb(2)
+          else to_jsonb('f2650000-0000-4000-8000-000000000099'::text)
+        end,
+        false
+      );
+      perform set_config(
+        'vaeroex.google_qualification_guard_context', v_context::text, true
+      );
+    end if;
+
+    update public.document_extraction_workspace_settings
+    set pages_reserved = pages_reserved - 1,
+        pages_consumed = pages_consumed + 1,
+        updated_at = now()
+    where workspace_id = (
+      select workspace_id
+      from public.document_extraction_google_qualification_runs
+      where id = p_run_id
+    );
+    raise exception 'Invalid dispatch quota mutation unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = case
+      when p_case in ('retry', 'wrong_processor') then '23514'
+      else '42501'
+    end;
+  end;
 end;
 $$;
 
@@ -866,6 +1093,65 @@ select ok(
   'ordinary completion cannot progress a qualification job'
 );
 reset role;
+
+select results_eq(
+  $$select test_case, pg_temp.dispatch_quota_mutation_rejects(
+      (select run_id from pg_temp.google_qualification_test_execution_ids),
+      'f2650000-0000-4000-8000-000000000004',
+      'e2650000-0000-4000-8000-000000000001',
+      'd2650000-0000-4000-8000-000000000001',
+      test_case
+    )
+    from unnest(array[
+      'fallback', 'no_reservation', 'retry', 'stopped', 'unrelated_field',
+      'wrong_fixture', 'wrong_job', 'wrong_lease', 'wrong_page',
+      'wrong_processor', 'wrong_reservation', 'wrong_run', 'wrong_worker',
+      'wrong_workspace'
+    ]::text[]) test_case
+    order by test_case$$,
+  $$values
+    ('fallback'::text, true),
+    ('no_reservation'::text, true),
+    ('retry'::text, true),
+    ('stopped'::text, true),
+    ('unrelated_field'::text, true),
+    ('wrong_fixture'::text, true),
+    ('wrong_job'::text, true),
+    ('wrong_lease'::text, true),
+    ('wrong_page'::text, true),
+    ('wrong_processor'::text, true),
+    ('wrong_reservation'::text, true),
+    ('wrong_run'::text, true),
+    ('wrong_worker'::text, true),
+    ('wrong_workspace'::text, true)$$,
+  'dispatch quota mutation rejects unsigned, mismatched, stopped, retry, fallback, and unrelated state'
+);
+
+select ok(
+  pg_temp.reservation_nine_dispatch_succeeds(
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
+    'f2650000-0000-4000-8000-000000000004',
+    'e2650000-0000-4000-8000-000000000001',
+    'qualification-worker',
+    'f2650000-0000-4000-8000-000000000027',
+    'f2650000-0000-4000-8000-000000000028'
+  ),
+  'the exact ninth reservation performs one bounded dispatch quota transition'
+);
+select results_eq(
+  $$select provider_reservation_count, provider_call_count
+    from public.document_extraction_google_qualification_runs
+    where id = (select run_id from pg_temp.google_qualification_test_execution_ids)$$,
+  $$values (0, 0)$$,
+  'reservation-nine proof rolls back without retaining provider state'
+);
+select results_eq(
+  $$select pages_reserved, pages_consumed
+    from public.document_extraction_workspace_settings
+    where workspace_id = 'b2650000-0000-4000-8000-000000000001'$$,
+  $$values (1, 0)$$,
+  'reservation-nine proof rolls back its quota accounting state'
+);
 
 update public.document_extraction_google_qualification_runs
 set provider_reservation_count = 9
