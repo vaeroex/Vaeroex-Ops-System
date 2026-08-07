@@ -173,3 +173,58 @@ def test_google_frozen_controller_runs_once_without_entering_polling_daemon(
     assert result["retry_count"] == 0
     assert server.shutdown_called
     assert server.close_called
+
+
+def test_google_frozen_controller_holds_terminal_worker_until_shutdown(
+    monkeypatch: Any,
+) -> None:
+    server = FakeServer()
+    config = replace(
+        worker_config(),
+        nvidia_api_key=None,
+        provider_contract=None,
+        google_provider_contract=GoogleDocumentAiContract(
+            project_number="123456789012",
+            processor_id="0123456789abcdef",
+        ),
+        synthetic_qualification_enabled=True,
+        google_frozen_qualification_controller_enabled=True,
+    )
+    controller_finished = asyncio.Event()
+
+    async def verify(_config: object) -> None:
+        return None
+
+    async def run_controller(
+        _config: WorkerConfig,
+        *,
+        progress_callback: Any = None,
+    ) -> GoogleFrozenQualificationResult:
+        del progress_callback
+        controller_finished.set()
+        return GoogleFrozenQualificationResult(
+            "stopped", 8, 9, 1, 0, "qualification_controller_failure"
+        )
+
+    monkeypatch.setattr(daemon, "assert_runtime_resources", lambda: None)
+    monkeypatch.setattr(daemon, "scavenge_stale_worker_directories", lambda: 0)
+    monkeypatch.setattr(daemon, "start_health_server", lambda _state, _port: server)
+    monkeypatch.setattr(daemon, "_verify_broker", verify)
+    monkeypatch.setattr(daemon, "run_google_frozen_qualification", run_controller)
+    monkeypatch.setattr(daemon, "emit_operational_event", lambda *_args, **_kwargs: None)
+
+    async def exercise() -> None:
+        task = asyncio.create_task(daemon.run_worker(config))
+        await controller_finished.wait()
+        await asyncio.sleep(0)
+        assert not task.done()
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(exercise())
+
+    assert server.shutdown_called
+    assert server.close_called

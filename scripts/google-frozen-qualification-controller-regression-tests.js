@@ -7,8 +7,14 @@ const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
 const migration = read(
   "supabase/migrations/20260806180609_document_extraction_google_frozen_qualification_controller.sql"
 );
+const concreteFix = read(
+  "supabase/migrations/20260807172710_document_extraction_google_frozen_qualification_concrete_fixes.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
+);
+const multiFixtureTest = read(
+  "supabase/tests/document_extraction_google_qualification_multifixture.test.sql"
 );
 const controller = read(
   "services/document-extraction-worker/src/vaeroex_document_worker/google_qualification_controller.py"
@@ -32,6 +38,48 @@ assert.match(
   migration,
   /p_confirmation <> \(case when p_enabled[\s\S]*?end\)/
 );
+assert.doesNotMatch(concreteFix, /\b(?:truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(
+  concreteFix,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(
+  concreteFix,
+  /document_extraction_google_qualification_processing_job_bindings/
+);
+assert.match(concreteFix, /deleted_file_processing_job_count/);
+assert.match(concreteFix, /google_qualification_guard_context/);
+assert.match(concreteFix, /'run_id', v_run\.id/);
+assert.match(concreteFix, /'workspace_id', v_run\.workspace_id/);
+assert.match(concreteFix, /'item_id', v_item\.id/);
+assert.match(concreteFix, /'intake_request_id', v_item\.intake_request_id/);
+assert.match(concreteFix, /'file_id', v_item\.file_id/);
+assert.match(concreteFix, /'fixture_index', v_item\.fixture_index/);
+assert.match(concreteFix, /'reservation_id', v_reservation\.id/);
+assert.match(concreteFix, /'page_index', v_reservation\.page_index/);
+assert.doesNotMatch(concreteFix, /order by fixture_index\s+limit 1/);
+assert.match(
+  concreteFix,
+  /prepare_google_frozen_qualification_base_v1[\s\S]*?restart_latched/
+);
+assert.match(
+  concreteFix,
+  /delete from public\.file_processing_jobs processing_job[\s\S]*?file_processing_job_id/
+);
+assert.match(
+  concreteFix,
+  /deleted_file_processing_jobs[\s\S]*?v_processing_job_count/
+);
+assert.match(controller, /restart_latched/);
+assert.match(controller, /qualification_worker_restarted/);
+assert.match(controller, /qualification_controller_failure/);
+assert.match(multiFixtureTest, /fixture 1 reaches the existing successful review boundary/);
+assert.match(multiFixtureTest, /fixture 2 enqueues after fixture 1/);
+assert.match(multiFixtureTest, /guard resolves fixture 2 rather than fixture 1/);
+assert.match(multiFixtureTest, /stale fixture 1 context cannot mutate fixture 2/);
+assert.match(multiFixtureTest, /wrong intake cannot manufacture qualification context/);
+assert.match(multiFixtureTest, /fixture 2 context cannot mutate fixture 1 job state/);
+assert.match(multiFixtureTest, /fixture 2 context cannot mutate fixture 1 file state/);
 assert.match(databaseTest, /create or replace function pg_temp\.google_qualification_assertion_reason/);
 assert.match(databaseTest, /create or replace function pg_temp\.finish_google_qualification_rpc/);
 assert.match(databaseTest, /create or replace function pg_temp\.new_google_qualification_run_id/);

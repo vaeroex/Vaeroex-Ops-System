@@ -85,6 +85,11 @@ async def run_worker(config: WorkerConfig, *, max_cycles: int | None = None) -> 
                 provider_calls=qualification_result.provider_calls,
                 retry_count=qualification_result.retry_count,
             )
+            # Worker Pools replace exited containers. Hold the one-shot process
+            # after its terminal result so it cannot start a second corpus run;
+            # scaling the pool to zero supplies the normal termination signal.
+            if max_cycles is None:
+                await stop.wait()
             return
         backoff = config.idle_poll_seconds
         completed_cycles = 0

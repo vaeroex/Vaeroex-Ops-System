@@ -65,6 +65,8 @@ class QualificationState:
     stop_reason: str | None = None
     running_jobs: int = 0
     max_running_jobs: int = 0
+    restart_latched: bool = False
+    fail_enqueue_after: int | None = None
 
 
 class FakeBroker:
@@ -86,6 +88,7 @@ class FakeBroker:
                 "run_id": str(uuid.UUID(int=100)),
                 "eligible_documents": 8,
                 "eligible_pages": 9,
+                "restart_latched": self.state.restart_latched,
             }
         if operation == "qualification_status":
             return {
@@ -101,6 +104,8 @@ class FakeBroker:
                 "concurrency": 1,
             }
         if operation == "qualification_enqueue_next":
+            if self.state.fail_enqueue_after == self.state.succeeded_documents:
+                raise BrokerFailure("qualification_enqueue_authorization_failed")
             if self.state.status != "active" or self.state.active_fixture is not None:
                 return {"enqueued": False}
             eligible = [1, 2, 3, 4, 6, 7, 10, 11]
@@ -275,6 +280,58 @@ def test_fatal_result_latches_corpus_stop_before_next_enqueue(
     assert state.enqueued_fixtures == [1]
     assert state.operations.count("qualification_enqueue_next") == 1
     assert state.provider_calls == 1
+
+
+def test_controller_failure_stops_cleanly_without_restarting_or_polling_next_page(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    state = QualificationState(fail_enqueue_after=1)
+    install_fake_broker(monkeypatch, state)
+
+    async def run_first_page(
+        _config: WorkerConfig,
+        *,
+        progress_callback: Any = None,
+    ) -> WorkerRunResult:
+        del progress_callback
+        state.provider_reservations += 1
+        state.provider_calls += 1
+        return WorkerRunResult("needs_review", 1, 0, None)
+
+    monkeypatch.setattr(controller, "run_one_job", run_first_page)
+    result = asyncio.run(controller.run_google_frozen_qualification(worker_config()))
+
+    assert result.status == "stopped"
+    assert result.failure_code == "qualification_enqueue_authorization_failed"
+    assert state.status == "stopped"
+    assert state.enqueued_fixtures == [1]
+    assert state.provider_calls == 1
+    assert state.operations.count("qualification_enqueue_next") == 2
+
+
+@pytest.mark.parametrize("prior_status", ("active", "stopped", "completed"))
+def test_restarted_one_shot_observes_existing_run_without_provider_work(
+    monkeypatch: pytest.MonkeyPatch,
+    prior_status: str,
+) -> None:
+    state = QualificationState(status=prior_status, restart_latched=True)
+    install_fake_broker(monkeypatch, state)
+    monkeypatch.setattr(
+        controller,
+        "run_one_job",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("a restarted one-shot worker cannot execute provider work")
+        ),
+    )
+
+    result = asyncio.run(controller.run_google_frozen_qualification(worker_config()))
+
+    assert result.status in {"stopped", "completed"}
+    assert state.provider_calls == 0
+    assert "qualification_enqueue_next" not in state.operations
+    if prior_status == "active":
+        assert state.status == "stopped"
+        assert state.operations.count("qualification_stop") == 1
 
 
 def test_controller_rejects_non_google_and_production_configuration() -> None:

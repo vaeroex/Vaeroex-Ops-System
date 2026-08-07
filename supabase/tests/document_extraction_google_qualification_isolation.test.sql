@@ -25,6 +25,7 @@ language plpgsql
 as $$
 begin
   perform set_config('vaeroex.google_qualification_guard', '', true);
+  perform set_config('vaeroex.google_qualification_guard_context', '', true);
 end;
 $$;
 
@@ -213,6 +214,29 @@ insert into public.file_uploads (
   'workspace-files',
   'b2650000-0000-4000-8000-000000000001/fixture-01.pdf',
   '{}'::jsonb, 'a2650000-0000-4000-8000-000000000001'
+), (
+  'c2650000-0000-4000-8000-000000000002',
+  'b2650000-0000-4000-8000-000000000002',
+  'unrelated.pdf', 'Unrelated', 'pdf', 'application/pdf', 512,
+  'workspace-files',
+  'b2650000-0000-4000-8000-000000000002/unrelated.pdf',
+  '{}'::jsonb, 'a2650000-0000-4000-8000-000000000001'
+);
+insert into public.file_processing_jobs (
+  id, workspace_id, file_upload_id, job_type, status, attempts, max_attempts,
+  metadata_json, created_by
+) values (
+  'c2650000-0000-4000-8000-000000000011',
+  'b2650000-0000-4000-8000-000000000001',
+  'c2650000-0000-4000-8000-000000000001',
+  'extract', 'queued', 0, 3, '{"source":"upload"}'::jsonb,
+  'a2650000-0000-4000-8000-000000000001'
+), (
+  'c2650000-0000-4000-8000-000000000012',
+  'b2650000-0000-4000-8000-000000000002',
+  'c2650000-0000-4000-8000-000000000002',
+  'extract', 'queued', 0, 3, '{"source":"upload"}'::jsonb,
+  'a2650000-0000-4000-8000-000000000001'
 );
 insert into public.document_extraction_workspace_settings (
   workspace_id, is_entitled, is_enabled, monthly_page_limit,
@@ -760,6 +784,39 @@ select is(
   (select count(*)::integer from public.document_extraction_google_qualification_job_bindings),
   0,
   'no qualification job binding remains'
+);
+select is(
+  (select count(*)::integer
+    from public.document_extraction_google_qualification_processing_job_bindings),
+  0,
+  'no qualification upload-processing binding remains'
+);
+select is(
+  (select count(*)::integer from public.file_processing_jobs
+    where id = 'c2650000-0000-4000-8000-000000000011'),
+  0,
+  'qualification-owned upload-processing state is removed'
+);
+select is(
+  (select count(*)::integer from public.file_processing_jobs
+    where id = 'c2650000-0000-4000-8000-000000000012'),
+  1,
+  'unrelated upload-processing state survives cleanup unchanged'
+);
+select is(
+  (
+    select deleted_file_processing_job_count
+    from public.document_extraction_google_qualification_cleanup_audits
+    where run_id_hash = encode(
+      extensions.digest(convert_to(
+        (select run_id from pg_temp.google_qualification_test_execution_ids)::text,
+        'UTF8'
+      ), 'sha256'),
+      'hex'
+    )
+  ),
+  1,
+  'cleanup audit proves the qualification-owned upload-processing row was removed'
 );
 select is(
   (select count(*)::integer from public.document_extraction_jobs

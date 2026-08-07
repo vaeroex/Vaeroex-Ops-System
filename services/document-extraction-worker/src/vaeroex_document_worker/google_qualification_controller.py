@@ -188,6 +188,34 @@ async def run_google_frozen_qualification(
             or prepared.get("eligible_pages") != GOOGLE_EXPECTED_PROVIDER_PAGE_CALLS
         ):
             raise BrokerFailure("qualification_prepare_bounds_invalid")
+        restart_latched = prepared.get("restart_latched") is True
+
+    if restart_latched:
+        existing = await _fetch_status(config, run_id)
+        if existing.status == "active":
+            async with BrokerClient(config) as broker:
+                await broker.post(
+                    {
+                        "operation": "qualification_stop",
+                        "runId": run_id,
+                        "reason": "qualification_worker_restarted",
+                    }
+                )
+            existing = await _fetch_status(config, run_id)
+        if existing.status not in {"stopped", "completed"}:
+            raise BrokerFailure("qualification_restart_latch_invalid")
+        return GoogleFrozenQualificationResult(
+            existing.status,
+            existing.eligible_documents,
+            existing.eligible_pages,
+            existing.provider_calls,
+            existing.retries,
+            (
+                "qualification_worker_restart_latched"
+                if existing.status == "stopped"
+                else None
+            ),
+        )
 
     completed = 0
     try:
@@ -291,7 +319,7 @@ async def run_google_frozen_qualification(
             final_status.retries,
             None,
         )
-    except Exception:
+    except Exception as error:
         if run_id is not None:
             try:
                 async with BrokerClient(config) as broker:
@@ -301,6 +329,20 @@ async def run_google_frozen_qualification(
                             "runId": run_id,
                             "reason": "qualification_controller_failure",
                         }
+                    )
+                stopped = await _fetch_status(config, run_id)
+                if stopped.status == "stopped":
+                    return GoogleFrozenQualificationResult(
+                        "stopped",
+                        stopped.eligible_documents,
+                        stopped.eligible_pages,
+                        stopped.provider_calls,
+                        stopped.retries,
+                        (
+                            error.code
+                            if isinstance(error, BrokerFailure)
+                            else "qualification_controller_failure"
+                        ),
                     )
             except Exception:
                 pass
