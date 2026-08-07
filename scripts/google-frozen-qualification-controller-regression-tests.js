@@ -19,6 +19,9 @@ const cleanupOrderFix = read(
 const processingCleanupProof = read(
   "supabase/migrations/20260807195152_document_extraction_google_qualification_processing_cleanup_proof.sql"
 );
+const claimCleanupMerge = read(
+  "supabase/migrations/20260807203645_document_extraction_google_qualification_claim_cleanup_merge.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
 );
@@ -183,6 +186,49 @@ assert.match(processingCleanupProof, /security definer\s+set search_path = ''/);
 assert.match(
   processingCleanupProof,
   /revoke execute on function[\s\S]*?begin_google_frozen_qualification_processing_cleanup_v1\(uuid\)[\s\S]*?from public, anon, authenticated, service_role/
+);
+
+const migrationDirectory = path.join(root, "supabase/migrations");
+const mutationGuardMigrations = fs
+  .readdirSync(migrationDirectory)
+  .filter((name) => name.endsWith(".sql"))
+  .sort()
+  .map((name) => ({ name, sql: read(`supabase/migrations/${name}`) }))
+  .filter(({ sql }) =>
+    /create or replace function public\.enforce_google_frozen_qualification_mutation_v1\(\)/.test(sql)
+  );
+assert.equal(
+  mutationGuardMigrations.at(-1)?.name,
+  "20260807203645_document_extraction_google_qualification_claim_cleanup_merge.sql"
+);
+const finalMutationGuard = mutationGuardMigrations.at(-1)?.sql ?? "";
+assert.match(finalMutationGuard, /v_claim_worker_id text/);
+assert.match(finalMutationGuard, /v_claim_lease_seconds integer/);
+assert.match(
+  finalMutationGuard,
+  /tg_table_name = 'document_extraction_jobs' and tg_op = 'UPDATE'[\s\S]*?v_item\.status <> 'queued'/
+);
+assert.match(
+  finalMutationGuard,
+  /tg_table_name = 'document_extraction_events' and tg_op = 'INSERT'[\s\S]*?v_item\.status <> 'processing'/
+);
+assert.match(finalMutationGuard, /google_qualification_job_claimed/);
+assert.match(
+  finalMutationGuard,
+  /google_qualification_processing_cleanup_proof_v1/
+);
+assert.match(finalMutationGuard, /v_context_processing_binding_id uuid/);
+assert.match(finalMutationGuard, /v_context_processing_job_id uuid/);
+assert.match(
+  finalMutationGuard,
+  /revoke execute on function public\.enforce_google_frozen_qualification_mutation_v1\(\)[\s\S]*?from public, anon, authenticated, service_role/
+);
+assert.doesNotMatch(claimCleanupMerge, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(claimCleanupMerge, /\bon delete cascade\b/i);
+assert.doesNotMatch(claimCleanupMerge, /create\s+(?:table|index|trigger)\b/i);
+assert.doesNotMatch(
+  claimCleanupMerge,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
 );
 assert.match(controller, /restart_latched/);
 assert.match(controller, /qualification_worker_restarted/);

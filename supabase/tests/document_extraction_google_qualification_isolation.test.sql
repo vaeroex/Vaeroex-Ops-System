@@ -4,6 +4,41 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 select no_plan();
 
+select ok(
+  position(
+    'v_claim_worker_id text' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0,
+  'final migration chain retains claim-aware worker identity validation'
+);
+select ok(
+  position(
+    'v_item.status <> ''processing''' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0
+  and position(
+    'google_qualification_job_claimed' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0,
+  'final migration chain retains the post-transition claimed-event phase'
+);
+select ok(
+  position(
+    'google_qualification_processing_cleanup_proof_v1' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0
+  and position(
+    'v_context_processing_binding_id' in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0,
+  'final migration chain retains transaction-signed processing cleanup proof'
+);
+
 create or replace function pg_temp.raises_sqlstate(p_sql text, p_expected text)
 returns boolean
 language plpgsql
@@ -881,6 +916,7 @@ select is(
   'google_frozen_corpus_cleanup_v2',
   'cleanup latches the graph and emits bounded storage obligations'
 );
+reset role;
 select ok(
   pg_temp.processing_cleanup_proof_matches(
     (
@@ -1035,20 +1071,27 @@ select ok(
   ),
   'substituted cleanup proof page identity fails closed'
 );
+select set_config(
+  'vaeroex.test_owner_only_cleanup_sql',
+  format(
+    'select public.begin_google_frozen_qualification_processing_cleanup_v1(%L::uuid)',
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    )::text
+  ),
+  true
+);
+set local role service_role;
 select ok(
   pg_temp.raises_sqlstate(
-    format(
-      'select public.begin_google_frozen_qualification_processing_cleanup_v1(%L::uuid)',
-      (
-        select id
-        from public.document_extraction_google_qualification_processing_job_bindings
-        where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
-      )::text
-    ),
+    current_setting('vaeroex.test_owner_only_cleanup_sql', true),
     '42501'
   ),
   'service role cannot invoke the owner-only processing cleanup proof helper'
 );
+reset role;
 select ok(
   pg_temp.premature_processing_cleanup_fails(
     'f2650000-0000-4000-8000-000000000004',
