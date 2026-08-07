@@ -68,6 +68,132 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.attempt_claim_context_substitution(p_kind text)
+returns void
+language plpgsql
+as $$
+declare
+  v_context jsonb;
+begin
+  v_context := current_setting(
+    'vaeroex.google_qualification_guard_context', true
+  )::jsonb;
+  if p_kind = 'run' then
+    v_context := jsonb_set(
+      v_context, '{run_id}', to_jsonb('f2660000-0000-4000-8000-000000000099'::text)
+    );
+  elsif p_kind = 'workspace' then
+    v_context := jsonb_set(
+      v_context, '{workspace_id}', to_jsonb('b2660000-0000-4000-8000-000000000002'::text)
+    );
+  elsif p_kind = 'job' then
+    v_context := jsonb_set(
+      v_context, '{job_id}', to_jsonb('e2660000-0000-4000-8000-000000000099'::text)
+    );
+  elsif p_kind = 'fixture' then
+    v_context := jsonb_set(v_context, '{fixture_index}', '2'::jsonb);
+  else
+    raise exception 'Unknown claim substitution case.';
+  end if;
+  perform set_config(
+    'vaeroex.google_qualification_guard_context', v_context::text, true
+  );
+  perform public.record_document_extraction_event_v1(
+    'b2660000-0000-4000-8000-000000000001',
+    'e2660000-0000-4000-8000-000000000001',
+    'google_qualification_job_claimed', 'worker', null, 'leased', 'processing',
+    null, null,
+    jsonb_build_object('provider_profile', 'google_document_ai_enterprise_ocr_v1'),
+    gen_random_uuid()
+  );
+end;
+$$;
+
+create or replace function pg_temp.claim_state_is_denied(p_kind text)
+returns boolean
+language plpgsql
+as $$
+declare
+  v_lease_owner text;
+  v_lease_expires_at timestamptz;
+  v_workspace_id uuid;
+  v_active_fixture_index integer;
+  v_denied boolean := false;
+begin
+  select lease_owner, lease_expires_at, workspace_id
+    into v_lease_owner, v_lease_expires_at, v_workspace_id
+  from public.document_extraction_jobs
+  where id = 'e2660000-0000-4000-8000-000000000001';
+  select active_fixture_index into v_active_fixture_index
+  from public.document_extraction_google_qualification_runs
+  where id = 'f2660000-0000-4000-8000-000000000021';
+
+  perform set_config('session_replication_role', 'replica', true);
+  if p_kind = 'wrong_worker' then
+    null;
+  elsif p_kind = 'wrong_lease' then
+    update public.document_extraction_jobs
+    set lease_owner = 'different-worker'
+    where id = 'e2660000-0000-4000-8000-000000000001';
+  elsif p_kind = 'missing_lease' then
+    update public.document_extraction_jobs
+    set lease_owner = null, lease_expires_at = null
+    where id = 'e2660000-0000-4000-8000-000000000001';
+  elsif p_kind = 'wrong_workspace' then
+    update public.document_extraction_jobs
+    set workspace_id = 'b2660000-0000-4000-8000-000000000002'
+    where id = 'e2660000-0000-4000-8000-000000000001';
+  elsif p_kind = 'wrong_fixture' then
+    update public.document_extraction_google_qualification_runs
+    set active_fixture_index = 2
+    where id = 'f2660000-0000-4000-8000-000000000021';
+  elsif p_kind <> 'wrong_job' then
+    raise exception 'Unknown claim state case.';
+  end if;
+  perform set_config('session_replication_role', 'origin', true);
+
+  begin
+    perform public.assert_google_frozen_qualification_job_v1(
+      case when p_kind = 'wrong_job'
+        then 'e2660000-0000-4000-8000-000000000099'::uuid
+        else 'e2660000-0000-4000-8000-000000000001'::uuid
+      end,
+      case when p_kind = 'wrong_worker'
+        then 'different-worker'
+        else 'qualification-worker'
+      end,
+      'heartbeat'
+    );
+  exception when sqlstate '42501' then
+    v_denied := true;
+  end;
+
+  perform set_config('session_replication_role', 'replica', true);
+  update public.document_extraction_jobs
+  set lease_owner = v_lease_owner,
+      lease_expires_at = v_lease_expires_at,
+      workspace_id = v_workspace_id
+  where id = 'e2660000-0000-4000-8000-000000000001';
+  update public.document_extraction_google_qualification_runs
+  set active_fixture_index = v_active_fixture_index
+  where id = 'f2660000-0000-4000-8000-000000000021';
+  perform set_config('session_replication_role', 'origin', true);
+  return v_denied;
+exception when others then
+  perform set_config('session_replication_role', 'replica', true);
+  update public.document_extraction_jobs
+  set lease_owner = v_lease_owner,
+      lease_expires_at = v_lease_expires_at,
+      workspace_id = v_workspace_id
+  where id = 'e2660000-0000-4000-8000-000000000001';
+  update public.document_extraction_google_qualification_runs
+  set active_fixture_index = v_active_fixture_index
+  where id = 'f2660000-0000-4000-8000-000000000021';
+  perform set_config('session_replication_role', 'origin', true);
+  raise;
+end;
+$$;
+
 insert into public.profiles (id, email, full_name) values
   ('a2660000-0000-4000-8000-000000000001', 'pr265-multifixture@example.test', 'PR 265 Multi Fixture');
 insert into public.workspaces (id, name, created_by) values
@@ -273,15 +399,105 @@ insert into public.document_extraction_google_qualification_job_bindings (
 update public.document_extraction_google_qualification_state
 set enabled = true where singleton_key = 'google_frozen_corpus_v1';
 
+select public.begin_google_frozen_qualification_mutation_v1(
+  'd2660000-0000-4000-8000-000000000001', 'claim'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.record_document_extraction_event_v1(
+      'b2660000-0000-4000-8000-000000000001',
+      'e2660000-0000-4000-8000-000000000001',
+      'google_qualification_job_claimed', 'worker', null, 'leased', 'processing',
+      null, null,
+      jsonb_build_object('provider_profile', 'google_document_ai_enterprise_ocr_v1'),
+      gen_random_uuid()
+    )$$,
+    '42501'
+  ),
+  'a claimed event cannot be recorded while the item is still queued'
+);
+select pg_temp.clear_google_guard();
+
 set local role service_role;
+select is(
+  (select count(*)::integer
+   from public.claim_google_document_extraction_job_v1('ordinary-worker', 120)),
+  0,
+  'the ordinary Google claim cannot receive the qualification job'
+);
 select is(
   (select count(*)::integer
    from public.claim_google_frozen_qualification_job_v1('qualification-worker', 120)),
   1,
   'fixture 1 is claimed through the qualification-only path'
 );
-select pg_temp.clear_google_guard();
+select results_eq(
+  $$select status from public.document_extraction_google_qualification_items
+    where id = 'f2660000-0000-4000-8000-000000000031'$$,
+  $$values ('processing'::text)$$,
+  'the qualification item atomically enters processing'
+);
+select results_eq(
+  $$select status, stage, attempts, lease_owner, lease_expires_at > now()
+    from public.document_extraction_jobs
+    where id = 'e2660000-0000-4000-8000-000000000001'$$,
+  $$values ('processing'::text, 'leased'::text, 1, 'qualification-worker'::text, true)$$,
+  'the qualification job has exactly the winning first lease'
+);
+select is(
+  (select count(*)::integer from public.document_extraction_events
+   where job_id = 'e2660000-0000-4000-8000-000000000001'
+     and event_type = 'google_qualification_job_claimed'),
+  1,
+  'the exact post-transition claimed event is recorded once'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select public.record_document_extraction_event_v1(
+      'b2660000-0000-4000-8000-000000000001',
+      'e2660000-0000-4000-8000-000000000001',
+      'google_qualification_job_claimed', 'worker', null, 'leased', 'processing',
+      null, null,
+      jsonb_build_object('provider_profile', 'google_document_ai_enterprise_ocr_v1'),
+      gen_random_uuid()
+    )$$,
+    '42501'
+  ),
+  'a duplicate claimed event is rejected in the winning transaction'
+);
 reset role;
+
+select ok(pg_temp.claim_state_is_denied('wrong_worker'), 'wrong claim worker fails');
+select ok(pg_temp.claim_state_is_denied('wrong_lease'), 'wrong claim lease fails');
+select ok(pg_temp.claim_state_is_denied('missing_lease'), 'missing claim lease fails');
+select ok(pg_temp.claim_state_is_denied('wrong_workspace'), 'wrong claim workspace fails');
+select ok(pg_temp.claim_state_is_denied('wrong_fixture'), 'wrong claim fixture fails');
+select ok(pg_temp.claim_state_is_denied('wrong_job'), 'wrong claim job fails');
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select pg_temp.attempt_claim_context_substitution('run')$$, '42501'
+  ),
+  'a substituted claim run fails signed-context validation'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select pg_temp.attempt_claim_context_substitution('workspace')$$, '42501'
+  ),
+  'a substituted claim workspace fails signed-context validation'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select pg_temp.attempt_claim_context_substitution('job')$$, '42501'
+  ),
+  'a substituted claim job fails signed-context validation'
+);
+select ok(
+  pg_temp.raises_sqlstate(
+    $$select pg_temp.attempt_claim_context_substitution('fixture')$$, '42501'
+  ),
+  'a substituted claim fixture fails signed-context validation'
+);
+select pg_temp.clear_google_guard();
 
 insert into public.document_extraction_google_qualification_page_reservations (
   id, run_id, item_id, job_id, fixture_index, page_index, reservation_number,

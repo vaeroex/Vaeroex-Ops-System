@@ -10,6 +10,9 @@ const migration = read(
 const concreteFix = read(
   "supabase/migrations/20260807172710_document_extraction_google_frozen_qualification_concrete_fixes.sql"
 );
+const claimPhaseFix = read(
+  "supabase/migrations/20260807181420_document_extraction_google_qualification_claim_phase_fix.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
 );
@@ -70,6 +73,24 @@ assert.match(
   concreteFix,
   /deleted_file_processing_jobs[\s\S]*?v_processing_job_count/
 );
+assert.doesNotMatch(claimPhaseFix, /\b(?:truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(
+  claimPhaseFix,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(claimPhaseFix, /'claim_worker_id', p_worker_id/);
+assert.match(claimPhaseFix, /'claim_lease_seconds', p_lease_seconds/);
+assert.match(claimPhaseFix, /v_item\.status <> 'queued'/);
+assert.match(claimPhaseFix, /v_item\.status <> 'processing'/);
+assert.match(claimPhaseFix, /new\.event_type <> 'google_qualification_job_claimed'/);
+assert.match(claimPhaseFix, /new\.lease_owner <> v_claim_worker_id/);
+assert.match(claimPhaseFix, /v_claim_job\.attempts <> 1/);
+assert.match(claimPhaseFix, /event\.event_type = 'google_qualification_job_claimed'/);
+assert.match(
+  claimPhaseFix,
+  /assert_google_frozen_qualification_job_v1\([\s\S]*?'heartbeat'/
+);
+assert.doesNotMatch(claimPhaseFix, /create\s+(?:table|index|trigger)\b/i);
 assert.match(controller, /restart_latched/);
 assert.match(controller, /qualification_worker_restarted/);
 assert.match(controller, /qualification_controller_failure/);
@@ -80,6 +101,16 @@ assert.match(multiFixtureTest, /stale fixture 1 context cannot mutate fixture 2/
 assert.match(multiFixtureTest, /wrong intake cannot manufacture qualification context/);
 assert.match(multiFixtureTest, /fixture 2 context cannot mutate fixture 1 job state/);
 assert.match(multiFixtureTest, /fixture 2 context cannot mutate fixture 1 file state/);
+assert.match(multiFixtureTest, /claimed event cannot be recorded while the item is still queued/);
+assert.match(multiFixtureTest, /qualification item atomically enters processing/);
+assert.match(multiFixtureTest, /qualification job has exactly the winning first lease/);
+assert.match(multiFixtureTest, /exact post-transition claimed event is recorded once/);
+assert.match(multiFixtureTest, /duplicate claimed event is rejected/);
+assert.match(multiFixtureTest, /wrong claim worker fails/);
+assert.match(multiFixtureTest, /wrong claim lease fails/);
+assert.match(multiFixtureTest, /missing claim lease fails/);
+assert.match(multiFixtureTest, /substituted claim run fails signed-context validation/);
+assert.match(multiFixtureTest, /ordinary Google claim cannot receive the qualification job/);
 assert.match(databaseTest, /create or replace function pg_temp\.google_qualification_assertion_reason/);
 assert.match(databaseTest, /create or replace function pg_temp\.finish_google_qualification_rpc/);
 assert.match(databaseTest, /create or replace function pg_temp\.new_google_qualification_run_id/);
