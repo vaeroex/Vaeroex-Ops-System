@@ -29,6 +29,33 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.premature_processing_cleanup_fails(
+  p_item_id uuid,
+  p_intake_request_id uuid,
+  p_processing_job_id uuid
+)
+returns boolean
+language plpgsql
+as $$
+begin
+  begin
+    update public.document_extraction_google_qualification_items
+    set job_id = null
+    where id = p_item_id;
+    perform public.begin_google_frozen_qualification_mutation_v1(
+      p_intake_request_id,
+      'cleanup'
+    );
+    delete from public.file_processing_jobs
+    where id = p_processing_job_id;
+    raise exception 'Premature processing cleanup unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
 -- Persistent qualification executions must never reuse an execution UUID.
 -- Corpus, fixture, and page identities remain deterministic and separate.
 create or replace function pg_temp.assert_google_qualification_run_id_unused(
@@ -711,6 +738,23 @@ select is(
   ) ->> 'cleanup_version',
   'google_frozen_corpus_cleanup_v2',
   'cleanup latches the graph and emits bounded storage obligations'
+);
+select ok(
+  pg_temp.premature_processing_cleanup_fails(
+    'f2650000-0000-4000-8000-000000000004',
+    'd2650000-0000-4000-8000-000000000001',
+    'c2650000-0000-4000-8000-000000000011'
+  ),
+  'clearing item job identity before processing-row deletion fails closed'
+);
+select is(
+  (
+    select job_id
+    from public.document_extraction_google_qualification_items
+    where id = 'f2650000-0000-4000-8000-000000000004'
+  ),
+  'e2650000-0000-4000-8000-000000000001'::uuid,
+  'failed premature cleanup preserves the authoritative item job binding'
 );
 select ok(
   public.verify_google_frozen_qualification_storage_cleanup_v1(

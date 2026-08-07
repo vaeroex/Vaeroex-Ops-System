@@ -13,6 +13,9 @@ const concreteFix = read(
 const claimPhaseFix = read(
   "supabase/migrations/20260807181420_document_extraction_google_qualification_claim_phase_fix.sql"
 );
+const cleanupOrderFix = read(
+  "supabase/migrations/20260807185224_document_extraction_google_qualification_cleanup_order_fix.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
 );
@@ -91,6 +94,34 @@ assert.match(
   /assert_google_frozen_qualification_job_v1\([\s\S]*?'heartbeat'/
 );
 assert.doesNotMatch(claimPhaseFix, /create\s+(?:table|index|trigger)\b/i);
+assert.doesNotMatch(cleanupOrderFix, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(
+  cleanupOrderFix,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(
+  cleanupOrderFix,
+  /create or replace function public\.finalize_google_frozen_qualification_cleanup_v1/
+);
+const processingCleanupIndex = cleanupOrderFix.indexOf(
+  "delete from public.file_processing_jobs processing_job"
+);
+const itemJobClearIndex = cleanupOrderFix.indexOf("set job_id = null, status = 'failed'");
+const extractionJobDeleteIndex = cleanupOrderFix.indexOf(
+  "delete from public.document_extraction_jobs where id = v_binding.job_id"
+);
+assert.ok(processingCleanupIndex >= 0);
+assert.ok(itemJobClearIndex > processingCleanupIndex);
+assert.ok(extractionJobDeleteIndex > processingCleanupIndex);
+assert.match(
+  cleanupOrderFix,
+  /processing_job\.id = v_processing_binding\.file_processing_job_id[\s\S]*?processing_job\.workspace_id = v_processing_binding\.workspace_id[\s\S]*?processing_job\.file_upload_id = v_processing_binding\.file_id/
+);
+assert.match(cleanupOrderFix, /security definer\s+set search_path = ''/);
+assert.match(
+  cleanupOrderFix,
+  /revoke execute on function public\.finalize_google_frozen_qualification_cleanup_v1\(uuid, text\)[\s\S]*?from public, anon, authenticated;[\s\S]*?grant execute[\s\S]*?to service_role;/
+);
 assert.match(controller, /restart_latched/);
 assert.match(controller, /qualification_worker_restarted/);
 assert.match(controller, /qualification_controller_failure/);
@@ -119,6 +150,8 @@ assert.match(databaseTest, /v_run_id := gen_random_uuid\(\)/);
 assert.match(databaseTest, /document_extraction_google_qualification_cleanup_audits/);
 assert.match(databaseTest, /three qualification executions receive distinct random run identities/);
 assert.match(databaseTest, /deliberate reuse of a cleaned run identity fails closed/);
+assert.match(databaseTest, /clearing item job identity before processing-row deletion fails closed/);
+assert.match(databaseTest, /failed premature cleanup preserves the authoritative item job binding/);
 assert.doesNotMatch(databaseTest, /f2650000-0000-4000-8000-000000000003/);
 for (const reason of [
   "qualification_run_mismatch",
