@@ -5,9 +5,11 @@ import { DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION } from "@/lib/document-extr
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const WORKER_ID = /^[A-Za-z0-9._:-]{1,128}$/;
+const KEY_VERSION = /^[A-Za-z0-9._:-]{1,120}$/;
 
 type LeaseCapability = {
   version: typeof DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION;
+  keyVersion: string;
   kind: "lease";
   jobId: string;
   workerId: string;
@@ -16,6 +18,7 @@ type LeaseCapability = {
 
 type FileCapability = {
   version: typeof DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION;
+  keyVersion: string;
   kind: "file";
   grantId: string;
   workerId: string;
@@ -24,28 +27,65 @@ type FileCapability = {
 };
 
 export type DocumentExtractionBrokerCapability = LeaseCapability | FileCapability;
+type UnsignedDocumentExtractionBrokerCapability =
+  | Omit<LeaseCapability, "keyVersion">
+  | Omit<FileCapability, "keyVersion">;
 
-function capabilityKey(environment: NodeJS.ProcessEnv) {
-  const encoded = environment.DOCUMENT_EXTRACTION_BROKER_CAPABILITY_SECRET;
-  if (!encoded?.trim()) throw new Error("document_extraction_broker_capability_key_missing");
-  const key = Buffer.from(encoded, "base64");
-  if (key.byteLength !== 32 || key.toString("base64") !== encoded) {
+function capabilityKeyring(environment: NodeJS.ProcessEnv) {
+  const encodedKeys = environment.DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON;
+  const currentVersion = environment.DOCUMENT_EXTRACTION_BROKER_CAPABILITY_CURRENT_KEY_VERSION;
+  if (!encodedKeys?.trim() || !KEY_VERSION.test(currentVersion || "")) {
+    throw new Error("document_extraction_broker_capability_key_missing");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(encodedKeys);
+  } catch {
     throw new Error("document_extraction_broker_capability_key_invalid");
   }
-  return key;
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("document_extraction_broker_capability_key_invalid");
+  }
+  const entries = Object.entries(parsed);
+  if (!entries.length || entries.length > 3) {
+    throw new Error("document_extraction_broker_capability_key_invalid");
+  }
+  const keys = new Map<string, Buffer>();
+  for (const [keyVersion, encoded] of entries) {
+    if (!KEY_VERSION.test(keyVersion) || typeof encoded !== "string") {
+      throw new Error("document_extraction_broker_capability_key_invalid");
+    }
+    const key = Buffer.from(encoded, "base64");
+    if (key.byteLength !== 32 || key.toString("base64") !== encoded) {
+      throw new Error("document_extraction_broker_capability_key_invalid");
+    }
+    keys.set(keyVersion, key);
+  }
+  if (!keys.has(currentVersion as string)) {
+    throw new Error("document_extraction_broker_capability_key_invalid");
+  }
+  return { currentVersion: currentVersion as string, keys };
 }
 
 function payloadFor(capability: DocumentExtractionBrokerCapability) {
   return Buffer.from(JSON.stringify(capability), "utf8").toString("base64url");
 }
 
-function sign(payload: string, environment: NodeJS.ProcessEnv) {
-  return createHmac("sha256", capabilityKey(environment)).update(payload).digest("base64url");
+function sign(payload: string, key: Buffer) {
+  return createHmac("sha256", key).update(payload).digest("base64url");
 }
 
-function encode(capability: DocumentExtractionBrokerCapability, environment: NodeJS.ProcessEnv) {
-  const payload = payloadFor(capability);
-  return `${payload}.${sign(payload, environment)}`;
+function encode(
+  capability: UnsignedDocumentExtractionBrokerCapability,
+  environment: NodeJS.ProcessEnv
+) {
+  const keyring = capabilityKeyring(environment);
+  const versionedCapability = {
+    ...capability,
+    keyVersion: keyring.currentVersion
+  } as DocumentExtractionBrokerCapability;
+  const payload = payloadFor(versionedCapability);
+  return `${payload}.${sign(payload, keyring.keys.get(keyring.currentVersion) as Buffer)}`;
 }
 
 export function createLeaseCapability({
@@ -123,11 +163,6 @@ export function verifyBrokerCapability({
 }): DocumentExtractionBrokerCapability {
   const [payload, signature, extra] = token.split(".");
   if (!payload || !signature || extra) throw new Error("document_extraction_capability_invalid");
-  const expected = Buffer.from(sign(payload, environment), "utf8");
-  const observed = Buffer.from(signature, "utf8");
-  if (expected.byteLength !== observed.byteLength || !timingSafeEqual(expected, observed)) {
-    throw new Error("document_extraction_capability_invalid");
-  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
@@ -138,6 +173,17 @@ export function verifyBrokerCapability({
     throw new Error("document_extraction_capability_invalid");
   }
   const capability = parsed as Partial<DocumentExtractionBrokerCapability>;
+  if (!KEY_VERSION.test(capability.keyVersion || "")) {
+    throw new Error("document_extraction_capability_invalid");
+  }
+  const keyring = capabilityKeyring(environment);
+  const key = keyring.keys.get(capability.keyVersion as string);
+  if (!key) throw new Error("document_extraction_capability_expired_or_invalid");
+  const expected = Buffer.from(sign(payload, key), "utf8");
+  const observed = Buffer.from(signature, "utf8");
+  if (expected.byteLength !== observed.byteLength || !timingSafeEqual(expected, observed)) {
+    throw new Error("document_extraction_capability_invalid");
+  }
   if (
     capability.version !== DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION
     || capability.kind !== expectedKind

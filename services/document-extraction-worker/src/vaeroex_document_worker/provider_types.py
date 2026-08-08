@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+MAX_PROVIDER_LATENCY_MS = 180_000
+
 
 class ProviderFailure(RuntimeError):
     def __init__(
@@ -16,6 +18,8 @@ class ProviderFailure(RuntimeError):
         retryable: bool,
         ambiguous: bool = False,
         completed_pages: tuple[dict[str, Any], ...] = (),
+        latency_ms: int | None = None,
+        provider_request_started: bool = False,
     ) -> None:
         super().__init__(code)
         self.code = code
@@ -23,6 +27,8 @@ class ProviderFailure(RuntimeError):
         self.retryable = retryable
         self.ambiguous = ambiguous
         self.completed_pages = completed_pages
+        self.latency_ms = latency_ms
+        self.provider_request_started = provider_request_started
 
 
 @dataclass(frozen=True)

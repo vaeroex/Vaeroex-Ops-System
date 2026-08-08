@@ -1,0 +1,10 @@
+.mypy_cache
+.pytest_cache
+.venv
+__pycache__
+api
+tests
+*.pyc
+*.pyo
+sbom.cdx.json
+THIRD_PARTY_LICENSES.md

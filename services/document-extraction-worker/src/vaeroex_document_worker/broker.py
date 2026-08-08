@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.serialization import load_der_private_key
 
 from . import BROKER_PROTOCOL_VERSION
 from .config import MAX_FILE_BYTES, WorkerConfig
+from .google_identity import GoogleIdentityTokenProvider
 
 BROKER_PATH = "/api/internal/document-extraction/broker"
 
@@ -31,26 +32,41 @@ class BrokerFailure(RuntimeError):
 
 
 class BrokerClient:
-    def __init__(self, config: WorkerConfig, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(
+        self,
+        config: WorkerConfig,
+        transport: httpx.AsyncBaseTransport | None = None,
+        identity_transport: httpx.AsyncBaseTransport | None = None,
+    ) -> None:
         self._config = config
         private_key = load_der_private_key(config.worker_private_key_der, password=None)
         if not isinstance(private_key, Ed25519PrivateKey):
             raise RuntimeError("The private worker signing key is not Ed25519.")
         self._private_key = private_key
+        self._identity = GoogleIdentityTokenProvider(
+            config.broker_audience,
+            transport=identity_transport,
+        )
         self._client = httpx.AsyncClient(
             base_url=config.broker_url,
             timeout=httpx.Timeout(30.0),
             follow_redirects=False,
+            trust_env=False,
             transport=transport,
         )
 
     async def __aenter__(self) -> "BrokerClient":
+        # Fail closed at startup before any broker operation, job claim, file
+        # grant, or provider boundary can run.
+        await self._identity.token()
         return self
 
     async def __aexit__(self, *_: object) -> None:
         await self._client.aclose()
+        await self._identity.close()
 
-    def _headers(self, method: str, target: str, body: bytes) -> dict[str, str]:
+    async def _headers(self, method: str, target: str, body: bytes) -> dict[str, str]:
+        google_identity_token = await self._identity.token()
         timestamp = str(int(time.time()))
         nonce = secrets.token_hex(16)
         body_digest = hashlib.sha256(body).hexdigest()
@@ -62,15 +78,20 @@ class BrokerClient:
                 body_digest,
                 self._config.worker_id,
                 self._config.worker_key_version,
+                self._config.runtime_environment,
+                self._config.deployment_id,
                 timestamp,
                 nonce,
             )
         ).encode("utf-8")
         signature = base64.b64encode(self._private_key.sign(canonical)).decode("ascii")
         return {
+            "x-serverless-authorization": f"Bearer {google_identity_token}",
             "x-vaeroex-broker-protocol": BROKER_PROTOCOL_VERSION,
             "x-vaeroex-worker-id": self._config.worker_id,
             "x-vaeroex-worker-key-version": self._config.worker_key_version,
+            "x-vaeroex-worker-environment": self._config.runtime_environment,
+            "x-vaeroex-worker-deployment-id": self._config.deployment_id,
             "x-vaeroex-worker-timestamp": timestamp,
             "x-vaeroex-worker-nonce": nonce,
             "x-vaeroex-worker-signature": signature,
@@ -78,7 +99,7 @@ class BrokerClient:
 
     async def post(self, payload: dict[str, Any]) -> dict[str, Any]:
         body = json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
-        headers = self._headers("POST", BROKER_PATH, body)
+        headers = await self._headers("POST", BROKER_PATH, body)
         headers["content-type"] = "application/json"
         try:
             response = await self._client.post(BROKER_PATH, content=body, headers=headers)
@@ -97,7 +118,7 @@ class BrokerClient:
         return value
 
     async def download(self, file_capability: str, destination: Path, expected_bytes: int | None = None) -> int:
-        headers = self._headers("GET", BROKER_PATH, b"")
+        headers = await self._headers("GET", BROKER_PATH, b"")
         headers["authorization"] = f"Bearer {file_capability}"
         total = 0
         try:

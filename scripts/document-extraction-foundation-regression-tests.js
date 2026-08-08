@@ -236,6 +236,11 @@ assert.notEqual(
   "contract changes must invalidate cache identity"
 );
 assert.notEqual(
+  buildDocumentExtractionIdentity({ ...baseIdentity, clientRevision: "vaeroex_nemotron_parse_rest_v2" }).cacheKey,
+  buildDocumentExtractionIdentity({ ...baseIdentity, clientRevision: "vaeroex_nemotron_parse_rest_v1" }).cacheKey,
+  "hosted compatibility revisions must never share cache identity"
+);
+assert.notEqual(
   buildDocumentExtractionIdentity({ ...baseIdentity, fileBytes: new TextEncoder().encode("different document bytes") }).contentHmac,
   first.contentHmac,
   "content changes must change the keyed identity"
