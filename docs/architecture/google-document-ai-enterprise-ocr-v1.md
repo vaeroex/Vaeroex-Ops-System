@@ -313,6 +313,26 @@ separately approved work is:
 6. Obtain a separate Production activation approval. Production approval must
    remain absent until then.
 
+### Frozen-corpus authorization diagnosis
+
+The first frozen-corpus attempt on 2026-08-08 reached the exact versioned
+`process` endpoint and recorded one content-free page outcome as
+`authorization` with `provider_request_started = true`. Google therefore
+returned HTTP 401/403 after request dispatch; no response payload was retained.
+The approved project custom role still contains only
+`documentai.processorVersions.processOnline`, and policy troubleshooting later
+confirmed that exact permission for the Preview worker service account and
+processor-version resource. The request began 62.8 seconds after the project
+IAM binding was written.
+
+Google documents that IAM policy changes are eventually consistent, commonly
+take about two minutes, and can take seven minutes or longer. A future,
+separately approved qualification must retain the one-permission role, wait at
+least seven complete minutes after the binding update, and recheck the exact
+principal/resource/permission before scaling the worker. It must not compensate
+with a broader Document AI role. See [Access change propagation](https://docs.cloud.google.com/iam/docs/access-change-propagation)
+and the [processor-version `process` contract](https://docs.cloud.google.com/document-ai/docs/reference/rest/v1/projects.locations.processors.processorVersions/process).
+
 The Google benchmark identity is
 `document_extraction_phase_c1_google_enterprise_ocr_v1`. It is separate from
 the historical NVIDIA benchmark identity and binds the exact corpus source

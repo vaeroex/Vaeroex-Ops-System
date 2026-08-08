@@ -56,6 +56,36 @@ select ok(
   ) > 0,
   'final migration chain retains exact reservation-bound dispatch quota mutation'
 );
+select ok(
+  position(
+    'google_qualification_planned_never_enqueued_cleanup_proof_v1'
+    in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0
+  and position(
+    'authorize_google_frozen_qualification_planned_cleanup_v1(old.id)'
+    in pg_get_functiondef(
+      'public.enforce_google_frozen_qualification_mutation_v1()'::regprocedure
+    )
+  ) > 0,
+  'final migration chain retains exact planned-never-enqueued cleanup proof'
+);
+select ok(
+  position(
+    'begin_google_frozen_qualification_planned_cleanup_v1'
+    in pg_get_functiondef(
+      'public.finalize_google_frozen_qualification_cleanup_v1(uuid,text)'::regprocedure
+    )
+  ) > 0
+  and position(
+    'begin_google_frozen_qualification_processing_cleanup_v1'
+    in pg_get_functiondef(
+      'public.finalize_google_frozen_qualification_cleanup_v1(uuid,text)'::regprocedure
+    )
+  ) > 0,
+  'final cleanup keeps both never-enqueued and job-bound ownership branches'
+);
 
 create or replace function pg_temp.raises_sqlstate(p_sql text, p_expected text)
 returns boolean
@@ -460,6 +490,175 @@ begin
 end;
 $$;
 
+create or replace function pg_temp.planned_cleanup_proof_matches(
+  p_processing_binding_id uuid,
+  p_processing_job_id uuid,
+  p_item_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_context jsonb;
+begin
+  perform public.begin_google_frozen_qualification_planned_cleanup_v1(
+    p_processing_binding_id
+  );
+  v_context := current_setting('vaeroex.google_qualification_guard_context', true)::jsonb;
+  return (v_context ->> 'classification') = 'planned_never_enqueued'
+    and v_context ->> 'cleanup_proof_version'
+      = 'google_qualification_planned_never_enqueued_cleanup_proof_v1'
+    and nullif(v_context ->> 'job_id', '') is null
+    and nullif(v_context ->> 'reservation_id', '') is null
+    and (v_context ->> 'item_id')::uuid = p_item_id
+    and (v_context ->> 'file_processing_job_id')::uuid = p_processing_job_id
+    and public.authorize_google_frozen_qualification_planned_cleanup_v1(
+      p_processing_job_id
+    );
+end;
+$$;
+
+create or replace function pg_temp.planned_cleanup_substitution_fails(
+  p_processing_binding_id uuid,
+  p_processing_job_id uuid,
+  p_field text,
+  p_value jsonb
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_context jsonb;
+begin
+  if p_field not in (
+    'run_id', 'item_id', 'source_binding_id', 'file_processing_job_id', 'file_id',
+    'intake_request_id', 'workspace_id', 'fixture_index',
+    'page_identity_fingerprints', 'classification'
+  ) then
+    return false;
+  end if;
+  begin
+    perform public.begin_google_frozen_qualification_planned_cleanup_v1(
+      p_processing_binding_id
+    );
+    v_context := current_setting('vaeroex.google_qualification_guard_context', true)::jsonb;
+    v_context := jsonb_set(v_context, array[p_field], p_value, false);
+    perform set_config(
+      'vaeroex.google_qualification_guard_context', v_context::text, true
+    );
+    delete from public.file_processing_jobs
+    where id = p_processing_job_id;
+    raise exception 'Substituted planned cleanup proof unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
+create or replace function pg_temp.planned_cleanup_with_reservation_fails(
+  p_run_id uuid,
+  p_item_id uuid,
+  p_job_id uuid,
+  p_processing_binding_id uuid,
+  p_provider_started boolean
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    insert into public.document_extraction_google_qualification_page_reservations (
+      id, run_id, item_id, job_id, fixture_index, page_index,
+      reservation_number, reservation_request_id, dispatch_request_id,
+      worker_id, lease_expires_at, provider, provider_profile, processor_id,
+      processor_resource, processor_version, controller_version,
+      qualification_state_updated_at, status, result_class,
+      provider_request_started, finished_at
+    )
+    select
+      gen_random_uuid(), run.id, item.id, p_job_id, item.fixture_index, 1,
+      2, gen_random_uuid(), gen_random_uuid(), 'qualification-worker',
+      now() + interval '2 minutes', 'google_document_ai', run.provider_profile,
+      run.processor_id, run.processor_resource, run.processor_version,
+      run.controller_version, state.updated_at,
+      case when p_provider_started then 'failed' else 'reserved' end,
+      case when p_provider_started then 'authorization' else null end,
+      case when p_provider_started then true else null end,
+      case when p_provider_started then now() else null end
+    from public.document_extraction_google_qualification_runs run
+    join public.document_extraction_google_qualification_items item
+      on item.run_id = run.id and item.id = p_item_id
+    join public.document_extraction_google_qualification_state state
+      on state.singleton_key = 'google_frozen_corpus_v1'
+    where run.id = p_run_id;
+    perform public.begin_google_frozen_qualification_planned_cleanup_v1(
+      p_processing_binding_id
+    );
+    raise exception 'Planned cleanup with reservation evidence unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
+create or replace function pg_temp.planned_cleanup_with_execution_evidence_fails(
+  p_item_id uuid,
+  p_processing_binding_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    update public.document_extraction_google_qualification_items
+    set provider_reservation_count = 1
+    where id = p_item_id;
+    perform public.begin_google_frozen_qualification_planned_cleanup_v1(
+      p_processing_binding_id
+    );
+    raise exception 'Planned cleanup with execution evidence unexpectedly succeeded.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
+create or replace function pg_temp.job_missing_unexpectedly_cleanup_fails(
+  p_item_id uuid,
+  p_processing_binding_id uuid
+)
+returns boolean
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  begin
+    update public.document_extraction_google_qualification_items
+    set job_id = null, status = 'planned'
+    where id = p_item_id;
+    perform public.begin_google_frozen_qualification_planned_cleanup_v1(
+      p_processing_binding_id
+    );
+    raise exception 'Unexpectedly missing qualification job was misclassified.'
+      using errcode = 'P0001';
+  exception when others then
+    return sqlstate = '42501';
+  end;
+end;
+$$;
+
 -- Persistent qualification executions must never reuse an execution UUID.
 -- Corpus, fixture, and page identities remain deterministic and separate.
 create or replace function pg_temp.assert_google_qualification_run_id_unused(
@@ -646,6 +845,13 @@ insert into public.file_uploads (
   'b2650000-0000-4000-8000-000000000001/fixture-01.pdf',
   '{}'::jsonb, 'a2650000-0000-4000-8000-000000000001'
 ), (
+  'c2650000-0000-4000-8000-000000000006',
+  'b2650000-0000-4000-8000-000000000001',
+  'fixture-02.pdf', 'Fixture 02', 'pdf', 'application/pdf', 2048,
+  'workspace-files',
+  'b2650000-0000-4000-8000-000000000001/fixture-02.pdf',
+  '{}'::jsonb, 'a2650000-0000-4000-8000-000000000001'
+), (
   'c2650000-0000-4000-8000-000000000002',
   'b2650000-0000-4000-8000-000000000002',
   'unrelated.pdf', 'Unrelated', 'pdf', 'application/pdf', 512,
@@ -660,6 +866,12 @@ insert into public.file_processing_jobs (
   'c2650000-0000-4000-8000-000000000011',
   'b2650000-0000-4000-8000-000000000001',
   'c2650000-0000-4000-8000-000000000001',
+  'extract', 'queued', 0, 3, '{"source":"upload"}'::jsonb,
+  'a2650000-0000-4000-8000-000000000001'
+), (
+  'c2650000-0000-4000-8000-000000000016',
+  'b2650000-0000-4000-8000-000000000001',
+  'c2650000-0000-4000-8000-000000000006',
   'extract', 'queued', 0, 3, '{"source":"upload"}'::jsonb,
   'a2650000-0000-4000-8000-000000000001'
 ), (
@@ -697,6 +909,15 @@ insert into public.document_extraction_intake_requests (
   'requested', 'pdf', 'application/pdf', 'pdf', 1024,
   'workspace-files',
   'b2650000-0000-4000-8000-000000000001/fixture-01.pdf'
+), (
+  'd2650000-0000-4000-8000-000000000006',
+  'b2650000-0000-4000-8000-000000000001',
+  'c2650000-0000-4000-8000-000000000006',
+  'a2650000-0000-4000-8000-000000000001',
+  'd2650000-0000-4000-8000-000000000016',
+  'requested', 'pdf', 'application/pdf', 'pdf', 2048,
+  'workspace-files',
+  'b2650000-0000-4000-8000-000000000001/fixture-02.pdf'
 );
 insert into public.document_extraction_jobs (
   id, intake_request_id, workspace_id, file_id, requested_by, request_id,
@@ -785,6 +1006,19 @@ insert into public.document_extraction_google_qualification_sources (
   'workspace-files',
   'b2650000-0000-4000-8000-000000000001/fixture-01.pdf', 1024,
   'trusted_storage_sha256_v1'
+), (
+  'f2650000-0000-4000-8000-000000000006',
+  'f2650000-0000-4000-8000-000000000001', 2,
+  'b2650000-0000-4000-8000-000000000001',
+  'd2650000-0000-4000-8000-000000000006',
+  'c2650000-0000-4000-8000-000000000006',
+  'd8bcb7a1d1e5c77d66591f621beaf33227e9f8c7779744423f4f498a338b9bad',
+  '6dd82f859b9e0a9542614e472ef7acfe9474370cf2d62268aad3a2dbb318e0a8',
+  array['742f58e6e58296f46a1e83543ba4bc1c1287772bc228559f92d639513398df3d']::text[],
+  1, 'image_only_pdf', repeat('7', 64), repeat('8', 64), repeat('9', 64),
+  'workspace-files',
+  'b2650000-0000-4000-8000-000000000001/fixture-02.pdf', 2048,
+  'trusted_storage_sha256_v1'
 );
 insert into public.document_extraction_google_qualification_runs (
   id, environment_id, workspace_id, request_id, workspace_binding_fingerprint,
@@ -821,6 +1055,16 @@ insert into public.document_extraction_google_qualification_items (
   'c2650000-0000-4000-8000-000000000001', 'google_primary', 'digital_pdf',
   repeat('3', 64), repeat('1', 64), repeat('2', 64),
   'e2650000-0000-4000-8000-000000000001', 'queued'
+), (
+  'f2650000-0000-4000-8000-000000000005',
+  (select run_id from pg_temp.google_qualification_test_execution_ids), 2,
+  '6dd82f859b9e0a9542614e472ef7acfe9474370cf2d62268aad3a2dbb318e0a8',
+  'd8bcb7a1d1e5c77d66591f621beaf33227e9f8c7779744423f4f498a338b9bad',
+  array['742f58e6e58296f46a1e83543ba4bc1c1287772bc228559f92d639513398df3d']::text[],
+  1, true, 'f2650000-0000-4000-8000-000000000006',
+  'd2650000-0000-4000-8000-000000000006',
+  'c2650000-0000-4000-8000-000000000006', 'google_primary', 'image_only_pdf',
+  repeat('7', 64), repeat('8', 64), repeat('9', 64), null, 'planned'
 );
 insert into public.document_extraction_google_qualification_job_bindings (
   run_id, item_id, source_binding_id, job_id, intake_request_id, file_id,
@@ -1407,6 +1651,179 @@ select ok(
   ),
   'the exact storage obligation can be marked absent'
 );
+select ok(
+  public.verify_google_frozen_qualification_storage_cleanup_v1(
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
+    'f2650000-0000-4000-8000-000000000006',
+    'workspace-files',
+    'b2650000-0000-4000-8000-000000000001/fixture-02.pdf',
+    'storage-object-absent-google-frozen-corpus-v2'
+  ),
+  'the planned-never-enqueued storage obligation can be marked absent'
+);
+reset role;
+select ok(
+  pg_temp.planned_cleanup_proof_matches(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'f2650000-0000-4000-8000-000000000005'
+  ),
+  'an untouched planned item produces the exact signed never-enqueued cleanup proof'
+);
+select ok(
+  pg_temp.planned_cleanup_with_execution_evidence_fails(
+    'f2650000-0000-4000-8000-000000000005',
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    )
+  ),
+  'a jobless item with execution evidence is not classified as never enqueued'
+);
+select ok(
+  pg_temp.planned_cleanup_with_reservation_fails(
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
+    'f2650000-0000-4000-8000-000000000005',
+    'e2650000-0000-4000-8000-000000000001',
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    false
+  ),
+  'a planned item with reservation evidence cannot use never-enqueued cleanup'
+);
+select ok(
+  pg_temp.planned_cleanup_with_reservation_fails(
+    (select run_id from pg_temp.google_qualification_test_execution_ids),
+    'f2650000-0000-4000-8000-000000000005',
+    'e2650000-0000-4000-8000-000000000001',
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    true
+  ),
+  'a planned item with dispatch evidence cannot use never-enqueued cleanup'
+);
+select ok(
+  pg_temp.job_missing_unexpectedly_cleanup_fails(
+    'f2650000-0000-4000-8000-000000000004',
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000011'
+    )
+  ),
+  'a previously bound job that becomes missing is not classified as never enqueued'
+);
+select ok(
+  pg_temp.planned_cleanup_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'workspace_id',
+    to_jsonb('b2650000-0000-4000-8000-000000000002'::text)
+  ),
+  'a substituted planned-cleanup workspace fails closed'
+);
+select ok(
+  pg_temp.planned_cleanup_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'run_id',
+    to_jsonb((select replay_run_id::text from pg_temp.google_qualification_test_execution_ids))
+  ),
+  'a substituted planned-cleanup run fails closed'
+);
+select ok(
+  pg_temp.planned_cleanup_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'source_binding_id',
+    to_jsonb('f2650000-0000-4000-8000-000000000002'::text)
+  ),
+  'a substituted planned-cleanup source fails closed'
+);
+select ok(
+  pg_temp.planned_cleanup_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'fixture_index',
+    '1'::jsonb
+  ),
+  'a substituted planned-cleanup fixture fails closed'
+);
+select ok(
+  pg_temp.planned_cleanup_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'file_id',
+    to_jsonb('c2650000-0000-4000-8000-000000000001'::text)
+  ),
+  'a substituted planned-cleanup file fails closed'
+);
+select ok(
+  pg_temp.planned_cleanup_substitution_fails(
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    ),
+    'c2650000-0000-4000-8000-000000000016',
+    'classification',
+    to_jsonb('job_missing_unexpectedly'::text)
+  ),
+  'caller-supplied cleanup classification cannot replace the signed classification'
+);
+select set_config(
+  'vaeroex.test_owner_only_planned_cleanup_sql',
+  format(
+    'select public.begin_google_frozen_qualification_planned_cleanup_v1(%L::uuid)',
+    (
+      select id
+      from public.document_extraction_google_qualification_processing_job_bindings
+      where file_processing_job_id = 'c2650000-0000-4000-8000-000000000016'
+    )::text
+  ),
+  true
+);
+set local role service_role;
+select ok(
+  pg_temp.raises_sqlstate(
+    current_setting('vaeroex.test_owner_only_planned_cleanup_sql', true),
+    '42501'
+  ),
+  'service role cannot invoke the owner-only planned cleanup proof helper'
+);
+reset role;
+set local role service_role;
 select is(
   public.finalize_google_frozen_qualification_cleanup_v1(
     (select run_id from pg_temp.google_qualification_test_execution_ids),
@@ -1484,6 +1901,12 @@ select is(
 );
 select is(
   (select count(*)::integer from public.file_processing_jobs
+    where id = 'c2650000-0000-4000-8000-000000000016'),
+  0,
+  'planned-never-enqueued upload-processing state is removed'
+);
+select is(
+  (select count(*)::integer from public.file_processing_jobs
     where id = 'c2650000-0000-4000-8000-000000000012'),
   1,
   'unrelated upload-processing state survives cleanup unchanged'
@@ -1500,8 +1923,8 @@ select is(
       'hex'
     )
   ),
-  1,
-  'cleanup audit proves the qualification-owned upload-processing row was removed'
+  2,
+  'cleanup audit proves both qualification-owned upload-processing rows were removed'
 );
 select is(
   (select count(*)::integer from public.document_extraction_jobs

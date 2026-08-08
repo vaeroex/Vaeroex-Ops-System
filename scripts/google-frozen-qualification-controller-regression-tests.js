@@ -25,6 +25,15 @@ const claimCleanupMerge = read(
 const dispatchQuotaGuard = read(
   "supabase/migrations/20260807215440_document_extraction_google_qualification_dispatch_quota_guard.sql"
 );
+const plannedCleanupFix = read(
+  "supabase/migrations/20260808060301_document_extraction_google_qualification_planned_cleanup.sql"
+);
+const plannedCleanupMultiFixtureFix = read(
+  "supabase/migrations/20260808064500_document_extraction_google_qualification_planned_cleanup_multifixture.sql"
+);
+const plannedCleanupSignedBindingFix = read(
+  "supabase/migrations/20260808070000_document_extraction_google_qualification_planned_cleanup_signed_binding.sql"
+);
 const databaseTest = read(
   "supabase/tests/document_extraction_google_qualification_isolation.test.sql"
 );
@@ -284,6 +293,111 @@ assert.match(
 assert.match(
   dispatchQuotaGuard,
   /v_operation not in \('enqueue', 'dispatch'\)/
+);
+assert.doesNotMatch(plannedCleanupFix, /\b(?:drop|truncate)\s+(?:table|schema)\b/i);
+assert.doesNotMatch(plannedCleanupFix, /\bon delete cascade\b/i);
+assert.doesNotMatch(plannedCleanupFix, /create\s+(?:table|index|trigger)\b/i);
+assert.doesNotMatch(
+  plannedCleanupFix,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(
+  plannedCleanupFix,
+  /create or replace function public\.authorize_google_frozen_qualification_planned_cleanup_v1/
+);
+assert.match(
+  plannedCleanupFix,
+  /create or replace function public\.begin_google_frozen_qualification_planned_cleanup_v1/
+);
+assert.match(plannedCleanupFix, /'classification', 'planned_never_enqueued'/);
+assert.match(plannedCleanupFix, /v_item\.status <> 'planned'/);
+assert.match(plannedCleanupFix, /v_item\.job_id is not null/);
+assert.match(plannedCleanupFix, /v_item\.provider_reservation_count <> 0/);
+assert.match(plannedCleanupFix, /v_item\.provider_call_count <> 0/);
+assert.match(plannedCleanupFix, /v_source\.storage_cleanup_verified_at is null/);
+assert.match(
+  plannedCleanupFix,
+  /exists \([\s\S]*?document_extraction_google_qualification_job_bindings/
+);
+assert.match(
+  plannedCleanupFix,
+  /exists \([\s\S]*?document_extraction_google_qualification_page_reservations/
+);
+assert.match(
+  plannedCleanupFix,
+  /if exists \([\s\S]*?item\.status = ''planned''[\s\S]*?item\.job_id is null[\s\S]*?begin_google_frozen_qualification_planned_cleanup_v1/
+);
+assert.match(
+  plannedCleanupFix,
+  /else[\s\S]*?begin_google_frozen_qualification_processing_cleanup_v1/
+);
+assert.match(
+  plannedCleanupFix,
+  /authorize_google_frozen_qualification_planned_cleanup_v1\(old\.id\)/
+);
+assert.match(
+  plannedCleanupFix,
+  /Canonical qualification mutation guard predecessor is invalid/
+);
+assert.match(
+  plannedCleanupFix,
+  /Canonical qualification cleanup predecessor is invalid/
+);
+assert.match(
+  plannedCleanupFix,
+  /revoke execute on function[\s\S]*?begin_google_frozen_qualification_planned_cleanup_v1\(uuid\)[\s\S]*?from public, anon, authenticated, service_role/
+);
+assert.doesNotMatch(
+  plannedCleanupMultiFixtureFix,
+  /\b(?:drop|truncate)\s+(?:table|schema)\b/i
+);
+assert.doesNotMatch(
+  plannedCleanupMultiFixtureFix,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(
+  plannedCleanupMultiFixtureFix,
+  /where binding\.run_id = v_run\.id[\s\S]*?and \([\s\S]*?binding\.item_id = v_item\.id/
+);
+assert.match(
+  plannedCleanupMultiFixtureFix,
+  /planned_cleanup_multifixture_binding_v1/
+);
+assert.match(
+  plannedCleanupMultiFixtureFix,
+  /Canonical planned cleanup predecessor is invalid/
+);
+assert.match(
+  plannedCleanupMultiFixtureFix,
+  /from public, anon, authenticated, service_role/
+);
+assert.doesNotMatch(
+  plannedCleanupSignedBindingFix,
+  /\b(?:drop|truncate)\s+(?:table|schema)\b/i
+);
+assert.doesNotMatch(
+  plannedCleanupSignedBindingFix,
+  /\b(?:alter|delete|update)\b[^;]*\b(?:kpis|business_notes|saved_analyses)\b/i
+);
+assert.match(
+  plannedCleanupSignedBindingFix,
+  /planned_cleanup_signed_binding_lifecycle_v1/
+);
+assert.match(
+  plannedCleanupSignedBindingFix,
+  /binding\.id = \(v_context ->> ''processing_binding_id''\)::uuid/
+);
+assert.match(
+  plannedCleanupSignedBindingFix,
+  /binding\.file_processing_job_id = v_processing_job\.id/
+);
+assert.match(
+  plannedCleanupSignedBindingFix,
+  /Canonical planned cleanup binding predecessor is invalid/
+);
+assert.match(
+  plannedCleanupSignedBindingFix,
+  /from public, anon, authenticated, service_role/
 );
 assert.match(controller, /restart_latched/);
 assert.match(controller, /qualification_worker_restarted/);
