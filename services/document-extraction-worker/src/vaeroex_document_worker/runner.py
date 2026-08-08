@@ -291,6 +291,65 @@ async def _fail_job(
     )
 
 
+def _is_strictly_normalized_empty_page(page: dict[str, Any]) -> bool:
+    if (
+        set(page) != {"page", "blocks", "structure"}
+        or type(page.get("page")) is not int
+        or page["page"] < 1
+        or page.get("blocks") != []
+    ):
+        return False
+    structure = page.get("structure")
+    if not isinstance(structure, dict) or set(structure) != {
+        "structureVersion",
+        "pageLayout",
+        "detectedLanguages",
+        "blocks",
+        "paragraphs",
+        "lines",
+        "tokens",
+        "tables",
+        "selectionMarks",
+        "imageQuality",
+    }:
+        return False
+    if structure.get("structureVersion") != "provider_neutral_document_structure_v1":
+        return False
+    if any(
+        structure.get(key) != []
+        for key in (
+            "detectedLanguages",
+            "blocks",
+            "paragraphs",
+            "lines",
+            "tokens",
+            "tables",
+            "selectionMarks",
+        )
+    ):
+        return False
+    layout = structure.get("pageLayout")
+    image_quality = structure.get("imageQuality")
+    if (
+        not isinstance(layout, dict)
+        or set(layout)
+        != {
+            "text",
+            "textSegments",
+            "confidence",
+            "orientation",
+            "coordinates",
+            "polygon",
+        }
+        or layout.get("text") != ""
+        or layout.get("textSegments") != []
+        or not isinstance(image_quality, dict)
+        or set(image_quality) != {"qualityScore", "detectedDefects"}
+    ):
+        return False
+    return True
+
+
 def _draft(
     result: ProviderResult,
     route: str,
@@ -301,7 +360,9 @@ def _draft(
     if len(result.pages) != page_count or not 1 <= page_count <= max_pages:
         raise ProviderFailure("normalized_page_count_mismatch", "validation", retryable=False)
     block_count = sum(len(page.get("blocks", [])) for page in result.pages)
-    if block_count == 0:
+    if block_count == 0 and not all(
+        _is_strictly_normalized_empty_page(page) for page in result.pages
+    ):
         raise ProviderFailure("normalized_output_empty", "validation", retryable=False)
     if block_count > 4_000:
         raise ProviderFailure("normalized_block_limit_exceeded", "validation", retryable=False)

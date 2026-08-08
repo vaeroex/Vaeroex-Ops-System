@@ -495,6 +495,60 @@ def test_empty_provider_output_is_validation_failure_before_completion(monkeypat
     assert outcomes[0]["resultClass"] == "validation"
 
 
+def test_strictly_normalized_empty_page_is_preserved_as_review_draft() -> None:
+    empty_page = {
+        "page": 1,
+        "blocks": [],
+        "structure": {
+            "structureVersion": "provider_neutral_document_structure_v1",
+            "pageLayout": {
+                "text": "",
+                "textSegments": [],
+                "confidence": None,
+                "orientation": "PAGE_UP",
+                "coordinates": {
+                    "page": 1,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 1.0,
+                    "height": 1.0,
+                },
+                "polygon": [
+                    {"x": 0.0, "y": 0.0},
+                    {"x": 1.0, "y": 0.0},
+                    {"x": 1.0, "y": 1.0},
+                    {"x": 0.0, "y": 1.0},
+                ],
+            },
+            "detectedLanguages": [],
+            "blocks": [],
+            "paragraphs": [],
+            "lines": [],
+            "tokens": [],
+            "tables": [],
+            "selectionMarks": [],
+            "imageQuality": {"qualityScore": 1.0, "detectedDefects": []},
+        },
+    }
+
+    artifact = runner._draft(
+        ProviderResult(
+            pages=[empty_page],
+            latency_ms=4,
+            request_contract_hashes=("a" * 64,),
+            payload_modes=("inline_raw_document",),
+        ),
+        "google_primary",
+        "image_only_pdf",
+        1,
+        15,
+    )
+
+    assert artifact["pages"] == [empty_page]
+    assert artifact["criticalFields"] == []
+    assert artifact["validationFindings"] == []
+
+
 def test_provider_gate_is_rechecked_immediately_before_invocation(monkeypatch: Any) -> None:
     fake = FakeBroker(worker_config())
     fake.dispatch_authorizations = [False]

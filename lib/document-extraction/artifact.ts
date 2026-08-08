@@ -453,9 +453,10 @@ function structuralElements(
   pageCount: number,
   page: number,
   limit: number,
-  seenIds: Set<string>
+  seenIds: Set<string>,
+  allowEmpty = false
 ) {
-  if (!Array.isArray(value) || value.length < 1 || value.length > limit) {
+  if (!Array.isArray(value) || (!allowEmpty && value.length < 1) || value.length > limit) {
     throw new Error(`Invalid document structure ${expectedKind}s.`);
   }
   return value.map((element) => {
@@ -588,7 +589,8 @@ function pageStructure(
   value: unknown,
   pageCount: number,
   page: number,
-  seenIds: Set<string>
+  seenIds: Set<string>,
+  allowEmpty = false
 ): DocumentExtractionPageStructureV1 {
   assertRecord(value, "provider-neutral document structure");
   assertExactKeys(
@@ -635,14 +637,14 @@ function pageStructure(
       confidence: confidence(defect.confidence, "document image quality defect confidence")
     };
   });
-  return {
+  const result: DocumentExtractionPageStructureV1 = {
     structureVersion: "provider_neutral_document_structure_v1",
-    pageLayout: structuralLayout(value.pageLayout, pageCount, page),
+    pageLayout: structuralLayout(value.pageLayout, pageCount, page, allowEmpty),
     detectedLanguages: detectedLanguages(value.detectedLanguages),
-    blocks: structuralElements(value.blocks, "block", pageCount, page, 1_000, seenIds),
-    paragraphs: structuralElements(value.paragraphs, "paragraph", pageCount, page, 2_000, seenIds),
-    lines: structuralElements(value.lines, "line", pageCount, page, 4_000, seenIds),
-    tokens: structuralElements(value.tokens, "token", pageCount, page, 20_000, seenIds),
+    blocks: structuralElements(value.blocks, "block", pageCount, page, 1_000, seenIds, allowEmpty),
+    paragraphs: structuralElements(value.paragraphs, "paragraph", pageCount, page, 2_000, seenIds, allowEmpty),
+    lines: structuralElements(value.lines, "line", pageCount, page, 4_000, seenIds, allowEmpty),
+    tokens: structuralElements(value.tokens, "token", pageCount, page, 20_000, seenIds, allowEmpty),
     tables: tables(value.tables, pageCount, page, seenIds),
     selectionMarks: [],
     imageQuality: {
@@ -654,6 +656,21 @@ function pageStructure(
       detectedDefects
     }
   };
+  if (
+    allowEmpty
+    && (
+      result.pageLayout.text !== ""
+      || result.detectedLanguages.length !== 0
+      || result.blocks.length !== 0
+      || result.paragraphs.length !== 0
+      || result.lines.length !== 0
+      || result.tokens.length !== 0
+      || result.tables.length !== 0
+    )
+  ) {
+    throw new Error("An empty normalized page cannot contain document elements.");
+  }
+  return result;
 }
 
 export function buildNormalizedDocumentExtractionArtifactV2(
@@ -705,7 +722,6 @@ export function buildNormalizedDocumentExtractionArtifactV2(
       || (page.page as number) > pageCount
       || seenPages.has(page.page as number)
       || !Array.isArray(page.blocks)
-      || page.blocks.length < 1
       || page.blocks.length > 1_000
     ) {
       throw new Error("Invalid or duplicate normalized page identity.");
@@ -738,10 +754,17 @@ export function buildNormalizedDocumentExtractionArtifactV2(
         coordinates: normalizedCoordinates(block.coordinates, pageCount, pageNumber)
       };
     });
+    const structure = pageStructure(
+      page.structure,
+      pageCount,
+      pageNumber,
+      seenIds,
+      blocks.length === 0
+    );
     return {
       page: pageNumber,
       blocks,
-      structure: pageStructure(page.structure, pageCount, pageNumber, seenIds)
+      structure
     };
   });
 

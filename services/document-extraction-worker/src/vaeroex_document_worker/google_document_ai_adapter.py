@@ -57,6 +57,7 @@ _BLOCK_ID = re.compile(r"^page-[1-9][0-9]*-element-[1-9][0-9]*$")
 _INT64 = re.compile(r"^(?:0|[1-9][0-9]{0,18})$")
 _PROCESS_RESPONSE_KEYS = frozenset({"document", "humanReviewStatus"})
 _DOCUMENT_KEYS = frozenset({"mimeType", "pages", "text"})
+_DOCUMENT_REQUIRED_KEYS = frozenset({"mimeType", "pages"})
 _PAGE_REQUIRED_KEYS = frozenset(
     {
         "blocks",
@@ -69,6 +70,12 @@ _PAGE_REQUIRED_KEYS = frozenset(
     }
 )
 _PAGE_KEYS = _PAGE_REQUIRED_KEYS | frozenset({"detectedLanguages", "tables"})
+_EMPTY_PAGE_REQUIRED_KEYS = frozenset(
+    {"imageQualityScores", "layout", "pageNumber"}
+)
+_EMPTY_PAGE_COLLECTION_KEYS = frozenset(
+    {"blocks", "detectedLanguages", "lines", "paragraphs", "tables", "tokens"}
+)
 _ANNOTATION_KEYS = frozenset({"detectedLanguages", "layout", "provenance"})
 _TOKEN_KEYS = frozenset(
     {"detectedBreak", "detectedLanguages", "layout", "provenance"}
@@ -1116,7 +1123,11 @@ def normalize_google_document_ai_response(
     if human_review_status is not None:
         _validate_human_review_status(human_review_status)
     document = response.get("document")
-    if not isinstance(document, dict) or set(document) != _DOCUMENT_KEYS:
+    if (
+        not isinstance(document, dict)
+        or not _DOCUMENT_REQUIRED_KEYS.issubset(document)
+        or bool(set(document) - _DOCUMENT_KEYS)
+    ):
         raise ProviderFailure(
             "google_document_ai_output_schema_mismatch",
             "malformed_output",
@@ -1131,14 +1142,9 @@ def normalize_google_document_ai_response(
     document_text = document.get("text")
     pages = document.get("pages")
     if (
-        not isinstance(document_text, str)
-        or not document_text.strip()
-        or len(document_text) > MAX_PAGE_TEXT_LENGTH
-        or "\x00" in document_text
-        or not isinstance(pages, list)
+        not isinstance(pages, list)
         or len(pages) != 1
         or not isinstance(pages[0], dict)
-        or not _PAGE_REQUIRED_KEYS.issubset(pages[0])
         or bool(set(pages[0]) - _PAGE_KEYS)
         or pages[0].get("pageNumber") != 1
     ):
@@ -1148,6 +1154,63 @@ def normalize_google_document_ai_response(
             retryable=False,
         )
     provider_page = pages[0]
+    empty_document = "text" not in document or document_text == ""
+    if empty_document:
+        if (
+            not _EMPTY_PAGE_REQUIRED_KEYS.issubset(provider_page)
+            or any(
+                key in provider_page and provider_page[key] != []
+                for key in _EMPTY_PAGE_COLLECTION_KEYS
+            )
+        ):
+            raise ProviderFailure(
+                "google_document_ai_output_schema_mismatch",
+                "malformed_output",
+                retryable=False,
+            )
+        page_layout, _ = _layout_v2(
+            provider_page.get("layout"),
+            "",
+            page.page,
+            allow_empty_text=True,
+        )
+        if page_layout["text"] or page_layout["textSegments"]:
+            raise ProviderFailure(
+                "google_document_ai_output_schema_mismatch",
+                "malformed_output",
+                retryable=False,
+            )
+        return {
+            "page": page.page,
+            "blocks": [],
+            "structure": {
+                "structureVersion": "provider_neutral_document_structure_v1",
+                "pageLayout": page_layout,
+                "detectedLanguages": [],
+                "blocks": [],
+                "paragraphs": [],
+                "lines": [],
+                "tokens": [],
+                "tables": [],
+                "selectionMarks": [],
+                "imageQuality": _image_quality(
+                    provider_page.get("imageQualityScores")
+                ),
+            },
+        }
+    if (
+        not isinstance(document_text, str)
+        or not document_text.strip()
+        or len(document_text) > MAX_PAGE_TEXT_LENGTH
+        or "\x00" in document_text
+        or set(document) != _DOCUMENT_KEYS
+        or not _PAGE_REQUIRED_KEYS.issubset(provider_page)
+    ):
+        raise ProviderFailure(
+            "google_document_ai_output_schema_mismatch",
+            "malformed_output",
+            retryable=False,
+        )
     page_layout, _ = _layout_v2(
         provider_page.get("layout"),
         document_text,

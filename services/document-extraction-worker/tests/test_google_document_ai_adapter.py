@@ -184,6 +184,43 @@ def process_response() -> dict[str, Any]:
     }
 
 
+def empty_page_process_response(*, explicit_defaults: bool = False) -> dict[str, Any]:
+    provider_page: dict[str, Any] = {
+        "pageNumber": 1,
+        "layout": {
+            "boundingPoly": {"normalizedVertices": _vertices(0, 0, 1, 1)},
+            "orientation": "PAGE_UP",
+        },
+        "imageQualityScores": {
+            "qualityScore": 1.0,
+            "detectedDefects": [],
+        },
+    }
+    document: dict[str, Any] = {
+        "mimeType": "image/png",
+        "pages": [provider_page],
+    }
+    if explicit_defaults:
+        document["text"] = ""
+        provider_page.update(
+            {
+                "blocks": [],
+                "detectedLanguages": [],
+                "lines": [],
+                "paragraphs": [],
+                "tables": [],
+                "tokens": [],
+            }
+        )
+    return {
+        "document": document,
+        "humanReviewStatus": {
+            "state": "HUMAN_REVIEW_SKIPPED",
+            "stateMessage": "",
+        },
+    }
+
+
 def response_bytes(value: dict[str, Any] | None = None) -> bytes:
     return json.dumps(
         process_response() if value is None else value,
@@ -326,6 +363,97 @@ def test_strict_response_normalizes_tables_and_excludes_duplicate_table_lines(
         ],
     }
     assert structure["selectionMarks"] == []
+
+
+@pytest.mark.parametrize("explicit_defaults", (False, True))
+def test_strict_response_accepts_canonical_empty_page_without_inventing_content(
+    tmp_path: Path,
+    explicit_defaults: bool,
+) -> None:
+    normalized = normalize_google_document_ai_response(
+        contract(),
+        rendered_page(tmp_path),
+        response_bytes(
+            empty_page_process_response(explicit_defaults=explicit_defaults)
+        ),
+    )
+
+    assert normalized["blocks"] == []
+    assert normalized["structure"]["pageLayout"]["text"] == ""
+    assert normalized["structure"]["pageLayout"]["textSegments"] == []
+    assert normalized["structure"]["detectedLanguages"] == []
+    assert normalized["structure"]["blocks"] == []
+    assert normalized["structure"]["paragraphs"] == []
+    assert normalized["structure"]["lines"] == []
+    assert normalized["structure"]["tokens"] == []
+    assert normalized["structure"]["tables"] == []
+    assert normalized["structure"]["imageQuality"] == {
+        "qualityScore": 1.0,
+        "detectedDefects": [],
+    }
+
+
+def test_adapter_accepts_one_canonical_empty_page_once(tmp_path: Path) -> None:
+    calls = 0
+
+    def handler(_request: httpx.Request) -> httpx.Response:
+        nonlocal calls
+        calls += 1
+        return httpx.Response(
+            200,
+            content=response_bytes(empty_page_process_response()),
+            headers={"Content-Type": "application/json"},
+        )
+
+    result = invoke_google_document_ai_adapter(
+        [rendered_page(tmp_path)],
+        "d" * 64,
+        contract(),
+        lambda: "token",
+        transport=httpx.MockTransport(handler),
+    )
+
+    assert calls == 1
+    assert result.pages[0]["blocks"] == []
+    assert result.pages[0]["structure"]["pageLayout"]["text"] == ""
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    (
+        "whitespace_text",
+        "nonempty_annotation",
+        "missing_layout",
+        "missing_image_quality",
+        "page_layout_text_anchor",
+    ),
+)
+def test_empty_page_response_remains_strict_and_fail_closed(
+    tmp_path: Path,
+    mutation: str,
+) -> None:
+    response = empty_page_process_response(explicit_defaults=True)
+    document = response["document"]
+    provider_page = document["pages"][0]
+    if mutation == "whitespace_text":
+        document["text"] = " "
+    elif mutation == "nonempty_annotation":
+        provider_page["blocks"] = [_annotation(0, 1, (0.1, 0.1, 0.2, 0.2))]
+    elif mutation == "missing_layout":
+        del provider_page["layout"]
+    elif mutation == "missing_image_quality":
+        del provider_page["imageQualityScores"]
+    elif mutation == "page_layout_text_anchor":
+        provider_page["layout"]["textAnchor"] = {
+            "textSegments": [{"startIndex": "0", "endIndex": "1"}]
+        }
+
+    with pytest.raises(ProviderFailure):
+        normalize_google_document_ai_response(
+            contract(),
+            rendered_page(tmp_path),
+            response_bytes(response),
+        )
 
 
 def test_provider_confidence_is_preserved_only_as_review_metadata(tmp_path: Path) -> None:
