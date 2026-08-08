@@ -145,6 +145,18 @@ def main() -> int:
     service_annotations = _mapping(
         service_metadata.get("annotations") or {}, "broker_service_metadata_invalid"
     )
+    expected_audience = (
+        f"https://{arguments.service}-{arguments.google_project_number}."
+        "us-west1.run.app"
+    )
+    try:
+        custom_audiences = json.loads(
+            str(service_annotations.get("run.googleapis.com/custom-audiences") or "")
+        )
+    except json.JSONDecodeError as error:
+        raise SystemExit("broker_custom_audience_invalid") from error
+    if custom_audiences != [expected_audience]:
+        raise SystemExit("broker_custom_audience_invalid")
     template_metadata = _mapping(
         template.get("metadata") or {}, "broker_template_metadata_invalid"
     )
@@ -252,6 +264,7 @@ def main() -> int:
                 "concurrency": 1,
                 "publicUnauthenticated": False,
                 "exactInvoker": True,
+                "exactCustomAudience": True,
                 "previewSupabaseOnly": True,
                 "secretValuesRead": False,
                 "staticGoogleCredential": False,

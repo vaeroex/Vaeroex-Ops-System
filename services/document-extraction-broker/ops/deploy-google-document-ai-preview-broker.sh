@@ -71,6 +71,7 @@ WORKER_KEYS_SECRET_NAME="$BROKER_SERVICE-worker-public-keys"
 CAPABILITY_KEYS_SECRET_NAME="$BROKER_SERVICE-capability-keys"
 TELEMETRY_SECRET_NAME="$BROKER_SERVICE-telemetry-hmac"
 ENCRYPTION_KEYS_SECRET_NAME="$BROKER_SERVICE-encryption-keys"
+BROKER_AUDIENCE="https://$BROKER_SERVICE-$GCP_PROJECT_NUMBER.$GCP_REGION.run.app"
 
 gcloud run deploy "$BROKER_SERVICE" \
   --project "$GCP_PROJECT_ID" \
@@ -79,6 +80,7 @@ gcloud run deploy "$BROKER_SERVICE" \
   --image "$BROKER_IMAGE_DIGEST" \
   --service-account "$BROKER_SERVICE_ACCOUNT" \
   --no-allow-unauthenticated \
+  --set-custom-audiences "$BROKER_AUDIENCE" \
   --ingress all \
   --min 0 \
   --max 1 \

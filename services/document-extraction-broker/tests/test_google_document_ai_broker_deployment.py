@@ -18,6 +18,7 @@ IMAGE = (
 )
 PROJECT_NUMBER = "626856681952"
 PROCESSOR_ID = "948f589143795629"
+BROKER_AUDIENCE = f"https://{SERVICE}-{PROJECT_NUMBER}.us-west1.run.app"
 
 
 def _environment(mode: str = "inert") -> list[dict[str, object]]:
@@ -79,7 +80,12 @@ def _description(mode: str = "inert") -> dict[str, Any]:
     return {
         "metadata": {
             "name": SERVICE,
-            "annotations": {"run.googleapis.com/maxScale": "1"},
+            "annotations": {
+                "run.googleapis.com/maxScale": "1",
+                "run.googleapis.com/custom-audiences": json.dumps(
+                    [BROKER_AUDIENCE], separators=(",", ":")
+                ),
+            },
         },
         "spec": {
             "template": {
@@ -156,6 +162,7 @@ def test_google_broker_verifier_accepts_exact_modes(tmp_path: Path) -> None:
         assert result.returncode == 0, result.stderr
         evidence = json.loads(result.stdout)
         assert evidence["exactInvoker"] is True
+        assert evidence["exactCustomAudience"] is True
         assert evidence["providerProfile"] == "google_document_ai_enterprise_ocr_v1"
         assert evidence["nvidiaCredential"] is False
         assert evidence["productionApproval"] is False
@@ -202,6 +209,24 @@ def test_google_broker_verifier_rejects_wrong_processor_or_missing_approval(
     assert "broker_environment_scope_invalid" in result.stderr
 
 
+def test_google_broker_verifier_rejects_missing_or_wrong_custom_audience(
+    tmp_path: Path,
+) -> None:
+    missing = _description()
+    del missing["metadata"]["annotations"]["run.googleapis.com/custom-audiences"]
+    result = _run(tmp_path, missing)
+    assert result.returncode != 0
+    assert "broker_custom_audience_invalid" in result.stderr
+
+    wrong = _description()
+    wrong["metadata"]["annotations"]["run.googleapis.com/custom-audiences"] = (
+        '["https://wrong-preview-broker.run.app"]'
+    )
+    result = _run(tmp_path, wrong)
+    assert result.returncode != 0
+    assert "broker_custom_audience_invalid" in result.stderr
+
+
 def test_google_broker_mode_script_is_bounded_and_revokes_preview_approval() -> None:
     script = (
         BROKER_ROOT / "ops" / "set-google-document-ai-preview-broker-mode.sh"
@@ -225,3 +250,4 @@ def test_google_broker_deploy_script_has_no_provider_secret_or_fallback() -> Non
     assert "GOOGLE_APPLICATION_CREDENTIALS" not in script
     assert "DOCUMENT_EXTRACTION_GOOGLE_PRODUCTION_APPROVAL" not in script
     assert "fallback" not in script.lower()
+    assert '--set-custom-audiences "$BROKER_AUDIENCE"' in script
