@@ -184,7 +184,11 @@ def process_response() -> dict[str, Any]:
     }
 
 
-def empty_page_process_response(*, explicit_defaults: bool = False) -> dict[str, Any]:
+def empty_page_process_response(
+    *,
+    explicit_defaults: bool = False,
+    text_anchor: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     provider_page: dict[str, Any] = {
         "pageNumber": 1,
         "layout": {
@@ -196,6 +200,8 @@ def empty_page_process_response(*, explicit_defaults: bool = False) -> dict[str,
             "detectedDefects": [],
         },
     }
+    if text_anchor is not None:
+        provider_page["layout"]["textAnchor"] = text_anchor
     document: dict[str, Any] = {
         "mimeType": "image/png",
         "pages": [provider_page],
@@ -393,15 +399,37 @@ def test_strict_response_accepts_canonical_empty_page_without_inventing_content(
     }
 
 
+@pytest.mark.parametrize(
+    "text_anchor",
+    ({}, {"textSegments": []}, {"textSegments": [{}]}),
+)
+def test_strict_response_accepts_canonical_protobuf_empty_text_anchor(
+    tmp_path: Path,
+    text_anchor: dict[str, Any],
+) -> None:
+    normalized = normalize_google_document_ai_response(
+        contract(),
+        rendered_page(tmp_path),
+        response_bytes(empty_page_process_response(text_anchor=text_anchor)),
+    )
+
+    assert normalized["blocks"] == []
+    assert normalized["structure"]["pageLayout"]["text"] == ""
+    assert normalized["structure"]["pageLayout"]["textSegments"] == []
+
+
 def test_adapter_accepts_one_canonical_empty_page_once(tmp_path: Path) -> None:
     calls = 0
+    outcomes: list[tuple[int, bool, str, bool]] = []
 
     def handler(_request: httpx.Request) -> httpx.Response:
         nonlocal calls
         calls += 1
         return httpx.Response(
             200,
-            content=response_bytes(empty_page_process_response()),
+            content=response_bytes(
+                empty_page_process_response(text_anchor={"textSegments": [{}]})
+            ),
             headers={"Content-Type": "application/json"},
         )
 
@@ -411,9 +439,11 @@ def test_adapter_accepts_one_canonical_empty_page_once(tmp_path: Path) -> None:
         contract(),
         lambda: "token",
         transport=httpx.MockTransport(handler),
+        provider_page_outcome=lambda *outcome: outcomes.append(outcome),
     )
 
     assert calls == 1
+    assert outcomes == [(1, True, "success", True)]
     assert result.pages[0]["blocks"] == []
     assert result.pages[0]["structure"]["pageLayout"]["text"] == ""
 
@@ -426,6 +456,8 @@ def test_adapter_accepts_one_canonical_empty_page_once(tmp_path: Path) -> None:
         "missing_layout",
         "missing_image_quality",
         "page_layout_text_anchor",
+        "empty_anchor_content",
+        "multiple_empty_segments",
     ),
 )
 def test_empty_page_response_remains_strict_and_fail_closed(
@@ -446,6 +478,12 @@ def test_empty_page_response_remains_strict_and_fail_closed(
     elif mutation == "page_layout_text_anchor":
         provider_page["layout"]["textAnchor"] = {
             "textSegments": [{"startIndex": "0", "endIndex": "1"}]
+        }
+    elif mutation == "empty_anchor_content":
+        provider_page["layout"]["textAnchor"] = {"content": "not empty"}
+    elif mutation == "multiple_empty_segments":
+        provider_page["layout"]["textAnchor"] = {
+            "textSegments": [{}, {}]
         }
 
     with pytest.raises(ProviderFailure):

@@ -338,6 +338,25 @@ def _anchored_text(
             retryable=False,
         )
     segments = text_anchor.get("textSegments")
+    supplied_content = text_anchor.get("content")
+    if allow_empty and document_text == "":
+        if supplied_content not in (None, ""):
+            raise ProviderFailure(
+                "google_document_ai_text_anchor_conflict",
+                "malformed_output",
+                retryable=False,
+            )
+        if segments in (None, []):
+            return "", ()
+        if (
+            isinstance(segments, list)
+            and len(segments) == 1
+            and isinstance(segments[0], dict)
+            and not (set(segments[0]) - _TEXT_SEGMENT_KEYS)
+            and _index(segments[0].get("startIndex"), default_zero=True) == 0
+            and _index(segments[0].get("endIndex"), default_zero=True) == 0
+        ):
+            return "", ()
     if not isinstance(segments, list) or not 1 <= len(segments) <= 64:
         raise ProviderFailure(
             "google_document_ai_text_anchor_invalid",
@@ -381,7 +400,6 @@ def _anchored_text(
             "malformed_output",
             retryable=False,
         )
-    supplied_content = text_anchor.get("content")
     if supplied_content is not None and supplied_content not in (raw_value, value):
         raise ProviderFailure(
             "google_document_ai_text_anchor_conflict",
