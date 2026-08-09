@@ -6,7 +6,11 @@ node_modules
 .pnpm-store
 dist
 coverage
+__pycache__/
+*.pyc
 *.tsbuildinfo
 work
 outputs
 .visual-qa/
+.vercel
+.env*

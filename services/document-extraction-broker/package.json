@@ -1,0 +1,19 @@
+{
+  "name": "vaeroex-document-extraction-broker",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build": "ncc build src/server.ts -o dist --minify --no-cache --license licenses.txt --external server-only"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "2.45.4",
+    "server-only": "0.0.1",
+    "zod": "3.25.76"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.21",
+    "@vercel/ncc": "0.44.1",
+    "typescript": "5.9.3"
+  }
+}

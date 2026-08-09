@@ -1,0 +1,93 @@
+apiVersion: run.googleapis.com/v1
+kind: WorkerPool
+metadata:
+  name: DOCUMENT_EXTRACTION_WORKER_POOL
+  annotations:
+    run.googleapis.com/description: Vaeroex document extraction Preview worker; disabled at zero instances by default.
+    run.googleapis.com/scalingMode: manual
+    run.googleapis.com/manualInstanceCount: "0"
+spec:
+  template:
+    spec:
+      serviceAccountName: DOCUMENT_EXTRACTION_SERVICE_ACCOUNT
+      containers:
+        - name: document-extraction-worker
+          image: DOCUMENT_EXTRACTION_IMAGE_DIGEST
+          volumeMounts:
+            - name: bounded-temporary-storage
+              mountPath: /var/tmp/vaeroex-document-worker
+          env:
+            - name: DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT
+              value: preview
+            - name: DOCUMENT_EXTRACTION_WORKER_DEPLOYMENT_ID
+              value: DOCUMENT_EXTRACTION_DEPLOYMENT_ID
+            - name: DOCUMENT_EXTRACTION_WORKER_ID
+              value: DOCUMENT_EXTRACTION_WORKER_ID_VALUE
+            - name: DOCUMENT_EXTRACTION_WORKER_KEY_VERSION
+              value: DOCUMENT_EXTRACTION_WORKER_KEY_VERSION_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_URL
+              value: DOCUMENT_EXTRACTION_BROKER_URL_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_AUDIENCE
+              value: DOCUMENT_EXTRACTION_BROKER_AUDIENCE_VALUE
+            - name: DOCUMENT_EXTRACTION_BROKER_AUTH_MODE
+              value: google_oidc_v1
+            - name: DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_ACTIVE_PROVIDER_PROFILE
+              value: "hosted_tool_call_v2"
+            - name: DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED
+              value: "false"
+            - name: DOCUMENT_EXTRACTION_NVIDIA_MODEL
+              value: nvidia/nemotron-parse
+            - name: DOCUMENT_EXTRACTION_NVIDIA_CLIENT_REVISION
+              value: vaeroex_nemotron_parse_rest_v2
+            - name: DOCUMENT_EXTRACTION_NVIDIA_PARSER_REVISION
+              value: nemotron_parse_hosted_tool_call_rest_v2
+            - name: DOCUMENT_EXTRACTION_IDLE_POLL_SECONDS
+              value: "5"
+            - name: TMPDIR
+              value: /var/tmp/vaeroex-document-worker
+            - name: DOCUMENT_EXTRACTION_WORKER_PRIVATE_KEY_PKCS8_BASE64
+              valueFrom:
+                secretKeyRef:
+                  key: "DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION"
+                  name: DOCUMENT_EXTRACTION_WORKER_SECRET_NAME
+            - name: NVIDIA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: "DOCUMENT_EXTRACTION_NVIDIA_SECRET_VERSION"
+                  name: DOCUMENT_EXTRACTION_NVIDIA_SECRET_NAME
+          resources:
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          startupProbe:
+            httpGet:
+              path: /startup
+              port: 8080
+            initialDelaySeconds: 0
+            timeoutSeconds: 2
+            periodSeconds: 5
+            failureThreshold: 24
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            timeoutSeconds: 2
+            periodSeconds: 30
+            failureThreshold: 12
+      volumes:
+        - name: bounded-temporary-storage
+          emptyDir:
+            medium: Memory
+            sizeLimit: 768Mi

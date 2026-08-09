@@ -1,0 +1,351 @@
+const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+const read = (relative) => fs.readFileSync(path.join(root, relative), "utf8");
+const workerRoot = path.join(root, "services/document-extraction-worker");
+const readWorker = (relative) => read(`services/document-extraction-worker/${relative}`);
+
+const dockerfile = readWorker("Dockerfile");
+const dockerignore = readWorker(".dockerignore");
+const poolTemplate = readWorker("cloud-run-worker-pool.yaml.template");
+const deploy = readWorker("ops/deploy-preview-worker.sh");
+const renderer = readWorker("ops/render-worker-pool.py");
+const enable = readWorker("ops/set-preview-qualification-worker.sh");
+const enableAuthentication = readWorker("ops/set-preview-authentication-worker.sh");
+const enableResponseProfileDiagnostic = readWorker("ops/set-preview-response-profile-diagnostic-worker.sh");
+const disable = readWorker("ops/disable-preview-worker.sh");
+const provision = readWorker("ops/provision-preview-secrets.sh");
+const verifySecretFiles = readWorker("ops/verify-secret-files.py");
+const provisionRuntime = readWorker("ops/provision-preview-runtime.sh");
+const buildImage = readWorker("ops/build-preview-image.sh");
+const verifyWorker = readWorker("ops/verify-worker-pool.py");
+const verifyDeployment = readWorker("ops/verify-preview-worker.sh");
+const summarizeSignals = readWorker("ops/summarize-worker-signals.py");
+const checkSignals = readWorker("ops/check-preview-worker-signals.sh");
+const cleanup = readWorker("ops/cleanup-nvcf-assets.py");
+const config = readWorker("src/vaeroex_document_worker/config.py");
+const broker = readWorker("src/vaeroex_document_worker/broker.py");
+const runner = readWorker("src/vaeroex_document_worker/runner.py");
+const daemon = readWorker("src/vaeroex_document_worker/daemon.py");
+const health = readWorker("src/vaeroex_document_worker/health.py");
+const telemetry = readWorker("src/vaeroex_document_worker/telemetry.py");
+const responseProfile = readWorker("src/vaeroex_document_worker/response_profile.py");
+const fieldPathDiagnostic = readWorker("src/vaeroex_document_worker/field_path_diagnostic.py");
+const synthetic = readWorker("src/vaeroex_document_worker/synthetic.py");
+const assetCleanup = readWorker("src/vaeroex_document_worker/asset_cleanup.py");
+const migration = read("supabase/migrations/20260804010000_document_extraction_worker_phase_c1_protocol.sql");
+const baseline = JSON.parse(readWorker("fixtures/current-baseline-v1.json"));
+const runbook = read("docs/architecture/document-extraction-worker-deployment-phase-c1.md");
+
+assert.match(dockerfile, /^FROM python:3\.12\.11-slim-bookworm@sha256:[0-9a-f]{64} AS runtime$/m);
+assert.match(dockerfile, /pip install --require-hashes --no-deps -r requirements\.lock/);
+assert.match(dockerfile, /COPY fixtures \.\/fixtures/);
+assert.match(dockerfile, /USER 10001:10001/);
+assert.match(dockerfile, /ENTRYPOINT \["python", "-m", "vaeroex_document_worker\.daemon"\]/);
+assert.doesNotMatch(dockerfile, /EXPOSE|curl|wget|apt-get|latest/i);
+assert.match(dockerignore, /^tests$/m);
+assert.match(dockerignore, /^sbom\.cdx\.json$/m);
+
+assert.match(poolTemplate, /kind: WorkerPool/);
+assert.match(poolTemplate, /scalingMode: manual/);
+assert.match(poolTemplate, /manualInstanceCount: "0"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /memory: 2Gi/);
+assert.match(poolTemplate, /mountPath: \/var\/tmp\/vaeroex-document-worker/);
+assert.match(poolTemplate, /name: TMPDIR[\s\S]+value: \/var\/tmp\/vaeroex-document-worker/);
+assert.doesNotMatch(poolTemplate, /name: PORT/);
+assert.match(poolTemplate, /emptyDir:[\s\S]+medium: Memory[\s\S]+sizeLimit: 768Mi/);
+assert.match(poolTemplate, /startupProbe:[\s\S]+\/startup/);
+assert.match(poolTemplate, /livenessProbe:[\s\S]+\/health/);
+assert.doesNotMatch(poolTemplate, /^kind:\s*Service$/m);
+assert.doesNotMatch(poolTemplate, /^\s*(?:ingress|loadBalancer|autoscaling):/m);
+
+assert.match(deploy, /WORKER_IMAGE_DIGEST must be immutable/);
+assert.match(deploy, /WORKER_SECRET_VERSION/);
+assert.match(deploy, /BROKER_AUDIENCE/);
+assert.match(deploy, /NVIDIA_SECRET_VERSION/);
+assert.doesNotMatch(deploy, /VERCEL_SHARE/);
+assert.doesNotMatch(deploy, /:latest/);
+assert.match(deploy, /gcloud run worker-pools replace/);
+assert.match(deploy, /render-worker-pool\.py/);
+assert.match(deploy, /verify-worker-pool\.py/);
+assert.doesNotMatch(deploy, /--startup-probe|--liveness-probe/);
+assert.match(renderer, /BROKER_URL must be an HTTPS Cloud Run origin/);
+assert.match(renderer, /BROKER_AUDIENCE must equal the exact broker origin/);
+assert.match(renderer, /Secret versions must be explicit positive integers/);
+assert.match(renderer, /WORKER_IMAGE_DIGEST must be immutable/);
+for (const mutatingPreviewScript of [deploy, enableAuthentication, enable, enableResponseProfileDiagnostic, disable, provision, provisionRuntime, buildImage]) {
+  assert.match(mutatingPreviewScript, /vaeroex-document-extraction-phase-c1-preview-only/);
+  assert.match(mutatingPreviewScript, /vaeroex-document-worker/);
+}
+for (const regionalPreviewScript of [deploy, enableAuthentication, enable, enableResponseProfileDiagnostic, disable, provisionRuntime, buildImage, verifyDeployment]) {
+  assert.match(regionalPreviewScript, /us-west1/);
+}
+for (const workerPoolScript of [deploy, enableAuthentication, enable, enableResponseProfileDiagnostic, disable, verifyDeployment]) {
+  assert.match(workerPoolScript, /vaeroex-document-extraction-preview/);
+}
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_WORKER_ENVIRONMENT[\s\S]+value: preview/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED[\s\S]+value: "false"/);
+assert.match(poolTemplate, /secretKeyRef:[\s\S]+DOCUMENT_EXTRACTION_WORKER_SECRET_VERSION/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_BROKER_AUTH_MODE[\s\S]+google_oidc_v1/);
+assert.match(poolTemplate, /DOCUMENT_EXTRACTION_BROKER_AUDIENCE/);
+assert.match(enableAuthentication, /cloud-run-broker-auth-zero-provider-calls/);
+assert.match(enableAuthentication, /DOCUMENT_EXTRACTION_PROVIDER_EXECUTION_ENABLED=false/);
+assert.match(enableAuthentication, /DOCUMENT_EXTRACTION_BROKER_AUTH_QUALIFICATION_ENABLED=true/);
+assert.match(enableAuthentication, /--instances 1/);
+assert.match(enable, /synthetic-preview-only-12-documents-13-pages/);
+assert.match(enable, /--instances 1/);
+assert.match(enableResponseProfileDiagnostic, /nemotron-parse-response-profile-one-call-v1/);
+assert.match(enableResponseProfileDiagnostic, /nemotron-parse-field-path-one-call-v1/);
+assert.match(enableResponseProfileDiagnostic, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED=true/);
+assert.match(enableResponseProfileDiagnostic, /DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED=true/);
+assert.match(enableResponseProfileDiagnostic, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED=true/);
+assert.match(enableResponseProfileDiagnostic, /--instances 1/);
+assert.match(disable, /--instances 0[\s\S]+DOCUMENT_EXTRACTION_PRIVATE_WORKER_ENABLED=false/);
+assert.match(disable, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED=false/);
+assert.match(disable, /DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED=false/);
+assert.match(disable, /--remove-env-vars "DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_CONFIRMATION,DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_CONFIRMATION"/);
+assert.match(disable, /run\.googleapis\.com\/manualInstanceCount/);
+assert.match(disable, /test "\$instances" = "0"/);
+assert.match(provision, /--data-file/);
+assert.match(provision, /verify-secret-files\.py/);
+assert.match(provision, /roles\/secretmanager\.secretAccessor/);
+assert.doesNotMatch(provision, /versions access|secrets versions access|cat |echo \$/i);
+assert.match(verifySecretFiles, /stat\.S_IMODE\(metadata\.st_mode\) != 0o600/);
+assert.match(verifySecretFiles, /stat\.S_ISLNK/);
+assert.doesNotMatch(verifySecretFiles, /print\(/);
+assert.match(provisionRuntime, /gcloud iam service-accounts create/);
+assert.match(provisionRuntime, /unexpected project-level roles/);
+assert.doesNotMatch(provisionRuntime, /add-iam-policy-binding/);
+assert.match(buildImage, /gcloud builds submit/);
+assert.match(buildImage, /image_summary\.digest/);
+assert.doesNotMatch(buildImage, /:latest/);
+assert.match(verifyDeployment, /gcloud run worker-pools describe/);
+assert.match(verifyWorker, /worker_pool_environment_scope_invalid/);
+assert.match(verifyWorker, /worker_pool_public_endpoint_unexpected/);
+assert.match(verifyWorker, /secretValuesRead/);
+assert.match(checkSignals, /resource\.type=\\"cloud_run_worker_pool\\"/);
+assert.doesNotMatch(checkSignals, /cloud_run_workerpool/);
+assert.match(summarizeSignals, /rawPayloadReturned/);
+assert.doesNotMatch(summarizeSignals, /print\(.+(?:jsonPayload|document_text|raw_response)/i);
+
+for (const forbidden of [
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+  "SUPABASE_ANON_KEY",
+  "SUPABASE_PUBLISHABLE_KEY",
+  "DATABASE_URL",
+  "DOCUMENT_EXTRACTION_ENCRYPTION_KEYS_JSON",
+  "DOCUMENT_EXTRACTION_BROKER_CAPABILITY_KEYS_JSON",
+  "VERCEL_BLOB_READ_WRITE_TOKEN",
+  "GOOGLE_APPLICATION_CREDENTIALS"
+]) {
+  assert.match(config, new RegExp(forbidden));
+}
+assert.match(config, /runtime_environment == "preview"/);
+assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_QUALIFICATION_ENABLED/);
+assert.match(config, /DOCUMENT_EXTRACTION_SYNTHETIC_PROVIDER_CALLS_ENABLED/);
+assert.match(config, /DOCUMENT_EXTRACTION_RESPONSE_PROFILE_DIAGNOSTIC_ENABLED/);
+assert.match(config, /DOCUMENT_EXTRACTION_FIELD_PATH_DIAGNOSTIC_ENABLED/);
+assert.match(config, /Response-profile diagnostics require the exact Preview-only synthetic confirmation/);
+assert.match(config, /Field-path diagnostics require the exact Preview-only synthetic confirmation/);
+assert.match(config, /Forbidden private-worker credential/);
+assert.match(config, /DOCUMENT_EXTRACTION_.+TOKEN\|SECRET\|PRIVATE_KEY\|CREDENTIALS/);
+assert.match(config, /google_oidc_v1/);
+assert.match(config, /Cloud Run origin/);
+
+assert.match(broker, /Ed25519PrivateKey/);
+assert.match(broker, /x-vaeroex-worker-environment/);
+assert.match(broker, /x-vaeroex-worker-deployment-id/);
+assert.match(broker, /secrets\.token_hex\(16\)/);
+assert.match(broker, /follow_redirects=False/);
+assert.match(broker, /trust_env=False/);
+assert.match(broker, /GoogleIdentityTokenProvider/);
+assert.match(broker, /x-serverless-authorization/);
+assert.match(runner, /approved_fixture_for_source/);
+assert.match(runner, /materialize_approved_pages/);
+assert.match(runner, /check_provider_boundary/);
+assert.match(runner, /lease, reservation_id = future\.result\(timeout=35\)/);
+assert.match(runner, /progress_callback/);
+assert.match(runner, /status="dispatch_in_flight"/);
+assert.match(runner, /status=_required_string\(completion\.get\("status"\)/);
+assert.match(runner, /synthetic_fixture\.document_id != DIAGNOSTIC_FIXTURE_ID/);
+assert.match(runner, /not active_config\.response_profile_diagnostic_enabled[\s\S]+not active_config\.field_path_diagnostic_enabled[\s\S]+failure\.retryable/);
+assert.match(daemon, /await _verify_broker\(config\)/);
+assert.match(daemon, /max_cycles/);
+assert.match(health, /\/startup/);
+assert.match(health, /\/health/);
+
+for (const forbiddenTelemetryField of [
+  "workspace_id", "workspaceId", "filename", "asset_id", "assetId",
+  "signed_url", "document_text", "raw_response", "assertion", "secret"
+]) {
+  assert.doesNotMatch(telemetry, new RegExp(`['\"]${forbiddenTelemetryField}['\"]`));
+}
+assert.match(telemetry, /_ALLOWED_FIELDS/);
+assert.match(telemetry, /operational_telemetry_field_rejected/);
+assert.match(telemetry, /emit_response_profile_diagnostic/);
+assert.match(telemetry, /emit_field_path_diagnostic/);
+for (const approvedDiagnosticField of [
+  "httpStatus", "responseContentType", "returnedModel", "finishReason",
+  "assistantContentState", "toolCallCount", "toolCallTypes", "functionNames",
+  "argumentsTransportTypes", "argumentsByteLengths", "argumentsCompleteJson",
+  "topLevelResponseKeys", "truncationIndicator", "tokenLimitIndicator",
+  "providerRequestId", "responseByteCount", "latencyMs"
+]) {
+  assert.match(responseProfile, new RegExp(`['"]${approvedDiagnosticField}['"]`));
+}
+for (const prohibitedDiagnosticField of [
+  "documentText", "extractedValues", "boundingBoxes", "toolCallArguments",
+  "assistantContent", "rawRequest", "rawResponse", "imageBytes", "prompt",
+  "credential", "workspaceId", "customerId"
+]) {
+  assert.doesNotMatch(responseProfile, new RegExp(`['"]${prohibitedDiagnosticField}['"]`));
+}
+assert.doesNotMatch(responseProfile, /\bprint\(/);
+for (const approvedFieldPath of [
+  "rootType", "topLevelKeyNames", "rootArrayLength", "observedElementCount",
+  "elementSchemas", "bboxArrayLength", "missingPaths", "unknownPaths", "duplicatePaths",
+  "typeMismatchPaths", "firstFailureClass", "firstFailurePath",
+  "additionalFailureCount", "providerRequestId", "finishReason",
+  "responseByteCount", "argumentByteCount", "latencyMs"
+]) {
+  assert.match(fieldPathDiagnostic, new RegExp(`['"]${approvedFieldPath}['"]`));
+}
+for (const prohibitedFieldPath of [
+  "documentText", "extractedValues", "coordinateValues", "rawArguments",
+  "rawResponse", "assistantContent", "prompt", "imageBytes", "filename",
+  "storagePath", "signedUrl", "workspaceId", "customerId", "fileId", "jobId",
+  "credential", "token", "signature", "assetId"
+]) {
+  assert.doesNotMatch(fieldPathDiagnostic, new RegExp(`['"]${prohibitedFieldPath}['"]`));
+}
+assert.doesNotMatch(fieldPathDiagnostic, /\bprint\(/);
+
+const fixtureRoot = path.join(workerRoot, "fixtures/synthetic-v1");
+function walk(directory) {
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const absolute = path.join(directory, entry.name);
+    return entry.isDirectory() ? walk(absolute) : [absolute];
+  });
+}
+const digest = crypto.createHash("sha256");
+for (const absolute of walk(fixtureRoot).sort()) {
+  digest.update(path.relative(fixtureRoot, absolute));
+  digest.update(Buffer.from([0]));
+  digest.update(crypto.createHash("sha256").update(fs.readFileSync(absolute)).digest());
+}
+assert.equal(digest.digest("hex"), "c0e6b1aa615e3674e5aa418436a84555889d8766d4d8a1e3401685dbe2495dec");
+const manifest = JSON.parse(fs.readFileSync(path.join(fixtureRoot, "ground-truth.json"), "utf8"));
+assert.equal(manifest.length, 12);
+assert.equal(manifest.reduce((total, fixture) => total + fixture.renderedPageFiles.length, 0), 13);
+assert.equal(
+  manifest.filter((fixture) => !fixture.documentClasses.includes("corrupted_page"))
+    .reduce((total, fixture) => total + fixture.renderedPageFiles.length, 0),
+  12
+);
+assert.match(synthetic, /FIXTURE_SOURCE_COMMIT = "cc3c125b01ac41513b3b92213b6daa39fa5ba91f"/);
+assert.match(synthetic, /synthetic_fixture_not_approved/);
+assert.match(synthetic, /synthetic_fixture_locally_invalid/);
+assert.match(synthetic, /"rawContentInTelemetry": False/);
+assert.equal(baseline.benchmarkVersion, "document_intelligence_benchmark_v1");
+assert.equal(baseline.sourceCommit, "cc3c125b01ac41513b3b92213b6daa39fa5ba91f");
+assert.doesNotMatch(JSON.stringify(baseline), /documentId|rawText|normalizedText|sourceFile|workspace/i);
+
+assert.match(assetCleanup, /MAX_CLEANUP_WINDOW = timedelta\(hours=2\)/);
+assert.match(assetCleanup, /asset\.get\("description"\) != NVCF_ASSET_DESCRIPTION/);
+assert.match(assetCleanup, /asset\.get\("contentType"\) != "image\/png"/);
+assert.match(assetCleanup, /DELETE_CONFIRMATION/);
+assert.match(cleanup, /--api-key-file/);
+assert.doesNotMatch(`${assetCleanup}\n${cleanup}`, /print\(.+(?:api_key|asset_id)/i);
+
+assert.match(migration, /document_extraction_broker_v2/);
+assert.match(migration, /document_extraction_worker_v2/);
+assert.match(migration, /drop constraint if exists document_extraction_jobs_phase_b_versions_check/);
+assert.match(migration, /document_extraction_broker_v1'[\s\S]+'document_extraction_broker_v2'/);
+assert.match(migration, /document_extraction_worker_v1'[\s\S]+'document_extraction_worker_v2'/);
+assert.match(migration, /check_document_extraction_provider_boundary_v1/);
+assert.match(migration, /lease_expires_at = now\(\) \+ interval '5 minutes'/);
+assert.match(migration, /set search_path = ''/);
+assert.doesNotMatch(migration, /create table|insert into public\.document_extraction_(?:workspace_settings|system_state)/i);
+assert.equal((migration.match(/alter table public\.document_extraction_jobs/g) || []).length, 2);
+assert.doesNotMatch(migration, /alter table public\.(?!document_extraction_jobs\b)/i);
+assert.doesNotMatch(migration, /\b(?:add|drop)\s+column\b/i);
+assert.doesNotMatch(migration, /grant execute[^;]+to (?:anon|authenticated)/i);
+assert.doesNotMatch(migration, /\b(?:delete|truncate)\b/i);
+
+const appFiles = walk(path.join(root, "app")).map((file) => path.relative(root, file));
+assert.deepEqual(
+  appFiles.filter((file) => /document-extraction/i.test(file)),
+  ["app/api/internal/document-extraction/broker/route.ts"],
+  "Phase C1 must retain only the authenticated broker and no customer or runner route"
+);
+assert.equal(fs.existsSync(path.join(workerRoot, "src/vaeroex_document_worker/workflow.py")), false);
+assert.equal(fs.existsSync(path.join(workerRoot, "api/health.py")), false);
+
+assert.match(runbook, /^# Document Extraction Worker Deployment and Synthetic Qualification - Phase C1$/m);
+assert.match(runbook, /```mermaid[\s\S]+Google Cloud control plane[\s\S]+Ephemeral Cloud Run broker[\s\S]+Awaiting human review[\s\S]+```/);
+for (const heading of [
+  "Deployment targets",
+  "Shared broker implementation",
+  "Topology and authority boundary",
+  "Two-layer broker authentication",
+  "Secret and IAM scope",
+  "Gates and bounded activation",
+  "Authentication qualification with zero provider calls",
+  "Live kill-switch drill",
+  "Bounded synthetic qualification",
+  "One-call response-profile diagnostic",
+  "One-call field-path diagnostic",
+  "Measurements",
+  "Mandatory cleanup and rollback",
+  "Validation",
+  "Qualification record",
+  "Hosted tool-call compatibility v2",
+  "Phase C2 prerequisites"
+]) {
+  assert.match(runbook, new RegExp(`^## ${heading}$`, "m"));
+}
+assert.match(runbook, /valid Google token cannot bypass Ed25519/i);
+assert.match(runbook, /valid Ed25519 assertion cannot\s+bypass Cloud Run IAM/i);
+assert.match(runbook, /provider call, dispatch, and file-grant counts must remain zero/i);
+assert.match(runbook, /zero instances/i);
+assert.match(runbook, /NVIDIA cost remains unknown/i);
+assert.match(runbook, /Production remained untouched/i);
+assert.match(runbook, /^### Isolated Preview outcome \(2026-08-04\)$/m);
+assert.match(runbook, /first provider-eligible fixture made exactly one inference attempt/i);
+assert.match(runbook, /provider successes, retries, ambiguous dispatches, authentication failures,[\s\S]+were all zero/i);
+assert.match(runbook, /provider-contract qualification blocker/i);
+assert.match(runbook, /complete frozen corpus can be rerun from the beginning/i);
+assert.match(runbook, /^### Hosted response contract audit$/m);
+assert.match(runbook, /cannot be classified as request error, validator error, provider drift, or[\s\S]+without guessing/i);
+assert.match(runbook, /Classification:\*\* Inconclusive due to insufficient content-free evidence\./);
+assert.match(runbook, /profiles therefore remain[\s\S]+separate and are never auto-detected or mixed/i);
+assert.match(runbook, /Every case remains a[\s\S]+malformed-output failure/i);
+assert.match(runbook, /^### One-call response-profile diagnostic \(2026-08-04\)$/m);
+assert.match(runbook, /exactly one NVIDIA[\s\S]+zero retries/i);
+assert.match(runbook, /finish_reason` `stop`/);
+assert.match(runbook, /Historical v1 diagnostic classification:\*\* `5\. malformed provider response`/);
+assert.match(runbook, /observer ran before, and could not[\s\S]+unchanged fail-closed validator/i);
+assert.match(runbook, /official hosted Nemotron Parse cookbook/i);
+assert.match(runbook, /does not explicitly define[\s\S]+finish_reason/i);
+assert.match(runbook, /application-owned compatibility[\s\S]+content-free observation/i);
+assert.match(runbook, /Historical v1 remains[\s\S]+still rejects[\s\S]+finish_reason: stop/i);
+assert.match(runbook, /v1\.2 tagged-content adapter is unchanged/i);
+assert.match(runbook, /awaiting_review` \/ `needs_review` \/[\s\S]+`pending`/i);
+assert.match(runbook, /Production and Vercel resources were not addressed/i);
+assert.match(runbook, /Customer[\s\S]+uploads, arbitrary images, public routes, automatic authority/);
+assert.match(runbook, /nemotron_parse_field_path_diagnostic_v1/);
+assert.match(runbook, /diagnostic_structure_limit_exceeded/);
+assert.match(runbook, /No field-path diagnostic has been executed/);
+
+process.stdout.write("Document extraction worker deployment Phase C1 regressions passed.\n");

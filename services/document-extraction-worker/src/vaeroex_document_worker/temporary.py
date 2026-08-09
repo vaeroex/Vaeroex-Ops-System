@@ -55,8 +55,9 @@ def scavenge_stale_worker_directories(max_age_seconds: int = 3_600, now: float |
 
 
 class SecureTemporaryWorkspace:
-    def __init__(self) -> None:
+    def __init__(self, *, install_signal_handlers: bool = True) -> None:
         self.path: Path | None = None
+        self._install_signal_handlers = install_signal_handlers
         self._previous_handlers: dict[int, Any] = {}
         self._atexit_callback: Callable[[], None] | None = None
 
@@ -68,7 +69,7 @@ class SecureTemporaryWorkspace:
         os.chmod(self.path, 0o700)
         self._atexit_callback = self.cleanup
         atexit.register(self._atexit_callback)
-        if threading.current_thread() is threading.main_thread():
+        if self._install_signal_handlers and threading.current_thread() is threading.main_thread():
             for signal_number in (signal.SIGTERM, signal.SIGINT):
                 try:
                     self._previous_handlers[signal_number] = signal.getsignal(signal_number)

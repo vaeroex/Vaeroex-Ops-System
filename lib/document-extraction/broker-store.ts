@@ -2,7 +2,25 @@ import "server-only";
 
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { VerifiedWorkerAssertion } from "@/lib/document-extraction/broker-auth";
-import type { DocumentExtractionCriticalFieldManifestV1 } from "@/lib/document-extraction/contracts";
+import {
+  DOCUMENT_EXTRACTION_CONTRACT_VERSION,
+  DOCUMENT_EXTRACTION_NORMALIZATION_VERSION,
+  DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION,
+  DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION,
+  GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION,
+  NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_MODEL,
+  NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+  NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
+  NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION,
+  type DocumentExtractionCriticalFieldManifestV2,
+  type DocumentExtractionCriticalFieldManifestV3
+} from "@/lib/document-extraction/contracts";
 
 type RpcResult = { data: unknown; error: { message?: string; code?: string } | null };
 type RpcClient = {
@@ -11,7 +29,7 @@ type RpcClient = {
 
 export type ClaimedDocumentExtractionJob = {
   id: string;
-  route: "nvidia_primary" | "nvidia_fallback";
+  route: "nvidia_primary" | "nvidia_fallback" | "google_primary" | "google_fallback";
   document_class: string;
   page_count: number;
   lease_expires_at: string;
@@ -20,16 +38,40 @@ export type ClaimedDocumentExtractionJob = {
 export type DocumentExtractionLeaseContext = {
   job_id: string;
   workspace_id: string;
-  route: "nvidia_primary" | "nvidia_fallback";
+  route: "nvidia_primary" | "nvidia_fallback" | "google_primary" | "google_fallback";
   document_class: string;
   page_count: number;
   cache_key: string;
+  parser_provider: string;
+  parser_model: string;
+  parser_revision: string;
+  client_revision: string;
+  provider_profile: string;
+  processor_type: string | null;
+  processor_id: string | null;
+  processor_resource: string | null;
+  processor_location: string | null;
+  processor_version: string | null;
+  endpoint_contract_version: string;
+  request_serializer_version: string;
+  response_validator_version: string;
+  provider_normalization_version: string;
+  compatibility_policy_version: string;
+  table_policy_version: string | null;
+  confidence_policy_version: string | null;
+  selection_mark_policy_version: string | null;
+  routing_policy_version: string;
+  review_provenance_version: string;
   extraction_contract_version: string;
   normalization_version: string;
   stage: string;
   status: string;
   lease_expires_at: string;
 };
+
+export type DocumentExtractionProviderProfile =
+  | typeof NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE
+  | typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
 
 export type ConsumedFileGrant = {
   storage_bucket: string;
@@ -55,6 +97,16 @@ async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T> {
   return result.data as T;
 }
 
+function providerRpc(
+  providerProfile: DocumentExtractionProviderProfile,
+  nvidiaRpc: string,
+  googleRpc: string
+) {
+  if (providerProfile === NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) return nvidiaRpc;
+  if (providerProfile === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) return googleRpc;
+  throw new Error("document_extraction_provider_profile_not_approved");
+}
+
 export async function consumeWorkerAssertion(assertion: VerifiedWorkerAssertion) {
   return rpc<boolean>("consume_document_extraction_worker_assertion_v1", {
     p_worker_id: assertion.workerId,
@@ -66,12 +118,272 @@ export async function consumeWorkerAssertion(assertion: VerifiedWorkerAssertion)
   });
 }
 
-export async function claimDocumentExtractionJob(workerId: string, leaseSeconds = 120) {
-  const rows = await rpc<ClaimedDocumentExtractionJob[]>("claim_document_extraction_job_v2", {
+export async function claimDocumentExtractionJob(
+  workerId: string,
+  providerProfile: DocumentExtractionProviderProfile,
+  leaseSeconds = 120
+) {
+  const rows = await rpc<ClaimedDocumentExtractionJob[]>(providerRpc(
+    providerProfile,
+    "claim_document_extraction_job_v2",
+    "claim_google_document_extraction_job_v1"
+  ), {
     p_worker_id: workerId,
     p_lease_seconds: leaseSeconds
   });
   return rows[0] || null;
+}
+
+export async function prepareGoogleFrozenQualification(args: {
+  requestId: string;
+  benchmarkProfileFingerprint: string;
+  items: Array<Record<string, unknown>>;
+}) {
+  return rpc<Record<string, unknown>>("prepare_google_frozen_qualification_v1", {
+    p_request_id: args.requestId,
+    p_confirmation: "prepare-google-frozen-corpus-controller-v1",
+    p_benchmark_profile_fingerprint: args.benchmarkProfileFingerprint,
+    p_items: args.items
+  });
+}
+
+export async function enqueueNextGoogleFrozenQualificationItem(runId: string, requestId: string) {
+  return rpc<Record<string, unknown>>("enqueue_next_google_frozen_qualification_item_v1", {
+    p_run_id: runId,
+    p_request_id: requestId
+  });
+}
+
+export async function claimGoogleFrozenQualificationJob(workerId: string, leaseSeconds = 120) {
+  const rows = await rpc<ClaimedDocumentExtractionJob[]>(
+    "claim_google_frozen_qualification_job_v1",
+    { p_worker_id: workerId, p_lease_seconds: leaseSeconds }
+  );
+  return rows[0] || null;
+}
+
+export async function assertGoogleFrozenQualificationJob(
+  jobId: string,
+  workerId: string,
+  operation: string
+) {
+  return rpc<Record<string, unknown>>("assert_google_frozen_qualification_job_v1", {
+    p_job_id: jobId,
+    p_worker_id: workerId,
+    p_operation: operation
+  });
+}
+
+export async function reserveGoogleFrozenQualificationPage(args: {
+  jobId: string;
+  workerId: string;
+  pageIndex: number;
+  reservationRequestId: string;
+  dispatchRequestId: string;
+}) {
+  return rpc<Record<string, unknown>>("reserve_google_frozen_qualification_page_v1", {
+    p_job_id: args.jobId,
+    p_worker_id: args.workerId,
+    p_page_index: args.pageIndex,
+    p_reservation_request_id: args.reservationRequestId,
+    p_dispatch_request_id: args.dispatchRequestId
+  });
+}
+
+export async function recordGoogleFrozenQualificationPageOutcome(args: {
+  reservationId: string;
+  jobId: string;
+  workerId: string;
+  succeeded: boolean;
+  resultClass: string;
+  providerRequestStarted: boolean;
+}) {
+  return rpc<Record<string, unknown>>("record_google_frozen_qualification_page_outcome_v1", {
+    p_reservation_id: args.reservationId,
+    p_job_id: args.jobId,
+    p_worker_id: args.workerId,
+    p_succeeded: args.succeeded,
+    p_result_class: args.resultClass,
+    p_provider_request_started: args.providerRequestStarted
+  });
+}
+
+export async function finishGoogleFrozenQualificationItem(runId: string, jobId: string) {
+  return rpc<Record<string, unknown>>("finish_google_frozen_qualification_item_v1", {
+    p_run_id: runId,
+    p_job_id: jobId
+  });
+}
+
+export async function stopGoogleFrozenQualification(runId: string, reason: string) {
+  return rpc<Record<string, unknown>>("stop_google_frozen_qualification_v1", {
+    p_run_id: runId,
+    p_reason: reason
+  });
+}
+
+export async function completeGoogleFrozenQualification(runId: string) {
+  return rpc<Record<string, unknown>>("complete_google_frozen_qualification_v1", {
+    p_run_id: runId
+  });
+}
+
+export async function getGoogleFrozenQualificationStatus(runId: string) {
+  return rpc<Record<string, unknown>>("get_google_frozen_qualification_status_v1", {
+    p_run_id: runId
+  });
+}
+
+export async function cleanupGoogleFrozenQualification(runId: string, confirmation: string) {
+  const prepared = await rpc<{
+    cleaned?: boolean;
+    storage_obligations?: Array<{
+      sourceBindingId: string;
+      storageBucket: string;
+      storagePath: string;
+      fileSizeBytes: number;
+    }>;
+  }>("cleanup_google_frozen_qualification_v1", {
+    p_run_id: runId,
+    p_confirmation: confirmation
+  });
+  if (prepared.cleaned === true) return prepared;
+  const obligations = prepared.storage_obligations || [];
+  if (obligations.length > 8) {
+    throw new Error("document_extraction_qualification_cleanup_bound_exceeded");
+  }
+  const supabase = client();
+  for (const obligation of obligations) {
+    if (
+      !obligation.sourceBindingId
+      || !obligation.storageBucket
+      || !obligation.storagePath
+      || !Number.isInteger(obligation.fileSizeBytes)
+      || obligation.fileSizeBytes <= 0
+    ) {
+      throw new Error("document_extraction_qualification_cleanup_obligation_invalid");
+    }
+    const removed = await supabase.storage
+      .from(obligation.storageBucket)
+      .remove([obligation.storagePath]);
+    if (removed.error) {
+      throw new Error("document_extraction_qualification_storage_cleanup_failed");
+    }
+    const pathParts = obligation.storagePath.split("/");
+    const objectName = pathParts.pop();
+    if (
+      !objectName
+      || pathParts.some((part) => !part || part === "." || part === "..")
+    ) {
+      throw new Error("document_extraction_qualification_cleanup_obligation_invalid");
+    }
+    const verified = await supabase.storage
+      .from(obligation.storageBucket)
+      .list(pathParts.join("/"), { limit: 2, search: objectName });
+    if (
+      verified.error
+      || (verified.data || []).some((item) => item.name === objectName)
+    ) {
+      throw new Error("document_extraction_qualification_storage_cleanup_unverified");
+    }
+    await rpc<boolean>("verify_google_frozen_qualification_storage_cleanup_v1", {
+      p_run_id: runId,
+      p_source_binding_id: obligation.sourceBindingId,
+      p_storage_bucket: obligation.storageBucket,
+      p_storage_path: obligation.storagePath,
+      p_confirmation: "storage-object-absent-google-frozen-corpus-v2"
+    });
+  }
+  return rpc<Record<string, unknown>>("finalize_google_frozen_qualification_cleanup_v1", {
+    p_run_id: runId,
+    p_confirmation: "finalize-google-frozen-corpus-cleanup-v2"
+  });
+}
+
+export async function resolveGoogleFrozenQualificationLease(jobId: string, workerId: string) {
+  return rpc<DocumentExtractionLeaseContext>(
+    "resolve_google_frozen_qualification_job_lease_v1",
+    { p_job_id: jobId, p_worker_id: workerId }
+  );
+}
+
+export async function heartbeatGoogleFrozenQualificationJob(
+  jobId: string,
+  workerId: string,
+  leaseSeconds = 120
+) {
+  return rpc<boolean>("heartbeat_google_frozen_qualification_job_v1", {
+    p_job_id: jobId,
+    p_worker_id: workerId,
+    p_lease_seconds: leaseSeconds
+  });
+}
+
+export async function advanceGoogleFrozenQualificationStage(args: {
+  jobId: string;
+  workerId: string;
+  expectedStage: string;
+  nextStage: string;
+  requestId: string;
+}) {
+  return rpc<{ advanced: boolean; reason?: string; stage?: string; status?: string }>(
+    "advance_google_frozen_qualification_job_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_expected_stage: args.expectedStage,
+      p_next_stage: args.nextStage,
+      p_request_id: args.requestId
+    }
+  );
+}
+
+export async function issueGoogleFrozenQualificationFileGrant(args: {
+  jobId: string;
+  workerId: string;
+  tokenHash: string;
+  ttlSeconds: number;
+}) {
+  return rpc<{ issued: boolean; reason?: string; grant_id?: string; expires_at?: string; page_count?: number }>(
+    "issue_google_frozen_qualification_file_grant_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_token_hash: args.tokenHash,
+      p_ttl_seconds: args.ttlSeconds
+    }
+  );
+}
+
+export async function consumeGoogleFrozenQualificationFileGrant(args: {
+  grantId: string;
+  workerId: string;
+  tokenHash: string;
+}) {
+  return rpc<ConsumedFileGrant>("consume_google_frozen_qualification_file_grant_v1", {
+    p_grant_id: args.grantId,
+    p_worker_id: args.workerId,
+    p_token_hash: args.tokenHash
+  });
+}
+
+export async function recordGoogleFrozenQualificationJobOutcome(args: {
+  jobId: string;
+  workerId: string;
+  dispatchRequestId: string;
+  resultClass: string;
+  latencyMs: number;
+}) {
+  return rpc<{ recorded: boolean; idempotent: boolean; circuit_state: null; retry_permitted: false }>(
+    "record_google_frozen_qualification_job_outcome_v1",
+    {
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_dispatch_request_id: args.dispatchRequestId,
+      p_result_class: args.resultClass,
+      p_latency_ms: args.latencyMs
+    }
+  );
 }
 
 export async function heartbeatDocumentExtractionJob(jobId: string, workerId: string, leaseSeconds = 120) {
@@ -82,11 +394,45 @@ export async function heartbeatDocumentExtractionJob(jobId: string, workerId: st
   });
 }
 
-export async function resolveDocumentExtractionLease(jobId: string, workerId: string) {
-  return rpc<DocumentExtractionLeaseContext>("resolve_document_extraction_job_lease_v1", {
+export async function resolveDocumentExtractionLease(
+  jobId: string,
+  workerId: string,
+  providerProfile: DocumentExtractionProviderProfile
+) {
+  const context = await rpc<DocumentExtractionLeaseContext>(providerRpc(
+    providerProfile,
+    "resolve_document_extraction_job_lease_v1",
+    "resolve_google_document_extraction_job_lease_v1"
+  ), {
     p_job_id: jobId,
     p_worker_id: workerId
   });
+  if (providerProfile === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) return context;
+  return {
+    ...context,
+    parser_provider: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER,
+    parser_model: NVIDIA_DOCUMENT_EXTRACTION_MODEL,
+    parser_revision: NVIDIA_DOCUMENT_EXTRACTION_PARSER_REVISION,
+    client_revision: NVIDIA_DOCUMENT_EXTRACTION_CLIENT_REVISION,
+    provider_profile: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_PROFILE,
+    processor_type: null,
+    processor_id: null,
+    processor_resource: null,
+    processor_location: null,
+    processor_version: null,
+    endpoint_contract_version: NVIDIA_DOCUMENT_EXTRACTION_ENDPOINT_CONTRACT_VERSION,
+    request_serializer_version: NVIDIA_DOCUMENT_EXTRACTION_REQUEST_SERIALIZER_VERSION,
+    response_validator_version: NVIDIA_DOCUMENT_EXTRACTION_RESPONSE_VALIDATOR_VERSION,
+    provider_normalization_version: NVIDIA_DOCUMENT_EXTRACTION_PROVIDER_NORMALIZATION_VERSION,
+    compatibility_policy_version: NVIDIA_DOCUMENT_EXTRACTION_HOSTED_COMPATIBILITY_CONTRACT_VERSION,
+    table_policy_version: null,
+    confidence_policy_version: null,
+    selection_mark_policy_version: null,
+    routing_policy_version: DOCUMENT_EXTRACTION_ROUTING_POLICY_VERSION,
+    review_provenance_version: DOCUMENT_EXTRACTION_REVIEW_PROVENANCE_VERSION,
+    extraction_contract_version: DOCUMENT_EXTRACTION_CONTRACT_VERSION,
+    normalization_version: DOCUMENT_EXTRACTION_NORMALIZATION_VERSION
+  };
 }
 
 export async function advanceDocumentExtractionStage({
@@ -94,16 +440,22 @@ export async function advanceDocumentExtractionStage({
   workerId,
   expectedStage,
   nextStage,
-  requestId
+  requestId,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   expectedStage: string;
   nextStage: string;
   requestId: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ advanced: boolean; reason?: string; stage?: string; status?: string }>(
-    "advance_document_extraction_job_v2",
+    providerRpc(
+      providerProfile,
+      "advance_document_extraction_job_v2",
+      "advance_google_document_extraction_job_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -118,15 +470,21 @@ export async function issueDocumentExtractionFileGrant({
   jobId,
   workerId,
   tokenHash,
-  ttlSeconds
+  ttlSeconds,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   tokenHash: string;
   ttlSeconds: number;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ issued: boolean; reason?: string; grant_id?: string; expires_at?: string; page_count?: number }>(
-    "issue_document_extraction_file_grant_v1",
+    providerRpc(
+      providerProfile,
+      "issue_document_extraction_file_grant_v1",
+      "issue_google_document_extraction_file_grant_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -139,13 +497,19 @@ export async function issueDocumentExtractionFileGrant({
 export async function consumeDocumentExtractionFileGrant({
   grantId,
   workerId,
-  tokenHash
+  tokenHash,
+  providerProfile
 }: {
   grantId: string;
   workerId: string;
   tokenHash: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
-  return rpc<ConsumedFileGrant>("consume_document_extraction_file_grant_v1", {
+  return rpc<ConsumedFileGrant>(providerRpc(
+    providerProfile,
+    "consume_document_extraction_file_grant_v1",
+    "consume_google_document_extraction_file_grant_v1"
+  ), {
     p_grant_id: grantId,
     p_worker_id: workerId,
     p_token_hash: tokenHash
@@ -155,18 +519,49 @@ export async function consumeDocumentExtractionFileGrant({
 export async function authorizeDocumentExtractionDispatch({
   jobId,
   workerId,
-  dispatchRequestId
+  dispatchRequestId,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   dispatchRequestId: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ authorized: boolean; reason: string; idempotent?: boolean }>(
-    "authorize_document_extraction_dispatch_v2",
+    providerRpc(
+      providerProfile,
+      "authorize_document_extraction_dispatch_v2",
+      "authorize_google_document_extraction_dispatch_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
       p_dispatch_request_id: dispatchRequestId
+    }
+  );
+}
+
+export async function checkDocumentExtractionProviderBoundary({
+  jobId,
+  workerId,
+  boundary,
+  providerProfile
+}: {
+  jobId: string;
+  workerId: string;
+  boundary: "asset_create" | "asset_upload" | "inference";
+  providerProfile: DocumentExtractionProviderProfile;
+}) {
+  return rpc<{ allowed: boolean; reason: string; boundary: string; lease_expires_at: string | null }>(
+    providerRpc(
+      providerProfile,
+      "check_document_extraction_provider_boundary_v1",
+      "check_google_document_extraction_provider_boundary_v1"
+    ),
+    {
+      p_job_id: jobId,
+      p_worker_id: workerId,
+      p_boundary: boundary
     }
   );
 }
@@ -176,16 +571,22 @@ export async function recordDocumentExtractionProviderOutcome({
   workerId,
   dispatchRequestId,
   resultClass,
-  latencyMs
+  latencyMs,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   dispatchRequestId: string;
   resultClass: string;
   latencyMs: number;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{ recorded: boolean; idempotent: boolean; circuit_state: string | null; retry_permitted?: boolean }>(
-    "record_document_extraction_provider_outcome_v1",
+    providerRpc(
+      providerProfile,
+      "record_document_extraction_provider_outcome_v1",
+      "record_google_document_extraction_provider_outcome_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -200,13 +601,18 @@ export async function authorizeDocumentExtractionRetry({
   jobId,
   workerId,
   priorDispatchRequestId,
-  nextDispatchRequestId
+  nextDispatchRequestId,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   priorDispatchRequestId: string;
   nextDispatchRequestId: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
+  if (providerProfile === GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) {
+    throw new Error("document_extraction_google_retry_not_permitted");
+  }
   return rpc<{ authorized: boolean; reason: string }>(
     "authorize_document_extraction_retry_dispatch_v1",
     {
@@ -231,17 +637,21 @@ export async function completeDocumentExtractionJob({
   keyVersion,
   nonce,
   authenticationTag,
-  aadDigest
+  aadDigest,
+  providerProfile
 }: {
   jobId: string;
   workerId: string;
   artifactFingerprint: string;
-  criticalFieldManifest: DocumentExtractionCriticalFieldManifestV1;
+  criticalFieldManifest:
+    | DocumentExtractionCriticalFieldManifestV2
+    | DocumentExtractionCriticalFieldManifestV3;
   ciphertext: Uint8Array;
   keyVersion: string;
   nonce: Uint8Array;
   authenticationTag: Uint8Array;
   aadDigest: string;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
   return rpc<{
     completed: boolean;
@@ -250,7 +660,11 @@ export async function completeDocumentExtractionJob({
     status?: string;
     approval_status?: string;
   }>(
-    "complete_document_extraction_job_v2",
+    providerRpc(
+      providerProfile,
+      "complete_document_extraction_job_v3",
+      "complete_google_document_extraction_job_v1"
+    ),
     {
       p_job_id: jobId,
       p_worker_id: workerId,
@@ -265,24 +679,87 @@ export async function completeDocumentExtractionJob({
   );
 }
 
+export async function completeGoogleFrozenQualificationJob({
+  jobId,
+  workerId,
+  artifactFingerprint,
+  criticalFieldManifest,
+  ciphertext,
+  keyVersion,
+  nonce,
+  authenticationTag,
+  aadDigest
+}: {
+  jobId: string;
+  workerId: string;
+  artifactFingerprint: string;
+  criticalFieldManifest: DocumentExtractionCriticalFieldManifestV3;
+  ciphertext: Uint8Array;
+  keyVersion: string;
+  nonce: Uint8Array;
+  authenticationTag: Uint8Array;
+  aadDigest: string;
+}) {
+  return rpc<{
+    completed: boolean;
+    reason?: "nonce_collision";
+    job_id?: string;
+    status?: string;
+    approval_status?: string;
+  }>("complete_google_frozen_qualification_job_v1", {
+    p_job_id: jobId,
+    p_worker_id: workerId,
+    p_artifact_fingerprint: artifactFingerprint,
+    p_critical_field_manifest_json: criticalFieldManifest,
+    p_payload_ciphertext: bytea(ciphertext),
+    p_encryption_key_version: keyVersion,
+    p_encryption_nonce: bytea(nonce),
+    p_authentication_tag: bytea(authenticationTag),
+    p_aad_digest: aadDigest
+  });
+}
+
 export async function failDocumentExtractionJob({
   jobId,
   workerId,
   failureCode,
-  failureClass
+  failureClass,
+  providerProfile
 }: {
+  jobId: string;
+  workerId: string;
+  failureCode: string;
+  failureClass: string;
+  providerProfile: DocumentExtractionProviderProfile;
+}) {
+  return rpc<{ job_id: string; status: string; retryable: boolean }>(
+    providerRpc(
+      providerProfile,
+      "fail_document_extraction_job_v2",
+      "fail_google_document_extraction_job_v1"
+    ),
+    {
+      p_job_id: jobId,
+      p_worker_id: workerId,
+      p_failure_code: failureCode,
+      p_failure_class: failureClass
+    }
+  );
+}
+
+export async function failGoogleFrozenQualificationJob(args: {
   jobId: string;
   workerId: string;
   failureCode: string;
   failureClass: string;
 }) {
   return rpc<{ job_id: string; status: string; retryable: boolean }>(
-    "fail_document_extraction_job_v2",
+    "fail_google_frozen_qualification_job_v1",
     {
-      p_job_id: jobId,
-      p_worker_id: workerId,
-      p_failure_code: failureCode,
-      p_failure_class: failureClass
+      p_job_id: args.jobId,
+      p_worker_id: args.workerId,
+      p_failure_code: args.failureCode,
+      p_failure_class: args.failureClass
     }
   );
 }
@@ -299,8 +776,13 @@ export async function recordDocumentExtractionTelemetry(args: {
   cacheResult: string | null;
   costRateVersion: string | null;
   costAmountUsd: number | null;
+  providerProfile: DocumentExtractionProviderProfile;
 }) {
-  return rpc<string>("record_document_extraction_telemetry_v1", {
+  return rpc<string>(providerRpc(
+    args.providerProfile,
+    "record_document_extraction_telemetry_v1",
+    "record_google_document_extraction_telemetry_v1"
+  ), {
     p_job_id: args.jobId,
     p_worker_id: args.workerId,
     p_request_id: args.requestId,
@@ -312,6 +794,73 @@ export async function recordDocumentExtractionTelemetry(args: {
     p_cache_result: args.cacheResult,
     p_cost_rate_version: args.costRateVersion,
     p_cost_amount_usd: args.costAmountUsd
+  });
+}
+
+export async function enqueueGoogleDocumentExtractionJob(args: {
+  intakeRequestId: string;
+  route: "google_primary" | "google_fallback";
+  documentClass: string;
+  assessmentFingerprint: string;
+  pageCount: number;
+  parserProvider: string;
+  parserModel: string;
+  parserRevision: string;
+  clientRevision: string;
+  contentHmac: string;
+  cacheKey: string;
+  routingPolicyVersion: string;
+  extractionContractVersion: string;
+  normalizationVersion: string;
+  providerProfile: typeof GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE;
+  processorType: string;
+  processorId: string;
+  processorResource: string;
+  processorLocation: string;
+  processorVersion: string;
+  endpointContractVersion: string;
+  requestSerializerVersion: string;
+  responseValidatorVersion: string;
+  providerNormalizationVersion: string;
+  compatibilityPolicyVersion: string;
+  tablePolicyVersion: string;
+  confidencePolicyVersion: string;
+  selectionMarkPolicyVersion: string;
+  reviewProvenanceVersion: string;
+}) {
+  if (args.providerProfile !== GOOGLE_DOCUMENT_EXTRACTION_PROVIDER_PROFILE) {
+    throw new Error("document_extraction_provider_profile_not_approved");
+  }
+  return rpc<Record<string, unknown>>("enqueue_google_document_extraction_job_v1", {
+    p_intake_request_id: args.intakeRequestId,
+    p_route: args.route,
+    p_document_class: args.documentClass,
+    p_assessment_fingerprint: args.assessmentFingerprint,
+    p_page_count: args.pageCount,
+    p_parser_provider: args.parserProvider,
+    p_parser_model: args.parserModel,
+    p_parser_revision: args.parserRevision,
+    p_client_revision: args.clientRevision,
+    p_content_hmac: args.contentHmac,
+    p_cache_key: args.cacheKey,
+    p_routing_policy_version: args.routingPolicyVersion,
+    p_extraction_contract_version: args.extractionContractVersion,
+    p_normalization_version: args.normalizationVersion,
+    p_provider_profile: args.providerProfile,
+    p_processor_type: args.processorType,
+    p_processor_id: args.processorId,
+    p_processor_resource: args.processorResource,
+    p_processor_location: args.processorLocation,
+    p_processor_version: args.processorVersion,
+    p_endpoint_contract_version: args.endpointContractVersion,
+    p_request_serializer_version: args.requestSerializerVersion,
+    p_response_validator_version: args.responseValidatorVersion,
+    p_provider_normalization_version: args.providerNormalizationVersion,
+    p_compatibility_policy_version: args.compatibilityPolicyVersion,
+    p_table_policy_version: args.tablePolicyVersion,
+    p_confidence_policy_version: args.confidencePolicyVersion,
+    p_selection_mark_policy_version: args.selectionMarkPolicyVersion,
+    p_review_provenance_version: args.reviewProvenanceVersion
   });
 }
 

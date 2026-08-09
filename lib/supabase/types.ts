@@ -78,6 +78,7 @@ export type Database = {
           required_review_version: number
           reserved_page_count: number
           retry_count: number
+          review_provenance_fingerprint: string | null
           review_required: boolean
           route: string
           routing_policy_version: string
@@ -124,6 +125,26 @@ export type Database = {
           p_workspace_id: string
         }
         Returns: boolean
+      }
+
+      document_extraction_job_binding_fingerprint_v1: {
+        Args: { p_cache_key: string; p_job_id: string; p_workspace_id: string }
+        Returns: string
+      }
+
+      document_extraction_page_identity_fingerprint_v1: {
+        Args: {
+          p_cache_key: string
+          p_job_id: string
+          p_page_count: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+
+      document_extraction_workspace_binding_fingerprint_v1: {
+        Args: { p_workspace_id: string }
+        Returns: string
       }
 
       document_extraction_runtime_reason_v1: {
@@ -204,6 +225,23 @@ export type Database = {
         Returns: Json
       }
 
+      mutate_document_extraction_review_v2: {
+        Args: {
+          p_action: string
+          p_artifact_fingerprint: string
+          p_classification_fingerprint: string
+          p_decision_summary_json: Json
+          p_extraction_contract_version: string
+          p_file_id: string
+          p_job_id: string
+          p_request_id: string
+          p_review_provenance_fingerprint: string
+          p_review_version: number
+          p_workspace_id: string
+        }
+        Returns: Json
+      }
+
       record_document_extraction_event_v1: {
         Args: {
           p_actor_id: string
@@ -250,6 +288,41 @@ export type Database = {
           p_artifact_fingerprint: string
           p_extraction_contract_version: string
           p_manifest: Json
+        }
+        Returns: string
+      }
+
+      validate_document_extraction_critical_field_manifest_v2: {
+        Args: {
+          p_artifact_fingerprint: string
+          p_cache_key: string
+          p_client_revision: string
+          p_extraction_contract_version: string
+          p_job_id: string
+          p_manifest: Json
+          p_normalization_version: string
+          p_page_count: number
+          p_parser_model: string
+          p_parser_revision: string
+          p_review_version: number
+          p_workspace_id: string
+        }
+        Returns: string
+      }
+
+      validate_document_extraction_review_provenance_v1: {
+        Args: {
+          p_artifact_fingerprint: string
+          p_artifact_normalization_version: string
+          p_cache_key: string
+          p_client_revision: string
+          p_job_id: string
+          p_page_count: number
+          p_parser_model: string
+          p_parser_revision: string
+          p_provenance: Json
+          p_review_version: number
+          p_workspace_id: string
         }
         Returns: string
       }
@@ -317,6 +390,7 @@ export type Database = {
           required_review_version: number
           reserved_page_count: number
           retry_count: number
+          review_provenance_fingerprint: string | null
           review_required: boolean
           route: string
           routing_policy_version: string
@@ -376,6 +450,15 @@ export type Database = {
         Returns: Json
       }
 
+      check_document_extraction_provider_boundary_v1: {
+        Args: {
+          p_boundary: string
+          p_job_id: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
       record_document_extraction_provider_outcome_v1: {
         Args: {
           p_dispatch_request_id: string
@@ -398,6 +481,21 @@ export type Database = {
       }
 
       complete_document_extraction_job_v2: {
+        Args: {
+          p_aad_digest: string
+          p_artifact_fingerprint: string
+          p_authentication_tag: string
+          p_critical_field_manifest_json: Json
+          p_encryption_key_version: string
+          p_encryption_nonce: string
+          p_job_id: string
+          p_payload_ciphertext: string
+          p_worker_id: string
+        }
+        Returns: Json
+      }
+
+      complete_document_extraction_job_v3: {
         Args: {
           p_aad_digest: string
           p_artifact_fingerprint: string
@@ -1161,6 +1259,7 @@ export type Database = {
           required_review_version: number
           reserved_page_count: number
           retry_count: number
+          review_provenance_fingerprint: string | null
           review_required: boolean
           route: string
           routing_policy_version: string
@@ -1221,6 +1320,7 @@ export type Database = {
           required_review_version?: number
           reserved_page_count?: number
           retry_count?: number
+          review_provenance_fingerprint?: string | null
           review_required?: boolean
           route: string
           routing_policy_version: string
@@ -1281,6 +1381,7 @@ export type Database = {
           required_review_version?: number
           reserved_page_count?: number
           retry_count?: number
+          review_provenance_fingerprint?: string | null
           review_required?: boolean
           route?: string
           routing_policy_version?: string
@@ -1523,6 +1624,7 @@ export type Database = {
           id: string
           job_id: string
           rejected_field_count: number
+          review_provenance_fingerprint: string | null
           review_version: number
           reviewed_at: string | null
           reviewer_id: string | null
@@ -1545,6 +1647,7 @@ export type Database = {
           id?: string
           job_id: string
           rejected_field_count?: number
+          review_provenance_fingerprint?: string | null
           review_version?: number
           reviewed_at?: string | null
           reviewer_id?: string | null
@@ -1567,6 +1670,7 @@ export type Database = {
           id?: string
           job_id?: string
           rejected_field_count?: number
+          review_provenance_fingerprint?: string | null
           review_version?: number
           reviewed_at?: string | null
           reviewer_id?: string | null

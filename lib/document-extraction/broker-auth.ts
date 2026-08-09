@@ -2,11 +2,13 @@ import "server-only";
 
 import { createHash, createPublicKey, verify } from "node:crypto";
 import { DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION } from "@/lib/document-extraction/contracts";
+import type { DocumentExtractionRuntimeEnvironment } from "@/lib/document-extraction/runtime-policy";
 
 const ASSERTION_TTL_SECONDS = 60;
 const MAX_CLOCK_SKEW_SECONDS = 15;
 const WORKER_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const KEY_VERSION = /^[A-Za-z0-9._:-]{1,120}$/;
+const DEPLOYMENT_ID = /^[A-Za-z0-9._:-]{1,128}$/;
 const NONCE = /^[0-9a-f]{32}$/;
 const ED25519_SIGNATURE_BYTES = 64;
 const ED25519_SPKI_BYTES = 44;
@@ -15,11 +17,15 @@ const ED25519_SPKI_PREFIX = Buffer.from("302a300506032b6570032100", "hex");
 type WorkerPublicKeyRecord = {
   keyVersion: string;
   publicKeySpkiBase64: string;
+  environment: "preview" | "production";
+  deploymentId: string;
 };
 
 export type VerifiedWorkerAssertion = {
   workerId: string;
   keyVersion: string;
+  environment: "preview" | "production";
+  deploymentId: string;
   nonceHash: string;
   requestHash: string;
   assertedAt: string;
@@ -51,6 +57,8 @@ function parseWorkerKeys(value: string | undefined) {
       !KEY_VERSION.test(record.keyVersion || "")
       || typeof record.publicKeySpkiBase64 !== "string"
       || !record.publicKeySpkiBase64.trim()
+      || (record.environment !== "preview" && record.environment !== "production")
+      || !DEPLOYMENT_ID.test(record.deploymentId || "")
     ) {
       throw new Error("document_extraction_worker_keys_invalid");
     }
@@ -77,7 +85,9 @@ function parseWorkerKeys(value: string | undefined) {
     }
     keys.set(workerId, {
       keyVersion: record.keyVersion as string,
-      publicKeySpkiBase64: record.publicKeySpkiBase64
+      publicKeySpkiBase64: record.publicKeySpkiBase64,
+      environment: record.environment,
+      deploymentId: record.deploymentId as string
     });
   }
   if (!keys.size || keys.size > 8) throw new Error("document_extraction_worker_keys_invalid");
@@ -90,6 +100,8 @@ export function canonicalWorkerAssertionPayload({
   bodyDigest,
   workerId,
   keyVersion,
+  workerEnvironment,
+  deploymentId,
   timestamp,
   nonce
 }: {
@@ -98,6 +110,8 @@ export function canonicalWorkerAssertionPayload({
   bodyDigest: string;
   workerId: string;
   keyVersion: string;
+  workerEnvironment: string;
+  deploymentId: string;
   timestamp: string;
   nonce: string;
 }) {
@@ -108,6 +122,8 @@ export function canonicalWorkerAssertionPayload({
     bodyDigest,
     workerId,
     keyVersion,
+    workerEnvironment,
+    deploymentId,
     timestamp,
     nonce
   ].join("\n");
@@ -116,17 +132,21 @@ export function canonicalWorkerAssertionPayload({
 export function verifyWorkerAssertion({
   request,
   body,
+  brokerEnvironment,
   environment = process.env,
   now = Date.now()
 }: {
   request: Request;
   body: Uint8Array;
+  brokerEnvironment: DocumentExtractionRuntimeEnvironment;
   environment?: NodeJS.ProcessEnv;
   now?: number;
 }): VerifiedWorkerAssertion {
   const protocol = request.headers.get("x-vaeroex-broker-protocol") || "";
   const workerId = request.headers.get("x-vaeroex-worker-id") || "";
   const keyVersion = request.headers.get("x-vaeroex-worker-key-version") || "";
+  const workerEnvironment = request.headers.get("x-vaeroex-worker-environment") || "";
+  const deploymentId = request.headers.get("x-vaeroex-worker-deployment-id") || "";
   const timestamp = request.headers.get("x-vaeroex-worker-timestamp") || "";
   const nonce = request.headers.get("x-vaeroex-worker-nonce") || "";
   const signature = request.headers.get("x-vaeroex-worker-signature") || "";
@@ -134,6 +154,8 @@ export function verifyWorkerAssertion({
     protocol !== DOCUMENT_EXTRACTION_BROKER_PROTOCOL_VERSION
     || !WORKER_ID.test(workerId)
     || !KEY_VERSION.test(keyVersion)
+    || (workerEnvironment !== "preview" && workerEnvironment !== "production")
+    || !DEPLOYMENT_ID.test(deploymentId)
     || !/^\d{10}$/.test(timestamp)
     || !NONCE.test(nonce)
     || !signature
@@ -149,7 +171,14 @@ export function verifyWorkerAssertion({
     throw new Error("document_extraction_worker_assertion_expired");
   }
   const workerKey = parseWorkerKeys(environment.DOCUMENT_EXTRACTION_WORKER_PUBLIC_KEYS_JSON).get(workerId);
-  if (!workerKey || workerKey.keyVersion !== keyVersion) {
+  if (
+    !workerKey
+    || workerKey.keyVersion !== keyVersion
+    || workerKey.environment !== workerEnvironment
+    || workerKey.deploymentId !== deploymentId
+    || brokerEnvironment === "development"
+    || brokerEnvironment !== workerEnvironment
+  ) {
     throw new Error("document_extraction_worker_identity_unknown");
   }
   const url = new URL(request.url);
@@ -161,6 +190,8 @@ export function verifyWorkerAssertion({
     bodyDigest,
     workerId,
     keyVersion,
+    workerEnvironment,
+    deploymentId,
     timestamp,
     nonce
   });
@@ -195,6 +226,8 @@ export function verifyWorkerAssertion({
   return {
     workerId,
     keyVersion,
+    environment: workerEnvironment,
+    deploymentId,
     nonceHash: sha256(nonce),
     requestHash: sha256(canonical),
     assertedAt: new Date(timestampMs).toISOString(),

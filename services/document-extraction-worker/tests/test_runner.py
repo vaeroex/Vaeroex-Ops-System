@@ -5,15 +5,38 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from vaeroex_document_worker import runner
+from vaeroex_document_worker.broker import BrokerFailure
 from vaeroex_document_worker.config import WorkerConfig
+from vaeroex_document_worker.google_document_ai_contract import GoogleDocumentAiContract
 from vaeroex_document_worker.provider_contract import HOSTED_CONTRACT
-from vaeroex_document_worker.provider_types import ProviderFailure, ProviderResult, RenderedPage
+from vaeroex_document_worker.provider_types import (
+    MAX_PROVIDER_LATENCY_MS,
+    ProviderFailure,
+    ProviderResult,
+    RenderedPage,
+)
+from vaeroex_document_worker.response_profile import DIAGNOSTIC_FIXTURE_ID
+from vaeroex_document_worker.synthetic import load_frozen_corpus
+from vaeroex_document_worker.telemetry import (
+    emit_field_path_diagnostic,
+    emit_response_profile_diagnostic,
+)
 
 
 class FakeBroker:
-    def __init__(self, _config: WorkerConfig, *, page_count: int = 1) -> None:
+    def __init__(
+        self,
+        _config: WorkerConfig,
+        *,
+        page_count: int = 1,
+        source_bytes: bytes = b"synthetic-source",
+    ) -> None:
+        self.config = _config
         self.page_count = page_count
+        self.source_bytes = source_bytes
         self.operations: list[str] = []
         self.payloads: list[dict[str, Any]] = []
         self.dispatch_authorizations: list[bool] = []
@@ -31,13 +54,15 @@ class FakeBroker:
         self.operations.append(operation)
         self.payloads.append(payload)
         if operation == "claim":
+            google = self.config.google_provider_contract is not None
             return {
                 "claimed": True,
                 "job": {
                     "leaseCapability": "lease-token",
-                    "route": "nvidia_primary",
-                    "documentClass": "scanned_pdf",
+                    "route": "google_primary" if google else "nvidia_primary",
+                    "documentClass": "printed_document_photo" if google else "scanned_pdf",
                     "pageCount": self.page_count,
+                    **runner._expected_claim_identity(self.config),
                 },
             }
         if operation == "heartbeat":
@@ -51,6 +76,14 @@ class FakeBroker:
                 return self.dispatch_authorization_responses.pop(0)
             authorized = self.dispatch_authorizations.pop(0) if self.dispatch_authorizations else True
             return {"ok": authorized, "authorized": authorized}
+        if operation == "check_provider_boundary":
+            boundary_count = self.operations.count("check_provider_boundary")
+            return {
+                "ok": True,
+                "allowed": True,
+                "reason": "eligible",
+                "leaseCapability": f"lease-token-{boundary_count}",
+            }
         if operation == "provider_outcome":
             return {
                 "ok": True,
@@ -68,21 +101,67 @@ class FakeBroker:
 
     async def download(self, _capability: str, destination: Path, expected_bytes: int | None = None) -> int:
         del expected_bytes
-        content = b"synthetic-source"
-        destination.write_bytes(content)
-        return len(content)
+        destination.write_bytes(self.source_bytes)
+        return len(self.source_bytes)
 
 
 def worker_config() -> WorkerConfig:
     return WorkerConfig(
         broker_url="https://preview.example.test",
+        broker_audience="https://preview.example.test",
+        broker_auth_mode="google_oidc_v1",
         worker_id="worker-1",
         worker_key_version="key-v1",
         worker_private_key_der=b"unused-by-fake",
         nvidia_api_key="unused-by-fake",
         provider_contract=HOSTED_CONTRACT,
-        vercel_environment="preview",
+        runtime_environment="preview",
+        deployment_id="phase-c1-preview-1",
+        provider_execution_enabled=True,
+        authentication_qualification_enabled=False,
         synthetic_qualification_enabled=False,
+    )
+
+
+def synthetic_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **worker_config().__dict__,
+            "synthetic_qualification_enabled": True,
+        }
+    )
+
+
+def google_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **worker_config().__dict__,
+            "nvidia_api_key": None,
+            "provider_contract": None,
+            "google_provider_contract": GoogleDocumentAiContract(
+                project_number="123456789012",
+                processor_id="abcdef1234567890",
+            ),
+        }
+    )
+
+
+def google_synthetic_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **google_worker_config().__dict__,
+            "synthetic_qualification_enabled": True,
+        }
+    )
+
+
+def diagnostic_worker_config() -> WorkerConfig:
+    return WorkerConfig(
+        **{
+            **synthetic_worker_config().__dict__,
+            "response_profile_diagnostic_enabled": True,
+            "field_path_diagnostic_enabled": True,
+        }
     )
 
 
@@ -98,6 +177,132 @@ def normalized_page(page: int) -> dict[str, Any]:
             }
         ],
     }
+
+
+class FakeGoogleTokenProvider:
+    def __enter__(self) -> "FakeGoogleTokenProvider":
+        return self
+
+    def __exit__(self, *_args: object) -> None:
+        return None
+
+    def token(self) -> str:
+        return "memory-only-test-token"
+
+
+def test_google_profile_uses_one_exact_adapter_without_retry_or_fallback(monkeypatch: Any) -> None:
+    config = google_worker_config()
+    fake = FakeBroker(config)
+    install_boundaries(monkeypatch, fake)
+    calls = 0
+
+    def provider(
+        _pages: list[RenderedPage],
+        _document_hash: str,
+        contract: object,
+        token_provider: object,
+        *,
+        completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: Any,
+    ) -> ProviderResult:
+        nonlocal calls
+        calls += 1
+        assert contract == config.google_provider_contract
+        assert callable(token_provider)
+        assert completed_pages == ()
+        before_provider_boundary("inference")
+        return result_for(1)
+
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(runner, "invoke_google_document_ai_adapter", provider)
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: pytest.fail("NVIDIA fallback must not run"),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+    assert result.status == "needs_review"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert calls == 1
+    assert fake.operations.count("authorize_retry") == 0
+    assert fake.payloads[0]["providerProfile"] == "google_document_ai_enterprise_ocr_v1"
+
+
+def test_google_retryable_failure_still_makes_one_attempt(monkeypatch: Any) -> None:
+    config = google_worker_config()
+    fake = FakeBroker(config)
+    install_boundaries(monkeypatch, fake)
+    calls = 0
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        nonlocal calls
+        calls += 1
+        raise ProviderFailure("transport", "transport", retryable=True)
+
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(runner, "invoke_google_document_ai_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+    assert result.status == "failed"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert calls == 1
+    assert fake.operations.count("authorize_retry") == 0
+
+
+@pytest.mark.parametrize(
+    ("identity_field", "invalid_value"),
+    (
+        ("providerProfile", "google_document_ai_enterprise_ocr_v2"),
+        ("parserProvider", "nvidia"),
+        ("parserModel", "latest"),
+        ("parserRevision", "google_document_ai_enterprise_ocr_v2"),
+        ("clientRevision", "vaeroex_google_document_ai_rest_v2"),
+        ("processorType", "FORM_PARSER_PROCESSOR"),
+        ("processorId", "fedcba9876543210"),
+        ("processorResource", "projects/123456789012/locations/us/processors/fedcba9876543210/processorVersions/pretrained-ocr-v2.1-2024-08-07"),
+        ("processorLocation", "eu"),
+        ("processorVersion", "latest"),
+        ("endpointContractVersion", "google_document_ai_processor_process_v2"),
+        ("requestSerializerVersion", "google_document_ai_process_request_v2"),
+        ("responseValidatorVersion", "google_document_ai_process_response_v3"),
+        ("providerNormalizationVersion", "google_document_ai_layout_normalization_v3"),
+        ("compatibilityPolicyVersion", "google_document_ai_permissive_v1"),
+        ("tablePolicyVersion", "tables_inferred_v1"),
+        ("confidencePolicyVersion", "provider_confidence_authoritative_v1"),
+        ("selectionMarkPolicyVersion", "enabled_v1"),
+        ("routingPolicyVersion", "document_extraction_routing_v2"),
+        ("reviewProvenanceVersion", "document_extraction_review_provenance_v1"),
+        ("extractionContractVersion", "document_extraction_artifact_v1"),
+        ("normalizationVersion", "document_extraction_normalization_v1"),
+        ("route", "nvidia_primary"),
+    ),
+)
+def test_google_claim_identity_mismatch_fails_before_file_or_provider(
+    monkeypatch: Any,
+    identity_field: str,
+    invalid_value: str,
+) -> None:
+    config = google_worker_config()
+
+    class MismatchedBroker(FakeBroker):
+        async def post(self, payload: dict[str, Any]) -> dict[str, Any]:
+            response = await super().post(payload)
+            if payload["operation"] == "claim":
+                response["job"][identity_field] = invalid_value
+            return response
+
+    fake = MismatchedBroker(config)
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(
+        runner,
+        "invoke_google_document_ai_adapter",
+        lambda *_args, **_kwargs: pytest.fail("Provider must not run"),
+    )
+    with pytest.raises(BrokerFailure, match="claim_provider_(?:identity|route)_mismatch"):
+        asyncio.run(runner.run_one_job(config))
+    assert fake.operations == ["claim"]
 
 
 def install_boundaries(monkeypatch: Any, fake: FakeBroker) -> None:
@@ -148,6 +353,7 @@ def test_one_safe_transport_retry_is_broker_authorized(monkeypatch: Any) -> None
         _api_key: str,
         *,
         completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: object,
     ) -> ProviderResult:
         nonlocal attempts
         attempts += 1
@@ -166,6 +372,53 @@ def test_one_safe_transport_retry_is_broker_authorized(monkeypatch: Any) -> None
     assert fake.operations.count("complete") == 1
 
 
+def test_each_provider_boundary_renews_the_lease_and_reports_progress(monkeypatch: Any) -> None:
+    fake = FakeBroker(worker_config())
+    install_boundaries(monkeypatch, fake)
+    observed_progress: list[str] = []
+
+    def provider(
+        _pages: list[RenderedPage],
+        _document_hash: str,
+        _contract: object,
+        _api_key: str,
+        *,
+        completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: Any,
+    ) -> ProviderResult:
+        assert completed_pages == ()
+        before_provider_boundary("asset_create")
+        before_provider_boundary("asset_upload")
+        before_provider_boundary("inference")
+        return result_for(1)
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(
+        runner.run_one_job(worker_config(), progress_callback=observed_progress.append)
+    )
+
+    assert result.status == "needs_review"
+    boundary_payloads = [
+        payload for payload in fake.payloads
+        if payload["operation"] == "check_provider_boundary"
+    ]
+    assert [payload["leaseCapability"] for payload in boundary_payloads] == [
+        "lease-token",
+        "lease-token-1",
+        "lease-token-2",
+    ]
+    assert observed_progress[-1] == "completed"
+    for stage in (
+        "asset_create",
+        "asset_create_authorized",
+        "asset_upload",
+        "asset_upload_authorized",
+        "inference",
+        "inference_authorized",
+    ):
+        assert stage in observed_progress
+
+
 def test_safe_retry_resumes_completed_pages_without_repeating_them(monkeypatch: Any) -> None:
     fake = FakeBroker(worker_config(), page_count=2)
     install_boundaries(monkeypatch, fake)
@@ -178,6 +431,7 @@ def test_safe_retry_resumes_completed_pages_without_repeating_them(monkeypatch: 
         _api_key: str,
         *,
         completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: object,
     ) -> ProviderResult:
         observed_resume_lengths.append(len(completed_pages))
         if not completed_pages:
@@ -239,6 +493,60 @@ def test_empty_provider_output_is_validation_failure_before_completion(monkeypat
     outcomes = [payload for payload in fake.payloads if payload["operation"] == "provider_outcome"]
     assert len(outcomes) == 1
     assert outcomes[0]["resultClass"] == "validation"
+
+
+def test_strictly_normalized_empty_page_is_preserved_as_review_draft() -> None:
+    empty_page = {
+        "page": 1,
+        "blocks": [],
+        "structure": {
+            "structureVersion": "provider_neutral_document_structure_v1",
+            "pageLayout": {
+                "text": "",
+                "textSegments": [],
+                "confidence": None,
+                "orientation": "PAGE_UP",
+                "coordinates": {
+                    "page": 1,
+                    "x": 0.0,
+                    "y": 0.0,
+                    "width": 1.0,
+                    "height": 1.0,
+                },
+                "polygon": [
+                    {"x": 0.0, "y": 0.0},
+                    {"x": 1.0, "y": 0.0},
+                    {"x": 1.0, "y": 1.0},
+                    {"x": 0.0, "y": 1.0},
+                ],
+            },
+            "detectedLanguages": [],
+            "blocks": [],
+            "paragraphs": [],
+            "lines": [],
+            "tokens": [],
+            "tables": [],
+            "selectionMarks": [],
+            "imageQuality": {"qualityScore": 1.0, "detectedDefects": []},
+        },
+    }
+
+    artifact = runner._draft(
+        ProviderResult(
+            pages=[empty_page],
+            latency_ms=4,
+            request_contract_hashes=("a" * 64,),
+            payload_modes=("inline_raw_document",),
+        ),
+        "google_primary",
+        "image_only_pdf",
+        1,
+        15,
+    )
+
+    assert artifact["pages"] == [empty_page]
+    assert artifact["criticalFields"] == []
+    assert artifact["validationFindings"] == []
 
 
 def test_provider_gate_is_rechecked_immediately_before_invocation(monkeypatch: Any) -> None:
@@ -311,3 +619,354 @@ def test_retry_provider_gate_is_rechecked_before_second_invocation(monkeypatch: 
     assert provider_calls == 1
     assert fake.operations.count("authorize_dispatch") == 1
     assert fake.operations.count("authorize_retry") == 1
+
+
+def test_synthetic_qualification_accepts_only_exact_frozen_source(monkeypatch: Any) -> None:
+    fixture = next(item for item in load_frozen_corpus() if item.provider_eligible)
+    config = synthetic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=len(fixture.rendered_page_paths),
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(
+        runner,
+        "render_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("qualification must use committed rendered pages")
+        ),
+    )
+    emitted: list[object] = []
+    monkeypatch.setattr(runner, "emit_synthetic_evaluation", emitted.append)
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: result_for(len(fixture.rendered_page_paths)),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "needs_review"
+    assert len(emitted) == 1
+    evaluation = emitted[0]
+    assert getattr(evaluation, "fixture_index") == fixture.fixture_index
+    assert getattr(evaluation, "status") == "success"
+    assert fake.operations.count("complete") == 1
+
+
+def test_google_synthetic_qualification_uses_google_identity_and_emitter(
+    monkeypatch: Any,
+) -> None:
+    fixture = load_frozen_corpus()[0]
+    config = google_synthetic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=len(fixture.rendered_page_paths),
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(
+        runner,
+        "render_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("Google qualification must use committed rendered pages")
+        ),
+    )
+    emitted: list[tuple[object, object]] = []
+    monkeypatch.setattr(
+        runner,
+        "emit_google_synthetic_evaluation",
+        lambda evaluation, google_contract: emitted.append(
+            (evaluation, google_contract)
+        ),
+    )
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(
+        runner,
+        "invoke_google_document_ai_adapter",
+        lambda *_args, **_kwargs: result_for(len(fixture.rendered_page_paths)),
+    )
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: pytest.fail("NVIDIA fallback must not run"),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "needs_review"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert len(emitted) == 1
+    assert getattr(emitted[0][0], "fixture_index") == fixture.fixture_index
+    assert emitted[0][1] == config.google_provider_contract
+    assert fake.operations.count("authorize_retry") == 0
+    assert fake.operations.count("complete") == 1
+
+
+def test_google_synthetic_failure_reports_actual_page_requests(
+    monkeypatch: Any,
+) -> None:
+    fixture = load_frozen_corpus()[6]
+    assert len(fixture.rendered_page_paths) == 2
+    config = google_synthetic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=2,
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    monkeypatch.setattr(runner, "GoogleMetadataAccessTokenProvider", FakeGoogleTokenProvider)
+    monkeypatch.setattr(
+        runner,
+        "invoke_google_document_ai_adapter",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            ProviderFailure(
+                "google_document_ai_request_rejected",
+                "validation",
+                retryable=False,
+                completed_pages=(normalized_page(1),),
+                provider_request_started=True,
+            )
+        ),
+    )
+    emitted: list[object] = []
+    monkeypatch.setattr(
+        runner,
+        "emit_google_synthetic_evaluation",
+        lambda evaluation, _contract: emitted.append(evaluation),
+    )
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert len(emitted) == 1
+    assert getattr(emitted[0], "provider_calls") == 2
+    assert getattr(emitted[0], "retry_count") == 0
+    assert fake.operations.count("authorize_retry") == 0
+
+
+def test_synthetic_qualification_rejects_arbitrary_source_before_provider(monkeypatch: Any) -> None:
+    config = synthetic_worker_config()
+    fake = FakeBroker(config, source_bytes=b"not-in-the-frozen-corpus")
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    provider_calls = 0
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("an unapproved source must never reach NVIDIA")
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.failure_code == "synthetic_fixture_not_approved"
+    assert provider_calls == 0
+    assert fake.operations.count("authorize_dispatch") == 0
+
+
+def test_corrupt_synthetic_fixture_is_rejected_locally_and_recorded(monkeypatch: Any) -> None:
+    fixture = next(item for item in load_frozen_corpus() if not item.provider_eligible)
+    config = synthetic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=len(fixture.rendered_page_paths),
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    emitted: list[object] = []
+    monkeypatch.setattr(runner, "emit_synthetic_evaluation", emitted.append)
+    provider_calls = 0
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("the corrupt fixture must fail before NVIDIA")
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.failure_code == "synthetic_fixture_locally_invalid"
+    assert provider_calls == 0
+    assert len(emitted) == 1
+    assert getattr(emitted[0], "status") == "failed"
+    assert getattr(emitted[0], "failure_code") == "synthetic_fixture_locally_invalid"
+
+
+def test_response_profile_diagnostic_is_bound_to_one_committed_fixture(
+    monkeypatch: Any,
+) -> None:
+    fixture = next(
+        item
+        for item in load_frozen_corpus()
+        if item.provider_eligible and item.document_id != DIAGNOSTIC_FIXTURE_ID
+    )
+    config = diagnostic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=len(fixture.rendered_page_paths),
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    provider_calls = 0
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        nonlocal provider_calls
+        provider_calls += 1
+        raise AssertionError("only the approved one-page diagnostic fixture may run")
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.failure_code == "response_profile_diagnostic_fixture_rejected"
+    assert provider_calls == 0
+    assert fake.operations.count("authorize_dispatch") == 0
+
+
+def test_field_path_diagnostic_direct_config_cannot_bypass_preview_boundary(
+    monkeypatch: Any,
+) -> None:
+    config = WorkerConfig(
+        **{
+            **diagnostic_worker_config().__dict__,
+            "runtime_environment": "production",
+        }
+    )
+    broker_opened = False
+
+    def broker(_config: WorkerConfig) -> FakeBroker:
+        nonlocal broker_opened
+        broker_opened = True
+        return FakeBroker(_config)
+
+    monkeypatch.setattr(runner, "BrokerClient", broker)
+
+    with pytest.raises(RuntimeError, match="not authorized"):
+        asyncio.run(runner.run_one_job(config))
+    assert not broker_opened
+
+
+def test_response_profile_diagnostic_allows_one_attempt_and_zero_retries(
+    monkeypatch: Any,
+) -> None:
+    fixture = next(
+        item for item in load_frozen_corpus() if item.document_id == DIAGNOSTIC_FIXTURE_ID
+    )
+    config = diagnostic_worker_config()
+    fake = FakeBroker(
+        config,
+        page_count=1,
+        source_bytes=fixture.source_path.read_bytes(),
+    )
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+    attempts = 0
+
+    def provider(
+        _pages: list[RenderedPage],
+        _document_hash: str,
+        _contract: object,
+        _api_key: str,
+        *,
+        completed_pages: tuple[dict[str, Any], ...],
+        before_provider_boundary: object,
+        response_profile_observer: object,
+        field_path_observer: object,
+    ) -> ProviderResult:
+        nonlocal attempts
+        attempts += 1
+        assert completed_pages == ()
+        assert before_provider_boundary is not None
+        assert response_profile_observer is emit_response_profile_diagnostic
+        assert field_path_observer is emit_field_path_diagnostic
+        raise ProviderFailure(
+            "transport",
+            "transport",
+            retryable=True,
+            latency_ms=1_220,
+            provider_request_started=True,
+        )
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    assert result.failure_code == "transport"
+    assert result.provider_calls == 1
+    assert result.retry_count == 0
+    assert attempts == 1
+    assert fake.operations.count("authorize_retry") == 0
+    assert fake.operations.count("authorize_dispatch") == 1
+    outcome = next(
+        payload for payload in fake.payloads if payload["operation"] == "provider_outcome"
+    )
+    terminal = next(payload for payload in fake.payloads if payload["operation"] == "fail")
+    assert outcome["latencyMs"] == 1_220
+    assert terminal["telemetry"]["latencyMs"] == 1_220
+
+
+@pytest.mark.parametrize(
+    ("observed_latency", "expected_latency"),
+    (
+        (-1, 0),
+        (MAX_PROVIDER_LATENCY_MS + 99_999, MAX_PROVIDER_LATENCY_MS),
+    ),
+)
+def test_runner_bounds_failure_latency_before_any_persistence(
+    monkeypatch: Any,
+    observed_latency: int,
+    expected_latency: int,
+) -> None:
+    fixture = next(
+        item for item in load_frozen_corpus() if item.document_id == DIAGNOSTIC_FIXTURE_ID
+    )
+    config = diagnostic_worker_config()
+    fake = FakeBroker(config, page_count=1, source_bytes=fixture.source_path.read_bytes())
+    monkeypatch.setattr(runner, "BrokerClient", lambda _config: fake)
+
+    def provider(*_args: object, **_kwargs: object) -> ProviderResult:
+        raise ProviderFailure(
+            "transport",
+            "transport",
+            retryable=False,
+            latency_ms=observed_latency,
+            provider_request_started=True,
+        )
+
+    monkeypatch.setattr(runner, "invoke_rest_adapter", provider)
+    result = asyncio.run(runner.run_one_job(config))
+
+    assert result.status == "failed"
+    outcome = next(
+        payload for payload in fake.payloads if payload["operation"] == "provider_outcome"
+    )
+    terminal = next(payload for payload in fake.payloads if payload["operation"] == "fail")
+    assert outcome["latencyMs"] == expected_latency
+    assert terminal["telemetry"]["latencyMs"] == expected_latency
+
+
+def test_runner_bounds_success_latency_before_provider_outcome(
+    monkeypatch: Any,
+) -> None:
+    fake = FakeBroker(worker_config())
+    install_boundaries(monkeypatch, fake)
+    monkeypatch.setattr(
+        runner,
+        "invoke_rest_adapter",
+        lambda *_args, **_kwargs: result_for(1, latency_ms=-10),
+    )
+
+    result = asyncio.run(runner.run_one_job(worker_config()))
+
+    assert result.status == "needs_review"
+    outcome = next(
+        payload for payload in fake.payloads if payload["operation"] == "provider_outcome"
+    )
+    assert outcome["latencyMs"] == 0

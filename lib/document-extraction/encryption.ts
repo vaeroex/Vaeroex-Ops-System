@@ -2,9 +2,9 @@ import "server-only";
 
 import type {
   EncryptedDocumentExtractionEnvelopeV1,
-  NormalizedDocumentExtractionArtifactV1
+  NormalizedDocumentExtractionArtifact
 } from "@/lib/document-extraction/contracts";
-import { parseNormalizedDocumentExtractionArtifact } from "@/lib/document-extraction/artifact";
+import { parseAnyNormalizedDocumentExtractionArtifact } from "@/lib/document-extraction/artifact";
 import {
   decryptDocumentExtractionBytes,
   encryptDocumentExtractionBytes,
@@ -19,13 +19,13 @@ export interface DocumentExtractionManagedEncryptionProvider {
   readonly currentKeyVersion: string;
   readonly readableKeyVersions: readonly string[];
   encrypt(
-    artifact: NormalizedDocumentExtractionArtifactV1,
+    artifact: NormalizedDocumentExtractionArtifact,
     context: DocumentExtractionEncryptionContext
   ): Promise<EncryptedDocumentExtractionEnvelopeV1>;
   decrypt(
     envelope: EncryptedDocumentExtractionEnvelopeV1,
     context: DocumentExtractionEncryptionContext
-  ): Promise<NormalizedDocumentExtractionArtifactV1>;
+  ): Promise<NormalizedDocumentExtractionArtifact>;
 }
 
 export type DocumentExtractionManagedKeyring = {
@@ -117,7 +117,7 @@ export function createManagedDocumentExtractionEncryptionProvider(
       } catch {
         throw new Error("The decrypted extraction artifact is malformed.");
       }
-      const normalizedArtifact = parseNormalizedDocumentExtractionArtifact(artifact);
+      const normalizedArtifact = parseAnyNormalizedDocumentExtractionArtifact(artifact);
       if (normalizedArtifact.artifactFingerprint !== context.artifactFingerprint) {
         throw new Error("The decrypted artifact fingerprint does not match its cache identity.");
       }
