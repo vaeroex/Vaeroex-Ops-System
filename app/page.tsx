@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
+import { PublicSystemsPortfolio } from "@/components/marketing/PublicSystemsPortfolio";
 import { PublicSpatialBackdrop } from "@/components/marketing/spatial/PublicSpatialBackdrop";
 import { EXECUTIVE_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
@@ -175,6 +176,16 @@ export default function HomePage() {
                 <span key={label}><small>{index}</small>{label}</span>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className="vaeroex-public-chapter vaeroex-public-chapter--portfolio" aria-labelledby="vaeroex-product-family-heading">
+          <div className="vaeroex-public-chapter__content vaeroex-public-chapter__content--center">
+            <ChapterMarker index="02.2" label="Product family" />
+            <p className="vaeroex-public-kicker">Vaeroex Intelligence Systems</p>
+            <h2 id="vaeroex-product-family-heading">Specialized intelligence for distinct decision environments.</h2>
+            <p className="vaeroex-public-lede vaeroex-public-lede--center">Each Vaeroex product is designed around a serious information environment, a clear decision purpose, and an inspectable relationship with evidence.</p>
+            <PublicSystemsPortfolio />
           </div>
         </section>
 
