@@ -585,6 +585,579 @@ button.bg-vaeroex-blue:hover {
   }
 }
 
+/* Spatial Workspace master composition: one guided environment behind the
+   authoritative routed DOM surfaces. Local analytical canvases remain opt-in. */
+.vaeroex-workspace-shell {
+  --vaeroex-workspace-height: clamp(38rem, calc(100svh - 8.5rem), 56rem);
+  --vaeroex-destination-accent: 143, 210, 221;
+  position: relative;
+  isolation: isolate;
+  container-type: inline-size;
+  min-height: 0;
+  min-width: 0;
+}
+
+.vaeroex-workspace-shell[data-spatial-workspace="overview"] {
+  --vaeroex-destination-accent: 154, 219, 230;
+}
+
+.vaeroex-workspace-shell[data-spatial-workspace="intelligence"] {
+  --vaeroex-destination-accent: 136, 205, 221;
+}
+
+.vaeroex-workspace-shell[data-spatial-workspace="kpis"] {
+  --vaeroex-destination-accent: 174, 200, 207;
+}
+
+.vaeroex-workspace-shell[data-spatial-workspace="sources"] {
+  --vaeroex-destination-accent: 185, 173, 130;
+}
+
+.vaeroex-workspace-shell[data-spatial-workspace="analyses"] {
+  --vaeroex-destination-accent: 147, 169, 191;
+}
+
+.vaeroex-workspace-shell--active {
+  min-height: var(--vaeroex-workspace-height);
+}
+
+.vaeroex-workspace-shell--enabled .vaeroex-workspace-canvas,
+.vaeroex-workspace-shell--enabled .vaeroex-workspace-canvas-loading {
+  position: absolute;
+  inset: 0 -1.25rem auto;
+  z-index: 1;
+  height: var(--vaeroex-workspace-height);
+  overflow: hidden;
+  border: 0;
+  border-block: 1px solid rgba(var(--vaeroex-destination-accent), 0.2);
+  border-radius: 0;
+  background: transparent;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.025),
+    inset 0 -86px 120px rgba(2, 6, 10, 0.82),
+    0 30px 72px rgba(0, 0, 0, 0.22);
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 240ms ease;
+}
+
+.vaeroex-workspace-shell--active .vaeroex-workspace-canvas {
+  background: #03080d;
+  opacity: 1;
+}
+
+.vaeroex-workspace-shell--enabled .vaeroex-workspace-canvas-loading {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.vaeroex-workspace-shell--active .vaeroex-workspace-canvas::before {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(3, 8, 13, 0.24), transparent 30%, transparent 82%, rgba(3, 8, 13, 0.16)),
+    linear-gradient(180deg, rgba(3, 8, 13, 0.025), transparent 54%, rgba(3, 8, 13, 0.68));
+  content: "";
+  pointer-events: none;
+}
+
+.vaeroex-workspace-shell--active .vaeroex-workspace-canvas::after {
+  position: absolute;
+  z-index: 1;
+  inset: auto 0 0;
+  height: 9rem;
+  background: linear-gradient(to bottom, transparent, rgba(3, 8, 13, 0.84));
+  content: "";
+  pointer-events: none;
+}
+
+.vaeroex-workspace-canvas canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.vaeroex-workspace-shell--active > .vaeroex-route-plane {
+  position: relative;
+  z-index: 2;
+  min-height: var(--vaeroex-workspace-height);
+  padding-top: clamp(3.75rem, 8vh, 5.25rem);
+  perspective: 1600px;
+  pointer-events: auto;
+}
+
+.vaeroex-route-plane {
+  transform-origin: var(--vaeroex-transform-origin, 50% 22%);
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+}
+
+.vaeroex-workspace-shell--active > .vaeroex-route-plane[data-spatial-motion="arriving"] {
+  will-change: transform, opacity;
+  animation: vaeroex-route-plane-arrive var(--vaeroex-route-travel-duration, 760ms) cubic-bezier(0.16, 0.82, 0.2, 1) both;
+}
+
+.vaeroex-workspace-shell--active > .vaeroex-route-plane[data-spatial-motion="departing"] {
+  opacity: 0.34;
+  transform: translate3d(var(--vaeroex-depart-x, 0), var(--vaeroex-depart-y, 18px), -160px)
+    rotateX(var(--vaeroex-depart-rotate-x, 2deg))
+    rotateY(var(--vaeroex-depart-rotate-y, 5deg))
+    scale(0.94);
+  will-change: transform, opacity;
+  transition:
+    transform var(--vaeroex-route-departure-duration, 190ms) cubic-bezier(0.48, 0.02, 0.72, 0.3),
+    opacity var(--vaeroex-route-departure-duration, 190ms) ease-out;
+}
+
+.vaeroex-workspace-shell--active > .vaeroex-route-plane[data-spatial-motion="settled"] {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) rotateX(0) rotateY(0) scale(1);
+}
+
+@keyframes vaeroex-route-plane-arrive {
+  from {
+    opacity: 0.22;
+    transform: translate3d(var(--vaeroex-arrive-x, 72px), var(--vaeroex-arrive-y, 18px), var(--vaeroex-arrive-z, -190px))
+      rotateX(var(--vaeroex-arrive-rotate-x, 2deg))
+      rotateY(var(--vaeroex-arrive-rotate-y, -5deg))
+      scale(var(--vaeroex-arrive-scale, 0.92));
+  }
+
+  48% {
+    opacity: 0.58;
+  }
+
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotateX(0) rotateY(0) scale(1);
+  }
+}
+
+.vaeroex-route-content {
+  position: relative;
+  z-index: 2;
+  min-width: 0;
+}
+
+.vaeroex-workspace-shell--active .vaeroex-route-content {
+  width: calc(100% - var(--vaeroex-surface-inset, clamp(7rem, 15vw, 10rem)));
+  border: 1px solid rgba(var(--vaeroex-destination-accent), 0.24);
+  background: rgba(248, 250, 252, 0.86);
+  padding: clamp(0.9rem, 1.8vw, 1.6rem);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    0 30px 80px rgba(15, 23, 42, 0.18),
+    18px 0 42px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(9px) saturate(0.9);
+}
+
+.vaeroex-workspace-shell--active .vaeroex-route-content::before,
+.vaeroex-workspace-shell--active .vaeroex-route-content::after {
+  position: absolute;
+  z-index: -1;
+  width: clamp(2.75rem, 5vw, 4.5rem);
+  height: 0.36rem;
+  border-block: 1px solid rgba(var(--vaeroex-destination-accent), 0.46);
+  background: linear-gradient(90deg, rgba(var(--vaeroex-destination-accent), 0.38), rgba(5, 12, 18, 0.92));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  content: "";
+  pointer-events: none;
+}
+
+.vaeroex-workspace-shell--active .vaeroex-route-content::before {
+  top: 1.35rem;
+  left: calc(-1 * clamp(2.75rem, 5vw, 4.5rem));
+}
+
+.vaeroex-workspace-shell--active .vaeroex-route-content::after {
+  right: calc(-1 * clamp(2.75rem, 5vw, 4.5rem));
+  bottom: 1.35rem;
+  transform: rotate(180deg);
+}
+
+.vaeroex-workspace-shell[data-spatial-align="end"] .vaeroex-route-content {
+  margin-left: auto;
+}
+
+.vaeroex-workspace-shell[data-spatial-align="start"] .vaeroex-route-content {
+  margin-right: auto;
+}
+
+.pulsar .vaeroex-workspace-shell--active .vaeroex-route-content {
+  background: rgba(5, 12, 20, 0.68);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    inset 0 -1px 0 rgba(var(--vaeroex-destination-accent), 0.22),
+    inset 18px 0 42px rgba(58, 101, 115, 0.035),
+    0 34px 86px rgba(0, 0, 0, 0.3),
+    20px 0 44px rgba(0, 0, 0, 0.14);
+  backdrop-filter: blur(10px) saturate(0.88);
+}
+
+.vaeroex-route-frame {
+  position: absolute;
+  z-index: 1;
+  inset: 0.4rem -0.55rem 1rem;
+  overflow: hidden;
+  border-left: 2px solid rgba(var(--vaeroex-destination-accent), 0.42);
+  box-shadow: -8px 0 22px rgba(var(--vaeroex-destination-accent), 0.06);
+  pointer-events: none;
+}
+
+.vaeroex-route-frame::before,
+.vaeroex-route-frame::after,
+.vaeroex-route-frame span {
+  position: absolute;
+  content: "";
+}
+
+.vaeroex-route-frame::before {
+  top: 0;
+  left: 0;
+  width: min(19rem, 38vw);
+  height: 2px;
+  background: linear-gradient(90deg, rgba(var(--vaeroex-destination-accent), 0.82), rgba(var(--vaeroex-destination-accent), 0.18), transparent);
+}
+
+.vaeroex-route-frame::after {
+  right: 0;
+  bottom: 0;
+  width: min(12rem, 24vw);
+  height: 1px;
+  background: linear-gradient(270deg, rgba(var(--vaeroex-destination-accent), 0.38), transparent);
+}
+
+.vaeroex-route-frame span:nth-child(1) {
+  top: 0;
+  left: min(19rem, 38vw);
+  width: 1px;
+  height: 1.8rem;
+  background: rgba(var(--vaeroex-destination-accent), 0.46);
+}
+
+.vaeroex-route-frame span:nth-child(2) {
+  top: 22%;
+  right: 0;
+  width: 3.25rem;
+  height: 1px;
+  background: rgba(var(--vaeroex-destination-accent), 0.24);
+}
+
+.vaeroex-route-frame span:nth-child(3) {
+  top: 22%;
+  right: 3.25rem;
+  width: 1px;
+  height: 2.4rem;
+  background: rgba(var(--vaeroex-destination-accent), 0.18);
+}
+
+.vaeroex-workspace-shell--active > .vaeroex-route-plane::before {
+  display: none;
+}
+
+@container (max-width: 48rem) {
+  .vaeroex-workspace-shell--active .vaeroex-route-content {
+    width: calc(100% - 4rem);
+  }
+}
+
+@media (max-width: 1023px) {
+  .vaeroex-workspace-shell--active > .vaeroex-route-plane {
+    padding-top: 2.25rem;
+  }
+
+  .vaeroex-workspace-shell--active[data-spatial-workspace] .vaeroex-route-content {
+    width: calc(100% - 2rem);
+    margin-inline: 1rem;
+    padding: 1rem;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .vaeroex-workspace-shell,
+  .vaeroex-workspace-shell--active {
+    min-height: 0;
+  }
+
+  .vaeroex-workspace-shell--active > .vaeroex-route-plane {
+    min-height: 0;
+    padding-top: 0;
+  }
+
+  .vaeroex-workspace-shell[data-spatial-workspace] .vaeroex-route-content {
+    width: 100%;
+    margin: 0;
+    border: 0;
+    background: transparent;
+    padding: 0;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+
+  .vaeroex-workspace-shell--active .vaeroex-route-content::before,
+  .vaeroex-workspace-shell--active .vaeroex-route-content::after {
+    display: none;
+  }
+
+  .vaeroex-route-frame {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vaeroex-workspace-shell--active > .vaeroex-route-plane[data-spatial-motion] {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .vaeroex-workspace-canvas,
+  .vaeroex-workspace-canvas-loading {
+    transition: none;
+  }
+}
+
+/* Spatial workspace V2: persistent route architecture and guided analytical environments. */
+.vaeroex-webgl-band--kpi {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  grid-template-columns: none;
+  border-block-color: rgba(129, 170, 184, 0.28);
+  background: #040a10;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 22px 48px rgba(0, 0, 0, 0.18);
+}
+
+.vaeroex-webgl-stage--kpi {
+  min-height: clamp(30rem, 62vh, 40rem);
+}
+
+.vaeroex-spatial-annotation {
+  --annotation-accent: #9adce5;
+  position: relative;
+  display: block;
+  max-width: 14rem;
+  overflow: hidden;
+  border-left: 2px solid var(--annotation-accent);
+  background: rgba(5, 12, 18, 0.82);
+  padding: 0.28rem 0.48rem;
+  color: #e7f2f5;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.vaeroex-kpi-focus-rail {
+  position: absolute;
+  z-index: 3;
+  right: 20rem;
+  bottom: 1rem;
+  left: 1rem;
+  display: flex;
+  gap: 0;
+  min-width: 0;
+  overflow-x: auto;
+  border-top: 1px solid rgba(126, 167, 180, 0.34);
+  border-bottom: 1px solid rgba(126, 167, 180, 0.16);
+  background: rgba(4, 10, 16, 0.76);
+  scrollbar-color: rgba(126, 167, 180, 0.42) transparent;
+  scrollbar-width: thin;
+  backdrop-filter: blur(12px);
+}
+
+.vaeroex-kpi-focus-rail button {
+  position: relative;
+  flex: 0 0 9.5rem;
+  min-height: 4rem;
+  border-right: 1px solid rgba(126, 167, 180, 0.16);
+  padding: 0.62rem 0.72rem;
+  color: #8ea3ad;
+  letter-spacing: 0;
+  text-align: left;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+
+.vaeroex-kpi-focus-rail button::before {
+  position: absolute;
+  top: -1px;
+  right: 0;
+  left: 0;
+  height: 2px;
+  background: transparent;
+  content: "";
+}
+
+.vaeroex-kpi-focus-rail button:hover,
+.vaeroex-kpi-focus-rail button:focus-visible,
+.vaeroex-kpi-focus-rail button.is-active {
+  background: rgba(21, 48, 62, 0.72);
+  color: #f0f7f8;
+}
+
+.vaeroex-kpi-focus-rail button:focus-visible {
+  outline: 2px solid rgba(143, 215, 230, 0.72);
+  outline-offset: -2px;
+}
+
+.vaeroex-kpi-focus-rail button.is-active::before {
+  background: #8fd7e6;
+}
+
+.vaeroex-spatial-readout {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  right: 1rem;
+  width: min(18rem, calc(100% - 2rem));
+  min-height: 10.5rem;
+  border-left: 2px solid rgba(143, 215, 230, 0.72);
+  background: rgba(5, 12, 18, 0.78);
+  padding: 1rem 1.05rem;
+  color: #e8f2f4;
+  box-shadow: -18px 20px 42px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(14px);
+}
+
+.vaeroex-spatial-readout > p {
+  color: #78919c;
+  font-size: 0.62rem;
+  font-weight: 700;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.vaeroex-spatial-readout > h2,
+.vaeroex-spatial-readout > h3 {
+  margin-top: 0.5rem;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
+.vaeroex-spatial-readout > span,
+.vaeroex-spatial-readout > small {
+  display: block;
+  margin-top: 0.48rem;
+  color: #a8bac2;
+  font-size: 0.73rem;
+  line-height: 1.55;
+}
+
+.vaeroex-spatial-readout > strong {
+  display: block;
+  margin-top: 0.62rem;
+  color: #ffffff;
+  font-size: 1.55rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.vaeroex-spatial-readout > a {
+  display: inline-flex;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.8rem;
+  color: #a9e2ea;
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.vaeroex-spatial-readout > a:hover,
+.vaeroex-spatial-readout > a:focus-visible {
+  color: #ffffff;
+  text-decoration: underline;
+}
+
+.vaeroex-kpi-layer-key {
+  position: absolute;
+  z-index: 3;
+  top: 1rem;
+  left: 1rem;
+  display: flex;
+  gap: 1rem;
+  border-top: 1px solid rgba(126, 167, 180, 0.32);
+  background: rgba(5, 12, 18, 0.68);
+  padding: 0.62rem 0.75rem;
+  color: #9fb2ba;
+  font-size: 0.66rem;
+  font-weight: 650;
+  backdrop-filter: blur(10px);
+}
+
+.vaeroex-kpi-layer-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.vaeroex-kpi-layer-key i {
+  display: block;
+  width: 1.35rem;
+  height: 2px;
+}
+
+.vaeroex-kpi-layer-key i.is-target {
+  background: #a99567;
+}
+
+.vaeroex-kpi-focus-rail button {
+  flex-basis: 7.25rem;
+}
+
+.vaeroex-kpi-focus-rail button span,
+.vaeroex-kpi-focus-rail button strong {
+  display: block;
+}
+
+.vaeroex-kpi-focus-rail button span {
+  font-size: 0.62rem;
+}
+
+.vaeroex-kpi-focus-rail button strong {
+  margin-top: 0.28rem;
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1023px) {
+  .vaeroex-intelligence-focus-rail,
+  .vaeroex-kpi-focus-rail {
+    right: 1rem;
+  }
+
+  .vaeroex-spatial-readout {
+    top: 4.75rem;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .vaeroex-workspace-canvas,
+  .vaeroex-workspace-canvas-loading {
+    display: none;
+  }
+
+  .vaeroex-workspace-shell--active > .vaeroex-route-plane {
+    padding-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vaeroex-intelligence-focus-rail button,
+  .vaeroex-kpi-focus-rail button {
+    transition: none;
+  }
+}
+
 /* Shared executive-priority semantics. Meaning is selected in application code;
    these values only define how that meaning is rendered in each theme. */
 :root {
@@ -1255,5 +1828,611 @@ button.bg-vaeroex-blue:hover {
   .pulsar .vaeroex-trust-card::before,
   .pulsar .vaeroex-form-intro::before {
     animation: none;
+  }
+}
+
+/* Restrained spatial presentation. These rules change visual hierarchy only;
+   operational tables, forms, and evidence records remain on the flat plane. */
+:root {
+  --vaeroex-spatial-edge: rgba(15, 23, 42, 0.14);
+  --vaeroex-spatial-highlight: rgba(255, 255, 255, 0.72);
+  --vaeroex-spatial-shadow-subtle: 0 8px 22px rgba(15, 23, 42, 0.08);
+  --vaeroex-spatial-shadow-raised: 0 16px 36px rgba(15, 23, 42, 0.14);
+  --vaeroex-spatial-shadow-focus: 0 24px 54px rgba(15, 23, 42, 0.18);
+}
+
+.pulsar {
+  --vaeroex-spatial-edge: rgba(148, 163, 184, 0.2);
+  --vaeroex-spatial-highlight: rgba(226, 232, 240, 0.24);
+  --vaeroex-spatial-shadow-subtle: 0 10px 24px rgba(0, 0, 0, 0.24);
+  --vaeroex-spatial-shadow-raised: 0 18px 42px rgba(0, 0, 0, 0.34), 0 0 0 1px rgba(56, 189, 248, 0.05);
+  --vaeroex-spatial-shadow-focus: 0 28px 68px rgba(0, 0, 0, 0.44), 0 0 36px rgba(37, 99, 235, 0.08);
+}
+
+.pulsar .vaeroex-spatial-shell {
+  background: linear-gradient(125deg, #060b14 0%, #0b1220 54%, #101827 100%);
+}
+
+.vaeroex-spatial-scene {
+  perspective: 1400px;
+  perspective-origin: 50% 12rem;
+}
+
+.vaeroex-navigation-link {
+  position: relative;
+  overflow: hidden;
+  transition: background-color 180ms ease, box-shadow 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.vaeroex-navigation-link[data-spatial-destination]::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 2px;
+  height: 0;
+  background: #9ce1e8;
+  box-shadow: 4px 0 12px rgba(156, 225, 232, 0.3);
+  content: "";
+  transform: translateY(-50%);
+  transition: height 180ms ease;
+}
+
+.pulsar a.vaeroex-navigation-link[data-spatial-destination][data-active="true"] {
+  background: rgba(20, 67, 94, 0.72) !important;
+  color: #ffffff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 10px 24px rgba(0, 0, 0, 0.16);
+}
+
+.vaeroex-navigation-link[data-spatial-destination][data-active="true"]::before {
+  height: 58%;
+}
+
+.vaeroex-spatial-camera-controls {
+  position: absolute;
+  z-index: 4;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid rgba(143, 177, 188, 0.3);
+  border-radius: 0.45rem;
+  background: rgba(4, 10, 16, 0.78);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
+}
+
+.vaeroex-spatial-camera-controls--workspace {
+  right: 1rem;
+  bottom: 6.25rem;
+}
+
+.vaeroex-spatial-camera-controls--scene {
+  left: 1rem;
+  bottom: 5.75rem;
+}
+
+.vaeroex-spatial-camera-controls button {
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border-right: 1px solid rgba(143, 177, 188, 0.18);
+  color: #a9c1ca;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.vaeroex-spatial-camera-controls button:last-child {
+  border-right: 0;
+}
+
+.vaeroex-spatial-camera-controls button:hover,
+.vaeroex-spatial-camera-controls button:focus-visible {
+  background: rgba(29, 62, 78, 0.78);
+  color: #ffffff;
+}
+
+.vaeroex-spatial-camera-controls button:focus-visible {
+  outline: 2px solid #8fd7e6;
+  outline-offset: -2px;
+}
+
+.vaeroex-view-toolbar {
+  display: flex;
+  min-height: 3.75rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border-block: 1px solid rgba(148, 163, 184, 0.24);
+  padding: 0.65rem 0;
+}
+
+.vaeroex-view-toolbar--compact {
+  min-height: 2.75rem;
+  border-block: 0;
+  padding: 0;
+}
+
+.vaeroex-view-segment {
+  display: inline-grid;
+  flex: 0 0 auto;
+  grid-template-columns: repeat(2, minmax(5.75rem, 1fr));
+  border: 1px solid rgba(100, 116, 139, 0.35);
+  border-radius: 0.45rem;
+  background: rgba(226, 232, 240, 0.58);
+  padding: 0.2rem;
+}
+
+.vaeroex-view-segment button {
+  display: inline-flex;
+  min-height: 2.25rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.42rem;
+  border-radius: 0.3rem;
+  color: #475569;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.vaeroex-view-segment button:hover,
+.vaeroex-view-segment button:focus-visible {
+  color: #0f172a;
+}
+
+.vaeroex-view-segment button:focus-visible {
+  outline: 2px solid #0891b2;
+  outline-offset: 1px;
+}
+
+.vaeroex-view-segment button.is-active {
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.16);
+}
+
+.vaeroex-view-segment--dark {
+  border-color: rgba(148, 163, 184, 0.25);
+  background: rgba(2, 6, 23, 0.48);
+}
+
+.vaeroex-view-segment--dark button {
+  color: #94a3b8;
+}
+
+.vaeroex-view-segment--dark button:hover,
+.vaeroex-view-segment--dark button:focus-visible {
+  color: #ffffff;
+}
+
+.vaeroex-view-segment--dark button.is-active {
+  background: #1e293b;
+  color: #ffffff;
+}
+
+.vaeroex-webgl-band {
+  display: grid;
+  min-height: 34rem;
+  overflow: hidden;
+  grid-template-columns: minmax(0, 1fr) minmax(14rem, 18rem);
+  border-block: 1px solid rgba(148, 163, 184, 0.3);
+  background: #050a12;
+  color: #f8fafc;
+}
+
+.vaeroex-webgl-band--kpi {
+  min-height: 27rem;
+}
+
+.vaeroex-webgl-stage {
+  position: relative;
+  min-height: clamp(29rem, 62vh, 42rem);
+  overflow: hidden;
+}
+
+.vaeroex-webgl-stage--kpi {
+  min-height: 27rem;
+}
+
+.vaeroex-webgl-stage canvas {
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
+  touch-action: none;
+}
+
+.vaeroex-webgl-detail {
+  min-width: 0;
+  border-left: 1px solid rgba(148, 163, 184, 0.22);
+  background: #09111d;
+  padding: 1.35rem;
+}
+
+.vaeroex-webgl-select-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vaeroex-webgl-select {
+  width: 100%;
+  min-height: 2.5rem;
+  margin-bottom: 1rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 0.35rem;
+  background: #020617;
+  padding: 0.45rem 0.6rem;
+  color: #f8fafc;
+  font-size: 0.75rem;
+  letter-spacing: 0;
+}
+
+.vaeroex-webgl-select:focus-visible {
+  border-color: #22d3ee;
+  outline: 2px solid rgba(34, 211, 238, 0.48);
+  outline-offset: 2px;
+}
+
+.vaeroex-webgl-reset {
+  position: absolute;
+  z-index: 2;
+  top: 0.8rem;
+  right: 0.8rem;
+  display: grid;
+  width: 2.5rem;
+  height: 2.5rem;
+  place-items: center;
+  border: 1px solid rgba(226, 232, 240, 0.24);
+  border-radius: 50%;
+  background: rgba(5, 10, 18, 0.86);
+  color: #e2e8f0;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.26);
+}
+
+.vaeroex-webgl-reset:hover,
+.vaeroex-webgl-reset:focus-visible {
+  border-color: rgba(103, 232, 249, 0.72);
+  color: #ffffff;
+}
+
+.vaeroex-webgl-reset:focus-visible {
+  outline: 2px solid #22d3ee;
+  outline-offset: 2px;
+}
+
+.vaeroex-webgl-label {
+  display: block;
+  max-width: 13rem;
+  overflow: hidden;
+  border: 1px solid rgba(226, 232, 240, 0.2);
+  border-radius: 0.3rem;
+  background: rgba(3, 7, 18, 0.9);
+  padding: 0.32rem 0.48rem;
+  color: #f8fafc;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vaeroex-webgl-loading,
+.vaeroex-webgl-fallback {
+  display: grid;
+  min-height: 20rem;
+  place-items: center;
+  border-block: 1px solid rgba(148, 163, 184, 0.28);
+  background: #08111f;
+  padding: 1.5rem;
+  color: #cbd5e1;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.vaeroex-webgl-loading--kpi {
+  min-height: 15rem;
+}
+
+@media (max-width: 1023px) {
+  .vaeroex-webgl-band {
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vaeroex-webgl-detail {
+    border-top: 1px solid rgba(148, 163, 184, 0.22);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .vaeroex-view-toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .vaeroex-view-toolbar--compact {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .vaeroex-view-segment {
+    width: 100%;
+  }
+
+  .vaeroex-view-toolbar--compact .vaeroex-view-segment {
+    width: auto;
+  }
+}
+
+.vaeroex-spatial-surface {
+  position: relative;
+  isolation: isolate;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms cubic-bezier(0.2, 0.75, 0.3, 1);
+}
+
+.vaeroex-spatial-surface::before,
+.vaeroex-spatial-surface::after {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  content: "";
+}
+
+.vaeroex-spatial-surface::before {
+  border-top: 1px solid var(--vaeroex-spatial-highlight);
+  opacity: 0.72;
+}
+
+.vaeroex-spatial-surface::after {
+  box-shadow: inset 0 -1px 0 var(--vaeroex-spatial-edge);
+}
+
+.vaeroex-spatial-surface--subtle {
+  transform: translate3d(0, 0, 0);
+  box-shadow: var(--vaeroex-spatial-shadow-subtle);
+}
+
+.vaeroex-spatial-surface--raised {
+  transform: translate3d(0, -1px, 8px);
+  box-shadow: var(--vaeroex-spatial-shadow-raised);
+}
+
+.vaeroex-spatial-surface--focus {
+  transform: translate3d(0, -2px, 14px);
+  box-shadow: var(--vaeroex-spatial-shadow-focus);
+}
+
+.vaeroex-spatial-surface--selected {
+  transform: translate3d(0, -2px, 12px);
+  box-shadow: var(--vaeroex-spatial-shadow-raised), 0 0 0 1px rgba(103, 232, 249, 0.18);
+}
+
+.vaeroex-spatial-surface:focus-within {
+  border-color: rgba(56, 189, 248, 0.5) !important;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .vaeroex-spatial-surface--interactive:hover {
+    transform: translate3d(0, -3px, 12px);
+    box-shadow: var(--vaeroex-spatial-shadow-raised);
+  }
+
+  .vaeroex-spatial-surface--interactive.vaeroex-spatial-surface--selected:hover {
+    transform: translate3d(0, -3px, 16px);
+  }
+}
+
+.vaeroex-business-health-surface,
+.pulsar .vaeroex-business-health-surface {
+  border-radius: 0 !important;
+  background:
+    linear-gradient(102deg, rgba(5, 13, 22, 0.98), rgba(10, 29, 41, 0.95) 52%, rgba(7, 17, 31, 0.98)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), inset 0 -1px 0 rgba(117, 164, 180, 0.2), 0 24px 58px rgba(0, 0, 0, 0.24) !important;
+}
+
+.vaeroex-health-instrument {
+  --vaeroex-health-track: rgba(148, 163, 184, 0.2);
+  position: relative;
+  display: grid;
+  width: 11.5rem;
+  max-width: 100%;
+  aspect-ratio: 1;
+  place-items: center;
+  transform: rotateX(7deg) translateZ(18px);
+  transform-style: preserve-3d;
+  filter: drop-shadow(0 16px 18px rgba(0, 0, 0, 0.3));
+}
+
+.vaeroex-health-instrument::before,
+.vaeroex-health-instrument::after {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  content: "";
+}
+
+.vaeroex-health-instrument::before {
+  background: conic-gradient(from -110deg, var(--semantic-current-border) 0 var(--vaeroex-health-score), var(--vaeroex-health-track) var(--vaeroex-health-score) 100%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 12px), #000 calc(100% - 11px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 12px), #000 calc(100% - 11px));
+}
+
+.vaeroex-health-instrument::after {
+  border: 1px solid rgba(226, 232, 240, 0.14);
+  box-shadow:
+    inset 0 2px 2px rgba(255, 255, 255, 0.08),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.28),
+    0 8px 18px rgba(0, 0, 0, 0.24);
+}
+
+.vaeroex-health-instrument__face {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: calc(100% - 3rem);
+  aspect-ratio: 1;
+  place-content: center;
+  border: 1px solid rgba(198, 225, 232, 0.16);
+  border-radius: 50%;
+  background-color: rgba(5, 14, 23, 0.96);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09), inset 0 -14px 28px rgba(0, 0, 0, 0.26), 0 0 0 8px rgba(56, 92, 108, 0.08);
+  text-align: center;
+}
+
+.vaeroex-health-instrument__ticks {
+  position: absolute;
+  inset: 0.42rem;
+  border-radius: 50%;
+}
+
+.vaeroex-health-instrument__ticks span {
+  --vaeroex-health-tick: 0;
+  position: absolute;
+  top: 0;
+  left: calc(50% - 1px);
+  width: 2px;
+  height: 0.38rem;
+  border-radius: 1px;
+  background: rgba(177, 207, 216, 0.36);
+  transform: rotate(calc(var(--vaeroex-health-tick) * 18deg)) translateY(0.1rem);
+  transform-origin: 1px calc(5.33rem - 0.1rem);
+}
+
+.vaeroex-health-instrument__inner-ring {
+  position: absolute;
+  inset: 1.12rem;
+  border: 1px solid rgba(146, 191, 204, 0.22);
+  border-radius: 50%;
+  box-shadow: inset 0 0 22px rgba(86, 157, 176, 0.08);
+}
+
+.vaeroex-health-instrument__datum {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 2.12rem;
+  width: 1.6rem;
+  height: 2px;
+  background: var(--semantic-current-border);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--semantic-current-border), transparent 45%);
+  transform: rotate(-34deg);
+  transform-origin: right center;
+}
+
+.vaeroex-health-instrument__score {
+  color: #ffffff;
+  font-size: 3rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  line-height: 1;
+}
+
+.vaeroex-health-instrument__scale,
+.vaeroex-health-instrument__unavailable {
+  margin-top: 0.35rem;
+  color: #cbd5e1;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.vaeroex-health-instrument__unavailable {
+  max-width: 6rem;
+  margin-inline: auto;
+  margin-top: 0;
+}
+
+.vaeroex-health-instrument[data-available="false"]::before {
+  background: var(--vaeroex-health-track);
+}
+
+@supports not ((mask: radial-gradient(#000, transparent)) or (-webkit-mask: radial-gradient(#000, transparent))) {
+  .vaeroex-health-instrument::before {
+    border: 14px solid var(--semantic-current-border);
+    background: transparent;
+  }
+
+  .vaeroex-health-instrument[data-available="false"]::before {
+    border-color: var(--vaeroex-health-track);
+  }
+}
+
+@media (pointer: coarse) {
+  .vaeroex-spatial-surface,
+  .vaeroex-spatial-surface--selected,
+  .vaeroex-health-instrument {
+    transform: none;
+  }
+
+  .vaeroex-health-instrument {
+    filter: none;
+  }
+
+  .vaeroex-spatial-surface--subtle,
+  .vaeroex-spatial-surface--raised,
+  .vaeroex-spatial-surface--focus,
+  .vaeroex-spatial-surface--selected {
+    box-shadow: var(--vaeroex-spatial-shadow-subtle);
+  }
+}
+
+/* Pulsar keeps visualization mode controls legible on the dark workspace. */
+.pulsar .vaeroex-view-segment {
+  border-color: rgba(138, 176, 188, 0.28);
+  background: rgba(3, 9, 15, 0.62);
+}
+
+.pulsar .vaeroex-view-segment button {
+  color: #91a8b1;
+}
+
+.pulsar .vaeroex-view-segment button:hover,
+.pulsar .vaeroex-view-segment button:focus-visible {
+  color: #f3f8f9;
+}
+
+.pulsar .vaeroex-view-segment button.is-active {
+  background: #182a37;
+  color: #f8fafc;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 12px rgba(0, 0, 0, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vaeroex-route-plane {
+    animation: none;
+  }
+
+  .vaeroex-view-segment button {
+    transition: none;
+  }
+
+  .vaeroex-spatial-surface,
+  .vaeroex-spatial-surface--interactive:hover,
+  .vaeroex-spatial-surface--selected,
+  .vaeroex-health-instrument {
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .vaeroex-health-instrument {
+    filter: none;
+  }
+
+  .vaeroex-spatial-surface--subtle,
+  .vaeroex-spatial-surface--raised,
+  .vaeroex-spatial-surface--focus,
+  .vaeroex-spatial-surface--selected {
+    box-shadow: var(--vaeroex-spatial-shadow-subtle);
   }
 }

@@ -17,7 +17,7 @@ function loadTypeScriptModule(file) {
   return module.exports;
 }
 
-const sourcesPage = read("app/app/sources/page.tsx");
+const sourcesPage = read("app/app/sources/SourcesPage.tsx");
 const sourceDetailRoute = read("app/app/sources/[fileId]/page.tsx");
 const legacyFilesPage = read("app/app/files/page.tsx");
 const fileActions = read("app/app/files/actions.ts");

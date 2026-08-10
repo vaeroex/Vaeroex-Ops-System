@@ -8,6 +8,7 @@ import { useMemo, useRef, useState, useTransition } from "react";
 import { explainFindingAction } from "@/app/app/finding-explanation/actions";
 import { mutateIntelligenceCardLifecycleAction } from "@/app/app/intelligence/lifecycle-actions";
 import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
+import { spatialSurfaceClassName } from "@/components/spatial/SpatialSurface";
 import type { FindingExplanationState } from "@/lib/ai/finding-explanation/contracts";
 import type {
   IntelligenceCardLifecycleAction,
@@ -581,7 +582,7 @@ export function IntelligenceSignalInbox({
     const selected = selectedCard?.findingKeyHash === card.findingKeyHash;
     const historyAffordance = card.view === "history";
     return (
-      <button key={card.findingKeyHash} type="button" aria-current={selected ? "true" : undefined} onClick={() => selectCard(card)} className={`vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
+      <button key={card.findingKeyHash} type="button" aria-current={selected ? "true" : undefined} onClick={() => selectCard(card)} className={`${spatialSurfaceClassName({ depth: selected ? "raised" : "subtle", interactive: true, selected })} vaeroex-semantic-card vaeroex-semantic-interactive ${semanticStatusClass(categoryStatus)} block w-full rounded-lg border p-3 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/80 ${historyAffordance ? "cursor-pointer" : ""} ${selected ? historyAffordance ? "border-cyan-300/55 bg-cyan-950/25 ring-2 ring-cyan-300/55 shadow-[0_0_0_1px_rgba(103,232,249,0.08)]" : "ring-1 ring-current/30" : historyAffordance ? "hover:border-cyan-300/50 hover:bg-cyan-950/20 hover:shadow-md" : "hover:brightness-[1.03]"}`}>
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="mb-2 flex flex-wrap gap-2">
@@ -672,7 +673,7 @@ export function IntelligenceSignalInbox({
           {filteredCards.length > pagedCards.length ? <button type="button" onClick={() => setVisibleCount((count) => count + pageSize)} className="min-h-10 rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2 text-sm font-semibold text-slate-100 hover:border-cyan-300/40 hover:bg-cyan-950/30">Load more</button> : null}
         </div>
 
-        <aside className={`vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
+        <aside className={`${spatialSurfaceClassName({ depth: "raised", selected: Boolean(selectedCard) })} vaeroex-semantic-card ${selectedCard ? semanticStatusClass(findingCategoryStatus(selectedCard.snapshot.type)) : semanticStatusClass("neutral")} rounded-lg border p-4 shadow-panel xl:sticky xl:top-24 xl:max-h-[calc(100dvh-8rem)] xl:self-start xl:overflow-y-auto`}>
           {selectedCard ? (
             <div className="space-y-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
