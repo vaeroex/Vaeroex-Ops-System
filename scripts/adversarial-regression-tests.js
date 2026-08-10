@@ -483,12 +483,21 @@ function runFileAnalysisRequestSizingTests() {
   assert.equal(metrics.attachmentBudgetMode, "image_vision", "image attachments should be budgeted as vision attachments");
   assert.ok(metrics.estimatedAttachmentTokens > 0, "image attachments should still contribute a bounded attachment estimate");
 
-  const sourcesPage = read("app/app/sources/page.tsx");
+  const sourcesRoute = read("app/app/sources/page.tsx");
+  const sourceDetailRoute = read("app/app/sources/[fileId]/page.tsx");
+  const sourcesPage = read("app/app/sources/SourcesPage.tsx");
   const sourceTabs = sourcesPage.slice(
     sourcesPage.indexOf("const sourceTabs"),
     sourcesPage.indexOf("];", sourcesPage.indexOf("const sourceTabs"))
   );
-  assert.match(sourcesPage, /SourceFileDetailPanel/, "Evidence should render source detail through one focused component");
+  assert.match(sourcesRoute, /import SourcesPage from "@\/app\/app\/sources\/SourcesPage";/, "Evidence route should delegate to the focused SourcesPage module");
+  assert.match(sourcesRoute, /export default SourcesPage;/, "Evidence route should preserve the focused SourcesPage entry point");
+  assert.match(sourceDetailRoute, /import \{ renderSourcesPage \} from "@\/app\/app\/sources\/SourcesPage";/, "Evidence detail route should delegate to the focused SourcesPage module");
+  assert.match(sourceDetailRoute, /return renderSourcesPage\(/, "Evidence detail route should use the shared source-detail renderer");
+  assert.equal((sourcesPage.match(/function SourceFileDetailPanel\s*\(/g) || []).length, 1, "Evidence should declare one focused source-detail component");
+  assert.equal((sourcesPage.match(/<SourceFileDetailPanel\b/g) || []).length, 1, "Evidence should render source detail through one focused component path");
+  assert.doesNotMatch(sourcesPage, /export\s+(?:default\s+)?(?:async\s+)?function SourceFileDetailPanel\b|export\s*\{[^}]*\bSourceFileDetailPanel\b/, "The focused source-detail component should remain private to SourcesPage");
+  assert.doesNotMatch(`${sourcesRoute}\n${sourceDetailRoute}`, /SourceFileDetailPanel/, "Evidence routes should not duplicate or bypass the focused source-detail component");
   assert.match(sourcesPage, /Open a source to review its analysis, imported data, history, and lifecycle\./, "Evidence rows should stay compact and point users to source detail");
   assert.match(sourcesPage, /Open source/, "Evidence rows should expose one clear source action");
   assert.match(sourcesPage, /Needs Review/, "Sources should expose review only when confidence or risk requires it");
