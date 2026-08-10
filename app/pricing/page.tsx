@@ -83,6 +83,9 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
       </details>
       <div className="border-t border-white/10 p-5 sm:p-6">
         <StartWithVaeroexMenu className="w-full sm:w-auto" />
+        <p className="mt-4 text-xs leading-5 text-slate-400">
+          Renews monthly unless canceled through Manage billing. Cancellation takes effect at the end of the current paid billing period and prevents the next renewal. Payments are final and non-refundable except where required by applicable law.
+        </p>
       </div>
     </article>
   );
@@ -136,15 +139,15 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
           <div className="mt-5 grid gap-3 md:grid-cols-2">
             <details className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
               <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-semibold text-white">Does the subscription renew automatically?</summary>
-              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Yes. Vaeroex subscriptions renew monthly unless canceled. Review the <Link href="/subscription-billing-terms" className="font-semibold text-cyan-200 hover:text-white">Subscription Billing Terms</Link> for details.</p>
+              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Yes. Vaeroex subscriptions renew monthly unless cancellation is scheduled through Manage billing. Cancellation prevents the next renewal, while access continues through the end of the current paid billing period. Review the <Link href="/subscription-billing-terms" className="font-semibold text-cyan-200 hover:text-white">Subscription Billing Terms</Link> for details.</p>
             </details>
             <details className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
               <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-semibold text-white">How are refunds handled?</summary>
-              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Refund requests are handled according to the <Link href="/refund-policy" className="font-semibold text-cyan-200 hover:text-white">Vaeroex Refund Policy</Link>.</p>
+              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law. Cancellation does not provide a prorated refund or credit for unused time. Review the <Link href="/refund-policy" className="font-semibold text-cyan-200 hover:text-white">Vaeroex Refund Policy</Link> for details.</p>
             </details>
             <details className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
               <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-semibold text-white">Can pricing change?</summary>
-              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Pricing may change in the future. Customers will receive advance notice before a pricing change takes effect.</p>
+              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals. If you cancel and later resubscribe, your new subscription will use the pricing available when you resubscribe. Price reductions do not provide retroactive refunds or credits for billing periods already paid.</p>
             </details>
             <details className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
               <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-semibold text-white">Who can help with billing?</summary>

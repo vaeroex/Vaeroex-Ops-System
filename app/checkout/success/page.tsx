@@ -39,6 +39,14 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
           </div>
 
           <p className="mt-6 text-sm leading-6 text-muted">
+            Your subscription renews automatically unless cancellation is scheduled through Manage billing. Cancellation prevents the next renewal, while paid access continues through the end of the current billing period. Payments are final and non-refundable except where required by applicable law, with no prorated refund or credit for unused time.
+          </p>
+
+          <p className="mt-3 text-sm leading-6 text-muted">
+            Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals. If you cancel and later resubscribe, the new subscription uses the pricing available at that time.
+          </p>
+
+          <p className="mt-3 text-sm leading-6 text-muted">
             Billing questions can be sent to{" "}
             <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
               {VAEROEX_CONTACT_EMAILS.billing}

@@ -1,4 +1,5 @@
 const assert = require("node:assert/strict");
+const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const path = require("node:path");
 
@@ -17,7 +18,7 @@ const setupPage = read("app/app/setup/page.tsx");
 const setupAction = read("app/app/setup/actions.ts");
 const migration = read("supabase/migrations/202607250002_workspace_agreements.sql");
 const adminEmailMigration = read("supabase/migrations/20260726205442_workspace_agreement_admin_email_delivery.sql");
-const sources = read("app/app/sources/page.tsx");
+const sources = read("app/app/sources/SourcesPage.tsx");
 const agreementList = read("components/legal/WorkspaceAgreementList.tsx");
 const customerPage = read("app/app/legal/agreements/[agreementId]/page.tsx");
 const customerPdf = read("app/api/legal/workspace-agreements/[agreementId]/pdf/route.ts");
@@ -190,18 +191,14 @@ const administrativeDeliverySources = [setupAction, adminEmail, adminActions, ad
 assert.doesNotMatch(administrativeDeliverySources, /from\(["']notifications["']\)|notification-center|unread badge|notification preferences/i, "Workspace Agreement email must not reuse the retired notification architecture");
 assert.match(read("components/legal/WorkspaceAgreementActions.tsx"), /View PDF[\s\S]+Download[\s\S]+Print/, "customer View, Download, and Print actions must remain available");
 
-const sourceFiles = ["app", "components", "lib"].flatMap((directory) => {
-  const walk = (current) => fs.readdirSync(path.join(root, current), { withFileTypes: true }).flatMap((entry) => {
-    const relative = path.join(current, entry.name);
-    if (entry.isDirectory()) return walk(relative);
-    return /\.(ts|tsx)$/.test(entry.name) ? [relative] : [];
-  });
-  return walk(directory);
-});
+const sourceFiles = execFileSync("git", ["ls-files", "app", "components", "lib"], { cwd: root, encoding: "utf8" })
+  .trim()
+  .split("\n")
+  .filter((file) => /\.(ts|tsx)$/.test(file));
 const agreementReferences = sourceFiles.filter((file) => read(file).includes("workspace_agreements"));
 const allowedReferenceRoots = [
   "app/app/setup/actions.ts",
-  "app/app/sources/page.tsx",
+  "app/app/sources/SourcesPage.tsx",
   "app/app/legal/agreements/",
   "app/app/admin/workspace-agreements/",
   "app/app/admin/workspaces/page.tsx",
