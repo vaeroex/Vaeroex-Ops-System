@@ -32,9 +32,9 @@ function webglIsAvailable() {
   }
 }
 
-function evaluateSpatialCapability(): SpatialCapability {
+function evaluateSpatialCapability({ allowMobile = false }: { allowMobile?: boolean } = {}): SpatialCapability {
   const mobile = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 767px)").matches;
-  if (mobile) {
+  if (mobile && !allowMobile) {
     return { ready: true, available: false, specializedAvailable: false, quality: null, reason: "mobile" };
   }
 
@@ -49,6 +49,8 @@ function evaluateSpatialCapability(): SpatialCapability {
 
   const device = navigator as Navigator & { deviceMemory?: number };
   const constrained = Boolean(
+    mobile
+    ||
     (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
     || (device.deviceMemory && device.deviceMemory <= 4)
   );
@@ -58,14 +60,14 @@ function evaluateSpatialCapability(): SpatialCapability {
     : { ready: true, available: true, specializedAvailable: true, quality: "full", reason: null };
 }
 
-export function useSpatialCapability() {
+export function useSpatialCapability(options: { allowMobile?: boolean } = {}) {
   const [capability, setCapability] = useState<SpatialCapability>(pendingCapability);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarsePointer = window.matchMedia("(pointer: coarse)");
     const narrowViewport = window.matchMedia("(max-width: 767px)");
-    const evaluate = () => setCapability(evaluateSpatialCapability());
+    const evaluate = () => setCapability(evaluateSpatialCapability(options));
 
     evaluate();
     reducedMotion.addEventListener("change", evaluate);
@@ -76,7 +78,7 @@ export function useSpatialCapability() {
       coarsePointer.removeEventListener("change", evaluate);
       narrowViewport.removeEventListener("change", evaluate);
     };
-  }, []);
+  }, [options.allowMobile]);
 
   return capability;
 }

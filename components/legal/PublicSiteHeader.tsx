@@ -7,8 +7,15 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const primaryNavLinks: Array<{ href: Route; label: string }> = [
   { href: "/", label: "Home" },
-  { href: "/#intelligence-systems", label: "Intelligence Systems" },
-  { href: "/executive-intelligence", label: "Executive Intelligence" },
+  { href: "/#intelligence-systems", label: "Intelligence Systems" }
+];
+
+const productLinks: Array<{ href: Route; label: string; status: string }> = [
+  { href: "/executive-intelligence", label: "Executive Intelligence", status: "Available" },
+  { href: "/drug-discovery-intelligence", label: "Drug Discovery Intelligence", status: "Under development" }
+];
+
+const secondaryNavLinks: Array<{ href: Route; label: string }> = [
   { href: "/pricing", label: "Pricing" },
   { href: "/trust", label: "Trust" }
 ];
@@ -58,6 +65,25 @@ export async function PublicSiteHeader() {
           ))}
           <details className="group relative">
             <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+              Products
+              <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="vaeroex-public-menu absolute left-0 top-full mt-2 w-72 border border-white/10 p-2 shadow-command">
+              {productLinks.map((link) => (
+                <Link key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                  <span className="block text-sm font-semibold text-slate-200">{link.label}</span>
+                  <span className="mt-1 block text-[0.64rem] font-semibold uppercase tracking-normal text-cyan-200/70">{link.status}</span>
+                </Link>
+              ))}
+            </div>
+          </details>
+          {secondaryNavLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+              {link.label}
+            </Link>
+          ))}
+          <details className="group relative">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
               Company
               <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
             </summary>
@@ -94,7 +120,7 @@ export async function PublicSiteHeader() {
             </summary>
             <nav className="vaeroex-public-menu absolute right-0 top-full mt-2 max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto border border-white/10 p-3 shadow-command" aria-label="Public navigation mobile">
               <p className="px-2 pb-2 text-[0.68rem] font-semibold uppercase tracking-normal text-slate-500">Explore Vaeroex</p>
-              {[...primaryNavLinks, ...companyLinks, { href: "/help" as Route, label: "Help" }].map((link) => (
+              {[...primaryNavLinks, ...productLinks, ...secondaryNavLinks, ...companyLinks, { href: "/help" as Route, label: "Help" }].map((link) => (
                 <Link key={link.href} href={link.href} className="block min-h-11 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                   {link.label}
                 </Link>

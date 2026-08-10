@@ -1,0 +1,114 @@
+.portfolio {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 2.5rem;
+  border: 1px solid rgba(148, 192, 213, 0.18);
+  background: rgba(148, 192, 213, 0.18);
+  box-shadow: 0 32px 86px rgba(0, 0, 0, 0.28);
+  backdrop-filter: blur(16px);
+}
+
+.system {
+  position: relative;
+  display: flex;
+  min-height: 26rem;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(1.5rem, 3vw, 2.5rem);
+  background: rgba(3, 10, 17, 0.9);
+}
+
+.system::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  content: "";
+  background: var(--system-accent);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--system-accent) 55%, transparent);
+}
+
+.relationship,
+.status {
+  color: #83ddf8;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.status {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 2rem;
+  align-items: center;
+  margin-top: 1.5rem;
+  border-block: 1px solid color-mix(in srgb, var(--system-accent) 38%, transparent);
+  padding: 0.4rem 0;
+  color: color-mix(in srgb, var(--system-accent) 82%, white);
+}
+
+.name {
+  max-width: 13ch;
+  margin-top: 1.4rem;
+  color: #f1f9fc;
+  font-size: clamp(1.8rem, 3vw, 3.15rem);
+  font-weight: 560;
+  line-height: 1;
+}
+
+.tagline {
+  max-width: 32rem;
+  margin-top: 1.25rem;
+  color: #d4e2e9;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.55;
+}
+
+.description {
+  max-width: 36rem;
+  margin-top: 0.9rem;
+  color: #9fb2be;
+  font-size: 0.86rem;
+  line-height: 1.7;
+}
+
+.link {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 2.75rem;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: auto;
+  padding-top: 2rem;
+  color: #bcefff;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.link svg {
+  width: 1rem;
+  height: 1rem;
+  transition: transform 160ms ease;
+}
+
+.link:hover,
+.link:focus-visible {
+  color: #fff;
+}
+
+.link:hover svg,
+.link:focus-visible svg {
+  transform: translateX(0.2rem);
+}
+
+@media (max-width: 767px) {
+  .portfolio {
+    grid-template-columns: 1fr;
+  }
+
+  .system {
+    min-height: 0;
+  }
+}

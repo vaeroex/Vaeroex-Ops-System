@@ -7,6 +7,7 @@ import { legalLinks } from "@/lib/legal/content";
 const platformLinks: Array<[string, Route]> = [
   ["Home", "/"],
   ["Executive Intelligence", "/executive-intelligence"],
+  ["Drug Discovery Intelligence", "/drug-discovery-intelligence"],
   ["Pricing", "/pricing"],
   ["Trust", "/trust"]
 ] as Array<[string, Route]>;
