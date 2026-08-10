@@ -10,6 +10,7 @@ const sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(path
 const homepage = read("app/page.tsx");
 const operations = read("app/executive-intelligence/page.tsx");
 const drugDiscovery = read("app/drug-discovery-intelligence/page.tsx");
+const biologicalIntelligence = read("app/biological-intelligence/page.tsx");
 const pricing = read("app/pricing/page.tsx");
 const about = read("app/about/page.tsx");
 const contact = read("app/contact/page.tsx");
@@ -48,8 +49,9 @@ assert.match(homepage, /ExecutiveInstrument/, "homepage must retain one believab
 assert.doesNotMatch(homepage, /CapabilityIntelligenceDemo|IntelligenceFlowDemo|IntelligenceLoopShowcase|SignalProductionDemo/, "homepage must not restore overlapping feature catalogs and lifecycle demos");
 assert.match(publicSystems, /PUBLIC_SYSTEMS[\s\S]*Executive Intelligence[\s\S]*availability: "available"/, "the public product architecture must use an extensible registry with the approved available system");
 assert.equal((publicSystems.match(/\n    availability: "available"/g) || []).length, 1, "the registry must keep Executive Intelligence as the only currently available system");
-assert.equal((publicSystems.match(/\n    availability: "under_development"/g) || []).length, 1, "the registry must contain exactly one approved under-development system");
+assert.equal((publicSystems.match(/\n    availability: "under_development"/g) || []).length, 2, "the registry must contain exactly two approved under-development systems");
 assert.match(publicSystems, /Drug Discovery Intelligence[\s\S]*under_development[\s\S]*\/drug-discovery-intelligence/, "the approved Drug Discovery system must use its exact status and product route");
+assert.match(publicSystems, /Biological Intelligence[\s\S]*under_development[\s\S]*\/biological-intelligence/, "the approved Biological Intelligence system must use its exact status and product route");
 assert.match(systemsPortfolio, /PUBLIC_SYSTEMS\.map/, "the homepage product family must render from the shared registry");
 assert.match(publicSpatialBackdrop, /dynamic\(\(\) => import\("@\/components\/marketing\/spatial\/PublicSpatialCanvas"\)[\s\S]*ssr: false/, "the public canvas must stay client-only while DOM marketing content remains server-rendered");
 
@@ -65,7 +67,7 @@ assert.match(plans, /VAEROEX_PLAN_PRICE_LABEL = "\$500\/month"/, "public subscri
 assert.match(pricing, /VAEROEX_PLAN_PRICE_LABEL/, "pricing page must use the authoritative plan price constant");
 assert.doesNotMatch(pricing, /10 Users Included|1 Workspace Included/, "pricing must not return to seat-limit positioning");
 
-for (const label of ["Home", "Intelligence Systems", "Products", "Executive Intelligence", "Drug Discovery Intelligence", "Pricing", "Trust", "Company"]) {
+for (const label of ["Home", "Intelligence Systems", "Products", "Executive Intelligence", "Drug Discovery Intelligence", "Biological Intelligence", "Pricing", "Trust", "Company"]) {
   assert.match(header, new RegExp(label), `public navigation must include ${label}`);
 }
 assert.match(header, /Open navigation menu/, "public header must provide one concise mobile menu control");
@@ -110,7 +112,7 @@ assert.match(globals, /prefers-reduced-motion: reduce/, "motion must honor reduc
 assert.match(redirects, /source: "\/network"[^\n]+destination: "\/networking"/, "legacy /network route must resolve to the authoritative Network page");
 assert.match(redirects, /source: "\/operations-intelligence"[^\n]+destination: "\/executive-intelligence"[^\n]+statusCode: 301/, "the previous product URL must permanently redirect to Executive Intelligence");
 
-const publicSources = [homepage, operations, drugDiscovery, pricing, about, contact, network, careers, help, demo, header, footer, trust, trustContent, seo, plans, savedAnalysisList, savedAnalysisPresentation].join("\n");
+const publicSources = [homepage, operations, drugDiscovery, biologicalIntelligence, pricing, about, contact, network, careers, help, demo, header, footer, trust, trustContent, seo, plans, savedAnalysisList, savedAnalysisPresentation].join("\n");
 assert.doesNotMatch(publicSources, /Hourly Consulting|Full Support Retainer|operations consulting agency/i, "current public experience must not expose legacy consulting offers");
 assert.doesNotMatch(publicSources, /Vaeroex Governance|Generated Outputs|Optional Outputs|workspace reset|automatic permanent purge/i, "current public experience must not expose unreleased or retired product concepts");
 assert.doesNotMatch(publicSources, /Executive Brief|Ask Vaeroex|Business Signals?|Notifications?|KPI Alerts?|Board Report|Improvement Plan|Investigation Summary/i, "current customer messaging must not expose retired features");

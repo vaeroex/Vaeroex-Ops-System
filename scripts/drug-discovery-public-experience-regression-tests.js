@@ -65,7 +65,7 @@ assert.doesNotMatch(page, /<Link|StartWithVaeroexMenu|href=\{?["']\/(?:pricing|c
 assert.match(systems, /Drug Discovery Intelligence[\s\S]*availability: "under_development"[\s\S]*route: "\/drug-discovery-intelligence"/, "the system registry must bind exact status and route");
 assert.match(systems, /Explore biological targets, run advanced computational discovery workflows, evaluate molecular candidates, preserve experimental evidence, and prioritize promising directions for further research/, "the product registry must retain the approved card copy");
 assert.match(portfolio, /data-availability=\{system\.availability\}[\s\S]*availabilityLabel\[system\.availability\][\s\S]*href=\{system\.route\}/, "the product card must separate status from normal navigation");
-assert.match(homepage, /PublicSystemsPortfolio/, "the homepage must present both Vaeroex Intelligence Systems");
+assert.match(homepage, /PublicSystemsPortfolio/, "the homepage must present the Vaeroex Intelligence Systems portfolio");
 assert.match(header, /\/drug-discovery-intelligence[\s\S]*Drug Discovery Intelligence/, "desktop and mobile product navigation must include Drug Discovery Intelligence");
 assert.match(footer, /Drug Discovery Intelligence[\s\S]*\/drug-discovery-intelligence/, "the product footer must include Drug Discovery Intelligence");
 assert.match(sitemap, /"\/drug-discovery-intelligence"/, "the canonical product route must be discoverable");

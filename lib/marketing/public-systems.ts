@@ -11,7 +11,7 @@ export type PublicSystemDefinition = Readonly<{
   cta: string;
   visual: Readonly<{
     accent: string;
-    environment: "executive_chamber" | "molecular_discovery";
+    environment: "executive_chamber" | "molecular_discovery" | "biological_systems";
   }>;
   capabilities: readonly string[];
 }>;
@@ -46,8 +46,24 @@ export const PUBLIC_SYSTEMS = [
       environment: "molecular_discovery"
     },
     capabilities: ["Protein Structure", "Molecular Generation", "Molecular Docking", "Binder Design", "Candidate Intelligence"]
+  },
+  {
+    id: "biological-intelligence",
+    name: "Biological Intelligence",
+    relationship: "A Vaeroex Intelligence System",
+    tagline: "Understand the system behind the signal.",
+    description: "Transform genomic, molecular, cellular, experimental, and scientific evidence into structured intelligence for mechanisms, hypotheses, knowledge gaps, and research priorities.",
+    availability: "under_development",
+    route: "/biological-intelligence",
+    cta: "Explore Biological Intelligence",
+    visual: {
+      accent: "#72c9ff",
+      environment: "biological_systems"
+    },
+    capabilities: ["Evidence Synthesis", "Mechanism Discovery", "Hypothesis Intelligence", "Knowledge Gaps", "Research Prioritization"]
   }
 ] as const satisfies readonly PublicSystemDefinition[];
 
 export const EXECUTIVE_INTELLIGENCE_SYSTEM = PUBLIC_SYSTEMS[0];
 export const DRUG_DISCOVERY_INTELLIGENCE_SYSTEM = PUBLIC_SYSTEMS[1];
+export const BIOLOGICAL_INTELLIGENCE_SYSTEM = PUBLIC_SYSTEMS[2];

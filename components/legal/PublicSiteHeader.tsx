@@ -12,7 +12,8 @@ const primaryNavLinks: Array<{ href: Route; label: string }> = [
 
 const productLinks: Array<{ href: Route; label: string; status: string }> = [
   { href: "/executive-intelligence", label: "Executive Intelligence", status: "Available" },
-  { href: "/drug-discovery-intelligence", label: "Drug Discovery Intelligence", status: "Under development" }
+  { href: "/drug-discovery-intelligence", label: "Drug Discovery Intelligence", status: "Under development" },
+  { href: "/biological-intelligence", label: "Biological Intelligence", status: "Under development" }
 ];
 
 const secondaryNavLinks: Array<{ href: Route; label: string }> = [

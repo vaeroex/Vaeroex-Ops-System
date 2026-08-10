@@ -1,6 +1,6 @@
 .portfolio {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
   margin-top: 2.5rem;
   border: 1px solid rgba(148, 192, 213, 0.18);
@@ -103,6 +103,16 @@
   transform: translateX(0.2rem);
 }
 
+@media (max-width: 1100px) {
+  .portfolio {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .system:last-child {
+    grid-column: 1 / -1;
+  }
+}
+
 @media (max-width: 767px) {
   .portfolio {
     grid-template-columns: 1fr;
@@ -110,5 +120,9 @@
 
   .system {
     min-height: 0;
+  }
+
+  .system:last-child {
+    grid-column: auto;
   }
 }
