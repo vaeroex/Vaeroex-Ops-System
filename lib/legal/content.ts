@@ -101,6 +101,13 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
         ]
       },
       {
+        title: "Subscription Pricing",
+        body: [
+          "Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals.",
+          "If you cancel and later resubscribe, your new subscription will be subject to the pricing available at the time you resubscribe. A price reduction does not provide a retroactive refund or credit for billing periods already paid."
+        ]
+      },
+      {
         title: "Customer Data Ownership",
         body: [
           "Customers retain ownership of the business records and files they enter into their workspace.",
@@ -276,7 +283,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Final and Non-Refundable Payments", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law."] },
       { title: "No Prorated Refunds or Credits", body: ["Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
       { title: "Promotions", body: [`Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels. ${VAEROEX_CONTACT_EMAILS.billing} can help customers with questions about eligible offers.`] },
-      { title: "Pricing Changes", body: ["Subscription pricing may change in the future. Customers will receive advance notice before pricing changes take effect."] }
+      { title: "Subscription Pricing", body: ["Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals.", "If you cancel and later resubscribe, your new subscription will be subject to the pricing available at the time you resubscribe. A price reduction does not provide a retroactive refund or credit for billing periods already paid."] }
     ]
   },
   "ai-disclaimer": {
@@ -322,7 +329,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Renewal and Cancellation Timing", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled. A scheduled cancellation prevents the next renewal and takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Access continues through that paid period."] },
       { title: "Refunds and Unused Time", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law. Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
       { title: "Access Changes", body: ["Once the current paid billing period ends, a canceled subscription may be routed to the billing-required flow unless access is manually unlocked by Vaeroex. Expired or past-due subscriptions may also be routed to that flow."] },
-      { title: "Pricing Changes", body: ["Pricing may change in the future, and customers will receive advance notice before pricing changes take effect."] }
+      { title: "Subscription Pricing", body: ["Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals.", "If you cancel and later resubscribe, your new subscription will be subject to the pricing available at the time you resubscribe. A price reduction does not provide a retroactive refund or credit for billing periods already paid."] }
     ]
   },
   "data-retention": {

@@ -147,7 +147,7 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
             </details>
             <details className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
               <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-semibold text-white">Can pricing change?</summary>
-              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Pricing may change in the future. Customers will receive advance notice before a pricing change takes effect.</p>
+              <p className="border-t border-white/10 pt-3 text-sm leading-6 text-slate-400">Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals. If you cancel and later resubscribe, your new subscription will use the pricing available when you resubscribe. Price reductions do not provide retroactive refunds or credits for billing periods already paid.</p>
             </details>
             <details className="rounded-lg border border-white/10 bg-white/[0.035] px-4 py-3">
               <summary className="min-h-11 cursor-pointer list-none py-2 text-sm font-semibold text-white">Who can help with billing?</summary>

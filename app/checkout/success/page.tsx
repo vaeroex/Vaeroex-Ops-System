@@ -43,6 +43,10 @@ export default async function CheckoutSuccessPage({ searchParams }: CheckoutSucc
           </p>
 
           <p className="mt-3 text-sm leading-6 text-muted">
+            Your subscription price will not increase while your subscription remains continuously active. If Vaeroex lowers the applicable subscription price, active subscribers will receive the lower price for future renewals. If you cancel and later resubscribe, the new subscription uses the pricing available at that time.
+          </p>
+
+          <p className="mt-3 text-sm leading-6 text-muted">
             Billing questions can be sent to{" "}
             <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
               {VAEROEX_CONTACT_EMAILS.billing}
