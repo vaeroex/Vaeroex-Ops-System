@@ -8,6 +8,7 @@ const platformLinks: Array<[string, Route]> = [
   ["Home", "/"],
   ["Executive Intelligence", "/executive-intelligence"],
   ["Drug Discovery Intelligence", "/drug-discovery-intelligence"],
+  ["Biological Intelligence", "/biological-intelligence"],
   ["Pricing", "/pricing"],
   ["Trust", "/trust"]
 ] as Array<[string, Route]>;

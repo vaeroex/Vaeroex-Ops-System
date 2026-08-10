@@ -5,7 +5,7 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { PublicCtaBand, PublicPageHero, PublicSectionHeading } from "@/components/marketing/PublicPagePrimitives";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
-import { DRUG_DISCOVERY_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
+import { BIOLOGICAL_INTELLIGENCE_SYSTEM, DRUG_DISCOVERY_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "About Vaeroex Intelligence Systems",
@@ -60,13 +60,17 @@ export default function AboutPage() {
               See the current product
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </Link>
-            <div className="mt-7 border-t border-white/10 pt-5">
-              <p className="text-xs font-semibold uppercase tracking-normal text-teal-200">Under development</p>
-              <Link href={DRUG_DISCOVERY_INTELLIGENCE_SYSTEM.route} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-white hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                {DRUG_DISCOVERY_INTELLIGENCE_SYSTEM.name}
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-              <p className="max-w-xl text-sm leading-6 text-slate-400">{DRUG_DISCOVERY_INTELLIGENCE_SYSTEM.tagline}</p>
+            <div className="mt-7 grid gap-5 border-t border-white/10 pt-5 sm:grid-cols-2">
+              {[DRUG_DISCOVERY_INTELLIGENCE_SYSTEM, BIOLOGICAL_INTELLIGENCE_SYSTEM].map((system) => (
+                <div key={system.id}>
+                  <p className="text-xs font-semibold uppercase tracking-normal text-teal-200">Under development</p>
+                  <Link href={system.route} className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-white hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                    {system.name}
+                    <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                  </Link>
+                  <p className="max-w-xl text-sm leading-6 text-slate-400">{system.tagline}</p>
+                </div>
+              ))}
             </div>
           </div>
           <div className="grid gap-px overflow-hidden rounded-lg border border-white/10 bg-white/10 sm:grid-cols-3">
