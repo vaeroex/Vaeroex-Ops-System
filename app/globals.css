@@ -2,6 +2,21 @@
 @tailwind components;
 @tailwind utilities;
 
+html[data-intelligence-universe="active"] .vaeroex-public-site {
+  position: relative;
+  z-index: 1;
+  background-color: transparent !important;
+}
+
+html[data-intelligence-universe="active"] [data-public-spatial-journey],
+html[data-intelligence-universe="active"] [data-intelligence-systems-journey],
+html[data-intelligence-universe="active"] [data-executive-intelligence-journey],
+html[data-intelligence-universe="active"] [data-drug-discovery-journey],
+html[data-intelligence-universe="active"] [data-biological-journey] {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
 :root {
   color-scheme: dark;
   -webkit-text-size-adjust: 100%;

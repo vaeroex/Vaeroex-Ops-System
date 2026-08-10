@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { ActivityProvider } from "@/components/app/ActivityProvider";
 import { PwaServiceWorker } from "@/components/app/PwaServiceWorker";
+import { IntelligenceUniverseProvider } from "@/components/marketing/intelligence-universe/IntelligenceUniverseProvider";
 import { organizationJsonLd, PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 import "./globals.css";
 
@@ -97,8 +98,10 @@ export default function RootLayout({
       </head>
       <body>
         <ActivityProvider>
-          <PwaServiceWorker />
-          {children}
+          <IntelligenceUniverseProvider>
+            <PwaServiceWorker />
+            {children}
+          </IntelligenceUniverseProvider>
         </ActivityProvider>
       </body>
     </html>

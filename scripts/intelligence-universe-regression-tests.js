@@ -1,0 +1,123 @@
+const assert = require("node:assert/strict");
+const fs = require("node:fs");
+const path = require("node:path");
+const ts = require("typescript");
+
+const root = process.cwd();
+const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
+
+require.extensions[".ts"] = function compileTypeScript(module, filename) {
+  const source = fs.readFileSync(filename, "utf8");
+  const output = ts.transpileModule(source, {
+    compilerOptions: {
+      esModuleInterop: true,
+      module: ts.ModuleKind.CommonJS,
+      moduleResolution: ts.ModuleResolutionKind.NodeJs,
+      target: ts.ScriptTarget.ES2022
+    },
+    fileName: filename
+  });
+  module._compile(output.outputText, filename);
+};
+
+const stateModel = require("../lib/marketing/intelligence-universe.ts");
+const provider = read("components/marketing/intelligence-universe/IntelligenceUniverseProvider.tsx");
+const context = read("components/marketing/intelligence-universe/IntelligenceUniverseContext.tsx");
+const shell = read("components/marketing/intelligence-universe/IntelligenceUniverseShell.tsx");
+const link = read("components/marketing/intelligence-universe/UniverseNavigationLink.tsx");
+const backdrop = read("components/marketing/intelligence-universe/IntelligenceUniverseBackdrop.tsx");
+const canvas = read("components/marketing/intelligence-universe/IntelligenceUniverseCanvas.tsx");
+const world = read("components/marketing/intelligence-universe/IntelligenceUniverseWorld.tsx");
+const styles = read("components/marketing/intelligence-universe/intelligence-universe.module.css");
+const layout = read("app/layout.tsx");
+const header = read("components/legal/PublicSiteHeader.tsx");
+
+assert.deepEqual(stateModel.INTELLIGENCE_UNIVERSE_ROUTES, {
+  vaeroex: "/",
+  "intelligence-systems": "/intelligence-systems",
+  "executive-intelligence": "/executive-intelligence",
+  "drug-discovery-intelligence": "/drug-discovery-intelligence",
+  "biological-intelligence": "/biological-intelligence"
+}, "the prototype must preserve every canonical public route");
+
+const directDrug = stateModel.initialUniverseState("/drug-discovery-intelligence");
+assert.equal(directDrug.current, "drug-discovery-intelligence", "a direct deep link must initialize at its destination");
+assert.equal(directDrug.selectedSystem, "drug-discovery-intelligence", "direct deep-link selection must match the destination");
+assert.equal(directDrug.phase, "arriving", "a direct deep link may use only the short destination arrival state");
+assert.equal(directDrug.assetReadiness["drug-discovery-intelligence"], "approach", "only the destination approach LOD should be prepared initially");
+assert.equal(stateModel.initialUniverseState("/pricing").current, "vaeroex", "non-universe routes must not invent spatial destinations");
+assert.equal(stateModel.adjacentUniverseSystem("executive-intelligence", -1), "biological-intelligence", "bounded system navigation must wrap safely");
+
+for (const field of ["current", "target", "selectedSystem", "route", "level", "phase", "inputLocked", "reducedMotion", "quality", "assetReadiness"]) {
+  assert.match(read("lib/marketing/intelligence-universe.ts"), new RegExp(`${field}:`), `central state must own ${field}`);
+}
+assert.match(context, /createContext<IntelligenceUniverseContextValue>/, "one focused context must own the public spatial controller contract");
+assert.match(provider, /usePathname\(\)[\s\S]*route_sync[\s\S]*router\.push\(nextRoute\)/, "route state and spatial state must stay synchronized through Next navigation");
+assert.match(provider, /phase === "transitioning"[\s\S]*phase === "arriving"/, "route travel must have explicit deterministic transition states");
+assert.match(provider, /isUniverseSystemDestination\(destination\)[\s\S]*920/, "direct product routes must settle through a short bounded arrival");
+assert.match(provider, /window\.scrollY < window\.innerHeight \* 0\.62/, "overview WebGL must release normal deep-page scrolling");
+assert.match(provider, /sessionStorage[\s\S]*classic[\s\S]*spatial/, "the experiment must remain locally reversible");
+assert.doesNotMatch(provider + shell, /history\.(?:pushState|replaceState)|onWheel|onTouchMove/, "minor movement must not spam history or hijack normal scrolling");
+assert.match(shell, /\{universe\.shellVisible \? \([\s\S]*IntelligenceUniverseBackdrop/, "the overview renderer must unload when an approved LOD-3 product renderer takes ownership");
+
+assert.match(link, /event\.button !== 0[\s\S]*event\.metaKey[\s\S]*event\.ctrlKey[\s\S]*event\.shiftKey[\s\S]*event\.altKey/, "fast travel must preserve normal browser link affordances");
+assert.match(shell, /Math\.abs\(distance\) < 72 \|\| velocity < 0\.18/, "spatial swipe selection must require deliberate distance and velocity");
+assert.match(shell, /event\.target !== event\.currentTarget/, "group keyboard shortcuts must not override focused semantic links or buttons");
+for (const key of ["ArrowLeft", "ArrowRight", "Enter", " ", "Escape"]) {
+  assert.match(shell, new RegExp(`event\\.key === ${JSON.stringify(key)}`), `keyboard navigation must support ${JSON.stringify(key)}`);
+}
+assert.match(shell, /UniverseNavigationLink[\s\S]*PUBLIC_SYSTEMS\.map[\s\S]*Enter \{selectedSystem\.name\}/, "every system must remain reachable through semantic links without gestures");
+assert.match(styles, /touch-action: pan-y/, "the overview gesture surface must preserve vertical page scrolling");
+assert.match(styles, /:focus-visible/, "spatial controls must retain a visible keyboard focus treatment");
+
+assert.match(backdrop, /dynamic\([\s\S]*IntelligenceUniverseCanvas[\s\S]*ssr: false/, "the experimental renderer must load progressively on the client");
+assert.match(backdrop, /useSpatialCapability\(\{ allowMobile: true \}\)/, "the shell must use the shared capability tier contract");
+assert.match(backdrop, /SpatialErrorBoundary[\s\S]*UniverseFallback/, "a WebGL exception must fail into a bounded visual fallback");
+for (const contract of ["probeRenderedCanvas", "SpatialResizeObserver", "ACESFilmicToneMapping", "SRGBColorSpace", "frameloop={active ? \"demand\" : \"never\"}"]) {
+  assert.match(canvas, new RegExp(contract.replace(/[{}?]/g, "\\$&")), `the shell canvas must retain ${contract}`);
+}
+assert.match(canvas, /MASTER_ANCHOR[\s\S]*intelligence-systems[\s\S]*state\.phase === "transitioning"/, "camera travel must resolve through bounded master, systems, and approach anchors");
+assert.match(canvas, /quality === "full"[\s\S]*34[\s\S]*quality === "constrained"[\s\S]*62[\s\S]*160/, "ambient frames must scale down by device tier");
+assert.match(canvas, /document\.visibilityState === "visible"/, "hidden pages must not continue ambient rendering");
+assert.match(canvas, /state\.reducedMotion \|\| state\.quality === "reduced_motion"[\s\S]*camera\.position\.set/, "reduced motion must replace travel with immediate anchored framing");
+
+for (const structure of ["ExecutiveStructure", "DrugStructure", "BiologicalStructure"]) {
+  assert.match(world, new RegExp(`function ${structure}`), `${structure} must provide a distinct bounded overview LOD`);
+}
+assert.match(world, /DRUG_ATOMS[\s\S]*DRUG_BONDS[\s\S]*sphereGeometry/, "Drug Discovery must use a coherent molecular topology rather than decorative biology");
+assert.match(world, /BiologicalStructure[\s\S]*strandA[\s\S]*strandB[\s\S]*icosahedronGeometry/, "Biological Intelligence must use a multiscale biological representation");
+assert.match(world, /ExecutiveStructure[\s\S]*data planes|ExecutiveStructure[\s\S]*boxGeometry[\s\S]*EXECUTIVE_NODES/, "Executive Intelligence must use structured analytical architecture");
+assert.doesNotMatch(world + canvas, /OrbitControls|FlyControls|MapControls|Math\.random|IntelligenceSnapshotV1|Business Health Formula V2|Evidence Engine|provider routing|database topology/i, "the public shell must avoid free flight, nondeterminism, and private architecture disclosure");
+
+assert.match(layout, /IntelligenceUniverseProvider[\s\S]*<PwaServiceWorker \/>[\s\S]*\{children\}/, "the lightweight controller must persist above compatible routes");
+assert.match(header, /UniverseNavigationLink[\s\S]*universeRoutes/, "the existing header must provide fast travel only for spatial destinations");
+assert.match(header, /<Link href="\/pricing"|secondaryNavLinks\.map[\s\S]*<Link/, "ordinary public destinations must retain normal Next links");
+
+const detailBackdrops = [
+  ["vaeroex", "components/marketing/spatial/PublicSpatialBackdrop.tsx", "PublicSpatialCanvas"],
+  ["intelligence-systems", "components/marketing/intelligence-systems/IntelligenceSystemsSpatialBackdrop.tsx", "IntelligenceSystemsSpatialCanvas"],
+  ["executive-intelligence", "components/marketing/executive-intelligence/ExecutiveIntelligenceSpatialBackdrop.tsx", "ExecutiveIntelligenceSpatialCanvas"],
+  ["drug-discovery-intelligence", "components/marketing/drug-discovery/DrugDiscoverySpatialBackdrop.tsx", "DrugDiscoverySpatialCanvas"],
+  ["biological-intelligence", "components/marketing/biological/BiologicalSpatialBackdrop.tsx", "BiologicalSpatialCanvas"]
+];
+for (const [destination, file, renderer] of detailBackdrops) {
+  const source = read(file);
+  assert.match(source, new RegExp(`suppressBackdrop\\(${JSON.stringify(destination)}\\)`), `${destination} must defer only its own approved detailed renderer during approach`);
+  assert.match(source, new RegExp(`dynamic\\([\\s\\S]*${renderer}[\\s\\S]*ssr: false`), `${destination} must preserve its existing detailed renderer as LOD 3`);
+}
+
+for (const page of [
+  "app/page.tsx",
+  "app/intelligence-systems/page.tsx",
+  "app/executive-intelligence/page.tsx",
+  "app/drug-discovery-intelligence/page.tsx",
+  "app/biological-intelligence/page.tsx"
+]) {
+  const source = read(page);
+  assert.match(source, /export const metadata: Metadata/, `${page} must retain route-specific metadata`);
+  assert.match(source, /PublicSiteHeader/, `${page} must retain the reliable navigation layer`);
+}
+
+assert.doesNotMatch(provider + context + shell + canvas + world, /api\/stripe\/checkout|Supabase|workspace_id|customer/i, "the public prototype must not alter commerce, tenant, or customer behavior");
+
+process.stdout.write("Intelligence Universe regressions passed.\n");
