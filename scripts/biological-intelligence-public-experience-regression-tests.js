@@ -71,7 +71,7 @@ assert.match(page, /href="#biological-sequence"[\s\S]*Explore Biological Intelli
 assert.match(systems, /Biological Intelligence[\s\S]*availability: "under_development"[\s\S]*route: "\/biological-intelligence"/, "the registry must bind exact status and route");
 assert.match(systems, /environment: "biological_systems"/, "the product must have a distinct visual environment identity");
 assert.match(portfolio, /PUBLIC_SYSTEMS\.map/, "the product family must continue to render from the shared registry");
-assert.match(header, /\/biological-intelligence[\s\S]*Biological Intelligence/, "desktop and mobile product navigation must include Biological Intelligence");
+assert.match(header, /PUBLIC_SYSTEMS\.map/, "desktop and mobile product navigation must derive Biological Intelligence from the shared registry");
 assert.match(footer, /Biological Intelligence[\s\S]*\/biological-intelligence/, "the product footer must include Biological Intelligence");
 assert.match(sitemap, /"\/biological-intelligence"/, "the canonical product route must be discoverable");
 

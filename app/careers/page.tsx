@@ -8,7 +8,7 @@ import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
   title: "Careers at Vaeroex",
-  description: "Vaeroex Intelligence Systems is not currently listing open roles. Qualified builders, operators, and intelligence specialists may share future interest.",
+  description: "Vaeroex is not currently listing open roles. Qualified builders, operators, and intelligence specialists may share future interest.",
   path: "/careers"
 });
 

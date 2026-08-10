@@ -22,7 +22,7 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
       title,
       description,
       url: canonical,
-      siteName: "Vaeroex Intelligence Systems",
+      siteName: "Vaeroex",
       type: "website",
       images: [
         {
@@ -45,11 +45,11 @@ export function publicPageMetadata({ title, description, path = "/" }: PublicMet
 export const organizationJsonLd = {
   "@context": "https://schema.org",
   "@type": "Organization",
-  name: "Vaeroex Intelligence Systems",
+  name: "Vaeroex",
   legalName: "Vaeroex LLC",
   url: PUBLIC_SITE_URL,
   logo: `${PUBLIC_SITE_URL}/brand/vaeroex-logo-white-wordmark.png`,
-  description: "Vaeroex builds intelligence systems that transform business information into visibility, awareness, prediction, and executive action.",
+  description: "Vaeroex Intelligence Systems transforms complex information into visibility, awareness, prediction, and action across specialized domains.",
   address: {
     "@type": "PostalAddress",
     streetAddress: "5319 University Dr, Unit 762",
@@ -77,7 +77,7 @@ export const operationsIntelligenceJsonLd = {
   url: `${PUBLIC_SITE_URL}/executive-intelligence`,
   publisher: {
     "@type": "Organization",
-    name: "Vaeroex Intelligence Systems",
+    name: "Vaeroex",
     url: PUBLIC_SITE_URL
   },
   description: "Executive Intelligence is Vaeroex's flagship evidence-backed platform for Business Health, prioritized Intelligence, Explain Finding, Evidence, and Saved Analyses."

@@ -22,7 +22,7 @@ const packageJson = read("package.json");
 const productCopySources = `${page}\n${systems}`;
 
 assert.match(page, /path: "\/drug-discovery-intelligence"/, "Drug Discovery metadata must use the canonical route");
-assert.match(page, /VAEROEX INTELLIGENCE SYSTEMS[\s\S]*<h1>\{system\.name\}<\/h1>/, "the product hero must preserve Vaeroex company hierarchy");
+assert.match(page, /VAEROEX INTELLIGENCE SYSTEM[\s\S]*<h1>\{system\.name\}<\/h1>/, "the product hero must preserve Vaeroex company hierarchy");
 for (const copy of [
   "Turn computational discovery into traceable research intelligence.",
   "Vaeroex Drug Discovery Intelligence brings biological targets, molecular candidates, computational experiments, research evidence, and scientific decisions into one intelligence system.",
@@ -64,9 +64,9 @@ assert.doesNotMatch(page, /<Link|StartWithVaeroexMenu|href=\{?["']\/(?:pricing|c
 
 assert.match(systems, /Drug Discovery Intelligence[\s\S]*availability: "under_development"[\s\S]*route: "\/drug-discovery-intelligence"/, "the system registry must bind exact status and route");
 assert.match(systems, /Explore biological targets, run advanced computational discovery workflows, evaluate molecular candidates, preserve experimental evidence, and prioritize promising directions for further research/, "the product registry must retain the approved card copy");
-assert.match(portfolio, /data-availability=\{system\.availability\}[\s\S]*availabilityLabel\[system\.availability\][\s\S]*href=\{system\.route\}/, "the product card must separate status from normal navigation");
-assert.match(homepage, /PublicSystemsPortfolio/, "the homepage must present the Vaeroex Intelligence Systems portfolio");
-assert.match(header, /\/drug-discovery-intelligence[\s\S]*Drug Discovery Intelligence/, "desktop and mobile product navigation must include Drug Discovery Intelligence");
+assert.match(portfolio, /data-availability=\{system\.availability\}[\s\S]*system\.statusLabel[\s\S]*href=\{system\.route\}/, "the product card must separate status from normal navigation");
+assert.match(homepage, /PublicSystemsPortfolio/, "the homepage must present the specialized Vaeroex intelligence areas");
+assert.match(header, /PUBLIC_SYSTEMS\.map/, "desktop and mobile product navigation must derive Drug Discovery Intelligence from the shared registry");
 assert.match(footer, /Drug Discovery Intelligence[\s\S]*\/drug-discovery-intelligence/, "the product footer must include Drug Discovery Intelligence");
 assert.match(sitemap, /"\/drug-discovery-intelligence"/, "the canonical product route must be discoverable");
 

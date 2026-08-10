@@ -12,15 +12,21 @@ const styles = read("app/globals.css");
 const systems = read("lib/marketing/public-systems.ts");
 const primitives = read("components/marketing/PublicPagePrimitives.tsx");
 const header = read("components/legal/PublicSiteHeader.tsx");
+const intelligenceSystemsPage = read("app/intelligence-systems/page.tsx");
+const intelligenceSystemsStyles = read("app/intelligence-systems/intelligence-systems.module.css");
+const intelligenceSystemsBackdrop = read("components/marketing/intelligence-systems/IntelligenceSystemsSpatialBackdrop.tsx");
+const intelligenceSystemsCanvas = read("components/marketing/intelligence-systems/IntelligenceSystemsSpatialCanvas.tsx");
+const intelligenceSystemsWorld = read("components/marketing/intelligence-systems/IntelligenceSystemsWorld.tsx");
 
 assert.match(homepage, /data-public-spatial-journey/, "the homepage must own one coherent scroll journey");
-assert.match(homepage, /vaeroex-public-hero-brand[\s\S]*<h1>VAEROEX<\/h1>[\s\S]*vaeroex-public-hero-category">Intelligence Systems/, "the hero must present Vaeroex as the primary identity and Intelligence Systems as its category");
-assert.doesNotMatch(homepage, /<h1>Intelligence(?:<br\s*\/?>|\s)+Systems/, "Intelligence Systems must not displace Vaeroex as the hero identity");
-for (const chapter of ["vaeroex", "intelligence-systems", "executive-intelligence", "trust-and-evidence", "explore"]) {
+assert.match(homepage, /vaeroex-public-hero-brand[\s\S]*<h1>VAEROEX<\/h1>[\s\S]*vaeroex-public-hero-category">Intelligence Systems/, "the hero must present Vaeroex as the overarching Intelligence Systems identity");
+assert.doesNotMatch(homepage, /<h1>Intelligence(?:<br\s*\/?>|\s)+Systems?/, "the category must not displace Vaeroex as the hero identity");
+for (const chapter of ["vaeroex", "intelligence-systems", "from-information-to-intelligence", "trust-and-evidence", "explore"]) {
   assert.match(homepage, new RegExp(`id="${chapter}"`), `the spatial journey must expose the ${chapter} chapter`);
 }
-assert.match(homepage, /Homepage chapters[\s\S]*#vaeroex[\s\S]*#intelligence-systems[\s\S]*#executive-intelligence[\s\S]*#trust-and-evidence[\s\S]*#explore/, "major spatial chapters must remain directly navigable");
-assert.match(homepage, /ExecutiveInstrument[\s\S]*Business Health[\s\S]*Prioritized Intelligence/, "the product destination must use a readable DOM product surface");
+assert.match(homepage, /Homepage chapters[\s\S]*#vaeroex[\s\S]*#intelligence-systems[\s\S]*#from-information-to-intelligence[\s\S]*#trust-and-evidence[\s\S]*#explore/, "major spatial chapters must remain directly navigable");
+assert.match(homepage, /label="From information to intelligence"[\s\S]*Visibility\. Awareness\. Prediction\. Action\./, "chapter three must retain a readable company-level intelligence surface");
+assert.doesNotMatch(homepage, /ExecutiveInstrument|Illustrative Executive Intelligence product view|label="System arrival"/, "the spatial journey must not repeat the Executive product destination");
 assert.match(homepage, /Facts remain facts\. Interpretation remains visible as interpretation/, "the trust chapter must preserve the public fact/interpretation boundary");
 assert.match(systems, /PublicSystemDefinition[\s\S]*visual[\s\S]*capabilities/, "future approved systems must extend one registry rather than rewrite the global environment");
 
@@ -43,12 +49,47 @@ assert.doesNotMatch(canvas, /OrbitControls|FlyControls|MapControls|sphereGeometr
 
 assert.match(styles, /\.vaeroex-public-spatial-canvas[\s\S]*position: fixed[\s\S]*height: 100svh/, "the public canvas must persist through the journey");
 assert.match(styles, /\.vaeroex-public-chapter--hero[\s\S]*min-height: calc\(100svh - 6\.5rem\)/, "the first viewport must retain space for the next chapter");
-assert.match(homepage, /vaeroex-next-chapter-label[\s\S]*02 \/ Intelligence Systems/, "the first viewport must reveal a meaningful next-chapter cue");
-assert.match(styles, /\.vaeroex-public-product-layout[\s\S]*grid-template-columns/, "the product destination must use a stable dimensional layout");
+assert.match(homepage, /vaeroex-next-chapter-label[\s\S]*02 \/ Intelligence/, "the first viewport must reveal a meaningful next-chapter cue");
+assert.match(styles, /\.vaeroex-method-list[\s\S]*grid-template-columns/, "the company intelligence path must use a stable dimensional layout");
 assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.vaeroex-public-spatial-canvas[\s\S]*display: none/, "mobile and coarse-pointer visitors must receive the image-backed DOM experience");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/, "reduced motion must disable decorative movement");
 assert.match(primitives, /vaeroex-intelligence-environment\.png|vaeroex-public-hero__veil/, "secondary public-page heroes must share the authored visual environment");
 assert.match(header, /Intelligence Systems/, "global public navigation must expose the company category");
 assert.equal(fs.existsSync(path.join(root, "public/brand/vaeroex-intelligence-environment.png")), true, "the authored fallback environment must exist");
+
+assert.match(intelligenceSystemsPage, /data-intelligence-systems-journey/, "the Intelligence Systems route must own one coherent page-specific journey");
+assert.match(intelligenceSystemsPage, /IntelligenceSystemsSpatialBackdrop/, "semantic page content must mount the page-specific visual environment separately");
+assert.match(intelligenceSystemsPage, /<h1>INTELLIGENCE SYSTEMS<\/h1>[\s\S]*Information is everywhere\. Intelligence is not\./, "the dedicated hero must preserve the approved category and thesis hierarchy");
+for (const stage of ["raw-complexity", "visibility", "awareness", "prediction", "action", "intelligence-reveal", "specialization", "executive-destination", "drug-discovery-destination", "biological-destination", "vaeroex-closing"]) {
+  assert.match(intelligenceSystemsPage, new RegExp(`data-is-stage="${stage}"`), `the cinematic route must retain its ${stage} chapter`);
+}
+assert.match(intelligenceSystemsPage, /role="status"><Check[\s\S]*Available/, "Executive Intelligence must remain visibly available");
+assert.equal((intelligenceSystemsPage.match(/<DevelopmentStatus \/>/g) || []).length, 2, "both development destinations must remain visibly in development");
+assert.doesNotMatch(intelligenceSystemsPage, /StartWithVaeroexMenu|api\/stripe\/checkout/, "the conceptual route must not expose a hidden direct checkout path");
+
+assert.match(intelligenceSystemsBackdrop, /dynamic\([\s\S]*IntelligenceSystemsSpatialCanvas[\s\S]*ssr: false/, "the page-specific WebGL world must remain progressively client-loaded");
+for (const contract of ["useSpatialCapability", "SpatialResizeObserver", "probeRenderedCanvas", "frameloop=\"demand\"", "data-intelligence-systems-canvas", "data-spatial-webgl"]) {
+  assert.match(intelligenceSystemsCanvas, new RegExp(contract), `the Intelligence Systems canvas must retain ${contract}`);
+}
+assert.match(intelligenceSystemsCanvas, /JOURNEY[\s\S]*progress: 0[\s\S]*progress: 1/, "the page must use an explicit beginning-to-end camera journey");
+assert.match(intelligenceSystemsCanvas, /position: \[4\.5, 3, 14\][\s\S]*position: \[-5\.2, 1\.2, -17\][\s\S]*position: \[0, 5, -110\][\s\S]*position: \[0, 4, -241\]/, "camera choreography must vary laterally, vertically, and in depth before settling");
+assert.match(intelligenceSystemsCanvas, /quality === "full" \? 34 : quality === "constrained" \? 62 : 150/, "ambient rendering must remain bounded by capability tier");
+assert.match(intelligenceSystemsCanvas, /ACESFilmicToneMapping[\s\S]*SRGBColorSpace/, "the page-specific world must use a controlled production color pipeline");
+
+for (const scene of ["RawComplexityScene", "VisibilityScene", "AwarenessScene", "PredictionScene", "ActionScene", "IntelligenceRevealScene", "SpecializationScene", "ExecutiveDestination", "DrugDiscoveryDestination", "BiologicalDestination", "ClosingScene"]) {
+  assert.match(intelligenceSystemsWorld, new RegExp(`function ${scene}`), `${scene} must remain a distinct art-directed world chapter`);
+}
+assert.match(intelligenceSystemsWorld, /VisibilityScene[\s\S]*smoothRange\(progress\.current, 0\.055, 0\.17\)[\s\S]*leftPanel[\s\S]*rightPanel/, "Visibility must reveal hidden architecture through a bounded scene transition");
+assert.match(intelligenceSystemsWorld, /PredictionScene[\s\S]*const paths:/, "Prediction must retain multiple spatial trajectories rather than one deterministic outcome");
+assert.match(intelligenceSystemsWorld, /IntelligenceRevealScene[\s\S]*frameCount[\s\S]*TechnicalFrame[\s\S]*ArchitecturalSlab/, "the major Intelligence reveal must use large ordered architecture rather than a generic core");
+assert.match(intelligenceSystemsWorld, /MoleculeModel[\s\S]*ProteinTarget[\s\S]*ComputationalHelix[\s\S]*icosahedronGeometry/, "specialized destinations must use distinct executive, molecular, protein, and multiscale biological geometry");
+assert.match(intelligenceSystemsWorld, /meshPhysicalMaterial[\s\S]*transmission[\s\S]*meshStandardMaterial[\s\S]*roughness[\s\S]*metalness/, "the page-specific world must preserve differentiated Vaeroex materials");
+assert.match(intelligenceSystemsWorld, /ambientLight[\s\S]*hemisphereLight[\s\S]*directionalLight[\s\S]*spotLight[\s\S]*pointLight/, "the Intelligence Systems world must use chapter-localized art-directed lighting");
+assert.doesNotMatch(intelligenceSystemsWorld, /OrbitControls|FlyControls|MapControls|<points(?:\s|>)|<pointsMaterial(?:\s|>)|Luna|Terra|Sol|SnapshotV1|Formula V2|Evidence Engine|model routing|provider/i, "the public conceptual world must avoid free flight, random point fields, and private architecture disclosure");
+
+assert.match(intelligenceSystemsStyles, /\.spatialCanvas,[\s\S]*position: fixed[\s\S]*height: 100svh/, "the page-specific canvas must persist across its directed scroll journey");
+assert.match(intelligenceSystemsStyles, /\.hero[\s\S]*min-height: calc\(100svh - 4\.5rem\)/, "the hero must preserve a complete first viewport with a next-chapter cue");
+assert.match(intelligenceSystemsStyles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*background-attachment: scroll[\s\S]*\.chapter,[\s\S]*min-height: auto/, "mobile and coarse-pointer visitors must receive the image-backed semantic journey");
+assert.match(intelligenceSystemsStyles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*transition: none/, "reduced-motion visitors must retain the full narrative without decorative transitions");
 
 process.stdout.write("Public spatial experience regressions passed.\n");

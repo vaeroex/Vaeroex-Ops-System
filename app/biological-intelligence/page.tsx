@@ -373,9 +373,9 @@ export default function BiologicalIntelligencePage() {
         <section className={`${styles.chapter} ${styles.closingChapter}`} data-bi-stage="evidence-close">
           <div className={styles.closingContent}>
             <Sparkles aria-hidden="true" />
-            <p className={styles.kicker}>VAEROEX INTELLIGENCE SYSTEMS</p>
+            <p className={styles.kicker}>VAEROEX INTELLIGENCE SYSTEM</p>
             <h2>{system.name}</h2>
-            <p>Vaeroex Biological Intelligence is currently being developed as part of the expanding Vaeroex Intelligence Systems platform.</p>
+            <p>Biological Intelligence is being developed as a specialized environment within the broader Vaeroex Intelligence Systems identity.</p>
             <p>We are building a research environment designed to connect biological evidence, mechanisms, hypotheses, uncertainty, and experimental direction within one intelligence system.</p>
             <AvailabilityStatus />
           </div>

@@ -3,14 +3,9 @@ import { ArrowRight } from "lucide-react";
 import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import styles from "./PublicSystemsPortfolio.module.css";
 
-const availabilityLabel = {
-  available: "Available",
-  under_development: "Under development"
-} as const;
-
 export function PublicSystemsPortfolio() {
   return (
-    <div className={styles.portfolio} aria-label="Vaeroex Intelligence Systems">
+    <div className={styles.portfolio} aria-label="Specialized Vaeroex intelligence areas">
       {PUBLIC_SYSTEMS.map((system) => (
         <article
           className={styles.system}
@@ -22,9 +17,9 @@ export function PublicSystemsPortfolio() {
           <h3 className={styles.name}>{system.name}</h3>
           <p className={styles.tagline}>{system.tagline}</p>
           <p className={styles.description}>{system.description}</p>
-          <p className={styles.status}>{availabilityLabel[system.availability]}</p>
+          <p className={styles.status}>{system.statusLabel}</p>
           <Link className={styles.link} href={system.route}>
-            {system.cta}
+            {system.detailCta}
             <ArrowRight aria-hidden="true" />
           </Link>
         </article>

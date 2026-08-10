@@ -231,7 +231,7 @@ export default function DrugDiscoveryIntelligencePage() {
 
         <section id="drug-discovery-target" className={`${styles.chapter} ${styles.hero}`} data-ddi-stage="biological-target">
           <div className={`${styles.content} ${styles.contentLeft}`}>
-            <p className={styles.eyebrow}>VAEROEX INTELLIGENCE SYSTEMS</p>
+            <p className={styles.eyebrow}>VAEROEX INTELLIGENCE SYSTEM</p>
             <h1>{system.name}</h1>
             <p className={styles.heroStatement}>{system.tagline}</p>
             <div className={styles.heroBody}>
@@ -394,7 +394,7 @@ export default function DrugDiscoveryIntelligencePage() {
         <section className={`${styles.chapter} ${styles.closingChapter}`} data-ddi-stage="evidence-close">
           <div className={styles.closing}>
             <StageMarker index="06" label="Drug Discovery Intelligence" />
-            <p className={styles.kicker}>A Vaeroex Intelligence System</p>
+            <p className={styles.kicker}>A SPECIALIZED VAEROEX INTELLIGENCE ENVIRONMENT</p>
             <h2>From possibility to evidence.</h2>
             <p>A unified intelligence system for computational drug discovery.</p>
             <AvailabilityStatus />

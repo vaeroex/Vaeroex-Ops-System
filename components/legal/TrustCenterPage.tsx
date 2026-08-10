@@ -103,9 +103,9 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
     <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
-        eyebrow="Trust at Vaeroex Intelligence Systems"
+        eyebrow="Trust at Vaeroex"
         title="Intelligence you can inspect, understand, and control."
-        description="See how Vaeroex builds trustworthy intelligence systems through secure workspaces, evidence-backed conclusions, deterministic business intelligence, explainable reasoning, and human control."
+        description="See how Vaeroex supports trustworthy intelligence through secure workspaces, evidence-backed conclusions, deterministic business intelligence, explainable reasoning, and human control."
       />
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">

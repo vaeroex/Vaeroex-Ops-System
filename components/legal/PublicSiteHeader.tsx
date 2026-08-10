@@ -3,18 +3,19 @@ import type { Route } from "next";
 import { ChevronDown, Menu } from "lucide-react";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
+import { INTELLIGENCE_SYSTEMS_ROUTE, PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const primaryNavLinks: Array<{ href: Route; label: string }> = [
   { href: "/", label: "Home" },
-  { href: "/#intelligence-systems", label: "Intelligence Systems" }
+  { href: INTELLIGENCE_SYSTEMS_ROUTE, label: "Intelligence" }
 ];
 
-const productLinks: Array<{ href: Route; label: string; status: string }> = [
-  { href: "/executive-intelligence", label: "Executive Intelligence", status: "Available" },
-  { href: "/drug-discovery-intelligence", label: "Drug Discovery Intelligence", status: "Under development" },
-  { href: "/biological-intelligence", label: "Biological Intelligence", status: "Under development" }
-];
+const productLinks: Array<{ href: Route; label: string; status: string }> = PUBLIC_SYSTEMS.map((system) => ({
+  href: system.route,
+  label: system.name,
+  status: system.statusLabel
+}));
 
 const secondaryNavLinks: Array<{ href: Route; label: string }> = [
   { href: "/pricing", label: "Pricing" },
@@ -66,7 +67,7 @@ export async function PublicSiteHeader() {
           ))}
           <details className="group relative">
             <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-              Products
+              Intelligence Areas
               <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
             </summary>
             <div className="vaeroex-public-menu absolute left-0 top-full mt-2 w-72 border border-white/10 p-2 shadow-command">
@@ -108,7 +109,7 @@ export async function PublicSiteHeader() {
               Login
             </Link>
           )}
-          <StartWithVaeroexMenu align="right" size="compact" />
+          <StartWithVaeroexMenu align="right" label="Start Executive Intelligence" size="compact" />
         </div>
 
         <div className="flex items-center gap-2 lg:hidden">
@@ -126,7 +127,7 @@ export async function PublicSiteHeader() {
                   {link.label}
                 </Link>
               ))}
-              <StartWithVaeroexMenu className="mt-3 w-full" />
+              <StartWithVaeroexMenu className="mt-3 w-full" label="Start Executive Intelligence" />
             </nav>
           </details>
         </div>

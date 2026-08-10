@@ -33,7 +33,7 @@ export default async function DemoPage({ searchParams }: DemoPageProps) {
           <p className="mt-4 text-sm leading-6 text-muted">
             Tell us what leadership needs to understand. Vaeroex will help you see how Executive Intelligence turns trusted business information into executive clarity.
           </p>
-          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Executive Intelligence by Vaeroex Intelligence Systems.</p>
+          <p className="mt-3 text-sm font-semibold text-vaeroex-blue">Executive Intelligence within Vaeroex Intelligence Systems.</p>
           <ScrollReveal delayMs={120} className="vaeroex-form-intro vaeroex-hover-card mt-6 rounded-lg border border-line bg-white p-5 shadow-sm">
             <p className="text-sm font-semibold text-vaeroex-blue">Product preview can include</p>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
