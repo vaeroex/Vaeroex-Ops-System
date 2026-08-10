@@ -569,7 +569,7 @@ const savedReportSource = fs.readFileSync(path.join(root, "app/app/reports/[id]/
 const saveActionSource = fs.readFileSync(path.join(root, "app/app/reports/saved-analysis-actions.ts"), "utf8");
 const intelligencePageSource = fs.readFileSync(path.join(root, "app/app/intelligence/page.tsx"), "utf8");
 const appNavigationSource = fs.readFileSync(path.join(root, "components/app/AppNavigation.tsx"), "utf8");
-const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
+const sourcesPageSource = fs.readFileSync(path.join(root, "app/app/sources/SourcesPage.tsx"), "utf8");
 const intelligenceLayerSource = fs.readFileSync(path.join(root, "lib/intelligence/layer.ts"), "utf8");
 const operationalEvidenceSource = fs.readFileSync(path.join(root, "lib/intelligence/operational-evidence.ts"), "utf8");
 assert.match(inboxSource, /label: "Summary".*label: "Evidence".*label: "Analysis"/s, "selected findings may expose one bounded analysis view when authorized");

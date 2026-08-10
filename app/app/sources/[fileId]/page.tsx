@@ -1,4 +1,4 @@
-import { renderSourcesPage } from "@/app/app/sources/page";
+import { renderSourcesPage } from "@/app/app/sources/SourcesPage";
 
 type SourceDetailPageProps = {
   params: Promise<{ fileId: string }>;

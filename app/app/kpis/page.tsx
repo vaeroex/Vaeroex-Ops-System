@@ -17,6 +17,8 @@ import { PrimaryButton, TextArea, TextInput } from "@/components/operations/Form
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
+import { KpiVisualizationSwitcher } from "@/components/spatial/KpiVisualizationSwitcher";
+import { spatialSurfaceClassName } from "@/components/spatial/SpatialSurface";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
 import {
@@ -415,7 +417,7 @@ function StatusFilterCard({
     <Link
       href={href}
       aria-current={active ? "true" : undefined}
-      className={`vaeroex-semantic-interactive ${toneClasses(tone)} block rounded-lg border p-3 transition ${active ? "shadow-panel ring-2 ring-current/30" : "hover:brightness-[1.03]"}`}
+      className={`${spatialSurfaceClassName({ depth: active ? "raised" : "subtle", interactive: true, selected: active })} vaeroex-semantic-interactive ${toneClasses(tone)} block rounded-lg border p-3 transition ${active ? "shadow-panel ring-2 ring-current/30" : "hover:brightness-[1.03]"}`}
     >
       <span className="text-xs font-semibold uppercase tracking-[0.14em] opacity-80">{label}</span>
       <span className="mt-2 block text-2xl font-semibold">{value}</span>
@@ -452,7 +454,7 @@ function KpiTile({
     : "Not available";
 
   return (
-    <article className={`vaeroex-semantic-card vaeroex-priority-surface ${semanticStatusClass(semanticStatus)} rounded-lg border p-3 text-slate-100 shadow-panel`}>
+    <article className={`${spatialSurfaceClassName({ depth: "subtle", interactive: true })} vaeroex-semantic-card vaeroex-priority-surface ${semanticStatusClass(semanticStatus)} rounded-lg border p-3 text-slate-100 shadow-panel`}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -1709,6 +1711,9 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       settings: kpiSettings
     });
   }
+  const selectedKpiSnapshot = kpiSnapshot && selectedKpiState
+    ? kpiSnapshot.kpis.find((kpi) => kpi.id === selectedKpiState.kpiId) || null
+    : null;
   const selectedKpiDirection = selectedKpiState?.semantics.desiredDirection ?? "unknown";
   const selectedKpiSemantics = selectedKpiState?.semantics ?? kpiSemantics("Unknown KPI", []);
   const selectedManualTarget = selectedKpiState?.manualTarget ?? null;
@@ -1977,7 +1982,12 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                 </div>
                 <div className="mt-4">
-                  <TrendChart rows={selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} />
+                  <KpiVisualizationSwitcher
+                    kpi={selectedKpiSnapshot}
+                    color={kpiColor(primaryMetric, kpiSettings, Math.max(0, metricNames.indexOf(primaryMetric)))}
+                  >
+                    <TrendChart rows={selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} />
+                  </KpiVisualizationSwitcher>
                 </div>
                 <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-4">
                   <p className="text-sm font-semibold text-white">Vaeroex summary</p>
