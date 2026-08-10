@@ -4,35 +4,25 @@ import { Check, CircleHelp } from "lucide-react";
 import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
-import { PublicCtaBand, PublicPageHero, PublicSectionHeading } from "@/components/marketing/PublicPagePrimitives";
+import { PublicPageHero, PublicSectionHeading } from "@/components/marketing/PublicPagePrimitives";
 import { VAEROEX_PLAN_PRICE_LABEL } from "@/lib/billing/plans";
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
+import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Executive Intelligence Pricing | Vaeroex",
-  description: "Vaeroex Executive Intelligence is $500 per month for a private workspace with Business Health, Intelligence, Explain Finding, Evidence, and Saved Analyses.",
+  title: "Vaeroex Intelligence Pricing",
+  description: "Review current availability and pricing across Executive Intelligence, Drug Discovery Intelligence, and Biological Intelligence.",
   path: "/pricing"
 });
 
-const planInclusions = [
+const executiveInclusions = [
   "Private business workspace",
   "Business Health and View Analysis",
-  "Prioritized Intelligence",
-  "Explain Finding",
+  "KPIs and performance context",
+  "Prioritized Intelligence and Explain Finding",
   "Evidence and trusted business context",
-  "KPI trends and performance context",
-  "Evidence-backed recommendations",
-  "Saved Analyses",
-  "Document, image, and multi-worksheet workbook analysis",
-  "Workspace Search",
-  "Continuous platform improvements"
-] as const;
-
-const setupSteps = [
-  ["Create the workspace", "Choose the operating environment and add concise business context."],
-  ["Add current evidence", "Upload reports, spreadsheets, KPIs, and relevant operating information."],
-  ["Review the intelligence", "Vaeroex surfaces supported changes, risks, priorities, and recommended reviews."]
+  "Saved Analyses and document analysis"
 ] as const;
 
 type PricingPageProps = {
@@ -44,94 +34,78 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
   const checkoutError = params?.checkout_error;
   const checkoutCancelled = params?.checkout === "cancelled";
 
-  const planCard = (
-    <article className="overflow-hidden rounded-lg border border-cyan-300/20 bg-[#07111f] shadow-command">
-      <div className="border-b border-white/10 p-5 sm:p-6">
-        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">Executive Intelligence</p>
-        <p className="mt-2 text-xs font-medium text-slate-500">by Vaeroex Intelligence Systems</p>
-        <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
-          <h2 className="text-2xl font-semibold text-white">One complete workspace</h2>
-          <div className="text-right">
-            <p className="text-4xl font-semibold text-white">{VAEROEX_PLAN_PRICE_LABEL}</p>
-            <p className="mt-1 text-xs text-slate-400">Monthly subscription</p>
-          </div>
-        </div>
-        <p className="mt-3 text-sm leading-6 text-slate-300">For owners, executives, and operations leaders who need clarity from fragmented business information.</p>
-      </div>
-      <div className="hidden gap-2 p-5 sm:grid sm:grid-cols-2 sm:p-6">
-        {planInclusions.map((item) => (
-          <div key={item} className="flex items-start gap-2 text-sm leading-6 text-slate-200">
-            <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-200" aria-hidden="true" />
-            <span>{item}</span>
-          </div>
-        ))}
-      </div>
-      <details className="group border-b border-white/10 px-5 py-2 sm:hidden">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-white">
-          Everything included
-          <span className="text-xs text-cyan-200 group-open:hidden">View</span>
-          <span className="hidden text-xs text-cyan-200 group-open:block">Close</span>
-        </summary>
-        <div className="grid gap-2 border-t border-white/10 py-4">
-          {planInclusions.map((item) => (
-            <div key={item} className="flex items-start gap-2 text-sm leading-6 text-slate-200">
-              <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-200" aria-hidden="true" />
-              <span>{item}</span>
-            </div>
-          ))}
-        </div>
-      </details>
-      <div className="border-t border-white/10 p-5 sm:p-6">
-        <StartWithVaeroexMenu className="w-full sm:w-auto" />
-        <p className="mt-4 text-xs leading-5 text-slate-400">
-          Renews monthly unless canceled through Manage billing. Cancellation takes effect at the end of the current paid billing period and prevents the next renewal. Payments are final and non-refundable except where required by applicable law.
-        </p>
-      </div>
-    </article>
-  );
-
   return (
     <main className="min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
 
       <PublicPageHero
-        eyebrow="Executive Intelligence by Vaeroex Intelligence Systems"
-        title="One subscription for executive clarity."
-        description="Give leadership a private Executive Intelligence Workspace with Business Health, prioritized intelligence, focused explanations, trusted Evidence, and Saved Analyses."
+        eyebrow="Vaeroex Intelligence"
+        title="Current availability across specialized intelligence."
+        description="Executive Intelligence is available through the current Vaeroex subscription. Drug Discovery Intelligence and Biological Intelligence remain in development, with pricing not yet announced."
         actions={
           <a href={VAEROEX_MAILTO_LINKS.billing} className="inline-flex min-h-11 items-center rounded-lg border border-white/15 bg-white/[0.06] px-5 py-3 text-sm font-semibold text-slate-100 hover:border-cyan-300/50 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">Billing questions</a>
         }
-        aside={planCard}
       />
+
+      <section id="intelligence-pricing" className="border-b border-white/10 px-5 py-12 sm:px-6 sm:py-14" aria-label="Vaeroex intelligence availability and pricing">
+        <div className="mx-auto max-w-[86rem]">
+          <PublicSectionHeading
+            eyebrow="Intelligence areas"
+            title="Three specialized offerings. One clear availability state for each."
+            description="Executive Intelligence is available now. Drug Discovery Intelligence and Biological Intelligence remain in development and cannot initiate checkout or subscription activation."
+          />
+          <div className="mt-8 grid items-stretch gap-4 lg:grid-cols-3">
+            {PUBLIC_SYSTEMS.map((system) => (
+              <article key={system.id} data-pricing-system={system.id} className={`flex min-h-[31rem] flex-col rounded-lg border bg-[#07111f] p-5 shadow-command sm:p-6 ${system.availability === "available" ? "border-cyan-300/30" : "border-white/10"}`}>
+                <header className="border-b border-white/10 pb-5">
+                  <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">{system.statusLabel}</p>
+                  <h2 className="mt-4 text-2xl font-semibold text-white">
+                    <Link href={system.route} className="rounded-sm hover:text-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">{system.name}</Link>
+                  </h2>
+                  <p className="mt-3 text-sm leading-6 text-slate-400">{system.description}</p>
+                </header>
+
+                {system.availability === "available" ? (
+                  <div className="flex flex-1 flex-col pt-5">
+                    <div>
+                      <p className="text-3xl font-semibold text-white">{VAEROEX_PLAN_PRICE_LABEL}</p>
+                      <p className="mt-1 text-xs text-slate-400">Monthly subscription</p>
+                    </div>
+                    <div className="mt-6">
+                      <h3 className="text-sm font-semibold text-white">What&apos;s included</h3>
+                      <ul className="mt-3 space-y-2">
+                        {executiveInclusions.map((item) => (
+                          <li key={item} className="flex items-start gap-2 text-sm leading-6 text-slate-300">
+                            <Check className="mt-1 h-4 w-4 shrink-0 text-emerald-200" aria-hidden="true" />
+                            <span>{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div className="mt-auto pt-6">
+                      <StartWithVaeroexMenu className="w-full" />
+                      <p className="mt-4 text-xs leading-5 text-slate-400">Renews monthly unless canceled through Manage billing. Cancellation takes effect at the end of the current paid billing period and prevents the next renewal. Payments are final and non-refundable except where required by applicable law.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-1 flex-col pt-5">
+                    <p className="text-xl font-semibold text-white">{system.pricing.display}</p>
+                    <p className="mt-3 text-sm leading-6 text-slate-400">This specialized Vaeroex intelligence environment is not currently available for purchase or subscription activation.</p>
+                    <span className="mt-auto inline-flex min-h-11 items-center border-y border-cyan-300/20 py-3 text-sm font-semibold uppercase text-cyan-100" aria-disabled="true">
+                      {system.pricing.ctaLabel}
+                    </span>
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section className="border-b border-white/10 bg-[#050b18] px-5 py-12 sm:px-6 sm:py-14">
         <div className="mx-auto max-w-7xl">
           {checkoutError ? <div className="mb-6 rounded-lg border border-amber-300/30 bg-amber-950/25 p-4 text-sm font-semibold text-amber-100">{checkoutError}</div> : null}
           {checkoutCancelled ? <div className="mb-6 rounded-lg border border-white/10 bg-white/[0.04] p-4 text-sm text-slate-300">Checkout was cancelled. You can restart when you are ready.</div> : null}
-          <div className="grid gap-10 lg:grid-cols-[minmax(0,.8fr)_minmax(0,1.2fr)]">
-            <div>
-              <PublicSectionHeading eyebrow="Who it is for" title="Leaders who need a connected view of the business." />
-              <p className="mt-4 text-sm leading-6 text-slate-300">Vaeroex is designed for an owner, CEO, COO, operations leader, or department leader who needs evidence-backed visibility across information already being created by the business.</p>
-              <p className="mt-3 text-sm leading-6 text-slate-400">It is not priced as an employee collaboration suite, CRM, or task-management replacement.</p>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">How setup works</p>
-              <ol className="mt-4 divide-y divide-white/10 border-y border-white/10">
-                {setupSteps.map(([title, body], index) => (
-                  <li key={title} className="grid gap-2 py-4 sm:grid-cols-[2rem_minmax(0,.35fr)_minmax(0,.65fr)]">
-                    <span className="text-xs font-semibold text-cyan-200">0{index + 1}</span>
-                    <h3 className="font-semibold text-white">{title}</h3>
-                    <p className="text-sm leading-6 text-slate-400">{body}</p>
-                  </li>
-                ))}
-              </ol>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="border-b border-white/10 px-5 py-12 sm:px-6 sm:py-14">
-        <div className="mx-auto max-w-7xl">
           <div className="flex items-center gap-3">
             <CircleHelp className="h-5 w-5 text-cyan-200" aria-hidden="true" />
             <h2 className="text-2xl font-semibold text-white">Subscription questions</h2>
@@ -157,14 +131,6 @@ export default async function PricingPage({ searchParams }: PricingPageProps) {
         </div>
       </section>
 
-      <PublicCtaBand
-        eyebrow="Executive Intelligence by Vaeroex"
-        title="Start with one private Executive Intelligence Workspace."
-        description="Bring together the evidence leadership already relies on and review what changed, what matters, and what needs attention next."
-        primaryHref="/api/stripe/checkout"
-        secondaryHref="/executive-intelligence"
-        secondaryLabel="Explore the product"
-      />
       <PublicFooter />
     </main>
   );

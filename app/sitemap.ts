@@ -3,6 +3,7 @@ import { PUBLIC_SITE_URL } from "@/lib/seo/public-seo";
 
 const publicPages = [
   "/",
+  "/intelligence-systems",
   "/executive-intelligence",
   "/drug-discovery-intelligence",
   "/biological-intelligence",

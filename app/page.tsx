@@ -13,26 +13,27 @@ import { PublicFooter } from "@/components/legal/PublicFooter";
 import { PublicSiteHeader } from "@/components/legal/PublicSiteHeader";
 import { PublicSystemsPortfolio } from "@/components/marketing/PublicSystemsPortfolio";
 import { PublicSpatialBackdrop } from "@/components/marketing/spatial/PublicSpatialBackdrop";
-import { EXECUTIVE_INTELLIGENCE_SYSTEM } from "@/lib/marketing/public-systems";
+import { EXECUTIVE_INTELLIGENCE_SYSTEM, INTELLIGENCE_SYSTEMS_ROUTE } from "@/lib/marketing/public-systems";
 import { publicPageMetadata } from "@/lib/seo/public-seo";
 
 export const metadata: Metadata = publicPageMetadata({
-  title: "Vaeroex Intelligence Systems",
-  description: "Vaeroex creates intelligence systems that transform complex information into visibility, awareness, prediction, and action.",
+  title: "Vaeroex | Intelligence Systems",
+  description: "Vaeroex transforms complex information into visibility, awareness, prediction, and action across specialized intelligence domains.",
   path: "/"
 });
 
 const systemPrinciples = [
-  ["Specialized", "Designed around a decision environment rather than generic conversation."],
-  ["Inspectable", "Supporting information remains available when understanding needs to be checked."],
-  ["Decision-ready", "Complex information resolves into a clearer view of what deserves attention."]
+  ["Specialized", "Each environment is shaped around the information, relationships, constraints, and objectives of its domain."],
+  ["Contextual", "Important signals become more useful when their relationships, uncertainty, and supporting context remain visible."],
+  ["Inspectable", "Understanding should remain connected to the information that supports it and open to human review."]
 ] as const;
 
 const conceptualPath = [
-  ["Bring relevant information together", "Reports, spreadsheets, documents, KPIs, and other useful business information enter one secure workspace."],
-  ["Establish trusted understanding", "Facts and supporting sources remain distinguishable from the interpretation built around them."],
-  ["Transform information into intelligence", "Important conditions, changes, relationships, and priorities become easier to see."],
-  ["Move with greater clarity", "Leadership can inspect the context, exercise judgment, and decide where to focus next."]
+  ["Information", "Complex environments generate more information than people can reasonably interpret in isolation."],
+  ["Visibility", "Important conditions, relationships, and changes become easier to see."],
+  ["Awareness", "Context helps explain what is happening, how it connects, and why it matters."],
+  ["Prediction", "Supported patterns can surface emerging conditions and possible outcomes without presenting uncertainty as certainty."],
+  ["Action", "Intelligence becomes useful when it helps people determine what deserves attention, investigation, or action."]
 ] as const;
 
 function ChapterMarker({ index, label }: { index: string; label: string }) {
@@ -40,46 +41,6 @@ function ChapterMarker({ index, label }: { index: string; label: string }) {
     <div className="vaeroex-public-chapter-marker" aria-hidden="true">
       <span>{index}</span>
       <span>{label}</span>
-    </div>
-  );
-}
-
-function ExecutiveInstrument() {
-  return (
-    <div className="vaeroex-product-console" aria-label="Illustrative Executive Intelligence product view">
-      <div className="vaeroex-product-console__bar">
-        <span>Executive Intelligence</span>
-        <span className="vaeroex-product-console__status">Current view</span>
-      </div>
-      <div className="vaeroex-product-console__body">
-        <section className="vaeroex-health-readout" aria-label="Illustrative Business Health view">
-          <div>
-            <p>Business Health</p>
-            <strong>82</strong>
-          </div>
-          <div className="vaeroex-health-readout__track" aria-hidden="true">
-            <span />
-          </div>
-          <p className="vaeroex-health-readout__summary">Stable condition with two priorities requiring leadership attention.</p>
-        </section>
-        <section className="vaeroex-priority-readout" aria-label="Illustrative prioritized intelligence">
-          <div className="vaeroex-priority-readout__heading">
-            <span>Prioritized Intelligence</span>
-            <span>3 findings</span>
-          </div>
-          {[
-            ["01", "Margin pressure", "Requires attention"],
-            ["02", "Pipeline concentration", "Monitor"],
-            ["03", "Delivery performance", "Improving"]
-          ].map(([number, title, state]) => (
-            <div className="vaeroex-priority-readout__row" key={number}>
-              <span>{number}</span>
-              <strong>{title}</strong>
-              <span>{state}</span>
-            </div>
-          ))}
-        </section>
-      </div>
     </div>
   );
 }
@@ -111,7 +72,7 @@ export default function HomePage() {
         <nav className="vaeroex-journey-index" aria-label="Homepage chapters">
           <a href="#vaeroex">01<span>Vaeroex</span></a>
           <a href="#intelligence-systems">02<span>Systems</span></a>
-          <a href="#executive-intelligence">03<span>Product</span></a>
+          <a href="#from-information-to-intelligence">03<span>Intelligence</span></a>
           <a href="#trust-and-evidence">04<span>Trust</span></a>
           <a href="#explore">05<span>Explore</span></a>
         </nav>
@@ -123,11 +84,12 @@ export default function HomePage() {
               <p className="vaeroex-public-hero-category">Intelligence Systems</p>
             </div>
             <p className="vaeroex-public-lede">Transforming information into visibility, awareness, prediction, and action.</p>
+            <p className="vaeroex-public-copy">Vaeroex transforms complex information into usable intelligence through specialized environments for distinct domains.</p>
             <div className="vaeroex-public-actions">
-              <a href="#intelligence-systems" className="vaeroex-button vaeroex-button--primary">
-                Enter the environment
+              <Link href={INTELLIGENCE_SYSTEMS_ROUTE} className="vaeroex-button vaeroex-button--primary">
+                Explore Vaeroex intelligence
                 <ArrowRight aria-hidden="true" />
-              </a>
+              </Link>
               <Link href={system.route} className="vaeroex-button vaeroex-button--quiet">Explore Executive Intelligence</Link>
             </div>
             <div className="vaeroex-hero-coordinate" aria-label="Vaeroex company principles">
@@ -143,12 +105,12 @@ export default function HomePage() {
         </section>
 
         <section id="intelligence-systems" className="vaeroex-public-chapter vaeroex-public-chapter--company">
-          <span className="vaeroex-next-chapter-label" aria-hidden="true">02 / Intelligence Systems</span>
+          <span className="vaeroex-next-chapter-label" aria-hidden="true">02 / Intelligence</span>
           <div className="vaeroex-public-chapter__content vaeroex-public-chapter__content--right">
-            <ChapterMarker index="02" label="What Vaeroex builds" />
-            <p className="vaeroex-public-kicker">Intelligence Systems</p>
-            <h2>Complex information should resolve into understanding.</h2>
-            <p className="vaeroex-public-copy">Vaeroex creates specialized systems for decision environments where the volume, fragmentation, and pace of information can obscure what matters.</p>
+            <ChapterMarker index="02" label="Why intelligence matters" />
+            <p className="vaeroex-public-kicker">Information is everywhere. Intelligence is not.</p>
+            <h2>Information tells you what exists. Intelligence helps you understand what it means.</h2>
+            <p className="vaeroex-public-copy">The problem is not simply access to information. It is seeing what matters, understanding how it connects, recognizing what may be changing, and deciding where attention should go.</p>
             <div className="vaeroex-principle-stack">
               {systemPrinciples.map(([title, description]) => (
                 <div key={title}>
@@ -162,16 +124,17 @@ export default function HomePage() {
 
         <section className="vaeroex-public-chapter vaeroex-public-chapter--definition">
           <div className="vaeroex-public-chapter__content vaeroex-public-chapter__content--left vaeroex-public-chapter__content--narrow">
-            <ChapterMarker index="02.1" label="A clearer category" />
-            <p className="vaeroex-public-kicker">The Vaeroex philosophy</p>
+            <ChapterMarker index="02.1" label="The intelligence path" />
+            <p className="vaeroex-public-kicker">Information to action</p>
             <h2>Not more information. A more useful relationship with it.</h2>
-            <p className="vaeroex-public-copy">An Intelligence System brings relevant information into a coherent, inspectable view and helps people reason over it with greater precision. The system supports judgment. It does not replace it.</p>
+            <p className="vaeroex-public-copy">Vaeroex brings relevant information into coherent, inspectable views and helps people reason over it with greater precision. It supports judgment without replacing human authority.</p>
             <div className="vaeroex-transformation-line" aria-label="Vaeroex transformation philosophy">
               {[
-                ["01", "Visibility"],
-                ["02", "Awareness"],
-                ["03", "Prediction"],
-                ["04", "Action"]
+                ["01", "Information"],
+                ["02", "Visibility"],
+                ["03", "Awareness"],
+                ["04", "Prediction"],
+                ["05", "Action"]
               ].map(([index, label]) => (
                 <span key={label}><small>{index}</small>{label}</span>
               ))}
@@ -181,46 +144,28 @@ export default function HomePage() {
 
         <section className="vaeroex-public-chapter vaeroex-public-chapter--portfolio" aria-labelledby="vaeroex-product-family-heading">
           <div className="vaeroex-public-chapter__content vaeroex-public-chapter__content--center">
-            <ChapterMarker index="02.2" label="Product family" />
-            <p className="vaeroex-public-kicker">Vaeroex Intelligence Systems</p>
+            <ChapterMarker index="02.2" label="Specialized intelligence" />
+            <p className="vaeroex-public-kicker">One system. Distinct domains.</p>
             <h2 id="vaeroex-product-family-heading">Specialized intelligence for distinct decision environments.</h2>
-            <p className="vaeroex-public-lede vaeroex-public-lede--center">Each Vaeroex product is designed around a serious information environment, a clear decision purpose, and an inspectable relationship with evidence.</p>
+            <p className="vaeroex-public-lede vaeroex-public-lede--center">Different domains contain different evidence, relationships, constraints, uncertainties, and objectives. Vaeroex applies specialized intelligence without treating every problem as the same generic conversation.</p>
             <PublicSystemsPortfolio />
           </div>
         </section>
 
-        <section id="executive-intelligence" className="vaeroex-public-chapter vaeroex-public-chapter--arrival">
+        <section id="from-information-to-intelligence" className="vaeroex-public-chapter vaeroex-public-chapter--arrival">
           <div className="vaeroex-public-chapter__content vaeroex-public-chapter__content--center">
-            <ChapterMarker index="03" label="System arrival" />
-            <p className="vaeroex-public-kicker">{system.relationship}</p>
-            <h2>{system.name}</h2>
-            <p className="vaeroex-public-lede vaeroex-public-lede--center">{system.tagline}</p>
-            <Link href={system.route} className="vaeroex-text-link">
-              Discover the system
-              <ArrowRight aria-hidden="true" />
-            </Link>
+            <ChapterMarker index="03" label="From information to intelligence" />
+            <p className="vaeroex-public-kicker">Visibility. Awareness. Prediction. Action.</p>
+            <h2>Intelligence makes complex information more useful.</h2>
+            <p className="vaeroex-public-lede vaeroex-public-lede--center">See important conditions and relationships. Understand context and why it matters. Recognize supported patterns and possible outcomes without implying certainty. Turn that understanding into clearer attention, investigation, prioritization, and decision support.</p>
           </div>
         </section>
 
-        <section className="vaeroex-public-chapter vaeroex-public-chapter--product">
-          <div className="vaeroex-public-product-layout">
-            <div className="vaeroex-public-product-copy">
-              <p className="vaeroex-public-kicker">Leadership environment</p>
-              <h2>See the whole condition. Inspect the important detail.</h2>
-              <p>{system.description}</p>
-              <div className="vaeroex-capability-rail" aria-label="Executive Intelligence capabilities">
-                {system.capabilities.map((capability) => <span key={capability}>{capability}</span>)}
-              </div>
-            </div>
-            <ExecutiveInstrument />
-          </div>
-        </section>
-
-        <section className="vaeroex-public-chapter vaeroex-public-chapter--method">
+        <section id="intelligence-path" className="vaeroex-public-chapter vaeroex-public-chapter--method">
           <div className="vaeroex-public-chapter__content vaeroex-public-chapter__content--right vaeroex-public-chapter__content--wide">
-            <ChapterMarker index="03.1" label="Conceptual journey" />
-            <p className="vaeroex-public-kicker">How it works</p>
-            <h2>From relevant information to executive clarity.</h2>
+            <ChapterMarker index="03.1" label="Company intelligence path" />
+            <p className="vaeroex-public-kicker">How intelligence becomes useful</p>
+            <h2>From information to action.</h2>
             <ol className="vaeroex-method-list">
               {conceptualPath.map(([title, description], index) => (
                 <li key={title}>
@@ -238,7 +183,7 @@ export default function HomePage() {
               <ChapterMarker index="04" label="Trust and precision" />
               <p className="vaeroex-public-kicker">Inspectable intelligence</p>
               <h2>Facts remain facts. Interpretation remains visible as interpretation.</h2>
-              <p className="vaeroex-public-copy">Executive Intelligence keeps supporting business information available for review, shows important limitations, and leaves consequential decisions with the people responsible for them.</p>
+              <p className="vaeroex-public-copy">Vaeroex keeps supporting information available for review, makes important limitations visible, and leaves consequential decisions with the people responsible for them.</p>
               <Link href="/trust" className="vaeroex-text-link">Review the Trust Center<ArrowRight aria-hidden="true" /></Link>
             </div>
             <div className="vaeroex-trust-ledger">
@@ -280,12 +225,12 @@ export default function HomePage() {
         <section id="explore" className="vaeroex-public-chapter vaeroex-public-chapter--closing">
           <div className="vaeroex-public-closing">
             <ChapterMarker index="05" label="Explore" />
-            <p className="vaeroex-public-kicker">Executive Intelligence is available now</p>
-            <h2>Enter the first Vaeroex Intelligence System.</h2>
-            <p>Explore the product, review its trust principles, and decide whether it belongs in your leadership environment.</p>
+            <p className="vaeroex-public-kicker">Explore Vaeroex</p>
+            <h2>See how specialized intelligence takes shape.</h2>
+            <p>Understand the Vaeroex intelligence philosophy, then explore the currently available Executive Intelligence environment.</p>
             <div className="vaeroex-public-actions vaeroex-public-actions--center">
-              <Link href={system.route} className="vaeroex-button vaeroex-button--primary">Explore Executive Intelligence<ArrowRight aria-hidden="true" /></Link>
-              <Link href="/pricing" className="vaeroex-button vaeroex-button--quiet">View pricing</Link>
+              <Link href={INTELLIGENCE_SYSTEMS_ROUTE} className="vaeroex-button vaeroex-button--primary">Explore Intelligence Systems<ArrowRight aria-hidden="true" /></Link>
+              <Link href={system.route} className="vaeroex-button vaeroex-button--quiet">Explore Executive Intelligence</Link>
             </div>
           </div>
         </section>

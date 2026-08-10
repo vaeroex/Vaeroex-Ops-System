@@ -594,8 +594,8 @@ button.bg-vaeroex-blue:hover {
 
 .vaeroex-transformation-line {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  max-width: 42rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  max-width: 48rem;
   margin-top: 3rem;
   border-top: 1px solid rgba(97, 210, 245, 0.35);
 }
