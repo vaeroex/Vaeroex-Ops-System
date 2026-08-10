@@ -73,6 +73,9 @@ export default async function AccountSubscriptionPage({ searchParams }: AccountS
           </a>
         </div>
         <p className="mt-3 text-sm leading-6 text-muted">
+          Use Manage billing to schedule cancellation through the Stripe Customer Portal. Cancellation prevents the next renewal and takes effect at the end of the current paid billing period, with access continuing through that period. No prorated refund or credit is provided for unused time.
+        </p>
+        <p className="mt-3 text-sm leading-6 text-muted">
           Billing, subscription, or payment questions can be sent to{" "}
           <a href={VAEROEX_MAILTO_LINKS.billing} className="font-semibold text-vaeroex-blue hover:text-vaeroex-accent">
             {VAEROEX_CONTACT_EMAILS.billing}

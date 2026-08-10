@@ -88,14 +88,15 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Cancellation",
         body: [
-          `Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`,
-          "Access may continue until the end of the paid billing period unless otherwise required by law or approved by Vaeroex."
+          `Customers may cancel through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`,
+          "Cancellation prevents the next renewal and takes effect at the end of the current paid billing period, as determined by the billing provider's actual period-end timestamp. Access continues through that paid period."
         ]
       },
       {
         title: "Refunds",
         body: [
-          "Refunds are handled according to the Vaeroex Refund Policy and applicable law.",
+          "All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law.",
+          "Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period.",
           "Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels."
         ]
       },
@@ -194,7 +195,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
         title: "Termination",
         body: [
           "Vaeroex may suspend or terminate access if a customer violates these terms, fails to pay, misuses the platform, or creates security or legal risk.",
-          "Customers may stop using the platform and cancel according to the applicable billing workflow."
+          "Customers may schedule cancellation through Manage billing in the Stripe Customer Portal. A scheduled cancellation ends access at the close of the current paid billing period and prevents renewal for the next billing period."
         ]
       },
       {
@@ -267,13 +268,13 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Refund Policy",
     summary: "Customer-friendly refund and cancellation language for Vaeroex subscriptions.",
     href: "/refund-policy",
-    updated: "2026-06-19",
+    updated: "2026-08-10",
     sections: [
-      { title: "Vaeroex Subscription", body: [`Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`] },
-      { title: "Automatic Renewal", body: ["Vaeroex subscriptions renew automatically unless canceled."] },
-      { title: "Cancel Anytime", body: ["Customers may cancel anytime. Access generally continues until the end of the paid billing period unless otherwise required by law or approved by Vaeroex."] },
-      { title: "Satisfaction Refund", body: ["First-time subscriptions may be eligible for a 14-day satisfaction refund. After 14 days, monthly subscription fees are generally non-refundable except where required by law or approved by Vaeroex."] },
-      { title: "Partial Months", body: ["No refunds are provided for partial months unless required by law or approved by Vaeroex."] },
+      { title: "Vaeroex Subscription", body: [`Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
+      { title: "Automatic Renewal", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled before the next renewal. A scheduled cancellation prevents renewal for the next billing period."] },
+      { title: "Cancellation Timing and Access", body: ["Cancellation takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Customers retain access through that paid period."] },
+      { title: "Final and Non-Refundable Payments", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law."] },
+      { title: "No Prorated Refunds or Credits", body: ["Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
       { title: "Promotions", body: [`Promotions, discounts, and special offers may be available through the Vaeroex Direct Website or official Vaeroex sales channels. ${VAEROEX_CONTACT_EMAILS.billing} can help customers with questions about eligible offers.`] },
       { title: "Pricing Changes", body: ["Subscription pricing may change in the future. Customers will receive advance notice before pricing changes take effect."] }
     ]
@@ -312,14 +313,16 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Subscription and Billing Terms",
     summary: "How Vaeroex subscription access, billing requests, and promotions work.",
     href: "/subscription-billing-terms",
-    updated: "2026-06-19",
+    updated: "2026-08-10",
     sections: [
       { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex Executive Intelligence, $500/month, Everything Included."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
       { title: "Access Matching", body: ["Customers should create their Vaeroex account with the same email used for Vaeroex checkout so subscription access can be matched."] },
-      { title: "Subscription Requests", body: [`Customers can manage subscription-related requests through the Vaeroex website or by contacting ${VAEROEX_CONTACT_EMAILS.billing}.`] },
-      { title: "Renewal and Pricing", body: ["Vaeroex subscriptions renew automatically unless canceled. Pricing may change in the future, and customers will receive advance notice before pricing changes take effect."] },
-      { title: "Access Changes", body: ["Canceled, expired, or past-due subscriptions may be routed to the billing-required flow unless access is manually unlocked by Vaeroex."] }
+      { title: "Manage Billing and Cancellation", body: [`Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
+      { title: "Renewal and Cancellation Timing", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled. A scheduled cancellation prevents the next renewal and takes effect at the end of the current paid billing period, based on the billing provider's actual period-end timestamp. Access continues through that paid period."] },
+      { title: "Refunds and Unused Time", body: ["All purchases and subscription payments are final and non-refundable, except where a refund is required by applicable law. Cancellation does not provide a prorated refund, credit, or refund for unused time in the current paid billing period."] },
+      { title: "Access Changes", body: ["Once the current paid billing period ends, a canceled subscription may be routed to the billing-required flow unless access is manually unlocked by Vaeroex. Expired or past-due subscriptions may also be routed to that flow."] },
+      { title: "Pricing Changes", body: ["Pricing may change in the future, and customers will receive advance notice before pricing changes take effect."] }
     ]
   },
   "data-retention": {
