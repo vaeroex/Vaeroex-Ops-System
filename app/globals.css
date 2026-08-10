@@ -124,19 +124,16 @@ button.bg-vaeroex-blue:hover {
 }
 
 .vaeroex-public-hero {
-  background:
-    radial-gradient(circle at 16% 12%, rgba(37, 99, 235, 0.24), transparent 31%),
-    radial-gradient(circle at 84% 18%, rgba(34, 211, 238, 0.12), transparent 28%),
-    linear-gradient(145deg, #030712 0%, #07111f 52%, #0b1220 100%);
+  min-height: min(44rem, calc(100svh - 7.5rem));
+  background-color: #02050a;
+  background-image: url("/brand/vaeroex-intelligence-environment.png");
+  background-position: center;
+  background-size: cover;
 }
 
-.vaeroex-public-grid {
-  background-image:
-    linear-gradient(rgba(56, 189, 248, 0.045) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56, 189, 248, 0.045) 1px, transparent 1px);
-  background-size: 64px 64px;
-  mask-image: linear-gradient(to bottom, black, transparent 88%);
-  opacity: 0.58;
+.vaeroex-public-hero__veil {
+  background: rgba(2, 5, 10, 0.68);
+  box-shadow: inset -30vw 0 30vw rgba(2, 5, 10, 0.14);
 }
 
 .vaeroex-cta-band {
@@ -149,9 +146,1031 @@ button.bg-vaeroex-blue:hover {
   inset: 0;
   z-index: -1;
   content: "";
-  background:
-    radial-gradient(circle at 12% 0%, rgba(37, 99, 235, 0.24), transparent 34%),
-    linear-gradient(100deg, transparent 50%, rgba(34, 211, 238, 0.08));
+  background: rgba(19, 46, 66, 0.22);
+}
+
+.vaeroex-public-site {
+  --public-blue: #5dd8ff;
+  --public-white: #f4f9fc;
+  --public-muted: #9baab8;
+  background: #02050a;
+}
+
+.vaeroex-public-header {
+  border-bottom: 1px solid rgba(160, 193, 214, 0.14);
+  background: rgba(2, 6, 11, 0.82);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.22);
+  backdrop-filter: blur(18px) saturate(120%);
+}
+
+.vaeroex-public-header__nav > a {
+  position: relative;
+}
+
+.vaeroex-public-header__nav > a::after {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.25rem;
+  left: 0.75rem;
+  height: 1px;
+  content: "";
+  background: #68ddff;
+  opacity: 0;
+  transform: scaleX(0.2);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.vaeroex-public-header__nav > a:hover::after,
+.vaeroex-public-header__nav > a:focus-visible::after {
+  opacity: 0.8;
+  transform: scaleX(1);
+}
+
+.vaeroex-public-menu {
+  border-radius: 6px;
+  background: rgba(5, 12, 20, 0.96);
+  backdrop-filter: blur(20px);
+}
+
+.vaeroex-header-action {
+  border: 1px solid rgba(170, 205, 225, 0.18);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.vaeroex-header-action:hover {
+  border-color: rgba(94, 218, 255, 0.46);
+  background: rgba(12, 55, 78, 0.44);
+}
+
+.vaeroex-public-journey {
+  position: relative;
+  isolation: isolate;
+  background-color: #02050a;
+  background-image: url("/brand/vaeroex-intelligence-environment.png");
+  background-position: center top;
+  background-size: auto 100svh;
+  background-attachment: fixed;
+}
+
+.vaeroex-public-spatial-canvas,
+.vaeroex-public-spatial-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100svh;
+  pointer-events: none;
+}
+
+.vaeroex-public-spatial-canvas canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.vaeroex-public-spatial-fallback {
+  background-color: #02050a;
+  background-image: url("/brand/vaeroex-intelligence-environment.png");
+  background-position: center;
+  background-size: cover;
+}
+
+.vaeroex-public-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 16vw rgba(0, 0, 0, 0.58),
+    inset 0 -18vh 22vh rgba(0, 0, 0, 0.32);
+}
+
+.vaeroex-journey-index {
+  position: fixed;
+  top: 50%;
+  right: 1.5rem;
+  z-index: 20;
+  display: grid;
+  gap: 0.75rem;
+  transform: translateY(-50%);
+}
+
+.vaeroex-journey-index a {
+  display: grid;
+  grid-template-columns: 1.25rem 0fr;
+  align-items: center;
+  min-height: 1.5rem;
+  overflow: hidden;
+  color: rgba(195, 215, 228, 0.48);
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+  transition: color 180ms ease, grid-template-columns 240ms ease;
+}
+
+.vaeroex-journey-index a::before {
+  position: absolute;
+  right: -0.75rem;
+  width: 0.3rem;
+  height: 1px;
+  content: "";
+  background: currentColor;
+}
+
+.vaeroex-journey-index a span {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.vaeroex-journey-index a:hover,
+.vaeroex-journey-index a:focus-visible {
+  grid-template-columns: 1.25rem 5rem;
+  color: #dff8ff;
+}
+
+.vaeroex-public-chapter {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 112svh;
+  align-items: center;
+  padding: 8rem max(5vw, 1.25rem);
+  scroll-margin-top: 4.5rem;
+}
+
+.vaeroex-public-chapter--hero {
+  min-height: calc(100svh - 6.5rem);
+  align-items: center;
+  padding-top: 3.5rem;
+  padding-bottom: 3.5rem;
+}
+
+.vaeroex-public-chapter--company {
+  min-height: 118svh;
+}
+
+.vaeroex-next-chapter-label {
+  position: absolute;
+  top: 1rem;
+  left: max(5vw, 1.25rem);
+  color: rgba(166, 205, 224, 0.62);
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vaeroex-public-chapter--definition,
+.vaeroex-public-chapter--method,
+.vaeroex-public-chapter--trust,
+.vaeroex-public-chapter--principles {
+  min-height: 124svh;
+}
+
+.vaeroex-public-chapter--arrival {
+  min-height: 110svh;
+}
+
+.vaeroex-public-chapter--product {
+  min-height: 132svh;
+}
+
+.vaeroex-public-chapter--closing {
+  min-height: 105svh;
+}
+
+.vaeroex-public-chapter__content {
+  width: min(43rem, 92vw);
+  padding: clamp(1.5rem, 3vw, 3.25rem) 0;
+  text-shadow: 0 2px 28px rgba(0, 0, 0, 0.72);
+}
+
+.vaeroex-public-chapter__content--left {
+  margin-right: auto;
+  margin-left: min(7vw, 7rem);
+}
+
+.vaeroex-public-chapter__content--right {
+  margin-right: min(8vw, 8rem);
+  margin-left: auto;
+}
+
+.vaeroex-public-chapter__content--center {
+  width: min(64rem, 94vw);
+  margin-inline: auto;
+  text-align: center;
+}
+
+.vaeroex-public-chapter__content--narrow {
+  width: min(39rem, 92vw);
+}
+
+.vaeroex-public-chapter__content--wide {
+  width: min(52rem, 92vw);
+}
+
+.vaeroex-public-kicker {
+  color: #83ddf8;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vaeroex-public-chapter h1 {
+  margin-top: 1rem;
+  max-width: 12ch;
+  color: var(--public-white);
+  font-size: 7rem;
+  font-weight: 560;
+  line-height: 0.86;
+  letter-spacing: 0;
+}
+
+.vaeroex-public-hero-brand {
+  display: grid;
+  width: fit-content;
+  gap: 1rem;
+}
+
+.vaeroex-public-hero-brand h1 {
+  margin-top: 0;
+  font-size: 7.6rem;
+  line-height: 0.82;
+}
+
+.vaeroex-public-hero-category {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #d8e9f1;
+  font-size: 1.28rem;
+  font-weight: 560;
+  line-height: 1.2;
+}
+
+.vaeroex-public-hero-category::before {
+  width: 3.25rem;
+  height: 1px;
+  content: "";
+  background: #65dbff;
+  box-shadow: 0 0 18px rgba(101, 219, 255, 0.46);
+}
+
+.vaeroex-public-chapter h2 {
+  margin-top: 0.9rem;
+  color: var(--public-white);
+  font-size: 4.9rem;
+  font-weight: 560;
+  line-height: 0.96;
+  letter-spacing: 0;
+}
+
+.vaeroex-public-lede {
+  max-width: 38rem;
+  margin-top: 1.6rem;
+  color: #d3dee5;
+  font-size: 1.25rem;
+  line-height: 1.65;
+}
+
+.vaeroex-public-lede--center {
+  margin-inline: auto;
+}
+
+.vaeroex-public-copy {
+  max-width: 40rem;
+  margin-top: 1.5rem;
+  color: #b9c8d2;
+  font-size: 1.08rem;
+  line-height: 1.75;
+}
+
+.vaeroex-public-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.vaeroex-public-actions--center {
+  justify-content: center;
+}
+
+.vaeroex-button {
+  display: inline-flex;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 0.8rem 1.15rem;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.vaeroex-button svg,
+.vaeroex-text-link svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.vaeroex-button--primary {
+  border-color: rgba(168, 229, 248, 0.46);
+  background: #e9f9ff;
+  color: #07131d;
+  box-shadow: 0 12px 45px rgba(55, 184, 229, 0.18);
+}
+
+.vaeroex-button--primary:hover {
+  background: #69dcff;
+  color: #06101a;
+  transform: translateY(-1px);
+}
+
+.vaeroex-button--quiet {
+  border-color: rgba(182, 211, 228, 0.22);
+  background: rgba(5, 12, 19, 0.64);
+  color: #d7e5ec;
+  backdrop-filter: blur(12px);
+}
+
+.vaeroex-button--quiet:hover {
+  border-color: rgba(93, 216, 255, 0.55);
+  color: white;
+}
+
+.vaeroex-hero-coordinate {
+  display: flex;
+  max-width: 31rem;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 3.5rem;
+  color: #8293a1;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vaeroex-hero-coordinate i {
+  height: 1px;
+  flex: 1;
+  background: rgba(99, 212, 248, 0.42);
+}
+
+.vaeroex-scroll-cue {
+  position: absolute;
+  bottom: 2.25rem;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  color: #93a6b4;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-decoration: none;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
+.vaeroex-scroll-cue > span:last-child {
+  width: 1px;
+  height: 2.75rem;
+  background: #63d6f8;
+  transform-origin: top;
+  animation: vaeroex-public-scroll-cue 2.4s ease-in-out infinite;
+}
+
+.vaeroex-public-chapter-marker {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  margin-bottom: 1.6rem;
+  color: #7f929f;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vaeroex-public-chapter-marker span:first-child {
+  display: grid;
+  width: 2.3rem;
+  height: 2.3rem;
+  place-items: center;
+  border: 1px solid rgba(100, 207, 240, 0.34);
+  color: #b9efff;
+}
+
+.vaeroex-principle-stack {
+  max-width: 40rem;
+  margin-top: 2.4rem;
+  border-top: 1px solid rgba(156, 192, 211, 0.22);
+}
+
+.vaeroex-principle-stack > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 0.35fr) minmax(0, 0.65fr);
+  gap: 1.25rem;
+  padding: 1.15rem 0;
+  border-bottom: 1px solid rgba(156, 192, 211, 0.16);
+}
+
+.vaeroex-principle-stack strong {
+  color: #eefaff;
+  font-size: 0.9rem;
+}
+
+.vaeroex-principle-stack p {
+  color: #a9bac5;
+  font-size: 0.86rem;
+  line-height: 1.65;
+}
+
+.vaeroex-transformation-line {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  max-width: 42rem;
+  margin-top: 3rem;
+  border-top: 1px solid rgba(97, 210, 245, 0.35);
+}
+
+.vaeroex-transformation-line span {
+  position: relative;
+  display: grid;
+  gap: 0.65rem;
+  padding-top: 1rem;
+  color: #dcebf2;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.vaeroex-transformation-line span::before {
+  position: absolute;
+  top: -3px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  content: "";
+  background: #7ce3ff;
+}
+
+.vaeroex-transformation-line small {
+  color: #667a88;
+  font-size: 0.6rem;
+}
+
+.vaeroex-text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  margin-top: 1.5rem;
+  color: #a9ecff;
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.vaeroex-text-link:hover {
+  color: white;
+}
+
+.vaeroex-public-product-layout,
+.vaeroex-public-trust-layout {
+  display: grid;
+  width: min(86rem, 92vw);
+  margin-inline: auto;
+  gap: clamp(2.5rem, 6vw, 7rem);
+  grid-template-columns: minmax(18rem, 0.72fr) minmax(32rem, 1.28fr);
+  align-items: center;
+}
+
+.vaeroex-public-product-copy h2,
+.vaeroex-public-trust-layout h2 {
+  font-size: 4.2rem;
+}
+
+.vaeroex-public-product-copy > p:last-of-type {
+  margin-top: 1.4rem;
+  color: #b6c6d0;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.vaeroex-capability-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.1rem;
+  margin-top: 2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid rgba(161, 200, 221, 0.2);
+  color: #a9c1cf;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vaeroex-product-console {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(138, 197, 226, 0.28);
+  border-radius: 4px;
+  background: rgba(5, 12, 19, 0.82);
+  box-shadow:
+    0 50px 100px rgba(0, 0, 0, 0.46),
+    0 0 0 8px rgba(5, 10, 16, 0.54),
+    0 0 0 9px rgba(112, 172, 203, 0.12);
+  backdrop-filter: blur(18px);
+  transform: perspective(1000px) rotateY(-3deg) rotateX(1deg);
+}
+
+.vaeroex-product-console::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  content: "";
+  background: #5cd9ff;
+  box-shadow: 0 0 22px rgba(92, 217, 255, 0.72);
+}
+
+.vaeroex-product-console__bar,
+.vaeroex-priority-readout__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.vaeroex-product-console__bar {
+  min-height: 3.2rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid rgba(145, 186, 207, 0.16);
+  color: #eaf8fd;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.vaeroex-product-console__status {
+  color: #81dff8;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+}
+
+.vaeroex-product-console__body {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  min-height: 24rem;
+}
+
+.vaeroex-health-readout,
+.vaeroex-priority-readout {
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.vaeroex-health-readout {
+  border-right: 1px solid rgba(145, 186, 207, 0.16);
+}
+
+.vaeroex-health-readout > div:first-child {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.vaeroex-health-readout p,
+.vaeroex-priority-readout__heading {
+  color: #8fa5b3;
+  font-size: 0.69rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vaeroex-health-readout strong {
+  color: #effbff;
+  font-size: 4.5rem;
+  font-weight: 500;
+  line-height: 0.8;
+}
+
+.vaeroex-health-readout__track {
+  height: 0.35rem;
+  margin-top: 2.1rem;
+  background: rgba(122, 153, 171, 0.18);
+}
+
+.vaeroex-health-readout__track span {
+  display: block;
+  width: 82%;
+  height: 100%;
+  background: #69dcff;
+  box-shadow: 0 0 18px rgba(105, 220, 255, 0.45);
+}
+
+.vaeroex-health-readout .vaeroex-health-readout__summary {
+  margin-top: 2rem;
+  color: #c2d0d8;
+  font-size: 0.84rem;
+  font-weight: 500;
+  line-height: 1.65;
+  text-transform: none;
+}
+
+.vaeroex-priority-readout__heading {
+  padding-bottom: 1rem;
+}
+
+.vaeroex-priority-readout__heading span:last-child {
+  color: #637986;
+}
+
+.vaeroex-priority-readout__row {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.9rem;
+  min-height: 4.8rem;
+  border-top: 1px solid rgba(145, 186, 207, 0.14);
+}
+
+.vaeroex-priority-readout__row > span {
+  color: #7090a2;
+  font-size: 0.64rem;
+}
+
+.vaeroex-priority-readout__row > span:last-child {
+  color: #9bc7d7;
+  text-align: right;
+}
+
+.vaeroex-priority-readout__row strong {
+  color: #e4eff4;
+  font-size: 0.84rem;
+}
+
+.vaeroex-method-list {
+  margin-top: 2.4rem;
+  border-top: 1px solid rgba(147, 190, 211, 0.22);
+}
+
+.vaeroex-method-list li {
+  display: grid;
+  grid-template-columns: 2.5rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 1.05rem 0;
+  border-bottom: 1px solid rgba(147, 190, 211, 0.16);
+}
+
+.vaeroex-method-list li > span {
+  color: #71daf8;
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.vaeroex-method-list strong {
+  color: #effaff;
+  font-size: 0.9rem;
+}
+
+.vaeroex-method-list p {
+  margin-top: 0.35rem;
+  color: #9fb1bc;
+  font-size: 0.82rem;
+  line-height: 1.6;
+}
+
+.vaeroex-public-trust-layout {
+  grid-template-columns: minmax(24rem, 0.9fr) minmax(28rem, 1.1fr);
+}
+
+.vaeroex-trust-ledger {
+  border-block: 1px solid rgba(151, 193, 214, 0.2);
+  background: rgba(3, 9, 15, 0.42);
+  backdrop-filter: blur(12px);
+}
+
+.vaeroex-trust-ledger > div {
+  display: grid;
+  grid-template-columns: 2rem minmax(7rem, 0.36fr) minmax(0, 0.64fr);
+  gap: 1rem;
+  padding: 1.25rem 0.75rem;
+  border-bottom: 1px solid rgba(151, 193, 214, 0.14);
+}
+
+.vaeroex-trust-ledger > div:last-child {
+  border-bottom: 0;
+}
+
+.vaeroex-trust-ledger svg {
+  width: 1.1rem;
+  color: #72dbfa;
+}
+
+.vaeroex-trust-ledger strong {
+  color: #effaff;
+  font-size: 0.86rem;
+}
+
+.vaeroex-trust-ledger p {
+  color: #a4b6c1;
+  font-size: 0.8rem;
+  line-height: 1.6;
+}
+
+.vaeroex-public-principle-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid rgba(151, 193, 214, 0.22);
+  border-left: 1px solid rgba(151, 193, 214, 0.16);
+  background: rgba(3, 9, 15, 0.48);
+  backdrop-filter: blur(12px);
+}
+
+.vaeroex-public-principle-grid > div {
+  min-height: 13rem;
+  padding: 1.5rem;
+  border-right: 1px solid rgba(151, 193, 214, 0.16);
+  border-bottom: 1px solid rgba(151, 193, 214, 0.16);
+}
+
+.vaeroex-public-principle-grid svg {
+  width: 1.25rem;
+  color: #75ddfb;
+}
+
+.vaeroex-public-principle-grid h3 {
+  margin-top: 2.3rem;
+  color: #effaff;
+  font-size: 1rem;
+}
+
+.vaeroex-public-principle-grid p {
+  margin-top: 0.65rem;
+  color: #9fb2be;
+  font-size: 0.82rem;
+  line-height: 1.65;
+}
+
+.vaeroex-public-closing {
+  width: min(68rem, 92vw);
+  margin-inline: auto;
+  text-align: center;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.8);
+}
+
+.vaeroex-public-closing .vaeroex-public-chapter-marker {
+  justify-content: center;
+}
+
+.vaeroex-public-closing > p:not(.vaeroex-public-kicker) {
+  max-width: 42rem;
+  margin: 1.5rem auto 0;
+  color: #bacbd5;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+
+.vaeroex-public-membership {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.5rem 3rem;
+  align-items: center;
+  padding: 2.5rem max(6vw, 1.25rem);
+  border-block: 1px solid rgba(151, 193, 214, 0.14);
+  background: #040910;
+}
+
+.vaeroex-public-membership > div {
+  width: min(86rem, 100%);
+}
+
+.vaeroex-public-membership > div > p {
+  color: #74dafa;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.vaeroex-public-membership h2 {
+  margin-top: 0.45rem;
+  color: #e8f4f9;
+  font-size: 1.4rem;
+}
+
+.vaeroex-public-membership img {
+  width: 12rem;
+  height: auto;
+}
+
+.vaeroex-public-membership__legal {
+  grid-column: 1 / -1;
+  max-width: 62rem;
+  color: #5f707c;
+  font-size: 0.62rem;
+  line-height: 1.6;
+}
+
+.vaeroex-public-footer {
+  position: relative;
+  z-index: 3;
+  border-top: 1px solid rgba(151, 193, 214, 0.14);
+  background: #040910;
+}
+
+@keyframes vaeroex-public-scroll-cue {
+  0%, 100% { opacity: 0.28; transform: scaleY(0.3); }
+  45% { opacity: 1; transform: scaleY(1); }
+}
+
+@media (max-width: 1023px) {
+  .vaeroex-journey-index {
+    display: none;
+  }
+
+  .vaeroex-public-product-layout,
+  .vaeroex-public-trust-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .vaeroex-public-product-copy {
+    max-width: 42rem;
+  }
+
+  .vaeroex-public-chapter h1 {
+    font-size: 5.6rem;
+  }
+
+  .vaeroex-public-hero-brand h1 {
+    font-size: 6.2rem;
+  }
+
+  .vaeroex-public-chapter h2,
+  .vaeroex-public-product-copy h2,
+  .vaeroex-public-trust-layout h2 {
+    font-size: 3.8rem;
+  }
+
+  .vaeroex-product-console {
+    width: min(46rem, 100%);
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 767px), (pointer: coarse) {
+  .vaeroex-public-journey {
+    background-attachment: scroll;
+    background-position: 58% top;
+    background-size: auto 100svh;
+  }
+
+  .vaeroex-public-spatial-canvas {
+    display: none;
+  }
+
+  .vaeroex-public-spatial-fallback,
+  .vaeroex-public-atmosphere {
+    position: absolute;
+    height: 100svh;
+  }
+
+  .vaeroex-public-chapter,
+  .vaeroex-public-chapter--company,
+  .vaeroex-public-chapter--definition,
+  .vaeroex-public-chapter--arrival,
+  .vaeroex-public-chapter--product,
+  .vaeroex-public-chapter--method,
+  .vaeroex-public-chapter--trust,
+  .vaeroex-public-chapter--principles,
+  .vaeroex-public-chapter--closing {
+    min-height: auto;
+    padding: 6rem 1.25rem;
+    background: rgba(2, 6, 11, 0.84);
+    border-bottom: 1px solid rgba(151, 193, 214, 0.12);
+  }
+
+  .vaeroex-public-chapter--hero {
+    min-height: calc(100svh - 7rem);
+    align-items: flex-end;
+    padding-top: 6.5rem;
+    padding-bottom: 4rem;
+    background: rgba(2, 6, 11, 0.48);
+  }
+
+  .vaeroex-public-chapter__content,
+  .vaeroex-public-chapter__content--left,
+  .vaeroex-public-chapter__content--right,
+  .vaeroex-public-product-layout,
+  .vaeroex-public-trust-layout {
+    width: 100%;
+    margin: 0;
+  }
+
+  .vaeroex-public-chapter h1 {
+    font-size: 4rem;
+  }
+
+  .vaeroex-public-hero-brand {
+    gap: 0.8rem;
+  }
+
+  .vaeroex-public-hero-brand h1 {
+    font-size: 4.25rem;
+  }
+
+  .vaeroex-public-hero-category {
+    gap: 0.75rem;
+    font-size: 1rem;
+  }
+
+  .vaeroex-public-hero-category::before {
+    width: 2.25rem;
+  }
+
+  .vaeroex-public-chapter h2,
+  .vaeroex-public-product-copy h2,
+  .vaeroex-public-trust-layout h2 {
+    font-size: 2.85rem;
+  }
+
+  .vaeroex-scroll-cue {
+    bottom: 1rem;
+    left: auto;
+    right: 1.25rem;
+    transform: none;
+  }
+
+  .vaeroex-scroll-cue > span:first-child {
+    display: none;
+  }
+
+  .vaeroex-scroll-cue > span:last-child {
+    height: 2rem;
+  }
+
+  .vaeroex-principle-stack > div,
+  .vaeroex-trust-ledger > div {
+    grid-template-columns: 1fr;
+  }
+
+  .vaeroex-transformation-line {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1.5rem 0;
+  }
+
+  .vaeroex-product-console {
+    transform: none;
+  }
+
+  .vaeroex-product-console__body {
+    grid-template-columns: 1fr;
+  }
+
+  .vaeroex-health-readout {
+    border-right: 0;
+    border-bottom: 1px solid rgba(145, 186, 207, 0.16);
+  }
+
+  .vaeroex-priority-readout__row {
+    grid-template-columns: 1.8rem minmax(0, 1fr);
+  }
+
+  .vaeroex-priority-readout__row > span:last-child {
+    grid-column: 2;
+    text-align: left;
+  }
+
+  .vaeroex-public-principle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .vaeroex-public-principle-grid > div {
+    min-height: 11rem;
+  }
+
+  .vaeroex-public-membership {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vaeroex-scroll-cue > span:last-child {
+    animation: none;
+  }
+
+  .vaeroex-product-console,
+  .vaeroex-button--primary:hover {
+    transform: none;
+  }
 }
 
 .vaeroex-story-change {
