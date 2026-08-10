@@ -12,18 +12,18 @@ type PublicPageHeroProps = {
 
 export function PublicPageHero({ eyebrow, title, description, actions, aside }: PublicPageHeroProps) {
   return (
-    <section className="vaeroex-public-hero relative overflow-hidden border-b border-white/10 px-5 py-12 text-white sm:px-6 sm:py-16">
-      <div className="vaeroex-public-grid pointer-events-none absolute inset-0" aria-hidden="true" />
-      <div className={`relative mx-auto max-w-7xl ${aside ? "grid gap-8 lg:grid-cols-[minmax(0,.96fr)_minmax(30rem,1.04fr)] lg:items-center" : ""}`}>
-        <div className="vaeroex-hero-reveal max-w-4xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-cyan-200">{eyebrow}</p>
-          <h1 className="mt-3 text-4xl font-semibold leading-[1.08] tracking-normal text-white sm:text-5xl lg:text-[3.35rem]">
+    <section className="vaeroex-public-hero relative overflow-hidden px-5 py-16 text-white sm:px-6 sm:py-20 lg:py-24">
+      <div className="vaeroex-public-hero__veil pointer-events-none absolute inset-0" aria-hidden="true" />
+      <div className="relative mx-auto max-w-[86rem]">
+        <div className="vaeroex-hero-reveal max-w-4xl py-4 lg:py-8">
+          <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">{eyebrow}</p>
+          <h1 className="mt-4 text-4xl font-semibold leading-[1.08] tracking-normal text-white sm:text-5xl lg:text-6xl">
             {title}
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-7 text-slate-300 sm:text-lg sm:leading-8">{description}</p>
           {actions ? <div className="mt-7 flex flex-wrap gap-3">{actions}</div> : null}
         </div>
-        {aside ? <div className="min-w-0">{aside}</div> : null}
+        {aside ? <div className="vaeroex-public-hero__product mt-10 min-w-0 border-t border-white/10 pt-8">{aside}</div> : null}
       </div>
     </section>
   );
@@ -41,7 +41,7 @@ export function PublicSectionHeading({ eyebrow, title, description, align = "lef
 
   return (
     <div className={alignment}>
-      {eyebrow ? <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vaeroex-accent">{eyebrow}</p> : null}
+      {eyebrow ? <p className="text-xs font-semibold uppercase tracking-normal text-vaeroex-accent">{eyebrow}</p> : null}
       <h2 className="mt-2 text-3xl font-semibold leading-tight tracking-normal text-white sm:text-4xl">{title}</h2>
       {description ? <p className="mt-4 text-sm leading-6 text-slate-300 sm:text-base sm:leading-7">{description}</p> : null}
     </div>
@@ -69,9 +69,9 @@ export function PublicCtaBand({
 }: PublicCtaBandProps) {
   return (
     <section className="px-5 py-8 sm:px-6 sm:py-10">
-      <div className="vaeroex-cta-band mx-auto flex max-w-7xl flex-col gap-5 overflow-hidden rounded-lg border border-cyan-300/20 bg-[#07111f] p-5 text-white shadow-command sm:p-6 lg:flex-row lg:items-end lg:justify-between">
+      <div className="vaeroex-cta-band mx-auto flex max-w-[86rem] flex-col gap-5 overflow-hidden border-y border-cyan-300/20 bg-[#07111f]/80 p-5 text-white shadow-command sm:p-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">{eyebrow}</p>
+          <p className="text-xs font-semibold uppercase tracking-normal text-cyan-200">{eyebrow}</p>
           <h2 className="mt-3 text-2xl font-semibold leading-tight tracking-normal sm:text-3xl">{title}</h2>
           <p className="mt-3 text-sm leading-6 text-slate-300 sm:text-base">{description}</p>
         </div>

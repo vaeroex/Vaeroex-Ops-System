@@ -32,14 +32,14 @@ const emailLinks = [
 
 export function PublicFooter() {
   return (
-    <footer className="border-t border-white/10 bg-[#050b18] px-5 py-8 text-sm text-slate-400 sm:px-6">
-      <div className="mx-auto grid max-w-7xl gap-6 lg:grid-cols-[1.1fr_1.5fr] lg:items-start">
+    <footer className="vaeroex-public-footer px-5 py-10 text-sm text-slate-400 sm:px-6 lg:py-14">
+      <div className="mx-auto grid max-w-[86rem] gap-10 lg:grid-cols-[1.1fr_1.5fr] lg:items-start">
         <div>
           <Link href="/" className="inline-flex items-center gap-3 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
             <VaeroexLogo variant="symbol" size="xs" />
             <span className="font-semibold">Vaeroex</span>
           </Link>
-          <p className="mt-3 max-w-sm leading-6 text-slate-300">Vaeroex Intelligence Systems transforms business information into visibility, awareness, prediction, and executive action.</p>
+          <p className="mt-4 max-w-sm text-base leading-7 text-slate-300">Vaeroex creates Intelligence Systems that transform complex information into visibility, awareness, prediction, and action.</p>
           <p className="mt-3 text-xs">{VAEROEX_FOOTER_LOCATION}</p>
           <div className="mt-4 text-xs leading-5">
             <p className="font-semibold text-slate-200">Business Address</p>
@@ -100,7 +100,7 @@ export function PublicFooter() {
           </div>
         </div>
       </div>
-      <div className="mx-auto mt-6 flex max-w-7xl flex-col gap-2 border-t border-white/10 pt-4 text-xs sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto mt-10 flex max-w-[86rem] flex-col gap-2 border-t border-white/10 pt-5 text-xs sm:flex-row sm:items-center sm:justify-between">
         <p>© {new Date().getFullYear()} Vaeroex LLC. All rights reserved.</p>
         <p>The Advantage of Knowing First.</p>
       </div>

@@ -29,19 +29,24 @@ const redirects = read("next.config.mjs");
 const demo = read("app/demo/page.tsx");
 const savedAnalysisList = read("components/reports/SavedAnalysisList.tsx");
 const savedAnalysisPresentation = read("lib/reports/saved-analysis.ts");
+const publicSystems = read("lib/marketing/public-systems.ts");
+const publicSpatialBackdrop = read("components/marketing/spatial/PublicSpatialBackdrop.tsx");
 
-assert.match(homepage, /Vaeroex Intelligence Systems/, "homepage must identify the parent company");
-assert.match(homepage, /VAEROEX · INTELLIGENCE SYSTEMS/, "homepage eyebrow must use the approved company position");
-assert.match(homepage, /Transform business information into executive clarity/, "homepage must open with the approved company-led promise");
-assert.match(homepage, /visibility, awareness, prediction, and executive action/, "homepage must communicate the approved Vaeroex mission");
+assert.match(homepage, /VAEROEX/, "homepage must identify the parent company before the product");
+assert.match(homepage, /vaeroex-public-hero-brand[\s\S]*<h1>VAEROEX<\/h1>[\s\S]*vaeroex-public-hero-category">Intelligence Systems/, "homepage hero must establish Vaeroex first and the approved company category second");
+assert.match(homepage, /Transforming information into visibility, awareness, prediction, and action/, "homepage must communicate the approved Vaeroex mission");
 assert.match(homepage, /Explore Executive Intelligence/, "homepage must use the approved flagship product action");
-assert.match(homepage, /Flagship product/, "homepage must identify Executive Intelligence as the current flagship product");
-assert.match(homepage, /Executive Intelligence by Vaeroex/, "homepage must separate the current product from the company identity");
-for (const step of ["Connect Your Business", "Build Trusted Business Understanding", "Transform Information into Executive Intelligence", "Advanced Executive Reasoning", "Executive Clarity"]) {
+assert.match(homepage, /system\.relationship/, "homepage must render the registered product relationship separately from the company identity");
+assert.match(publicSystems, /relationship: "A Vaeroex Intelligence System"/, "the public system registry must preserve the approved company-to-product relationship");
+for (const step of ["Bring relevant information together", "Establish trusted understanding", "Transform information into intelligence", "Move with greater clarity"]) {
   assert.match(homepage, new RegExp(step), `homepage How It Works must include ${step}`);
 }
-assert.match(homepage, /MarketingDashboardPreview/, "homepage must retain one believable illustrative product preview");
+assert.match(homepage, /PublicSpatialBackdrop/, "homepage must mount the public spatial environment separately from readable DOM content");
+assert.match(homepage, /ExecutiveInstrument/, "homepage must retain one believable illustrative product view");
 assert.doesNotMatch(homepage, /CapabilityIntelligenceDemo|IntelligenceFlowDemo|IntelligenceLoopShowcase|SignalProductionDemo/, "homepage must not restore overlapping feature catalogs and lifecycle demos");
+assert.match(publicSystems, /PUBLIC_SYSTEMS[\s\S]*Executive Intelligence[\s\S]*availability: "available"/, "the public product architecture must use an extensible registry with the approved available system");
+assert.equal((publicSystems.match(/\n    availability: "available"/g) || []).length, 1, "the registry must not publicly invent future systems");
+assert.match(publicSpatialBackdrop, /dynamic\(\(\) => import\("@\/components\/marketing\/spatial\/PublicSpatialCanvas"\)[\s\S]*ssr: false/, "the public canvas must stay client-only while DOM marketing content remains server-rendered");
 
 assert.equal((operations.match(/<OperationsIntelligenceEngineDemo/g) || []).length, 1, "Executive Intelligence must render one interactive demo");
 assert.doesNotMatch(operations, /OperationsIntelligenceProductExperience/, "Executive Intelligence must not restore the overlapping second product demo");
@@ -55,14 +60,14 @@ assert.match(plans, /VAEROEX_PLAN_PRICE_LABEL = "\$500\/month"/, "public subscri
 assert.match(pricing, /VAEROEX_PLAN_PRICE_LABEL/, "pricing page must use the authoritative plan price constant");
 assert.doesNotMatch(pricing, /10 Users Included|1 Workspace Included/, "pricing must not return to seat-limit positioning");
 
-for (const label of ["Home", "Executive Intelligence", "Pricing", "Trust", "Company"]) {
+for (const label of ["Home", "Intelligence Systems", "Executive Intelligence", "Pricing", "Trust", "Company"]) {
   assert.match(header, new RegExp(label), `public navigation must include ${label}`);
 }
 assert.match(header, /Open navigation menu/, "public header must provide one concise mobile menu control");
 assert.match(header, /\/about|\/contact|\/networking|\/careers/, "Company navigation must retain the authoritative secondary pages");
 
 assert.match(footer, /VAEROEX_COMPANY_ADDRESS_LINES/, "footer must retain the complete official business address");
-assert.match(footer, /Vaeroex Intelligence Systems/, "footer must use company positioning");
+assert.match(footer, /Vaeroex creates Intelligence Systems/, "footer must use company positioning");
 assert.match(footer, /Vaeroex LLC/, "footer must preserve the legal company name");
 
 assert.match(about, /Vaeroex Intelligence Systems/, "About must remain focused on the company");
@@ -87,7 +92,7 @@ for (const boundary of ["Workspace Isolation", "Secure Data Handling", "Evidence
 }
 
 assert.match(seo, /Vaeroex Intelligence Systems/, "public SEO must use the company identity");
-assert.match(layout, /Vaeroex Intelligence Systems \| Executive Clarity/, "global public metadata must use the approved company-level title");
+assert.match(layout, /Vaeroex Intelligence Systems \| Executive Clarity/, "global metadata must retain the approved company-level title");
 assert.match(logo, /\/brand\/vaeroex-logo-white-wordmark\.png/, "shared logo component must use the canonical white-wordmark PNG");
 assert.match(logo, /variant === "symbol" \? "\/icon-192\.png"/, "compact logo variants must preserve the approved symbol-only asset");
 assert.match(logo, /alt="Vaeroex"/, "shared logo must preserve concise accessible alt text");
@@ -107,5 +112,6 @@ assert.doesNotMatch(publicSources, /Executive Brief|Ask Vaeroex|Business Signals
 
 const customerMessaging = [homepage, operations, pricing, about, demo, footer, trust, trustContent, seo].join("\n");
 assert.doesNotMatch(customerMessaging, /GPT-5|OpenAI model|\bRAG\b|vector search|embeddings?|pgvector|prompt engineering|evidence retrieval|Supabase Row Level Security|private workspace file bucket/i, "customer messaging must not expose proprietary implementation details");
+assert.doesNotMatch(homepage, /\b(?:Luna|Terra|Sol)\b|IntelligenceSnapshotV1|Business Health Formula V2|model routing|provider fallback|retrieval|reranking|validation gate/i, "the fictional public environment must not expose internal architecture");
 
 process.stdout.write("Public experience regressions passed.\n");

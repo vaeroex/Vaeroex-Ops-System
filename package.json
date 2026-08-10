@@ -31,6 +31,7 @@
     "test:file-analysis": "node scripts/file-analysis-regression-tests.js",
     "test:spreadsheet-ingestion": "node scripts/spreadsheet-ingestion-regression-tests.js",
     "test:public": "node scripts/public-experience-regression-tests.js",
+    "test:public-spatial": "node scripts/public-spatial-experience-regression-tests.js",
     "test:executive-intelligence-branding": "node scripts/executive-intelligence-branding-regression-tests.js",
     "test:spatial-ui": "node scripts/spatial-ui-regression-tests.js",
     "test:ai-provider": "node scripts/ai-provider-regression-tests.js",
