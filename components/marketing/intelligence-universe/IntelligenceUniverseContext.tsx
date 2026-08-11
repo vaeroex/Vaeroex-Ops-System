@@ -7,7 +7,8 @@ import {
   type IntelligenceUniverseDestination,
   type IntelligenceUniverseMotion,
   type IntelligenceUniverseState,
-  type IntelligenceUniverseSystemDestination
+  type IntelligenceUniverseSystemDestination,
+  type IntelligenceUniverseVector3
 } from "@/lib/marketing/intelligence-universe";
 
 export type IntelligenceUniverseContextValue = Readonly<{
@@ -22,11 +23,16 @@ export type IntelligenceUniverseContextValue = Readonly<{
   selectAdjacentSystem: (direction: -1 | 1) => void;
   enterSelectedSystem: () => void;
   enterSystem: (destination: IntelligenceUniverseSystemDestination) => void;
-  beginRailDrag: (clientX: number, at: number) => void;
-  updateRailDrag: (clientX: number, at: number, viewportWidth: number) => void;
-  endRailDrag: (at: number) => void;
-  moveRailBy: (delta: number) => void;
-  settleRail: () => void;
+  beginExplorationDrag: (clientX: number, clientY: number, at: number) => void;
+  updateExplorationDrag: (
+    clientX: number,
+    clientY: number,
+    at: number,
+    viewportWidth: number,
+    viewportHeight: number
+  ) => void;
+  endExplorationDrag: (at: number) => void;
+  nudgeExploration: (delta: IntelligenceUniverseVector3) => void;
   setQuality: (quality: IntelligenceUniverseState["quality"]) => void;
   suppressBackdrop: (destination: IntelligenceUniverseDestination) => boolean;
 }>;
@@ -46,11 +52,10 @@ export const IntelligenceUniverseContext = createContext<IntelligenceUniverseCon
   selectAdjacentSystem: () => undefined,
   enterSelectedSystem: () => undefined,
   enterSystem: () => undefined,
-  beginRailDrag: () => undefined,
-  updateRailDrag: () => undefined,
-  endRailDrag: () => undefined,
-  moveRailBy: () => undefined,
-  settleRail: () => undefined,
+  beginExplorationDrag: () => undefined,
+  updateExplorationDrag: () => undefined,
+  endExplorationDrag: () => undefined,
+  nudgeExploration: () => undefined,
   setQuality: () => undefined,
   suppressBackdrop: () => false
 });
