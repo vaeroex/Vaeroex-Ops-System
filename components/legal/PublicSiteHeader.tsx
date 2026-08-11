@@ -122,11 +122,10 @@ export async function PublicSiteHeader() {
             </summary>
             <nav className="vaeroex-public-menu absolute right-0 top-full mt-2 max-h-[calc(100dvh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto border border-white/10 p-3 shadow-command" aria-label="Public navigation mobile">
               <p className="px-2 pb-2 text-[0.68rem] font-semibold uppercase tracking-normal text-slate-500">Explore Vaeroex</p>
-              {[...primaryNavLinks, ...productLinks, ...secondaryNavLinks, ...companyLinks, { href: "/help" as Route, label: "Help" }].map((link) => (
-                <Link key={link.href} href={link.href} className="block min-h-11 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
-                  {link.label}
-                </Link>
-              ))}
+              {[...primaryNavLinks, ...productLinks, ...secondaryNavLinks, ...companyLinks, { href: "/help" as Route, label: "Help" }].map((link) => {
+                const className = "block min-h-11 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60";
+                return <Link key={link.href} href={link.href} className={className}>{link.label}</Link>;
+              })}
               <StartWithVaeroexMenu className="mt-3 w-full" label="Start Executive Intelligence" />
             </nav>
           </details>

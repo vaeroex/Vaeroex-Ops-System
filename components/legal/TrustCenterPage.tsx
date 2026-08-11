@@ -100,7 +100,7 @@ export function TrustCenterPage({ inApp = false }: { inApp?: boolean }) {
   }
 
   return (
-    <main className="min-h-screen bg-[#030712] text-white">
+    <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="Trust at Vaeroex"

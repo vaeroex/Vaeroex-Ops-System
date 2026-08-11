@@ -15,7 +15,7 @@ export const metadata: Metadata = publicPageMetadata({
 
 export default function AboutPage() {
   return (
-    <main className="min-h-screen bg-[#030712] text-white">
+    <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
 
       <PublicPageHero

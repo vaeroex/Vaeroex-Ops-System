@@ -194,7 +194,7 @@ assert.match(read("components/legal/WorkspaceAgreementActions.tsx"), /View PDF[\
 const sourceFiles = execFileSync("git", ["ls-files", "app", "components", "lib"], { cwd: root, encoding: "utf8" })
   .trim()
   .split("\n")
-  .filter((file) => /\.(ts|tsx)$/.test(file));
+  .filter((file) => /\.(ts|tsx)$/.test(file) && exists(file));
 const agreementReferences = sourceFiles.filter((file) => read(file).includes("workspace_agreements"));
 const allowedReferenceRoots = [
   "app/app/setup/actions.ts",
