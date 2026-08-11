@@ -1,6 +1,6 @@
 "use client";
 
-import { Html, Line, useCursor } from "@react-three/drei";
+import { Html, Line } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { useMemo, useRef, useState, type MutableRefObject, type ReactNode } from "react";
 import {
@@ -31,7 +31,6 @@ type IntelligenceUniverseWorldProps = Readonly<{
   state: IntelligenceUniverseState;
   motion: MutableRefObject<IntelligenceUniverseMotion>;
   quality: SpatialQualityTier;
-  onEnterDestination: (destination: IntelligenceUniverseDestination) => void;
 }>;
 
 type DestinationLod = "distant" | "identified" | "near";
@@ -138,11 +137,16 @@ function SignalField({
   useFrame((_, delta) => {
     const currentMotion = motion.current;
     if (nearGroup.current) {
-      nearGroup.current.rotation.y = MathUtils.damp(nearGroup.current.rotation.y, currentMotion.velocity.x * -0.0014, 4, delta);
-      nearGroup.current.rotation.x = MathUtils.damp(nearGroup.current.rotation.x, currentMotion.velocity.y * 0.001, 4, delta);
+      nearGroup.current.rotation.y = MathUtils.damp(nearGroup.current.rotation.y, currentMotion.scrollProgress * -0.18, 4, delta);
+      nearGroup.current.rotation.x = MathUtils.damp(nearGroup.current.rotation.x, (currentMotion.scrollProgress - 0.5) * 0.025, 4, delta);
     }
     if (farGroup.current) {
-      farGroup.current.rotation.y = MathUtils.damp(farGroup.current.rotation.y, currentMotion.position.x * -0.00032, 2.4, delta);
+      farGroup.current.rotation.y = MathUtils.damp(
+        farGroup.current.rotation.y,
+        currentMotion.scrollProgress * 0.1 + currentMotion.position.x * -0.00032,
+        2.4,
+        delta
+      );
     }
   });
 
@@ -545,11 +549,11 @@ function ProductStructure({ id, selected, detailed }: { id: IntelligenceUniverse
   return <BiologicalStructure selected={selected} detailed={detailed} />;
 }
 
-function DestinationLabel({ id, lod, hovered }: { id: IntelligenceUniverseDestination; lod: DestinationLod; hovered: boolean }) {
+function DestinationLabel({ id, lod }: { id: IntelligenceUniverseDestination; lod: DestinationLod }) {
   const definition = INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[id];
   return (
     <Html center position={[0, id === "vaeroex" || id === "intelligence-systems" ? 12 : 8.2, 0]} distanceFactor={22} zIndexRange={[6, 1]}>
-      <div className={styles.worldLabel} data-lod={lod} data-hovered={hovered} data-kind={definition.kind}>
+      <div className={styles.worldLabel} data-lod={lod} data-kind={definition.kind}>
         <span>{lod === "distant" ? definition.code : definition.name}</span>
         {lod !== "distant" ? <small>{definition.statusLabel}</small> : null}
         {lod === "near" ? <p>{definition.description}</p> : null}
@@ -561,27 +565,22 @@ function DestinationLabel({ id, lod, hovered }: { id: IntelligenceUniverseDestin
 function DestinationEnvironment({
   id,
   motion,
-  onEnterDestination,
   selected,
   quality,
   children
 }: {
   id: IntelligenceUniverseDestination;
   motion: MutableRefObject<IntelligenceUniverseMotion>;
-  onEnterDestination: (destination: IntelligenceUniverseDestination) => void;
   selected: boolean;
   quality: SpatialQualityTier;
   children: (detailed: boolean) => ReactNode;
 }) {
   const group = useRef<Group>(null);
-  const [hovered, setHovered] = useState(false);
   const [lod, setLod] = useState<DestinationLod>("distant");
   const base = INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS[id];
   const definition = INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[id];
   const seed = id.length * 0.47 + id.charCodeAt(0) * 0.03;
   const detailed = lod !== "distant" && quality !== "reduced_motion";
-  const hitRadius = definition.kind === "core" || definition.kind === "systems" ? 11.5 : 7.4;
-  useCursor(hovered, "pointer", "grab");
 
   useFrame((_, delta) => {
     if (!group.current) return;
@@ -593,52 +592,45 @@ function DestinationEnvironment({
     const proximity = MathUtils.clamp(1 - (distance - 18) / 76, 0, 1);
     const approach = selected ? currentMotion.approachProgress : 0;
     const baseScale = definition.kind === "core" ? 0.86 : definition.kind === "systems" ? 0.8 : 0.7;
-    const targetScale = baseScale + proximity * 0.38 + approach * 0.34 + (hovered ? 0.04 : 0);
+    const targetScale = baseScale + proximity * 0.38 + approach * 0.34;
     const drift = Math.sin(performance.now() * 0.00017 + seed) * (definition.kind === "system" ? 0.18 : 0.12);
-    group.current.scale.setScalar(MathUtils.damp(group.current.scale.x, targetScale, currentMotion.dragging ? 15 : 5.5, delta));
+    group.current.scale.setScalar(MathUtils.damp(group.current.scale.x, targetScale, 5.5, delta));
     group.current.position.x = MathUtils.damp(group.current.position.x, base.x, 9, delta);
     group.current.position.y = MathUtils.damp(group.current.position.y, base.y + drift, 4.5, delta);
     group.current.position.z = MathUtils.damp(group.current.position.z, base.z, 7, delta);
-    group.current.rotation.y = MathUtils.damp(group.current.rotation.y, currentMotion.velocity.x * -0.006 + seed * 0.002, 6, delta);
-    group.current.rotation.x = MathUtils.damp(group.current.rotation.x, currentMotion.velocity.y * 0.0025, 6, delta);
+    group.current.rotation.y = MathUtils.damp(
+      group.current.rotation.y,
+      Math.sin(currentMotion.scrollProgress * Math.PI * 2 + seed) * 0.025 + seed * 0.002,
+      6,
+      delta
+    );
+    group.current.rotation.x = MathUtils.damp(
+      group.current.rotation.x,
+      Math.cos(currentMotion.scrollProgress * Math.PI * 2 + seed) * 0.012,
+      6,
+      delta
+    );
   });
 
   return (
-    <group
-      ref={group}
-      position={[base.x, base.y, base.z]}
-      scale={0.7}
-      onPointerOver={(event) => {
-        event.stopPropagation();
-        setHovered(true);
-      }}
-      onPointerOut={() => setHovered(false)}
-      onClick={(event) => {
-        event.stopPropagation();
-        onEnterDestination(id);
-      }}
-    >
-      <mesh>
-        <sphereGeometry args={[hitRadius, 12, 10]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
+    <group ref={group} position={[base.x, base.y, base.z]} scale={0.7}>
       {selected ? <pointLight color={definition.accent} intensity={24} distance={34} /> : null}
       {children(detailed)}
-      <DestinationLabel id={id} lod={lod} hovered={hovered} />
+      <DestinationLabel id={id} lod={lod} />
     </group>
   );
 }
 
-function DynamicDestinations({ state, motion, onEnterDestination, quality }: Pick<IntelligenceUniverseWorldProps, "state" | "motion" | "onEnterDestination" | "quality">) {
+function DynamicDestinations({ state, motion, quality }: Pick<IntelligenceUniverseWorldProps, "state" | "motion" | "quality">) {
   return (
     <group>
       {INTELLIGENCE_UNIVERSE_PRIMARY_REGIONS.map((id) => (
-        <DestinationEnvironment key={id} id={id} motion={motion} onEnterDestination={onEnterDestination} selected={state.selectedDestination === id} quality={quality}>
+        <DestinationEnvironment key={id} id={id} motion={motion} selected={state.selectedDestination === id} quality={quality}>
           {(detailed) => <RegionStructure id={id} selected={state.selectedDestination === id} detailed={detailed} />}
         </DestinationEnvironment>
       ))}
       {INTELLIGENCE_UNIVERSE_SYSTEMS.map((id) => (
-        <DestinationEnvironment key={id} id={id} motion={motion} onEnterDestination={onEnterDestination} selected={state.selectedDestination === id} quality={quality}>
+        <DestinationEnvironment key={id} id={id} motion={motion} selected={state.selectedDestination === id} quality={quality}>
           {(detailed) => <ProductStructure id={id} selected={state.selectedDestination === id} detailed={detailed} />}
         </DestinationEnvironment>
       ))}
@@ -650,8 +642,7 @@ export function IntelligenceUniverseWorld({
   active,
   state,
   motion,
-  quality,
-  onEnterDestination
+  quality
 }: IntelligenceUniverseWorldProps) {
   return (
     <>
@@ -667,7 +658,7 @@ export function IntelligenceUniverseWorld({
       <DistantArchitecture quality={quality} />
       <WorldCorridors />
       <SupportingSignals />
-      <DynamicDestinations state={state} motion={motion} quality={quality} onEnterDestination={onEnterDestination} />
+      <DynamicDestinations state={state} motion={motion} quality={quality} />
       {active ? <SignalField quality={quality} motion={motion} /> : null}
     </>
   );

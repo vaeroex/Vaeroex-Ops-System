@@ -18,7 +18,6 @@ import {
   INTELLIGENCE_UNIVERSE_ENTRY_POSITIONS,
   INTELLIGENCE_UNIVERSE_START_POSITION,
   isUniverseSystemDestination,
-  type IntelligenceUniverseDestination,
   type IntelligenceUniverseMotion,
   type IntelligenceUniverseState
 } from "@/lib/marketing/intelligence-universe";
@@ -28,7 +27,6 @@ type IntelligenceUniverseCanvasProps = Readonly<{
   state: IntelligenceUniverseState;
   motion: MutableRefObject<IntelligenceUniverseMotion>;
   quality: SpatialQualityTier;
-  onEnterDestination: (destination: IntelligenceUniverseDestination) => void;
 }>;
 
 const MASTER_CAMERA_POSITION = [
@@ -43,8 +41,8 @@ function UniverseCamera({ active, state, motion }: Pick<IntelligenceUniverseCanv
   const lookAt = useRef(new Vector3(0, 0, -18));
   const desiredPosition = useRef(new Vector3(...MASTER_CAMERA_POSITION));
   const desiredTarget = useRef(new Vector3(0, 0, -18));
-  const freeTarget = useRef(new Vector3(0, 0, -18));
-  const systemTarget = useRef(new Vector3());
+  const guidedTarget = useRef(new Vector3(0, 0, -18));
+  const destinationTarget = useRef(new Vector3());
 
   useEffect(() => {
     if (active) invalidate();
@@ -57,39 +55,23 @@ function UniverseCamera({ active, state, motion }: Pick<IntelligenceUniverseCanv
     const entry = INTELLIGENCE_UNIVERSE_ENTRY_POSITIONS[selectedDestination];
     const destination = INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS[selectedDestination];
     const approach = currentMotion.approachProgress;
-    const velocityMagnitude = Math.hypot(
-      currentMotion.velocity.x,
-      currentMotion.velocity.y,
-      currentMotion.velocity.z
-    );
-    const lookAheadScale = MathUtils.clamp(velocityMagnitude / 16, 0, 1);
     const position = desiredPosition.current.set(
       MathUtils.lerp(currentMotion.position.x, entry.x, approach),
       MathUtils.lerp(currentMotion.position.y, entry.y, approach),
       MathUtils.lerp(currentMotion.position.z, entry.z, approach)
     );
 
-    freeTarget.current.set(
-      currentMotion.position.x + MathUtils.clamp(currentMotion.velocity.x * 0.2, -4.5, 4.5),
-      currentMotion.position.y + MathUtils.clamp(currentMotion.velocity.y * 0.16, -3, 3),
-      currentMotion.position.z - 36 - Math.max(0, -currentMotion.velocity.z) * 0.08
+    guidedTarget.current.set(
+      currentMotion.position.x * 0.08,
+      currentMotion.position.y * 0.08,
+      currentMotion.position.z - 34
     );
-    systemTarget.current.set(destination.x, destination.y, destination.z);
-    const systemDistance = Math.max(0.001, Math.hypot(
-      destination.x - currentMotion.position.x,
-      destination.y - currentMotion.position.y,
-      destination.z - currentMotion.position.z
-    ));
-    const headingTowardSystem = (
-      currentMotion.velocity.x * (destination.x - currentMotion.position.x)
-      + currentMotion.velocity.y * (destination.y - currentMotion.position.y)
-      + currentMotion.velocity.z * (destination.z - currentMotion.position.z)
-    ) / systemDistance;
+    destinationTarget.current.set(destination.x, destination.y, destination.z);
     const proximityFocus = state.proximity === "near"
-      ? (headingTowardSystem < -0.08 ? 0.1 : 0.52 + lookAheadScale * 0.08)
-      : state.proximity === "signal" ? (headingTowardSystem < -0.08 ? 0.025 : 0.12) : 0;
+      ? 0.56
+      : 0.18;
     const focus = Math.max(approach, proximityFocus);
-    const target = desiredTarget.current.copy(freeTarget.current).lerp(systemTarget.current, focus);
+    const target = desiredTarget.current.copy(guidedTarget.current).lerp(destinationTarget.current, focus);
     const destinationFov = isUniverseSystemDestination(selectedDestination) ? 40.5 : 44;
     const fov = MathUtils.lerp(state.current === "vaeroex" ? 51 : 49, destinationFov, approach);
     const reducedMotion = state.reducedMotion || state.quality === "reduced_motion";
@@ -99,12 +81,14 @@ function UniverseCamera({ active, state, motion }: Pick<IntelligenceUniverseCanv
       lookAt.current.copy(target);
       camera.fov = fov;
     } else {
-      const positionDamping = currentMotion.dragging ? 19 : currentMotion.mode === "fast_travel" ? 10.5 : 7.6;
+      const positionDamping = currentMotion.mode === "fast_travel"
+        ? 10.5
+        : currentMotion.mode === "scrolling" ? 6.8 : 7.6;
       camera.position.x = MathUtils.damp(camera.position.x, position.x, positionDamping, delta);
       camera.position.y = MathUtils.damp(camera.position.y, position.y, positionDamping * 0.9, delta);
       camera.position.z = MathUtils.damp(camera.position.z, position.z, positionDamping * 0.86, delta);
-      lookAt.current.x = MathUtils.damp(lookAt.current.x, target.x, currentMotion.dragging ? 15 : 7.8, delta);
-      lookAt.current.y = MathUtils.damp(lookAt.current.y, target.y, currentMotion.dragging ? 15 : 7.2, delta);
+      lookAt.current.x = MathUtils.damp(lookAt.current.x, target.x, 7.8, delta);
+      lookAt.current.y = MathUtils.damp(lookAt.current.y, target.y, 7.2, delta);
       lookAt.current.z = MathUtils.damp(lookAt.current.z, target.z, 7.4, delta);
       camera.fov = MathUtils.damp(camera.fov, fov, 6.2, delta);
     }
@@ -129,12 +113,9 @@ function UniverseFrameScheduler({
     let frame = 0;
     const renderMotion = () => {
       const currentMotion = motion.current;
-      const speed = Math.hypot(
-        currentMotion.velocity.x,
-        currentMotion.velocity.y,
-        currentMotion.velocity.z
-      );
-      const isMoving = currentMotion.dragging || currentMotion.mode !== "idle" || speed > 0.012;
+      const isMoving = currentMotion.mode !== "idle"
+        || Math.abs(currentMotion.approachTarget - currentMotion.approachProgress) > 0.0015
+        || Math.abs(currentMotion.scrollTarget - currentMotion.scrollProgress) > 0.0015;
       if (isMoving && document.visibilityState === "visible") invalidate();
       frame = window.requestAnimationFrame(renderMotion);
     };
@@ -159,8 +140,7 @@ export default function IntelligenceUniverseCanvas({
   active,
   state,
   motion,
-  quality,
-  onEnterDestination
+  quality
 }: IntelligenceUniverseCanvasProps) {
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
   const dpr: [number, number] = quality === "full"
@@ -196,7 +176,6 @@ export default function IntelligenceUniverseCanvas({
           quality={quality}
           state={state}
           motion={motion}
-          onEnterDestination={onEnterDestination}
         />
         <UniverseCamera active={active} state={state} motion={motion} />
         <UniverseFrameScheduler active={active} quality={quality} motion={motion} />

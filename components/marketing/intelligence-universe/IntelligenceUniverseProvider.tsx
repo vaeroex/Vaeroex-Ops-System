@@ -17,26 +17,19 @@ import {
 import { IntelligenceUniverseShell } from "@/components/marketing/intelligence-universe/IntelligenceUniverseShell";
 import {
   INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS,
-  INTELLIGENCE_UNIVERSE_BOUNDS,
+  INTELLIGENCE_UNIVERSE_MAP_EXTENTS,
   INTELLIGENCE_UNIVERSE_ROUTES,
-  adjacentUniverseDestination,
-  adjacentUniverseSystem,
-  clampUniversePosition,
   createUniverseMotion,
   distanceBetweenUniversePoints,
-  distanceToUniverseDestination,
   initialUniverseState,
   isUniverseSystemDestination,
-  moveUniversePosition,
-  nearestUniverseDestination,
+  sampleGuidedUniverseJourney,
   universeDestinationForPathname,
   universeLevelForDestination,
-  universeProximityForDistance,
   type IntelligenceUniverseDestination,
   type IntelligenceUniverseMotion,
   type IntelligenceUniverseProximity,
   type IntelligenceUniverseState,
-  type IntelligenceUniverseSystemDestination,
   type IntelligenceUniverseVector3
 } from "@/lib/marketing/intelligence-universe";
 
@@ -46,7 +39,7 @@ type UniverseAction =
   | { type: "route_sync"; destination: IntelligenceUniverseDestination; preserveSelection: boolean }
   | { type: "travel"; destination: IntelligenceUniverseDestination }
   | { type: "settle" }
-  | { type: "locate"; destination: IntelligenceUniverseDestination; proximity: IntelligenceUniverseProximity }
+  | { type: "focus"; destination: IntelligenceUniverseDestination; proximity: IntelligenceUniverseProximity }
   | { type: "reduced_motion"; value: boolean }
   | { type: "quality"; value: IntelligenceUniverseState["quality"] };
 
@@ -78,9 +71,9 @@ function reducer(state: IntelligenceUniverseState, action: UniverseAction): Inte
       ...state,
       current: action.destination,
       target: action.destination,
-      selectedDestination: action.destination,
+      selectedDestination: action.preserveSelection ? state.selectedDestination : action.destination,
       selectedSystem,
-      proximity: action.destination === "vaeroex" ? state.proximity : "near",
+      proximity: action.destination === "vaeroex" ? "signal" : "near",
       route: INTELLIGENCE_UNIVERSE_ROUTES[action.destination],
       phase,
       level: universeLevelForDestination(action.destination, phase),
@@ -105,7 +98,7 @@ function reducer(state: IntelligenceUniverseState, action: UniverseAction): Inte
     };
   }
 
-  if (action.type === "locate") {
+  if (action.type === "focus") {
     if (state.selectedDestination === action.destination && state.proximity === action.proximity) return state;
     const productDestination = isUniverseSystemDestination(action.destination) ? action.destination : null;
     return {
@@ -113,9 +106,9 @@ function reducer(state: IntelligenceUniverseState, action: UniverseAction): Inte
       selectedDestination: action.destination,
       selectedSystem: productDestination || state.selectedSystem,
       proximity: action.proximity,
-      assetReadiness: action.proximity === "open_field" || !productDestination
-        ? state.assetReadiness
-        : { ...state.assetReadiness, [productDestination]: "approach" }
+      assetReadiness: productDestination
+        ? { ...state.assetReadiness, [productDestination]: "approach" }
+        : state.assetReadiness
     };
   }
 
@@ -133,66 +126,21 @@ function copyPosition(target: IntelligenceUniverseVector3, source: Readonly<Inte
   target.z = source.z;
 }
 
-function zeroVelocity(motion: IntelligenceUniverseMotion) {
-  motion.velocity.x = 0;
-  motion.velocity.y = 0;
-  motion.velocity.z = 0;
+function dampPosition(
+  target: IntelligenceUniverseVector3,
+  destination: Readonly<IntelligenceUniverseVector3>,
+  smoothing: number,
+  delta: number
+) {
+  target.x = damp(target.x, destination.x, smoothing, delta);
+  target.y = damp(target.y, destination.y, smoothing, delta);
+  target.z = damp(target.z, destination.z, smoothing, delta);
 }
 
-function velocityMagnitude(motion: IntelligenceUniverseMotion) {
-  return Math.hypot(motion.velocity.x, motion.velocity.y, motion.velocity.z);
-}
-
-function springPosition(motion: IntelligenceUniverseMotion, delta: number, spring = 25, drag = 8.8) {
-  for (const axis of ["x", "y", "z"] as const) {
-    motion.velocity[axis] += (motion.targetPosition[axis] - motion.position[axis]) * spring * delta;
-    motion.velocity[axis] *= Math.exp(-drag * delta);
-    motion.position[axis] += motion.velocity[axis] * delta;
-  }
-  const bounded = clampUniversePosition(motion.position);
-  copyPosition(motion.position, bounded);
-}
-
-function integrateFreeMotion(motion: IntelligenceUniverseMotion, delta: number) {
-  const nearest = nearestUniverseDestination(motion.position);
-  const gravityTarget = INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[nearest];
-  const direction = {
-    x: gravityTarget.x - motion.position.x,
-    y: gravityTarget.y - motion.position.y,
-    z: gravityTarget.z - motion.position.z
-  };
-  const distance = Math.max(0.001, Math.hypot(direction.x, direction.y, direction.z));
-  const headingToward = (
-    motion.velocity.x * direction.x
-    + motion.velocity.y * direction.y
-    + motion.velocity.z * direction.z
-  ) / distance;
-
-  if (distance < 38 && headingToward > 0.08) {
-    const attraction = (1 - distance / 38) * 0.72 * delta;
-    motion.velocity.x += direction.x / distance * attraction;
-    motion.velocity.y += direction.y / distance * attraction;
-    motion.velocity.z += direction.z / distance * attraction;
-  }
-
-  for (const axis of ["x", "y", "z"] as const) {
-    const [minimum, maximum] = INTELLIGENCE_UNIVERSE_BOUNDS[axis];
-    const boundaryBand = axis === "z" ? 10 : 8;
-    if (motion.position[axis] < minimum + boundaryBand) {
-      motion.velocity[axis] += (minimum + boundaryBand - motion.position[axis]) * 2.2 * delta;
-    } else if (motion.position[axis] > maximum - boundaryBand) {
-      motion.velocity[axis] -= (motion.position[axis] - (maximum - boundaryBand)) * 2.2 * delta;
-    }
-    motion.velocity[axis] *= Math.exp(-2.85 * delta);
-    motion.position[axis] += motion.velocity[axis] * delta;
-  }
-
-  const bounded = clampUniversePosition(motion.position);
-  for (const axis of ["x", "y", "z"] as const) {
-    if (bounded[axis] !== motion.position[axis]) motion.velocity[axis] = 0;
-  }
-  copyPosition(motion.position, bounded);
-  copyPosition(motion.targetPosition, bounded);
+function journeySelector(destination: IntelligenceUniverseDestination) {
+  if (destination === "vaeroex") return "[data-public-spatial-journey]";
+  if (destination === "intelligence-systems") return "[data-intelligence-systems-journey]";
+  return ".vaeroex-public-site";
 }
 
 export function IntelligenceUniverseProvider({ children }: { children: ReactNode }) {
@@ -205,7 +153,6 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
   const settleTimer = useRef<number | null>(null);
   const internalTravelTarget = useRef<IntelligenceUniverseDestination | null>(null);
   const selectedDestinationRef = useRef(state.selectedDestination);
-  const selectedSystemRef = useRef(state.selectedSystem);
   const proximityRef = useRef(state.proximity);
   const initialDestination = universeDestinationForPathname(pathname);
   const motion = useRef<IntelligenceUniverseMotion>(createUniverseMotion(
@@ -215,40 +162,25 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
   const destination = universeDestinationForPathname(pathname);
   const routeIsCompatible = destination !== null;
 
-  const syncSpatialLocation = useCallback(() => {
-    const currentMotion = motion.current;
-    const assisted = currentMotion.mode === "fast_travel"
-      || currentMotion.mode === "approaching"
-      || currentMotion.approachProgress > 0.055;
-    const nearest = assisted ? selectedDestinationRef.current : nearestUniverseDestination(currentMotion.position);
-    const proximity = universeProximityForDistance(distanceToUniverseDestination(currentMotion.position, nearest));
-    if (nearest === selectedDestinationRef.current && proximity === proximityRef.current) return;
-    selectedDestinationRef.current = nearest;
-    if (isUniverseSystemDestination(nearest)) selectedSystemRef.current = nearest;
+  const syncGuidedFocus = useCallback((nextDestination: IntelligenceUniverseDestination, proximity: IntelligenceUniverseProximity) => {
+    if (selectedDestinationRef.current === nextDestination && proximityRef.current === proximity) return;
+    selectedDestinationRef.current = nextDestination;
     proximityRef.current = proximity;
-    dispatch({ type: "locate", destination: nearest, proximity });
+    dispatch({ type: "focus", destination: nextDestination, proximity });
   }, []);
 
   const configureMotionForDestination = useCallback((nextDestination: IntelligenceUniverseDestination) => {
     const currentMotion = motion.current;
-    currentMotion.dragging = false;
-    currentMotion.dragOriginX = null;
-    currentMotion.dragOriginY = null;
-    currentMotion.dragLastX = null;
-    currentMotion.dragLastY = null;
-    currentMotion.dragLastAt = null;
-
     selectedDestinationRef.current = nextDestination;
-    if (isUniverseSystemDestination(nextDestination)) selectedSystemRef.current = nextDestination;
     proximityRef.current = "signal";
+    currentMotion.scrollTarget = 0;
     const nextPosition = INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[nextDestination];
     const crossesUniverse = distanceBetweenUniversePoints(currentMotion.position, nextPosition) > 2.5;
     copyPosition(currentMotion.targetPosition, nextPosition);
-    zeroVelocity(currentMotion);
     if (crossesUniverse) {
       currentMotion.mode = "fast_travel";
       currentMotion.travelStage = currentMotion.approachProgress > 0.24 ? "pullback" : "crossing";
-      currentMotion.approachTarget = 0.08;
+      currentMotion.approachTarget = 0.06;
     } else {
       currentMotion.mode = "approaching";
       currentMotion.travelStage = "approach";
@@ -280,9 +212,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     }
     if (!isInternalTravel) {
       selectedDestinationRef.current = destination;
-      if (isUniverseSystemDestination(destination)) selectedSystemRef.current = destination;
-      proximityRef.current = destination === "vaeroex" ? "open_field" : "near";
-      copyPosition(motion.current.targetPosition, INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[destination]);
+      proximityRef.current = destination === "vaeroex" ? "signal" : "near";
     }
     internalTravelTarget.current = null;
 
@@ -291,7 +221,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
       () => dispatch({ type: "settle" }),
       destination === "vaeroex"
         ? 0
-        : (state.reducedMotion ? 80 : isInternalTravel ? 720 : 1180)
+        : (state.reducedMotion ? 100 : isInternalTravel ? 680 : 1080)
     );
     return () => {
       if (settleTimer.current) window.clearTimeout(settleTimer.current);
@@ -299,8 +229,15 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
   }, [configureMotionForDestination, destination, state.reducedMotion]);
 
   useEffect(() => {
-    if (!routeIsCompatible) return;
-    const update = () => setNearTop(window.scrollY < window.innerHeight * 0.72);
+    if (!destination) return;
+    const update = () => {
+      const journey = document.querySelector<HTMLElement>(journeySelector(destination));
+      const travel = journey ? Math.max(1, journey.offsetHeight - window.innerHeight) : 1;
+      const bounds = journey?.getBoundingClientRect();
+      const progress = Math.min(1, Math.max(0, bounds ? -bounds.top / travel : 0));
+      motion.current.scrollTarget = progress;
+      setNearTop(window.scrollY < window.innerHeight * 0.72);
+    };
     update();
     window.addEventListener("scroll", update, { passive: true });
     window.addEventListener("resize", update, { passive: true });
@@ -308,16 +245,23 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
       window.removeEventListener("scroll", update);
       window.removeEventListener("resize", update);
     };
-  }, [destination, routeIsCompatible]);
+  }, [destination]);
 
+  const persistentJourney = destination === "vaeroex" || destination === "intelligence-systems";
   const shellVisible = enabled && routeIsCompatible && (
     state.phase === "transitioning"
     || state.phase === "arriving"
+    || persistentJourney
     || (!isUniverseSystemDestination(destination || "vaeroex") && nearTop)
+  );
+  const controlsVisible = shellVisible && (
+    state.phase === "transitioning"
+    || state.phase === "arriving"
+    || nearTop
   );
 
   useEffect(() => {
-    if (!shellVisible) return;
+    if (!shellVisible || !destination) return;
     let animationFrame = 0;
     let previous = performance.now();
 
@@ -326,69 +270,64 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
       const delta = Math.min(0.034, Math.max(0.001, (now - previous) / 1000));
       previous = now;
 
-      if (!currentMotion.dragging) {
-        if (currentMotion.mode === "fast_travel") {
-          if (currentMotion.travelStage === "pullback") {
-            currentMotion.approachTarget = 0.08;
-            if (currentMotion.approachProgress < 0.16) currentMotion.travelStage = "crossing";
-          } else if (currentMotion.travelStage === "crossing") {
-            springPosition(currentMotion, delta, 29, 8.2);
-            if (
-              distanceBetweenUniversePoints(currentMotion.position, currentMotion.targetPosition) < 1.8
-              && velocityMagnitude(currentMotion) < 2.2
-            ) {
-              currentMotion.travelStage = "approach";
-              currentMotion.approachTarget = 1;
-            }
-          } else {
-            springPosition(currentMotion, delta, 24, 9.2);
+      currentMotion.scrollProgress = state.reducedMotion
+        ? currentMotion.scrollTarget
+        : damp(currentMotion.scrollProgress, currentMotion.scrollTarget, 4.2, delta);
+
+      if (currentMotion.mode === "fast_travel") {
+        if (currentMotion.travelStage === "pullback") {
+          currentMotion.approachTarget = 0.06;
+          if (currentMotion.approachProgress < 0.14) currentMotion.travelStage = "crossing";
+        } else if (currentMotion.travelStage === "crossing") {
+          dampPosition(currentMotion.position, currentMotion.targetPosition, 5.8, delta);
+          if (distanceBetweenUniversePoints(currentMotion.position, currentMotion.targetPosition) < 1.25) {
+            currentMotion.travelStage = "approach";
+            currentMotion.approachTarget = 1;
           }
-        } else if (currentMotion.mode === "settling" || currentMotion.mode === "approaching" || currentMotion.mode === "retreating") {
-          springPosition(currentMotion, delta, currentMotion.mode === "retreating" ? 18 : 24, 9.2);
-        } else if (currentMotion.mode === "coasting") {
-          integrateFreeMotion(currentMotion, delta);
+        } else {
+          dampPosition(currentMotion.position, currentMotion.targetPosition, 6.4, delta);
+        }
+      } else if (currentMotion.mode === "approaching" || currentMotion.mode === "retreating") {
+        dampPosition(currentMotion.position, currentMotion.targetPosition, currentMotion.mode === "retreating" ? 5 : 6.2, delta);
+      } else {
+        const frame = sampleGuidedUniverseJourney(destination, currentMotion.scrollProgress);
+        copyPosition(currentMotion.targetPosition, frame.position);
+        currentMotion.approachTarget = frame.approach;
+        currentMotion.mode = "scrolling";
+        dampPosition(currentMotion.position, currentMotion.targetPosition, 4.8, delta);
+        syncGuidedFocus(frame.focus, frame.approach > 0.42 ? "near" : "signal");
+      }
+
+      currentMotion.approachProgress = state.reducedMotion
+        ? currentMotion.approachTarget
+        : damp(currentMotion.approachProgress, currentMotion.approachTarget, 5.4, delta);
+      currentMotion.approachProgress = Math.min(1, Math.max(0, currentMotion.approachProgress));
+
+      const positionSettled = distanceBetweenUniversePoints(currentMotion.position, currentMotion.targetPosition) < 0.055;
+      const approachSettled = Math.abs(currentMotion.approachTarget - currentMotion.approachProgress) < 0.004;
+      const scrollSettled = Math.abs(currentMotion.scrollTarget - currentMotion.scrollProgress) < 0.0015;
+      if (positionSettled && approachSettled) {
+        if (currentMotion.mode === "fast_travel" && currentMotion.travelStage === "approach") {
+          currentMotion.mode = "idle";
+        } else if (currentMotion.mode === "approaching" || currentMotion.mode === "retreating") {
+          currentMotion.mode = "idle";
+        } else if (currentMotion.mode === "scrolling" && scrollSettled) {
+          currentMotion.mode = "idle";
         }
       }
 
-      const approachSmoothing = currentMotion.mode === "retreating" ? 4.8 : 3.8;
-      currentMotion.approachProgress = damp(
-        currentMotion.approachProgress,
-        currentMotion.approachTarget,
-        approachSmoothing,
-        delta
-      );
-      currentMotion.approachProgress = Math.min(1, Math.max(0, currentMotion.approachProgress));
-      syncSpatialLocation();
-
-      const positionSettled = distanceBetweenUniversePoints(currentMotion.position, currentMotion.targetPosition) < 0.06
-        && velocityMagnitude(currentMotion) < 0.045;
-      const approachSettled = Math.abs(currentMotion.approachTarget - currentMotion.approachProgress) < 0.004;
-      if (!currentMotion.dragging && currentMotion.mode === "coasting" && velocityMagnitude(currentMotion) < 0.018) {
-        zeroVelocity(currentMotion);
-        currentMotion.mode = "idle";
-      } else if (
-        !currentMotion.dragging
-        && positionSettled
-        && approachSettled
-        && currentMotion.mode !== "fast_travel"
-      ) {
-        copyPosition(currentMotion.position, currentMotion.targetPosition);
-        zeroVelocity(currentMotion);
-        currentMotion.approachProgress = currentMotion.approachTarget;
-        currentMotion.mode = "idle";
-      }
-
       const root = document.documentElement;
-      const normalizedX = (currentMotion.position.x - INTELLIGENCE_UNIVERSE_BOUNDS.x[0])
-        / (INTELLIGENCE_UNIVERSE_BOUNDS.x[1] - INTELLIGENCE_UNIVERSE_BOUNDS.x[0]);
-      const normalizedY = 1 - (currentMotion.position.y - INTELLIGENCE_UNIVERSE_BOUNDS.y[0])
-        / (INTELLIGENCE_UNIVERSE_BOUNDS.y[1] - INTELLIGENCE_UNIVERSE_BOUNDS.y[0]);
-      const normalizedZ = (currentMotion.position.z - INTELLIGENCE_UNIVERSE_BOUNDS.z[0])
-        / (INTELLIGENCE_UNIVERSE_BOUNDS.z[1] - INTELLIGENCE_UNIVERSE_BOUNDS.z[0]);
+      const normalizedX = (currentMotion.position.x - INTELLIGENCE_UNIVERSE_MAP_EXTENTS.x[0])
+        / (INTELLIGENCE_UNIVERSE_MAP_EXTENTS.x[1] - INTELLIGENCE_UNIVERSE_MAP_EXTENTS.x[0]);
+      const normalizedY = 1 - (currentMotion.position.y - INTELLIGENCE_UNIVERSE_MAP_EXTENTS.y[0])
+        / (INTELLIGENCE_UNIVERSE_MAP_EXTENTS.y[1] - INTELLIGENCE_UNIVERSE_MAP_EXTENTS.y[0]);
+      const normalizedZ = (currentMotion.position.z - INTELLIGENCE_UNIVERSE_MAP_EXTENTS.z[0])
+        / (INTELLIGENCE_UNIVERSE_MAP_EXTENTS.z[1] - INTELLIGENCE_UNIVERSE_MAP_EXTENTS.z[0]);
       root.dataset.intelligenceUniverseX = currentMotion.position.x.toFixed(3);
       root.dataset.intelligenceUniverseY = currentMotion.position.y.toFixed(3);
       root.dataset.intelligenceUniverseZ = currentMotion.position.z.toFixed(3);
       root.dataset.intelligenceUniverseApproach = currentMotion.approachProgress.toFixed(4);
+      root.dataset.intelligenceUniverseScroll = currentMotion.scrollProgress.toFixed(4);
       root.dataset.intelligenceUniverseMotion = currentMotion.mode;
       root.dataset.intelligenceUniverseProximity = proximityRef.current;
       root.style.setProperty("--intelligence-universe-map-x", `${(normalizedX * 100).toFixed(2)}%`);
@@ -399,7 +338,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
 
     animationFrame = window.requestAnimationFrame(tick);
     return () => window.cancelAnimationFrame(animationFrame);
-  }, [shellVisible, syncSpatialLocation]);
+  }, [destination, shellVisible, state.reducedMotion, syncGuidedFocus]);
 
   useEffect(() => {
     document.documentElement.dataset.intelligenceUniverse = shellVisible ? "active" : "inactive";
@@ -414,6 +353,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
       delete root.dataset.intelligenceUniverseY;
       delete root.dataset.intelligenceUniverseZ;
       delete root.dataset.intelligenceUniverseApproach;
+      delete root.dataset.intelligenceUniverseScroll;
       delete root.dataset.intelligenceUniverseMotion;
       delete root.dataset.intelligenceUniverseProximity;
       root.style.removeProperty("--intelligence-universe-map-x");
@@ -434,7 +374,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
 
   const travel = useCallback((nextDestination: IntelligenceUniverseDestination) => {
     const nextRoute = INTELLIGENCE_UNIVERSE_ROUTES[nextDestination];
-    if (!enabled || !routeIsCompatible || state.reducedMotion) {
+    if (!enabled || !routeIsCompatible) {
       router.push(nextRoute);
       return;
     }
@@ -442,161 +382,17 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     if (travelTimer.current) window.clearTimeout(travelTimer.current);
     internalTravelTarget.current = nextDestination;
     selectedDestinationRef.current = nextDestination;
-    if (isUniverseSystemDestination(nextDestination)) selectedSystemRef.current = nextDestination;
     proximityRef.current = "signal";
-    configureMotionForDestination(nextDestination);
     dispatch({ type: "travel", destination: nextDestination });
 
-    const currentMotion = motion.current;
-    const delay = currentMotion.travelStage === "pullback" || currentMotion.travelStage === "crossing" ? 1280 : 760;
-    travelTimer.current = window.setTimeout(() => router.push(nextRoute), delay);
-  }, [configureMotionForDestination, enabled, routeIsCompatible, router, state.reducedMotion]);
-
-  const selectDestination = useCallback((nextDestination: IntelligenceUniverseDestination) => {
-    if (state.inputLocked) return;
-    const currentMotion = motion.current;
-    selectedDestinationRef.current = nextDestination;
-    if (isUniverseSystemDestination(nextDestination)) selectedSystemRef.current = nextDestination;
-    proximityRef.current = "signal";
-    dispatch({ type: "locate", destination: nextDestination, proximity: "signal" });
-    copyPosition(currentMotion.targetPosition, INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[nextDestination]);
-    zeroVelocity(currentMotion);
-    currentMotion.approachTarget = 0;
-    currentMotion.mode = "settling";
-    currentMotion.travelStage = "overview";
-  }, [state.inputLocked]);
-
-  const selectAdjacentDestination = useCallback((direction: -1 | 1) => {
-    if (state.inputLocked) return;
-    selectDestination(adjacentUniverseDestination(selectedDestinationRef.current, direction));
-  }, [selectDestination, state.inputLocked]);
-
-  const selectSystem = useCallback((nextDestination: IntelligenceUniverseSystemDestination) => {
-    selectDestination(nextDestination);
-  }, [selectDestination]);
-
-  const selectAdjacentSystem = useCallback((direction: -1 | 1) => {
-    if (state.inputLocked) return;
-    selectSystem(adjacentUniverseSystem(selectedSystemRef.current, direction));
-  }, [selectSystem, state.inputLocked]);
-
-  const beginExplorationDrag = useCallback((clientX: number, clientY: number, at: number) => {
-    if (state.inputLocked) return;
-    const currentMotion = motion.current;
-    currentMotion.dragging = true;
-    currentMotion.dragOriginX = clientX;
-    currentMotion.dragOriginY = clientY;
-    currentMotion.dragLastX = clientX;
-    currentMotion.dragLastY = clientY;
-    currentMotion.dragLastAt = at;
-    zeroVelocity(currentMotion);
-    copyPosition(currentMotion.targetPosition, currentMotion.position);
-    currentMotion.mode = "dragging";
-    currentMotion.travelStage = "overview";
-    currentMotion.approachTarget = 0;
-  }, [state.inputLocked]);
-
-  const updateExplorationDrag = useCallback((
-    clientX: number,
-    clientY: number,
-    at: number,
-    viewportWidth: number,
-    viewportHeight: number
-  ) => {
-    const currentMotion = motion.current;
-    if (
-      !currentMotion.dragging
-      || currentMotion.dragLastX === null
-      || currentMotion.dragLastY === null
-      || currentMotion.dragLastAt === null
-    ) return;
-    const elapsed = Math.max(8, at - currentMotion.dragLastAt) / 1000;
-    const delta: IntelligenceUniverseVector3 = {
-      x: -(clientX - currentMotion.dragLastX) * 38 / Math.max(320, viewportWidth),
-      y: (clientY - currentMotion.dragLastY) * 26 / Math.max(480, viewportHeight),
-      z: 0
-    };
-    const nextPosition = moveUniversePosition(currentMotion.position, delta);
-    currentMotion.velocity.x = Math.min(8, Math.max(
-      -8,
-      currentMotion.velocity.x * 0.52 + (nextPosition.x - currentMotion.position.x) / elapsed * 0.48
-    ));
-    currentMotion.velocity.y = Math.min(6, Math.max(
-      -6,
-      currentMotion.velocity.y * 0.52 + (nextPosition.y - currentMotion.position.y) / elapsed * 0.48
-    ));
-    currentMotion.velocity.z *= 0.72;
-    copyPosition(currentMotion.position, nextPosition);
-    copyPosition(currentMotion.targetPosition, nextPosition);
-    currentMotion.dragLastX = clientX;
-    currentMotion.dragLastY = clientY;
-    currentMotion.dragLastAt = at;
-    if (
-      currentMotion.dragOriginX !== null
-      && currentMotion.dragOriginY !== null
-      && Math.hypot(clientX - currentMotion.dragOriginX, clientY - currentMotion.dragOriginY) > 7
-    ) {
-      currentMotion.suppressClickUntil = at + 260;
+    if (state.reducedMotion) {
+      travelTimer.current = window.setTimeout(() => router.push(nextRoute), 140);
+      return;
     }
-    syncSpatialLocation();
-  }, [syncSpatialLocation]);
 
-  const endExplorationDrag = useCallback((at: number) => {
-    const currentMotion = motion.current;
-    if (!currentMotion.dragging) return;
-    const moved = currentMotion.dragOriginX !== null
-      && currentMotion.dragOriginY !== null
-      && currentMotion.dragLastX !== null
-      && currentMotion.dragLastY !== null
-      && Math.hypot(
-        currentMotion.dragLastX - currentMotion.dragOriginX,
-        currentMotion.dragLastY - currentMotion.dragOriginY
-      ) > 7;
-    if (moved) currentMotion.suppressClickUntil = Math.max(currentMotion.suppressClickUntil, at + 120);
-    currentMotion.dragging = false;
-    currentMotion.dragOriginX = null;
-    currentMotion.dragOriginY = null;
-    currentMotion.dragLastX = null;
-    currentMotion.dragLastY = null;
-    currentMotion.dragLastAt = null;
-    copyPosition(currentMotion.targetPosition, currentMotion.position);
-    currentMotion.mode = velocityMagnitude(currentMotion) > 0.02 ? "coasting" : "idle";
-    currentMotion.travelStage = "overview";
-  }, []);
-
-  const nudgeExploration = useCallback((delta: IntelligenceUniverseVector3) => {
-    if (state.inputLocked) return;
-    const currentMotion = motion.current;
-    const nextPosition = moveUniversePosition(currentMotion.position, delta);
-    currentMotion.velocity.x = Math.min(10, Math.max(-10, currentMotion.velocity.x * 0.45 + (nextPosition.x - currentMotion.position.x) * 4.2));
-    currentMotion.velocity.y = Math.min(8, Math.max(-8, currentMotion.velocity.y * 0.45 + (nextPosition.y - currentMotion.position.y) * 4.2));
-    currentMotion.velocity.z = Math.min(12, Math.max(-12, currentMotion.velocity.z * 0.45 + (nextPosition.z - currentMotion.position.z) * 4.2));
-    copyPosition(currentMotion.position, nextPosition);
-    copyPosition(currentMotion.targetPosition, nextPosition);
-    currentMotion.approachTarget = 0;
-    currentMotion.mode = "coasting";
-    currentMotion.travelStage = "overview";
-    syncSpatialLocation();
-  }, [state.inputLocked, syncSpatialLocation]);
-
-  const enterDestination = useCallback((nextDestination: IntelligenceUniverseDestination) => {
-    if (performance.now() < motion.current.suppressClickUntil) return;
-    travel(nextDestination);
-  }, [travel]);
-
-  const enterSelectedDestination = useCallback(
-    () => enterDestination(state.selectedDestination),
-    [enterDestination, state.selectedDestination]
-  );
-
-  const enterSystem = useCallback((nextDestination: IntelligenceUniverseSystemDestination) => {
-    enterDestination(nextDestination);
-  }, [enterDestination]);
-
-  const enterSelectedSystem = useCallback(
-    () => enterSystem(state.selectedSystem),
-    [enterSystem, state.selectedSystem]
-  );
+    configureMotionForDestination(nextDestination);
+    travelTimer.current = window.setTimeout(() => router.push(nextRoute), 1120);
+  }, [configureMotionForDestination, enabled, routeIsCompatible, router, state.reducedMotion]);
 
   const setQuality = useCallback((quality: IntelligenceUniverseState["quality"]) => {
     dispatch({ type: "quality", value: quality });
@@ -606,45 +402,23 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     state,
     enabled,
     shellVisible,
+    controlsVisible,
     routeIsCompatible,
     motion,
     setEnabled,
     travel,
-    selectDestination,
-    selectAdjacentDestination,
-    enterSelectedDestination,
-    enterDestination,
-    selectSystem,
-    selectAdjacentSystem,
-    enterSelectedSystem,
-    enterSystem,
-    beginExplorationDrag,
-    updateExplorationDrag,
-    endExplorationDrag,
-    nudgeExploration,
     setQuality,
     suppressBackdrop: (backdropDestination) => shellVisible && destination === backdropDestination
   }), [
-    beginExplorationDrag,
+    controlsVisible,
     destination,
     enabled,
-    endExplorationDrag,
-    enterDestination,
-    enterSelectedDestination,
-    enterSelectedSystem,
-    enterSystem,
-    nudgeExploration,
     routeIsCompatible,
-    selectAdjacentDestination,
-    selectAdjacentSystem,
-    selectDestination,
-    selectSystem,
     setEnabled,
     setQuality,
     shellVisible,
     state,
-    travel,
-    updateExplorationDrag
+    travel
   ]);
 
   return (

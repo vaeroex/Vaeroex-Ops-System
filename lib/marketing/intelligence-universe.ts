@@ -26,12 +26,10 @@ export type IntelligenceUniverseRegionDestination = Exclude<
 export type IntelligenceUniverseLevel = "master" | "systems" | "region" | "approach" | "deep";
 export type IntelligenceUniversePhase = "idle" | "transitioning" | "arriving" | "deep";
 export type IntelligenceUniverseAssetLevel = "distant" | "approach" | "detail";
-export type IntelligenceUniverseProximity = "open_field" | "signal" | "near";
+export type IntelligenceUniverseProximity = "signal" | "near";
 export type IntelligenceUniverseMotionMode =
   | "idle"
-  | "dragging"
-  | "coasting"
-  | "settling"
+  | "scrolling"
   | "approaching"
   | "retreating"
   | "fast_travel";
@@ -47,19 +45,23 @@ export type IntelligenceUniverseVector3 = {
 export type IntelligenceUniverseMotion = {
   position: IntelligenceUniverseVector3;
   targetPosition: IntelligenceUniverseVector3;
-  velocity: IntelligenceUniverseVector3;
   approachProgress: number;
   approachTarget: number;
-  dragging: boolean;
-  dragOriginX: number | null;
-  dragOriginY: number | null;
-  dragLastX: number | null;
-  dragLastY: number | null;
-  dragLastAt: number | null;
+  scrollProgress: number;
+  scrollTarget: number;
   mode: IntelligenceUniverseMotionMode;
   travelStage: IntelligenceUniverseTravelStage;
-  suppressClickUntil: number;
 };
+
+export type IntelligenceUniverseGuidedFrame = Readonly<{
+  position: Readonly<IntelligenceUniverseVector3>;
+  focus: IntelligenceUniverseDestination;
+  approach: number;
+}>;
+
+type IntelligenceUniverseJourneyPoint = IntelligenceUniverseGuidedFrame & Readonly<{
+  progress: number;
+}>;
 
 export type IntelligenceUniverseState = Readonly<{
   current: IntelligenceUniverseDestination;
@@ -180,11 +182,34 @@ export const INTELLIGENCE_UNIVERSE_SYSTEM_POSITIONS: Readonly<
   "biological-intelligence": INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS["biological-intelligence"]
 };
 
-export const INTELLIGENCE_UNIVERSE_BOUNDS = {
+export const INTELLIGENCE_UNIVERSE_MAP_EXTENTS = {
   x: [-76, 82],
   y: [-40, 43],
   z: [-82, 40]
 } as const;
+
+const INTELLIGENCE_UNIVERSE_GUIDED_JOURNEYS: Readonly<Partial<
+  Record<IntelligenceUniverseDestination, readonly IntelligenceUniverseJourneyPoint[]>
+>> = {
+  vaeroex: [
+    { progress: 0, position: INTELLIGENCE_UNIVERSE_START_POSITION, focus: "vaeroex", approach: 0.12 },
+    { progress: 0.13, position: { x: 0, y: 4, z: 20 }, focus: "vaeroex", approach: 0.24 },
+    { progress: 0.32, position: { x: 2, y: 6, z: 3 }, focus: "intelligence-systems", approach: 0.28 },
+    { progress: 0.5, position: { x: -10, y: 7, z: -8 }, focus: "intelligence-systems", approach: 0.2 },
+    { progress: 0.67, position: { x: -44, y: 15, z: -2 }, focus: "trust", approach: 0.28 },
+    { progress: 0.84, position: { x: -38, y: -10, z: 19 }, focus: "company", approach: 0.24 },
+    { progress: 1, position: { x: 0, y: 6, z: 20 }, focus: "vaeroex", approach: 0.2 }
+  ],
+  "intelligence-systems": [
+    { progress: 0, position: { x: 2, y: 6, z: 2 }, focus: "intelligence-systems", approach: 0.24 },
+    { progress: 0.16, position: { x: 0, y: 6, z: -7 }, focus: "intelligence-systems", approach: 0.42 },
+    { progress: 0.5, position: { x: 2, y: 5, z: -12 }, focus: "intelligence-systems", approach: 0.5 },
+    { progress: 0.65, position: { x: -24, y: 9, z: -16 }, focus: "executive-intelligence", approach: 0.34 },
+    { progress: 0.79, position: { x: 18, y: -9, z: -43 }, focus: "drug-discovery-intelligence", approach: 0.34 },
+    { progress: 0.91, position: { x: 40, y: 17, z: -25 }, focus: "biological-intelligence", approach: 0.34 },
+    { progress: 1, position: { x: 2, y: 6, z: 1 }, focus: "intelligence-systems", approach: 0.3 }
+  ]
+};
 
 export const INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS: Readonly<
   Record<IntelligenceUniverseDestination, IntelligenceUniverseDestinationDefinition>
@@ -323,16 +348,6 @@ function copyVector(vector: Readonly<IntelligenceUniverseVector3>): Intelligence
   return { x: vector.x, y: vector.y, z: vector.z };
 }
 
-function resistAxis(position: number, delta: number, bounds: readonly [number, number]) {
-  const [minimum, maximum] = bounds;
-  const resistanceBand = Math.max(7, (maximum - minimum) * 0.14);
-  const distanceToBoundary = delta < 0 ? position - minimum : maximum - position;
-  const resistance = distanceToBoundary >= resistanceBand
-    ? 1
-    : 0.16 + 0.84 * Math.max(0, distanceToBoundary) / resistanceBand;
-  return Math.min(maximum, Math.max(minimum, position + delta * resistance));
-}
-
 export function universeDestinationForPathname(pathname: string): IntelligenceUniverseDestination | null {
   return destinationByRoute.get(pathname) || null;
 }
@@ -351,45 +366,6 @@ export function universeLevelForDestination(
   if (destination === "intelligence-systems") return "systems";
   if (isUniverseSystemDestination(destination)) return phase === "deep" ? "deep" : "approach";
   return "region";
-}
-
-export function adjacentUniverseSystem(
-  current: IntelligenceUniverseSystemDestination,
-  direction: -1 | 1
-): IntelligenceUniverseSystemDestination {
-  const currentIndex = INTELLIGENCE_UNIVERSE_SYSTEMS.indexOf(current);
-  const nextIndex = (currentIndex + direction + INTELLIGENCE_UNIVERSE_SYSTEMS.length) % INTELLIGENCE_UNIVERSE_SYSTEMS.length;
-  return INTELLIGENCE_UNIVERSE_SYSTEMS[nextIndex];
-}
-
-export function adjacentUniverseDestination(
-  current: IntelligenceUniverseDestination,
-  direction: -1 | 1
-): IntelligenceUniverseDestination {
-  const currentIndex = INTELLIGENCE_UNIVERSE_DESTINATIONS.indexOf(current);
-  const nextIndex = (currentIndex + direction + INTELLIGENCE_UNIVERSE_DESTINATIONS.length) % INTELLIGENCE_UNIVERSE_DESTINATIONS.length;
-  return INTELLIGENCE_UNIVERSE_DESTINATIONS[nextIndex];
-}
-
-export function moveUniversePosition(
-  position: Readonly<IntelligenceUniverseVector3>,
-  delta: Readonly<IntelligenceUniverseVector3>
-): IntelligenceUniverseVector3 {
-  return {
-    x: resistAxis(position.x, delta.x, INTELLIGENCE_UNIVERSE_BOUNDS.x),
-    y: resistAxis(position.y, delta.y, INTELLIGENCE_UNIVERSE_BOUNDS.y),
-    z: resistAxis(position.z, delta.z, INTELLIGENCE_UNIVERSE_BOUNDS.z)
-  };
-}
-
-export function clampUniversePosition(
-  position: Readonly<IntelligenceUniverseVector3>
-): IntelligenceUniverseVector3 {
-  return {
-    x: Math.min(INTELLIGENCE_UNIVERSE_BOUNDS.x[1], Math.max(INTELLIGENCE_UNIVERSE_BOUNDS.x[0], position.x)),
-    y: Math.min(INTELLIGENCE_UNIVERSE_BOUNDS.y[1], Math.max(INTELLIGENCE_UNIVERSE_BOUNDS.y[0], position.y)),
-    z: Math.min(INTELLIGENCE_UNIVERSE_BOUNDS.z[1], Math.max(INTELLIGENCE_UNIVERSE_BOUNDS.z[0], position.z))
-  };
 }
 
 export function distanceBetweenUniversePoints(
@@ -413,54 +389,68 @@ export function distanceToUniverseSystem(
   return distanceToUniverseDestination(position, destination);
 }
 
-export function nearestUniverseDestination(
-  position: Readonly<IntelligenceUniverseVector3>
-): IntelligenceUniverseDestination {
-  return INTELLIGENCE_UNIVERSE_DESTINATIONS.reduce((nearest, destination) => (
-    distanceToUniverseDestination(position, destination) < distanceToUniverseDestination(position, nearest)
-      ? destination
-      : nearest
-  ), INTELLIGENCE_UNIVERSE_DESTINATIONS[0]);
-}
-
-export function nearestUniverseSystem(
-  position: Readonly<IntelligenceUniverseVector3>
-): IntelligenceUniverseSystemDestination {
-  return INTELLIGENCE_UNIVERSE_SYSTEMS.reduce((nearest, destination) => (
-    distanceToUniverseSystem(position, destination) < distanceToUniverseSystem(position, nearest)
-      ? destination
-      : nearest
-  ), INTELLIGENCE_UNIVERSE_SYSTEMS[0]);
-}
-
 export function universeProximityForDistance(distance: number): IntelligenceUniverseProximity {
   if (distance <= 30) return "near";
-  if (distance <= 62) return "signal";
-  return "open_field";
+  return "signal";
+}
+
+function smoothStep(value: number) {
+  return value * value * (3 - 2 * value);
+}
+
+export function sampleGuidedUniverseJourney(
+  routeDestination: IntelligenceUniverseDestination,
+  progress: number
+): IntelligenceUniverseGuidedFrame {
+  const normalized = Math.min(1, Math.max(0, progress));
+  const journey = INTELLIGENCE_UNIVERSE_GUIDED_JOURNEYS[routeDestination];
+
+  if (!journey) {
+    const from = INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[routeDestination];
+    const to = INTELLIGENCE_UNIVERSE_ENTRY_POSITIONS[routeDestination];
+    const local = smoothStep(Math.min(1, normalized * 1.4));
+    return {
+      position: {
+        x: from.x + (to.x - from.x) * local * 0.34,
+        y: from.y + (to.y - from.y) * local * 0.34,
+        z: from.z + (to.z - from.z) * local * 0.34
+      },
+      focus: routeDestination,
+      approach: 0.5 + local * 0.2
+    };
+  }
+
+  let index = 0;
+  while (index < journey.length - 2 && normalized > journey[index + 1].progress) index += 1;
+  const from = journey[index];
+  const to = journey[index + 1];
+  const range = Math.max(0.001, to.progress - from.progress);
+  const local = smoothStep(Math.min(1, Math.max(0, (normalized - from.progress) / range)));
+  return {
+    position: {
+      x: from.position.x + (to.position.x - from.position.x) * local,
+      y: from.position.y + (to.position.y - from.position.y) * local,
+      z: from.position.z + (to.position.z - from.position.z) * local
+    },
+    focus: local < 0.5 ? from.focus : to.focus,
+    approach: from.approach + (to.approach - from.approach) * local
+  };
 }
 
 export function createUniverseMotion(
   selectedDestination: IntelligenceUniverseDestination,
   approachProgress = 0
 ): IntelligenceUniverseMotion {
-  const initialPosition = approachProgress > 0
-    ? INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[selectedDestination]
-    : INTELLIGENCE_UNIVERSE_START_POSITION;
+  const initialFrame = sampleGuidedUniverseJourney(selectedDestination, 0);
   return {
-    position: copyVector(initialPosition),
-    targetPosition: copyVector(initialPosition),
-    velocity: { x: 0, y: 0, z: 0 },
-    approachProgress,
-    approachTarget: approachProgress,
-    dragging: false,
-    dragOriginX: null,
-    dragOriginY: null,
-    dragLastX: null,
-    dragLastY: null,
-    dragLastAt: null,
+    position: copyVector(initialFrame.position),
+    targetPosition: copyVector(initialFrame.position),
+    approachProgress: approachProgress || initialFrame.approach,
+    approachTarget: approachProgress || initialFrame.approach,
+    scrollProgress: 0,
+    scrollTarget: 0,
     mode: "idle",
-    travelStage: approachProgress > 0 ? "approach" : "overview",
-    suppressClickUntil: 0
+    travelStage: approachProgress > 0 ? "approach" : "overview"
   };
 }
 
@@ -474,7 +464,7 @@ export function initialUniverseState(pathname: string): IntelligenceUniverseStat
     target: destination,
     selectedDestination: destination,
     selectedSystem: productDestination ? destination : "executive-intelligence",
-    proximity: destination === "vaeroex" ? "open_field" : "near",
+    proximity: destination === "vaeroex" ? "signal" : "near",
     route: INTELLIGENCE_UNIVERSE_ROUTES[destination],
     level: universeLevelForDestination(destination, phase),
     phase,

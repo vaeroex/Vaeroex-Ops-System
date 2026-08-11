@@ -23,12 +23,9 @@
 .visual canvas {
   width: 100% !important;
   height: 100% !important;
-  cursor: grab;
-  touch-action: none;
-}
-
-:global(html[data-intelligence-universe-motion="dragging"]) .visual canvas {
-  cursor: grabbing;
+  pointer-events: none;
+  cursor: default;
+  touch-action: auto;
 }
 
 .visual {
@@ -40,7 +37,7 @@
 .visual[data-active="true"] {
   opacity: 1;
   visibility: visible;
-  pointer-events: auto;
+  pointer-events: none;
   transition-delay: 0s;
   animation: universeReveal 2.6s cubic-bezier(0.2, 0.72, 0.2, 1) both;
 }
@@ -122,7 +119,18 @@
   inset: 0;
   z-index: 42;
   pointer-events: none;
-  touch-action: none;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(0.45rem);
+  transition: opacity 220ms ease, transform 300ms ease, visibility 0s linear 300ms;
+  touch-action: auto;
+}
+
+.interaction[data-visible="true"] {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0s;
 }
 
 .viewportHint {
@@ -257,10 +265,6 @@
   border-left: 1px solid rgba(119, 221, 248, 0.26);
 }
 
-.selectionReadout[data-proximity="open_field"] {
-  border-left-color: rgba(119, 221, 248, 0.14);
-}
-
 .selectionReadout p {
   color: #7fdcf4;
   font-size: 0.61rem;
@@ -300,7 +304,7 @@
   background: linear-gradient(90deg, rgba(4, 13, 20, 0.9), rgba(5, 15, 22, 0.62));
   box-shadow: 0 1.8rem 4rem rgba(0, 0, 0, 0.24);
   outline: none;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .destinationGroups {
@@ -309,8 +313,8 @@
   gap: 0.45rem;
 }
 
-.navigationPanel:focus-visible {
-  box-shadow: 0 0 0 2px rgba(111, 224, 255, 0.72), 0 1.8rem 4rem rgba(0, 0, 0, 0.28);
+.interaction[data-visible="true"] .navigationPanel {
+  pointer-events: auto;
 }
 
 .destinationIndex {
@@ -531,8 +535,7 @@
   opacity: 0.82;
 }
 
-.worldLabel[data-lod="near"],
-.worldLabel[data-hovered="true"] {
+.worldLabel[data-lod="near"] {
   opacity: 1;
   transform: scale(1.03);
 }
@@ -679,6 +682,7 @@
 @media (prefers-reduced-motion: reduce) {
   .visual,
   .transitionVeil,
+  .interaction,
   .destinationIndex a::after,
   .worldLabel {
     transition: none;

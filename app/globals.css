@@ -6,7 +6,7 @@ html[data-intelligence-universe="active"] .vaeroex-public-site {
   position: relative;
   z-index: 1;
   background-color: transparent !important;
-  pointer-events: none;
+  pointer-events: auto;
   touch-action: pan-y;
 }
 

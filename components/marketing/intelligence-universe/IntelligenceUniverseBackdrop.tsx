@@ -45,7 +45,6 @@ export function IntelligenceUniverseBackdrop() {
         state={universe.state}
         motion={universe.motion}
         quality={capability.quality}
-        onEnterDestination={universe.enterDestination}
       />
     </SpatialErrorBoundary>
   );
