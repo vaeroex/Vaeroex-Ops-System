@@ -10,6 +10,8 @@ const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const actions = read("app/app/admin/subscriptions/actions.ts");
 const gate = read("lib/billing/get-subscription-status.ts");
 const migration = read("supabase/migrations/202607260001_manual_activation_entitlement.sql");
+const restoreMigration = read("supabase/migrations/20260811233219_restore_manual_activation_review_rpc.sql");
+const databaseTest = read("supabase/tests/manual_activation_entitlement.test.sql");
 const types = read("lib/supabase/types.ts");
 
 require.extensions[".ts"] = function compileTypeScript(module, filename) {
@@ -37,6 +39,10 @@ Module._resolveFilename = function resolveAlias(request, parent, isMain, options
 };
 
 assert.match(actions, /rpc\("review_manual_activation_request"/);
+assert.match(actions, /requireSubscriptionAdmin\(returnTo\)/);
+assert.match(actions, /p_reviewed_by: user\.id/);
+assert.doesNotMatch(actions, /formData\.get\(["']reviewed_by["']\)/);
+assert.match(actions, /new Set\(\["pending", "approved", "denied", "needs_more_info"\]\)/);
 assert.doesNotMatch(
   actions.slice(actions.indexOf("export async function reviewActivationRequestAction")),
   /\.from\("manual_activation_requests"\)[\s\S]{0,180}\.update\(/,
@@ -79,6 +85,36 @@ assert.match(migration, /not exists \([\s\S]+from public\.customer_subscriptions
 assert.match(migration, /perform public\.review_manual_activation_request\([\s\S]+request_to_repair\.id/);
 assert.match(migration, /revoke all on function public\.review_manual_activation_request[\s\S]+from public, anon, authenticated/);
 assert.match(migration, /grant execute on function public\.review_manual_activation_request[\s\S]+to service_role/);
+
+assert.match(
+  restoreMigration,
+  /create or replace function public\.review_manual_activation_request\(\s*p_request_id uuid,\s*p_status text,\s*p_reviewed_by uuid,\s*p_plan_slug text default 'vaeroex'/
+);
+assert.match(restoreMigration, /security invoker/);
+assert.match(restoreMigration, /set search_path = ''/);
+assert.match(restoreMigration, /for update;[\s\S]+if not found then/);
+assert.match(restoreMigration, /pg_advisory_xact_lock\(hashtextextended\(normalized_email, 0\)\)/);
+assert.match(restoreMigration, /existing_subscription\.id is null/);
+assert.match(restoreMigration, /reviewed_at = coalesce\(request\.reviewed_at, statement_timestamp\(\)\)/);
+assert.match(
+  restoreMigration,
+  /revoke all on function public\.review_manual_activation_request\(uuid, text, uuid, text\) from public, anon, authenticated/
+);
+assert.match(
+  restoreMigration,
+  /grant execute on function public\.review_manual_activation_request\(uuid, text, uuid, text\) to service_role/
+);
+assert.match(restoreMigration, /notify pgrst, 'reload schema'/);
+assert.doesNotMatch(restoreMigration, /manual_activation_backfill/);
+
+assert.match(databaseTest, /authenticated non-admin callers cannot review activation requests directly/);
+assert.match(databaseTest, /an unknown request id is rejected/);
+assert.match(databaseTest, /an unsupported review status is rejected/);
+assert.match(databaseTest, /an unavailable plan slug is rejected/);
+assert.match(databaseTest, /an authorized approval creates an active entitlement atomically/);
+assert.match(databaseTest, /the entitlement links to the customer owner workspace/);
+assert.match(databaseTest, /replayed approval does not create a duplicate subscription/);
+assert.match(databaseTest, /an approved request cannot be rewritten to another review state/);
 
 assert.match(gate, /\.from\("customer_subscriptions"\)/);
 assert.match(gate, /subscription\.manually_activated && \["active", "trialing"\]\.includes\(status\)/);
