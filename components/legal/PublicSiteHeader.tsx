@@ -3,8 +3,6 @@ import type { Route } from "next";
 import { ChevronDown, Menu } from "lucide-react";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
-import { UniverseNavigationLink } from "@/components/marketing/intelligence-universe/UniverseNavigationLink";
-import { INTELLIGENCE_UNIVERSE_ROUTES } from "@/lib/marketing/intelligence-universe";
 import { INTELLIGENCE_SYSTEMS_ROUTE, PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -31,10 +29,6 @@ const companyLinks: Array<{ href: Route; label: string }> = [
   { href: "/careers", label: "Careers" }
 ];
 
-const universeRoutes = new Set<Route>([
-  ...Object.values(INTELLIGENCE_UNIVERSE_ROUTES)
-]);
-
 async function isLoggedIn() {
   const supabase = await createSupabaseServerClient();
 
@@ -55,7 +49,7 @@ export async function PublicSiteHeader() {
   return (
     <header className="vaeroex-public-header sticky top-0 z-50 px-4 text-white sm:px-6">
       <div className="mx-auto flex h-[4.5rem] max-w-[86rem] items-center justify-between gap-4">
-        <UniverseNavigationLink href="/" className="flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
+        <Link href="/" className="flex min-w-0 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60" aria-label="Vaeroex home">
           <span className="grid h-9 w-9 shrink-0 place-items-center">
             <VaeroexLogo variant="symbol" size="xs" priority />
           </span>
@@ -63,13 +57,13 @@ export async function PublicSiteHeader() {
             <span className="block text-sm font-semibold uppercase leading-none tracking-normal">Vaeroex</span>
             <span className="mt-1 hidden text-[0.66rem] font-medium uppercase tracking-normal text-slate-500 sm:block">Intelligence Systems</span>
           </span>
-        </UniverseNavigationLink>
+        </Link>
 
         <nav className="vaeroex-public-header__nav hidden items-center gap-1 lg:flex" aria-label="Public navigation">
           {primaryNavLinks.map((link) => (
-            <UniverseNavigationLink key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+            <Link key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
               {link.label}
-            </UniverseNavigationLink>
+            </Link>
           ))}
           <details className="group relative">
             <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
@@ -78,17 +72,17 @@ export async function PublicSiteHeader() {
             </summary>
             <div className="vaeroex-public-menu absolute left-0 top-full mt-2 w-72 border border-white/10 p-2 shadow-command">
               {productLinks.map((link) => (
-                <UniverseNavigationLink key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                <Link key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 hover:bg-cyan-950/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                   <span className="block text-sm font-semibold text-slate-200">{link.label}</span>
                   <span className="mt-1 block text-[0.64rem] font-semibold uppercase tracking-normal text-cyan-200/70">{link.status}</span>
-                </UniverseNavigationLink>
+                </Link>
               ))}
             </div>
           </details>
           {secondaryNavLinks.map((link) => (
-            <UniverseNavigationLink key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+            <Link key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
               {link.label}
-            </UniverseNavigationLink>
+            </Link>
           ))}
           <details className="group relative">
             <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
@@ -97,9 +91,9 @@ export async function PublicSiteHeader() {
             </summary>
             <div className="vaeroex-public-menu absolute left-0 top-full mt-2 w-52 border border-white/10 p-2 shadow-command">
               {companyLinks.map((link) => (
-                <UniverseNavigationLink key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 text-sm font-semibold text-slate-300 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                <Link key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 text-sm font-semibold text-slate-300 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                   {link.label}
-                </UniverseNavigationLink>
+                </Link>
               ))}
             </div>
           </details>
@@ -130,15 +124,7 @@ export async function PublicSiteHeader() {
               <p className="px-2 pb-2 text-[0.68rem] font-semibold uppercase tracking-normal text-slate-500">Explore Vaeroex</p>
               {[...primaryNavLinks, ...productLinks, ...secondaryNavLinks, ...companyLinks, { href: "/help" as Route, label: "Help" }].map((link) => {
                 const className = "block min-h-11 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-200 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60";
-                return universeRoutes.has(link.href) ? (
-                  <UniverseNavigationLink key={link.href} href={link.href} className={className}>
-                    {link.label}
-                  </UniverseNavigationLink>
-                ) : (
-                  <Link key={link.href} href={link.href} className={className}>
-                    {link.label}
-                  </Link>
-                );
+                return <Link key={link.href} href={link.href} className={className}>{link.label}</Link>;
               })}
               <StartWithVaeroexMenu className="mt-3 w-full" label="Start Executive Intelligence" />
             </nav>

@@ -2,44 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-html[data-intelligence-universe="active"] .vaeroex-public-site {
-  position: relative;
-  z-index: 1;
-  background-color: transparent !important;
-  pointer-events: auto;
-  touch-action: pan-y;
-}
-
-html[data-intelligence-universe="active"] .vaeroex-public-site a,
-html[data-intelligence-universe="active"] .vaeroex-public-site button,
-html[data-intelligence-universe="active"] .vaeroex-public-site input,
-html[data-intelligence-universe="active"] .vaeroex-public-site select,
-html[data-intelligence-universe="active"] .vaeroex-public-site textarea,
-html[data-intelligence-universe="active"] .vaeroex-public-site summary,
-html[data-intelligence-universe="active"] .vaeroex-public-site [data-universe-control] {
-  pointer-events: auto;
-}
-
-html[data-intelligence-universe="active"] [data-public-spatial-journey],
-html[data-intelligence-universe="active"] [data-intelligence-systems-journey],
-html[data-intelligence-universe="active"] [data-executive-intelligence-journey],
-html[data-intelligence-universe="active"] [data-drug-discovery-journey],
-html[data-intelligence-universe="active"] [data-biological-journey] {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-html[data-intelligence-universe="active"] .vaeroex-public-site .vaeroex-public-hero {
-  min-height: calc(100svh - 4.5rem);
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-html[data-intelligence-universe="active"] .vaeroex-public-site .vaeroex-public-hero__veil {
-  background: linear-gradient(90deg, rgba(3, 10, 16, 0.84), rgba(3, 10, 16, 0.4) 58%, rgba(3, 10, 16, 0.12));
-  box-shadow: none;
-}
-
 :root {
   color-scheme: dark;
   -webkit-text-size-adjust: 100%;
