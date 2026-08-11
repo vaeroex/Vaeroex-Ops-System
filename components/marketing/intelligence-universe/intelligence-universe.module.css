@@ -34,6 +34,7 @@
 .visual[data-active="true"] {
   opacity: 1;
   visibility: visible;
+  pointer-events: auto;
   transition-delay: 0s;
 }
 
@@ -105,30 +106,63 @@
 
 .interaction {
   position: fixed;
-  right: max(1.25rem, 2vw);
-  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  inset: 0;
   z-index: 42;
-  display: grid;
-  width: min(60rem, calc(100vw - 15rem));
-  grid-template-columns: minmax(11rem, 0.72fr) minmax(22rem, 1.35fr) minmax(12rem, 0.8fr);
-  gap: 0.7rem;
-  align-items: center;
-  padding: 0.65rem;
-  border-top: 1px solid rgba(116, 218, 244, 0.28);
-  border-bottom: 1px solid rgba(116, 218, 244, 0.1);
-  background: linear-gradient(90deg, rgba(2, 8, 14, 0.88), rgba(2, 8, 14, 0.54));
-  box-shadow: 0 1.8rem 4rem rgba(0, 0, 0, 0.28);
-  outline: none;
+  pointer-events: none;
   touch-action: pan-y;
 }
 
-.interaction:focus-visible {
+.viewportHint {
+  position: absolute;
+  top: clamp(6rem, 14vh, 8.5rem);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: rgba(181, 218, 230, 0.64);
+  font-size: 0.63rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: translateX(-50%);
+}
+
+.viewportHint svg {
+  width: 1rem;
+  height: 1rem;
+  color: #78d9f0;
+}
+
+.navigationPanel {
+  position: absolute;
+  right: max(1.25rem, 2vw);
+  bottom: max(1.25rem, env(safe-area-inset-bottom));
+  display: grid;
+  width: min(47rem, calc(100vw - 18rem));
+  grid-template-columns: minmax(22rem, 1fr) minmax(12rem, 0.48fr);
+  gap: 0.7rem;
+  align-items: center;
+  padding: 0.55rem;
+  border-top: 1px solid rgba(116, 218, 244, 0.26);
+  border-bottom: 1px solid rgba(116, 218, 244, 0.08);
+  background: linear-gradient(90deg, rgba(2, 8, 14, 0.82), rgba(2, 8, 14, 0.48));
+  box-shadow: 0 1.8rem 4rem rgba(0, 0, 0, 0.24);
+  outline: none;
+  pointer-events: auto;
+}
+
+.navigationPanel:focus-visible {
   box-shadow: 0 0 0 2px rgba(111, 224, 255, 0.72), 0 1.8rem 4rem rgba(0, 0, 0, 0.28);
 }
 
 .selectionReadout {
+  position: absolute;
+  top: clamp(8rem, 18vh, 10rem);
+  right: max(1.5rem, 4vw);
+  width: min(21rem, 25vw);
   min-width: 0;
-  padding-left: 0.35rem;
+  padding-left: 0.85rem;
+  border-left: 1px solid rgba(119, 221, 248, 0.38);
 }
 
 .selectionReadout p {
@@ -142,7 +176,7 @@
   display: block;
   margin-top: 0.2rem;
   color: #f4fafc;
-  font-size: 1rem;
+  font-size: clamp(1.25rem, 2vw, 1.85rem);
   font-weight: 620;
 }
 
@@ -150,12 +184,9 @@
   display: block;
   max-width: 34rem;
   margin-top: 0.2rem;
-  overflow: hidden;
   color: #aabdc6;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   line-height: 1.45;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .systemRail {
@@ -292,20 +323,20 @@
 }
 
 @media (max-width: 767px), (pointer: coarse) {
-  .interaction {
+  .navigationPanel {
     right: 0;
     bottom: 0;
     left: 0;
     width: 100%;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 0.8rem 1.2rem;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
     align-items: end;
     padding: 0.8rem 0.65rem max(0.8rem, env(safe-area-inset-bottom));
     background: linear-gradient(180deg, rgba(2, 7, 13, 0.52), rgba(2, 7, 13, 0.96));
   }
 
   .selectionReadout {
-    padding-left: 0.25rem;
+    display: none;
   }
 
   .selectionReadout span {
@@ -322,13 +353,18 @@
   }
 
   .systemRail {
-    grid-column: 1 / -1;
+    grid-column: 1;
   }
 
   .enterLink {
+    width: 100%;
     padding-right: 0.65rem;
     padding-left: 0.65rem;
     font-size: 0.65rem;
+  }
+
+  .viewportHint {
+    display: none;
   }
 
   .modeToggle,

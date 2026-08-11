@@ -6,6 +6,18 @@ html[data-intelligence-universe="active"] .vaeroex-public-site {
   position: relative;
   z-index: 1;
   background-color: transparent !important;
+  pointer-events: none;
+  touch-action: pan-y;
+}
+
+html[data-intelligence-universe="active"] .vaeroex-public-site a,
+html[data-intelligence-universe="active"] .vaeroex-public-site button,
+html[data-intelligence-universe="active"] .vaeroex-public-site input,
+html[data-intelligence-universe="active"] .vaeroex-public-site select,
+html[data-intelligence-universe="active"] .vaeroex-public-site textarea,
+html[data-intelligence-universe="active"] .vaeroex-public-site summary,
+html[data-intelligence-universe="active"] .vaeroex-public-site [data-universe-control] {
+  pointer-events: auto;
 }
 
 html[data-intelligence-universe="active"] [data-public-spatial-journey],

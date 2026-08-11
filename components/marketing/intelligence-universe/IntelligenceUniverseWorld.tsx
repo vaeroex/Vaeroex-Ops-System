@@ -1,8 +1,8 @@
 "use client";
 
-import { Line } from "@react-three/drei";
+import { Line, useCursor } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useMemo, useRef } from "react";
+import { useMemo, useRef, useState, type MutableRefObject } from "react";
 import {
   AdditiveBlending,
   BufferAttribute,
@@ -13,20 +13,24 @@ import {
 } from "three";
 import type { SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
 import type {
+  IntelligenceUniverseMotion,
   IntelligenceUniverseState,
   IntelligenceUniverseSystemDestination
 } from "@/lib/marketing/intelligence-universe";
+import { INTELLIGENCE_UNIVERSE_RAIL_ANCHORS } from "@/lib/marketing/intelligence-universe";
 
 type IntelligenceUniverseWorldProps = Readonly<{
   active: boolean;
   state: IntelligenceUniverseState;
+  motion: MutableRefObject<IntelligenceUniverseMotion>;
   quality: SpatialQualityTier;
+  onEnterSystem: (destination: IntelligenceUniverseSystemDestination) => void;
 }>;
 
 const SYSTEM_POSITIONS: Readonly<Record<IntelligenceUniverseSystemDestination, Vector3Tuple>> = {
-  "executive-intelligence": [-9.5, 0.1, -9],
-  "drug-discovery-intelligence": [0, 0, -9.6],
-  "biological-intelligence": [9.5, 0.1, -9]
+  "executive-intelligence": [-12, 0.7, -14],
+  "drug-discovery-intelligence": [0, -0.8, -18],
+  "biological-intelligence": [12, 1.1, -13.5]
 };
 
 const FRAME_DEPTHS = [-3.5, -1.8, 0, 1.8, 3.5] as const;
@@ -43,7 +47,14 @@ const DRUG_BONDS = [
   [0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 0], [3, 6], [6, 7], [6, 8], [0, 9], [9, 10], [9, 11]
 ] as const;
 
-function SignalField({ quality }: { quality: SpatialQualityTier }) {
+function SignalField({
+  motion,
+  quality
+}: {
+  motion: MutableRefObject<IntelligenceUniverseMotion>;
+  quality: SpatialQualityTier;
+}) {
+  const group = useRef<Group>(null);
   const geometry = useMemo(() => {
     const count = quality === "full" ? 520 : quality === "constrained" ? 280 : 140;
     const positions = new Float32Array(count * 3);
@@ -60,32 +71,61 @@ function SignalField({ quality }: { quality: SpatialQualityTier }) {
     return next;
   }, [quality]);
 
+  useFrame((_, delta) => {
+    if (!group.current) return;
+    const currentMotion = motion.current;
+    group.current.position.x = MathUtils.damp(
+      group.current.position.x,
+      -currentMotion.railProgress * 1.6,
+      currentMotion.dragging ? 16 : 5,
+      delta
+    );
+    group.current.rotation.y = MathUtils.damp(
+      group.current.rotation.y,
+      currentMotion.railProgress * -0.026 + currentMotion.velocity * 0.012,
+      6,
+      delta
+    );
+  });
+
   return (
-    <points geometry={geometry} frustumCulled>
-      <pointsMaterial
-        color="#74d9f2"
-        size={quality === "full" ? 0.055 : 0.07}
-        sizeAttenuation
-        transparent
-        opacity={0.34}
-        depthWrite={false}
-        blending={AdditiveBlending}
-      />
-    </points>
+    <group ref={group}>
+      <points geometry={geometry} frustumCulled>
+        <pointsMaterial
+          color="#74d9f2"
+          size={quality === "full" ? 0.055 : 0.07}
+          sizeAttenuation
+          transparent
+          opacity={0.34}
+          depthWrite={false}
+          blending={AdditiveBlending}
+        />
+      </points>
+    </group>
   );
 }
 
-function MasterArchitecture() {
+function MasterArchitecture({ motion }: { motion: MutableRefObject<IntelligenceUniverseMotion> }) {
+  const group = useRef<Group>(null);
+  useFrame((_, delta) => {
+    if (!group.current) return;
+    group.current.position.x = MathUtils.damp(group.current.position.x, motion.current.railProgress * 0.8, 4, delta);
+    group.current.rotation.y = MathUtils.damp(group.current.rotation.y, motion.current.railProgress * 0.018, 4, delta);
+  });
   return (
-    <group position={[0, 0, -12]}>
+    <group ref={group} position={[0, 0, -13]}>
       {FRAME_DEPTHS.map((depth, index) => (
-        <mesh key={depth} position={[0, 0, depth]}>
-          <boxGeometry args={[28 - index * 1.25, 10 - index * 0.36, 0.05]} />
+        <mesh key={depth} position={[0, 0, depth]} rotation={[0, index % 2 === 0 ? 0.025 : -0.025, 0]}>
+          <boxGeometry args={[34 - index * 1.5, 12 - index * 0.42, 0.05]} />
           <meshBasicMaterial color="#397b97" transparent opacity={0.055 + index * 0.012} wireframe depthWrite={false} />
         </mesh>
       ))}
-      <Line points={[[-17, -4.8, 2], [0, 0, -3.5], [17, -4.8, 2]]} color="#4c9bb6" transparent opacity={0.13} lineWidth={0.7} />
-      <Line points={[[-17, 4.8, 2], [0, 0, -3.5], [17, 4.8, 2]]} color="#4c9bb6" transparent opacity={0.1} lineWidth={0.7} />
+      <Line points={[[-21, -5.4, 3], [0, 0, -4.5], [21, -5.4, 3]]} color="#4c9bb6" transparent opacity={0.13} lineWidth={0.7} />
+      <Line points={[[-21, 5.4, 3], [0, 0, -4.5], [21, 5.4, 3]]} color="#4c9bb6" transparent opacity={0.1} lineWidth={0.7} />
+      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -4.8, -2]}>
+        <torusGeometry args={[16, 0.035, 5, 120]} />
+        <meshBasicMaterial color="#5bb4d0" transparent opacity={0.13} depthWrite={false} />
+      </mesh>
     </group>
   );
 }
@@ -186,16 +226,72 @@ function BiologicalStructure({ selected, detailed }: { selected: boolean; detail
 
 function SystemEnvironment({
   id,
+  motion,
+  onEnterSystem,
   selected,
   quality
 }: {
   id: IntelligenceUniverseSystemDestination;
+  motion: MutableRefObject<IntelligenceUniverseMotion>;
+  onEnterSystem: (destination: IntelligenceUniverseSystemDestination) => void;
   selected: boolean;
   quality: SpatialQualityTier;
 }) {
+  const group = useRef<Group>(null);
+  const [hovered, setHovered] = useState(false);
   const detailed = selected && quality !== "reduced_motion";
+  const basePosition = SYSTEM_POSITIONS[id];
+  useCursor(hovered, "pointer", "grab");
+
+  useFrame((_, delta) => {
+    if (!group.current) return;
+    const currentMotion = motion.current;
+    const anchor = INTELLIGENCE_UNIVERSE_RAIL_ANCHORS[id];
+    const distance = Math.abs(currentMotion.railProgress - anchor);
+    const focus = MathUtils.clamp(1 - distance * 0.82, 0, 1);
+    const approach = selected ? currentMotion.approachProgress : 0;
+    const targetScale = 0.74 + focus * 0.22 + approach * 0.7 + (hovered ? 0.035 : 0);
+    const drift = Math.sin(performance.now() * 0.00022 + anchor * 2.4) * 0.12;
+    group.current.scale.setScalar(MathUtils.damp(group.current.scale.x, targetScale, currentMotion.dragging ? 15 : 6, delta));
+    group.current.position.x = MathUtils.damp(group.current.position.x, basePosition[0], 9, delta);
+    group.current.position.y = MathUtils.damp(group.current.position.y, basePosition[1] + drift + focus * 0.16, 5, delta);
+    group.current.position.z = MathUtils.damp(group.current.position.z, basePosition[2] - (1 - focus) * 2.4, 6, delta);
+    group.current.rotation.y = MathUtils.damp(
+      group.current.rotation.y,
+      (currentMotion.railProgress - anchor) * -0.1 + currentMotion.velocity * 0.016,
+      7,
+      delta
+    );
+  });
+
   return (
-    <group position={SYSTEM_POSITIONS[id]} scale={selected ? 1.08 : 0.92}>
+    <group
+      ref={group}
+      position={basePosition}
+      scale={0.8}
+      onPointerOver={(event) => {
+        event.stopPropagation();
+        setHovered(true);
+      }}
+      onPointerOut={() => setHovered(false)}
+      onClick={(event) => {
+        event.stopPropagation();
+        onEnterSystem(id);
+      }}
+    >
+      <mesh>
+        <sphereGeometry args={[5.1, 12, 10]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[5.5, selected ? 0.055 : 0.035, 6, 96]} />
+        <meshBasicMaterial
+          color={id === "drug-discovery-intelligence" ? "#6dd9d1" : "#6dcced"}
+          transparent
+          opacity={selected ? 0.3 : 0.11}
+          depthWrite={false}
+        />
+      </mesh>
       {id === "executive-intelligence" ? <ExecutiveStructure selected={selected} detailed={detailed} /> : null}
       {id === "drug-discovery-intelligence" ? <DrugStructure selected={selected} detailed={detailed} /> : null}
       {id === "biological-intelligence" ? <BiologicalStructure selected={selected} detailed={detailed} /> : null}
@@ -203,27 +299,47 @@ function SystemEnvironment({
   );
 }
 
-function DynamicSystems({ state, quality }: Pick<IntelligenceUniverseWorldProps, "state" | "quality">) {
+function DynamicSystems({
+  state,
+  motion,
+  onEnterSystem,
+  quality
+}: Pick<IntelligenceUniverseWorldProps, "state" | "motion" | "onEnterSystem" | "quality">) {
   const group = useRef<Group>(null);
   useFrame((_, delta) => {
-    if (!group.current || state.reducedMotion || quality === "reduced_motion") return;
-    const travelScale = state.phase === "transitioning" ? 1.035 : 1;
+    if (!group.current) return;
+    const currentMotion = motion.current;
+    const travelScale = state.phase === "transitioning" || state.phase === "arriving" ? 1.02 : 1;
     group.current.scale.x = MathUtils.damp(group.current.scale.x, travelScale, 5, delta);
     group.current.scale.y = MathUtils.damp(group.current.scale.y, 1, 5, delta);
-    group.current.scale.z = MathUtils.damp(group.current.scale.z, state.phase === "transitioning" ? 1.12 : 1, 5, delta);
-    group.current.rotation.y += delta * 0.008;
+    group.current.scale.z = MathUtils.damp(group.current.scale.z, 1 + currentMotion.approachProgress * 0.035, 5, delta);
+    group.current.position.x = MathUtils.damp(group.current.position.x, currentMotion.railProgress * -0.38, 8, delta);
+    if (!state.reducedMotion && quality !== "reduced_motion") {
+      group.current.rotation.y = MathUtils.damp(
+        group.current.rotation.y,
+        currentMotion.railProgress * 0.008 + currentMotion.velocity * -0.006,
+        6,
+        delta
+      );
+    }
   });
 
   return (
     <group ref={group}>
-      <SystemEnvironment id="executive-intelligence" selected={state.selectedSystem === "executive-intelligence"} quality={quality} />
-      <SystemEnvironment id="drug-discovery-intelligence" selected={state.selectedSystem === "drug-discovery-intelligence"} quality={quality} />
-      <SystemEnvironment id="biological-intelligence" selected={state.selectedSystem === "biological-intelligence"} quality={quality} />
+      <SystemEnvironment id="executive-intelligence" motion={motion} onEnterSystem={onEnterSystem} selected={state.selectedSystem === "executive-intelligence"} quality={quality} />
+      <SystemEnvironment id="drug-discovery-intelligence" motion={motion} onEnterSystem={onEnterSystem} selected={state.selectedSystem === "drug-discovery-intelligence"} quality={quality} />
+      <SystemEnvironment id="biological-intelligence" motion={motion} onEnterSystem={onEnterSystem} selected={state.selectedSystem === "biological-intelligence"} quality={quality} />
     </group>
   );
 }
 
-export function IntelligenceUniverseWorld({ active, state, quality }: IntelligenceUniverseWorldProps) {
+export function IntelligenceUniverseWorld({
+  active,
+  state,
+  motion,
+  quality,
+  onEnterSystem
+}: IntelligenceUniverseWorldProps) {
   return (
     <>
       <color attach="background" args={["#02050a"]} />
@@ -233,9 +349,9 @@ export function IntelligenceUniverseWorld({ active, state, quality }: Intelligen
       <pointLight position={[-10, 2, -4]} intensity={28} distance={24} color="#52bde3" />
       <pointLight position={[0, -2, -4]} intensity={24} distance={23} color="#6bd8d1" />
       <pointLight position={[10, 2, -4]} intensity={25} distance={24} color="#62b7e8" />
-      <MasterArchitecture />
-      <DynamicSystems state={state} quality={quality} />
-      {active ? <SignalField quality={quality} /> : null}
+      <MasterArchitecture motion={motion} />
+      <DynamicSystems state={state} motion={motion} quality={quality} onEnterSystem={onEnterSystem} />
+      {active ? <SignalField quality={quality} motion={motion} /> : null}
     </>
   );
 }

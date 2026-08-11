@@ -43,7 +43,9 @@ export function IntelligenceUniverseBackdrop() {
       <IntelligenceUniverseCanvas
         active={universe.shellVisible}
         state={universe.state}
+        motion={universe.motion}
         quality={capability.quality}
+        onEnterSystem={universe.enterSystem}
       />
     </SpatialErrorBoundary>
   );

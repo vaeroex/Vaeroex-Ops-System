@@ -1,7 +1,7 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import {
   ACESFilmicToneMapping,
   MathUtils,
@@ -14,7 +14,9 @@ import { probeRenderedCanvas, type CanvasPixelProbeResult } from "@/components/s
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
 import type { SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
 import {
-  isUniverseSystemDestination,
+  INTELLIGENCE_UNIVERSE_RAIL_ANCHORS,
+  nearestUniverseSystem,
+  type IntelligenceUniverseMotion,
   type IntelligenceUniverseState,
   type IntelligenceUniverseSystemDestination
 } from "@/lib/marketing/intelligence-universe";
@@ -22,81 +24,69 @@ import {
 type IntelligenceUniverseCanvasProps = Readonly<{
   active: boolean;
   state: IntelligenceUniverseState;
+  motion: MutableRefObject<IntelligenceUniverseMotion>;
   quality: SpatialQualityTier;
+  onEnterSystem: (destination: IntelligenceUniverseSystemDestination) => void;
 }>;
 
-type CameraAnchor = Readonly<{
-  position: readonly [number, number, number];
-  target: readonly [number, number, number];
-  fov: number;
-}>;
-
-const SYSTEM_X: Readonly<Record<IntelligenceUniverseSystemDestination, number>> = {
-  "executive-intelligence": -9.5,
-  "drug-discovery-intelligence": 0,
-  "biological-intelligence": 9.5
+const SYSTEM_DEPTH: Readonly<Record<IntelligenceUniverseSystemDestination, number>> = {
+  "executive-intelligence": -14,
+  "drug-discovery-intelligence": -18,
+  "biological-intelligence": -13.5
 };
 
-const MASTER_ANCHOR: CameraAnchor = {
-  position: [0, 5.4, 33],
-  target: [0, 0, -9],
-  fov: 47
-};
+const MASTER_CAMERA_POSITION = [0, 4.9, 28] as const;
 
-function resolveCameraAnchor(state: IntelligenceUniverseState): CameraAnchor {
-  const destination = state.phase === "transitioning" || state.phase === "arriving"
-    ? state.target
-    : state.current;
-
-  if (destination === "vaeroex") return MASTER_ANCHOR;
-
-  if (destination === "intelligence-systems") {
-    const selectedX = SYSTEM_X[state.selectedSystem];
-    return {
-      position: [selectedX * 0.16, 3.1, 20.5],
-      target: [selectedX * 0.28, 0, -9],
-      fov: 46
-    };
-  }
-
-  const system = isUniverseSystemDestination(destination) ? destination : state.selectedSystem;
-  const systemX = SYSTEM_X[system];
-  return {
-    position: [systemX, 2.1, state.phase === "transitioning" ? 9.5 : 7.2],
-    target: [systemX, 0, -9.4],
-    fov: state.phase === "transitioning" ? 49 : 41
-  };
-}
-
-function UniverseCamera({ active, state }: Pick<IntelligenceUniverseCanvasProps, "active" | "state">) {
+function UniverseCamera({ active, state, motion }: Pick<IntelligenceUniverseCanvasProps, "active" | "state" | "motion">) {
   const camera = useThree((root) => root.camera) as PerspectiveCamera;
   const invalidate = useThree((root) => root.invalidate);
-  const anchor = useMemo(() => resolveCameraAnchor(state), [state]);
-  const lookAt = useRef(new Vector3(...anchor.target));
+  const lookAt = useRef(new Vector3(0, 0, -14));
+  const desiredPosition = useRef(new Vector3(...MASTER_CAMERA_POSITION));
+  const desiredTarget = useRef(new Vector3(0, 0, -14));
 
   useEffect(() => {
-    if (!active) return;
-    invalidate();
-  }, [active, anchor, invalidate]);
+    if (active) invalidate();
+  }, [active, invalidate, state.current, state.phase, state.selectedSystem]);
 
   useFrame((_, delta) => {
     if (!active) return;
+    const currentMotion = motion.current;
+    const selectedSystem = nearestUniverseSystem(currentMotion.railProgress);
+    const selectedAnchor = INTELLIGENCE_UNIVERSE_RAIL_ANCHORS[selectedSystem];
+    const selectedX = selectedAnchor * 12;
+    const railX = currentMotion.railProgress * 12;
+    const approach = currentMotion.approachProgress;
+    const selectedDepth = SYSTEM_DEPTH[selectedSystem];
+    const isMaster = state.current === "vaeroex" && state.phase === "idle";
+    const overviewY = isMaster ? 4.9 : 3.8;
+    const overviewZ = isMaster ? 28 : 25;
+    const lookAhead = MathUtils.clamp(currentMotion.velocity, -1.25, 1.25) * 2.2;
+    const position = desiredPosition.current.set(
+      MathUtils.lerp(railX, selectedX, approach),
+      MathUtils.lerp(overviewY, 2.05, approach),
+      MathUtils.lerp(overviewZ, selectedDepth + 13.2, approach)
+    );
+    const target = desiredTarget.current.set(
+      MathUtils.lerp(railX + lookAhead, selectedX, approach),
+      MathUtils.lerp(0.15, 0, approach),
+      MathUtils.lerp(-14.5, selectedDepth, approach)
+    );
+    const fov = MathUtils.lerp(isMaster ? 50 : 48, 40.5, approach);
     const reducedMotion = state.reducedMotion || state.quality === "reduced_motion";
-    const position = anchor.position;
-    const target = anchor.target;
 
     if (reducedMotion) {
-      camera.position.set(...position);
-      lookAt.current.set(...target);
-      camera.fov = anchor.fov;
+      camera.position.copy(position);
+      lookAt.current.copy(target);
+      camera.fov = fov;
     } else {
-      camera.position.x = MathUtils.damp(camera.position.x, position[0], 4.6, delta);
-      camera.position.y = MathUtils.damp(camera.position.y, position[1], 4.6, delta);
-      camera.position.z = MathUtils.damp(camera.position.z, position[2], 4.6, delta);
-      lookAt.current.x = MathUtils.damp(lookAt.current.x, target[0], 5.1, delta);
-      lookAt.current.y = MathUtils.damp(lookAt.current.y, target[1], 5.1, delta);
-      lookAt.current.z = MathUtils.damp(lookAt.current.z, target[2], 5.1, delta);
-      camera.fov = MathUtils.damp(camera.fov, anchor.fov, 4.2, delta);
+      const positionDamping = currentMotion.dragging ? 18 : 7.4;
+      camera.position.x = MathUtils.damp(camera.position.x, position.x, positionDamping, delta);
+      camera.position.y = MathUtils.damp(camera.position.y, position.y, 6.8, delta);
+      camera.position.z = MathUtils.damp(camera.position.z, position.z, 6.8, delta);
+      lookAt.current.x = MathUtils.damp(lookAt.current.x, target.x, currentMotion.dragging ? 16 : 8.2, delta);
+      lookAt.current.y = MathUtils.damp(lookAt.current.y, target.y, 7.2, delta);
+      lookAt.current.z = MathUtils.damp(lookAt.current.z, target.z, 7.2, delta);
+      camera.fov = MathUtils.damp(camera.fov, fov, 6.2, delta);
     }
 
     camera.lookAt(lookAt.current);
@@ -106,28 +96,49 @@ function UniverseCamera({ active, state }: Pick<IntelligenceUniverseCanvasProps,
   return null;
 }
 
-function UniverseFrameScheduler({ active, quality }: Pick<IntelligenceUniverseCanvasProps, "active" | "quality">) {
+function UniverseFrameScheduler({
+  active,
+  motion,
+  quality
+}: Pick<IntelligenceUniverseCanvasProps, "active" | "motion" | "quality">) {
   const invalidate = useThree((root) => root.invalidate);
 
   useEffect(() => {
     if (!active) return;
-    const intervalMs = quality === "full" ? 34 : quality === "constrained" ? 62 : 160;
-    const renderIfVisible = () => {
+    const intervalMs = quality === "full" ? 42 : quality === "constrained" ? 72 : 180;
+    let frame = 0;
+    const renderMotion = () => {
+      const currentMotion = motion.current;
+      const isMoving = currentMotion.dragging
+        || currentMotion.mode !== "idle"
+        || Math.abs(currentMotion.velocity) > 0.006;
+      if (isMoving && document.visibilityState === "visible") invalidate();
+      frame = window.requestAnimationFrame(renderMotion);
+    };
+    const renderAmbient = () => {
       if (document.visibilityState === "visible") invalidate();
     };
-    renderIfVisible();
-    const interval = window.setInterval(renderIfVisible, intervalMs);
-    document.addEventListener("visibilitychange", renderIfVisible);
+    renderAmbient();
+    frame = window.requestAnimationFrame(renderMotion);
+    const interval = window.setInterval(renderAmbient, intervalMs);
+    document.addEventListener("visibilitychange", renderAmbient);
     return () => {
+      window.cancelAnimationFrame(frame);
       window.clearInterval(interval);
-      document.removeEventListener("visibilitychange", renderIfVisible);
+      document.removeEventListener("visibilitychange", renderAmbient);
     };
-  }, [active, invalidate, quality]);
+  }, [active, invalidate, motion, quality]);
 
   return null;
 }
 
-export default function IntelligenceUniverseCanvas({ active, state, quality }: IntelligenceUniverseCanvasProps) {
+export default function IntelligenceUniverseCanvas({
+  active,
+  state,
+  motion,
+  quality,
+  onEnterSystem
+}: IntelligenceUniverseCanvasProps) {
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
   const dpr: [number, number] = quality === "full"
     ? [1, 1.35]
@@ -145,7 +156,7 @@ export default function IntelligenceUniverseCanvas({ active, state, quality }: I
       style={{ width: "100%", height: "100%" }}
     >
       <Canvas
-        camera={{ position: MASTER_ANCHOR.position, fov: MASTER_ANCHOR.fov, near: 0.1, far: 180 }}
+        camera={{ position: MASTER_CAMERA_POSITION, fov: 50, near: 0.1, far: 190 }}
         dpr={dpr}
         frameloop={active ? "demand" : "never"}
         gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
@@ -157,9 +168,15 @@ export default function IntelligenceUniverseCanvas({ active, state, quality }: I
           if (active) probeRenderedCanvas(root, setPixelProbe);
         }}
       >
-        <IntelligenceUniverseWorld active={active} quality={quality} state={state} />
-        <UniverseCamera active={active} state={state} />
-        <UniverseFrameScheduler active={active} quality={quality} />
+        <IntelligenceUniverseWorld
+          active={active}
+          quality={quality}
+          state={state}
+          motion={motion}
+          onEnterSystem={onEnterSystem}
+        />
+        <UniverseCamera active={active} state={state} motion={motion} />
+        <UniverseFrameScheduler active={active} quality={quality} motion={motion} />
       </Canvas>
     </div>
   );
