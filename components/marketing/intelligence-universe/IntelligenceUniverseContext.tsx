@@ -19,6 +19,10 @@ export type IntelligenceUniverseContextValue = Readonly<{
   motion: MutableRefObject<IntelligenceUniverseMotion>;
   setEnabled: (enabled: boolean) => void;
   travel: (destination: IntelligenceUniverseDestination) => void;
+  selectDestination: (destination: IntelligenceUniverseDestination) => void;
+  selectAdjacentDestination: (direction: -1 | 1) => void;
+  enterSelectedDestination: () => void;
+  enterDestination: (destination: IntelligenceUniverseDestination) => void;
   selectSystem: (destination: IntelligenceUniverseSystemDestination) => void;
   selectAdjacentSystem: (direction: -1 | 1) => void;
   enterSelectedSystem: () => void;
@@ -38,7 +42,7 @@ export type IntelligenceUniverseContextValue = Readonly<{
 }>;
 
 const defaultState = initialUniverseState("/");
-const defaultMotion = { current: createUniverseMotion(defaultState.selectedSystem) };
+const defaultMotion = { current: createUniverseMotion(defaultState.selectedDestination) };
 
 export const IntelligenceUniverseContext = createContext<IntelligenceUniverseContextValue>({
   state: defaultState,
@@ -48,6 +52,10 @@ export const IntelligenceUniverseContext = createContext<IntelligenceUniverseCon
   motion: defaultMotion,
   setEnabled: () => undefined,
   travel: () => undefined,
+  selectDestination: () => undefined,
+  selectAdjacentDestination: () => undefined,
+  enterSelectedDestination: () => undefined,
+  enterDestination: () => undefined,
   selectSystem: () => undefined,
   selectAdjacentSystem: () => undefined,
   enterSelectedSystem: () => undefined,

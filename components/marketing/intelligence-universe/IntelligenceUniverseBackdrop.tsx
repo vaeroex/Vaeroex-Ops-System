@@ -16,7 +16,7 @@ function UniverseFallback({ reason }: { reason: string }) {
   return (
     <div className={styles.fallback} data-intelligence-universe-fallback={reason} aria-hidden="true">
       <div className={styles.fallbackFrames}>{Array.from({ length: 7 }, (_, index) => <span key={index} />)}</div>
-      <div className={styles.fallbackSystems}>{Array.from({ length: 3 }, (_, index) => <i key={index} />)}</div>
+      <div className={styles.fallbackSystems}>{Array.from({ length: 8 }, (_, index) => <i key={index} />)}</div>
     </div>
   );
 }
@@ -45,7 +45,7 @@ export function IntelligenceUniverseBackdrop() {
         state={universe.state}
         motion={universe.motion}
         quality={capability.quality}
-        onEnterSystem={universe.enterSystem}
+        onEnterDestination={universe.enterDestination}
       />
     </SpatialErrorBoundary>
   );

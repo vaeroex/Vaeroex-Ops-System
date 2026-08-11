@@ -27,7 +27,7 @@ const process = [
 
 export default function NetworkingPage() {
   return (
-    <main className="min-h-screen bg-[#030712] text-white">
+    <main className="vaeroex-public-site min-h-screen bg-[#030712] text-white">
       <PublicSiteHeader />
       <PublicPageHero
         eyebrow="Vaeroex Intelligence Systems"

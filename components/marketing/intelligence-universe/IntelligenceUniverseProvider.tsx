@@ -19,15 +19,16 @@ import {
   INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS,
   INTELLIGENCE_UNIVERSE_BOUNDS,
   INTELLIGENCE_UNIVERSE_ROUTES,
+  adjacentUniverseDestination,
   adjacentUniverseSystem,
   clampUniversePosition,
   createUniverseMotion,
   distanceBetweenUniversePoints,
-  distanceToUniverseSystem,
+  distanceToUniverseDestination,
   initialUniverseState,
   isUniverseSystemDestination,
   moveUniversePosition,
-  nearestUniverseSystem,
+  nearestUniverseDestination,
   universeDestinationForPathname,
   universeLevelForDestination,
   universeProximityForDistance,
@@ -45,7 +46,7 @@ type UniverseAction =
   | { type: "route_sync"; destination: IntelligenceUniverseDestination; preserveSelection: boolean }
   | { type: "travel"; destination: IntelligenceUniverseDestination }
   | { type: "settle" }
-  | { type: "locate"; destination: IntelligenceUniverseSystemDestination; proximity: IntelligenceUniverseProximity }
+  | { type: "locate"; destination: IntelligenceUniverseDestination; proximity: IntelligenceUniverseProximity }
   | { type: "reduced_motion"; value: boolean }
   | { type: "quality"; value: IntelligenceUniverseState["quality"] };
 
@@ -55,10 +56,11 @@ function reducer(state: IntelligenceUniverseState, action: UniverseAction): Inte
     return {
       ...state,
       target: action.destination,
+      selectedDestination: action.destination,
       selectedSystem: productDestination || state.selectedSystem,
-      proximity: productDestination ? "signal" : state.proximity,
+      proximity: "signal",
       phase: "transitioning",
-      level: productDestination ? "approach" : universeLevelForDestination(action.destination, "idle"),
+      level: universeLevelForDestination(action.destination, "arriving"),
       inputLocked: true,
       assetReadiness: productDestination
         ? { ...state.assetReadiness, [productDestination]: "approach" }
@@ -71,17 +73,18 @@ function reducer(state: IntelligenceUniverseState, action: UniverseAction): Inte
     const selectedSystem = productDestination && !action.preserveSelection
       ? productDestination
       : state.selectedSystem;
-    const phase = productDestination ? "arriving" : "idle";
+    const phase = action.destination === "vaeroex" ? "idle" : "arriving";
     return {
       ...state,
       current: action.destination,
       target: action.destination,
+      selectedDestination: action.destination,
       selectedSystem,
-      proximity: productDestination ? "near" : state.proximity,
+      proximity: action.destination === "vaeroex" ? state.proximity : "near",
       route: INTELLIGENCE_UNIVERSE_ROUTES[action.destination],
       phase,
       level: universeLevelForDestination(action.destination, phase),
-      inputLocked: Boolean(productDestination),
+      inputLocked: action.destination !== "vaeroex",
       assetReadiness: productDestination
         ? { ...state.assetReadiness, [productDestination]: "approach" }
         : state.assetReadiness
@@ -103,14 +106,16 @@ function reducer(state: IntelligenceUniverseState, action: UniverseAction): Inte
   }
 
   if (action.type === "locate") {
-    if (state.selectedSystem === action.destination && state.proximity === action.proximity) return state;
+    if (state.selectedDestination === action.destination && state.proximity === action.proximity) return state;
+    const productDestination = isUniverseSystemDestination(action.destination) ? action.destination : null;
     return {
       ...state,
-      selectedSystem: action.destination,
+      selectedDestination: action.destination,
+      selectedSystem: productDestination || state.selectedSystem,
       proximity: action.proximity,
-      assetReadiness: action.proximity === "open_field"
+      assetReadiness: action.proximity === "open_field" || !productDestination
         ? state.assetReadiness
-        : { ...state.assetReadiness, [action.destination]: "approach" }
+        : { ...state.assetReadiness, [productDestination]: "approach" }
     };
   }
 
@@ -149,7 +154,7 @@ function springPosition(motion: IntelligenceUniverseMotion, delta: number, sprin
 }
 
 function integrateFreeMotion(motion: IntelligenceUniverseMotion, delta: number) {
-  const nearest = nearestUniverseSystem(motion.position);
+  const nearest = nearestUniverseDestination(motion.position);
   const gravityTarget = INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[nearest];
   const direction = {
     x: gravityTarget.x - motion.position.x,
@@ -199,25 +204,27 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
   const travelTimer = useRef<number | null>(null);
   const settleTimer = useRef<number | null>(null);
   const internalTravelTarget = useRef<IntelligenceUniverseDestination | null>(null);
+  const selectedDestinationRef = useRef(state.selectedDestination);
   const selectedSystemRef = useRef(state.selectedSystem);
   const proximityRef = useRef(state.proximity);
   const initialDestination = universeDestinationForPathname(pathname);
   const motion = useRef<IntelligenceUniverseMotion>(createUniverseMotion(
-    isUniverseSystemDestination(initialDestination || "vaeroex")
-      ? initialDestination as IntelligenceUniverseSystemDestination
-      : state.selectedSystem,
-    isUniverseSystemDestination(initialDestination || "vaeroex") ? 0.52 : 0
+    initialDestination || "vaeroex",
+    initialDestination && initialDestination !== "vaeroex" ? 0.52 : 0
   ));
   const destination = universeDestinationForPathname(pathname);
   const routeIsCompatible = destination !== null;
 
   const syncSpatialLocation = useCallback(() => {
     const currentMotion = motion.current;
-    const assisted = currentMotion.mode === "fast_travel" || currentMotion.mode === "approaching";
-    const nearest = assisted ? selectedSystemRef.current : nearestUniverseSystem(currentMotion.position);
-    const proximity = universeProximityForDistance(distanceToUniverseSystem(currentMotion.position, nearest));
-    if (nearest === selectedSystemRef.current && proximity === proximityRef.current) return;
-    selectedSystemRef.current = nearest;
+    const assisted = currentMotion.mode === "fast_travel"
+      || currentMotion.mode === "approaching"
+      || currentMotion.approachProgress > 0.055;
+    const nearest = assisted ? selectedDestinationRef.current : nearestUniverseDestination(currentMotion.position);
+    const proximity = universeProximityForDistance(distanceToUniverseDestination(currentMotion.position, nearest));
+    if (nearest === selectedDestinationRef.current && proximity === proximityRef.current) return;
+    selectedDestinationRef.current = nearest;
+    if (isUniverseSystemDestination(nearest)) selectedSystemRef.current = nearest;
     proximityRef.current = proximity;
     dispatch({ type: "locate", destination: nearest, proximity });
   }, []);
@@ -231,20 +238,8 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     currentMotion.dragLastY = null;
     currentMotion.dragLastAt = null;
 
-    if (!isUniverseSystemDestination(nextDestination)) {
-      currentMotion.approachTarget = 0;
-      copyPosition(currentMotion.targetPosition, currentMotion.position);
-      if (currentMotion.approachProgress > 0.015) {
-        copyPosition(currentMotion.targetPosition, INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[selectedSystemRef.current]);
-        currentMotion.mode = "retreating";
-      } else {
-        currentMotion.mode = velocityMagnitude(currentMotion) > 0.02 ? "coasting" : "idle";
-      }
-      currentMotion.travelStage = "overview";
-      return;
-    }
-
-    selectedSystemRef.current = nextDestination;
+    selectedDestinationRef.current = nextDestination;
+    if (isUniverseSystemDestination(nextDestination)) selectedSystemRef.current = nextDestination;
     proximityRef.current = "signal";
     const nextPosition = INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[nextDestination];
     const crossesUniverse = distanceBetweenUniversePoints(currentMotion.position, nextPosition) > 2.5;
@@ -283,9 +278,10 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     if (!isInternalTravel || motion.current.mode === "idle") {
       configureMotionForDestination(destination);
     }
-    if (!isInternalTravel && isUniverseSystemDestination(destination)) {
-      selectedSystemRef.current = destination;
-      proximityRef.current = "near";
+    if (!isInternalTravel) {
+      selectedDestinationRef.current = destination;
+      if (isUniverseSystemDestination(destination)) selectedSystemRef.current = destination;
+      proximityRef.current = destination === "vaeroex" ? "open_field" : "near";
       copyPosition(motion.current.targetPosition, INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[destination]);
     }
     internalTravelTarget.current = null;
@@ -293,9 +289,9 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     if (settleTimer.current) window.clearTimeout(settleTimer.current);
     settleTimer.current = window.setTimeout(
       () => dispatch({ type: "settle" }),
-      isUniverseSystemDestination(destination)
-        ? (state.reducedMotion ? 80 : isInternalTravel ? 720 : 1180)
-        : 0
+      destination === "vaeroex"
+        ? 0
+        : (state.reducedMotion ? 80 : isInternalTravel ? 720 : 1180)
     );
     return () => {
       if (settleTimer.current) window.clearTimeout(settleTimer.current);
@@ -303,7 +299,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
   }, [configureMotionForDestination, destination, state.reducedMotion]);
 
   useEffect(() => {
-    if (!routeIsCompatible || (destination !== "vaeroex" && destination !== "intelligence-systems")) return;
+    if (!routeIsCompatible) return;
     const update = () => setNearTop(window.scrollY < window.innerHeight * 0.72);
     update();
     window.addEventListener("scroll", update, { passive: true });
@@ -317,7 +313,7 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
   const shellVisible = enabled && routeIsCompatible && (
     state.phase === "transitioning"
     || state.phase === "arriving"
-    || ((destination === "vaeroex" || destination === "intelligence-systems") && nearTop)
+    || (!isUniverseSystemDestination(destination || "vaeroex") && nearTop)
   );
 
   useEffect(() => {
@@ -445,24 +441,22 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
 
     if (travelTimer.current) window.clearTimeout(travelTimer.current);
     internalTravelTarget.current = nextDestination;
-    if (isUniverseSystemDestination(nextDestination)) {
-      selectedSystemRef.current = nextDestination;
-      proximityRef.current = "signal";
-    }
+    selectedDestinationRef.current = nextDestination;
+    if (isUniverseSystemDestination(nextDestination)) selectedSystemRef.current = nextDestination;
+    proximityRef.current = "signal";
     configureMotionForDestination(nextDestination);
     dispatch({ type: "travel", destination: nextDestination });
 
     const currentMotion = motion.current;
-    const delay = isUniverseSystemDestination(nextDestination)
-      ? currentMotion.travelStage === "pullback" || currentMotion.travelStage === "crossing" ? 1280 : 760
-      : 880;
+    const delay = currentMotion.travelStage === "pullback" || currentMotion.travelStage === "crossing" ? 1280 : 760;
     travelTimer.current = window.setTimeout(() => router.push(nextRoute), delay);
   }, [configureMotionForDestination, enabled, routeIsCompatible, router, state.reducedMotion]);
 
-  const selectSystem = useCallback((nextDestination: IntelligenceUniverseSystemDestination) => {
+  const selectDestination = useCallback((nextDestination: IntelligenceUniverseDestination) => {
     if (state.inputLocked) return;
     const currentMotion = motion.current;
-    selectedSystemRef.current = nextDestination;
+    selectedDestinationRef.current = nextDestination;
+    if (isUniverseSystemDestination(nextDestination)) selectedSystemRef.current = nextDestination;
     proximityRef.current = "signal";
     dispatch({ type: "locate", destination: nextDestination, proximity: "signal" });
     copyPosition(currentMotion.targetPosition, INTELLIGENCE_UNIVERSE_APPROACH_POSITIONS[nextDestination]);
@@ -471,6 +465,15 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     currentMotion.mode = "settling";
     currentMotion.travelStage = "overview";
   }, [state.inputLocked]);
+
+  const selectAdjacentDestination = useCallback((direction: -1 | 1) => {
+    if (state.inputLocked) return;
+    selectDestination(adjacentUniverseDestination(selectedDestinationRef.current, direction));
+  }, [selectDestination, state.inputLocked]);
+
+  const selectSystem = useCallback((nextDestination: IntelligenceUniverseSystemDestination) => {
+    selectDestination(nextDestination);
+  }, [selectDestination]);
 
   const selectAdjacentSystem = useCallback((direction: -1 | 1) => {
     if (state.inputLocked) return;
@@ -576,10 +579,19 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     syncSpatialLocation();
   }, [state.inputLocked, syncSpatialLocation]);
 
-  const enterSystem = useCallback((nextDestination: IntelligenceUniverseSystemDestination) => {
+  const enterDestination = useCallback((nextDestination: IntelligenceUniverseDestination) => {
     if (performance.now() < motion.current.suppressClickUntil) return;
     travel(nextDestination);
   }, [travel]);
+
+  const enterSelectedDestination = useCallback(
+    () => enterDestination(state.selectedDestination),
+    [enterDestination, state.selectedDestination]
+  );
+
+  const enterSystem = useCallback((nextDestination: IntelligenceUniverseSystemDestination) => {
+    enterDestination(nextDestination);
+  }, [enterDestination]);
 
   const enterSelectedSystem = useCallback(
     () => enterSystem(state.selectedSystem),
@@ -598,6 +610,10 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     motion,
     setEnabled,
     travel,
+    selectDestination,
+    selectAdjacentDestination,
+    enterSelectedDestination,
+    enterDestination,
     selectSystem,
     selectAdjacentSystem,
     enterSelectedSystem,
@@ -613,11 +629,15 @@ export function IntelligenceUniverseProvider({ children }: { children: ReactNode
     destination,
     enabled,
     endExplorationDrag,
+    enterDestination,
+    enterSelectedDestination,
     enterSelectedSystem,
     enterSystem,
     nudgeExploration,
     routeIsCompatible,
+    selectAdjacentDestination,
     selectAdjacentSystem,
+    selectDestination,
     selectSystem,
     setEnabled,
     setQuality,

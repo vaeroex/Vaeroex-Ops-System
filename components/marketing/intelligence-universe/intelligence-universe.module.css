@@ -7,7 +7,7 @@
   height: 100svh;
   overflow: hidden;
   pointer-events: none;
-  background: #02050a;
+  background: #07121b;
 }
 
 .visual::after {
@@ -16,8 +16,8 @@
   content: "";
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 52%, transparent 18%, rgba(0, 4, 9, 0.18) 62%, rgba(0, 3, 7, 0.8) 100%),
-    linear-gradient(180deg, rgba(0, 4, 9, 0.16), transparent 24%, transparent 70%, rgba(0, 3, 7, 0.72));
+    radial-gradient(circle at 50% 48%, transparent 20%, rgba(4, 12, 19, 0.12) 68%, rgba(2, 8, 13, 0.66) 100%),
+    linear-gradient(180deg, rgba(3, 10, 16, 0.08), transparent 24%, transparent 72%, rgba(2, 8, 13, 0.58));
 }
 
 .visual canvas {
@@ -42,10 +42,17 @@
   visibility: visible;
   pointer-events: auto;
   transition-delay: 0s;
+  animation: universeReveal 2.6s cubic-bezier(0.2, 0.72, 0.2, 1) both;
+}
+
+@keyframes universeReveal {
+  0% { filter: brightness(0.52) saturate(0.72); }
+  48% { filter: brightness(0.86) saturate(0.92); }
+  100% { filter: brightness(1) saturate(1); }
 }
 
 .fallback {
-  background-color: #02050a;
+  background-color: #07121b;
   background-image:
     linear-gradient(90deg, rgba(2, 5, 10, 0.78), rgba(2, 5, 10, 0.18) 54%, rgba(2, 5, 10, 0.68)),
     url("/brand/vaeroex-intelligence-environment.png");
@@ -80,12 +87,12 @@
   bottom: 17%;
   left: 40%;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8%;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.8rem;
 }
 
 .fallbackSystems i {
-  height: 5rem;
+  height: 3.6rem;
   border: 1px solid rgba(112, 220, 246, 0.22);
   background: rgba(24, 52, 67, 0.2);
   box-shadow: inset 0 0 30px rgba(76, 198, 230, 0.06), 0 0 30px rgba(65, 184, 218, 0.04);
@@ -143,7 +150,7 @@
   position: absolute;
   top: clamp(5.6rem, 10vh, 7rem);
   right: max(1.25rem, 2vw);
-  width: 13.5rem;
+  width: 15rem;
   padding: 0.1rem 0 0.55rem 0.8rem;
   border-left: 1px solid rgba(117, 220, 246, 0.24);
   color: #c9eaf2;
@@ -167,14 +174,14 @@
 
 .orientationPlot {
   position: relative;
-  height: 6.4rem;
+  height: 8.6rem;
   margin-top: 0.55rem;
   border-top: 1px solid rgba(112, 205, 229, 0.13);
   border-bottom: 1px solid rgba(112, 205, 229, 0.08);
   background-image:
-    linear-gradient(rgba(95, 171, 193, 0.055) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(95, 171, 193, 0.055) 1px, transparent 1px);
-  background-size: 25% 33.333%;
+    linear-gradient(rgba(95, 171, 193, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(95, 171, 193, 0.045) 1px, transparent 1px);
+  background-size: 20% 25%;
 }
 
 .orientationTrace {
@@ -194,19 +201,31 @@
 }
 
 .orientationMarker {
-  width: 1.35rem;
-  height: 1.35rem;
+  width: 1.2rem;
+  height: 1.2rem;
   border: 1px solid rgba(108, 215, 242, 0.24);
   color: rgba(196, 238, 248, 0.7);
   background: rgba(3, 11, 18, 0.72);
-  font-size: 0.48rem;
+  font-size: 0.42rem;
   font-style: normal;
   font-weight: 760;
 }
 
-.orientationMarker[data-system="executive-intelligence"] { top: 39%; left: 24%; }
-.orientationMarker[data-system="drug-discovery-intelligence"] { top: 71%; left: 67%; }
-.orientationMarker[data-system="biological-intelligence"] { top: 25%; left: 90%; }
+.orientationMarker[data-kind="system"] {
+  width: 0.92rem;
+  height: 0.92rem;
+  border-color: rgba(109, 215, 242, 0.16);
+  color: rgba(196, 238, 248, 0.56);
+  background: rgba(3, 11, 18, 0.58);
+  font-size: 0.34rem;
+}
+
+.orientationMarker[data-kind="core"],
+.orientationMarker[data-kind="systems"] {
+  border-color: rgba(132, 231, 252, 0.55);
+  color: #e4fbff;
+  box-shadow: 0 0 0.7rem rgba(85, 200, 229, 0.16);
+}
 
 .orientationPosition {
   top: var(--intelligence-universe-map-y, 46%);
@@ -231,8 +250,8 @@
 .selectionReadout {
   position: absolute;
   top: clamp(14.8rem, 31vh, 18rem);
-  right: max(1.5rem, 2.2vw);
-  width: min(20rem, 24vw);
+  right: max(18rem, 18vw);
+  width: min(18rem, 20vw);
   min-width: 0;
   padding-left: 0.85rem;
   border-left: 1px solid rgba(119, 221, 248, 0.26);
@@ -271,17 +290,23 @@
   right: max(1.25rem, 2vw);
   bottom: max(1.25rem, env(safe-area-inset-bottom));
   display: grid;
-  width: min(49rem, calc(100vw - 18rem));
-  grid-template-columns: minmax(25rem, 1fr) minmax(13rem, 0.46fr);
+  width: min(72rem, calc(100vw - 18rem));
+  grid-template-columns: minmax(38rem, 1fr) minmax(13rem, 0.32fr);
   gap: 0.7rem;
   align-items: stretch;
   padding: 0.55rem;
   border-top: 1px solid rgba(116, 218, 244, 0.24);
   border-bottom: 1px solid rgba(116, 218, 244, 0.08);
-  background: linear-gradient(90deg, rgba(2, 8, 14, 0.86), rgba(2, 8, 14, 0.5));
+  background: linear-gradient(90deg, rgba(4, 13, 20, 0.9), rgba(5, 15, 22, 0.62));
   box-shadow: 0 1.8rem 4rem rgba(0, 0, 0, 0.24);
   outline: none;
   pointer-events: auto;
+}
+
+.destinationGroups {
+  display: grid;
+  min-width: 0;
+  gap: 0.45rem;
 }
 
 .navigationPanel:focus-visible {
@@ -291,7 +316,7 @@
 .destinationIndex {
   display: grid;
   min-width: 0;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(8, minmax(0, 1fr));
   border-right: 1px solid rgba(122, 210, 232, 0.14);
   border-left: 1px solid rgba(122, 210, 232, 0.14);
 }
@@ -323,6 +348,42 @@
   font-weight: 720;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.systemIndex {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: auto repeat(3, minmax(0, 1fr));
+  align-items: center;
+  border-top: 1px solid rgba(122, 210, 232, 0.08);
+}
+
+.systemIndex > small {
+  padding: 0.45rem 0.7rem;
+  color: rgba(129, 183, 198, 0.58);
+  font-size: 0.45rem;
+  font-weight: 730;
+  text-transform: uppercase;
+}
+
+.systemIndex a {
+  position: relative;
+  min-width: 0;
+  padding: 0.42rem 0.55rem;
+  color: #869ba5;
+  font-size: 0.53rem;
+  font-weight: 710;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.systemIndex a[data-current="true"],
+.systemIndex a:hover,
+.systemIndex a:focus-visible {
+  color: #effbff;
+  background: rgba(63, 165, 190, 0.1);
+  outline: none;
 }
 
 .destinationIndex a::after {
@@ -476,11 +537,31 @@
   transform: scale(1.03);
 }
 
-@media (max-width: 900px) {
+.worldLabel[data-kind="core"] span,
+.worldLabel[data-kind="systems"] span {
+  font-size: 0.8rem;
+}
+
+.supportingWorldLabel {
+  display: block;
+  width: max-content;
+  color: rgba(184, 222, 231, 0.52);
+  font-size: 0.45rem;
+  font-weight: 680;
+  text-transform: uppercase;
+  filter: drop-shadow(0 0.25rem 0.6rem rgba(0, 5, 10, 0.8));
+  pointer-events: none;
+}
+
+@media (max-width: 1180px) {
   .navigationPanel {
     right: 1rem;
-    width: min(43rem, calc(100vw - 8.5rem));
-    grid-template-columns: minmax(20rem, 1fr) minmax(11rem, 0.42fr);
+    width: min(52rem, calc(100vw - 8.5rem));
+    grid-template-columns: minmax(28rem, 1fr) minmax(11rem, 0.35fr);
+  }
+
+  .destinationIndex {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
   .selectionReadout {
@@ -501,7 +582,25 @@
     background: linear-gradient(180deg, rgba(2, 7, 13, 0.46), rgba(2, 7, 13, 0.96));
   }
 
+  .destinationGroups {
+    gap: 0.4rem;
+    overflow: hidden;
+  }
+
+  .destinationIndex {
+    display: flex;
+    overflow-x: auto;
+    border-right: 0;
+    border-left: 0;
+    scrollbar-width: none;
+  }
+
+  .destinationIndex::-webkit-scrollbar {
+    display: none;
+  }
+
   .destinationIndex a {
+    min-width: 4.5rem;
     padding-right: 0.25rem;
     padding-left: 0.25rem;
   }
@@ -520,6 +619,14 @@
     font-size: 0.62rem;
   }
 
+  .systemIndex {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .systemIndex > small {
+    display: none;
+  }
+
   .viewportHint {
     display: none;
   }
@@ -527,12 +634,12 @@
   .orientationAid {
     top: 5.15rem;
     right: 0.7rem;
-    width: 9.4rem;
+    width: 10.2rem;
     opacity: 0.82;
   }
 
   .orientationPlot {
-    height: 4.5rem;
+    height: 5.4rem;
   }
 
   .depthReadout {
@@ -563,6 +670,10 @@
   .worldLabel p {
     display: none;
   }
+
+  .supportingWorldLabel {
+    display: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -571,5 +682,9 @@
   .destinationIndex a::after,
   .worldLabel {
     transition: none;
+  }
+
+  .visual[data-active="true"] {
+    animation: none;
   }
 }

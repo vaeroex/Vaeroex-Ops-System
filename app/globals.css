@@ -29,6 +29,17 @@ html[data-intelligence-universe="active"] [data-biological-journey] {
   background-image: none !important;
 }
 
+html[data-intelligence-universe="active"] .vaeroex-public-site .vaeroex-public-hero {
+  min-height: calc(100svh - 4.5rem);
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+html[data-intelligence-universe="active"] .vaeroex-public-site .vaeroex-public-hero__veil {
+  background: linear-gradient(90deg, rgba(3, 10, 16, 0.84), rgba(3, 10, 16, 0.4) 58%, rgba(3, 10, 16, 0.12));
+  box-shadow: none;
+}
+
 :root {
   color-scheme: dark;
   -webkit-text-size-adjust: 100%;

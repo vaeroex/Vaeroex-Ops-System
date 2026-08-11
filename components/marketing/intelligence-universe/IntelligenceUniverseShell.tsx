@@ -1,19 +1,22 @@
 "use client";
 
 import { ArrowRight, LocateFixed, Maximize2, Minimize2, Move3d } from "lucide-react";
-import { useEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useRef, type CSSProperties, type KeyboardEvent } from "react";
 import { IntelligenceUniverseBackdrop } from "@/components/marketing/intelligence-universe/IntelligenceUniverseBackdrop";
 import { useIntelligenceUniverse } from "@/components/marketing/intelligence-universe/IntelligenceUniverseContext";
 import { UniverseNavigationLink } from "@/components/marketing/intelligence-universe/UniverseNavigationLink";
 import {
+  INTELLIGENCE_UNIVERSE_BOUNDS,
+  INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS,
+  INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS,
+  INTELLIGENCE_UNIVERSE_PRIMARY_REGIONS,
   INTELLIGENCE_UNIVERSE_ROUTES,
+  INTELLIGENCE_UNIVERSE_SYSTEMS,
   isUniverseSystemDestination,
-  type IntelligenceUniverseSystemDestination
+  type IntelligenceUniverseDestination
 } from "@/lib/marketing/intelligence-universe";
-import { PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import styles from "@/components/marketing/intelligence-universe/intelligence-universe.module.css";
 
-const systemById = new Map(PUBLIC_SYSTEMS.map((system) => [system.id, system]));
 const INTERACTIVE_SELECTOR = "a, button, input, textarea, select, summary, [role='button'], [data-universe-control]";
 
 type PointerPoint = {
@@ -26,11 +29,20 @@ function pointerDistance(points: PointerPoint[]) {
   return Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y);
 }
 
+function orientationStyle(destination: IntelligenceUniverseDestination): CSSProperties {
+  const position = INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS[destination];
+  const x = (position.x - INTELLIGENCE_UNIVERSE_BOUNDS.x[0])
+    / (INTELLIGENCE_UNIVERSE_BOUNDS.x[1] - INTELLIGENCE_UNIVERSE_BOUNDS.x[0]);
+  const y = 1 - (position.y - INTELLIGENCE_UNIVERSE_BOUNDS.y[0])
+    / (INTELLIGENCE_UNIVERSE_BOUNDS.y[1] - INTELLIGENCE_UNIVERSE_BOUNDS.y[0]);
+  return { left: `${(x * 88 + 6).toFixed(2)}%`, top: `${(y * 78 + 11).toFixed(2)}%` };
+}
+
 export function IntelligenceUniverseShell() {
   const universe = useIntelligenceUniverse();
   const activePointers = useRef(new Map<number, PointerPoint>());
   const pinchDistance = useRef<number | null>(null);
-  const selectedSystem = systemById.get(universe.state.selectedSystem) || PUBLIC_SYSTEMS[0];
+  const selectedDefinition = INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[universe.state.selectedDestination];
   const productRoute = isUniverseSystemDestination(universe.state.current);
   const {
     beginExplorationDrag,
@@ -67,23 +79,13 @@ export function IntelligenceUniverseShell() {
       if (points.length >= 2) {
         const nextDistance = pointerDistance(points);
         if (pinchDistance.current !== null) {
-          nudgeExploration({
-            x: 0,
-            y: 0,
-            z: (pinchDistance.current - nextDistance) * 0.045
-          });
+          nudgeExploration({ x: 0, y: 0, z: (pinchDistance.current - nextDistance) * 0.045 });
         }
         pinchDistance.current = nextDistance;
         return;
       }
 
-      updateExplorationDrag(
-        event.clientX,
-        event.clientY,
-        performance.now(),
-        window.innerWidth,
-        window.innerHeight
-      );
+      updateExplorationDrag(event.clientX, event.clientY, performance.now(), window.innerWidth, window.innerHeight);
     };
 
     const finishPointer = (event: globalThis.PointerEvent) => {
@@ -125,23 +127,16 @@ export function IntelligenceUniverseShell() {
       window.removeEventListener("pointercancel", finishPointer, true);
       window.removeEventListener("wheel", onWheel);
     };
-  }, [
-    beginExplorationDrag,
-    endExplorationDrag,
-    inputLocked,
-    nudgeExploration,
-    shellVisible,
-    updateExplorationDrag
-  ]);
+  }, [beginExplorationDrag, endExplorationDrag, inputLocked, nudgeExploration, shellVisible, updateExplorationDrag]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
     if (event.key === "ArrowLeft") {
       event.preventDefault();
-      universe.selectAdjacentSystem(-1);
+      universe.selectAdjacentDestination(-1);
     } else if (event.key === "ArrowRight") {
       event.preventDefault();
-      universe.selectAdjacentSystem(1);
+      universe.selectAdjacentDestination(1);
     } else if (event.key === "ArrowUp") {
       event.preventDefault();
       universe.nudgeExploration({ x: 0, y: 0, z: -5 });
@@ -150,10 +145,10 @@ export function IntelligenceUniverseShell() {
       universe.nudgeExploration({ x: 0, y: 0, z: 5 });
     } else if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      universe.enterSelectedSystem();
+      universe.enterSelectedDestination();
     } else if (event.key === "Escape") {
       event.preventDefault();
-      universe.travel("intelligence-systems");
+      universe.travel("vaeroex");
     }
   };
 
@@ -162,12 +157,7 @@ export function IntelligenceUniverseShell() {
   return (
     <>
       {universe.shellVisible ? (
-        <div
-          className={styles.visual}
-          data-active="true"
-          data-intelligence-universe-shell
-          aria-hidden="true"
-        >
+        <div className={styles.visual} data-active="true" data-intelligence-universe-shell aria-hidden="true">
           <IntelligenceUniverseBackdrop />
         </div>
       ) : null}
@@ -181,25 +171,32 @@ export function IntelligenceUniverseShell() {
               <span>Drag to roam · Scroll or pinch for depth</span>
             </div>
 
-            <aside className={styles.orientationAid} aria-label="Intelligence Universe orientation">
+            <aside className={styles.orientationAid} aria-label="Vaeroex Intelligence Universe orientation">
               <div className={styles.orientationHeading}>
                 <LocateFixed aria-hidden="true" />
-                <span>VAEROEX / FIELD</span>
+                <span>VAEROEX / UNIVERSE</span>
               </div>
               <div className={styles.orientationPlot} aria-hidden="true">
                 <i className={styles.orientationTrace} />
-                <span className={styles.orientationMarker} data-system="executive-intelligence">EI</span>
-                <span className={styles.orientationMarker} data-system="drug-discovery-intelligence">DD</span>
-                <span className={styles.orientationMarker} data-system="biological-intelligence">BI</span>
+                {[...INTELLIGENCE_UNIVERSE_PRIMARY_REGIONS, ...INTELLIGENCE_UNIVERSE_SYSTEMS].map((destination) => (
+                  <span
+                    key={destination}
+                    className={styles.orientationMarker}
+                    data-kind={INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[destination].kind}
+                    style={orientationStyle(destination)}
+                  >
+                    {INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[destination].code.split(" /")[0]}
+                  </span>
+                ))}
                 <b className={styles.orientationPosition} />
               </div>
-              <span className={styles.depthReadout}>Near / far position</span>
+              <span className={styles.depthReadout}>One continuous public environment</span>
             </aside>
 
             <div className={styles.selectionReadout} data-proximity={universe.state.proximity} aria-live="polite">
-              <p>{openField ? "Open intelligence field" : selectedSystem.statusLabel}</p>
-              <strong>{openField ? "Between destinations" : selectedSystem.name}</strong>
-              <span>{openField ? "Move freely, follow a distant signal, or use fast travel." : selectedSystem.tagline}</span>
+              <p>{openField ? "Open intelligence field" : selectedDefinition.statusLabel}</p>
+              <strong>{openField ? "Between destinations" : selectedDefinition.name}</strong>
+              <span>{openField ? "Move freely, follow a signal, or use fast travel." : selectedDefinition.description}</span>
             </div>
 
             <div
@@ -207,28 +204,46 @@ export function IntelligenceUniverseShell() {
               data-universe-control
               tabIndex={0}
               role="group"
-              aria-label="Intelligence Universe navigation"
+              aria-label="Vaeroex Intelligence Universe navigation"
               onKeyDown={onKeyDown}
             >
-              <nav className={styles.destinationIndex} aria-label="Fast travel to an Intelligence System">
-                {PUBLIC_SYSTEMS.map((system) => {
-                  const destination = system.id as IntelligenceUniverseSystemDestination;
-                  return (
-                    <UniverseNavigationLink
-                      key={system.id}
-                      href={system.route}
-                      data-current={universe.state.selectedSystem === destination && !openField}
-                      aria-current={universe.state.selectedSystem === destination && !openField ? "true" : undefined}
-                    >
-                      <small>{system.id === "executive-intelligence" ? "01" : system.id === "drug-discovery-intelligence" ? "02" : "03"}</small>
-                      <span>{system.name.replace(" Intelligence", "")}</span>
-                    </UniverseNavigationLink>
-                  );
-                })}
-              </nav>
+              <div className={styles.destinationGroups}>
+                <nav className={styles.destinationIndex} aria-label="Fast travel to public destinations">
+                  {INTELLIGENCE_UNIVERSE_PRIMARY_REGIONS.map((destination) => {
+                    const definition = INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[destination];
+                    return (
+                      <UniverseNavigationLink
+                        key={destination}
+                        href={definition.route}
+                        data-current={universe.state.selectedDestination === destination && !openField}
+                        aria-current={universe.state.current === destination ? "page" : undefined}
+                      >
+                        <small>{definition.code.split(" /")[0]}</small>
+                        <span>{definition.shortName}</span>
+                      </UniverseNavigationLink>
+                    );
+                  })}
+                </nav>
+                <nav className={styles.systemIndex} aria-label="Intelligence Systems destinations">
+                  <small>Intelligence Systems</small>
+                  {INTELLIGENCE_UNIVERSE_SYSTEMS.map((destination) => {
+                    const definition = INTELLIGENCE_UNIVERSE_DESTINATION_DEFINITIONS[destination];
+                    return (
+                      <UniverseNavigationLink
+                        key={destination}
+                        href={definition.route}
+                        data-current={universe.state.selectedDestination === destination && !openField}
+                        aria-current={universe.state.current === destination ? "page" : undefined}
+                      >
+                        {definition.shortName}
+                      </UniverseNavigationLink>
+                    );
+                  })}
+                </nav>
+              </div>
 
-              <UniverseNavigationLink className={styles.enterLink} href={selectedSystem.route}>
-                Approach {selectedSystem.name}
+              <UniverseNavigationLink className={styles.enterLink} href={selectedDefinition.route}>
+                Approach {selectedDefinition.name}
                 <ArrowRight aria-hidden="true" />
               </UniverseNavigationLink>
             </div>
@@ -251,11 +266,7 @@ export function IntelligenceUniverseShell() {
       ) : null}
 
       {universe.enabled && productRoute && !universe.shellVisible ? (
-        <UniverseNavigationLink
-          className={styles.returnControl}
-          data-universe-control
-          href={INTELLIGENCE_UNIVERSE_ROUTES["intelligence-systems"]}
-        >
+        <UniverseNavigationLink className={styles.returnControl} data-universe-control href={INTELLIGENCE_UNIVERSE_ROUTES["intelligence-systems"]}>
           <Minimize2 aria-hidden="true" />
           Return to Intelligence Universe
         </UniverseNavigationLink>

@@ -4,6 +4,7 @@ import { ChevronDown, Menu } from "lucide-react";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { StartWithVaeroexMenu } from "@/components/legal/StartWithVaeroexMenu";
 import { UniverseNavigationLink } from "@/components/marketing/intelligence-universe/UniverseNavigationLink";
+import { INTELLIGENCE_UNIVERSE_ROUTES } from "@/lib/marketing/intelligence-universe";
 import { INTELLIGENCE_SYSTEMS_ROUTE, PUBLIC_SYSTEMS } from "@/lib/marketing/public-systems";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -31,9 +32,7 @@ const companyLinks: Array<{ href: Route; label: string }> = [
 ];
 
 const universeRoutes = new Set<Route>([
-  "/",
-  INTELLIGENCE_SYSTEMS_ROUTE,
-  ...PUBLIC_SYSTEMS.map((system) => system.route)
+  ...Object.values(INTELLIGENCE_UNIVERSE_ROUTES)
 ]);
 
 async function isLoggedIn() {
@@ -87,9 +86,9 @@ export async function PublicSiteHeader() {
             </div>
           </details>
           {secondaryNavLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+            <UniverseNavigationLink key={link.href} href={link.href} className="px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
               {link.label}
-            </Link>
+            </UniverseNavigationLink>
           ))}
           <details className="group relative">
             <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1 px-3 py-2 text-xs font-semibold uppercase tracking-normal text-slate-400 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
@@ -98,9 +97,9 @@ export async function PublicSiteHeader() {
             </summary>
             <div className="vaeroex-public-menu absolute left-0 top-full mt-2 w-52 border border-white/10 p-2 shadow-command">
               {companyLinks.map((link) => (
-                <Link key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 text-sm font-semibold text-slate-300 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
+                <UniverseNavigationLink key={link.href} href={link.href} className="block rounded-md px-3 py-2.5 text-sm font-semibold text-slate-300 hover:bg-cyan-950/30 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-300/60">
                   {link.label}
-                </Link>
+                </UniverseNavigationLink>
               ))}
             </div>
           </details>

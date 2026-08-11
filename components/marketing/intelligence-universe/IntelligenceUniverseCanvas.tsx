@@ -14,12 +14,13 @@ import { probeRenderedCanvas, type CanvasPixelProbeResult } from "@/components/s
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
 import type { SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
 import {
+  INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS,
   INTELLIGENCE_UNIVERSE_ENTRY_POSITIONS,
   INTELLIGENCE_UNIVERSE_START_POSITION,
-  INTELLIGENCE_UNIVERSE_SYSTEM_POSITIONS,
+  isUniverseSystemDestination,
+  type IntelligenceUniverseDestination,
   type IntelligenceUniverseMotion,
-  type IntelligenceUniverseState,
-  type IntelligenceUniverseSystemDestination
+  type IntelligenceUniverseState
 } from "@/lib/marketing/intelligence-universe";
 
 type IntelligenceUniverseCanvasProps = Readonly<{
@@ -27,7 +28,7 @@ type IntelligenceUniverseCanvasProps = Readonly<{
   state: IntelligenceUniverseState;
   motion: MutableRefObject<IntelligenceUniverseMotion>;
   quality: SpatialQualityTier;
-  onEnterSystem: (destination: IntelligenceUniverseSystemDestination) => void;
+  onEnterDestination: (destination: IntelligenceUniverseDestination) => void;
 }>;
 
 const MASTER_CAMERA_POSITION = [
@@ -47,14 +48,14 @@ function UniverseCamera({ active, state, motion }: Pick<IntelligenceUniverseCanv
 
   useEffect(() => {
     if (active) invalidate();
-  }, [active, invalidate, state.current, state.phase, state.selectedSystem]);
+  }, [active, invalidate, state.current, state.phase, state.selectedDestination]);
 
   useFrame((_, delta) => {
     if (!active) return;
     const currentMotion = motion.current;
-    const selectedSystem = state.selectedSystem;
-    const entry = INTELLIGENCE_UNIVERSE_ENTRY_POSITIONS[selectedSystem];
-    const system = INTELLIGENCE_UNIVERSE_SYSTEM_POSITIONS[selectedSystem];
+    const selectedDestination = state.selectedDestination;
+    const entry = INTELLIGENCE_UNIVERSE_ENTRY_POSITIONS[selectedDestination];
+    const destination = INTELLIGENCE_UNIVERSE_DESTINATION_POSITIONS[selectedDestination];
     const approach = currentMotion.approachProgress;
     const velocityMagnitude = Math.hypot(
       currentMotion.velocity.x,
@@ -73,23 +74,24 @@ function UniverseCamera({ active, state, motion }: Pick<IntelligenceUniverseCanv
       currentMotion.position.y + MathUtils.clamp(currentMotion.velocity.y * 0.16, -3, 3),
       currentMotion.position.z - 36 - Math.max(0, -currentMotion.velocity.z) * 0.08
     );
-    systemTarget.current.set(system.x, system.y, system.z);
+    systemTarget.current.set(destination.x, destination.y, destination.z);
     const systemDistance = Math.max(0.001, Math.hypot(
-      system.x - currentMotion.position.x,
-      system.y - currentMotion.position.y,
-      system.z - currentMotion.position.z
+      destination.x - currentMotion.position.x,
+      destination.y - currentMotion.position.y,
+      destination.z - currentMotion.position.z
     ));
     const headingTowardSystem = (
-      currentMotion.velocity.x * (system.x - currentMotion.position.x)
-      + currentMotion.velocity.y * (system.y - currentMotion.position.y)
-      + currentMotion.velocity.z * (system.z - currentMotion.position.z)
+      currentMotion.velocity.x * (destination.x - currentMotion.position.x)
+      + currentMotion.velocity.y * (destination.y - currentMotion.position.y)
+      + currentMotion.velocity.z * (destination.z - currentMotion.position.z)
     ) / systemDistance;
     const proximityFocus = state.proximity === "near"
       ? (headingTowardSystem < -0.08 ? 0.1 : 0.52 + lookAheadScale * 0.08)
       : state.proximity === "signal" ? (headingTowardSystem < -0.08 ? 0.025 : 0.12) : 0;
     const focus = Math.max(approach, proximityFocus);
     const target = desiredTarget.current.copy(freeTarget.current).lerp(systemTarget.current, focus);
-    const fov = MathUtils.lerp(state.current === "vaeroex" ? 51 : 49, 40.5, approach);
+    const destinationFov = isUniverseSystemDestination(selectedDestination) ? 40.5 : 44;
+    const fov = MathUtils.lerp(state.current === "vaeroex" ? 51 : 49, destinationFov, approach);
     const reducedMotion = state.reducedMotion || state.quality === "reduced_motion";
 
     if (reducedMotion) {
@@ -158,7 +160,7 @@ export default function IntelligenceUniverseCanvas({
   state,
   motion,
   quality,
-  onEnterSystem
+  onEnterDestination
 }: IntelligenceUniverseCanvasProps) {
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
   const dpr: [number, number] = quality === "full"
@@ -185,7 +187,7 @@ export default function IntelligenceUniverseCanvas({
         onCreated={(root) => {
           root.gl.outputColorSpace = SRGBColorSpace;
           root.gl.toneMapping = ACESFilmicToneMapping;
-          root.gl.toneMappingExposure = 1.02;
+          root.gl.toneMappingExposure = 1.08;
           if (active) probeRenderedCanvas(root, setPixelProbe);
         }}
       >
@@ -194,7 +196,7 @@ export default function IntelligenceUniverseCanvas({
           quality={quality}
           state={state}
           motion={motion}
-          onEnterSystem={onEnterSystem}
+          onEnterDestination={onEnterDestination}
         />
         <UniverseCamera active={active} state={state} motion={motion} />
         <UniverseFrameScheduler active={active} quality={quality} motion={motion} />
