@@ -309,6 +309,15 @@ function canonicalKpiPerformanceIdentity(semantics: KpiSemantics) {
   ].join("|");
 }
 
+function kpiFindingFingerprint(
+  condition: "performance-gap" | "positive-performance" | "sustained-favorable-trend",
+  semantics: KpiSemantics,
+  timePeriod: string
+) {
+  const normalizedPeriod = /^\d{4}-\d{2}/.test(timePeriod) ? timePeriod.slice(0, 7) : lower(timePeriod) || "current";
+  return `kpi:${canonicalKpiPerformanceIdentity(semantics)}:${condition}:${normalizedPeriod}`;
+}
+
 function distinctDatedKpiHistory(history: KpiRow[]) {
   const byDate = new Map<string, KpiRow>();
   for (const row of [...history].sort(compareKpiRowsNewest)) {
@@ -700,7 +709,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         fingerprint: ""
       };
     }),
-    ...materialTargetMisses.slice(0, 4).map(({ kpi, semantics, evaluation, history: kpiHistory }) => {
+    ...materialTargetMisses.map(({ kpi, semantics, evaluation, history: kpiHistory }) => {
       const key = normalizeKpiName(kpi.name);
       const history = historyCounts.get(key) || 1;
       const targetMissPeriods = kpiHistory.filter((row) => isMaterialTargetMiss(row, semantics)).length;
@@ -741,7 +750,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         affectedArea: kpi.category || kpi.name,
         timePeriod: kpi.metric_date,
         limitation,
-        fingerprint: ""
+        fingerprint: kpiFindingFingerprint("performance-gap", semantics, kpi.metric_date)
       };
     }),
     ...customerContextWithoutFollowup.slice(0, 3).map((lead) => {
@@ -819,7 +828,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         affectedArea: kpi.category || kpi.name,
         timePeriod: kpi.metric_date,
         limitation: history < 3 ? `Only ${history} historical record${history === 1 ? " is" : "s are"} available, so the result may not represent a durable trend.` : "The KPI history confirms the result, but not what caused it.",
-        fingerprint: "",
+        fingerprint: kpiFindingFingerprint("positive-performance", semantics, kpi.metric_date),
         businessHealthEffect: {
           identity: canonicalKpiPerformanceIdentity(semantics),
           points: 10 as const
@@ -859,7 +868,7 @@ export function buildIntelligenceLayer(input: IntelligenceLayerInput): Intellige
         affectedArea: kpi.category || kpi.name,
         timePeriod: `${start.metric_date} to ${latest.metric_date}`,
         limitation: "The KPI history confirms favorable movement, not causation or future performance.",
-        fingerprint: "",
+        fingerprint: kpiFindingFingerprint("sustained-favorable-trend", semantics, `${start.metric_date} to ${latest.metric_date}`),
         businessHealthEffect: {
           identity: canonicalKpiPerformanceIdentity(semantics),
           points: 8 as const

@@ -126,7 +126,7 @@ export function ExecutiveHomepage({
               <div className="mt-4">
                 <BusinessHealthInstrument score={model.health.available ? model.health.score : null} status={model.health.status} />
               </div>
-              {!model.health.available ? <p className="mt-4 text-xl font-semibold">Business Health needs more eligible evidence.</p> : null}
+              {!model.health.available ? <p className="mt-4 text-xl font-semibold">Business Health is not yet evaluable.</p> : null}
               {model.health.available ? (
                 <dl className="mt-5 grid gap-3 border-t border-white/10 pt-4 text-sm sm:grid-cols-3 lg:grid-cols-1">
                   <div>

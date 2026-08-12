@@ -32,6 +32,7 @@ import { projectKpiCompareV1, projectKpiDetailV1, projectKpiPageV1 } from "@/lib
 import type { IntelligenceSnapshotV1 } from "@/lib/intelligence/snapshot/v1/types";
 import { INTELLIGENCE_SNAPSHOT_LIMITS } from "@/lib/intelligence/snapshot/v1/versions";
 import { buildCanonicalKpiProducerOutputV1 } from "@/lib/kpis/snapshot-producer";
+import { loadActiveWorkspaceKpis } from "@/lib/kpis/load-workspace-kpis";
 import {
   kpiStatus,
   semanticPresentation,
@@ -89,6 +90,8 @@ type KpisPageProps = {
     undo_target?: string;
     start?: string;
     end?: string;
+    q?: string;
+    limit?: string;
   }>;
 };
 
@@ -1579,14 +1582,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
     fileResult,
     kpiSettingsResult
   ] = await Promise.all([
-    supabase
-      .from("kpis")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .is("archived_at", null)
-      .is("deleted_at", null)
-      .order("metric_date", { ascending: false })
-      .order("created_at", { ascending: false }),
+    loadActiveWorkspaceKpis({ supabase, workspaceId }),
     getRecordFolders(supabase, workspaceId, "kpis"),
     supabase.from("people").select("id,full_name,role_title,department").eq("workspace_id", workspaceId).is("deleted_at", null).order("full_name"),
     supabase.from("record_shares").select("*").eq("workspace_id", workspaceId).eq("source_type", "kpi").is("deleted_at", null).order("created_at", { ascending: false }),
@@ -2063,6 +2059,20 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                     </div>
                     <p>Import ID: {selectedLatestKpi?.import_id || "None"}</p>
                     <p>Import row: {selectedLatestKpi?.import_row_id || "None"}</p>
+                  </div>
+                </details>
+                <details className="rounded-lg border border-white/10 bg-[#08111f] p-4 text-sm text-slate-300 shadow-panel">
+                  <summary className="cursor-pointer font-semibold text-white">Manage or deactivate this series</summary>
+                  <div className="mt-3 space-y-3 text-xs leading-5 text-slate-400">
+                    <p>
+                      Open the records view filtered to this KPI, select the observations you intend to change, and use the existing administrator-confirmed Archive action. Source evidence and other KPI series remain unchanged.
+                    </p>
+                    <Link
+                      href={`/app/kpis?section=records&q=${encodeURIComponent(primaryMetric)}&limit=50` as Route}
+                      className="inline-flex min-h-10 items-center rounded-lg border border-white/10 px-3 py-2 font-semibold text-cyan-100 hover:border-vaeroex-accent/50 hover:bg-cyan-950/40"
+                    >
+                      Manage series records
+                    </Link>
                   </div>
                 </details>
               </div>

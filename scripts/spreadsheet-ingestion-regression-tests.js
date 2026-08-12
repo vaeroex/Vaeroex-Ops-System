@@ -203,6 +203,7 @@ assert.throws(
 const detectedTypes = [
   ["Company Profile", ["Company", "Industry"], "company_profile"],
   ["Monthly Sales", ["Month", "Revenue", "Target Revenue"], "wide_time_series"],
+  ["KPI Targets", ["Domain", "KPI Name", "Target", "Unit", "Direction"], "kpi_targets"],
   ["Inventory", ["SKU", "On Hand", "Reorder Point"], "inventory"],
   ["Orders", ["Order ID", "Status", "Days to Deliver"], "orders"],
   ["Employees", ["Employee", "Department", "Overtime Hours"], "employees"],
@@ -219,6 +220,11 @@ assert.notStrictEqual(
   "a KPI-like worksheet name must not trigger KPI mapping without the required name and actual-value columns"
 );
 assert(worksheetTypes.WORKSHEET_IMPORT_FIELDS.kpis.some((field) => field.key === "actual_value"), "KPI worksheets must receive KPI mapping fields");
+assert.deepStrictEqual(
+  worksheetTypes.WORKSHEET_IMPORT_FIELDS.kpi_targets.map((field) => field.key),
+  ["domain", "kpi_name", "target", "unit", "direction"],
+  "KPI target worksheets must require the exact reviewed metadata contract"
+);
 assert(!worksheetTypes.WORKSHEET_IMPORT_FIELDS.inventory.some((field) => field.key === "actual_value"), "inventory worksheets must not receive KPI mapping fields");
 
 const monthlySales = {
@@ -288,6 +294,12 @@ assert.deepStrictEqual(wideMapping, { period: "Month" }, "wide time series must 
 const metricColumns = worksheetTypes.inferWideTimeSeriesMetricColumns(monthlySales, wideMapping.period);
 assert.strictEqual(metricColumns.length, 9, "every numeric metric series must be retained");
 assert(metricColumns.includes("Inventory Value"), "Inventory Value must remain a metric rather than changing the worksheet parser");
+const helperColumnMetrics = worksheetTypes.inferWideTimeSeriesMetricColumns({
+  ...monthlySales,
+  columns: ["Month", "Year", ...monthlySales.columns.slice(1)],
+  rows: monthlySales.rows.map((row, index) => ({ values: { ...row.values, Year: 2026 + index } }))
+}, "Month");
+assert(!helperColumnMetrics.includes("Year"), "date helper columns must never expand into KPI series");
 assert.strictEqual(worksheetTypes.wideTimeSeriesTargetColumn("Revenue", metricColumns), "Target Revenue", "Revenue must retain its explicit target relationship");
 assert.strictEqual(worksheetTypes.wideTimeSeriesTargetColumn("Transactions", metricColumns), null, "targets must never be invented");
 const evaluatedCells = worksheetTypes.evaluateWideTimeSeriesCells(monthlySales.rows[1].values, metricColumns);
@@ -350,7 +362,7 @@ const review = fs.readFileSync(path.join(root, "components/evidence/SourceImport
 const workbookReview = fs.readFileSync(path.join(root, "components/evidence/WorkbookImportReview.tsx"), "utf8");
 const evidenceIndex = fs.readFileSync(path.join(root, "lib/ai/evidence-index.ts"), "utf8");
 const toolGateway = fs.readFileSync(path.join(root, "lib/security/tool-execution-gateway.ts"), "utf8");
-const sources = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
+const sources = fs.readFileSync(path.join(root, "app/app/sources/SourcesPage.tsx"), "utf8");
 
 assert.match(actions, /parseSpreadsheetWorkbook/, "file ingestion must use the multi-worksheet parser");
 assert.doesNotMatch(actions, /rows\.slice\(0,\s*1000\)/, "structured imports must not silently truncate rows");

@@ -65,7 +65,7 @@ const recordActions = fs.readFileSync(path.join(root, "app/app/operations/record
 const fileActions = fs.readFileSync(path.join(root, "app/app/files/actions.ts"), "utf8");
 const boundedContext = fs.readFileSync(path.join(root, "lib/ai/bounded-context.ts"), "utf8");
 const searchRoute = fs.readFileSync(path.join(root, "app/api/search/route.ts"), "utf8");
-const sourcesPage = fs.readFileSync(path.join(root, "app/app/sources/page.tsx"), "utf8");
+const sourcesPage = fs.readFileSync(path.join(root, "app/app/sources/SourcesPage.tsx"), "utf8");
 const migration = fs.readFileSync(path.join(root, "supabase/migrations/202607110002_business_signal_lifecycle_integrity.sql"), "utf8");
 const packageJson = require("../package.json");
 

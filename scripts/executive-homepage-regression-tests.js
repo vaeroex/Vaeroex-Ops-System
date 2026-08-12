@@ -335,7 +335,7 @@ assert.match(loadingSource, /animate-pulse/, "homepage route must retain a visib
 assert.match(homepageSource, /lg:grid-cols-\[1fr_1fr_\.78fr\]/, "executive focus and readiness cards must use horizontal space without forcing mobile columns");
 assert.match(homepageSource, /Needs Attention/, "risk and leadership decision must be consolidated into one focus card");
 assert.match(homepageSource, /Top Opportunity/, "the opportunity must remain distinct without being presented as a positive signal");
-assert.match(homepageSource, /Business Health needs more eligible evidence/, "homepage must include a calm insufficient-evidence state");
+assert.match(homepageSource, /Business Health is not yet evaluable/, "homepage must include a calm fail-closed state without mislabeling KPI meaning as missing evidence");
 assert.match(homepageSource, /Validated executive interpretation/, "the Version 1 homepage must label the visible validated interpretation correctly");
 assert.match(homepageSource, /lg:grid-cols-\[minmax\(220px,\.62fr\)_minmax\(0,1\.38fr\)\]/, "the Version 1 Business Health snapshot must retain its score and interpretation columns");
 assert.match(homepageSource, />Executive Overview<\//, "Overview must use a stable executive heading instead of a time-based greeting");

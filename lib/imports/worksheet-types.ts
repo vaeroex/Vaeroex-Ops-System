@@ -1,6 +1,6 @@
 import type { SpreadsheetWorksheet } from "@/lib/imports/spreadsheets";
 
-export const WORKBOOK_DETECTION_VERSION = 2;
+export const WORKBOOK_DETECTION_VERSION = 3;
 
 export function workbookDetectionVersion(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return 0;
@@ -15,6 +15,7 @@ export function workbookDetectionPlanIsStale(value: unknown) {
 export type WorksheetType =
   | "company_profile"
   | "wide_time_series"
+  | "kpi_targets"
   | "kpis"
   | "sales"
   | "financials"
@@ -39,6 +40,7 @@ export type WorksheetImportField = {
 export const WORKSHEET_TYPE_OPTIONS: Array<{ value: WorksheetType; label: string }> = [
   { value: "company_profile", label: "Company Profile" },
   { value: "wide_time_series", label: "Time Series" },
+  { value: "kpi_targets", label: "KPI Targets" },
   { value: "kpis", label: "KPIs" },
   { value: "sales", label: "Sales" },
   { value: "financials", label: "Financials" },
@@ -54,6 +56,7 @@ export const WORKSHEET_TYPE_OPTIONS: Array<{ value: WorksheetType; label: string
 const WORKSHEET_CONTEXT_LABELS: Record<WorksheetType, string> = {
   company_profile: "Company Context",
   wide_time_series: "Time Series",
+  kpi_targets: "KPI Targets",
   kpis: "KPIs",
   sales: "Sales",
   financials: "Financial",
@@ -82,6 +85,13 @@ export const WORKSHEET_IMPORT_FIELDS: Record<WorksheetType, WorksheetImportField
   ],
   wide_time_series: [
     { key: "period", label: "Date or period", required: true, valueType: "date", candidates: ["date", "period", "month", "week", "quarter", "year"] }
+  ],
+  kpi_targets: [
+    { key: "domain", label: "KPI domain", required: true, candidates: ["domain", "area", "category", "department", "worksheet", "sheet"] },
+    { key: "kpi_name", label: "KPI name", required: true, candidates: ["kpi", "kpi name", "metric", "metric name", "name"] },
+    { key: "target", label: "Target", required: true, valueType: "number", candidates: ["target", "goal", "threshold"] },
+    { key: "unit", label: "Unit", required: true, candidates: ["unit", "units", "format", "scale"] },
+    { key: "direction", label: "Direction", required: true, candidates: ["direction", "desired direction", "performance direction", "goal direction"] }
   ],
   kpis: [
     { key: "name", label: "KPI name", required: true, candidates: ["kpi", "kpi name", "metric", "metric name", "month", "store", "name"] },
@@ -280,7 +290,10 @@ export function inferWideTimeSeriesMetricColumns(
   periodColumn = exactColumn(worksheet.columns, PERIOD_COLUMNS)
 ) {
   if (!periodColumn) return [];
-  const candidates = worksheet.columns.filter((column) => column !== periodColumn);
+  const candidates = worksheet.columns.filter((column) => {
+    if (column === periodColumn) return false;
+    return !PERIOD_COLUMNS.includes(normalized(column));
+  });
   const rows = worksheet.rows || [];
 
   if (!rows.length) {
@@ -383,6 +396,15 @@ export function detectWorksheetType(
   const combined = `${name} ${columns}`;
 
   if (includesAny(combined, ["company profile", "company context", "business profile"])) return "company_profile";
+  const targetMapping = inferWorksheetMapping("kpi_targets", worksheet.columns);
+  if (
+    (name.includes("kpi target") || name.includes("metric target") || name.includes("scorecard target"))
+    && targetMapping.domain
+    && targetMapping.kpi_name
+    && targetMapping.target
+    && targetMapping.unit
+    && targetMapping.direction
+  ) return "kpi_targets";
   if (isWideTimeSeriesWorksheet(worksheet)) return "wide_time_series";
   if (isInventoryWorksheet(name, worksheet.columns)) return "inventory";
   if (includesAny(combined, ["customer feedback", "customer rating", "customer satisfaction", "support feedback"])) return "customers";

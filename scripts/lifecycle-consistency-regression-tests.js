@@ -98,10 +98,11 @@ assert.deepEqual(
 
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 const kpiPage = read("app/app/kpis/page.tsx");
+const kpiLoader = read("lib/kpis/load-workspace-kpis.ts");
 const searchRoute = read("app/api/search/route.ts");
 const boundedContext = read("lib/ai/bounded-context.ts");
 const reportPage = read("app/app/reports/page.tsx");
-const sourcesPage = read("app/app/sources/page.tsx");
+const sourcesPage = read("app/app/sources/SourcesPage.tsx");
 const sourceParentEligibilityHelper = read("lib/intelligence/source-parent-eligibility.ts");
 const recordActions = read("app/app/operations/record-management-actions.ts");
 const intelligenceLayer = read("lib/intelligence/layer.ts");
@@ -112,7 +113,8 @@ const checklistRunsPage = read("app/app/checklist-runs/page.tsx");
 
 const activeQuery = (table) => new RegExp(`from\\("${table}"\\)[\\s\\S]{0,520}\\.eq\\("workspace_id", workspaceId\\)[\\s\\S]{0,180}\\.is\\("(?:archived_at|deleted_at)", null\\)[\\s\\S]{0,180}\\.is\\("(?:archived_at|deleted_at)", null\\)`);
 
-assert.match(kpiPage, activeQuery("kpis"), "KPI charts and trends must query active rows only");
+assert.match(kpiPage, /loadActiveWorkspaceKpis/, "KPI charts and trends must use the shared complete-history loader");
+assert.match(kpiLoader, activeQuery("kpis"), "the shared KPI loader must query active rows only");
 for (const table of ["reports", "issues", "sops"]) {
   assert.match(searchRoute, activeQuery(table), `global search must exclude inactive ${table} before limiting`);
 }
