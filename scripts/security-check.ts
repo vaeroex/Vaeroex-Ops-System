@@ -384,6 +384,7 @@ for (const toolName of [
   "save_file_analysis_business_memory",
   "update_kpi_record",
   "update_kpi_settings",
+  "assign_kpi_colors",
   "delete_kpi_record",
   "manage_record",
   "archive_record",

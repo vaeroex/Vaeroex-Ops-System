@@ -319,7 +319,7 @@ export function SourceImportReview({
   const fields = IMPORT_FIELDS[importType];
   const columns = Array.from(new Set(importRows.flatMap((row) => Object.keys(rowValues(row))))).filter(Boolean);
   const previewRows = importRows.slice(0, 5);
-  const color = interpretationValue(latestImport.mapping_json, "color", "#10B981");
+  const color = interpretationValue(latestImport.mapping_json, "color");
   const inputClass = "mt-2 min-h-11 w-full rounded-md border border-white/10 bg-slate-950/80 px-3 py-2 text-sm text-slate-100 outline-none focus:border-vaeroex-accent";
 
   return (
@@ -347,7 +347,7 @@ export function SourceImportReview({
             <label className="text-sm text-slate-300">X-axis label<input name="x_axis_label" defaultValue={interpretationValue(latestImport.mapping_json, "x_axis_label", "Date")} className={inputClass} /></label>
             <label className="text-sm text-slate-300">Y-axis label<input name="y_axis_label" defaultValue={interpretationValue(latestImport.mapping_json, "y_axis_label")} className={inputClass} /></label>
             <label className="text-sm text-slate-300">Preferred chart<select name="preferred_chart_type" defaultValue={interpretationValue(latestImport.mapping_json, "preferred_chart_type", "line")} className={inputClass}>{CHART_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label className="text-sm text-slate-300">KPI color<select name="color" defaultValue={color} className={inputClass}>{KPI_COLOR_PALETTE.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.value})</option>)}</select></label>
+            <label className="text-sm text-slate-300">KPI color<select name="color" defaultValue={color} className={inputClass}><option value="">Automatic (distributed palette)</option>{KPI_COLOR_PALETTE.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.value})</option>)}</select></label>
           </div>
           {kpiColorMayBeLowContrast(color) ? <p className="mt-3 text-xs leading-5 text-amber-100">This color may have low contrast on dark charts. Review it before saving.</p> : null}
         </details>
