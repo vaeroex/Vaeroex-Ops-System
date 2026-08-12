@@ -81,6 +81,7 @@ const sourceImportReview = read("components/evidence/SourceImportReview.tsx");
 const snapshotProducer = read("lib/kpis/snapshot-producer.ts");
 const migration = read("supabase/migrations/20260812051159_persistent_kpi_colors.sql");
 const initializationMigration = read("supabase/migrations/20260812060853_initialize_existing_kpi_colors.sql");
+const repairMigration = read("supabase/migrations/20260812064259_repair_existing_kpi_color_initialization.sql");
 
 assert.match(fileActions, /persistedSetting\?\.color[\s\S]{0,220}color_source/, "source reprocessing must preserve an existing KPI color and its provenance");
 assert.match(fileActions, /upsertWorkbookKpiTargetSettings[\s\S]{0,2200}allocateAutomaticKpiColors/, "new workbook KPI settings must receive persisted automatic colors");
@@ -102,6 +103,12 @@ assert.match(initializationMigration, /row_number\(\) over \([\s\S]*partition by
 assert.match(initializationMigration, /% 8 \+ 1[\s\S]*#38BDF8[\s\S]*#D1D5DB/, "existing assignments must be evenly distributed across the approved automatic palette");
 assert.match(initializationMigration, /set[\s\S]*color = assigned\.color,[\s\S]*color_source = 'automatic'/, "initialized historical rows must persist both color and automatic provenance");
 assert(!/\b(?:kpis|evidence|findings|business_health|intelligence_snapshot|saved_analyses)\b/i.test(initializationMigration), "the initializer must remain presentation-only");
+assert.match(repairMigration, /having count\(\*\) = 48[\s\S]*= 47[\s\S]*= 1[\s\S]*count\(distinct setting\.updated_at\) = 1/, "the repair must remain bounded to the verified 48-setting workspace shape");
+assert.match(repairMigration, /bool_and\(setting\.updated_at > setting\.created_at\)/, "the repair must require the provenance migration trigger fingerprint");
+assert.match(repairMigration, /color_source = 'user'[\s\S]*color = '#38BDF8'/, "the repair must target only the verified historical workbook default");
+assert.match(repairMigration, /row_number\(\) over \([\s\S]*partition by eligible\.workspace_id[\s\S]*md5\(lower\(/, "the repair assignment must remain deterministic per workspace");
+assert.match(repairMigration, /set[\s\S]*color = assigned\.color,[\s\S]*color_source = 'automatic'/, "the repair must persist both color and automatic provenance");
+assert(!/\b(?:kpis|evidence|findings|business_health|intelligence_snapshot|saved_analyses)\b/i.test(repairMigration), "the repair must remain presentation-only");
 
 const historicalStressRows = [
   ...names(47).map((kpi_name) => ({
@@ -109,21 +116,31 @@ const historicalStressRows = [
     color: "#38BDF8",
     color_source: "user",
     created_at: "2026-08-11T00:00:00Z",
-    updated_at: "2026-08-11T00:00:00Z"
+    updated_at: "2026-08-12T06:39:43Z"
   })),
   {
     kpi_name: "Manually customized KPI",
     color: "#1E6BFF",
     color_source: "user",
     created_at: "2026-08-11T00:00:00Z",
-    updated_at: "2026-08-11T00:05:00Z"
+    updated_at: "2026-08-12T06:39:43Z"
   }
 ];
-const eligibleHistoricalRows = historicalStressRows.filter(
+const originallyEligibleHistoricalRows = historicalStressRows.filter(
   (row) => row.color === "#38BDF8" && row.color_source === "user" && row.updated_at === row.created_at
 );
-assert.equal(eligibleHistoricalRows.length, 47, "the historical stress-workbook defaults must be eligible without reuploading the workbook");
-assert.equal(historicalStressRows.filter((row) => row.updated_at !== row.created_at).length, 1, "the manually changed KPI must remain excluded from initialization");
+assert.equal(originallyEligibleHistoricalRows.length, 0, "the regression must reproduce the trigger-induced initializer miss");
+assert.equal(new Set(historicalStressRows.map((row) => row.updated_at)).size, 1, "the provenance migration trigger must leave one shared update timestamp fingerprint");
+const repairableStressShape = historicalStressRows.length === 48
+  && historicalStressRows.filter((row) => row.color === "#38BDF8" && row.color_source === "user").length === 47
+  && historicalStressRows.filter((row) => row.color !== "#38BDF8" && row.color_source === "user").length === 1
+  && historicalStressRows.every((row) => row.updated_at > row.created_at);
+assert(repairableStressShape, "the verified stress-workbook shape must qualify for the bounded repair");
+const eligibleHistoricalRows = historicalStressRows.filter(
+  (row) => row.color === "#38BDF8" && row.color_source === "user"
+);
+assert.equal(eligibleHistoricalRows.length, 47, "the bounded repair must include all untouched historical workbook defaults");
+assert.equal(historicalStressRows.filter((row) => row.color === "#1E6BFF").length, 1, "the manually changed KPI must remain excluded from repair");
 const historicalAssignments = colors.allocateAutomaticKpiColors(
   workspaceId,
   eligibleHistoricalRows.map((row) => row.kpi_name),
