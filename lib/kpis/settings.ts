@@ -23,6 +23,8 @@ const DEFAULT_KPI_COLOR = AUTO_KPI_COLOR_PALETTE[0]?.value || KPI_COLOR_PALETTE[
 export const KPI_COLOR_SOURCES = ["automatic", "user", "legacy_unclassified"] as const;
 export type KpiColorSource = (typeof KPI_COLOR_SOURCES)[number];
 
+export const LEGACY_SYSTEM_DEFAULT_KPI_COLORS = ["#1E6BFF", "#38BDF8", "#10B981"] as const;
+
 type KpiColorAssignmentSetting = Pick<KpiSettingRow, "kpi_name" | "color"> & {
   color_source?: string | null;
 };
@@ -60,6 +62,10 @@ export function resolveSelectedKpiNames(
 export function approvedKpiColor(value: string | null | undefined): string {
   const match = KPI_COLOR_PALETTE.find((color) => color.value === value);
   return match?.value || DEFAULT_KPI_COLOR;
+}
+
+export function isLegacySystemDefaultKpiColor(value: string | null | undefined) {
+  return LEGACY_SYSTEM_DEFAULT_KPI_COLORS.some((color) => color === value);
 }
 
 function stableKpiColorHash(value: string) {

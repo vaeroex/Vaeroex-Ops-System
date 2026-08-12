@@ -12,6 +12,7 @@ import {
   allocateAutomaticKpiColors,
   approvedKpiColor,
   automaticKpiColorForIdentity,
+  isLegacySystemDefaultKpiColor,
   normalizeKpiName,
   KPI_COLOR_PALETTE,
   type KpiColorSource
@@ -633,7 +634,7 @@ export async function assignLegacyKpiColorsAction(formData: FormData) {
   const selectedLegacyColors = (settings || []).filter(
     (setting) => requestedIds.includes(setting.id)
       && setting.color_source === "legacy_unclassified"
-      && ["#1E6BFF", "#10B981"].includes(setting.color)
+      && isLegacySystemDefaultKpiColor(setting.color)
   );
 
   if (selectedLegacyColors.length !== requestedIds.length) {

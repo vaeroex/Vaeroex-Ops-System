@@ -80,6 +80,7 @@ const executiveOverview = read("app/app/page.tsx");
 const sourceImportReview = read("components/evidence/SourceImportReview.tsx");
 const snapshotProducer = read("lib/kpis/snapshot-producer.ts");
 const migration = read("supabase/migrations/20260812051159_persistent_kpi_colors.sql");
+const initializationMigration = read("supabase/migrations/20260812060853_initialize_existing_kpi_colors.sql");
 
 assert.match(fileActions, /persistedSetting\?\.color[\s\S]{0,220}color_source/, "source reprocessing must preserve an existing KPI color and its provenance");
 assert.match(fileActions, /upsertWorkbookKpiTargetSettings[\s\S]{0,2200}allocateAutomaticKpiColors/, "new workbook KPI settings must receive persisted automatic colors");
@@ -95,5 +96,40 @@ assert.match(migration, /color_source[\s\S]*legacy_unclassified[\s\S]*automatic[
 assert.match(migration, /updated_at = created_at/, "legacy classification must use untouched-row evidence rather than color alone");
 assert(!/set\s+color\s*=/i.test(migration), "the forward migration must not silently rewrite existing colors");
 assert(!/source_file_id|import_id|archived_at|deleted_at/.test(migration), "color provenance must remain independent of source lifecycle and KPI truth");
+assert.match(initializationMigration, /color_source = 'user'[\s\S]*color = '#38BDF8'/, "the initializer must recognize the historical workbook-import default missed by the provenance migration");
+assert.equal((initializationMigration.match(/updated_at = setting\.created_at/g) || []).length, 2, "eligibility and the final write must both require a never-updated setting");
+assert.match(initializationMigration, /row_number\(\) over \([\s\S]*partition by eligible\.workspace_id[\s\S]*md5\(lower\(/, "existing assignment must be deterministic per workspace and independent of query order");
+assert.match(initializationMigration, /% 8 \+ 1[\s\S]*#38BDF8[\s\S]*#D1D5DB/, "existing assignments must be evenly distributed across the approved automatic palette");
+assert.match(initializationMigration, /set[\s\S]*color = assigned\.color,[\s\S]*color_source = 'automatic'/, "initialized historical rows must persist both color and automatic provenance");
+assert(!/\b(?:kpis|evidence|findings|business_health|intelligence_snapshot|saved_analyses)\b/i.test(initializationMigration), "the initializer must remain presentation-only");
+
+const historicalStressRows = [
+  ...names(47).map((kpi_name) => ({
+    kpi_name,
+    color: "#38BDF8",
+    color_source: "user",
+    created_at: "2026-08-11T00:00:00Z",
+    updated_at: "2026-08-11T00:00:00Z"
+  })),
+  {
+    kpi_name: "Manually customized KPI",
+    color: "#1E6BFF",
+    color_source: "user",
+    created_at: "2026-08-11T00:00:00Z",
+    updated_at: "2026-08-11T00:05:00Z"
+  }
+];
+const eligibleHistoricalRows = historicalStressRows.filter(
+  (row) => row.color === "#38BDF8" && row.color_source === "user" && row.updated_at === row.created_at
+);
+assert.equal(eligibleHistoricalRows.length, 47, "the historical stress-workbook defaults must be eligible without reuploading the workbook");
+assert.equal(historicalStressRows.filter((row) => row.updated_at !== row.created_at).length, 1, "the manually changed KPI must remain excluded from initialization");
+const historicalAssignments = colors.allocateAutomaticKpiColors(
+  workspaceId,
+  eligibleHistoricalRows.map((row) => row.kpi_name),
+  []
+);
+const historicalCounts = histogram(historicalAssignments);
+assert(Math.max(...historicalCounts) - Math.min(...historicalCounts) <= 1, "the 47 eligible historical KPIs must receive a balanced palette");
 
 console.log("Persistent deterministic KPI color assignment regression passed.");

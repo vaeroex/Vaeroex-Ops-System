@@ -167,6 +167,7 @@ const actions = loadTypescriptModule("app/app/operations/actions.ts", {
     allocateAutomaticKpiColors: (_workspaceId, identities) => new Map(identities.map((identity, index) => [String(identity).trim().toLowerCase(), index % 2 ? "#10B981" : "#38BDF8"])),
     approvedKpiColor: (value) => value,
     automaticKpiColorForIdentity: () => "#10B981",
+    isLegacySystemDefaultKpiColor: (value) => ["#1E6BFF", "#38BDF8", "#10B981"].includes(value),
     normalizeKpiName: (value) => String(value || "").trim().toLowerCase(),
     KPI_COLOR_PALETTE: [
       { value: "#10B981", label: "Emerald" },
@@ -322,7 +323,7 @@ function assertSingleCanonicalRow() {
 
   persistedRows.push(
     { id: "legacy-one", workspace_id: workspaceId, kpi_name: "Legacy One", color: "#1E6BFF", color_source: "legacy_unclassified" },
-    { id: "legacy-two", workspace_id: workspaceId, kpi_name: "Legacy Two", color: "#10B981", color_source: "legacy_unclassified" },
+    { id: "legacy-two", workspace_id: workspaceId, kpi_name: "Legacy Two", color: "#38BDF8", color_source: "legacy_unclassified" },
     { id: "manual-color", workspace_id: workspaceId, kpi_name: "Manual Color", color: "#EF4444", color_source: "user" }
   );
   const legacyForm = new FormData();

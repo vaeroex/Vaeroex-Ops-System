@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import {
   approvedKpiColor,
   getConfiguredMetricNames,
+  isLegacySystemDefaultKpiColor,
   kpiColor,
   kpiColorMayBeLowContrast,
   kpiSettingForName,
@@ -393,7 +394,7 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
   const names = metricNames(kpis, settings);
   const duplicateGroups = potentialKpiDuplicateGroups(names, settings);
   const unclassifiedLegacyColors = settings.filter(
-    (setting) => setting.color_source === "legacy_unclassified" && ["#1E6BFF", "#10B981"].includes(setting.color)
+    (setting) => setting.color_source === "legacy_unclassified" && isLegacySystemDefaultKpiColor(setting.color)
   );
 
   return (
