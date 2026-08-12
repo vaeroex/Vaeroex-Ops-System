@@ -16,6 +16,26 @@ export type WorkbookMetricInput = Readonly<{
   metricColumn: string;
 }>;
 
+export type WorkbookMetricRole = "rate" | "amount" | "duration" | "count" | "measure";
+
+export type WorkbookKpiTargetCandidate = Readonly<{
+  worksheetName: string;
+  metricColumn: string;
+  normalizedDomain: string;
+  normalizedMetricName: string;
+  canonicalIdentity: string;
+  aliasUsed: string | null;
+  matchType: "exact_name" | "exact_base_name" | "normalized_alias" | "none";
+  semanticUnit: string | null;
+  semanticScale: number | null;
+  metricRole: WorkbookMetricRole | null;
+  domainEligible: boolean;
+  unitCompatible: boolean | null;
+  roleCompatible: boolean | null;
+  eligible: boolean;
+  rejectionReason: string | null;
+}>;
+
 export type WorkbookKpiTargetBinding = Readonly<{
   importRowId: string;
   worksheetName: string;
@@ -136,6 +156,14 @@ function unitSemanticsMatch(left: WorkbookUnitSemantics, right: WorkbookUnitSema
     && left.semanticScale === right.semanticScale;
 }
 
+function metricRole(semantics: WorkbookUnitSemantics): WorkbookMetricRole {
+  if (semantics.semanticUnit === "percent") return "rate";
+  if (semantics.semanticUnit === "currency") return "amount";
+  if (["hour", "hours", "hr", "hrs", "minute", "minutes", "min", "mins", "day", "days"].includes(semantics.semanticUnit)) return "duration";
+  if (semantics.semanticUnit === "count") return "count";
+  return "measure";
+}
+
 function normalizeExactWorkbookKpiLabel(value: string) {
   return normalized(value)
     .replace(/\s+(?:000|m)$/, "")
@@ -145,6 +173,76 @@ function normalizeExactWorkbookKpiLabel(value: string) {
     .replace(/\s+(?:x|score|count|units?)$/, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+export function workbookKpiTargetCandidatesForTarget(
+  target: WorkbookKpiTargetInput,
+  metrics: readonly WorkbookMetricInput[]
+): readonly WorkbookKpiTargetCandidate[] {
+  const targetDomain = normalizeWorkbookDomain(target.domain);
+  const targetName = normalizedMetricColumn(target.kpiName);
+  const targetBaseName = normalizeExactWorkbookKpiLabel(target.kpiName);
+  const targetAlias = normalizeWorkbookKpiLabel(target.kpiName);
+  const targetSemantics = unitSemantics(target.unit);
+  const targetRole = metricRole(targetSemantics);
+
+  const candidates = metrics.map((metric) => {
+    const normalizedDomain = normalizeWorkbookDomain(metric.worksheetName);
+    const normalizedName = normalizedMetricColumn(metric.metricColumn);
+    const normalizedBaseName = normalizeExactWorkbookKpiLabel(metric.metricColumn);
+    const normalizedAlias = normalizeWorkbookKpiLabel(metric.metricColumn);
+    const domainEligible = normalizedDomain === targetDomain;
+    const matchType = normalizedName === targetName
+      ? "exact_name" as const
+      : normalizedBaseName === targetBaseName
+        ? "exact_base_name" as const
+        : normalizedAlias === targetAlias
+          ? "normalized_alias" as const
+          : "none" as const;
+    const semantics = metricColumnUnitSemantics(metric.metricColumn);
+    const candidateRole = semantics ? metricRole(semantics) : null;
+    return {
+      metric,
+      candidate: {
+        worksheetName: metric.worksheetName,
+        metricColumn: metric.metricColumn,
+        normalizedDomain,
+        normalizedMetricName: normalizedName,
+        canonicalIdentity: slug(`${normalizedDomain} ${normalizedName}`),
+        aliasUsed: matchType === "normalized_alias" ? normalizedAlias : null,
+        matchType,
+        semanticUnit: semantics?.semanticUnit ?? null,
+        semanticScale: semantics?.semanticScale ?? null,
+        metricRole: candidateRole,
+        domainEligible,
+        unitCompatible: semantics ? unitSemanticsMatch(semantics, targetSemantics) : null,
+        roleCompatible: candidateRole ? candidateRole === targetRole : null
+      }
+    };
+  });
+
+  const sameDomain = candidates.filter(({ candidate }) => candidate.domainEligible);
+  const selectedMatchType = (["exact_name", "exact_base_name", "normalized_alias"] as const)
+    .find((matchType) => sameDomain.some(({ candidate }) => candidate.matchType === matchType)) || null;
+  const nameQualified = selectedMatchType
+    ? sameDomain.filter(({ candidate }) => candidate.matchType === selectedMatchType)
+    : [];
+  const explicitQualified = nameQualified.filter(({ candidate }) => candidate.unitCompatible && candidate.roleCompatible);
+  const eligibleMetrics = new Set((explicitQualified.length
+    ? explicitQualified
+    : nameQualified.filter(({ candidate }) => candidate.unitCompatible === null && candidate.roleCompatible === null)
+  ).map(({ metric }) => metric));
+
+  return candidates.map(({ metric, candidate }) => {
+    let rejectionReason: string | null = null;
+    if (!candidate.domainEligible) rejectionReason = "domain_mismatch";
+    else if (candidate.matchType === "none") rejectionReason = "metric_name_mismatch";
+    else if (candidate.matchType !== selectedMatchType) rejectionReason = "lower_priority_name_match";
+    else if (candidate.roleCompatible === false) rejectionReason = "metric_role_mismatch";
+    else if (candidate.unitCompatible === false) rejectionReason = "unit_or_scale_mismatch";
+    else if (!eligibleMetrics.has(metric)) rejectionReason = "explicit_unit_match_preferred";
+    return { ...candidate, eligible: eligibleMetrics.has(metric), rejectionReason };
+  });
 }
 
 export function parseWorkbookKpiTargetDirection(value: unknown): WorkbookKpiTargetDirection | null {
@@ -173,8 +271,9 @@ export function buildWorkbookKpiTargetRegistry({
 
   for (const target of targets) {
     const domain = normalizeWorkbookDomain(target.domain);
-    const label = normalizeWorkbookKpiLabel(target.kpiName);
-    const key = `${domain}::${label}`;
+    const label = normalizeExactWorkbookKpiLabel(target.kpiName);
+    const semantics = unitSemantics(target.unit);
+    const key = `${domain}::${label}::${semantics.semanticUnit}::${semantics.semanticScale}::${metricRole(semantics)}`;
     if (!domain || !label) {
       errors.push(`Target row ${target.importRowId} must include an exact domain and KPI name.`);
       continue;
@@ -205,30 +304,15 @@ export function buildWorkbookKpiTargetRegistry({
 
   const bindings: WorkbookKpiTargetBinding[] = [];
   for (const target of targetsByKey.values()) {
-    const targetDomain = normalizeWorkbookDomain(target.domain);
-    const targetLabel = normalizeWorkbookKpiLabel(target.kpiName);
-    const exactTargetLabel = normalizeExactWorkbookKpiLabel(target.kpiName);
-    const sameDomainMetrics = metrics.filter((metric) => normalizeWorkbookDomain(metric.worksheetName) === targetDomain);
-    const exactLabelMatches = sameDomainMetrics.filter((metric) => normalizeExactWorkbookKpiLabel(metric.metricColumn) === exactTargetLabel);
-    const normalizedAliasMatches = sameDomainMetrics.filter((metric) =>
-      normalizeWorkbookKpiLabel(metric.metricColumn) === targetLabel
-      && !exactLabelMatches.includes(metric)
-    );
-    const labelMatches = exactLabelMatches.length ? exactLabelMatches : normalizedAliasMatches;
+    const candidates = workbookKpiTargetCandidatesForTarget(target, metrics);
+    const matches = candidates.filter((candidate) => candidate.eligible);
     const targetUnit = unitSemantics(target.unit);
-    const explicitlyCompatible = labelMatches.filter((metric) => {
-      const metricUnit = metricColumnUnitSemantics(metric.metricColumn);
-      return metricUnit ? unitSemanticsMatch(metricUnit, targetUnit) : false;
-    });
-    const matches = explicitlyCompatible.length
-      ? explicitlyCompatible
-      : labelMatches.filter((metric) => metricColumnUnitSemantics(metric.metricColumn) === null);
 
     if (matches.length !== 1) {
-      const hasExplicitUnitConflict = labelMatches.length > 0 && matches.length === 0;
+      const hasNameMatch = candidates.some((candidate) => candidate.domainEligible && candidate.matchType !== "none");
       errors.push(matches.length
         ? `Target ${target.domain} / ${target.kpiName} matches more than one metric column.`
-        : hasExplicitUnitConflict
+        : hasNameMatch
           ? `Target ${target.domain} / ${target.kpiName} does not match a metric column with compatible unit ${target.unit}.`
           : `Target ${target.domain} / ${target.kpiName} does not match a metric column in that worksheet.`);
       continue;

@@ -162,11 +162,24 @@ export function materializeKpiPageStateV1({
   rows: KpiRow[];
   settings: KpiSettingRow[];
 }): KpiPageConsumerStateV1 {
-  const metricName = snapshot.identity.displayName;
+  const snapshotRow = rows.find((row) => row.id === snapshot.id);
+  if (!snapshotRow) throw new Error(`KPI ${snapshot.id} does not resolve to its authoritative source row.`);
+  const metricName = snapshotRow.name;
   const metricRows = rowsForMetric(rows, metricName);
   const latest = metricRows.at(-1);
-  if (!latest || latest.id !== snapshot.id) throw new Error(`KPI ${snapshot.id} presentation identity does not resolve to its latest row.`);
+  if (!latest || latest.id !== snapshot.id) throw new Error(`KPI ${snapshot.id} source identity does not resolve to its latest row.`);
   const legacySemantics = kpiSemantics(metricName, settings);
+  const expectedIdentity = {
+    canonicalName: legacySemantics.canonicalName,
+    displayName: legacySemantics.displayName,
+    originalSourceLabel: legacySemantics.originalSourceLabel,
+    unit: legacySemantics.unit,
+    scale: legacySemantics.scale,
+    metricRole: legacySemantics.metricRole
+  };
+  if (canonicalSnapshotJson(snapshot.identity) !== canonicalSnapshotJson(expectedIdentity)) {
+    throw new Error(`KPI ${snapshot.id} presentation identity disagrees with its authoritative source row.`);
+  }
   const semantics = projectedSemantics(snapshot, legacySemantics);
   const legacyManualTarget = kpiSettingForName(settings, metricName)?.target ?? latest.target ?? null;
   const manualTarget = stateManualTarget(snapshot.manualTarget);

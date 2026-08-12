@@ -351,6 +351,74 @@ assert.equal(kpiStates.byName.get("operational index").recommendation.confidence
 assert.ok(kpiProjection.kpis.every((kpi) => kpi.observations.selectedRange.boundedObservations.length <= 6));
 assert.ok(JSON.stringify(kpiProjection).length < 100_000, "KPI page projection must remain bounded");
 
+const domainQualifiedRows = kpiRows
+  .filter((row) => row.name === "Revenue")
+  .map((row) => ({ ...row, name: "Finance · Gross Margin %" }));
+const domainQualifiedSettings = kpiSettings
+  .filter((setting) => setting.kpi_name === "Revenue")
+  .map((setting) => ({
+    ...setting,
+    kpi_name: "Finance · Gross Margin %",
+    canonical_name: "finance_gross_margin",
+    display_name: "Gross Margin % (Finance)",
+    original_source_label: "Gross Margin %",
+    semantic_unit: "percent"
+  }));
+const domainQualifiedProducer = buildCanonicalKpiProducerOutputV1({
+  workspaceId: FOUNDATION_FIXTURE_WORKSPACE_ID,
+  rows: domainQualifiedRows,
+  settings: domainQualifiedSettings,
+  asOf: FOUNDATION_FIXTURE_AS_OF
+});
+const domainQualifiedBuild = buildIntelligenceSnapshotFromProducersV1({
+  workspaceId: FOUNDATION_FIXTURE_WORKSPACE_ID,
+  asOf: FOUNDATION_FIXTURE_AS_OF,
+  kpis: domainQualifiedProducer
+});
+const domainQualifiedProjection = projectKpiPageV1(domainQualifiedBuild.snapshot);
+assert.equal(domainQualifiedProjection.kpis[0].identity.displayName, "Gross Margin % (Finance)");
+const domainQualifiedState = buildKpiPageStatesFromSnapshotV1({
+  projection: domainQualifiedProjection,
+  rows: domainQualifiedRows,
+  settings: domainQualifiedSettings
+}).states[0];
+assert.equal(
+  domainQualifiedState.metricName,
+  "Finance · Gross Margin %",
+  "presentation labels must not replace the authoritative source-series identity"
+);
+
+const staleDomainQualifiedRows = [
+  ...domainQualifiedRows,
+  {
+    ...domainQualifiedRows.at(-1),
+    id: "kpi-revenue:newer-row",
+    metric_date: "2026-07-01",
+    created_at: "2026-07-01T00:00:00.000Z",
+    updated_at: "2026-07-01T00:00:00.000Z"
+  }
+];
+assert.throws(
+  () => materializeKpiPageStateV1({
+    snapshot: domainQualifiedProjection.kpis[0],
+    rows: staleDomainQualifiedRows,
+    settings: domainQualifiedSettings
+  }),
+  /source identity does not resolve to its latest row/,
+  "a stale snapshot must not masquerade as the latest domain-qualified KPI"
+);
+const mismatchedPresentationIdentity = clone(domainQualifiedProjection.kpis[0]);
+mismatchedPresentationIdentity.identity.displayName = "Gross Margin % (Sales & Merchandising)";
+assert.throws(
+  () => materializeKpiPageStateV1({
+    snapshot: mismatchedPresentationIdentity,
+    rows: domainQualifiedRows,
+    settings: domainQualifiedSettings
+  }),
+  /presentation identity disagrees with its authoritative source row/,
+  "a substituted presentation identity must continue to fail closed"
+);
+
 const checkout = kpiStates.byName.get("average checkout wait");
 const detailProjection = projectKpiDetailV1(kpiBuild.snapshot, checkout.kpiId);
 assert.equal(detailProjection.kpi.state, "available");

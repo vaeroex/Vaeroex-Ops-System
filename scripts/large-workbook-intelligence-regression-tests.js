@@ -123,11 +123,12 @@ assert.strictEqual(perUnitRegistry.bindings[0].valueFormat, "currency");
 const grossMarginMetrics = [
   { worksheetName: "Sales & Merchandising", metricColumn: "Gross Margin %" },
   { worksheetName: "Sales & Merchandising", metricColumn: "Gross Margin $000" },
-  { worksheetName: "Finance", metricColumn: "Gross Margin %" }
+  { worksheetName: "Finance", metricColumn: "Gross Margin %" },
+  { worksheetName: "Finance", metricColumn: "Gross Profit $000" }
 ];
 const grossMarginTargets = [
-  { importRowId: "sales-margin-target", domain: "Sales & Merchandising", kpiName: "Gross Margin", target: 38.5, unit: "%", direction: "maximize" },
-  { importRowId: "finance-margin-target", domain: "Finance", kpiName: "Gross Margin", target: 38.5, unit: "%", direction: "maximize" }
+  { importRowId: "sales-margin-target", domain: "Sales & Merchandising", kpiName: "Gross Margin %", target: 38.5, unit: "%", direction: "maximize" },
+  { importRowId: "finance-margin-target", domain: "Finance", kpiName: "Gross Margin %", target: 38.5, unit: "%", direction: "maximize" }
 ];
 const grossMarginRegistry = targets.buildWorkbookKpiTargetRegistry({
   targets: grossMarginTargets,
@@ -141,6 +142,27 @@ const retriedGrossMarginRegistry = targets.buildWorkbookKpiTargetRegistry({
 });
 assert.deepStrictEqual(grossMarginRegistry.errors, [], "domain plus compatible unit/scale must resolve qualified gross-margin targets without ambiguity");
 assert.deepStrictEqual(retriedGrossMarginRegistry, grossMarginRegistry, "retrying the same reviewed target contract must resolve idempotently");
+const salesMarginCandidates = targets.workbookKpiTargetCandidatesForTarget(grossMarginTargets[0], grossMarginMetrics);
+assert.deepStrictEqual(
+  salesMarginCandidates.map((candidate) => ({
+    worksheet: candidate.worksheetName,
+    column: candidate.metricColumn,
+    identity: candidate.canonicalIdentity,
+    match: candidate.matchType,
+    unit: candidate.semanticUnit,
+    scale: candidate.semanticScale,
+    role: candidate.metricRole,
+    eligible: candidate.eligible,
+    reason: candidate.rejectionReason
+  })),
+  [
+    { worksheet: "Sales & Merchandising", column: "Gross Margin %", identity: "sales_merchandising_gross_margin_percent", match: "exact_name", unit: "percent", scale: 1, role: "rate", eligible: true, reason: null },
+    { worksheet: "Sales & Merchandising", column: "Gross Margin $000", identity: "sales_merchandising_gross_margin_dollar_000", match: "exact_base_name", unit: "currency", scale: 1000, role: "amount", eligible: false, reason: "lower_priority_name_match" },
+    { worksheet: "Finance", column: "Gross Margin %", identity: "finance_gross_margin_percent", match: "exact_name", unit: "percent", scale: 1, role: "rate", eligible: false, reason: "domain_mismatch" },
+    { worksheet: "Finance", column: "Gross Profit $000", identity: "finance_gross_profit_dollar_000", match: "none", unit: "currency", scale: 1000, role: "amount", eligible: false, reason: "domain_mismatch" }
+  ],
+  "candidate diagnostics must preserve exact domain, raw metric identity, unit, scale, role, and elimination reason"
+);
 assert.deepStrictEqual(
   grossMarginRegistry.bindings.map((binding) => [binding.worksheetName, binding.metricColumn, binding.canonicalName]),
   [
@@ -183,6 +205,38 @@ const exactBeforeAliasRegistry = targets.buildWorkbookKpiTargetRegistry({
 });
 assert.deepStrictEqual(exactBeforeAliasRegistry.errors, [], "a qualified exact label must outrank a bounded alias");
 assert.strictEqual(exactBeforeAliasRegistry.bindings[0].metricColumn, "Response Time Hours", "an alias must not compete with an exact qualified match");
+
+const ambiguousSameUnitRegistry = targets.buildWorkbookKpiTargetRegistry({
+  targets: [{ importRowId: "ambiguous-hours", domain: "Operations", kpiName: "Response Time", target: 4, unit: "hours", direction: "minimize" }],
+  metrics: [
+    { worksheetName: "Operations", metricColumn: "Avg Response Hrs" },
+    { worksheetName: "Operations", metricColumn: "Average Response Hours" }
+  ],
+  hasTargetContract: true
+});
+assert.strictEqual(ambiguousSameUnitRegistry.bindings.length, 0, "same-domain, same-unit aliases must remain fail-closed when neither is an exact name");
+assert.match(ambiguousSameUnitRegistry.errors[0], /matches more than one metric column/, "genuine qualified ambiguity must remain explicit");
+
+const qualifiedMeasureCases = [
+  { domain: "Sales", target: "Revenue %", unit: "%", selected: "Revenue %", support: "Revenue $" },
+  { domain: "People", target: "Labor Cost %", unit: "%", selected: "Labor Cost %", support: "Labor Hours" },
+  { domain: "Inventory", target: "Inventory Value $", unit: "$", selected: "Inventory Value $", support: "Inventory Units" },
+  { domain: "Digital", target: "Conversion %", unit: "%", selected: "Conversion %", support: "Conversion Count" },
+  { domain: "Returns", target: "Return Rate %", unit: "%", selected: "Return Rate %", support: "Return Units" }
+];
+for (const [index, fixture] of qualifiedMeasureCases.entries()) {
+  const qualifiedRegistry = targets.buildWorkbookKpiTargetRegistry({
+    targets: [{ importRowId: `qualified-${index}`, domain: fixture.domain, kpiName: fixture.target, target: 1, unit: fixture.unit, direction: "maximize" }],
+    metrics: [
+      { worksheetName: fixture.domain, metricColumn: fixture.selected },
+      { worksheetName: fixture.domain, metricColumn: fixture.support }
+    ],
+    hasTargetContract: true
+  });
+  assert.deepStrictEqual(qualifiedRegistry.errors, [], `${fixture.target} must resolve through the generic qualified-measure contract`);
+  assert.strictEqual(qualifiedRegistry.bindings[0].metricColumn, fixture.selected, `${fixture.support} must not compete with ${fixture.target}`);
+  assert.strictEqual(targets.workbookKpiTargetBindingForMetric(qualifiedRegistry, fixture.domain, fixture.support), null, `${fixture.support} must remain supporting evidence`);
+}
 
 const unmatched = targets.buildWorkbookKpiTargetRegistry({
   targets: [{ importRowId: "bad-1", domain: "Finance", kpiName: "Not Present", target: 1, unit: "count", direction: "maximize" }],
