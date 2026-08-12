@@ -1940,20 +1940,6 @@ button.bg-vaeroex-blue:hover {
 }
 
 /* Spatial workspace V2: persistent route architecture and guided analytical environments. */
-.vaeroex-webgl-band--kpi {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  grid-template-columns: none;
-  border-block-color: rgba(129, 170, 184, 0.28);
-  background: #040a10;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03), 0 22px 48px rgba(0, 0, 0, 0.18);
-}
-
-.vaeroex-webgl-stage--kpi {
-  min-height: clamp(30rem, 62vh, 40rem);
-}
-
 .vaeroex-spatial-annotation {
   --annotation-accent: #9adce5;
   position: relative;
@@ -1971,62 +1957,6 @@ button.bg-vaeroex-blue:hover {
   text-overflow: ellipsis;
   white-space: nowrap;
   box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
-}
-
-.vaeroex-kpi-focus-rail {
-  position: absolute;
-  z-index: 3;
-  right: 20rem;
-  bottom: 1rem;
-  left: 1rem;
-  display: flex;
-  gap: 0;
-  min-width: 0;
-  overflow-x: auto;
-  border-top: 1px solid rgba(126, 167, 180, 0.34);
-  border-bottom: 1px solid rgba(126, 167, 180, 0.16);
-  background: rgba(4, 10, 16, 0.76);
-  scrollbar-color: rgba(126, 167, 180, 0.42) transparent;
-  scrollbar-width: thin;
-  backdrop-filter: blur(12px);
-}
-
-.vaeroex-kpi-focus-rail button {
-  position: relative;
-  flex: 0 0 9.5rem;
-  min-height: 4rem;
-  border-right: 1px solid rgba(126, 167, 180, 0.16);
-  padding: 0.62rem 0.72rem;
-  color: #8ea3ad;
-  letter-spacing: 0;
-  text-align: left;
-  transition: background-color 160ms ease, color 160ms ease;
-}
-
-.vaeroex-kpi-focus-rail button::before {
-  position: absolute;
-  top: -1px;
-  right: 0;
-  left: 0;
-  height: 2px;
-  background: transparent;
-  content: "";
-}
-
-.vaeroex-kpi-focus-rail button:hover,
-.vaeroex-kpi-focus-rail button:focus-visible,
-.vaeroex-kpi-focus-rail button.is-active {
-  background: rgba(21, 48, 62, 0.72);
-  color: #f0f7f8;
-}
-
-.vaeroex-kpi-focus-rail button:focus-visible {
-  outline: 2px solid rgba(143, 215, 230, 0.72);
-  outline-offset: -2px;
-}
-
-.vaeroex-kpi-focus-rail button.is-active::before {
-  background: #8fd7e6;
 }
 
 .vaeroex-spatial-readout {
@@ -2097,60 +2027,8 @@ button.bg-vaeroex-blue:hover {
   text-decoration: underline;
 }
 
-.vaeroex-kpi-layer-key {
-  position: absolute;
-  z-index: 3;
-  top: 1rem;
-  left: 1rem;
-  display: flex;
-  gap: 1rem;
-  border-top: 1px solid rgba(126, 167, 180, 0.32);
-  background: rgba(5, 12, 18, 0.68);
-  padding: 0.62rem 0.75rem;
-  color: #9fb2ba;
-  font-size: 0.66rem;
-  font-weight: 650;
-  backdrop-filter: blur(10px);
-}
-
-.vaeroex-kpi-layer-key span {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-}
-
-.vaeroex-kpi-layer-key i {
-  display: block;
-  width: 1.35rem;
-  height: 2px;
-}
-
-.vaeroex-kpi-layer-key i.is-target {
-  background: #a99567;
-}
-
-.vaeroex-kpi-focus-rail button {
-  flex-basis: 7.25rem;
-}
-
-.vaeroex-kpi-focus-rail button span,
-.vaeroex-kpi-focus-rail button strong {
-  display: block;
-}
-
-.vaeroex-kpi-focus-rail button span {
-  font-size: 0.62rem;
-}
-
-.vaeroex-kpi-focus-rail button strong {
-  margin-top: 0.28rem;
-  font-size: 0.74rem;
-  font-variant-numeric: tabular-nums;
-}
-
 @media (max-width: 1023px) {
-  .vaeroex-intelligence-focus-rail,
-  .vaeroex-kpi-focus-rail {
+  .vaeroex-intelligence-focus-rail {
     right: 1rem;
   }
 
@@ -2171,8 +2049,7 @@ button.bg-vaeroex-blue:hover {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vaeroex-intelligence-focus-rail button,
-  .vaeroex-kpi-focus-rail button {
+  .vaeroex-intelligence-focus-rail button {
     transition: none;
   }
 }
@@ -3038,18 +2915,10 @@ button.bg-vaeroex-blue:hover {
   color: #f8fafc;
 }
 
-.vaeroex-webgl-band--kpi {
-  min-height: 27rem;
-}
-
 .vaeroex-webgl-stage {
   position: relative;
   min-height: clamp(29rem, 62vh, 42rem);
   overflow: hidden;
-}
-
-.vaeroex-webgl-stage--kpi {
-  min-height: 27rem;
 }
 
 .vaeroex-webgl-stage canvas {
@@ -3151,10 +3020,6 @@ button.bg-vaeroex-blue:hover {
   color: #cbd5e1;
   font-size: 0.875rem;
   text-align: center;
-}
-
-.vaeroex-webgl-loading--kpi {
-  min-height: 15rem;
 }
 
 @media (max-width: 1023px) {

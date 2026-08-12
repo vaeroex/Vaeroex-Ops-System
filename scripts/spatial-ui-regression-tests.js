@@ -32,11 +32,8 @@ const homepage = read("components/intelligence/ExecutiveHomepage.tsx");
 const intelligenceInbox = read("components/intelligence/IntelligenceSignalInbox.tsx");
 const intelligencePage = read("app/app/intelligence/page.tsx");
 const kpiPage = read("app/app/kpis/page.tsx");
-const kpiSwitcher = read("components/spatial/KpiVisualizationSwitcher.tsx");
-const kpiCanvas = read("components/spatial/KpiSpatialCanvas.tsx");
 const managedRecords = read("components/operations/ManagedRecordList.tsx");
 const evidenceWorkspace = read("app/app/sources/SourcesPage.tsx");
-const kpiPresentation = read("lib/presentation/spatial-kpi.ts");
 
 assert.equal(packageJson.dependencies.three, "0.185.1", "Three.js must be pinned for repeatable spatial rendering");
 assert.equal(packageJson.dependencies["@react-three/fiber"], "9.6.1", "R3F must be pinned for repeatable spatial rendering");
@@ -125,22 +122,12 @@ assert.doesNotMatch(instrument, /fetch\(|canvas|requestAnimationFrame|WebGL|thre
 assert.match(intelligencePage, /<IntelligenceSignalInbox[\s\S]*currentCards=\{lifecycleCards\.current\}[\s\S]*historyCards=\{lifecycleCards\.history\}/, "the authoritative Intelligence cards must render directly inside the global workspace");
 assert.doesNotMatch(intelligencePage, /SpatialIntelligenceWorkspace|Cards[\s\S]*Spatial/, "the redundant Intelligence-only visualization toggle must be absent");
 
-assert.match(kpiPage, /<KpiVisualizationSwitcher[\s\S]*kpi=\{selectedKpiSnapshot\}/, "KPI detail must expose the optional 3D view from its snapshot projection");
-assert.match(kpiSwitcher, /useState<"2d" \| "3d">\("2d"\)/, "the readable 2D KPI chart must remain the default");
-assert.match(kpiSwitcher, /dynamic\(\(\) => import\("@\/components\/spatial\/KpiSpatialCanvas"\)/, "the KPI canvas must be lazy loaded");
-assert.match(kpiPresentation, /position: readonly \[number, number, 0\]/, "KPI data must use a literal zero Z coordinate when there is no third metric");
-assert.match(kpiPresentation, /boundedObservations/, "KPI spatial points must use the canonical bounded observation range");
-assert.match(kpiPresentation, /effectiveAuthoritativeTarget[\s\S]*targetReference/, "KPI target planes must come only from the authoritative snapshot target");
-assert.doesNotMatch(kpiPresentation, /supabase|fetch\(|\.from\(/, "the KPI scene mapper must not access data providers");
-assert.match(kpiCanvas, /Depth separates visual layers only/, "KPI depth must be disclosed as presentation, not a business metric");
-assert.match(kpiCanvas, /TargetLayer/, "KPI spatial mode must render authoritative target layers when available");
-assert.match(kpiCanvas, /<BoundedSpatialCamera[\s\S]*enablePan/, "KPI inspection must combine guided focus with bounded orbit, dolly, and pan");
-assert.doesNotMatch(kpiCanvas, /sphereGeometry/, "the KPI environment must not retain spherical point markers");
-assert.match(kpiCanvas, /<SpatialCameraControls[\s\S]*dollyIn[\s\S]*dollyOut/, "KPI inspection must expose working zoom and reset controls");
-assert.match(kpiCanvas, /frameloop=\{visible \? "demand" : "never"\}/, "the KPI canvas must pause when hidden");
-assert.match(kpiCanvas, /resize=\{\{ polyfill: SpatialResizeObserver \}\}/, "the KPI canvas must receive a guaranteed initial measurement");
-assert.match(kpiCanvas, /role="listbox" aria-label="KPI observations"/, "the KPI scene must provide a keyboard-equivalent observation rail");
-assert.match(kpiSwitcher, /selectedPointId/, "KPI point selection must persist when switching back to the 2D detail view");
+assert.match(kpiPage, /<TrendChart rows=\{selectedMetricRows\.slice\(-12\)\} metricName=\{primaryMetric\} settings=\{kpiSettings\} \/>/, "KPI detail must render the authoritative 2D trend chart directly");
+assert.match(kpiPage, /resolveKpiTargetReference\(semantics, row\.target\)/, "the KPI trend chart must retain authoritative target references");
+assert.match(kpiPage, /const chartColor = kpiColor\(metricName, settings\)/, "the KPI trend chart must retain persisted KPI colors");
+assert.match(kpiPage, /<circle key=\{row\.id\}[\s\S]*row\.actual_value/, "the KPI trend chart must retain historical observations");
+assert.match(kpiPage, /formatShortDate\(firstDate\)[\s\S]*formatShortDate\(lastDate\)/, "the KPI trend chart must retain its date range labels");
+assert.doesNotMatch(kpiPage, /KpiVisualizationSwitcher|KpiSpatialCanvas|selectedKpiSnapshot|spatial-kpi|2D\s*\/\s*3D/, "KPI detail must not retain a KPI-specific 3D mode or mode selector");
 assert.match(pixelProbe, /sampleSize = Math\.min\(64[\s\S]*\[0\.1, 0\.3, 0\.5, 0\.7, 0\.9\][\s\S]*readPixels/, "the one-time framebuffer check must stay bounded to a 25-sample grid");
 assert.match(resizeObserver, /new window\.ResizeObserver\(callback\)/, "the canvas observer must preserve native resize delivery");
 assert.match(resizeObserver, /requestAnimationFrame\(\(\) => \{[\s\S]*this\.callback\(\[\], this\)/, "the canvas observer must guarantee one asynchronous initial measurement");
@@ -160,6 +147,9 @@ for (const obsoletePath of [
   "components/spatial/SpatialIntelligenceWorkspace.tsx",
   "components/spatial/SpatialIntelligenceCanvas.tsx",
   "lib/presentation/spatial-intelligence.ts",
+  "components/spatial/KpiVisualizationSwitcher.tsx",
+  "components/spatial/KpiSpatialCanvas.tsx",
+  "lib/presentation/spatial-kpi.ts",
   "components/spatial/KpiSpatialCanvas 2.tsx",
   "components/spatial/SpatialIntelligenceCanvas 2.tsx",
   "scripts/spatial-ui-regression-tests 2.js"

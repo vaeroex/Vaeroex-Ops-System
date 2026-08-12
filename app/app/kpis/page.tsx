@@ -17,7 +17,6 @@ import { PrimaryButton, TextArea, TextInput } from "@/components/operations/Form
 import { ManagedRecordList, type ManagedRecordEditField } from "@/components/operations/ManagedRecordList";
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
-import { KpiVisualizationSwitcher } from "@/components/spatial/KpiVisualizationSwitcher";
 import { spatialSurfaceClassName } from "@/components/spatial/SpatialSurface";
 import { filterBySourceParentEligibility, loadSourceParentEligibilityResult } from "@/lib/intelligence/source-parent-eligibility";
 import { buildIntelligenceSnapshotFromProducersV1 } from "@/lib/intelligence/snapshot/v1/composition";
@@ -1707,9 +1706,6 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
       settings: kpiSettings
     });
   }
-  const selectedKpiSnapshot = kpiSnapshot && selectedKpiState
-    ? kpiSnapshot.kpis.find((kpi) => kpi.id === selectedKpiState.kpiId) || null
-    : null;
   const selectedKpiDirection = selectedKpiState?.semantics.desiredDirection ?? "unknown";
   const selectedKpiSemantics = selectedKpiState?.semantics ?? kpiSemantics("Unknown KPI", []);
   const selectedManualTarget = selectedKpiState?.manualTarget ?? null;
@@ -1978,12 +1974,7 @@ export default async function KpisPage({ searchParams }: KpisPageProps) {
                   />
                 </div>
                 <div className="mt-4">
-                  <KpiVisualizationSwitcher
-                    kpi={selectedKpiSnapshot}
-                    color={kpiColor(primaryMetric, kpiSettings, Math.max(0, metricNames.indexOf(primaryMetric)))}
-                  >
-                    <TrendChart rows={selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} />
-                  </KpiVisualizationSwitcher>
+                  <TrendChart rows={selectedMetricRows.slice(-12)} metricName={primaryMetric} settings={kpiSettings} />
                 </div>
                 <div className="mt-4 rounded-lg border border-white/10 bg-slate-950/35 p-4">
                   <p className="text-sm font-semibold text-white">Vaeroex summary</p>
