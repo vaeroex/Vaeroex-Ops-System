@@ -20,6 +20,7 @@ const persistedRows = [{
   weight: 1,
   definition: "Average customer checkout wait.",
   color: "#10B981",
+  color_source: "automatic",
   is_visible: true,
   sort_order: 0,
   unit_type: "minutes",
@@ -50,13 +51,17 @@ const persistedRows = [{
 
 function settingsQuery() {
   const filters = {};
+  const matchingRows = () => persistedRows.filter((candidate) => Object.entries(filters).every(([column, value]) => candidate[column] === value));
   const query = {
     select() { return query; },
     eq(column, value) { filters[column] = value; return query; },
     limit() { return query; },
     async maybeSingle() {
-      const row = persistedRows.find((candidate) => Object.entries(filters).every(([column, value]) => candidate[column] === value));
+      const row = matchingRows()[0];
       return { data: row || null, error: null };
+    },
+    then(resolve) {
+      return Promise.resolve({ data: matchingRows(), error: null }).then(resolve);
     }
   };
   return query;
@@ -86,6 +91,23 @@ const supabase = {
             };
           }
         };
+      },
+      update(payload) {
+        const filters = {};
+        const updateQuery = {
+          eq(column, value) { filters[column] = value; return updateQuery; },
+          select() {
+            return {
+              maybeSingle: async () => {
+                const row = persistedRows.find((candidate) => Object.entries(filters).every(([column, value]) => candidate[column] === value));
+                if (!row) return { data: null, error: null };
+                Object.assign(row, payload);
+                return { data: { id: row.id }, error: null };
+              }
+            };
+          }
+        };
+        return updateQuery;
       }
     };
   }
@@ -141,7 +163,17 @@ const actions = loadTypescriptModule("app/app/operations/actions.ts", {
   "@/lib/ai/prompts/vaeroex-system-prompt": { VAEROEX_SYSTEM_PROMPT: "" },
   "@/lib/ai/kpi-semantics/service": { classifyAndPersistKpiSemantics: async () => null, KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE: 0.92 },
   "@/lib/billing/require-active-subscription": { requireActiveSubscription: async () => undefined },
-  "@/lib/kpis/settings": { approvedKpiColor: (value) => value, KPI_COLOR_PALETTE: [{ value: "#10B981", label: "Emerald" }] },
+  "@/lib/kpis/settings": {
+    allocateAutomaticKpiColors: (_workspaceId, identities) => new Map(identities.map((identity, index) => [String(identity).trim().toLowerCase(), index % 2 ? "#10B981" : "#38BDF8"])),
+    approvedKpiColor: (value) => value,
+    automaticKpiColorForIdentity: () => "#10B981",
+    normalizeKpiName: (value) => String(value || "").trim().toLowerCase(),
+    KPI_COLOR_PALETTE: [
+      { value: "#10B981", label: "Emerald" },
+      { value: "#38BDF8", label: "Electric Blue" },
+      { value: "#EF4444", label: "Red" }
+    ]
+  },
   "@/lib/kpis/semantics": {
     deterministicKpiSemantics: () => semanticDefaults,
     KPI_DESIRED_DIRECTIONS: ["maximize", "minimize", "target_range", "exact_target", "maintain", "unknown"],
@@ -203,6 +235,15 @@ async function submit(formData) {
   assert.fail("The server action should complete through its redirect contract.");
 }
 
+async function submitAction(action, formData) {
+  try {
+    await action(formData);
+  } catch (error) {
+    return error.location || "";
+  }
+  assert.fail("The server action should complete through its redirect contract.");
+}
+
 function persistedSetting() {
   return persistedRows.find((row) => row.workspace_id === workspaceId && row.kpi_name === kpiName);
 }
@@ -224,6 +265,7 @@ function assertSingleCanonicalRow() {
   assert.equal(persistedSetting().target, 4, "Reloading persistence after the target save must return target 4.");
   assert.equal(persistedSetting().desired_direction, "unknown", "Saving a target must not invent directional meaning.");
   assert.equal(persistedSetting().classification_confirmed, false, "Unknown semantics must remain fail-closed.");
+  assert.equal(persistedSetting().color_source, "user", "a full administrator settings save must make its selected color authoritative");
   assertSingleCanonicalRow();
 
   const directionRedirect = await submit(formDataFor({
@@ -263,6 +305,7 @@ function assertSingleCanonicalRow() {
   assert.equal(submittedPayloads[2].desired_direction, "minimize", "Applying a recommendation must preserve confirmed semantics.");
   assert.equal(persistedSetting().target, 3.75, "Reloading persistence must return the recommended target.");
   assert.equal(persistedSetting().desired_direction, "minimize");
+  assert.equal(persistedSetting().color_source, "user", "target recommendation updates must preserve existing color provenance");
   assertSingleCanonicalRow();
 
   const settings = loadTypescriptModule("lib/kpis/settings.ts", {
@@ -277,7 +320,31 @@ function assertSingleCanonicalRow() {
     assert.ok(revalidatedPaths.includes(expectedPath), `The action must revalidate ${expectedPath}.`);
   }
 
-  console.log("KPI target, direction, and recommendation persistence integration passed.");
+  persistedRows.push(
+    { id: "legacy-one", workspace_id: workspaceId, kpi_name: "Legacy One", color: "#1E6BFF", color_source: "legacy_unclassified" },
+    { id: "legacy-two", workspace_id: workspaceId, kpi_name: "Legacy Two", color: "#10B981", color_source: "legacy_unclassified" },
+    { id: "manual-color", workspace_id: workspaceId, kpi_name: "Manual Color", color: "#EF4444", color_source: "user" }
+  );
+  const legacyForm = new FormData();
+  legacyForm.set("return_path", "/app/kpis/settings");
+  legacyForm.append("legacy_kpi_setting_id", "legacy-one");
+  legacyForm.append("legacy_kpi_setting_id", "legacy-two");
+  const legacyRedirect = await submitAction(actions.assignLegacyKpiColorsAction, legacyForm);
+  assert.match(legacyRedirect, /message=2\+legacy\+KPI\+colors\+assigned\./);
+  assert.equal(persistedRows.find((row) => row.id === "legacy-one").color_source, "automatic");
+  assert.equal(persistedRows.find((row) => row.id === "legacy-two").color_source, "automatic");
+  assert.equal(persistedRows.find((row) => row.id === "manual-color").color, "#EF4444", "legacy assignment must not overwrite a manual color");
+  assert.equal(persistedRows.find((row) => row.id === "manual-color").color_source, "user");
+
+  const manualSelectionForm = new FormData();
+  manualSelectionForm.set("return_path", "/app/kpis/settings");
+  manualSelectionForm.append("legacy_kpi_setting_id", "manual-color");
+  const manualSelectionRedirect = await submitAction(actions.assignLegacyKpiColorsAction, manualSelectionForm);
+  assert.match(manualSelectionRedirect, /error=One\+or\+more\+selected\+KPI\+colors\+are\+no\+longer\+eligible/);
+  assert.equal(persistedRows.find((row) => row.id === "manual-color").color, "#EF4444", "caller selection must not promote a user color back to automatic");
+  assert.equal(persistedRows.find((row) => row.id === "manual-color").color_source, "user");
+
+  console.log("KPI target, direction, recommendation, and legacy color persistence integration passed.");
 })().catch((error) => {
   console.error(error);
   process.exitCode = 1;

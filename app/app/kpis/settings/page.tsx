@@ -1,6 +1,6 @@
 import type { Route } from "next";
 import Link from "next/link";
-import { updateKpiSettingAction } from "@/app/app/operations/actions";
+import { assignLegacyKpiColorsAction, updateKpiSettingAction } from "@/app/app/operations/actions";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { ModuleTabs } from "@/components/operations/ModuleTabs";
 import { PageHeader } from "@/components/operations/PageHeader";
@@ -8,6 +8,7 @@ import { SectionCard } from "@/components/operations/SectionCard";
 import {
   approvedKpiColor,
   getConfiguredMetricNames,
+  kpiColor,
   kpiColorMayBeLowContrast,
   kpiSettingForName,
   KPI_COLOR_PALETTE,
@@ -94,7 +95,7 @@ function KpiSettingCard({
 }) {
   const target = setting?.target ?? latest?.target ?? null;
   const weight = setting?.weight ?? 1;
-  const color = approvedKpiColor(setting?.color);
+  const color = setting ? approvedKpiColor(setting.color) : kpiColor(metric, []);
   const category = setting?.category ?? latest?.category ?? "";
   const isVisible = setting?.is_visible ?? true;
   const definition = setting?.definition ?? "";
@@ -391,6 +392,9 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
   const latest = latestByMetric(kpis);
   const names = metricNames(kpis, settings);
   const duplicateGroups = potentialKpiDuplicateGroups(names, settings);
+  const unclassifiedLegacyColors = settings.filter(
+    (setting) => setting.color_source === "legacy_unclassified" && ["#1E6BFF", "#10B981"].includes(setting.color)
+  );
 
   return (
     <div className="space-y-6">
@@ -417,6 +421,30 @@ export default async function KpiSettingsPage({ searchParams }: KpiSettingsPageP
       />
       <ErrorNotice message={params?.error || kpiResult.error?.message || settingsResult.error?.message || sourceParentResult.error?.message} />
       <SuccessNotice message={params?.message} />
+
+      {canManage && unclassifiedLegacyColors.length ? (
+        <form action={assignLegacyKpiColorsAction} className="space-y-3 rounded-lg border border-cyan-400/25 bg-cyan-950/20 p-4">
+          <input type="hidden" name="return_path" value="/app/kpis/settings" />
+          <div>
+            <p className="text-sm font-semibold text-white">Review legacy default-looking colors</p>
+            <p className="mt-1 text-xs leading-5 text-slate-300">
+              Historical data cannot prove whether these {unclassifiedLegacyColors.length} default-colored KPI{unclassifiedLegacyColors.length === 1 ? " was" : "s were"} selected intentionally. Keep only the KPIs you want Vaeroex to distribute selected. Confirmed customized colors are excluded.
+            </p>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {unclassifiedLegacyColors.map((setting) => (
+              <label key={setting.id} className="flex min-w-0 items-center gap-2 text-xs text-slate-200">
+                <input type="checkbox" name="legacy_kpi_setting_id" value={setting.id} defaultChecked />
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: setting.color }} />
+                <span className="truncate">{setting.kpi_name}</span>
+              </label>
+            ))}
+          </div>
+          <button className="min-h-10 shrink-0 rounded-lg border border-cyan-300/35 px-3 py-2 text-xs font-semibold text-cyan-100 hover:bg-cyan-950/40">
+            Assign selected automatic colors
+          </button>
+        </form>
+      ) : null}
 
       {duplicateGroups.length ? (
         <div className="rounded-lg border border-amber-400/30 bg-amber-950/25 p-4 text-sm leading-6 text-amber-100">

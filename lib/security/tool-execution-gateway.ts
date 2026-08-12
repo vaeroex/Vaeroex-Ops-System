@@ -121,6 +121,7 @@ const kpiMutationSchema = z
     fieldSet: z.array(safeTextSchema(80)).max(12).optional()
   })
   .strict();
+const kpiColorAssignmentSchema = z.object({ kpiCount: z.number().int().min(1).max(2_000) }).strict();
 const completedAnalysisSaveSchema = z
   .object({
     sourceArtifactId: uuidSchema,
@@ -218,6 +219,15 @@ export const TOOL_EXECUTION_REGISTRY = {
     operationType: "UPDATE_RECORD",
     targetTable: "kpi_settings",
     schema: z.object({ kpiName: safeTextSchema() }).strict(),
+    requiresConfirmation: true,
+    destructive: false,
+    allowedRoles: ADMIN_ROLES
+  },
+  assign_kpi_colors: {
+    name: "assign_kpi_colors",
+    operationType: "UPDATE_RECORD",
+    targetTable: "kpi_settings",
+    schema: kpiColorAssignmentSchema,
     requiresConfirmation: true,
     destructive: false,
     allowedRoles: ADMIN_ROLES

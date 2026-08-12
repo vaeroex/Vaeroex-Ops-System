@@ -3065,6 +3065,7 @@ export type Database = {
           weight: number;
           definition: string | null;
           color: string;
+          color_source: string;
           is_visible: boolean;
           sort_order: number;
           unit_type: string | null;
@@ -3105,6 +3106,7 @@ export type Database = {
           weight?: number;
           definition?: string | null;
           color?: string;
+          color_source?: string;
           is_visible?: boolean;
           sort_order?: number;
           unit_type?: string | null;

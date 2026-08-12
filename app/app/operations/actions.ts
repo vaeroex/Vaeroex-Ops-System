@@ -8,7 +8,14 @@ import {
   KPI_SEMANTIC_ACCEPTANCE_CONFIDENCE
 } from "@/lib/ai/kpi-semantics/service";
 import { requireActiveSubscription } from "@/lib/billing/require-active-subscription";
-import { approvedKpiColor, KPI_COLOR_PALETTE } from "@/lib/kpis/settings";
+import {
+  allocateAutomaticKpiColors,
+  approvedKpiColor,
+  automaticKpiColorForIdentity,
+  normalizeKpiName,
+  KPI_COLOR_PALETTE,
+  type KpiColorSource
+} from "@/lib/kpis/settings";
 import {
   deterministicKpiSemantics,
   KPI_DESIRED_DIRECTIONS,
@@ -367,6 +374,7 @@ export async function updateKpiSettingAction(formData: FormData) {
   const idealRangeMax = optionalNumber(path, "Ideal range maximum", text(formData, "ideal_range_max"));
   const semanticUpdate = bool(formData, "semantic_update");
   const color = approvedKpiColor(text(formData, "color"));
+  const targetChangeContext = text(formData, "target_change_context");
   const target = optionalNumber(path, "Target", text(formData, "target"));
   const weight = optionalNumber(path, "Weight", text(formData, "weight")) ?? 1;
   const sortOrder = optionalNumber(path, "Sort order", text(formData, "sort_order")) ?? 0;
@@ -421,6 +429,13 @@ export async function updateKpiSettingAction(formData: FormData) {
   }
   const existing = existingResult.data;
   const deterministic = deterministicKpiSemantics(kpiName);
+  const preservesExistingColor = targetChangeContext === "recommended" || targetChangeContext === "undo";
+  const persistedColor = preservesExistingColor
+    ? existing?.color || automaticKpiColorForIdentity(workspaceId, kpiName)
+    : color;
+  const colorSource: KpiColorSource = preservesExistingColor
+    ? (existing?.color_source as KpiColorSource | undefined) || "automatic"
+    : "user";
 
   let semanticValues = existing
     ? {
@@ -545,7 +560,8 @@ export async function updateKpiSettingAction(formData: FormData) {
       target,
       weight,
       definition: definition || null,
-      color,
+      color: persistedColor,
+      color_source: colorSource,
       is_visible: bool(formData, "is_visible"),
       sort_order: Math.round(sortOrder),
       unit_type: unitType || null,
@@ -578,7 +594,7 @@ export async function updateKpiSettingAction(formData: FormData) {
   revalidatePath("/app");
   revalidatePath("/app/kpis");
   revalidatePath("/app/kpis/settings");
-  if (text(formData, "target_change_context") === "recommended") {
+  if (targetChangeContext === "recommended") {
     redirectWithMessageParams(path, "Recommended target applied.", {
       target_applied: "true",
       undo_kpi: kpiName,
@@ -586,11 +602,84 @@ export async function updateKpiSettingAction(formData: FormData) {
     });
   }
 
-  if (text(formData, "target_change_context") === "undo") {
+  if (targetChangeContext === "undo") {
     redirectWithMessage(path, "Previous target restored.");
   }
 
   redirectWithMessage(path, "KPI settings updated.");
+}
+
+export async function assignLegacyKpiColorsAction(formData: FormData) {
+  const path = returnPath(formData, "/app/kpis/settings");
+  const { supabase, user, workspaceId, membership } = await requireWorkspace(path);
+  requireKpiSettingsAdministrator(path, membership.role);
+  const requestedIds = [...new Set(
+    formData
+      .getAll("legacy_kpi_setting_id")
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim())
+      .filter(Boolean)
+  )];
+
+  if (!requestedIds.length) redirectWithError(path, "Select at least one unclassified legacy KPI color.");
+
+  const { data: settings, error: settingsError } = await supabase
+    .from("kpi_settings")
+    .select("*")
+    .eq("workspace_id", workspaceId);
+
+  if (settingsError) redirectWithError(path, settingsError.message);
+
+  const selectedLegacyColors = (settings || []).filter(
+    (setting) => requestedIds.includes(setting.id)
+      && setting.color_source === "legacy_unclassified"
+      && ["#1E6BFF", "#10B981"].includes(setting.color)
+  );
+
+  if (selectedLegacyColors.length !== requestedIds.length) {
+    redirectWithError(path, "One or more selected KPI colors are no longer eligible for automatic assignment.");
+  }
+
+  await requireToolExecution(
+    { supabase, workspaceId, userId: user.id, userRole: membership.role },
+    {
+      toolName: "assign_kpi_colors",
+      args: { kpiCount: selectedLegacyColors.length },
+      initiatedBy: "user",
+      confirmationReceived: true,
+      targetRecordId: null,
+      metadata: { source: "legacy_kpi_color_assignment", kpi_count: selectedLegacyColors.length } satisfies Json
+    }
+  );
+
+  const assignments = allocateAutomaticKpiColors(
+    workspaceId,
+    selectedLegacyColors.map((setting) => setting.kpi_name),
+    settings || []
+  );
+
+  for (const setting of selectedLegacyColors) {
+    const assignedColor = assignments.get(normalizeKpiName(setting.kpi_name));
+    if (!assignedColor) redirectWithError(path, "A legacy KPI color assignment could not be prepared.");
+
+    const { data: updated, error } = await supabase
+      .from("kpi_settings")
+      .update({ color: assignedColor, color_source: "automatic" })
+      .eq("id", setting.id)
+      .eq("workspace_id", workspaceId)
+      .eq("color_source", "legacy_unclassified")
+      .eq("color", setting.color)
+      .select("id")
+      .maybeSingle();
+
+    if (error || !updated) redirectWithError(path, error?.message || "A legacy KPI color changed while assignments were being saved. Try again.");
+  }
+
+  revalidatePath("/app");
+  revalidatePath("/app/intelligence");
+  revalidatePath("/app/kpis");
+  revalidatePath("/app/kpis/settings");
+  redirectWithMessage(path, `${selectedLegacyColors.length} legacy KPI color${selectedLegacyColors.length === 1 ? "" : "s"} assigned.`);
 }
 
 export async function requestKpiSemanticSuggestionAction(formData: FormData) {

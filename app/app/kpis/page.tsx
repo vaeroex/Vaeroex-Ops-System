@@ -1369,7 +1369,7 @@ function KpiChartSettingsForm({
   latest: KpiRow | undefined;
   semantics: KpiSemantics;
 }) {
-  const selectedColor = setting?.color ?? "#10B981";
+  const selectedColor = setting?.color ?? kpiColor(metricName, []);
   const lowContrastColor = kpiColorMayBeLowContrast(selectedColor);
   const fallback = deterministicKpiSemantics(metricName);
   const resolvedSemantics = semantics;

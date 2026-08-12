@@ -17,8 +17,15 @@ export const KPI_COLOR_PALETTE = [
 ] as const;
 
 const HIGH_CONTRAST_DEFAULT_COLORS = new Set(["#10B981", "#38BDF8", "#F59E0B", "#EF4444", "#8B5CF6", "#F97316", "#14B8A6", "#D1D5DB"]);
-const AUTO_KPI_COLOR_PALETTE = KPI_COLOR_PALETTE.filter((color) => HIGH_CONTRAST_DEFAULT_COLORS.has(color.value));
+export const AUTO_KPI_COLOR_PALETTE = KPI_COLOR_PALETTE.filter((color) => HIGH_CONTRAST_DEFAULT_COLORS.has(color.value));
 const DEFAULT_KPI_COLOR = AUTO_KPI_COLOR_PALETTE[0]?.value || KPI_COLOR_PALETTE[0].value;
+
+export const KPI_COLOR_SOURCES = ["automatic", "user", "legacy_unclassified"] as const;
+export type KpiColorSource = (typeof KPI_COLOR_SOURCES)[number];
+
+type KpiColorAssignmentSetting = Pick<KpiSettingRow, "kpi_name" | "color"> & {
+  color_source?: string | null;
+};
 
 export function normalizeKpiName(value: string | null | undefined) {
   return (value || "").trim().toLowerCase();
@@ -55,6 +62,62 @@ export function approvedKpiColor(value: string | null | undefined): string {
   return match?.value || DEFAULT_KPI_COLOR;
 }
 
+function stableKpiColorHash(value: string) {
+  let hash = 0x811c9dc5;
+
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return hash >>> 0;
+}
+
+export function automaticKpiColorForIdentity(workspaceId: string, kpiIdentity: string) {
+  const identity = `${workspaceId.trim().toLowerCase()}::${normalizeKpiName(kpiIdentity)}`;
+  const index = stableKpiColorHash(identity) % AUTO_KPI_COLOR_PALETTE.length;
+  return AUTO_KPI_COLOR_PALETTE[index]?.value || DEFAULT_KPI_COLOR;
+}
+
+export function allocateAutomaticKpiColors(
+  workspaceId: string,
+  kpiIdentities: readonly string[],
+  existingSettings: readonly KpiColorAssignmentSetting[] = []
+) {
+  const pendingByIdentity = new Map<string, string>();
+  for (const identity of kpiIdentities) {
+    const normalized = normalizeKpiName(identity);
+    if (normalized && !pendingByIdentity.has(normalized)) pendingByIdentity.set(normalized, identity.trim());
+  }
+
+  const counts = new Map<string, number>(AUTO_KPI_COLOR_PALETTE.map((color) => [color.value, 0]));
+  for (const setting of existingSettings) {
+    if (pendingByIdentity.has(normalizeKpiName(setting.kpi_name))) continue;
+    if (counts.has(setting.color)) counts.set(setting.color, (counts.get(setting.color) || 0) + 1);
+  }
+
+  const sortedPending = [...pendingByIdentity.entries()].sort((left, right) => {
+    const leftHash = stableKpiColorHash(`${workspaceId}::${left[0]}`);
+    const rightHash = stableKpiColorHash(`${workspaceId}::${right[0]}`);
+    return leftHash - rightHash || left[0].localeCompare(right[0]);
+  });
+  const assignments = new Map<string, string>();
+
+  for (const [normalized, identity] of sortedPending) {
+    const minimum = Math.min(...counts.values());
+    const preferredIndex = stableKpiColorHash(`${workspaceId}::${normalized}`) % AUTO_KPI_COLOR_PALETTE.length;
+    const eligible = AUTO_KPI_COLOR_PALETTE
+      .map((color, index) => ({ color: color.value, distance: (index - preferredIndex + AUTO_KPI_COLOR_PALETTE.length) % AUTO_KPI_COLOR_PALETTE.length }))
+      .filter(({ color }) => counts.get(color) === minimum)
+      .sort((left, right) => left.distance - right.distance || left.color.localeCompare(right.color));
+    const color = eligible[0]?.color || automaticKpiColorForIdentity(workspaceId, identity);
+    assignments.set(normalized, color);
+    counts.set(color, (counts.get(color) || 0) + 1);
+  }
+
+  return assignments;
+}
+
 export function kpiSettingsByName(settings: KpiSettingRow[]) {
   return new Map(settings.map((setting) => [normalizeKpiName(setting.kpi_name), setting]));
 }
@@ -74,7 +137,8 @@ export function kpiColor(name: string, settings: KpiSettingRow[], fallbackIndex 
     return approvedKpiColor(setting.color);
   }
 
-  return AUTO_KPI_COLOR_PALETTE[fallbackIndex % AUTO_KPI_COLOR_PALETTE.length]?.value || DEFAULT_KPI_COLOR;
+  void fallbackIndex;
+  return automaticKpiColorForIdentity("", name);
 }
 
 export function kpiWeight(name: string, settings: KpiSettingRow[]) {

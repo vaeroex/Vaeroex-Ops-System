@@ -14,6 +14,7 @@ import {
   validateKpiSemanticClassification,
   type KpiSemanticClassificationProposal
 } from "@/lib/ai/kpi-semantics/contracts";
+import { automaticKpiColorForIdentity } from "@/lib/kpis/settings";
 import { deterministicKpiSemantics, KPI_SEMANTIC_VERSION } from "@/lib/kpis/semantics";
 import type { Database, Json } from "@/lib/supabase/types";
 
@@ -144,7 +145,15 @@ export async function classifyAndPersistKpiSemantics({
     const persisted = await supabase.from("kpi_settings").update(values).eq("id", existing.data.id).eq("workspace_id", workspaceId);
     if (persisted.error) return { status: "failed" as const, reason: persisted.error.message };
   } else {
-    const persisted = await supabase.from("kpi_settings").insert({ workspace_id: workspaceId, kpi_name: label, category, created_by: userId, ...values });
+    const persisted = await supabase.from("kpi_settings").insert({
+      workspace_id: workspaceId,
+      kpi_name: label,
+      category,
+      color: automaticKpiColorForIdentity(workspaceId, label),
+      color_source: "automatic",
+      created_by: userId,
+      ...values
+    });
     if (persisted.error) return { status: "failed" as const, reason: persisted.error.message };
   }
 

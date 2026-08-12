@@ -43,7 +43,12 @@ import {
   type WorkbookKpiTargetBinding,
   type WorkbookKpiTargetRegistry
 } from "@/lib/imports/workbook-kpi-targets";
-import { approvedKpiColor } from "@/lib/kpis/settings";
+import {
+  allocateAutomaticKpiColors,
+  approvedKpiColor,
+  normalizeKpiName,
+  type KpiColorSource
+} from "@/lib/kpis/settings";
 import { deterministicKpiSemantics, KPI_SEMANTIC_VERSION } from "@/lib/kpis/semantics";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { validateUploadFileSafety } from "@/lib/security/file-upload-safety";
@@ -81,7 +86,8 @@ type KpiImportInterpretation = {
   value_format: string | null;
   x_axis_label: string | null;
   y_axis_label: string | null;
-  color: string;
+  color: string | null;
+  color_source: Extract<KpiColorSource, "automatic" | "user">;
   preferred_chart_type: KpiImportChartType;
 };
 type FileContentKind = "spreadsheet" | "pdf_text" | "docx_text" | "image_vision" | "unsupported";
@@ -622,13 +628,16 @@ function validKpiImportChartType(value: string): KpiImportChartType {
 }
 
 function kpiImportInterpretationFromForm(formData: FormData): KpiImportInterpretation {
+  const requestedColor = text(formData, "color");
+
   return {
     unit_type: limitedText(formData, "unit_type", 80) || null,
     display_unit: limitedText(formData, "display_unit", 80) || null,
     value_format: limitedText(formData, "value_format", 80) || null,
     x_axis_label: limitedText(formData, "x_axis_label", 80) || null,
     y_axis_label: limitedText(formData, "y_axis_label", 80) || null,
-    color: approvedKpiColor(text(formData, "color")),
+    color: requestedColor ? approvedKpiColor(requestedColor) : null,
+    color_source: requestedColor ? "user" : "automatic",
     preferred_chart_type: validKpiImportChartType(text(formData, "preferred_chart_type"))
   };
 }
@@ -929,6 +938,13 @@ async function upsertImportedKpiSettings({
   const persistedSettingsByName = new Map(
     (existingSettings || []).map((setting) => [setting.kpi_name.trim().toLowerCase(), setting])
   );
+  const automaticColors = allocateAutomaticKpiColors(
+    workspaceId,
+    rows
+      .map((row) => row.record.name)
+      .filter((name) => !persistedSettingsByName.has(normalizeKpiName(name))),
+    existingSettings || []
+  );
   const settingsByName = new Map<
     string,
     {
@@ -942,6 +958,7 @@ async function upsertImportedKpiSettings({
       x_axis_label: string | null;
       y_axis_label: string | null;
       color: string;
+      color_source: KpiColorSource;
       preferred_chart_type: KpiImportChartType;
       canonical_name: string | null;
       display_name: string | null;
@@ -981,7 +998,12 @@ async function upsertImportedKpiSettings({
         value_format: interpretation.value_format,
         x_axis_label: interpretation.x_axis_label,
         y_axis_label: interpretation.y_axis_label,
-        color: interpretation.color,
+        color: persistedSetting?.color
+          || (interpretation.color_source === "user" && interpretation.color
+            ? interpretation.color
+            : automaticColors.get(settingsKey) || approvedKpiColor(null)),
+        color_source: (persistedSetting?.color_source as KpiColorSource | undefined)
+          || (interpretation.color_source === "user" ? "user" : "automatic"),
         preferred_chart_type: interpretation.preferred_chart_type,
         canonical_name: preservePersistedSemantics ? persistedSetting?.canonical_name ?? null : semantics.canonicalName,
         display_name: preservePersistedSemantics ? persistedSetting?.display_name ?? null : semantics.displayName,
@@ -3524,6 +3546,13 @@ async function upsertWorkbookKpiTargetSettings({
   if (existingError) throw new Error(existingError.message);
 
   const existingByName = new Map((existingSettings || []).map((setting) => [setting.kpi_name.trim().toLowerCase(), setting]));
+  const automaticColors = allocateAutomaticKpiColors(
+    workspaceId,
+    bindings
+      .map((binding) => binding.storageName)
+      .filter((name) => !existingByName.has(normalizeKpiName(name))),
+    existingSettings || []
+  );
   const settings = bindings.map((binding, index) => {
     const existing = existingByName.get(binding.storageName.trim().toLowerCase());
     const preserveConfirmedSemantics = Boolean(existing?.classification_confirmed && existing.desired_direction !== "unknown");
@@ -3536,7 +3565,8 @@ async function upsertWorkbookKpiTargetSettings({
       target: existing?.target ?? binding.target,
       weight: existing?.weight ?? 1,
       definition: existing?.definition || `Performance meaning imported from the reviewed ${binding.category} KPI target metadata.`,
-      color: existing?.color || approvedKpiColor(null),
+      color: existing?.color || automaticColors.get(normalizeKpiName(binding.storageName)) || approvedKpiColor(null),
+      color_source: existing?.color_source || "automatic",
       is_visible: existing?.is_visible ?? true,
       sort_order: existing?.sort_order ?? index,
       created_by: existing?.created_by || userId,

@@ -69,6 +69,7 @@
     "test:business-notes-context": "node scripts/business-notes-contextual-integration-regression-tests.js",
     "test:workspace-agreement": "node scripts/workspace-agreement-regression-tests.js",
     "test:kpi-semantics": "node scripts/kpi-semantics-regression-tests.js && node scripts/kpi-target-persistence-integration-tests.js",
+    "test:kpi-colors": "node scripts/kpi-color-assignment-regression-tests.js",
     "test:intelligence-snapshot": "node scripts/intelligence-snapshot-v1-regression-tests.js",
     "test:snapshot-consumers": "node scripts/final-snapshot-consumer-migration-regression-tests.js",
     "test:structural-v1": "node scripts/structural-v1-cleanup-regression-tests.js",
