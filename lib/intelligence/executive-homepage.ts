@@ -346,6 +346,8 @@ export function buildExecutiveHomepageModel({
   sourceDataAvailable
 }: BuildExecutiveHomepageInput): ExecutiveHomepageModel {
   const hasUsableHealth = sourceDataAvailable && intelligence.businessHealth.available !== false;
+  const hasEvidenceButNoEvaluableOutcome = sourceDataAvailable
+    && intelligence.businessHealth.unavailableReason === "no_evaluable_performance_outcome";
   const risk = hasUsableHealth ? intelligence.topRisk : undefined;
   const opportunity = hasUsableHealth ? intelligence.topOpportunity : undefined;
   const memorySignals = intelligence.memorySummary.sourceRecords + intelligence.memorySummary.kpiHistoryRecords;
@@ -403,13 +405,19 @@ export function buildExecutiveHomepageModel({
     health: {
       available: hasUsableHealth,
       score: hasUsableHealth ? intelligence.businessHealth.score : null,
-      status: hasUsableHealth ? healthStatusLabel(intelligence.businessHealth.status) : "Limited evidence",
+      status: hasUsableHealth
+        ? healthStatusLabel(intelligence.businessHealth.status)
+        : hasEvidenceButNoEvaluableOutcome
+          ? "Needs KPI meaning"
+          : "Limited evidence",
       trend: hasUsableHealth && trendDelta !== null ? intelligence.businessHealth.trend : null,
       trendDelta,
       summary: healthSummary,
       driver: healthDriver,
       displayTitle: healthDisplayTitle,
-      driverPresentation,
+      driverPresentation: hasEvidenceButNoEvaluableOutcome
+        ? { identity: "KPI performance eligibility", details: [healthDriver] }
+        : driverPresentation,
       confidence: hasUsableHealth ? intelligence.dataQuality.confidence : "Low",
       memorySignals: sourceDataAvailable ? memorySignals : 0,
       eligibleSignalCategories: sourceDataAvailable ? eligibleSignalCategories : []

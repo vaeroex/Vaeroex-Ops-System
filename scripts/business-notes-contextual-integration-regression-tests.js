@@ -570,7 +570,7 @@ assert.match(
 const approvalSource = read("app/app/sources/business-notes/actions.ts");
 assert.match(approvalSource, /note\.status !== "review_required"/, "a completed approval must not be approved again");
 assert.match(approvalSource, /\.eq\("status", "review_required"\)/, "approval persistence must remain conditional on the review state");
-const sourcesPageSource = read("app/app/sources/page.tsx");
+const sourcesPageSource = read("app/app/sources/SourcesPage.tsx");
 assert.match(sourcesPageSource, /collapseBusinessNoteKnowledgeRows\(matchingChunks\)/, "Learned Knowledge must project one customer-visible record per Business Note");
 assert.match(sourcesPageSource, /tab\.key === "knowledge"[\s\S]*\? activeKnowledgeRows\.length/, "the Learned Knowledge tab count must use the same record projection as the list");
 assert.doesNotMatch(read("lib/intelligence/snapshot/v1/builder.ts"), /runStructuredAI|generateBusinessHealthExplanation|generateFindingExplanation/);

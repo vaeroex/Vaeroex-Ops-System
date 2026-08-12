@@ -554,10 +554,10 @@ const duplicate = {
   id: "duplicate-risk",
   lastUpdated: "2026-07-11T00:00:00Z",
   supportingRecords: supported.topRisk.supportingRecords.map((record, index) => ({ ...record, id: `${record.id}-duplicate-${index}`, sourceKey: `${record.sourceKey}-duplicate-${index}` })),
-  fingerprint: ""
+  fingerprint: supported.topRisk.fingerprint
 };
 const consolidated = consolidateDuplicateInsights([supported.topRisk, duplicate]);
-assert.equal(consolidated.length, 1, "visually identical findings in the same reporting period must consolidate");
+assert.equal(consolidated.length, 1, "findings with the same canonical KPI condition and reporting period must consolidate");
 assert.equal(consolidated[0].supportingRecords.length, 6, "consolidation preserves all distinct supporting records");
 
 const noDirectMetric = buildIntelligenceLayer({});

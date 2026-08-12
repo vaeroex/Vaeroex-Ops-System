@@ -36,6 +36,13 @@ import {
   type WorksheetMapping,
   type WorksheetType
 } from "@/lib/imports/worksheet-types";
+import {
+  buildWorkbookKpiTargetRegistry,
+  parseWorkbookKpiTargetDirection,
+  workbookKpiTargetBindingForMetric,
+  type WorkbookKpiTargetBinding,
+  type WorkbookKpiTargetRegistry
+} from "@/lib/imports/workbook-kpi-targets";
 import { approvedKpiColor } from "@/lib/kpis/settings";
 import { deterministicKpiSemantics, KPI_SEMANTIC_VERSION } from "@/lib/kpis/semantics";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
@@ -3315,6 +3322,19 @@ function validateWorksheetImportRow(row: StagedImportRow, plan: WorkbookWorkshee
     return issues;
   }
 
+  if (plan.selected_type === "kpi_targets") {
+    const directionColumn = plan.mapping.direction;
+    const direction = directionColumn ? values[directionColumn] : null;
+    if (directionColumn && direction !== null && String(direction).trim() && !parseWorkbookKpiTargetDirection(direction)) {
+      issues.push(issueForImportRow(
+        row,
+        "import_validation",
+        `Column "${directionColumn}" must be exactly maximize or minimize.`,
+        "direction"
+      ));
+    }
+  }
+
   for (const importField of WORKSHEET_IMPORT_FIELDS[plan.selected_type]) {
     const column = plan.mapping[importField.key];
     const value = column && Object.prototype.hasOwnProperty.call(values, column) ? values[column] : null;
@@ -3362,9 +3382,40 @@ function rowWithWorkbookLineage(row: StagedImportRow, file: FileUploadRow, plan:
   } satisfies ImportRow;
 }
 
+function workbookKpiTargetRegistry(rows: StagedImportRow[], plans: WorkbookWorksheetPlan[]) {
+  const targetPlans = plans.filter((plan) => plan.enabled && plan.selected_type === "kpi_targets");
+  const targetPlanIndexes = new Set(targetPlans.map((plan) => plan.index));
+  const targets = rows.flatMap((row) => {
+    const plan = plans.find((candidate) => candidate.index === worksheetIndexForRow(row));
+    if (!plan || !targetPlanIndexes.has(plan.index)) return [];
+    const values = jsonToImportRow(row.data_json);
+    const direction = parseWorkbookKpiTargetDirection(values[plan.mapping.direction]);
+    const target = parseWorksheetNumber(values[plan.mapping.target]);
+    if (!direction || target === null) return [];
+    return [{
+      importRowId: row.id,
+      domain: String(values[plan.mapping.domain] ?? ""),
+      kpiName: String(values[plan.mapping.kpi_name] ?? ""),
+      target,
+      unit: String(values[plan.mapping.unit] ?? ""),
+      direction
+    }];
+  });
+  const metrics = plans
+    .filter((plan) => plan.enabled && plan.selected_type === "wide_time_series")
+    .flatMap((plan) => plan.metric_columns.map((metricColumn) => ({ worksheetName: plan.name, metricColumn })));
+
+  return buildWorkbookKpiTargetRegistry({
+    targets,
+    metrics,
+    hasTargetContract: targetPlans.length > 0
+  });
+}
+
 function buildWideTimeSeriesKpiRecords({
   rows,
   plan,
+  targetRegistry,
   workspaceId,
   userId,
   file,
@@ -3372,6 +3423,7 @@ function buildWideTimeSeriesKpiRecords({
 }: {
   rows: StagedImportRow[];
   plan: WorkbookWorksheetPlan;
+  targetRegistry: WorkbookKpiTargetRegistry;
   workspaceId: string;
   userId: string;
   file: FileUploadRow;
@@ -3407,8 +3459,13 @@ function buildWideTimeSeriesKpiRecords({
       const metricColumn = metric.column;
       const actualValue = metric.value;
 
+      const targetBinding = targetRegistry.hasTargetContract
+        ? workbookKpiTargetBindingForMetric(targetRegistry, plan.name, metricColumn)
+        : null;
+      if (targetRegistry.hasTargetContract && !targetBinding) continue;
+
       const targetColumn = wideTimeSeriesTargetColumn(metricColumn, plan.metric_columns);
-      const target = targetColumn ? parseWorksheetNumber(values[targetColumn]) : null;
+      const target = targetBinding?.target ?? (targetColumn ? parseWorksheetNumber(values[targetColumn]) : null);
       const lineage = rowWithWorkbookLineage(row, file, plan);
       records.push({
         importRowId: row.id,
@@ -3417,8 +3474,8 @@ function buildWideTimeSeriesKpiRecords({
           source_file_id: file.id,
           import_id: importId,
           import_row_id: row.id,
-          name: metricColumn,
-          category: "Imported time series",
+          name: targetBinding?.storageName || metricColumn,
+          category: targetBinding?.category || "Imported time series",
           target,
           actual_value: actualValue,
           metric_date: period,
@@ -3430,7 +3487,9 @@ function buildWideTimeSeriesKpiRecords({
             "Vaeroex period column": periodColumn || "",
             "Vaeroex original period": String(originalPeriod ?? ""),
             "Vaeroex metric column": metricColumn,
-            "Vaeroex target column": targetColumn || ""
+            "Vaeroex target column": targetColumn || "",
+            "Vaeroex target metadata row": targetBinding?.importRowId || "",
+            "Vaeroex target metadata unit": targetBinding?.sourceUnit || ""
           }),
           created_by: userId
         }
@@ -3444,6 +3503,76 @@ function buildWideTimeSeriesKpiRecords({
   }
 
   return { records, issues, generatedByRow };
+}
+
+async function upsertWorkbookKpiTargetSettings({
+  supabase,
+  workspaceId,
+  userId,
+  bindings
+}: {
+  supabase: SupabaseServerClient;
+  workspaceId: string;
+  userId: string;
+  bindings: readonly WorkbookKpiTargetBinding[];
+}) {
+  if (!bindings.length) return 0;
+  const { data: existingSettings, error: existingError } = await supabase
+    .from("kpi_settings")
+    .select("*")
+    .eq("workspace_id", workspaceId);
+  if (existingError) throw new Error(existingError.message);
+
+  const existingByName = new Map((existingSettings || []).map((setting) => [setting.kpi_name.trim().toLowerCase(), setting]));
+  const settings = bindings.map((binding, index) => {
+    const existing = existingByName.get(binding.storageName.trim().toLowerCase());
+    const preserveConfirmedSemantics = Boolean(existing?.classification_confirmed && existing.desired_direction !== "unknown");
+    const existingAliases = Array.isArray(existing?.aliases) ? existing.aliases.filter((value): value is string => typeof value === "string") : [];
+    const aliases = [...new Set([...existingAliases, binding.metricColumn, binding.displayName])];
+    return {
+      workspace_id: workspaceId,
+      kpi_name: existing?.kpi_name || binding.storageName,
+      category: existing?.category || binding.category,
+      target: existing?.target ?? binding.target,
+      weight: existing?.weight ?? 1,
+      definition: existing?.definition || `Performance meaning imported from the reviewed ${binding.category} KPI target metadata.`,
+      color: existing?.color || approvedKpiColor(null),
+      is_visible: existing?.is_visible ?? true,
+      sort_order: existing?.sort_order ?? index,
+      created_by: existing?.created_by || userId,
+      unit_type: existing?.unit_type || binding.semanticUnit,
+      display_unit: existing?.display_unit || binding.displayUnit,
+      value_format: existing?.value_format || binding.valueFormat,
+      x_axis_label: existing?.x_axis_label || "Date",
+      y_axis_label: existing?.y_axis_label || binding.displayName,
+      preferred_chart_type: existing?.preferred_chart_type || "line",
+      canonical_name: preserveConfirmedSemantics ? existing?.canonical_name || binding.canonicalName : binding.canonicalName,
+      display_name: preserveConfirmedSemantics ? existing?.display_name || binding.displayName : binding.displayName,
+      original_source_label: preserveConfirmedSemantics ? existing?.original_source_label || binding.metricColumn : binding.metricColumn,
+      aliases: aliases as Json,
+      semantic_unit: preserveConfirmedSemantics ? existing?.semantic_unit || binding.semanticUnit : binding.semanticUnit,
+      semantic_scale: preserveConfirmedSemantics ? existing?.semantic_scale || binding.semanticScale : binding.semanticScale,
+      aggregation_basis: existing?.aggregation_basis || "period_end",
+      period_basis: existing?.period_basis || "monthly",
+      desired_direction: preserveConfirmedSemantics ? existing!.desired_direction : binding.direction,
+      target_behavior: preserveConfirmedSemantics ? existing!.target_behavior : binding.targetBehavior,
+      ideal_value: preserveConfirmedSemantics ? existing?.ideal_value ?? null : null,
+      ideal_range_min: preserveConfirmedSemantics ? existing?.ideal_range_min ?? null : null,
+      ideal_range_max: preserveConfirmedSemantics ? existing?.ideal_range_max ?? null : null,
+      metric_role: preserveConfirmedSemantics ? existing!.metric_role : "actual",
+      classification_source: preserveConfirmedSemantics ? existing!.classification_source : "user",
+      classification_confidence: preserveConfirmedSemantics ? existing?.classification_confidence ?? 1 : 1,
+      classification_version: preserveConfirmedSemantics ? existing!.classification_version : KPI_SEMANTIC_VERSION,
+      classification_rationale: preserveConfirmedSemantics
+        ? existing?.classification_rationale
+        : "Direction, target, unit, and domain came from an explicitly reviewed KPI target worksheet.",
+      classification_confirmed: preserveConfirmedSemantics ? existing!.classification_confirmed : true
+    };
+  });
+
+  const { error } = await supabase.from("kpi_settings").upsert(settings, { onConflict: "workspace_id,kpi_name" });
+  if (error) throw new Error(error.message);
+  return settings.length;
 }
 
 async function saveWorkbookImport({
@@ -3493,8 +3622,8 @@ async function saveWorkbookImport({
   });
   await updateImportRowDiagnostics({ supabase, workspaceId, importId: importRecord.id, results: diagnostics });
 
-  const kpiRowIds = diagnostics.filter((result) => ["kpis", "wide_time_series"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
-  const metricRowIds = diagnostics.filter((result) => !["kpis", "wide_time_series"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
+  const kpiRowIds = diagnostics.filter((result) => ["kpis", "wide_time_series", "kpi_targets"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
+  const metricRowIds = diagnostics.filter((result) => !["kpis", "wide_time_series", "kpi_targets"].includes(planByIndex.get(worksheetIndexForRow(result.row))?.selected_type || "")).map((result) => result.row.id);
   if (kpiRowIds.length) await supabase.from("file_import_rows").update({ import_type: "kpi" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", kpiRowIds);
   if (metricRowIds.length) await supabase.from("file_import_rows").update({ import_type: "metrics" }).eq("workspace_id", workspaceId).eq("import_id", importRecord.id).in("id", metricRowIds);
 
@@ -3515,6 +3644,29 @@ async function saveWorkbookImport({
     redirectWithFileError(message, file.id, "imported");
   }
 
+  const targetRegistry = workbookKpiTargetRegistry(validRows, enabledPlans);
+  const invalidTargetRows = diagnostics.filter((result) =>
+    planByIndex.get(worksheetIndexForRow(result.row))?.selected_type === "kpi_targets"
+    && result.issues.length > 0
+  );
+  if (targetRegistry.hasTargetContract && (invalidTargetRows.length || targetRegistry.errors.length || !targetRegistry.bindings.length)) {
+    const firstIssue = invalidTargetRows[0]?.issues[0]?.message || targetRegistry.errors[0] || "No target metadata matched an approved KPI metric column.";
+    const targetIssues = targetRegistry.errors.map((message) => ({
+      stage: "import_validation" as const,
+      worksheet: "KPI Targets",
+      row_number: null,
+      field: "target_binding",
+      message
+    }));
+    await supabase.from("file_imports").update({
+      status: "failed",
+      rows_imported: 0,
+      mapping_json: workbookMappingWithPlans(importRecord.mapping_json, plans),
+      errors_json: [...parserIssues, ...rejectedIssues, ...targetIssues] as unknown as Json
+    }).eq("workspace_id", workspaceId).eq("id", importRecord.id);
+    redirectWithFileError(`KPI target metadata could not be bound safely. ${firstIssue}`, file.id, "imported");
+  }
+
   let insertedStructuredRows = 0;
   const duplicateIds = new Set<string>();
   const structuredIds = new Set<string>();
@@ -3522,13 +3674,22 @@ async function saveWorkbookImport({
   const runtimeIssues: ImportPipelineIssue[] = [];
   try {
     await updateFileProcessingStatus({ supabase, file, status: "processing" });
+    if (targetRegistry.hasTargetContract) {
+      insertedStructuredRows += await upsertWorkbookKpiTargetSettings({
+        supabase,
+        workspaceId,
+        userId: user.id,
+        bindings: targetRegistry.bindings
+      });
+      targetRegistry.targetRowIds.forEach((id) => structuredIds.add(id));
+    }
     for (const plan of enabledPlans) {
       const planRows = validRows.filter((row) => worksheetIndexForRow(row) === plan.index);
-      if (!planRows.length || plan.selected_type === "company_profile" || plan.selected_type === "unknown") continue;
+      if (!planRows.length || plan.selected_type === "company_profile" || plan.selected_type === "unknown" || plan.selected_type === "kpi_targets") continue;
 
       try {
         if (plan.selected_type === "wide_time_series") {
-          const generated = buildWideTimeSeriesKpiRecords({ rows: planRows, plan, workspaceId, userId: user.id, file, importId: importRecord.id });
+          const generated = buildWideTimeSeriesKpiRecords({ rows: planRows, plan, targetRegistry, workspaceId, userId: user.id, file, importId: importRecord.id });
           runtimeIssues.push(...generated.issues);
           const deduped = await removeDuplicateKpiRows({
             supabase,

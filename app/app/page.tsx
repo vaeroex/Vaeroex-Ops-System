@@ -45,6 +45,7 @@ import {
   sortKpiRowsBySettings,
   type KpiSettingRow
 } from "@/lib/kpis/settings";
+import { loadActiveWorkspaceKpis } from "@/lib/kpis/load-workspace-kpis";
 import { effectiveKpiTarget, evaluateKpiPerformance, isKpiTargetMiss, type KpiPerformanceEvaluation } from "@/lib/kpis/semantics";
 import type { Database, Json } from "@/lib/supabase/types";
 import { requireWorkspacePage } from "@/lib/workspaces/page-context";
@@ -1034,13 +1035,7 @@ export default async function AppDashboardPage({ searchParams }: DashboardPagePr
     formResult,
     submissionResult
   ] = await Promise.all([
-    supabase
-      .from("kpis")
-      .select("*")
-      .eq("workspace_id", workspaceId)
-      .order("metric_date", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(500),
+    loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }).limit(300),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }).limit(200),

@@ -8,7 +8,9 @@ import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/con
 import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
 import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import { loadActiveWorkspaceKpis } from "@/lib/kpis/load-workspace-kpis";
 import type { IntelligenceCardLifecycleRecord } from "@/lib/intelligence/card-lifecycle/contracts";
+import { buildIntelligenceBlockedState } from "@/lib/intelligence/blocked-state";
 import { buildIntelligenceCardIdentityV1, buildIntelligenceCardSnapshotV1 } from "@/lib/intelligence/card-lifecycle/identity";
 import { buildIntelligenceCardLifecycleOverlayV1 } from "@/lib/intelligence/card-lifecycle/overlay";
 import { trySealIntelligenceCardLifecycleToken } from "@/lib/intelligence/card-lifecycle/token";
@@ -33,7 +35,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   const { supabase, workspaceId, context } = await requireWorkspacePage();
   const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
-    supabase.from("kpis").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("metric_date", { ascending: false }),
+    loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
@@ -135,6 +137,11 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     people: peopleResult.data || [],
     decisions: decisionsResult.data || [],
     operationalInsights
+  });
+  const blockedState = buildIntelligenceBlockedState({
+    intelligence,
+    kpis: eligibleKpis,
+    settings: kpiSettingsResult.data || []
   });
   const businessNoteContextReleaseChannel = businessNoteReleaseChannel();
   const businessNoteContext = await loadApprovedBusinessNoteContextV1({
@@ -238,6 +245,7 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
         initialFindingId={params?.finding}
         explanationTokens={explanationTokens}
         canManageLifecycle={canManageLifecycle}
+        blockedState={blockedState}
       />
     </div>
   );

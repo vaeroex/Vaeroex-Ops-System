@@ -721,7 +721,7 @@ async function main() {
   assert.match(filesActionSource, /export async function bulkManageLearnedKnowledgeAction/);
   assert.match(filesActionSource, /collection: "learned_knowledge"/);
   assert.match(filesActionSource, /\.in\("id", ids\)/);
-  const sourcesPage = read("app/app/sources/page.tsx");
+  const sourcesPage = read("app/app/sources/SourcesPage.tsx");
   assert.match(sourcesPage, /archived=\{activeTab === "archived"\}/);
   assert.match(sourcesPage, /bulkManageLearnedKnowledgeAction/);
   assert.match(sourcesPage, /EvidenceLifecycleCheckbox/);

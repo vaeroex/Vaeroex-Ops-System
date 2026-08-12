@@ -24,6 +24,7 @@ import {
   supportingEvidenceHref
 } from "@/lib/intelligence/evidence-groups";
 import type { IntelligenceConfidence, IntelligenceEvidenceRecord, IntelligenceInsight, IntelligenceInsightType } from "@/lib/intelligence/layer";
+import type { IntelligenceBlockedState } from "@/lib/intelligence/blocked-state";
 import {
   findingCategoryStatus,
   findingPriorityStatus,
@@ -448,13 +449,15 @@ export function IntelligenceSignalInbox({
   historyCards,
   initialFindingId,
   explanationTokens = {},
-  canManageLifecycle
+  canManageLifecycle,
+  blockedState = null
 }: {
   currentCards: IntelligenceLifecycleCardV1[];
   historyCards: IntelligenceLifecycleCardV1[];
   initialFindingId?: string;
   explanationTokens?: Readonly<Record<string, string>>;
   canManageLifecycle: boolean;
+  blockedState?: IntelligenceBlockedState | null;
 }) {
   const router = useRouter();
   const requestedCard = initialFindingId ? [...currentCards, ...historyCards].find((card) => card.findingId === initialFindingId) : null;
@@ -651,7 +654,7 @@ export function IntelligenceSignalInbox({
                       ? "No current attention findings match the selected filter."
                       : surfacedAttention.length
                         ? "No undismissed issues are in the current feed. Dismissed findings remain in History."
-                        : "No active issues require attention."}
+                        : blockedState?.description || "No active issues require attention."}
                   </div>
                 )}
               </section>
@@ -661,7 +664,7 @@ export function IntelligenceSignalInbox({
                   <p className="mt-1 text-xs text-slate-400">Current opportunities, recommendations, and forecasts already produced by deterministic intelligence.</p>
                 </div>
                 {currentImprovements.length ? currentImprovements.map(renderCard) : (
-                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{hideLowConfidence && totalCurrentImprovements.length ? "No improvement findings match the selected filter." : "No evidence-backed improvement finding is currently surfaced."}</div>
+                  <div className="rounded-lg border border-dashed border-white/15 bg-slate-950/35 p-5 text-sm leading-6 text-slate-300">{hideLowConfidence && totalCurrentImprovements.length ? "No improvement findings match the selected filter." : blockedState?.title || "No evidence-backed improvement finding is currently surfaced."}</div>
                 )}
               </section>
             </>
@@ -741,6 +744,12 @@ export function IntelligenceSignalInbox({
                   {selectedCard.reasonText ? <p><span className="font-semibold text-slate-100">Leadership note:</span> {selectedCard.reasonText}</p> : null}
                 </div>
               )}
+            </div>
+          ) : blockedState ? (
+            <div className="space-y-3 py-8 text-sm leading-6 text-slate-300">
+              <p className="font-semibold text-white">{blockedState.title}</p>
+              <p>{blockedState.description}</p>
+              <Link href={blockedState.actionHref} className="inline-flex min-h-10 items-center text-sm font-semibold text-cyan-200 hover:text-white">{blockedState.actionLabel}</Link>
             </div>
           ) : <div className="py-8 text-sm leading-6 text-slate-300">Select a finding to review its summary and supporting evidence.</div>}
         </aside>
