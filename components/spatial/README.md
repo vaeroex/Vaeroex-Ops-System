@@ -19,4 +19,4 @@ Each route owns a distinct hero composition in `DestinationArchitecture`. Inacti
 
 New destinations must occupy a materially distinct world region, reveal a recognizable silhouette before arrival, and settle without ambient camera drift. They must not add free-flight controls or fork the application navigation model. Local analytical canvases may use bounded controls inside their own intentional interaction region.
 
-The former Intelligence-only Cards/Spatial visualization has been retired. `/app/intelligence` always renders the authoritative Intelligence cards inside whichever global workspace experience the user selected. Shared low-level WebGL utilities remain available to the global workspace and the optional KPI-specific 3D chart.
+The former Intelligence-only Cards/Spatial visualization has been retired. `/app/intelligence` always renders the authoritative Intelligence cards inside whichever global workspace experience the user selected. Shared low-level WebGL utilities remain available to the global workspace and public spatial experiences.
