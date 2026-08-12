@@ -374,6 +374,7 @@ assert.match(actions, /detection_version: WORKBOOK_DETECTION_VERSION/, "new work
 assert.match(actions, /reprepareImportId[\s\S]*\.eq\("workspace_id", workspaceId\)[\s\S]*\.eq\("file_upload_id", file\.id\)/, "workbook re-preparation must resolve its target inside the active workspace and source");
 assert.match(actions, /if \(reprepareImport\)[\s\S]*importRecord = \{ id: reprepareImport\.id \}/, "re-preparation must reuse the existing import record rather than creating a duplicate import");
 assert.match(actions, /status: "superseded"/, "previous unapproved staging rows must be retired before the refreshed plan is reviewed");
+assert.match(actions, /const targetRegistry = workbookKpiTargetRegistry[\s\S]{0,1800}redirectWithFileError\(`KPI target metadata could not be bound safely\.[\s\S]{0,600}let insertedStructuredRows = 0/, "target-contract ambiguity must stop atomically before any KPI/settings write begins");
 assert.match(actions, /\.eq\("status", "staged"\)[\s\S]*\.order\("row_number"/, "approval must load only the current staged workbook generation");
 assert.match(actions, /approve_workbook_import/, "approved workbook imports must pass through the Tool Execution Gateway");
 assert.match(actions, /indexWorksheetImportEvidence/, "approved workbook rows must preserve source lineage in Business Memory");

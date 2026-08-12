@@ -50,7 +50,13 @@ assert.equal(importNotices.shouldClearSourceImportError({ error: staleImportErro
 assert.equal(importNotices.shouldClearSourceImportError({ error: staleImportError, successMessage: "Workbook detection updated", latestImportStatus: "needs_review" }), true, "a successful re-prepare must clear the prior failure");
 assert.equal(importNotices.shouldClearSourceImportError({ error: staleImportError, latestImportStatus: "completed" }), true, "persisted completion must clear the obsolete failure after refresh");
 assert.equal(importNotices.shouldClearSourceImportError({ error: "Storage download failed.", latestImportStatus: "completed" }), false, "a genuine current error must remain visible");
+const persistedTargetError = "Target Sales & Merchandising / Gross Margin matches more than one metric column.";
+const persistedTargetIssues = [{ stage: "import_validation", worksheet: "KPI Targets", field: "target_binding", message: persistedTargetError }];
+assert.equal(importNotices.sourceImportHasPersistedIssue(persistedTargetIssues, persistedTargetError), true, "an identical persisted validation issue must be recognized");
+assert.equal(importNotices.shouldClearSourceImportError({ error: `KPI target metadata could not be bound safely. ${persistedTargetError}`, latestImportStatus: "failed", persistedIssues: persistedTargetIssues }), true, "a persisted validation issue must not also render as a duplicate redirect toast");
+assert.equal(importNotices.shouldClearSourceImportError({ error: "Different current failure.", latestImportStatus: "failed", persistedIssues: persistedTargetIssues }), false, "distinct current errors must remain visible");
 assert.match(sourcesPage, /params\.error && clearSourceImportError[\s\S]{0,160}redirect\(sourceDetailNoticeHref/, "Source Detail must replace stale failure URLs after a successful import or re-prepare");
+assert.match(sourceImportReview, /const seen = new Set<string>\(\)[\s\S]{0,800}seen\.has\(identity\)/, "persisted import diagnostics must deduplicate identical issue records");
 assert.match(sourcesPage, /params\.error && !params\.message/, "legacy Source URLs must not preserve an error beside a later success message");
 assert.match(sourcesPage, /manageSourceFileAction/, "source detail must retain transactional lifecycle controls");
 assert.match(sourcesPage, /\.eq\("workspace_id", workspaceId\)/, "Evidence data queries must remain workspace scoped");

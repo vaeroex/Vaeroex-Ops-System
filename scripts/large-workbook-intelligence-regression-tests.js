@@ -120,6 +120,70 @@ const perUnitRegistry = targets.buildWorkbookKpiTargetRegistry({
 assert.deepStrictEqual(perUnitRegistry.errors, [], "per-unit slash labels must normalize without losing their currency display contract");
 assert.strictEqual(perUnitRegistry.bindings[0].valueFormat, "currency");
 
+const grossMarginMetrics = [
+  { worksheetName: "Sales & Merchandising", metricColumn: "Gross Margin %" },
+  { worksheetName: "Sales & Merchandising", metricColumn: "Gross Margin $000" },
+  { worksheetName: "Finance", metricColumn: "Gross Margin %" }
+];
+const grossMarginTargets = [
+  { importRowId: "sales-margin-target", domain: "Sales & Merchandising", kpiName: "Gross Margin", target: 38.5, unit: "%", direction: "maximize" },
+  { importRowId: "finance-margin-target", domain: "Finance", kpiName: "Gross Margin", target: 38.5, unit: "%", direction: "maximize" }
+];
+const grossMarginRegistry = targets.buildWorkbookKpiTargetRegistry({
+  targets: grossMarginTargets,
+  metrics: grossMarginMetrics,
+  hasTargetContract: true
+});
+const retriedGrossMarginRegistry = targets.buildWorkbookKpiTargetRegistry({
+  targets: grossMarginTargets,
+  metrics: grossMarginMetrics,
+  hasTargetContract: true
+});
+assert.deepStrictEqual(grossMarginRegistry.errors, [], "domain plus compatible unit/scale must resolve qualified gross-margin targets without ambiguity");
+assert.deepStrictEqual(retriedGrossMarginRegistry, grossMarginRegistry, "retrying the same reviewed target contract must resolve idempotently");
+assert.deepStrictEqual(
+  grossMarginRegistry.bindings.map((binding) => [binding.worksheetName, binding.metricColumn, binding.canonicalName]),
+  [
+    ["Sales & Merchandising", "Gross Margin %", "sales_and_merchandising_gross_margin"],
+    ["Finance", "Gross Margin %", "finance_gross_margin"]
+  ],
+  "each reviewed percentage target must bind to the exact percentage measure in its own domain"
+);
+assert.strictEqual(
+  targets.workbookKpiTargetBindingForMetric(grossMarginRegistry, "Sales & Merchandising", "Gross Margin $000"),
+  null,
+  "the dollar gross-margin measure must remain supporting evidence rather than inherit the percentage target"
+);
+assert.strictEqual(
+  targets.workbookKpiTargetBindingForMetric(grossMarginRegistry, "Sales & Merchandising", "Gross Margin %").sourceUnit,
+  "%",
+  "the selected Sales binding must retain the reviewed percent scale"
+);
+assert.strictEqual(
+  targets.workbookKpiTargetBindingForMetric(grossMarginRegistry, "Finance", "Gross Margin %").sourceUnit,
+  "%",
+  "the Finance target must remain isolated from the Sales domain"
+);
+
+const conflictingUnitRegistry = targets.buildWorkbookKpiTargetRegistry({
+  targets: [{ importRowId: "wrong-unit", domain: "Sales & Merchandising", kpiName: "Gross Margin", target: 38.5, unit: "%", direction: "maximize" }],
+  metrics: [{ worksheetName: "Sales & Merchandising", metricColumn: "Gross Margin $000" }],
+  hasTargetContract: true
+});
+assert.strictEqual(conflictingUnitRegistry.bindings.length, 0, "an explicitly incompatible metric unit must fail closed");
+assert.match(conflictingUnitRegistry.errors[0], /compatible unit %/, "the unit conflict must remain explicit and reviewable");
+
+const exactBeforeAliasRegistry = targets.buildWorkbookKpiTargetRegistry({
+  targets: [{ importRowId: "exact-before-alias", domain: "Operations", kpiName: "Response Time", target: 4, unit: "hours", direction: "minimize" }],
+  metrics: [
+    { worksheetName: "Operations", metricColumn: "Response Time Hours" },
+    { worksheetName: "Operations", metricColumn: "Avg Response Hrs" }
+  ],
+  hasTargetContract: true
+});
+assert.deepStrictEqual(exactBeforeAliasRegistry.errors, [], "a qualified exact label must outrank a bounded alias");
+assert.strictEqual(exactBeforeAliasRegistry.bindings[0].metricColumn, "Response Time Hours", "an alias must not compete with an exact qualified match");
+
 const unmatched = targets.buildWorkbookKpiTargetRegistry({
   targets: [{ importRowId: "bad-1", domain: "Finance", kpiName: "Not Present", target: 1, unit: "count", direction: "maximize" }],
   metrics,

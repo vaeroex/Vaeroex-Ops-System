@@ -53,6 +53,12 @@ function normalized(value: string) {
     .trim();
 }
 
+function normalizedMetricColumn(value: string) {
+  return normalized(value
+    .replace(/%/g, " percent ")
+    .replace(/\$/g, " dollar "));
+}
+
 export function normalizeWorkbookDomain(value: string) {
   return normalized(value).replace(/\band\b/g, "").replace(/\s+/g, " ").trim();
 }
@@ -96,6 +102,49 @@ function unitSemantics(unit: string) {
     return { semanticUnit: "count", semanticScale: 1, displayUnit: unit.trim(), valueFormat: "count" as const };
   }
   return { semanticUnit: normalizedUnit || "number", semanticScale: 1, displayUnit: unit.trim(), valueFormat: "decimal" as const };
+}
+
+type WorkbookUnitSemantics = ReturnType<typeof unitSemantics>;
+
+function metricColumnUnitSemantics(metricColumn: string): WorkbookUnitSemantics | null {
+  const raw = metricColumn.trim();
+  const normalizedColumn = normalized(raw);
+
+  if (/%/.test(raw) || /\b(?:percent|percentage)\b/i.test(raw)) {
+    return unitSemantics("%");
+  }
+  if (/\$\s*(?:000|k)\b/i.test(raw) || /\b(?:usd|currency)\s+(?:000|k)\b/i.test(raw)) {
+    return unitSemantics("$000");
+  }
+  if (/\$/.test(raw) || /\b(?:usd|currency|dollars?)\b/i.test(raw)) {
+    return unitSemantics("$");
+  }
+  const duration = normalizedColumn.match(/\b(hours?|hrs?|minutes?|mins?|days?)\b/);
+  if (duration) return unitSemantics(duration[1]);
+  if (/\b(?:count|units?)\b/.test(normalizedColumn)) return unitSemantics("count");
+  return null;
+}
+
+function unitSemanticsMatch(left: WorkbookUnitSemantics, right: WorkbookUnitSemantics) {
+  const comparableUnit = (unit: string) => {
+    if (["hour", "hours", "hr", "hrs"].includes(unit)) return "hours";
+    if (["minute", "minutes", "min", "mins"].includes(unit)) return "minutes";
+    if (["day", "days"].includes(unit)) return "days";
+    return unit;
+  };
+  return comparableUnit(left.semanticUnit) === comparableUnit(right.semanticUnit)
+    && left.semanticScale === right.semanticScale;
+}
+
+function normalizeExactWorkbookKpiLabel(value: string) {
+  return normalized(value)
+    .replace(/\s+(?:000|m)$/, "")
+    .replace(/\s+(?:hrs?|hours?|min|mins|minutes?|days?)$/, "")
+    .replace(/\s+(?:percent|percentage)$/, "")
+    .replace(/\s+(?:usd|dollars?)$/, "")
+    .replace(/\s+(?:x|score|count|units?)$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function parseWorkbookKpiTargetDirection(value: unknown): WorkbookKpiTargetDirection | null {
@@ -142,12 +191,6 @@ export function buildWorkbookKpiTargetRegistry({
     targetsByKey.set(key, target);
   }
 
-  const metricsByKey = new Map<string, WorkbookMetricInput[]>();
-  for (const metric of metrics) {
-    const key = `${normalizeWorkbookDomain(metric.worksheetName)}::${normalizeWorkbookKpiLabel(metric.metricColumn)}`;
-    metricsByKey.set(key, [...(metricsByKey.get(key) || []), metric]);
-  }
-
   const duplicateLabels = new Set<string>();
   const domainsByLabel = new Map<string, Set<string>>();
   for (const target of targetsByKey.values()) {
@@ -161,12 +204,33 @@ export function buildWorkbookKpiTargetRegistry({
   }
 
   const bindings: WorkbookKpiTargetBinding[] = [];
-  for (const [key, target] of targetsByKey) {
-    const matches = metricsByKey.get(key) || [];
+  for (const target of targetsByKey.values()) {
+    const targetDomain = normalizeWorkbookDomain(target.domain);
+    const targetLabel = normalizeWorkbookKpiLabel(target.kpiName);
+    const exactTargetLabel = normalizeExactWorkbookKpiLabel(target.kpiName);
+    const sameDomainMetrics = metrics.filter((metric) => normalizeWorkbookDomain(metric.worksheetName) === targetDomain);
+    const exactLabelMatches = sameDomainMetrics.filter((metric) => normalizeExactWorkbookKpiLabel(metric.metricColumn) === exactTargetLabel);
+    const normalizedAliasMatches = sameDomainMetrics.filter((metric) =>
+      normalizeWorkbookKpiLabel(metric.metricColumn) === targetLabel
+      && !exactLabelMatches.includes(metric)
+    );
+    const labelMatches = exactLabelMatches.length ? exactLabelMatches : normalizedAliasMatches;
+    const targetUnit = unitSemantics(target.unit);
+    const explicitlyCompatible = labelMatches.filter((metric) => {
+      const metricUnit = metricColumnUnitSemantics(metric.metricColumn);
+      return metricUnit ? unitSemanticsMatch(metricUnit, targetUnit) : false;
+    });
+    const matches = explicitlyCompatible.length
+      ? explicitlyCompatible
+      : labelMatches.filter((metric) => metricColumnUnitSemantics(metric.metricColumn) === null);
+
     if (matches.length !== 1) {
+      const hasExplicitUnitConflict = labelMatches.length > 0 && matches.length === 0;
       errors.push(matches.length
         ? `Target ${target.domain} / ${target.kpiName} matches more than one metric column.`
-        : `Target ${target.domain} / ${target.kpiName} does not match a metric column in that worksheet.`);
+        : hasExplicitUnitConflict
+          ? `Target ${target.domain} / ${target.kpiName} does not match a metric column with compatible unit ${target.unit}.`
+          : `Target ${target.domain} / ${target.kpiName} does not match a metric column in that worksheet.`);
       continue;
     }
 
@@ -175,7 +239,7 @@ export function buildWorkbookKpiTargetRegistry({
     const duplicatedAcrossDomains = duplicateLabels.has(label);
     const storageName = duplicatedAcrossDomains ? `${target.domain} · ${target.kpiName}` : target.kpiName;
     const displayName = duplicatedAcrossDomains ? `${target.kpiName} (${target.domain})` : target.kpiName;
-    const semantics = unitSemantics(target.unit);
+    const semantics = targetUnit;
     bindings.push({
       importRowId: target.importRowId,
       worksheetName: metric.worksheetName,
@@ -209,9 +273,9 @@ export function workbookKpiTargetBindingForMetric(
   metricColumn: string
 ) {
   const domain = normalizeWorkbookDomain(worksheetName);
-  const label = normalizeWorkbookKpiLabel(metricColumn);
+  const column = normalizedMetricColumn(metricColumn);
   return registry.bindings.find((binding) =>
     normalizeWorkbookDomain(binding.worksheetName) === domain
-    && normalizeWorkbookKpiLabel(binding.metricColumn) === label
+    && normalizedMetricColumn(binding.metricColumn) === column
   ) || null;
 }

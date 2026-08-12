@@ -76,13 +76,19 @@ function rowSource(row: FileImportDataRow) {
 
 function importIssues(value: unknown) {
   if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
   return value.filter(isRecord).map((issue) => ({
     stage: typeof issue.stage === "string" ? issue.stage.replace(/_/g, " ") : "import",
     worksheet: typeof issue.worksheet === "string" ? issue.worksheet : "Workbook",
     rowNumber: typeof issue.row_number === "number" ? issue.row_number : null,
     field: typeof issue.field === "string" ? issue.field : "",
     message: typeof issue.message === "string" ? issue.message : "The row could not be processed."
-  }));
+  })).filter((issue) => {
+    const identity = [issue.stage, issue.worksheet, issue.rowNumber ?? "", issue.field, issue.message].join("::");
+    if (seen.has(identity)) return false;
+    seen.add(identity);
+    return true;
+  });
 }
 
 function latestExtraction(file: FileUploadRow) {

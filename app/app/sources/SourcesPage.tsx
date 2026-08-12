@@ -1208,7 +1208,8 @@ export async function renderSourcesPage(params: SourceSearchParams = {}, options
         error: actionErrorMessage,
         successMessage,
         fileImportStatus: linkedFile.import_status,
-        latestImportStatus: linkedFileImports[0]?.status
+        latestImportStatus: linkedFileImports[0]?.status,
+        persistedIssues: linkedFileImports[0]?.errors_json
       })
     : false;
   const selectedFileActionError = linkedFile && !clearSourceImportError ? actionErrorMessage : null;
