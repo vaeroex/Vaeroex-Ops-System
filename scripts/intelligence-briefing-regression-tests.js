@@ -404,7 +404,12 @@ const intelligencePage = read("app/app/intelligence/page.tsx");
 const briefingPage = read("app/app/intelligence/briefings/page.tsx");
 assert.match(action, /buildWorkspaceIntelligenceBriefingPackage/);
 assert.doesNotMatch(action, /workspaceId:\s*input|evidence:\s*input|snapshot:\s*input/, "client input cannot supply workspace or evidence authority");
-assert.ok(action.indexOf('state.status !== "ready"') < action.indexOf("generateIntelligenceBriefing({"), "eligibility and materiality must run before provider execution");
+assert.match(action, /intelligenceBriefingStateAllowsGeneration\(state\)/, "the provider path must use the typed briefing-state eligibility guard");
+assert.ok(
+  action.indexOf("intelligenceBriefingStateAllowsGeneration(state)") >= 0
+    && action.indexOf("intelligenceBriefingStateAllowsGeneration(state)") < action.indexOf("generateIntelligenceBriefing({"),
+  "eligibility and materiality must run before provider execution"
+);
 assert.match(claim, /insertError\?\.code !== "23505"/);
 assert.match(migration, /create unique index if not exists ai_agent_runs_intelligence_briefing_generation_claim_uidx/);
 assert.match(migration, /status in \('processing', 'completed'\)/);
@@ -421,6 +426,7 @@ assert.match(cards, /Last 7 days/);
 assert.match(cards, /Last 30 days/);
 assert.match(cards, /View Current Briefing/);
 assert.match(cards, /Generation unavailable/);
+assert.match(cards, /Evidence verification unavailable/);
 assert.match(cards, /No eligible evidence/);
 assert.match(cards, /Limited evidence/);
 assert.match(cards, /Ready to generate/);

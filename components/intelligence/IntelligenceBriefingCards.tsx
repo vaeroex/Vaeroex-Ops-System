@@ -11,9 +11,11 @@ import {
   type IntelligenceBriefingType
 } from "@/lib/ai/intelligence-briefing/contracts";
 import { briefingPeriodLabel } from "@/lib/ai/intelligence-briefing/period";
+import { intelligenceBriefingStateAllowsGeneration } from "@/lib/ai/intelligence-briefing/state";
 
 function statusLabel(state: IntelligenceBriefingState, generationEnabled: boolean) {
-  if (!generationEnabled && ["ready", "failed", "unavailable"].includes(state.status)) return "Generation unavailable";
+  if (!generationEnabled) return "Generation unavailable";
+  if (state.eligibility === "verification_unavailable") return "Evidence verification unavailable";
   if (state.status === "current") return "No new information";
   if (state.status === "unchanged") return "No significant change";
   if (state.status === "generating") return "Generating";
@@ -23,6 +25,7 @@ function statusLabel(state: IntelligenceBriefingState, generationEnabled: boolea
 }
 
 function eligibilityLabel(state: IntelligenceBriefingState) {
+  if (state.eligibility === "verification_unavailable") return "Evidence verification unavailable";
   if (state.eligibility === "no_eligible_evidence") return "No eligible evidence";
   if (state.eligibility === "limited") return "Limited evidence";
   return "Sufficient evidence";
@@ -52,11 +55,14 @@ function BriefingCard({
   const [state, setState] = useState(initialState);
   const [pending, startTransition] = useTransition();
   const type = state.briefingType;
-  const canGenerate = generationEnabled && (state.status === "ready" || state.status === "failed");
+  const canGenerate = generationEnabled && intelligenceBriefingStateAllowsGeneration(state);
   const generationLabel = type === "weekly" ? "Generate Weekly Briefing" : "Generate Monthly Briefing";
-  const displayMessage = generationEnabled
-    ? state.message
+  const providerMessage = generationEnabled
+    ? null
     : "Briefing generation is currently unavailable. You can continue to view any existing briefing.";
+  const evidenceMessage = generationEnabled || state.eligibility === "verification_unavailable" || state.eligibility === "no_eligible_evidence"
+    ? state.message
+    : null;
 
   function generate() {
     if (!canGenerate || pending) return;
@@ -93,7 +99,8 @@ function BriefingCard({
         <span className="rounded-full border border-white/10 px-2.5 py-1 font-semibold text-slate-300">Confidence {state.confidence}</span>
         {state.artifact ? <span className="rounded-full border border-emerald-300/20 bg-emerald-950/20 px-2.5 py-1 font-semibold text-emerald-100">Current briefing available</span> : null}
       </div>
-      {displayMessage ? <p className="mt-4 text-sm leading-6 text-slate-300" role="status">{displayMessage}</p> : null}
+      {providerMessage ? <p className="mt-4 text-sm leading-6 text-slate-300" role="status">{providerMessage}</p> : null}
+      {evidenceMessage ? <p className="mt-2 text-sm leading-6 text-slate-300" role="status">{evidenceMessage}</p> : null}
       <div className="mt-5 flex flex-wrap gap-3 border-t border-white/10 pt-4">
         {state.artifact ? (
           <Link href={`/app/intelligence/briefings/${type}`} className="inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">

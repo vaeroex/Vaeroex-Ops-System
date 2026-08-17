@@ -16,6 +16,7 @@ import {
   briefingStateFromPackage,
   loadCurrentIntelligenceBriefing
 } from "@/lib/ai/intelligence-briefing/storage";
+import { intelligenceBriefingVerificationUnavailableState } from "@/lib/ai/intelligence-briefing/state";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
@@ -37,6 +38,20 @@ type WorkspaceShape = Readonly<{
 
 function queryFailure(errors: readonly ({ message: string } | null | undefined)[]) {
   return errors.find(Boolean)?.message || null;
+}
+
+export async function loadIntelligenceBriefingCrmHistory({
+  supabase,
+  workspaceId
+}: {
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+}) {
+  return supabase
+    .from("crm_lead_history")
+    .select("*")
+    .eq("workspace_id", workspaceId)
+    .order("created_at", { ascending: false });
 }
 
 export async function buildWorkspaceIntelligenceBriefingPackage({
@@ -78,7 +93,7 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
     supabase.from("file_uploads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("crm_leads").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
-    supabase.from("crm_lead_history").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
+    loadIntelligenceBriefingCrmHistory({ supabase, workspaceId }),
     supabase.from("file_imports").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     supabase.from("sops").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
     supabase.from("forms").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
@@ -221,21 +236,6 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
   return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt };
 }
 
-function unavailableBriefingState(
-  briefingType: IntelligenceBriefingType,
-  message: string
-): IntelligenceBriefingState {
-  return {
-    status: "unavailable",
-    briefingType,
-    period: intelligenceBriefingPeriod(briefingType),
-    eligibility: "no_eligible_evidence",
-    confidence: "Low",
-    artifact: null,
-    message
-  };
-}
-
 export async function loadWorkspaceIntelligenceBriefingStates({
   supabase,
   workspaceId,
@@ -269,10 +269,11 @@ export async function loadWorkspaceIntelligenceBriefingStates({
       });
       return briefingStateFromPackage({ briefingPackage, current });
     } catch {
-      return {
-        ...unavailableBriefingState(briefingType, "Eligible evidence could not be verified safely."),
+      return intelligenceBriefingVerificationUnavailableState({
+        briefingType,
+        period: intelligenceBriefingPeriod(briefingType, new Date(asOf)),
         artifact: current?.artifact || null
-      };
+      });
     }
   }
 

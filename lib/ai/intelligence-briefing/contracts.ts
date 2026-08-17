@@ -35,6 +35,7 @@ export const INTELLIGENCE_BRIEFING_SECTION_LABELS: Record<IntelligenceBriefingSe
 };
 
 export type IntelligenceBriefingEligibilityState = "no_eligible_evidence" | "limited" | "sufficient";
+export type IntelligenceBriefingEvidenceState = IntelligenceBriefingEligibilityState | "verification_unavailable";
 export type IntelligenceBriefingConfidence = "High" | "Medium" | "Low";
 export type IntelligenceBriefingFreshness = "current" | "stale" | "unavailable";
 
@@ -259,7 +260,7 @@ export type IntelligenceBriefingState = Readonly<{
   status: IntelligenceBriefingGenerationStatus;
   briefingType: IntelligenceBriefingType;
   period: IntelligenceBriefingEvidencePeriod;
-  eligibility: IntelligenceBriefingEligibilityState;
+  eligibility: IntelligenceBriefingEvidenceState;
   confidence: IntelligenceBriefingConfidence;
   artifact: IntelligenceBriefingViewArtifact | null;
   message: string | null;
