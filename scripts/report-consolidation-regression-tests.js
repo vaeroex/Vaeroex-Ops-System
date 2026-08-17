@@ -129,7 +129,12 @@ const aiTrustData = read("lib/admin/ai-trust-data.ts");
 assert.match(aiTrustData, /from\("reports"\)\.select\("id", \{ count: "exact", head: true \}\)[\s\S]*\.eq\("report_type", "Saved Analysis"\)[\s\S]*analysis_type: "finding_explanation"/, "the admin Trust reader may count only current finding Saved Analyses, not retired report artifacts");
 
 const { SAVED_ANALYSIS_TYPES, parseSavedAnalysisEnvelope, savedAnalysisListItem } = require("../lib/reports/saved-analysis.ts");
-assert.deepEqual([...SAVED_ANALYSIS_TYPES], ["business_health", "finding_explanation"]);
+assert.deepEqual([...SAVED_ANALYSIS_TYPES], [
+  "business_health",
+  "finding_explanation",
+  "weekly_briefing",
+  "monthly_briefing"
+]);
 const baseEnvelope = {
   record_kind: "saved_analysis",
   envelope_version: 1,

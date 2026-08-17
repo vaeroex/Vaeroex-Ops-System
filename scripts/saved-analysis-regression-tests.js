@@ -14,6 +14,7 @@ const renderer = read("components/reports/SavedAnalysisRenderer.tsx");
 const saveButton = read("components/reports/SaveAnalysisButton.tsx");
 const businessHealth = read("components/intelligence/BusinessHealthAnalysisPanel.tsx");
 const findingExplanation = read("components/intelligence/IntelligenceSignalInbox.tsx");
+const briefingViewer = read("components/intelligence/IntelligenceBriefingViewer.tsx");
 const agentPage = read("app/app/agents/page.tsx");
 const home = read("app/app/page.tsx");
 const globalSearch = read("components/app/GlobalSearch.tsx");
@@ -35,9 +36,9 @@ assert.doesNotMatch(actions, /provider-manager|vaeroex-client|runExecutive|gener
 for (const field of [
   "record_kind", "envelope_version", "workspace_id", "analysis_type", "source_artifact",
   "provider_attribution", "generated_at", "saved_at", "confidence", "evidence_fingerprint",
-  "citations", "evidence_lineage", "release_channel", "artifact", "saved_analysis_key"
+  "citations", "evidence_lineage", "release_channel", "artifact", "saved_analysis_key", "business_health_state"
 ]) assert.match(contracts, new RegExp(field), `saved-analysis envelope must preserve ${field}`);
-assert.match(contracts, /SAVED_ANALYSIS_TYPES = \[\s*"business_health",\s*"finding_explanation"\s*\]/);
+assert.match(contracts, /SAVED_ANALYSIS_TYPES = \[\s*"business_health",\s*"finding_explanation",\s*"weekly_briefing",\s*"monthly_briefing"\s*\]/);
 assert.doesNotMatch(contracts, /executive_brief/);
 
 assert.match(actions, /artifact: completed\.artifact/);
@@ -50,6 +51,8 @@ assert.match(saveButton, /Already saved/);
 
 assert.match(businessHealth, /SaveAnalysisButton analysisType="business_health"/);
 assert.match(findingExplanation, /SaveAnalysisButton analysisType="finding_explanation"/);
+assert.match(briefingViewer, /analysisType=\{analysisType\}/);
+assert.match(list, /Business Health:/, "Saved Briefing cards expose their preserved Business Health state when available");
 for (const source of [businessHealth, findingExplanation]) {
   assert.match(source, /generatedAt=\{(?:state\.)?artifact\.generatedAt\}/);
 }
@@ -63,7 +66,7 @@ assert.match(migration, /where deleted_at is null[\s\S]+record_kind[\s\S]+saved_
 assert.match(list, /Search saved analyses/);
 assert.match(globalSearch, /saved analysis title/);
 assert.doesNotMatch(globalSearch, /report title/);
-for (const label of ["All", "Business Health", "Finding Explanations"]) assert.match(list, new RegExp(label));
+for (const label of ["All", "Business Health", "Finding Explanations", "Weekly", "Monthly"]) assert.match(list, new RegExp(label));
 assert.doesNotMatch(list, /Legacy Leadership/);
 assert.match(list, /Select all visible/);
 assert.match(list, /Clear selection/);

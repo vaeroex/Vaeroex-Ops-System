@@ -15,6 +15,8 @@ export const BUSINESS_HEALTH_GPT56_SOL_MODEL = "gpt-5.6-sol" as const;
 export const BUSINESS_HEALTH_GPT56_TERRA_MODEL = "gpt-5.6-terra" as const;
 export const FINDING_EXPLANATION_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
 export const FINDING_EXPLANATION_GPT56_POLICY_ID = "finding_explanation_preview_gpt56_sol_terra_v1" as const;
+export const INTELLIGENCE_BRIEFING_POLICY_SELECTOR = "gpt56_sol_terra_v1" as const;
+export const INTELLIGENCE_BRIEFING_GPT56_POLICY_ID = "intelligence_briefing_gpt56_sol_terra_v1" as const;
 export const BUSINESS_NOTE_EXTRACTION_POLICY_SELECTOR = "gpt56_luna_terra_v1" as const;
 export const BUSINESS_NOTE_EXTRACTION_POLICY_ID = "business_note_gpt56_luna_terra_v2" as const;
 export const BUSINESS_NOTE_EXTRACTION_LUNA_MODEL = "gpt-5.6-luna" as const;
@@ -34,6 +36,11 @@ const FINDING_EXPLANATION_GPT56_SOL_TIMEOUT_MS = 42_000;
 const FINDING_EXPLANATION_GPT56_TERRA_TIMEOUT_MS = 25_000;
 const FINDING_EXPLANATION_GPT56_SOL_OUTPUT_TOKENS = 3_500;
 const FINDING_EXPLANATION_GPT56_TERRA_OUTPUT_TOKENS = 3_000;
+const INTELLIGENCE_BRIEFING_GPT56_DEADLINE_MS = 105_000;
+const INTELLIGENCE_BRIEFING_GPT56_SOL_TIMEOUT_MS = 55_000;
+const INTELLIGENCE_BRIEFING_GPT56_TERRA_TIMEOUT_MS = 35_000;
+const INTELLIGENCE_BRIEFING_GPT56_SOL_OUTPUT_TOKENS = 7_000;
+const INTELLIGENCE_BRIEFING_GPT56_TERRA_OUTPUT_TOKENS = 6_000;
 const BUSINESS_NOTE_EXTRACTION_DEADLINE_MS = 55_000;
 const BUSINESS_NOTE_EXTRACTION_LUNA_TIMEOUT_MS = 24_000;
 const BUSINESS_NOTE_EXTRACTION_TERRA_TIMEOUT_MS = 24_000;
@@ -68,6 +75,7 @@ export type StructuredWorkflowGenerationPolicy = Readonly<{
 }>;
 
 export type FindingExplanationGenerationPolicy = StructuredWorkflowGenerationPolicy;
+export type IntelligenceBriefingGenerationPolicy = StructuredWorkflowGenerationPolicy;
 export type BusinessNoteExtractionGenerationPolicy = StructuredWorkflowGenerationPolicy;
 
 export const BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS = [
@@ -84,6 +92,10 @@ export const BUSINESS_NOTE_EXTRACTION_FALLBACK_REASONS = [
 
 export function isFindingExplanationEnabled() {
   return process.env.VAEROEX_FINDING_EXPLANATION_POLICY === FINDING_EXPLANATION_POLICY_SELECTOR;
+}
+
+export function isIntelligenceBriefingEnabled() {
+  return process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY === INTELLIGENCE_BRIEFING_POLICY_SELECTOR;
 }
 
 export function isBusinessNoteExtractionEnabled() {
@@ -324,5 +336,67 @@ export function resolveFindingExplanationGenerationPolicy({
     },
     requestTimeoutMs: FINDING_EXPLANATION_GPT56_SOL_TIMEOUT_MS,
     requestMaxOutputTokens: FINDING_EXPLANATION_GPT56_SOL_OUTPUT_TOKENS
+  };
+}
+
+export function resolveIntelligenceBriefingGenerationPolicy({
+  startedAtMs,
+  structuredOutput
+}: {
+  startedAtMs: number;
+  structuredOutput: AIProviderStructuredOutput;
+}): IntelligenceBriefingGenerationPolicy {
+  if (!isIntelligenceBriefingEnabled()) {
+    throw new Error("Intelligence Briefing generation is not enabled for this environment.");
+  }
+
+  return {
+    providerPolicy: {
+      id: INTELLIGENCE_BRIEFING_GPT56_POLICY_ID,
+      fallbackOn: BUSINESS_HEALTH_GPT56_FALLBACK_REASONS,
+      steps: [
+        {
+          provider: "openai",
+          model: BUSINESS_HEALTH_GPT56_SOL_MODEL,
+          workflowConfiguration: {
+            timeoutMs: INTELLIGENCE_BRIEFING_GPT56_SOL_TIMEOUT_MS,
+            maxAttempts: 1,
+            maxOutputTokens: INTELLIGENCE_BRIEFING_GPT56_SOL_OUTPUT_TOKENS,
+            temperature: null,
+            topP: null,
+            reasoning: { mode: "standard", effort: "medium" },
+            structuredOutput,
+            store: false,
+            stream: false
+          }
+        },
+        {
+          provider: "openai",
+          model: BUSINESS_HEALTH_GPT56_TERRA_MODEL,
+          minimumRemainingMs: 9_000,
+          workflowConfiguration: {
+            timeoutMs: INTELLIGENCE_BRIEFING_GPT56_TERRA_TIMEOUT_MS,
+            maxAttempts: 1,
+            maxOutputTokens: INTELLIGENCE_BRIEFING_GPT56_TERRA_OUTPUT_TOKENS,
+            temperature: null,
+            topP: null,
+            reasoning: { mode: "standard", effort: "medium" },
+            structuredOutput,
+            store: false,
+            stream: false
+          }
+        }
+      ]
+    },
+    executionBudget: {
+      deadlineAtMs: startedAtMs + INTELLIGENCE_BRIEFING_GPT56_DEADLINE_MS,
+      providerTimeoutMs: { openai: INTELLIGENCE_BRIEFING_GPT56_SOL_TIMEOUT_MS },
+      minimumAttemptWindowMs: { openai: 9_000 },
+      fallbackReserveMs: INTELLIGENCE_BRIEFING_GPT56_TERRA_TIMEOUT_MS + 1_000,
+      reserveFallbackForPrimary: true,
+      transitionReserveMs: 1_000
+    },
+    requestTimeoutMs: INTELLIGENCE_BRIEFING_GPT56_SOL_TIMEOUT_MS,
+    requestMaxOutputTokens: INTELLIGENCE_BRIEFING_GPT56_SOL_OUTPUT_TOKENS
   };
 }

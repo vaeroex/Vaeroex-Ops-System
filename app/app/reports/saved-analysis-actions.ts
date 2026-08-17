@@ -13,6 +13,12 @@ import {
 } from "@/lib/ai/finding-explanation/contracts";
 import { parseFindingExplanationArtifact } from "@/lib/ai/finding-explanation/storage";
 import {
+  INTELLIGENCE_BRIEFING_CONTRACT_ID,
+  briefingTypeLabel,
+  type IntelligenceBriefingArtifact
+} from "@/lib/ai/intelligence-briefing/contracts";
+import { parseIntelligenceBriefingArtifact } from "@/lib/ai/intelligence-briefing/storage";
+import {
   SAVED_ANALYSIS_ENVELOPE_VERSION,
   type SavedAnalysisDisplaySection,
   type SavedAnalysisEnvelope,
@@ -25,7 +31,7 @@ import { requireWorkspaceAccess } from "@/lib/security/require-workspace-access"
 import { requireToolExecution } from "@/lib/security/tool-execution-gateway";
 import type { Json } from "@/lib/supabase/types";
 
-type CompletedArtifact = BusinessHealthExplanationArtifact | FindingExplanationArtifact;
+type CompletedArtifact = BusinessHealthExplanationArtifact | FindingExplanationArtifact | IntelligenceBriefingArtifact;
 type SaveAnalysisInput = Readonly<{ analysisType: SaveableAnalysisType; fingerprint: string; generatedAt: string }>;
 type SavedAnalysisMutationResult = Readonly<{
   status: "saved" | "already_saved" | "deleted" | "error";
@@ -36,7 +42,9 @@ type SavedAnalysisMutationResult = Readonly<{
 
 const contractByType: Record<SaveableAnalysisType, string> = {
   business_health: BUSINESS_HEALTH_EXPLANATION_CONTRACT_ID,
-  finding_explanation: FINDING_EXPLANATION_CONTRACT_ID
+  finding_explanation: FINDING_EXPLANATION_CONTRACT_ID,
+  weekly_briefing: INTELLIGENCE_BRIEFING_CONTRACT_ID,
+  monthly_briefing: INTELLIGENCE_BRIEFING_CONTRACT_ID
 };
 
 function record(value: Json): Record<string, Json | undefined> {
@@ -47,7 +55,14 @@ function record(value: Json): Record<string, Json | undefined> {
 
 function parseArtifact(type: SaveableAnalysisType, value: Json): CompletedArtifact | null {
   if (type === "business_health") return parseBusinessHealthExplanationArtifact(value);
-  return parseFindingExplanationArtifact(value);
+  if (type === "finding_explanation") return parseFindingExplanationArtifact(value);
+  const artifact = parseIntelligenceBriefingArtifact(value);
+  const briefingType = type === "weekly_briefing" ? "weekly" : "monthly";
+  return artifact?.briefingType === briefingType ? artifact : null;
+}
+
+function artifactFingerprint(artifact: CompletedArtifact) {
+  return "generationKey" in artifact ? artifact.generationKey : artifact.fingerprint;
 }
 
 function sectionsForBusinessHealth(artifact: BusinessHealthExplanationArtifact): SavedAnalysisDisplaySection[] {
@@ -99,6 +114,29 @@ function sectionsForFinding(artifact: FindingExplanationArtifact): SavedAnalysis
   ];
 }
 
+function sectionsForBriefing(artifact: IntelligenceBriefingArtifact): SavedAnalysisDisplaySection[] {
+  const sectionLabelById = new Map(artifact.sections.map((section) => [section.id, section.label]));
+  return [
+    ...artifact.analysis.sections.map((section) => ({
+      id: section.section_id,
+      label: sectionLabelById.get(section.section_id) || section.section_id,
+      body: [section.summary, ...section.claims.map((claim) => claim.text)]
+    } satisfies SavedAnalysisDisplaySection)),
+    {
+      id: "leadership-considerations",
+      label: "Leadership considerations",
+      body: artifact.analysis.leadership_considerations.map((claim) => claim.text),
+      tone: "supporting"
+    },
+    ...(artifact.limitations.length ? [{
+      id: "limitations",
+      label: "Evidence limitations",
+      body: artifact.limitations.map((limitation) => limitation.text),
+      tone: "limitation" as const
+    }] : [])
+  ];
+}
+
 function analysisMetadata(type: SaveableAnalysisType, artifact: CompletedArtifact) {
   if (type === "business_health") {
     const current = artifact as BusinessHealthExplanationArtifact;
@@ -110,7 +148,22 @@ function analysisMetadata(type: SaveableAnalysisType, artifact: CompletedArtifac
       freshness: current.facts.freshness,
       evidenceStatus: `${current.citations.length} supporting citation${current.citations.length === 1 ? "" : "s"}`,
       dateRange: current.facts.latestEvidenceAt ? `Evidence through ${current.facts.latestEvidenceAt.slice(0, 10)}` : null,
+      businessHealthState: current.facts.status,
       sections: sectionsForBusinessHealth(current)
+    } as const;
+  }
+  if (type === "weekly_briefing" || type === "monthly_briefing") {
+    const current = artifact as IntelligenceBriefingArtifact;
+    return {
+      title: briefingTypeLabel(current.briefingType),
+      summaryLabel: "Executive summary",
+      summary: current.analysis.executive_summary.text,
+      confidence: current.confidence,
+      freshness: current.evidenceCoverage.freshness,
+      evidenceStatus: `${current.citations.length} citation${current.citations.length === 1 ? "" : "s"} · ${current.evidenceCoverage.independentSourceCount} independent source${current.evidenceCoverage.independentSourceCount === 1 ? "" : "s"}`,
+      dateRange: `${current.period.start} through ${current.period.end}`,
+      businessHealthState: current.businessHealth.available ? current.businessHealth.status : null,
+      sections: sectionsForBriefing(current)
     } as const;
   }
   const current = artifact as FindingExplanationArtifact;
@@ -122,6 +175,7 @@ function analysisMetadata(type: SaveableAnalysisType, artifact: CompletedArtifac
     freshness: current.facts.freshness,
     evidenceStatus: `${current.citations.length} citation${current.citations.length === 1 ? "" : "s"} · ${current.facts.independentSourceCount} independent source${current.facts.independentSourceCount === 1 ? "" : "s"}`,
     dateRange: current.facts.timePeriod || null,
+    businessHealthState: null,
     sections: sectionsForFinding(current)
   } as const;
 }
@@ -140,7 +194,7 @@ function savedAnalysisKey({
   artifact: CompletedArtifact;
 }) {
   return createHash("sha256")
-    .update([workspaceId, channel, analysisType, sourceArtifactId, artifact.contractVersion, artifact.fingerprint].join("\n"))
+    .update([workspaceId, channel, analysisType, sourceArtifactId, artifact.contractVersion, artifactFingerprint(artifact)].join("\n"))
     .digest("hex");
 }
 
@@ -174,9 +228,12 @@ async function completedArtifact({
     .limit(30);
   if (error) return null;
   for (const run of data || []) {
-    if (record(run.input_json).fingerprint !== fingerprint) continue;
+    const inputFingerprint = analysisType === "weekly_briefing" || analysisType === "monthly_briefing"
+      ? record(run.input_json).generation_key
+      : record(run.input_json).fingerprint;
+    if (inputFingerprint !== fingerprint) continue;
     const artifact = parseArtifact(analysisType, run.output_json);
-    if (artifact?.fingerprint === fingerprint && artifact.generatedAt === generatedAt) return { runId: run.id, artifact };
+    if (artifact && artifactFingerprint(artifact) === fingerprint && artifact.generatedAt === generatedAt) return { runId: run.id, artifact };
   }
   return null;
 }
@@ -272,7 +329,7 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
     saved_at: savedAt,
     confidence: metadata.confidence,
     freshness: metadata.freshness,
-    evidence_fingerprint: completed.artifact.fingerprint,
+    evidence_fingerprint: artifactFingerprint(completed.artifact),
     citations: completed.artifact.citations,
     evidence_lineage: completed.artifact.citations,
     display: {
@@ -280,7 +337,8 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
       summary: metadata.summary,
       sections: metadata.sections,
       evidence_status: metadata.evidenceStatus,
-      date_range: metadata.dateRange
+      date_range: metadata.dateRange,
+      business_health_state: metadata.businessHealthState
     },
     artifact: completed.artifact as unknown as Json
   };
@@ -290,8 +348,8 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
       workspace_id: workspaceId,
       report_type: "Saved Analysis",
       title: envelope.title,
-      date_range_start: null,
-      date_range_end: null,
+      date_range_start: "period" in completed.artifact ? completed.artifact.period.start : null,
+      date_range_end: "period" in completed.artifact ? completed.artifact.period.end : null,
       body_markdown: markdownForEnvelope(envelope),
       source_data_json: envelope as unknown as Json,
       created_by: user.id
