@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CalendarRange } from "lucide-react";
+import { IntelligenceBriefingCards } from "@/components/intelligence/IntelligenceBriefingCards";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
@@ -9,7 +10,11 @@ import { businessNoteReleaseChannel } from "@/lib/ai/business-notes/release-chan
 import { buildFindingExplanationPackage } from "@/lib/ai/finding-explanation/context";
 import { buildFindingExplanationFromSnapshotV1 } from "@/lib/ai/finding-explanation/snapshot-context";
 import { trySealFindingExplanationPackage } from "@/lib/ai/finding-explanation/token";
-import { isFindingExplanationEnabled } from "@/lib/ai/providers/workflow-provider-policy";
+import {
+  isFindingExplanationEnabled,
+  isIntelligenceBriefingEnabled
+} from "@/lib/ai/providers/workflow-provider-policy";
+import { loadWorkspaceIntelligenceBriefingStates } from "@/lib/ai/intelligence-briefing/workspace-context";
 import { loadActiveWorkspaceKpis } from "@/lib/kpis/load-workspace-kpis";
 import type { IntelligenceCardLifecycleRecord } from "@/lib/intelligence/card-lifecycle/contracts";
 import { buildIntelligenceBlockedState } from "@/lib/intelligence/blocked-state";
@@ -35,7 +40,7 @@ type IntelligencePageProps = {
 export default async function IntelligencePage({ searchParams }: IntelligencePageProps) {
   const params = await searchParams;
   const { supabase, workspaceId, context } = await requireWorkspacePage();
-  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult] = await Promise.all([
+  const [issuesResult, kpisResult, kpiSettingsResult, filesResult, crmResult, importsResult, sopsResult, formsResult, submissionsResult, peopleResult, decisionsResult, metricsResult, memoryResult, lifecycleResult, briefingStates] = await Promise.all([
     supabase.from("issues").select("*").eq("workspace_id", workspaceId).order("created_at", { ascending: false }),
     loadActiveWorkspaceKpis({ supabase, workspaceId }),
     supabase.from("kpi_settings").select("*").eq("workspace_id", workspaceId).order("sort_order", { ascending: true }).order("weight", { ascending: false }),
@@ -49,7 +54,12 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     supabase.from("business_decisions").select("*").eq("workspace_id", workspaceId).is("deleted_at", null).order("created_at", { ascending: false }),
     supabase.from("operational_metrics").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("created_at", { ascending: false }).limit(2000),
     supabase.from("business_memory_chunks").select("*").eq("workspace_id", workspaceId).is("archived_at", null).is("deleted_at", null).order("indexed_at", { ascending: false }).limit(500),
-    supabase.from("intelligence_card_lifecycle").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false })
+    supabase.from("intelligence_card_lifecycle").select("*").eq("workspace_id", workspaceId).order("updated_at", { ascending: false }),
+    loadWorkspaceIntelligenceBriefingStates({
+      supabase,
+      workspaceId,
+      workspace: context.activeWorkspace || {}
+    })
   ]);
 
   const lifecycleRecords = (lifecycleResult.data || []) as IntelligenceCardLifecycleRecord[];
@@ -239,17 +249,30 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
     actorDisplayNames
   });
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Executive Intelligence</p>
-          <p className="mt-1 text-sm text-slate-400">Review current signals or open rolling leadership briefings.</p>
+          <p className="mt-1 text-sm text-slate-400">Review current signals and rolling leadership briefings.</p>
         </div>
-        <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06]">
-          <CalendarRange aria-hidden="true" className="h-4 w-4 text-cyan-300" /> Intelligence Briefings
-        </Link>
       </div>
       <ErrorNotice message={displayErrors[0]?.message || null} />
+      <section aria-labelledby="intelligence-briefings-heading" className="space-y-4 border-b border-white/10 pb-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Leadership cadence</p>
+            <h2 id="intelligence-briefings-heading" className="mt-1 text-xl font-semibold text-white">Intelligence Briefings</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-400">Generate rolling weekly and monthly syntheses from eligible business evidence, or return to the latest current briefing.</p>
+          </div>
+          <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-cyan-200 hover:underline">
+            <CalendarRange aria-hidden="true" className="h-4 w-4" /> Open Briefings
+          </Link>
+        </div>
+        <IntelligenceBriefingCards
+          states={briefingStates}
+          generationEnabled={isIntelligenceBriefingEnabled()}
+        />
+      </section>
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}
         historyCards={lifecycleCards.history}

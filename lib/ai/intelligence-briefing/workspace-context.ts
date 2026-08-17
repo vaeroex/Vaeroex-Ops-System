@@ -9,8 +9,13 @@ import { intelligenceBriefingKpiEvidenceKey } from "@/lib/ai/intelligence-briefi
 import { intelligenceBriefingPeriod } from "@/lib/ai/intelligence-briefing/period";
 import type {
   IntelligenceBriefingPackage,
+  IntelligenceBriefingState,
   IntelligenceBriefingType
 } from "@/lib/ai/intelligence-briefing/contracts";
+import {
+  briefingStateFromPackage,
+  loadCurrentIntelligenceBriefing
+} from "@/lib/ai/intelligence-briefing/storage";
 import { buildBusinessIntelligenceCoverage } from "@/lib/intelligence/coverage";
 import { buildIntelligenceLayer } from "@/lib/intelligence/layer";
 import { buildOperationalEvidenceInsights } from "@/lib/intelligence/operational-evidence";
@@ -214,4 +219,66 @@ export async function buildWorkspaceIntelligenceBriefingPackage({
     previousBriefing
   });
   return { briefingPackage, snapshot: snapshot.snapshot, receipt: snapshot.receipt };
+}
+
+function unavailableBriefingState(
+  briefingType: IntelligenceBriefingType,
+  message: string
+): IntelligenceBriefingState {
+  return {
+    status: "unavailable",
+    briefingType,
+    period: intelligenceBriefingPeriod(briefingType),
+    eligibility: "no_eligible_evidence",
+    confidence: "Low",
+    artifact: null,
+    message
+  };
+}
+
+export async function loadWorkspaceIntelligenceBriefingStates({
+  supabase,
+  workspaceId,
+  workspace,
+  asOf = new Date().toISOString()
+}: {
+  supabase: SupabaseClient<Database>;
+  workspaceId: string;
+  workspace: WorkspaceShape;
+  asOf?: string;
+}): Promise<Readonly<Record<IntelligenceBriefingType, IntelligenceBriefingState>>> {
+  async function stateFor(briefingType: IntelligenceBriefingType) {
+    const current = await loadCurrentIntelligenceBriefing({
+      supabase,
+      workspaceId,
+      briefingType
+    }).catch(() => null);
+
+    try {
+      const { briefingPackage } = await buildWorkspaceIntelligenceBriefingPackage({
+        supabase,
+        workspaceId,
+        workspace,
+        briefingType,
+        asOf,
+        previousBriefing: current ? {
+          runId: current.runId,
+          generatedAt: current.artifact.generatedAt,
+          materialStateFingerprint: current.artifact.materialStateFingerprint
+        } : null
+      });
+      return briefingStateFromPackage({ briefingPackage, current });
+    } catch {
+      return {
+        ...unavailableBriefingState(briefingType, "Eligible evidence could not be verified safely."),
+        artifact: current?.artifact || null
+      };
+    }
+  }
+
+  const [weekly, monthly] = await Promise.all([
+    stateFor("weekly"),
+    stateFor("monthly")
+  ]);
+  return { weekly, monthly };
 }

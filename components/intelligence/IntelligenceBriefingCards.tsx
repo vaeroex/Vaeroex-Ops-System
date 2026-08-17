@@ -12,13 +12,20 @@ import {
 } from "@/lib/ai/intelligence-briefing/contracts";
 import { briefingPeriodLabel } from "@/lib/ai/intelligence-briefing/period";
 
-function statusLabel(state: IntelligenceBriefingState) {
-  if (state.status === "current") return "Current";
+function statusLabel(state: IntelligenceBriefingState, generationEnabled: boolean) {
+  if (!generationEnabled && ["ready", "failed", "unavailable"].includes(state.status)) return "Generation unavailable";
+  if (state.status === "current") return "No new information";
   if (state.status === "unchanged") return "No significant change";
-  if (state.status === "generating") return "Preparing";
-  if (state.status === "unavailable") return state.eligibility === "no_eligible_evidence" ? "Not enough evidence" : "Unavailable";
-  if (state.status === "failed") return "Not prepared";
-  return state.eligibility === "limited" ? "Limited evidence" : "Ready";
+  if (state.status === "generating") return "Generating";
+  if (state.status === "unavailable") return "Unavailable";
+  if (state.status === "failed") return "Generation failed";
+  return "Ready to generate";
+}
+
+function eligibilityLabel(state: IntelligenceBriefingState) {
+  if (state.eligibility === "no_eligible_evidence") return "No eligible evidence";
+  if (state.eligibility === "limited") return "Limited evidence";
+  return "Sufficient evidence";
 }
 
 function generatedLabel(value: string) {
@@ -34,12 +41,22 @@ function generatedLabel(value: string) {
   }).format(date);
 }
 
-function BriefingCard({ initialState }: { initialState: IntelligenceBriefingState }) {
+function BriefingCard({
+  initialState,
+  generationEnabled
+}: {
+  initialState: IntelligenceBriefingState;
+  generationEnabled: boolean;
+}) {
   const router = useRouter();
   const [state, setState] = useState(initialState);
   const [pending, startTransition] = useTransition();
   const type = state.briefingType;
-  const canGenerate = state.status === "ready" || state.status === "failed";
+  const canGenerate = generationEnabled && (state.status === "ready" || state.status === "failed");
+  const generationLabel = type === "weekly" ? "Generate Weekly Briefing" : "Generate Monthly Briefing";
+  const displayMessage = generationEnabled
+    ? state.message
+    : "Briefing generation is currently unavailable. You can continue to view any existing briefing.";
 
   function generate() {
     if (!canGenerate || pending) return;
@@ -51,10 +68,14 @@ function BriefingCard({ initialState }: { initialState: IntelligenceBriefingStat
   }
 
   return (
-    <article className="rounded-lg border border-white/10 bg-[#08111f] p-5 shadow-panel" data-intelligence-briefing-card={type}>
+    <article
+      className="rounded-lg border border-white/10 bg-[#08111f] p-5 shadow-panel"
+      data-intelligence-briefing-card={type}
+      data-generation-enabled={generationEnabled ? "true" : "false"}
+    >
       <div className="flex items-start justify-between gap-4">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">{type === "weekly" ? "Rolling 7 days" : "Rolling 30 days"}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">{type === "weekly" ? "Last 7 days" : "Last 30 days"}</p>
           <h2 className="mt-2 text-lg font-semibold text-white">{briefingTypeLabel(type)}</h2>
         </div>
         <CalendarRange aria-hidden="true" className="h-5 w-5 shrink-0 text-cyan-300" />
@@ -67,33 +88,27 @@ function BriefingCard({ initialState }: { initialState: IntelligenceBriefingStat
       </p>
       {state.artifact ? <p className="mt-2 text-xs text-slate-500">Last generated {generatedLabel(state.artifact.generatedAt)}</p> : null}
       <div className="mt-4 flex flex-wrap gap-2 text-xs">
-        <span className="rounded-full border border-cyan-300/25 bg-cyan-950/25 px-2.5 py-1 font-semibold text-cyan-100">{statusLabel(state)}</span>
+        <span className="rounded-full border border-cyan-300/25 bg-cyan-950/25 px-2.5 py-1 font-semibold text-cyan-100">{statusLabel(state, generationEnabled)}</span>
+        <span className="rounded-full border border-white/10 px-2.5 py-1 font-semibold text-slate-300">{eligibilityLabel(state)}</span>
         <span className="rounded-full border border-white/10 px-2.5 py-1 font-semibold text-slate-300">Confidence {state.confidence}</span>
+        {state.artifact ? <span className="rounded-full border border-emerald-300/20 bg-emerald-950/20 px-2.5 py-1 font-semibold text-emerald-100">Current briefing available</span> : null}
       </div>
-      {state.message ? <p className="mt-4 text-sm leading-6 text-slate-300" role="status">{state.message}</p> : null}
+      {displayMessage ? <p className="mt-4 text-sm leading-6 text-slate-300" role="status">{displayMessage}</p> : null}
       <div className="mt-5 flex flex-wrap gap-3 border-t border-white/10 pt-4">
         {state.artifact ? (
           <Link href={`/app/intelligence/briefings/${type}`} className="inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">
-            View briefing
+            View Current Briefing
           </Link>
         ) : null}
-        {canGenerate ? (
-          <button
-            type="button"
-            onClick={generate}
-            disabled={pending}
-            className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {pending ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-4 w-4" />}
-            {pending
-              ? "Preparing..."
-              : state.artifact
-                ? "Prepare updated briefing"
-                : type === "weekly"
-                  ? "Generate Weekly Briefing"
-                  : "Generate Monthly Briefing"}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={generate}
+          disabled={!canGenerate || pending}
+          className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {pending ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <RefreshCw aria-hidden="true" className="h-4 w-4" />}
+          {pending ? "Generating..." : generationLabel}
+        </button>
         {state.eligibility === "no_eligible_evidence" && !state.artifact ? (
           <Link href="/app/sources" className="inline-flex min-h-11 items-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06]">
             Add business information
@@ -104,11 +119,17 @@ function BriefingCard({ initialState }: { initialState: IntelligenceBriefingStat
   );
 }
 
-export function IntelligenceBriefingCards({ states }: { states: Readonly<Record<IntelligenceBriefingType, IntelligenceBriefingState>> }) {
+export function IntelligenceBriefingCards({
+  states,
+  generationEnabled
+}: {
+  states: Readonly<Record<IntelligenceBriefingType, IntelligenceBriefingState>>;
+  generationEnabled: boolean;
+}) {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <BriefingCard initialState={states.weekly} />
-      <BriefingCard initialState={states.monthly} />
+      <BriefingCard initialState={states.weekly} generationEnabled={generationEnabled} />
+      <BriefingCard initialState={states.monthly} generationEnabled={generationEnabled} />
     </div>
   );
 }
