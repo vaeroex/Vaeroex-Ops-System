@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { CalendarRange } from "lucide-react";
 import { IntelligenceSignalInbox } from "@/components/intelligence/IntelligenceSignalInbox";
 import { ErrorNotice } from "@/components/operations/ErrorNotice";
 import { SecurityResponseNotice } from "@/components/security/SecurityResponseNotice";
@@ -238,6 +240,15 @@ export default async function IntelligencePage({ searchParams }: IntelligencePag
   });
   return (
     <div className="space-y-4">
+      <div className="flex flex-col gap-3 border-b border-white/10 pb-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Executive Intelligence</p>
+          <p className="mt-1 text-sm text-slate-400">Review current signals or open rolling leadership briefings.</p>
+        </div>
+        <Link href="/app/intelligence/briefings" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-white hover:bg-white/[0.06]">
+          <CalendarRange aria-hidden="true" className="h-4 w-4 text-cyan-300" /> Intelligence Briefings
+        </Link>
+      </div>
       <ErrorNotice message={displayErrors[0]?.message || null} />
       <IntelligenceSignalInbox
         currentCards={lifecycleCards.current}

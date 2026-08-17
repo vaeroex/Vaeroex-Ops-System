@@ -16,7 +16,9 @@ type Filter = "all" | SavedAnalysisType;
 const filters: Array<{ value: Filter; label: string }> = [
   { value: "all", label: "All" },
   { value: "business_health", label: "Business Health" },
-  { value: "finding_explanation", label: "Finding Explanations" }
+  { value: "finding_explanation", label: "Finding Explanations" },
+  { value: "weekly_briefing", label: "Weekly" },
+  { value: "monthly_briefing", label: "Monthly" }
 ];
 
 function readableDate(value: string) {
@@ -149,7 +151,8 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
                       <div><dt className="font-semibold text-slate-300">Evidence</dt><dd className="mt-0.5">{analysis.evidenceStatus}</dd></div>
                     </dl>
                     {analysis.dateRange ? <p className="mt-2 text-xs text-slate-500">{analysis.dateRange}</p> : null}
-                    <Link href={`/app/reports/${analysis.id}`} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">View Analysis</Link>
+                    {analysis.businessHealthState ? <p className="mt-1 text-xs text-slate-500">Business Health: {analysis.businessHealthState}</p> : null}
+                    <Link href={`/app/reports/${analysis.id}`} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-vaeroex-blue px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-400 hover:text-vaeroex-navy">{analysis.analysisType.endsWith("_briefing") ? "View Briefing" : "View Analysis"}</Link>
                   </div>
                 </div>
               </article>
@@ -159,7 +162,7 @@ export function SavedAnalysisList({ analyses }: { analyses: readonly SavedAnalys
       ) : (
         <div className="rounded-lg border border-dashed border-white/15 bg-[#08111f] p-6 text-center">
           <h3 className="text-base font-semibold text-white">No saved analyses match this view</h3>
-          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Open a completed Business Health analysis or Finding Explanation and choose Save Analysis.</p>
+          <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-400">Open a completed analysis or Intelligence Briefing and choose Save.</p>
         </div>
       )}
       {message ? <p className="text-sm text-slate-300" role="status">{message}</p> : null}

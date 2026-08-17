@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Clock3, ShieldCheck } from "lucide-react";
 import {
   savedAnalysisTypeLabel,
@@ -64,6 +65,7 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
               <p className="mt-1 text-xs font-semibold text-slate-500">{citation.sourceLabel} · {citation.sourceType}</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">{citation.excerpt}</p>
               {citation.recordedAt ? <p className="mt-1 text-xs text-slate-500">Recorded {readableDate(citation.recordedAt)}</p> : null}
+              {citation.href ? <Link href={citation.href} className="mt-2 inline-flex text-xs font-semibold text-cyan-200 hover:underline">Open source</Link> : null}
             </li>
           ))}
         </ol>

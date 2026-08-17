@@ -58,6 +58,7 @@ export function SaveAnalysisButton({
   const base = light
     ? "border-line bg-white text-ink hover:bg-vaeroex-soft"
     : "border-white/15 bg-white/[0.05] text-white hover:bg-white/[0.1]";
+  const isBriefing = analysisType === "weekly_briefing" || analysisType === "monthly_briefing";
 
   return (
     <div className="flex flex-wrap items-center gap-3 border-t border-current/10 pt-5" data-save-analysis>
@@ -67,7 +68,7 @@ export function SaveAnalysisButton({
             <BookmarkCheck aria-hidden="true" className="h-4 w-4" /> Already saved
           </span>
           <Link href={`/app/reports/${savedId}`} className="inline-flex min-h-11 items-center text-sm font-semibold text-vaeroex-blue hover:underline">
-            View saved analysis
+            View saved {isBriefing ? "briefing" : "analysis"}
           </Link>
         </>
       ) : (
@@ -78,7 +79,7 @@ export function SaveAnalysisButton({
           className={`inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60 ${base}`}
         >
           {pending || checking ? <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" /> : <BookmarkCheck aria-hidden="true" className="h-4 w-4" />}
-          {pending ? "Saving..." : checking ? "Checking..." : "Save Analysis"}
+          {pending ? "Saving..." : checking ? "Checking..." : isBriefing ? "Save Briefing" : "Save Analysis"}
         </button>
       )}
       {message && !savedId ? <p className="text-sm text-amber-200" role="status">{message}</p> : null}

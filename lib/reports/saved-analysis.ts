@@ -4,7 +4,9 @@ export const SAVED_ANALYSIS_ENVELOPE_VERSION = 1 as const;
 
 export const SAVED_ANALYSIS_TYPES = [
   "business_health",
-  "finding_explanation"
+  "finding_explanation",
+  "weekly_briefing",
+  "monthly_briefing"
 ] as const;
 
 export type SavedAnalysisType = (typeof SAVED_ANALYSIS_TYPES)[number];
@@ -20,6 +22,7 @@ export type SavedAnalysisCitation = Readonly<{
   sourceType: string;
   excerpt: string;
   recordedAt: string | null;
+  href?: `/app/${string}`;
 }>;
 
 export type SavedAnalysisDisplaySection = Readonly<{
@@ -63,6 +66,7 @@ export type SavedAnalysisEnvelope = Readonly<{
     sections: readonly SavedAnalysisDisplaySection[];
     evidence_status: string;
     date_range: string | null;
+    business_health_state?: string | null;
   }>;
   artifact: Json;
 }>;
@@ -76,6 +80,7 @@ export type SavedAnalysisListItem = Readonly<{
   confidence: SavedAnalysisConfidence;
   evidenceStatus: string;
   dateRange: string | null;
+  businessHealthState: string | null;
 }>;
 
 function record(value: unknown): Record<string, unknown> {
@@ -121,7 +126,10 @@ function parseCitations(value: unknown): SavedAnalysisCitation[] | null {
       sourceLabel: text(citation.sourceLabel),
       sourceType: text(citation.sourceType),
       excerpt: text(citation.excerpt),
-      recordedAt: typeof citation.recordedAt === "string" ? citation.recordedAt : null
+      recordedAt: typeof citation.recordedAt === "string" ? citation.recordedAt : null,
+      ...(typeof citation.href === "string" && citation.href.startsWith("/app/")
+        ? { href: citation.href as `/app/${string}` }
+        : {})
     } satisfies SavedAnalysisCitation;
   });
   return citations.every(Boolean) ? citations as SavedAnalysisCitation[] : null;
@@ -165,6 +173,7 @@ export function parseSavedAnalysisEnvelope(value: unknown): SavedAnalysisEnvelop
   if (!text(envelope.evidence_fingerprint) || !citations || !lineage || !sections || !text(display.summary_label) || !text(display.summary) || !text(display.evidence_status)) return null;
   if (envelope.artifact === undefined) return null;
   if (display.date_range !== null && display.date_range !== undefined && typeof display.date_range !== "string") return null;
+  if (display.business_health_state !== null && display.business_health_state !== undefined && !text(display.business_health_state)) return null;
 
   return {
     record_kind: "saved_analysis",
@@ -199,7 +208,8 @@ export function parseSavedAnalysisEnvelope(value: unknown): SavedAnalysisEnvelop
       summary: text(display.summary),
       sections,
       evidence_status: text(display.evidence_status),
-      date_range: typeof display.date_range === "string" ? display.date_range : null
+      date_range: typeof display.date_range === "string" ? display.date_range : null,
+      business_health_state: typeof display.business_health_state === "string" ? text(display.business_health_state) : null
     },
     artifact: envelope.artifact as Json
   };
@@ -207,6 +217,8 @@ export function parseSavedAnalysisEnvelope(value: unknown): SavedAnalysisEnvelop
 
 export function savedAnalysisTypeLabel(type: SavedAnalysisType) {
   if (type === "business_health") return "Business Health";
+  if (type === "weekly_briefing") return "Weekly Briefing";
+  if (type === "monthly_briefing") return "Monthly Briefing";
   return "Finding Explanation";
 }
 
@@ -219,6 +231,7 @@ export function savedAnalysisListItem(id: string, envelope: SavedAnalysisEnvelop
     savedAt: envelope.saved_at,
     confidence: envelope.confidence,
     evidenceStatus: envelope.display.evidence_status,
-    dateRange: envelope.display.date_range
+    dateRange: envelope.display.date_range,
+    businessHealthState: envelope.display.business_health_state || null
   };
 }
