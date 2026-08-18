@@ -122,12 +122,12 @@ function sectionsForBriefing(artifact: IntelligenceBriefingArtifact): SavedAnaly
       label: sectionLabelById.get(section.section_id) || section.section_id,
       body: [section.summary, ...section.claims.map((claim) => claim.text)]
     } satisfies SavedAnalysisDisplaySection)),
-    {
+    ...(artifact.analysis.leadership_considerations.length ? [{
       id: "leadership-considerations",
       label: "Leadership considerations",
       body: artifact.analysis.leadership_considerations.map((claim) => claim.text),
-      tone: "supporting"
-    },
+      tone: "supporting" as const
+    }] : []),
     ...(artifact.limitations.length ? [{
       id: "limitations",
       label: "Evidence limitations",

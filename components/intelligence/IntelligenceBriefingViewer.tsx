@@ -86,14 +86,16 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
         ))}
       </div>
 
-      <section className="border-b border-white/10 pb-6">
-        <h2 className="text-lg font-semibold text-white">Leadership considerations</h2>
-        <ul className="mt-3 space-y-3">
-          {artifact.analysis.leadership_considerations.map((claim, index) => (
-            <li key={index} className="text-sm leading-6 text-slate-300">{claim.text}<CitationLinks claim={claim} artifact={artifact} /></li>
-          ))}
-        </ul>
-      </section>
+      {artifact.analysis.leadership_considerations.length ? (
+        <section className="border-b border-white/10 pb-6">
+          <h2 className="text-lg font-semibold text-white">Leadership considerations</h2>
+          <ul className="mt-3 space-y-3">
+            {artifact.analysis.leadership_considerations.map((claim, index) => (
+              <li key={index} className="text-sm leading-6 text-slate-300">{claim.text}<CitationLinks claim={claim} artifact={artifact} /></li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       {artifact.contextReferences.length ? (
         <section className="border-b border-white/10 pb-6">

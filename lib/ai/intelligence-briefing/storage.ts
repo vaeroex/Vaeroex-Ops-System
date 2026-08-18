@@ -3,10 +3,12 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import {
+  INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION,
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
   INTELLIGENCE_BRIEFING_CONTRACT_VERSION,
   INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
   INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
+  INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS,
   INTELLIGENCE_BRIEFING_PROMPT_VERSION,
   INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
   INTELLIGENCE_BRIEFING_SECTION_IDS,
@@ -45,9 +47,9 @@ const modelOutputSchema = z.object({
     section_id: z.enum(INTELLIGENCE_BRIEFING_SECTION_IDS),
     summary: z.string().trim().min(1),
     support_refs: z.array(z.string().trim().min(1)).min(1),
-    claims: z.array(claimSchema).min(1)
+    claims: z.array(claimSchema)
   }).strict()),
-  leadership_considerations: z.array(claimSchema).min(1),
+  leadership_considerations: z.array(claimSchema),
   limitation_refs: z.array(z.string().trim().min(1))
 }).strict();
 const coverageSchema = z.object({
@@ -145,7 +147,27 @@ const artifactSchema = z.object({
     snapshotContract: z.literal("intelligence_snapshot_v1"),
     snapshotFingerprint: snapshotHash,
     evidenceManifestId: hash,
-    previousBriefingRunId: z.string().uuid().nullable()
+    previousBriefingRunId: z.string().uuid().nullable(),
+    claimAcceptance: z.object({
+      version: z.literal(INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION),
+      providerModel: z.string().trim().min(1),
+      totalClaimsReturned: z.number().int().positive(),
+      acceptedClaimCount: z.number().int().positive(),
+      rejectedClaimCount: z.number().int().nonnegative(),
+      acceptedMeasuredClaimCount: z.number().int().positive(),
+      retainedSections: z.array(z.enum(INTELLIGENCE_BRIEFING_SECTION_IDS)).min(1),
+      omittedSections: z.array(z.enum(INTELLIGENCE_BRIEFING_SECTION_IDS)),
+      rejectionCategories: z.array(z.object({
+        reasonCode: z.string().trim().min(1),
+        stage: z.string().trim().min(1),
+        sectionId: z.enum([...INTELLIGENCE_BRIEFING_SECTION_IDS, "executive_summary", "leadership_considerations"]),
+        count: z.number().int().positive()
+      }).strict()),
+      promptVersion: z.literal(INTELLIGENCE_BRIEFING_PROMPT_VERSION),
+      schemaVersion: z.literal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION),
+      validatorVersion: z.literal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION),
+      generationPolicyVersion: z.literal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION)
+    }).strict()
   }).strict()
 }).strict();
 
@@ -170,7 +192,24 @@ function artifactRelationshipsAreValid(artifact: IntelligenceBriefingArtifact) {
   if (artifact.analysis.limitation_refs.some((ref) => !limitationRefs.has(ref))) return false;
   const expectedSections = new Set(artifact.sections.map((section) => section.id));
   const actualSections = new Set(artifact.analysis.sections.map((section) => section.section_id));
-  return expectedSections.size === actualSections.size && [...expectedSections].every((id) => actualSections.has(id));
+  if (expectedSections.size !== actualSections.size || ![...expectedSections].every((id) => actualSections.has(id))) return false;
+  const acceptedRefs = new Set(claims.flatMap((claim) => claim.support_refs));
+  if (acceptedRefs.size !== signalRefs.size || [...signalRefs].some((ref) => !acceptedRefs.has(ref))) return false;
+  const usedCitationIds = new Set(artifact.signals.flatMap((signal) => signal.citationIds));
+  if (usedCitationIds.size !== citationIds.size || [...citationIds].some((id) => !usedCitationIds.has(id))) return false;
+  if (artifact.contextReferences.some((reference) => !acceptedRefs.has(reference.ref))) return false;
+  const acceptance = artifact.provenance.claimAcceptance;
+  if (!acceptance) return false;
+  if (acceptance.providerModel !== artifact.providerAttribution.model) return false;
+  if (acceptance.totalClaimsReturned !== acceptance.acceptedClaimCount + acceptance.rejectedClaimCount) return false;
+  if (acceptance.acceptedMeasuredClaimCount > acceptance.acceptedClaimCount) return false;
+  if (acceptance.acceptedMeasuredClaimCount < INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS[artifact.eligibility]) return false;
+  if (acceptance.rejectedClaimCount !== acceptance.rejectionCategories.reduce((sum, category) => sum + category.count, 0)) return false;
+  if (new Set(acceptance.retainedSections).size !== acceptance.retainedSections.length) return false;
+  if (new Set(acceptance.omittedSections).size !== acceptance.omittedSections.length) return false;
+  if (acceptance.retainedSections.some((section) => acceptance.omittedSections.includes(section))) return false;
+  return acceptance.retainedSections.length === actualSections.size
+    && acceptance.retainedSections.every((section) => actualSections.has(section));
 }
 
 export function parseIntelligenceBriefingArtifact(value: unknown): IntelligenceBriefingArtifact | null {

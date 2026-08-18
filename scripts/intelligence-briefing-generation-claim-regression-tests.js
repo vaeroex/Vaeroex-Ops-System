@@ -148,10 +148,20 @@ async function claim(existingRows) {
           validator_version: "intelligence_briefing_validator_v2",
           generation_policy_version: "intelligence_briefing_generation_policy_v2"
         }
+      }),
+      row("failed", {
+        id: "run-failed-v3",
+        input_json: {
+          briefing_type: "monthly",
+          generation_key: "3".repeat(64),
+          prompt_version: "intelligence_briefing_prompt_v3",
+          validator_version: "intelligence_briefing_validator_v3",
+          generation_policy_version: "intelligence_briefing_generation_policy_v3"
+        }
       })
     ]),
     { status: "claimed", runId: "33333333-3333-4333-8333-333333333333" },
-    "failed V1 and V2 validation runs cannot block the corrected V3 identity from claiming a fresh generation"
+    "failed V1 through V3 validation runs cannot block the V4 identity from claiming a fresh generation"
   );
   assert.deepEqual(await claim([row("processing")]), { status: "processing" }, "an active identical generation remains concurrency-safe");
   assert.equal(

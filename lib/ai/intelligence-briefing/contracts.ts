@@ -5,10 +5,19 @@ import type { Json } from "@/lib/supabase/types";
 export const INTELLIGENCE_BRIEFING_CONTRACT_ID = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_CONTRACT_VERSION = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v2" as const;
-export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v3" as const;
-export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v3" as const;
-export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v3" as const;
+export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v4" as const;
+export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v4" as const;
+export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v4" as const;
 export const INTELLIGENCE_BRIEFING_MATERIALITY_VERSION = "intelligence_briefing_materiality_v1" as const;
+export const INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION = "intelligence_briefing_claim_acceptance_v1" as const;
+export const INTELLIGENCE_BRIEFING_FILTERED_CONTENT_LIMITATION_REF = "L-CLAIM-ACCEPTANCE" as const;
+export const INTELLIGENCE_BRIEFING_FILTERED_CONTENT_LIMITATION =
+  "This briefing reflects the evidence available for this period; unsupported or insufficiently grounded conclusions were excluded." as const;
+
+export const INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS = {
+  limited: 1,
+  sufficient: 2
+} as const;
 
 export const INTELLIGENCE_BRIEFING_TYPES = ["weekly", "monthly"] as const;
 export type IntelligenceBriefingType = (typeof INTELLIGENCE_BRIEFING_TYPES)[number];
@@ -168,6 +177,37 @@ export type IntelligenceBriefingModelOutput = Readonly<{
   limitation_refs: readonly string[];
 }>;
 
+export type IntelligenceBriefingClaimRejectionCategory = Readonly<{
+  reasonCode: string;
+  stage: string;
+  sectionId: string;
+  count: number;
+}>;
+
+export type IntelligenceBriefingClaimAcceptanceEvaluation = Readonly<{
+  version: typeof INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION;
+  totalClaimsReturned: number;
+  acceptedClaimCount: number;
+  rejectedClaimCount: number;
+  acceptedMeasuredClaimCount: number;
+  retainedSections: readonly IntelligenceBriefingSectionId[];
+  omittedSections: readonly IntelligenceBriefingSectionId[];
+  rejectionCategories: readonly IntelligenceBriefingClaimRejectionCategory[];
+  promptVersion: typeof INTELLIGENCE_BRIEFING_PROMPT_VERSION;
+  schemaVersion: typeof INTELLIGENCE_BRIEFING_SCHEMA_VERSION;
+  validatorVersion: typeof INTELLIGENCE_BRIEFING_VALIDATOR_VERSION;
+  generationPolicyVersion: typeof INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION;
+}>;
+
+export type IntelligenceBriefingAcceptedCandidate = Readonly<{
+  analysis: IntelligenceBriefingModelOutput;
+  acceptance: IntelligenceBriefingClaimAcceptanceEvaluation;
+  acceptedSignalRefs: readonly string[];
+}>;
+
+export type IntelligenceBriefingClaimAcceptanceProvenance =
+  IntelligenceBriefingClaimAcceptanceEvaluation & Readonly<{ providerModel: string }>;
+
 export type IntelligenceBriefingProviderAttribution = Readonly<{
   provider: "openai";
   model: string;
@@ -208,6 +248,7 @@ export type IntelligenceBriefingArtifact = Readonly<{
     snapshotFingerprint: string;
     evidenceManifestId: string;
     previousBriefingRunId: string | null;
+    claimAcceptance: IntelligenceBriefingClaimAcceptanceProvenance;
   }>;
 }>;
 

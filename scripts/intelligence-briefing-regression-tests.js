@@ -48,6 +48,7 @@ const {
   intelligenceBriefingPeriodNumericTokens
 } = require("../lib/ai/intelligence-briefing/numeric-integrity.ts");
 const {
+  filterIntelligenceBriefingPackageForAcceptedCandidate,
   INTELLIGENCE_BRIEFING_SYSTEM_PROMPT,
   intelligenceBriefingProviderAttemptTelemetry,
   intelligenceBriefingProviderPayload
@@ -252,32 +253,34 @@ function validOutput(input) {
   const sectionClaims = input.sections.map((section) => ({
     section_id: section.id,
     summary: "The supplied deterministic signals in this area warrant bounded leadership awareness.",
-    support_refs: section.signalRefs,
+    support_refs: [section.signalRefs[0]],
     claims: [{
       text: "The measured evidence remains within the application-owned confidence and evidence boundaries.",
-      support_refs: section.signalRefs
+      support_refs: [section.signalRefs[0]]
     }]
   }));
   return {
     executive_summary: {
       text: "The supplied deterministic business signals warrant leadership review within the stated evidence and confidence limits.",
-      support_refs: input.requiredSignalRefs
+      support_refs: [input.requiredSignalRefs[0]]
     },
     sections: sectionClaims,
     leadership_considerations: [{
       text: "Leadership can review the supported signals and investigate their context without asserting causation.",
-      support_refs: input.requiredSignalRefs
+      support_refs: [input.requiredSignalRefs[0]]
     }],
     limitation_refs: input.limitations.map((limitation) => limitation.ref)
   };
 }
 
 const valid = validOutput(limited);
-assert.equal(validateIntelligenceBriefingOutput(valid, limited).ok, true, "a fully bounded structured briefing passes strict validation");
+const validResult = validateIntelligenceBriefingOutput(valid, limited);
+assert.equal(validResult.ok, true, "a fully bounded structured briefing passes strict validation");
+const acceptedValid = validResult.value;
 assert.equal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION, "intelligence_briefing_schema_v2");
-assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v3");
-assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v3");
-assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v3");
+assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v4");
+assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v4");
+assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v4");
 assert.equal(
   INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
   INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.min,
@@ -355,14 +358,22 @@ unsupportedSectionOutput.sections.push({
   }]
 });
 const unsupportedSectionResult = validateIntelligenceBriefingOutput(unsupportedSectionOutput, limited);
-assert.equal(unsupportedSectionResult.ok, false, "a structurally valid but unsupported section fails closed");
-assert.equal(unsupportedSectionResult.diagnostic?.expectedField, "sections");
+assert.equal(unsupportedSectionResult.ok, true, "a structurally valid but unsupported section is excluded claim-by-claim");
+assert.equal(
+  unsupportedSectionResult.value.analysis.sections.some((section) => section.section_id === unsupportedSectionId),
+  false,
+  "an unsupported section cannot enter the accepted artifact"
+);
 const badCitation = clone(valid);
 badCitation.executive_summary.support_refs = ["UNKNOWN"];
-assert.equal(validateIntelligenceBriefingOutput(badCitation, limited).ok, false, "unknown support references fail closed");
+const badCitationResult = validateIntelligenceBriefingOutput(badCitation, limited);
+assert.equal(badCitationResult.ok, true, "an isolated unknown-reference claim is excluded when measured content remains viable");
+assert.notDeepEqual(badCitationResult.value.analysis.executive_summary, badCitation.executive_summary);
 const fabricatedNumber = clone(valid);
 fabricatedNumber.executive_summary.text += " The unsupported value is 999999.";
-assert.equal(validateIntelligenceBriefingOutput(fabricatedNumber, limited).ok, false, "invented numeric facts fail closed");
+const fabricatedNumberResult = validateIntelligenceBriefingOutput(fabricatedNumber, limited);
+assert.equal(fabricatedNumberResult.ok, true, "an isolated invented-number claim is excluded when measured content remains viable");
+assert.equal(JSON.stringify(fabricatedNumberResult.value.analysis).includes("999999"), false);
 const firstKpiSignal = limited.signals.find((signal) => signal.ref === "K1");
 const secondKpiSignal = limited.signals.find((signal) => signal.ref === "K2");
 assert.ok(firstKpiSignal && secondKpiSignal, "the fixture exposes two independently bound KPI signals");
@@ -378,9 +389,9 @@ assert.equal(validateIntelligenceBriefingOutput(groundedNumber, limited).ok, tru
 const crossBoundNumber = clone(groundedNumber);
 crossBoundNumber.executive_summary.text = `The cited deterministic signal records ${foreignNumber}, which warrants bounded leadership review within the available evidence.`;
 const crossBoundNumberResult = validateIntelligenceBriefingOutput(crossBoundNumber, limited);
-assert.equal(crossBoundNumberResult.ok, false, "a number borrowed from an uncited signal fails closed");
-assert.equal(crossBoundNumberResult.diagnostic?.numericSupportMode, "claim_local_observed_to_supported_containment");
-assert.deepEqual(crossBoundNumberResult.diagnostic?.citedSignalIds, [firstKpiSignal.ref]);
+assert.equal(crossBoundNumberResult.ok, true, "a number borrowed from an uncited signal is excluded claim-locally");
+assert.equal(JSON.stringify(crossBoundNumberResult.value.analysis).includes(crossBoundNumber.executive_summary.text), false);
+assert.ok(crossBoundNumberResult.value.acceptance.rejectionCategories.some((category) => category.reasonCode === "numeric_integrity_failed"));
 
 const fiveNumberPackage = clone(limited);
 const fiveNumberSignal = fiveNumberPackage.signals.find((signal) => signal.ref === firstKpiSignal.ref);
@@ -407,10 +418,9 @@ fabricatedNumberSet.executive_summary = {
   support_refs: [oneNumberSignal.ref]
 };
 const fabricatedNumberSetResult = validateIntelligenceBriefingOutput(fabricatedNumberSet, oneNumberPackage);
-assert.equal(fabricatedNumberSetResult.ok, false, "a claim cannot expand one supported number into five business values");
-assert.equal(fabricatedNumberSetResult.diagnostic?.expectedCount, 0, "numeric telemetry expects zero unsupported emitted tokens");
-assert.equal(fabricatedNumberSetResult.diagnostic?.observedCount, 4, "numeric telemetry reports unsupported emitted tokens rather than unused source numbers");
-assert.equal(fabricatedNumberSetResult.diagnostic?.unsupportedNumericCount, 4);
+assert.equal(fabricatedNumberSetResult.ok, true, "a claim that expands one number into five is excluded without retaining its prose");
+assert.equal(JSON.stringify(fabricatedNumberSetResult.value.analysis).includes("20%"), false);
+assert.ok(fabricatedNumberSetResult.value.acceptance.rejectionCategories.some((category) => category.reasonCode === "numeric_integrity_failed"));
 const equivalentFormattingPackage = clone(limited);
 const equivalentFormattingSignal = equivalentFormattingPackage.signals.find((signal) => signal.ref === firstKpiSignal.ref);
 equivalentFormattingSignal.fact = "Revenue was $1,000.00 and margin was 38.50%.";
@@ -435,10 +445,9 @@ const customersMarketOutput = validOutput(customersMarketPackage);
 const customersMarketClaim = customersMarketOutput.sections.find((section) => section.section_id === "customers_market").claims[0];
 customersMarketClaim.text += " The unsupported measured value is 17.3%.";
 const customersMarketFailure = validateIntelligenceBriefingOutput(customersMarketOutput, customersMarketPackage);
-assert.equal(customersMarketFailure.ok, false, "a claim-local unsupported number reproduces the Sol failure class");
-assert.equal(customersMarketFailure.diagnostic?.stage, "numeric_integrity");
-assert.equal(customersMarketFailure.diagnostic?.expectedField, "customers_market");
-assert.equal(customersMarketFailure.diagnostic?.numericSupportMode, "claim_local_observed_to_supported_containment");
+assert.equal(customersMarketFailure.ok, true, "an isolated claim-local unsupported number no longer rejects a viable candidate");
+assert.equal(JSON.stringify(customersMarketFailure.value.analysis).includes("17.3%"), false);
+assert.ok(customersMarketFailure.value.acceptance.rejectionCategories.some((category) => category.stage === "numeric_integrity" && category.sectionId === "customers_market"));
 
 const numericFixture = "Revenue was $1,000.00, margin was 38.50%, movement was -4.250, range was 10-12%, observed 2026-07-20, segment B2B, quarter S1, and support was 24/7.";
 const numericKeys = new Set(intelligenceBriefingNumericTokens(numericFixture).map((token) => token.key));
@@ -467,10 +476,12 @@ assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /none, one, or a subset/);
 assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /Never emit an empty, partial, null, scalar, or object-valued claims field/);
 const omittedLimitation = clone(valid);
 omittedLimitation.limitation_refs = omittedLimitation.limitation_refs.slice(1);
-assert.equal(validateIntelligenceBriefingOutput(omittedLimitation, limited).ok, false, "application-owned limitations cannot be omitted");
+assert.equal(validateIntelligenceBriefingOutput(omittedLimitation, limited).ok, true, "application-owned limitations are attached after claim validation rather than trusted to provider prose");
 const causal = clone(valid);
 causal.leadership_considerations[0].text = "The metric caused the business result and should be reviewed immediately.";
-assert.equal(validateIntelligenceBriefingOutput(causal, limited).ok, false, "unsupported causation fails closed");
+const causalResult = validateIntelligenceBriefingOutput(causal, limited);
+assert.equal(causalResult.ok, true, "unsupported leadership causation is excluded from an otherwise viable artifact");
+assert.equal(causalResult.value.analysis.leadership_considerations.length, 0);
 
 const contextSnapshot = clone(buildIntelligenceSnapshotV1(foundationSnapshotBuildInput()).snapshot);
 contextSnapshot.contextualEvidence = [{
@@ -534,19 +545,23 @@ assert.equal(validateIntelligenceBriefingOutput(contextualOutput, contextual).ok
 const unboundedContext = clone(contextualOutput);
 const contextClaim = unboundedContext.sections.find((section) => section.section_id === "business_updates_context").claims[0];
 contextClaim.text = "A pricing update happened during the period and warrants leadership review.";
-assert.equal(validateIntelligenceBriefingOutput(unboundedContext, contextual).ok, false, "Business Note context without attribution and a non-causal boundary fails closed");
+const unboundedContextResult = validateIntelligenceBriefingOutput(unboundedContext, contextual);
+assert.equal(unboundedContextResult.ok, true, "an unbounded Business Note claim is excluded while attributed context remains viable");
+assert.equal(JSON.stringify(unboundedContextResult.value.analysis).includes(contextClaim.text), false);
 const causalContext = clone(contextualOutput);
 causalContext.sections.find((section) => section.section_id === "business_updates_context").claims[0].text = "An approved Business Note reports a pricing update that drove measured revenue; this reported context does not establish causation.";
 const causalContextResult = validateIntelligenceBriefingOutput(causalContext, contextual);
-assert.equal(causalContextResult.ok, false, "reported context cannot introduce unsupported causal language");
-assert.equal(causalContextResult.diagnostic?.relationshipCategory, "causal");
-assert.deepEqual(causalContextResult.diagnostic?.citedSignalIds, [contextRef]);
+assert.equal(causalContextResult.ok, true, "reported context with unsupported causal language is excluded");
+assert.equal(JSON.stringify(causalContextResult.value.analysis).includes("drove measured revenue"), false);
+assert.ok(causalContextResult.value.acceptance.rejectionCategories.some((category) => category.reasonCode === "unsupported_relationship"));
 const correlatedContext = clone(contextualOutput);
 correlatedContext.sections.find((section) => section.section_id === "business_updates_context").claims[0].text = "An approved Business Note reports a pricing update correlated with measured revenue; this reported context does not establish causation.";
-assert.equal(validateIntelligenceBriefingOutput(correlatedContext, contextual).diagnostic?.relationshipCategory, "correlational", "reported context cannot imply correlation");
+const correlatedContextResult = validateIntelligenceBriefingOutput(correlatedContext, contextual);
+assert.equal(JSON.stringify(correlatedContextResult.value.analysis).includes("correlated with"), false, "reported context cannot retain implied correlation");
 const comparedContext = clone(contextualOutput);
 comparedContext.sections.find((section) => section.section_id === "business_updates_context").claims[0].text = "An approved Business Note reports pricing higher than measured performance; this reported context does not establish causation.";
-assert.equal(validateIntelligenceBriefingOutput(comparedContext, contextual).diagnostic?.relationshipCategory, "comparative", "reported context cannot imply comparison");
+const comparedContextResult = validateIntelligenceBriefingOutput(comparedContext, contextual);
+assert.equal(JSON.stringify(comparedContextResult.value.analysis).includes("higher than"), false, "reported context cannot retain implied comparison");
 
 const contextOnly = project({ snapshot: contextSnapshot, evidence: emptyEvidence, maps: false });
 assert.equal(contextOnly.eligibility, "no_eligible_evidence", "Business Notes remain contextual and cannot satisfy briefing eligibility");
@@ -562,21 +577,34 @@ supportedRelationshipOutput.executive_summary = {
 assert.equal(validateIntelligenceBriefingOutput(supportedRelationshipOutput, supportedRelationshipPackage).ok, true, "a relationship passes only when its cited canonical deterministic signal states that relationship category");
 const categoryOnlyRelationshipOutput = clone(supportedRelationshipOutput);
 categoryOnlyRelationshipOutput.executive_summary.text = "A different condition caused an unrelated result, despite citing a finding with the same broad relationship category.";
-assert.equal(validateIntelligenceBriefingOutput(categoryOnlyRelationshipOutput, supportedRelationshipPackage).ok, false, "relationship-category overlap alone cannot authorize changed entities or facts");
+const categoryOnlyRelationshipResult = validateIntelligenceBriefingOutput(categoryOnlyRelationshipOutput, supportedRelationshipPackage);
+assert.equal(categoryOnlyRelationshipResult.ok, true, "relationship-category overlap alone cannot authorize a claim but need not reject other valid claims");
+assert.equal(JSON.stringify(categoryOnlyRelationshipResult.value.analysis).includes("different condition caused"), false);
 
 const numericTelemetry = intelligenceBriefingProviderAttemptTelemetry({
-  validationDiagnostic: fabricatedNumberSetResult.diagnostic,
+  validationDiagnostic: {
+    reasonCode: "numeric_integrity_failed",
+    stage: "numeric_integrity",
+    numericSupportMode: "claim_local_observed_to_supported_containment",
+    unsupportedNumericCount: 4
+  },
   truncationDetected: false
 });
 assert.equal(numericTelemetry.numeric_support_mode, "claim_local_observed_to_supported_containment");
 assert.equal(numericTelemetry.unsupported_numeric_count, 4);
 const relationshipTelemetry = intelligenceBriefingProviderAttemptTelemetry({
-  validationDiagnostic: causalContextResult.diagnostic,
+  validationDiagnostic: {
+    reasonCode: "unsupported_relationship",
+    stage: "relationship_support",
+    relationshipCategory: "causal",
+    citedSignalIds: [contextRef]
+  },
   truncationDetected: false
 });
 assert.equal(relationshipTelemetry.relationship_category, "causal");
 assert.deepEqual(relationshipTelemetry.cited_signal_ids, [contextRef]);
 
+const acceptedArtifactProjection = filterIntelligenceBriefingPackageForAcceptedCandidate(limited, acceptedValid);
 const artifact = {
   contractId: limited.contractId,
   contractVersion: limited.contractVersion,
@@ -598,14 +626,16 @@ const artifact = {
   snapshotFingerprint: limited.snapshotFingerprint,
   generatedAt: asOf,
   businessHealth: limited.businessHealth,
-  analysis: valid,
-  sections: limited.sections,
-  signals: limited.signals,
-  limitations: limited.limitations,
-  citations: limited.citations,
-  contextReferences: limited.contextReferences,
+  analysis: acceptedValid.analysis,
+  ...acceptedArtifactProjection,
   providerAttribution: { provider: "openai", model: "gpt-5.6-sol", fallbackUsed: false, providerPolicyId: INTELLIGENCE_BRIEFING_GPT56_POLICY_ID },
-  provenance: { snapshotContract: "intelligence_snapshot_v1", snapshotFingerprint: limited.snapshotFingerprint, evidenceManifestId: limited.manifest.manifestId, previousBriefingRunId: null }
+  provenance: {
+    snapshotContract: "intelligence_snapshot_v1",
+    snapshotFingerprint: limited.snapshotFingerprint,
+    evidenceManifestId: limited.manifest.manifestId,
+    previousBriefingRunId: null,
+    claimAcceptance: { ...acceptedValid.acceptance, providerModel: "gpt-5.6-sol" }
+  }
 };
 assert.ok(parseIntelligenceBriefingArtifact(artifact), "a complete immutable artifact round-trips through strict storage validation");
 assert.equal(parseIntelligenceBriefingArtifact({ ...artifact, workspaceId: "foreign-workspace" }), null, "stored artifacts reject invalid workspace identity");
