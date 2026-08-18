@@ -191,7 +191,7 @@ function limitationCategory(value: string) {
   if (/\bhas limited evidence coverage\b/.test(normalized)) return "weak_area";
   if (/\b(?:business updates|business notes|reported context)\b/.test(normalized)
     && /\b(?:context|not independently measured|does not establish causation)\b/.test(normalized)) return "reported_context";
-  if (/\b(?:kpi|metric|historical).*(?:does not|do not).*(?:caus\w*|explain\w*)/.test(normalized)) return "historical_causation";
+  if (/\b(?:kpi|metric|historical).*(?:(?:does not|do not).*(?:caus\w*|explain\w*)|not caus\w*)/.test(normalized)) return "historical_causation";
   if (/\b(?:limited eligible evidence|evidence coverage is limited|supported by limited)\b/.test(normalized)) return "limited_evidence";
   if (/\bunsupported or insufficiently grounded conclusions were excluded\b/.test(normalized)) return "filtered_content";
   return normalized.replace(/[^a-z0-9]+/g, " ").trim();

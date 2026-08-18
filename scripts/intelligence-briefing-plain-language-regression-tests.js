@@ -229,7 +229,8 @@ const presentationFixture = {
     { ref: "L3", text: "Evidence coverage is limited." },
     { ref: "L4", text: "Business Updates provide context. They are not independently measured evidence." },
     { ref: "L5", text: "Business Notes are reported context, not independently measured proof." },
-    { ref: "L6", text: "KPI history does not prove causation." }
+    { ref: "L6", text: "KPI history does not prove causation." },
+    { ref: "L7", text: "The KPI history confirms favorable movement, not causation or future performance." }
   ],
   contextReferences: [{ ref: "N1" }]
 };
@@ -251,6 +252,7 @@ assert.equal(presentationLimitations.filter((value) => /limited eligible evidenc
 assert.equal(presentationLimitations.filter((value) => /Business Updates provide context/i.test(value)).length, 1);
 assert.equal(presentationLimitations.filter((value) => /caused a change/i.test(value)).length, 1);
 assert.doesNotMatch(presentationLimitations.join(" "), /Customers has limited|Financials has limited/);
+assert.doesNotMatch(presentationLimitations.join(" "), /not causation or future performance/, "semantically equivalent historical-causation limitations are consolidated");
 assert.equal(intelligenceBriefingEvidenceLimitsLabel(presentationFixture), "Evidence limits · 47 records from 1 source · Limited");
 assert.deepEqual(presentationFixture, immutablePresentationInput, "presentation projection must not rewrite an immutable current or Saved Briefing artifact");
 
