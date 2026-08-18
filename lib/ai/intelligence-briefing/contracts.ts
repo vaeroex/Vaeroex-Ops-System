@@ -5,9 +5,9 @@ import type { Json } from "@/lib/supabase/types";
 export const INTELLIGENCE_BRIEFING_CONTRACT_ID = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_CONTRACT_VERSION = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v2" as const;
-export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v2" as const;
-export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v2" as const;
-export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v2" as const;
+export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v3" as const;
+export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v3" as const;
+export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v3" as const;
 export const INTELLIGENCE_BRIEFING_MATERIALITY_VERSION = "intelligence_briefing_materiality_v1" as const;
 
 export const INTELLIGENCE_BRIEFING_TYPES = ["weekly", "monthly"] as const;

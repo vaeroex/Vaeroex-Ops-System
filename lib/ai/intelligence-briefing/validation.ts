@@ -17,7 +17,8 @@ import {
   validationFailure,
   validationValueType,
   type AIValidationReasonCode,
-  type AIValidationStage
+  type AIValidationStage,
+  type SafeAIValidationDiagnostic
 } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
 import type { Json } from "@/lib/supabase/types";
@@ -25,12 +26,20 @@ import type { Json } from "@/lib/supabase/types";
 const UUID_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const INTERNAL_IDENTIFIER_PATTERN = /\b(?:workspace_id|source_file_id|candidate_id|manifest_id|raw_data_json|input_json|output_json)\b/i;
 const REASONING_PATTERN = /\b(?:chain of thought|hidden reasoning|internal reasoning|system prompt|step-by-step reasoning)\b|<\/?think>/i;
-const CAUSAL_PATTERN = /\b(?:cause(?:d|s)?|because of|results? in|leads? to|drives?|due to|therefore|consequently|proves?)\b/i;
 const PREDICTION_CERTAINTY_PATTERN = /\b(?:will definitely|guaranteed|certain to|without doubt|inevitably)\b/i;
 const TASK_PATTERN = /\b(?:assign(?:ed)? to|owner\s*:|due date|deadline|create a task|project plan|work item|to-do)\b/i;
 const HIGH_RISK_ACTION_PATTERN = /\b(?:hire|fire|lay off|acquire|sell the company|borrow|increase budget|reduce headcount)\b/i;
-const CONTEXT_ATTRIBUTION_PATTERN = /\b(?:approved business note|business note reports?|leadership reported|reported context|the note reports?)\b/i;
+const CONTEXT_ATTRIBUTION_PATTERN = /\b(?:approved business note|business note reports?|business (?:noted|reports?)|leadership reported|reported context|the note reports?)\b/i;
 const CONTEXT_BOUNDARY_PATTERN = /\b(?:does not establish causation|may provide context|could be relevant|reported context|not independently measured)\b/i;
+type RelationshipCategory = NonNullable<SafeAIValidationDiagnostic["relationshipCategory"]>;
+const RELATIONSHIP_PATTERNS: ReadonlyArray<readonly [Exclude<RelationshipCategory, "context_attribution">, RegExp]> = [
+  ["causal", /\b(?:cause(?:d|s)?|because of|results? in|leads? to|drives?|drove|driven|due to|therefore|consequently|proves?)\b/i],
+  ["explanatory", /\b(?:explain(?:s|ed|ing)?|attribut(?:e|ed|able) to|accounts? for|reason for)\b/i],
+  ["correlational", /\b(?:correlat(?:e|es|ed|ion)|associated with|linked to|tracks? with|relationship between)\b/i],
+  ["comparative", /\b(?:compared (?:to|with)|versus|vs\.?|higher than|lower than|greater than|less than|above target|below target)\b/i],
+  ["offsetting", /\b(?:offset(?:s|ting)?|counterbalance(?:s|d)?|compensat(?:e|es|ed) for)\b/i],
+  ["directional_effect", /\b(?:improv(?:e|es|ed|ing)|worsen(?:s|ed|ing)|boost(?:s|ed|ing)|reduce(?:s|d|ing))\s+(?:the\s+)?(?:metric|performance|result|outcome|margin|revenue|cost|sales)\b/i]
+];
 const DIRECTION_PAIRS = [
   ["above target", "below target"],
   ["increased", "decreased"],
@@ -66,6 +75,53 @@ function failure(message: string, reasonCode: AIValidationReasonCode, stage: AIV
     expectedField: field,
     expectedType: "string",
     observedType: "string"
+  });
+}
+
+function relationshipCategories(value: string) {
+  return RELATIONSHIP_PATTERNS
+    .filter(([, pattern]) => pattern.test(value))
+    .map(([category]) => category);
+}
+
+function normalizedRelationshipText(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9%$€£]+/g, " ").trim();
+}
+
+function hasCanonicalRelationshipSupport(
+  claim: string,
+  signal: IntelligenceBriefingSignal,
+  category: Exclude<RelationshipCategory, "context_attribution">
+) {
+  if (signal.authority === "reported_context") return false;
+  const normalizedClaim = normalizedRelationshipText(claim);
+  return signal.fact
+    .split(/(?<=[.!?])\s+/)
+    .some((sentence) =>
+      relationshipCategories(sentence).includes(category)
+      && normalizedClaim.includes(normalizedRelationshipText(sentence))
+    );
+}
+
+function relationshipFailure({
+  message,
+  field,
+  category,
+  citedSignalIds
+}: {
+  message: string;
+  field: string;
+  category: RelationshipCategory;
+  citedSignalIds: readonly string[];
+}) {
+  return validationFailure(message, {
+    reasonCode: "unsupported_relationship",
+    stage: "relationship_support",
+    expectedField: field,
+    expectedType: "string",
+    observedType: "string",
+    relationshipCategory: category,
+    citedSignalIds: [...citedSignalIds]
   });
 }
 
@@ -125,8 +181,33 @@ export function validateIntelligenceBriefingOutput(
       return failure("A material briefing claim does not resolve to eligible citations.", "invalid_citation_id", "citation_provenance", sectionId);
     }
     const usesContext = supportedSignals.some((signal) => signal.authority === "reported_context");
+    const detectedRelationships = relationshipCategories(claim.text);
+    if (usesContext && detectedRelationships.length) {
+      return relationshipFailure({
+        message: "Reported context cannot be connected to measured performance without canonical deterministic relationship support.",
+        field: sectionId,
+        category: detectedRelationships[0],
+        citedSignalIds: refs
+      });
+    }
+    const unsupportedRelationship = detectedRelationships.find((category) =>
+      !supportedSignals.some((signal) => hasCanonicalRelationshipSupport(claim.text, signal, category))
+    );
+    if (unsupportedRelationship) {
+      return relationshipFailure({
+        message: "A briefing claim introduced a relationship not stated by its cited deterministic signals.",
+        field: sectionId,
+        category: unsupportedRelationship,
+        citedSignalIds: refs
+      });
+    }
     if (usesContext && (!CONTEXT_ATTRIBUTION_PATTERN.test(claim.text) || !CONTEXT_BOUNDARY_PATTERN.test(claim.text))) {
-      return failure("Business Note context must remain attributed and explicitly non-causal.", "unsupported_relationship", "relationship_support", sectionId);
+      return relationshipFailure({
+        message: "Business Note context must remain attributed and explicitly non-causal.",
+        field: sectionId,
+        category: "context_attribution",
+        citedSignalIds: refs
+      });
     }
     if (supportedSignals.some((signal) => contradicts(claim.text, signal))) {
       return failure("A briefing claim contradicted deterministic KPI or finding direction.", "contextual_inconsistency", "numeric_integrity", sectionId);
@@ -135,7 +216,8 @@ export function validateIntelligenceBriefingOutput(
       ...intelligenceBriefingPeriodNumericTokens(context.period),
       ...supportedSignals.flatMap((signal) => intelligenceBriefingNumericTokens(signal.fact))
     ].map((token) => token.key));
-    const unsupportedClaimNumbers = intelligenceBriefingNumericTokens(claim.text)
+    const emittedClaimNumbers = intelligenceBriefingNumericTokens(claim.text);
+    const unsupportedClaimNumbers = emittedClaimNumbers
       .filter((token) => !approvedClaimNumbers.has(token.key));
     if (unsupportedClaimNumbers.length) {
       return validationFailure("A briefing claim used a number that is not present in its cited deterministic signals.", {
@@ -144,8 +226,13 @@ export function validateIntelligenceBriefingOutput(
         expectedField: sectionId,
         expectedType: "string",
         observedType: "string",
-        expectedCount: approvedClaimNumbers.size,
-        observedCount: unsupportedClaimNumbers.length
+        expectedCount: 0,
+        observedCount: unsupportedClaimNumbers.length,
+        citedSignalIds: [...refs],
+        numericSupportMode: "claim_local_observed_to_supported_containment",
+        supportedNumericCount: approvedClaimNumbers.size,
+        emittedNumericCount: emittedClaimNumbers.length,
+        unsupportedNumericCount: unsupportedClaimNumbers.length
       });
     }
   }
@@ -167,9 +254,6 @@ export function validateIntelligenceBriefingOutput(
   }
   if (REASONING_PATTERN.test(text)) {
     return failure("The briefing exposed internal reasoning or instructions.", "reasoning_leakage", "contextual_validation");
-  }
-  if (CAUSAL_PATTERN.test(text)) {
-    return failure("The briefing introduced an unsupported causal relationship.", "unsupported_relationship", "relationship_support");
   }
   if (PREDICTION_CERTAINTY_PATTERN.test(text)) {
     return failure("The briefing expressed unsupported predictive certainty.", "unsupported_inference", "contextual_validation");

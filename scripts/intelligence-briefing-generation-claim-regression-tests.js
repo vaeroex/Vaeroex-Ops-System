@@ -31,12 +31,23 @@ Module._load = function loadPatched(request, parent, isMain) {
 };
 
 const { claimIntelligenceBriefingGeneration } = require("../lib/ai/intelligence-briefing/generation-claim.ts");
-const { INTELLIGENCE_BRIEFING_CONTRACT_ID } = require("../lib/ai/intelligence-briefing/contracts.ts");
+const {
+  INTELLIGENCE_BRIEFING_CONTRACT_ID,
+  INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
+  INTELLIGENCE_BRIEFING_PROMPT_VERSION,
+  INTELLIGENCE_BRIEFING_VALIDATOR_VERSION
+} = require("../lib/ai/intelligence-briefing/contracts.ts");
 
 const workspaceId = "11111111-1111-4111-8111-111111111111";
 const userId = "22222222-2222-4222-8222-222222222222";
 const generationKey = "a".repeat(64);
-const inputJson = { briefing_type: "monthly", generation_key: generationKey };
+const inputJson = {
+  briefing_type: "monthly",
+  generation_key: generationKey,
+  prompt_version: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
+  validator_version: INTELLIGENCE_BRIEFING_VALIDATOR_VERSION,
+  generation_policy_version: INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION
+};
 
 function createAdmin(existingRows) {
   return {
@@ -117,9 +128,30 @@ async function claim(existingRows) {
 
 (async () => {
   assert.deepEqual(
-    await claim([row("failed")]),
+    await claim([
+      row("failed", {
+        id: "run-failed-v1",
+        input_json: {
+          briefing_type: "monthly",
+          generation_key: "1".repeat(64),
+          prompt_version: "intelligence_briefing_prompt_v1",
+          validator_version: "intelligence_briefing_validator_v1",
+          generation_policy_version: "intelligence_briefing_generation_policy_v1"
+        }
+      }),
+      row("failed", {
+        id: "run-failed-v2",
+        input_json: {
+          briefing_type: "monthly",
+          generation_key: "2".repeat(64),
+          prompt_version: "intelligence_briefing_prompt_v2",
+          validator_version: "intelligence_briefing_validator_v2",
+          generation_policy_version: "intelligence_briefing_generation_policy_v2"
+        }
+      })
+    ]),
     { status: "claimed", runId: "33333333-3333-4333-8333-333333333333" },
-    "a failed validation run cannot block a corrected contract version from claiming a fresh generation"
+    "failed V1 and V2 validation runs cannot block the corrected V3 identity from claiming a fresh generation"
   );
   assert.deepEqual(await claim([row("processing")]), { status: "processing" }, "an active identical generation remains concurrency-safe");
   assert.equal(

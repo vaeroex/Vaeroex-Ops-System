@@ -49,6 +49,7 @@ const {
 } = require("../lib/ai/intelligence-briefing/numeric-integrity.ts");
 const {
   INTELLIGENCE_BRIEFING_SYSTEM_PROMPT,
+  intelligenceBriefingProviderAttemptTelemetry,
   intelligenceBriefingProviderPayload
 } = require("../lib/ai/intelligence-briefing/service.ts");
 const {
@@ -274,9 +275,9 @@ function validOutput(input) {
 const valid = validOutput(limited);
 assert.equal(validateIntelligenceBriefingOutput(valid, limited).ok, true, "a fully bounded structured briefing passes strict validation");
 assert.equal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION, "intelligence_briefing_schema_v2");
-assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v2");
-assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v2");
-assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v2");
+assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v3");
+assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v3");
+assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v3");
 assert.equal(
   INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
   INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.min,
@@ -376,7 +377,49 @@ groundedNumber.executive_summary = {
 assert.equal(validateIntelligenceBriefingOutput(groundedNumber, limited).ok, true, "a number present in the claim's cited signal remains valid");
 const crossBoundNumber = clone(groundedNumber);
 crossBoundNumber.executive_summary.text = `The cited deterministic signal records ${foreignNumber}, which warrants bounded leadership review within the available evidence.`;
-assert.equal(validateIntelligenceBriefingOutput(crossBoundNumber, limited).ok, false, "a number borrowed from an uncited signal fails closed");
+const crossBoundNumberResult = validateIntelligenceBriefingOutput(crossBoundNumber, limited);
+assert.equal(crossBoundNumberResult.ok, false, "a number borrowed from an uncited signal fails closed");
+assert.equal(crossBoundNumberResult.diagnostic?.numericSupportMode, "claim_local_observed_to_supported_containment");
+assert.deepEqual(crossBoundNumberResult.diagnostic?.citedSignalIds, [firstKpiSignal.ref]);
+
+const fiveNumberPackage = clone(limited);
+const fiveNumberSignal = fiveNumberPackage.signals.find((signal) => signal.ref === firstKpiSignal.ref);
+fiveNumberSignal.fact = "The cited deterministic values are 10%, 20%, 25%, 40%, and 50%.";
+const selectiveNumberOutput = validOutput(fiveNumberPackage);
+selectiveNumberOutput.executive_summary = {
+  text: "The cited deterministic signal records 10% for bounded leadership review.",
+  support_refs: [fiveNumberSignal.ref]
+};
+assert.equal(
+  validateIntelligenceBriefingOutput(selectiveNumberOutput, fiveNumberPackage).ok,
+  true,
+  "a claim may selectively use one of five supported numbers"
+);
+const repeatedNumberOutput = clone(selectiveNumberOutput);
+repeatedNumberOutput.executive_summary.text = "The cited 10% value remains 10% in the same supported claim.";
+assert.equal(validateIntelligenceBriefingOutput(repeatedNumberOutput, fiveNumberPackage).ok, true, "repeating a supported number remains valid");
+const oneNumberPackage = clone(limited);
+const oneNumberSignal = oneNumberPackage.signals.find((signal) => signal.ref === firstKpiSignal.ref);
+oneNumberSignal.fact = "The cited deterministic value is 10%.";
+const fabricatedNumberSet = validOutput(oneNumberPackage);
+fabricatedNumberSet.executive_summary = {
+  text: "The cited deterministic signal reports 10%, while the generated claim improperly adds 20%, 25%, 40%, and 50% without support.",
+  support_refs: [oneNumberSignal.ref]
+};
+const fabricatedNumberSetResult = validateIntelligenceBriefingOutput(fabricatedNumberSet, oneNumberPackage);
+assert.equal(fabricatedNumberSetResult.ok, false, "a claim cannot expand one supported number into five business values");
+assert.equal(fabricatedNumberSetResult.diagnostic?.expectedCount, 0, "numeric telemetry expects zero unsupported emitted tokens");
+assert.equal(fabricatedNumberSetResult.diagnostic?.observedCount, 4, "numeric telemetry reports unsupported emitted tokens rather than unused source numbers");
+assert.equal(fabricatedNumberSetResult.diagnostic?.unsupportedNumericCount, 4);
+const equivalentFormattingPackage = clone(limited);
+const equivalentFormattingSignal = equivalentFormattingPackage.signals.find((signal) => signal.ref === firstKpiSignal.ref);
+equivalentFormattingSignal.fact = "Revenue was $1,000.00 and margin was 38.50%.";
+const equivalentFormattingOutput = validOutput(equivalentFormattingPackage);
+equivalentFormattingOutput.executive_summary = {
+  text: "Revenue was $1000 and margin was 38.5% in the cited deterministic signal.",
+  support_refs: [equivalentFormattingSignal.ref]
+};
+assert.equal(validateIntelligenceBriefingOutput(equivalentFormattingOutput, equivalentFormattingPackage).ok, true, "equivalent numeric formatting remains claim-locally supported");
 const customersMarketPackage = clone(limited);
 let customersMarketSection = customersMarketPackage.sections.find((section) => section.id === "customers_market");
 if (!customersMarketSection) {
@@ -395,6 +438,7 @@ const customersMarketFailure = validateIntelligenceBriefingOutput(customersMarke
 assert.equal(customersMarketFailure.ok, false, "a claim-local unsupported number reproduces the Sol failure class");
 assert.equal(customersMarketFailure.diagnostic?.stage, "numeric_integrity");
 assert.equal(customersMarketFailure.diagnostic?.expectedField, "customers_market");
+assert.equal(customersMarketFailure.diagnostic?.numericSupportMode, "claim_local_observed_to_supported_containment");
 
 const numericFixture = "Revenue was $1,000.00, margin was 38.50%, movement was -4.250, range was 10-12%, observed 2026-07-20, segment B2B, quarter S1, and support was 24/7.";
 const numericKeys = new Set(intelligenceBriefingNumericTokens(numericFixture).map((token) => token.key));
@@ -417,7 +461,9 @@ const providerPayload = intelligenceBriefingProviderPayload(limited);
 assert.deepEqual(providerPayload.sections.map((section) => section.section_id), limited.sections.map((section) => section.id));
 assert.ok(providerPayload.sections.flatMap((section) => section.signals).every((signal) => Array.isArray(signal.allowed_numeric_tokens)));
 assert.deepEqual(providerPayload.allowed_period_numeric_tokens, intelligenceBriefingPeriodNumericTokens(limited.period).map((token) => token.display));
+assert.ok(!providerPayload.sections.some((section) => section.section_id === "business_updates_context"), "unsupported context sections are omitted before provider execution");
 assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /Every quantitative token in prose/);
+assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /none, one, or a subset/);
 assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /Never emit an empty, partial, null, scalar, or object-valued claims field/);
 const omittedLimitation = clone(valid);
 omittedLimitation.limitation_refs = omittedLimitation.limitation_refs.slice(1);
@@ -465,6 +511,10 @@ const contextual = project({ snapshot: contextSnapshot });
 const contextRef = contextual.signals.find((signal) => signal.authority === "reported_context")?.ref;
 assert.ok(contextRef && contextual.sections.some((section) => section.id === "business_updates_context"), "approved applicable Business Notes enter only the context section");
 assert.equal(contextual.signals.find((signal) => signal.ref === contextRef).citationIds.length, 0, "reported context never becomes original measured evidence");
+const contextualProviderPayload = intelligenceBriefingProviderPayload(contextual);
+const contextualProviderSection = contextualProviderPayload.sections.find((section) => section.section_id === "business_updates_context");
+assert.equal(contextualProviderSection.section_constraints.authority, "reported_context_only");
+assert.equal(contextualProviderSection.section_constraints.relationship_to_measured_performance_allowed, false);
 const contextualOutput = validOutput(contextual);
 for (const section of contextualOutput.sections) {
   if (section.support_refs.includes(contextRef)) {
@@ -477,7 +527,7 @@ for (const claim of [
   ...contextualOutput.leadership_considerations
 ]) {
   if (claim.support_refs.includes(contextRef)) {
-    claim.text = "An approved Business Note reports a pricing update; this reported context does not establish causation or replace measured evidence.";
+    claim.text = "Separately, the business noted a pricing update; this reported context does not establish causation or replace measured evidence.";
   }
 }
 assert.equal(validateIntelligenceBriefingOutput(contextualOutput, contextual).ok, true, "attributed, explicitly non-causal Business Note context passes");
@@ -485,6 +535,47 @@ const unboundedContext = clone(contextualOutput);
 const contextClaim = unboundedContext.sections.find((section) => section.section_id === "business_updates_context").claims[0];
 contextClaim.text = "A pricing update happened during the period and warrants leadership review.";
 assert.equal(validateIntelligenceBriefingOutput(unboundedContext, contextual).ok, false, "Business Note context without attribution and a non-causal boundary fails closed");
+const causalContext = clone(contextualOutput);
+causalContext.sections.find((section) => section.section_id === "business_updates_context").claims[0].text = "An approved Business Note reports a pricing update that drove measured revenue; this reported context does not establish causation.";
+const causalContextResult = validateIntelligenceBriefingOutput(causalContext, contextual);
+assert.equal(causalContextResult.ok, false, "reported context cannot introduce unsupported causal language");
+assert.equal(causalContextResult.diagnostic?.relationshipCategory, "causal");
+assert.deepEqual(causalContextResult.diagnostic?.citedSignalIds, [contextRef]);
+const correlatedContext = clone(contextualOutput);
+correlatedContext.sections.find((section) => section.section_id === "business_updates_context").claims[0].text = "An approved Business Note reports a pricing update correlated with measured revenue; this reported context does not establish causation.";
+assert.equal(validateIntelligenceBriefingOutput(correlatedContext, contextual).diagnostic?.relationshipCategory, "correlational", "reported context cannot imply correlation");
+const comparedContext = clone(contextualOutput);
+comparedContext.sections.find((section) => section.section_id === "business_updates_context").claims[0].text = "An approved Business Note reports pricing higher than measured performance; this reported context does not establish causation.";
+assert.equal(validateIntelligenceBriefingOutput(comparedContext, contextual).diagnostic?.relationshipCategory, "comparative", "reported context cannot imply comparison");
+
+const contextOnly = project({ snapshot: contextSnapshot, evidence: emptyEvidence, maps: false });
+assert.equal(contextOnly.eligibility, "no_eligible_evidence", "Business Notes remain contextual and cannot satisfy briefing eligibility");
+const supportedRelationshipPackage = clone(limited);
+const relationshipSignal = supportedRelationshipPackage.signals.find((signal) => signal.kind === "finding");
+assert.ok(relationshipSignal, "the deterministic fixture includes a canonical finding signal");
+relationshipSignal.fact = "A deterministic processing bottleneck caused delayed delivery.";
+const supportedRelationshipOutput = validOutput(supportedRelationshipPackage);
+supportedRelationshipOutput.executive_summary = {
+  text: "A deterministic processing bottleneck caused delayed delivery. This exact cited relationship warrants bounded leadership review.",
+  support_refs: [relationshipSignal.ref]
+};
+assert.equal(validateIntelligenceBriefingOutput(supportedRelationshipOutput, supportedRelationshipPackage).ok, true, "a relationship passes only when its cited canonical deterministic signal states that relationship category");
+const categoryOnlyRelationshipOutput = clone(supportedRelationshipOutput);
+categoryOnlyRelationshipOutput.executive_summary.text = "A different condition caused an unrelated result, despite citing a finding with the same broad relationship category.";
+assert.equal(validateIntelligenceBriefingOutput(categoryOnlyRelationshipOutput, supportedRelationshipPackage).ok, false, "relationship-category overlap alone cannot authorize changed entities or facts");
+
+const numericTelemetry = intelligenceBriefingProviderAttemptTelemetry({
+  validationDiagnostic: fabricatedNumberSetResult.diagnostic,
+  truncationDetected: false
+});
+assert.equal(numericTelemetry.numeric_support_mode, "claim_local_observed_to_supported_containment");
+assert.equal(numericTelemetry.unsupported_numeric_count, 4);
+const relationshipTelemetry = intelligenceBriefingProviderAttemptTelemetry({
+  validationDiagnostic: causalContextResult.diagnostic,
+  truncationDetected: false
+});
+assert.equal(relationshipTelemetry.relationship_category, "causal");
+assert.deepEqual(relationshipTelemetry.cited_signal_ids, [contextRef]);
 
 const artifact = {
   contractId: limited.contractId,

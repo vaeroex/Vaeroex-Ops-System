@@ -70,6 +70,12 @@ export type SafeAIValidationDiagnostic = {
   observedCount?: number;
   fieldPresent?: boolean;
   truncationDetected?: boolean;
+  relationshipCategory?: "causal" | "explanatory" | "correlational" | "comparative" | "offsetting" | "directional_effect" | "context_attribution";
+  citedSignalIds?: string[];
+  numericSupportMode?: "claim_local_observed_to_supported_containment";
+  supportedNumericCount?: number;
+  emittedNumericCount?: number;
+  unsupportedNumericCount?: number;
 };
 
 export type StructuredOutputValidation<T> =
