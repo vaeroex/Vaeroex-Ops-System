@@ -19,6 +19,11 @@ import {
 } from "@/lib/ai/intelligence-briefing/contracts";
 import { parseIntelligenceBriefingArtifact } from "@/lib/ai/intelligence-briefing/storage";
 import {
+  intelligenceBriefingCustomerCitation,
+  intelligenceBriefingCustomerText,
+  intelligenceBriefingPlainPeriodLabel
+} from "@/lib/ai/intelligence-briefing/plain-language";
+import {
   SAVED_ANALYSIS_ENVELOPE_VERSION,
   type SavedAnalysisDisplaySection,
   type SavedAnalysisEnvelope,
@@ -117,21 +122,25 @@ function sectionsForFinding(artifact: FindingExplanationArtifact): SavedAnalysis
 function sectionsForBriefing(artifact: IntelligenceBriefingArtifact): SavedAnalysisDisplaySection[] {
   const sectionLabelById = new Map(artifact.sections.map((section) => [section.id, section.label]));
   return [
-    ...artifact.analysis.sections.map((section) => ({
+    ...artifact.analysis.sections
+      .filter((section) => section.section_id !== "business_updates_context" || artifact.contextReferences.length > 0)
+      .map((section) => ({
       id: section.section_id,
-      label: sectionLabelById.get(section.section_id) || section.section_id,
-      body: [section.summary, ...section.claims.map((claim) => claim.text)]
+      label: section.section_id === "business_updates_context"
+        ? "Business Updates"
+        : intelligenceBriefingCustomerText(sectionLabelById.get(section.section_id) || "Business area"),
+      body: [section.summary, ...section.claims.map((claim) => claim.text)].map(intelligenceBriefingCustomerText)
     } satisfies SavedAnalysisDisplaySection)),
-    {
+    ...(artifact.analysis.leadership_considerations.length ? [{
       id: "leadership-considerations",
-      label: "Leadership considerations",
-      body: artifact.analysis.leadership_considerations.map((claim) => claim.text),
-      tone: "supporting"
-    },
+      label: "Leadership Actions",
+      body: artifact.analysis.leadership_considerations.map((claim) => intelligenceBriefingCustomerText(claim.text)),
+      tone: "supporting" as const
+    }] : []),
     ...(artifact.limitations.length ? [{
       id: "limitations",
-      label: "Evidence limitations",
-      body: artifact.limitations.map((limitation) => limitation.text),
+      label: "Evidence Limits",
+      body: artifact.limitations.map((limitation) => intelligenceBriefingCustomerText(limitation.text)),
       tone: "limitation" as const
     }] : [])
   ];
@@ -156,12 +165,12 @@ function analysisMetadata(type: SaveableAnalysisType, artifact: CompletedArtifac
     const current = artifact as IntelligenceBriefingArtifact;
     return {
       title: briefingTypeLabel(current.briefingType),
-      summaryLabel: "Executive summary",
-      summary: current.analysis.executive_summary.text,
+      summaryLabel: "Summary",
+      summary: intelligenceBriefingCustomerText(current.analysis.executive_summary.text),
       confidence: current.confidence,
       freshness: current.evidenceCoverage.freshness,
       evidenceStatus: `${current.citations.length} citation${current.citations.length === 1 ? "" : "s"} · ${current.evidenceCoverage.independentSourceCount} independent source${current.evidenceCoverage.independentSourceCount === 1 ? "" : "s"}`,
-      dateRange: `${current.period.start} through ${current.period.end}`,
+      dateRange: intelligenceBriefingPlainPeriodLabel(current.period),
       businessHealthState: current.businessHealth.available ? current.businessHealth.status : null,
       sections: sectionsForBriefing(current)
     } as const;
@@ -330,8 +339,12 @@ export async function saveAnalysisAction(input: SaveAnalysisInput): Promise<Save
     confidence: metadata.confidence,
     freshness: metadata.freshness,
     evidence_fingerprint: artifactFingerprint(completed.artifact),
-    citations: completed.artifact.citations,
-    evidence_lineage: completed.artifact.citations,
+    citations: input.analysisType === "weekly_briefing" || input.analysisType === "monthly_briefing"
+      ? completed.artifact.citations.map(intelligenceBriefingCustomerCitation)
+      : completed.artifact.citations,
+    evidence_lineage: input.analysisType === "weekly_briefing" || input.analysisType === "monthly_briefing"
+      ? completed.artifact.citations.map(intelligenceBriefingCustomerCitation)
+      : completed.artifact.citations,
     display: {
       summary_label: metadata.summaryLabel,
       summary: metadata.summary,

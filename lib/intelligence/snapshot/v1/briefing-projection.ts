@@ -4,9 +4,11 @@ import { intelligenceBriefingKpiEvidenceKey } from "@/lib/ai/intelligence-briefi
 import {
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
   INTELLIGENCE_BRIEFING_CONTRACT_VERSION,
+  INTELLIGENCE_BRIEFING_DEFAULT_LOCALE,
   INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
   INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
   INTELLIGENCE_BRIEFING_PROMPT_VERSION,
+  INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION,
   INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
   INTELLIGENCE_BRIEFING_SECTION_IDS,
   INTELLIGENCE_BRIEFING_SECTION_LABELS,
@@ -22,7 +24,17 @@ import {
   type IntelligenceBriefingType
 } from "@/lib/ai/intelligence-briefing/contracts";
 import { dateFallsInBriefingPeriod } from "@/lib/ai/intelligence-briefing/period";
-import type { IntelligenceSnapshotV1, KpiSnapshotV1, SnapshotState } from "@/lib/intelligence/snapshot/v1/types";
+import {
+  intelligenceBriefingCustomerCitation,
+  intelligenceBriefingCustomerText,
+  intelligenceBriefingDesiredDirectionSentence,
+  intelligenceBriefingExplicitDate,
+  intelligenceBriefingMetricName,
+  intelligenceBriefingMetricValue,
+  intelligenceBriefingMovementSentence,
+  intelligenceBriefingTargetSentence
+} from "@/lib/ai/intelligence-briefing/plain-language";
+import type { IntelligenceSnapshotV1, SnapshotState } from "@/lib/intelligence/snapshot/v1/types";
 
 const MAX_KPI_SIGNALS = 12;
 const MAX_FINDING_SIGNALS = 12;
@@ -75,14 +87,6 @@ export function intelligenceBriefingSectionForDomain(value: string): Intelligenc
 
 function availableValue<T>(state: SnapshotState<T>) {
   return state.state === "available" ? state.value : null;
-}
-
-function targetText(target: KpiSnapshotV1["effectiveAuthoritativeTarget"]) {
-  const value = availableValue(target);
-  if (!value) return "no authoritative target is configured";
-  if (value.kind === "scalar") return `the authoritative target is ${value.value}`;
-  if (value.kind === "range") return `the authoritative range is ${value.min} to ${value.max}`;
-  return "no authoritative target is configured";
 }
 
 function confidenceCeiling(
@@ -152,11 +156,47 @@ function kpiSignals({
     if (!dateFallsInBriefingPeriod(current.observedAt, period)) continue;
     const citationIds = citationIdsByMetric.get(intelligenceBriefingKpiEvidenceKey(kpi.identity)) || [];
     if (!citationIds.length) continue;
-    const unit = kpi.identity.unit ? ` ${kpi.identity.unit}` : "";
+    const start = kpi.observations.rangeStart || kpi.observations.previous || current;
+    const observationCount = kpi.observations.selectedRange.totalObservationCount;
+    const temporalLineage = observationCount >= 2 ? {
+      startDate: start.observedAt.slice(0, 10),
+      endDate: current.observedAt.slice(0, 10),
+      startValue: start.value,
+      endValue: current.value,
+      observationCount,
+      fullyInsideBriefingPeriod: dateFallsInBriefingPeriod(start.observedAt, period)
+        && dateFallsInBriefingPeriod(current.observedAt, period),
+      cadence: "recorded_dates" as const
+    } : undefined;
+    const target = availableValue(kpi.effectiveAuthoritativeTarget) || { kind: "none" as const };
+    const metricName = intelligenceBriefingMetricName(kpi.identity.displayName);
+    const currentSentence = /^one-star reviews$/i.test(metricName)
+      ? `The business recorded ${intelligenceBriefingMetricValue(current.value, kpi.identity.unit, kpi.identity.displayName)} one-star reviews on ${intelligenceBriefingExplicitDate(current.observedAt)}.`
+      : `${metricName} was ${intelligenceBriefingMetricValue(current.value, kpi.identity.unit, kpi.identity.displayName)} on ${intelligenceBriefingExplicitDate(current.observedAt)}.`;
     const fact = [
-      `${kpi.identity.displayName} was ${current.value}${unit} on ${current.observedAt.slice(0, 10)}.`,
-      `The deterministic period evaluation classifies movement as ${performance.rawMovement}, performance as ${performance.latestPerformanceEffect}, and target status as ${performance.targetStatus}; ${targetText(kpi.effectiveAuthoritativeTarget)}.`
-    ].join(" ");
+      currentSentence,
+      temporalLineage
+        ? intelligenceBriefingMovementSentence({
+            metricName: kpi.identity.displayName,
+            startValue: temporalLineage.startValue,
+            endValue: temporalLineage.endValue,
+            unit: kpi.identity.unit,
+            startDate: temporalLineage.startDate,
+            endDate: temporalLineage.endDate,
+            observationCount: temporalLineage.observationCount,
+            movement: performance.rawMovement,
+            fullyInsideBriefingPeriod: temporalLineage.fullyInsideBriefingPeriod
+          })
+        : `There is not enough recent data to determine whether ${metricName} is improving or declining.`,
+      intelligenceBriefingTargetSentence({
+        metricName: kpi.identity.displayName,
+        latestValue: current.value,
+        unit: kpi.identity.unit,
+        target,
+        status: performance.targetStatus
+      }),
+      intelligenceBriefingDesiredDirectionSentence(kpi.identity.displayName, semantics.desiredDirection)
+    ].filter(Boolean).join(" ");
     const sectionId = sectionDomainForCitations(citationIds, manifest, kpi.identity.canonicalName);
     const stableKey = evidenceEngineHash({
       kind: "kpi",
@@ -180,15 +220,17 @@ function kpiSignals({
       kind: "kpi",
       authority: "measured_evidence",
       sectionId,
-      label: kpi.identity.displayName,
+      label: metricName,
       fact,
       confidence: signalConfidence(semantics.classificationConfidence !== null && semantics.classificationConfidence >= 0.85 ? "High" : "Medium"),
       citationIds,
       evidenceReferenceIds: kpi.evidenceReferenceIds,
       limitation: kpi.freshness.state === "available" && kpi.freshness.value.status !== "current"
-        ? "The latest KPI observation is not current under the canonical freshness policy."
+        ? `The latest ${metricName} record does not meet the current-data standard.`
         : null,
       periodRelation: kpi.observations.previous ? "new_or_changed" : "current_state",
+      periodContext: "briefing_period",
+      ...(temporalLineage ? { temporalLineage } : {}),
       semanticState: {
         desiredDirection: semantics.desiredDirection,
         targetStatus: performance.targetStatus,
@@ -217,6 +259,24 @@ function findingSignals({
     .flatMap((finding) => {
       const citationIds = citationIdsByFinding.get(finding.id) || [];
       if (!citationIds.length) return [];
+      const selectedCitationIds = new Set(citationIds);
+      const citationDates = manifest.evidence
+        .filter((entry) => selectedCitationIds.has(entry.citationId))
+        .map((entry) => entry.recordedAt)
+        .filter((value): value is string => Boolean(value))
+        .map((value) => value.slice(0, 10))
+        .sort();
+      const timePeriodDates = finding.timePeriod.match(/\d{4}-\d{2}-\d{2}/g) || [];
+      const findingStartsInsidePeriod = !timePeriodDates[0] || dateFallsInBriefingPeriod(timePeriodDates[0], period);
+      const findingEndsInsidePeriod = !timePeriodDates.at(-1) || dateFallsInBriefingPeriod(timePeriodDates.at(-1), period);
+      const fullyInsideBriefingPeriod = findingStartsInsidePeriod && findingEndsInsidePeriod;
+      const trendCount = Number(finding.summary.match(/\bacross\s+(\d+)\s+dated periods\b/i)?.[1] || 0);
+      const trendDetailsAreVisible = trendCount === 0 || (
+        fullyInsideBriefingPeriod
+        && trendCount <= citationDates.length
+        && (!timePeriodDates[0] || citationDates.includes(timePeriodDates[0]))
+        && (!timePeriodDates.at(-1) || citationDates.includes(timePeriodDates.at(-1) || ""))
+      );
       const sectionId = sectionDomainForCitations(citationIds, manifest, finding.affectedArea);
       const stableKey = evidenceEngineHash({
         kind: "finding",
@@ -226,19 +286,24 @@ function findingSignals({
         confidence: finding.confidence,
         dependencies: finding.deterministicDependencies
       });
+      const historicalLabel = intelligenceBriefingExplicitDate(timePeriodDates.at(-1) || citationDates.at(-1) || finding.lastUpdated);
+      const fact = trendDetailsAreVisible
+        ? `${fullyInsideBriefingPeriod ? "During this briefing period" : `Historical context through ${historicalLabel}`}, ${intelligenceBriefingCustomerText(`${finding.summary} ${finding.why} ${finding.impact}`)}`
+        : `Historical context through ${historicalLabel}. ${intelligenceBriefingCustomerText(finding.title)}. ${intelligenceBriefingCustomerText(finding.impact)}`;
       return [{
         ref: "",
         stableKey,
         kind: "finding",
         authority: "deterministic_result",
         sectionId,
-        label: finding.title,
-        fact: compact(`${finding.summary} ${finding.why} ${finding.impact}`, 760),
+        label: intelligenceBriefingCustomerText(finding.title),
+        fact: compact(fact, 760),
         confidence: signalConfidence(finding.confidence),
         citationIds,
         evidenceReferenceIds: candidateIdsForCitations(citationIds, manifest).map((candidateId) => `manifest:${manifest.manifestId}:${candidateId}`),
-        limitation: compact(finding.limitation, 320) || null,
-        periodRelation: dateFallsInBriefingPeriod(finding.lastUpdated, period) ? "new_or_changed" : "continuing"
+        limitation: compact(intelligenceBriefingCustomerText(finding.limitation), 320) || null,
+        periodRelation: dateFallsInBriefingPeriod(finding.lastUpdated, period) ? "new_or_changed" : "continuing",
+        periodContext: fullyInsideBriefingPeriod ? "briefing_period" : "historical_context"
       } satisfies IntelligenceBriefingSignal];
     })
     .slice(0, MAX_FINDING_SIGNALS)
@@ -268,12 +333,13 @@ function contextSignals(snapshot: IntelligenceSnapshotV1, period: IntelligenceBr
     authority: "reported_context",
     sectionId: "business_updates_context",
     label: record.title,
-    fact: `An approved Business Note reports: ${compact(record.summary, 520)} This reported context does not establish causation or override measured evidence.`,
+    fact: `The business noted: ${compact(intelligenceBriefingCustomerText(record.summary), 520)} This update provides context. It does not establish causation or replace measured evidence.`,
     confidence: signalConfidence(record.extractionConfidence >= 0.85 ? "High" : record.extractionConfidence >= 0.65 ? "Medium" : "Low"),
     citationIds: [],
     evidenceReferenceIds: [],
-    limitation: "Business Notes are approved reported context, not independently measured proof.",
-    periodRelation: "reported_context"
+    limitation: "Business Updates provide context. They are not independently measured evidence.",
+    periodRelation: "reported_context",
+    periodContext: dateFallsInBriefingPeriod(record.observedAt || record.approvedAt, period) ? "briefing_period" : "historical_context"
   }));
   return { signals, references };
 }
@@ -290,12 +356,13 @@ function businessHealthSignal(snapshot: IntelligenceSnapshotV1, findingSignalsIn
     authority: "deterministic_result",
     sectionId: null,
     label: "Business Health",
-    fact: `Business Health is ${health.score} out of 100, with status ${health.status}, trajectory ${health.trajectory}, and ${health.confidence} deterministic confidence.`,
+    fact: `Business Health is ${health.score} out of 100. Its status is ${intelligenceBriefingCustomerText(health.status)}. Its direction is ${intelligenceBriefingCustomerText(health.trajectory)}. Evidence confidence is ${health.confidence}.`,
     confidence: signalConfidence(health.confidence),
     citationIds,
     evidenceReferenceIds: findingSignalsInput.slice(0, 4).flatMap((signal) => signal.evidenceReferenceIds),
     limitation: null,
-    periodRelation: "current_state"
+    periodRelation: "current_state",
+    periodContext: "briefing_period"
   } satisfies IntelligenceBriefingSignal;
 }
 
@@ -311,7 +378,7 @@ function citations({
   const sourceByOrdinal = new Map(manifest.sourceRegistry.entries.map((entry) => [entry.sourceOrdinal, entry]));
   return manifest.evidence.map((entry) => {
     const source = sourceByOrdinal.get(entry.sourceOrdinal);
-    return {
+    return intelligenceBriefingCustomerCitation({
       citationId: entry.citationId,
       title: entry.title,
       sourceLabel: sourceLabelByCandidateId.get(entry.candidateId) || source?.title || "Eligible business evidence",
@@ -319,7 +386,7 @@ function citations({
       excerpt: entry.excerpt,
       recordedAt: entry.recordedAt,
       href: hrefByCandidateId.get(entry.candidateId) || "/app/sources"
-    } satisfies IntelligenceBriefingCitation;
+    } satisfies IntelligenceBriefingCitation);
   });
 }
 
@@ -375,10 +442,10 @@ export function projectIntelligenceBriefingV1({
     ? coverage.categories.filter((category) => weakCoverageLabels.has(category.confidenceLabel)).map((category) => COVERAGE_LABELS[category.id] || category.id)
     : ["Intelligence coverage is unavailable"];
   const limitationTexts = unique([
-    ...snapshot.limitations.map((limitation) => limitation.message),
+    ...snapshot.limitations.map((limitation) => intelligenceBriefingCustomerText(limitation.message)),
     ...allSignals.map((signal) => signal.limitation),
     eligibility === "limited" ? "This briefing is supported by limited eligible evidence and may omit parts of the business." : null,
-    latest.freshness === "stale" ? "The newest supporting evidence is stale under the canonical freshness policy." : null,
+    latest.freshness === "stale" ? "The newest supporting evidence does not meet the current-data standard." : null,
     ...missingOrWeakDomains.map((domain) => `${domain} has limited evidence coverage.`)
   ], MAX_LIMITATIONS);
   const limitations = limitationTexts.map((text, index) => ({ ref: `L${index + 1}`, text }));
@@ -399,6 +466,7 @@ export function projectIntelligenceBriefingV1({
     eligibility,
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     schemaVersion: INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
+    plainLanguageVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION,
     materialityVersion: INTELLIGENCE_BRIEFING_MATERIALITY_VERSION
   });
   const effectiveEvidenceFingerprint = evidenceEngineHash({
@@ -411,7 +479,8 @@ export function projectIntelligenceBriefingV1({
     eligibility,
     context: context.references.map((record) => ({ sourceNoteId: record.sourceNoteId, sourceVersion: record.sourceVersion })),
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
-    schemaVersion: INTELLIGENCE_BRIEFING_SCHEMA_VERSION
+    schemaVersion: INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
+    plainLanguageVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION
   });
   const materialStateFingerprint = evidenceEngineHash({
     workspaceId: snapshot.scope.workspaceId,
@@ -427,6 +496,7 @@ export function projectIntelligenceBriefingV1({
     missingOrWeakDomains,
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     schemaVersion: INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
+    plainLanguageVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION,
     materialityVersion: INTELLIGENCE_BRIEFING_MATERIALITY_VERSION
   });
   const generationKey = evidenceEngineHash({
@@ -436,7 +506,8 @@ export function projectIntelligenceBriefingV1({
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     schemaVersion: INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
     validatorVersion: INTELLIGENCE_BRIEFING_VALIDATOR_VERSION,
-    generationPolicyVersion: INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION
+    generationPolicyVersion: INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
+    plainLanguageVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION
   });
   const trustBinding = {
     version: "trust_projection_binding_v1" as const,
@@ -454,6 +525,10 @@ export function projectIntelligenceBriefingV1({
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     generationPolicyVersion: INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
     materialityVersion: INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
+    language: {
+      locale: INTELLIGENCE_BRIEFING_DEFAULT_LOCALE,
+      standardVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION
+    },
     workspaceId: snapshot.scope.workspaceId,
     briefingType,
     period,

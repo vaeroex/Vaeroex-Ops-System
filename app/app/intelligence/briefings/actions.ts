@@ -8,12 +8,15 @@ import {
   type IntelligenceBriefingType
 } from "@/lib/ai/intelligence-briefing/contracts";
 import { claimIntelligenceBriefingGeneration } from "@/lib/ai/intelligence-briefing/generation-claim";
-import { intelligenceBriefingPeriod } from "@/lib/ai/intelligence-briefing/period";
 import { generateIntelligenceBriefing, intelligenceBriefingProviderAttemptTelemetry } from "@/lib/ai/intelligence-briefing/service";
 import {
   briefingStateFromPackage,
   loadCurrentIntelligenceBriefing
 } from "@/lib/ai/intelligence-briefing/storage";
+import {
+  intelligenceBriefingStateAllowsGeneration,
+  intelligenceBriefingVerificationUnavailableState
+} from "@/lib/ai/intelligence-briefing/state";
 import { buildWorkspaceIntelligenceBriefingPackage } from "@/lib/ai/intelligence-briefing/workspace-context";
 import { enforceAIProviderRateLimits } from "@/lib/ai/provider-guardrails";
 import { AIProviderExecutionError } from "@/lib/ai/providers/provider-manager";
@@ -29,15 +32,7 @@ import { getWorkspaceContext } from "@/lib/workspaces/current";
 const SAFE_FAILURE_MESSAGE = "The latest eligible evidence remains available, but this briefing could not be prepared. Please try again.";
 
 function unavailable(briefingType: IntelligenceBriefingType, message: string): IntelligenceBriefingState {
-  return {
-    status: "unavailable",
-    briefingType,
-    period: intelligenceBriefingPeriod(briefingType),
-    eligibility: "no_eligible_evidence",
-    confidence: "Low",
-    artifact: null,
-    message
-  };
+  return intelligenceBriefingVerificationUnavailableState({ briefingType, message });
 }
 
 function failedUsage(error: unknown, latencyMs: number, briefingType: IntelligenceBriefingType) {
@@ -102,7 +97,7 @@ export async function generateIntelligenceBriefingAction(input: {
     return { ...unavailable(briefingType, "Eligible evidence could not be verified safely."), artifact: current?.artifact || null };
   }
   const state = briefingStateFromPackage({ briefingPackage, current });
-  if (state.status !== "ready") return state;
+  if (!intelligenceBriefingStateAllowsGeneration(state)) return state;
   if (!isIntelligenceBriefingEnabled()) {
     return { ...state, status: "unavailable", message: "Intelligence Briefing generation is not enabled for this environment." };
   }

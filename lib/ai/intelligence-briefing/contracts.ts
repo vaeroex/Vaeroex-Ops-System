@@ -4,11 +4,40 @@ import type { Json } from "@/lib/supabase/types";
 
 export const INTELLIGENCE_BRIEFING_CONTRACT_ID = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_CONTRACT_VERSION = "intelligence_briefing_v1" as const;
-export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v1" as const;
-export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v1" as const;
-export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v1" as const;
-export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v1" as const;
+export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v2" as const;
+export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v6" as const;
+export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v6" as const;
+export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v6" as const;
+export const INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS = [
+  "intelligence_briefing_validator_v4",
+  "intelligence_briefing_validator_v5",
+  INTELLIGENCE_BRIEFING_VALIDATOR_VERSION
+] as const;
+export const INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS = [
+  "intelligence_briefing_prompt_v4",
+  "intelligence_briefing_prompt_v5",
+  INTELLIGENCE_BRIEFING_PROMPT_VERSION
+] as const;
+export const INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS = [
+  "intelligence_briefing_generation_policy_v4",
+  "intelligence_briefing_generation_policy_v5",
+  INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION
+] as const;
+export type IntelligenceBriefingStoredValidatorVersion = (typeof INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS)[number];
+export type IntelligenceBriefingStoredPromptVersion = (typeof INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS)[number];
+export type IntelligenceBriefingStoredGenerationPolicyVersion = (typeof INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS)[number];
 export const INTELLIGENCE_BRIEFING_MATERIALITY_VERSION = "intelligence_briefing_materiality_v1" as const;
+export const INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION = "intelligence_briefing_claim_acceptance_v1" as const;
+export const INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION = "intelligence_briefing_plain_language_v1" as const;
+export const INTELLIGENCE_BRIEFING_DEFAULT_LOCALE = "en-US" as const;
+export const INTELLIGENCE_BRIEFING_FILTERED_CONTENT_LIMITATION_REF = "L-CLAIM-ACCEPTANCE" as const;
+export const INTELLIGENCE_BRIEFING_FILTERED_CONTENT_LIMITATION =
+  "This briefing reflects the evidence available for this period; unsupported or insufficiently grounded conclusions were excluded." as const;
+
+export const INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS = {
+  limited: 1,
+  sufficient: 2
+} as const;
 
 export const INTELLIGENCE_BRIEFING_TYPES = ["weekly", "monthly"] as const;
 export type IntelligenceBriefingType = (typeof INTELLIGENCE_BRIEFING_TYPES)[number];
@@ -31,10 +60,11 @@ export const INTELLIGENCE_BRIEFING_SECTION_LABELS: Record<IntelligenceBriefingSe
   customers_market: "Customers & Market",
   workforce_organizational_performance: "Workforce & Organizational Performance",
   quality_risk_compliance: "Quality, Risk & Compliance",
-  business_updates_context: "Business Updates & Context"
+  business_updates_context: "Business Updates"
 };
 
 export type IntelligenceBriefingEligibilityState = "no_eligible_evidence" | "limited" | "sufficient";
+export type IntelligenceBriefingEvidenceState = IntelligenceBriefingEligibilityState | "verification_unavailable";
 export type IntelligenceBriefingConfidence = "High" | "Medium" | "Low";
 export type IntelligenceBriefingFreshness = "current" | "stale" | "unavailable";
 
@@ -59,6 +89,16 @@ export type IntelligenceBriefingCitation = Readonly<{
 export type IntelligenceBriefingSignalKind = "business_health" | "kpi" | "finding" | "reported_context";
 export type IntelligenceBriefingSignalAuthority = "deterministic_result" | "measured_evidence" | "reported_context";
 
+export type IntelligenceBriefingTemporalLineage = Readonly<{
+  startDate: string;
+  endDate: string;
+  startValue: number;
+  endValue: number;
+  observationCount: number;
+  fullyInsideBriefingPeriod: boolean;
+  cadence: "recorded_dates" | "weekly_records" | "monthly_records";
+}>;
+
 export type IntelligenceBriefingSignal = Readonly<{
   ref: string;
   stableKey: string;
@@ -72,6 +112,8 @@ export type IntelligenceBriefingSignal = Readonly<{
   evidenceReferenceIds: readonly string[];
   limitation: string | null;
   periodRelation: "new_or_changed" | "continuing" | "current_state" | "reported_context";
+  periodContext: "briefing_period" | "historical_context";
+  temporalLineage?: IntelligenceBriefingTemporalLineage;
   semanticState?: Readonly<{
     desiredDirection: string;
     targetStatus: string;
@@ -117,6 +159,10 @@ export type IntelligenceBriefingPackage = Readonly<{
   promptVersion: typeof INTELLIGENCE_BRIEFING_PROMPT_VERSION;
   generationPolicyVersion: typeof INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION;
   materialityVersion: typeof INTELLIGENCE_BRIEFING_MATERIALITY_VERSION;
+  language: Readonly<{
+    locale: typeof INTELLIGENCE_BRIEFING_DEFAULT_LOCALE;
+    standardVersion: typeof INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION;
+  }>;
   workspaceId: string;
   briefingType: IntelligenceBriefingType;
   period: IntelligenceBriefingEvidencePeriod;
@@ -167,40 +213,45 @@ export type IntelligenceBriefingModelOutput = Readonly<{
   limitation_refs: readonly string[];
 }>;
 
-const CLAIM_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["text", "support_refs"],
-  properties: {
-    text: { type: "string" },
-    support_refs: { type: "array", items: { type: "string" } }
-  }
-} as const;
+export type IntelligenceBriefingClaimRejectionCategory = Readonly<{
+  reasonCode: string;
+  stage: string;
+  sectionId: string;
+  count: number;
+}>;
 
-export const INTELLIGENCE_BRIEFING_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["executive_summary", "sections", "leadership_considerations", "limitation_refs"],
-  properties: {
-    executive_summary: CLAIM_SCHEMA,
-    sections: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["section_id", "summary", "support_refs", "claims"],
-        properties: {
-          section_id: { type: "string", enum: INTELLIGENCE_BRIEFING_SECTION_IDS },
-          summary: { type: "string" },
-          support_refs: { type: "array", items: { type: "string" } },
-          claims: { type: "array", items: CLAIM_SCHEMA }
-        }
-      }
-    },
-    leadership_considerations: { type: "array", items: CLAIM_SCHEMA },
-    limitation_refs: { type: "array", items: { type: "string" } }
-  }
-} as const;
+export type IntelligenceBriefingClaimAcceptanceEvaluation = Readonly<{
+  version: typeof INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION;
+  totalClaimsReturned: number;
+  acceptedClaimCount: number;
+  rejectedClaimCount: number;
+  acceptedMeasuredClaimCount: number;
+  retainedSections: readonly IntelligenceBriefingSectionId[];
+  omittedSections: readonly IntelligenceBriefingSectionId[];
+  rejectionCategories: readonly IntelligenceBriefingClaimRejectionCategory[];
+  promptVersion: typeof INTELLIGENCE_BRIEFING_PROMPT_VERSION;
+  schemaVersion: typeof INTELLIGENCE_BRIEFING_SCHEMA_VERSION;
+  validatorVersion: typeof INTELLIGENCE_BRIEFING_VALIDATOR_VERSION;
+  generationPolicyVersion: typeof INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION;
+}>;
+
+export type IntelligenceBriefingAcceptedCandidate = Readonly<{
+  analysis: IntelligenceBriefingModelOutput;
+  acceptance: IntelligenceBriefingClaimAcceptanceEvaluation;
+  acceptedSignalRefs: readonly string[];
+}>;
+
+export type IntelligenceBriefingClaimAcceptanceProvenance =
+  Omit<
+    IntelligenceBriefingClaimAcceptanceEvaluation,
+    "promptVersion" | "validatorVersion" | "generationPolicyVersion"
+  > & Readonly<{
+    providerModel: string;
+    promptVersion: IntelligenceBriefingStoredPromptVersion;
+    schemaVersion: typeof INTELLIGENCE_BRIEFING_SCHEMA_VERSION;
+    validatorVersion: IntelligenceBriefingStoredValidatorVersion;
+    generationPolicyVersion: IntelligenceBriefingStoredGenerationPolicyVersion;
+  }>;
 
 export type IntelligenceBriefingProviderAttribution = Readonly<{
   provider: "openai";
@@ -213,10 +264,14 @@ export type IntelligenceBriefingArtifact = Readonly<{
   contractId: typeof INTELLIGENCE_BRIEFING_CONTRACT_ID;
   contractVersion: typeof INTELLIGENCE_BRIEFING_CONTRACT_VERSION;
   schemaVersion: typeof INTELLIGENCE_BRIEFING_SCHEMA_VERSION;
-  validatorVersion: typeof INTELLIGENCE_BRIEFING_VALIDATOR_VERSION;
-  promptVersion: typeof INTELLIGENCE_BRIEFING_PROMPT_VERSION;
-  generationPolicyVersion: typeof INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION;
+  validatorVersion: IntelligenceBriefingStoredValidatorVersion;
+  promptVersion: IntelligenceBriefingStoredPromptVersion;
+  generationPolicyVersion: IntelligenceBriefingStoredGenerationPolicyVersion;
   materialityVersion: typeof INTELLIGENCE_BRIEFING_MATERIALITY_VERSION;
+  language?: Readonly<{
+    locale: typeof INTELLIGENCE_BRIEFING_DEFAULT_LOCALE;
+    standardVersion: typeof INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION;
+  }>;
   workspaceId: string;
   briefingType: IntelligenceBriefingType;
   period: IntelligenceBriefingEvidencePeriod;
@@ -242,6 +297,7 @@ export type IntelligenceBriefingArtifact = Readonly<{
     snapshotFingerprint: string;
     evidenceManifestId: string;
     previousBriefingRunId: string | null;
+    claimAcceptance: IntelligenceBriefingClaimAcceptanceProvenance;
   }>;
 }>;
 
@@ -259,7 +315,7 @@ export type IntelligenceBriefingState = Readonly<{
   status: IntelligenceBriefingGenerationStatus;
   briefingType: IntelligenceBriefingType;
   period: IntelligenceBriefingEvidencePeriod;
-  eligibility: IntelligenceBriefingEligibilityState;
+  eligibility: IntelligenceBriefingEvidenceState;
   confidence: IntelligenceBriefingConfidence;
   artifact: IntelligenceBriefingViewArtifact | null;
   message: string | null;

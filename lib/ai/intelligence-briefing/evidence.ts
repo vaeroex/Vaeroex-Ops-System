@@ -11,6 +11,15 @@ import { buildSourceRegistry } from "@/lib/ai/evidence-engine/source-registry";
 import type { IntelligenceBriefingEvidencePeriod } from "@/lib/ai/intelligence-briefing/contracts";
 import { intelligenceBriefingKpiEvidenceKey } from "@/lib/ai/intelligence-briefing/identity";
 import { dateFallsInBriefingPeriod } from "@/lib/ai/intelligence-briefing/period";
+import {
+  intelligenceBriefingCustomerText,
+  intelligenceBriefingDesiredDirectionSentence,
+  intelligenceBriefingExplicitDate,
+  intelligenceBriefingMetricName,
+  intelligenceBriefingMetricValue,
+  intelligenceBriefingMovementSentence,
+  intelligenceBriefingTargetSentence
+} from "@/lib/ai/intelligence-briefing/plain-language";
 import type { IntelligenceInsight } from "@/lib/intelligence/layer";
 import {
   getConfiguredMetricNames,
@@ -134,12 +143,6 @@ function candidateBase({
   };
 }
 
-function targetText(target: ReturnType<typeof resolveKpiTargetReference>) {
-  if (target.kind === "scalar") return String(target.value);
-  if (target.kind === "range") return `${target.min} to ${target.max}`;
-  return "not configured";
-}
-
 function kpiCandidates({
   workspaceId,
   rows,
@@ -168,7 +171,7 @@ function kpiCandidates({
       .sort((left, right) => left.metric_date.localeCompare(right.metric_date) || left.created_at.localeCompare(right.created_at) || left.id.localeCompare(right.id));
     const latest = metricRows.at(-1);
     if (!latest || latest.actual_value === null) continue;
-    const previous = metricRows.at(-2) || null;
+    const first = metricRows[0];
     const setting = kpiSettingForName(settings as KpiSettingRow[], metricName);
     const manualTarget = setting?.target ?? latest.target ?? null;
     const target = resolveKpiTargetReference(semantics, manualTarget);
@@ -183,24 +186,43 @@ function kpiCandidates({
     const sourceLabel = latest.source_file_id
       ? sourceLabelsById[latest.source_file_id] || latest.source || "KPI source"
       : latest.source || "Canonical KPI record";
-    const unit = semantics.unit ? ` ${semantics.unit}` : "";
+    const metricNameForCustomers = intelligenceBriefingMetricName(semantics.displayName);
+    const currentSentence = /^one-star reviews$/i.test(metricNameForCustomers)
+      ? `The business recorded ${intelligenceBriefingMetricValue(latest.actual_value, semantics.unit, semantics.displayName)} one-star reviews on ${intelligenceBriefingExplicitDate(latest.metric_date)}.`
+      : `${metricNameForCustomers} was ${intelligenceBriefingMetricValue(latest.actual_value, semantics.unit, semantics.displayName)} on ${intelligenceBriefingExplicitDate(latest.metric_date)}.`;
     const excerpt = [
-      `Latest ${latest.actual_value}${unit} on ${latest.metric_date}.`,
-      previous?.actual_value === null || previous?.actual_value === undefined
-        ? "No earlier observation is available within this briefing period."
-        : `Previous ${previous.actual_value}${unit} on ${previous.metric_date}.`,
-      `Movement ${evaluation.rawMovement}; performance effect ${evaluation.latestPerformanceEffect}; target status ${evaluation.targetStatus}.`,
-      `Authoritative target ${targetText(target)}.`
-    ].join(" ");
+      currentSentence,
+      first?.actual_value === null || first?.actual_value === undefined || metricRows.length < 2
+        ? `There is not enough recent data to determine whether ${metricNameForCustomers} is improving or declining.`
+        : intelligenceBriefingMovementSentence({
+            metricName: semantics.displayName,
+            startValue: first.actual_value,
+            endValue: latest.actual_value,
+            unit: semantics.unit,
+            startDate: first.metric_date,
+            endDate: latest.metric_date,
+            observationCount: metricRows.length,
+            movement: evaluation.rawMovement,
+            fullyInsideBriefingPeriod: true
+          }),
+      intelligenceBriefingTargetSentence({
+        metricName: semantics.displayName,
+        latestValue: latest.actual_value,
+        unit: semantics.unit,
+        target,
+        status: evaluation.targetStatus
+      }),
+      intelligenceBriefingDesiredDirectionSentence(semantics.displayName, semantics.desiredDirection)
+    ].filter(Boolean).join(" ");
     candidates.push(candidateBase({
       workspaceId,
       candidateId,
       domain: setting?.category || latest.category || semantics.displayName,
-      recordType: "Canonical KPI observation",
-      title: semantics.displayName,
+      recordType: "Metric record",
+      title: metricNameForCustomers,
       excerpt,
       summary: semantics.rationale,
-      sourceType: "KPI evidence",
+      sourceType: "Metric evidence",
       sourceId: latest.id,
       sourceFileId: latest.source_file_id,
       parentSourceId: latest.import_id,
@@ -261,9 +283,9 @@ function findingCandidates({
         domain: insight.affectedArea || record.groupHint || "Operations",
         recordType: record.recordType,
         title: record.title,
-        excerpt: `${record.value}. ${record.support}`,
+        excerpt: intelligenceBriefingCustomerText(`${record.value}. ${record.support}`),
         summary: insight.summary,
-        sourceType: record.recordType,
+        sourceType: intelligenceBriefingCustomerText(record.recordType),
         sourceId: record.id,
         sourceFileId,
         parentSourceId: null,
@@ -281,7 +303,7 @@ function findingCandidates({
       if (!current.includes(candidateId)) candidateIdsByFinding.set(insight.id, [...current, candidateId]);
       hrefByCandidateId.set(
         candidateId,
-        sourceFileId ? `/app/sources/${sourceFileId}` : safeAppHref(insight.sourceHref, "/app/intelligence")
+        sourceFileId ? `/app/sources/${sourceFileId}` : safeAppHref(record.href, safeAppHref(insight.sourceHref, "/app/intelligence"))
       );
       sourceLabelByCandidateId.set(candidateId, sourceFileId ? sourceLabelsById[sourceFileId] || record.title : record.title);
     }
