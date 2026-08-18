@@ -76,6 +76,7 @@
     "test:snapshot-consumers": "node scripts/final-snapshot-consumer-migration-regression-tests.js",
     "test:structural-v1": "node scripts/structural-v1-cleanup-regression-tests.js",
     "test:manual-activation": "node scripts/manual-activation-regression-tests.js",
+    "test:production-migration-history": "node scripts/production-migration-history-regression-tests.js",
     "test:billing-policy": "node scripts/billing-policy-regression-tests.js",
     "test:admin-company-management": "node scripts/admin-company-management-regression-tests.js",
     "test:admin-ai-trust": "node scripts/admin-ai-trust-dashboard-regression-tests.js",
