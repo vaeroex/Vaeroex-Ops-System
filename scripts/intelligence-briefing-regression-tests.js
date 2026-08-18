@@ -39,6 +39,26 @@ const { intelligenceBriefingPeriod } = require("../lib/ai/intelligence-briefing/
 const { validateIntelligenceBriefingOutput } = require("../lib/ai/intelligence-briefing/validation.ts");
 const { parseIntelligenceBriefingArtifact, briefingStateFromPackage } = require("../lib/ai/intelligence-briefing/storage.ts");
 const {
+  INTELLIGENCE_BRIEFING_JSON_SCHEMA,
+  INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS,
+  INTELLIGENCE_BRIEFING_MODEL_OUTPUT_SCHEMA
+} = require("../lib/ai/intelligence-briefing/model-output-contract.ts");
+const {
+  intelligenceBriefingNumericTokens,
+  intelligenceBriefingPeriodNumericTokens
+} = require("../lib/ai/intelligence-briefing/numeric-integrity.ts");
+const {
+  INTELLIGENCE_BRIEFING_SYSTEM_PROMPT,
+  intelligenceBriefingProviderPayload
+} = require("../lib/ai/intelligence-briefing/service.ts");
+const {
+  INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
+  INTELLIGENCE_BRIEFING_VALIDATOR_VERSION,
+  INTELLIGENCE_BRIEFING_PROMPT_VERSION,
+  INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
+  INTELLIGENCE_BRIEFING_SECTION_IDS
+} = require("../lib/ai/intelligence-briefing/contracts.ts");
+const {
   INTELLIGENCE_BRIEFING_GPT56_POLICY_ID,
   INTELLIGENCE_BRIEFING_POLICY_SELECTOR,
   resolveIntelligenceBriefingGenerationPolicy
@@ -253,6 +273,89 @@ function validOutput(input) {
 
 const valid = validOutput(limited);
 assert.equal(validateIntelligenceBriefingOutput(valid, limited).ok, true, "a fully bounded structured briefing passes strict validation");
+assert.equal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION, "intelligence_briefing_schema_v2");
+assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v2");
+assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v2");
+assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v2");
+assert.equal(
+  INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
+  INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.min,
+  "the provider contract and canonical validator share the same nonempty claims bound"
+);
+assert.equal(
+  INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.maxItems,
+  INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.max,
+  "the provider contract and canonical validator share the same maximum claims bound"
+);
+assert.equal(
+  INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.summary.minLength,
+  INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionSummaryText.min,
+  "provider and canonical section text limits remain aligned"
+);
+assert.equal(INTELLIGENCE_BRIEFING_MODEL_OUTPUT_SCHEMA.safeParse(valid).success, true);
+const malformedTerraOutput = clone(valid);
+for (const sectionId of INTELLIGENCE_BRIEFING_SECTION_IDS) {
+  if (malformedTerraOutput.sections.length >= 2) break;
+  if (malformedTerraOutput.sections.some((section) => section.section_id === sectionId)) continue;
+  malformedTerraOutput.sections.push({
+    section_id: sectionId,
+    summary: "The supplied deterministic signals in this area warrant bounded leadership awareness.",
+    support_refs: [limited.requiredSignalRefs[0]],
+    claims: [{
+      text: "The measured evidence remains within the application-owned confidence and evidence boundaries.",
+      support_refs: [limited.requiredSignalRefs[0]]
+    }]
+  });
+}
+const malformedSectionId = INTELLIGENCE_BRIEFING_SECTION_IDS.find((sectionId) =>
+  !malformedTerraOutput.sections.some((section) => section.section_id === sectionId)
+);
+assert.ok(malformedSectionId, "the sanitized Terra fixture has a third canonical section identity available");
+malformedTerraOutput.sections.push({
+  section_id: malformedSectionId,
+  summary: "The supplied deterministic signals in this area warrant bounded leadership awareness.",
+  support_refs: [limited.requiredSignalRefs[0]],
+  claims: []
+});
+const malformedTerraResult = validateIntelligenceBriefingOutput(malformedTerraOutput, limited);
+assert.equal(malformedTerraResult.ok, false, "an empty claims array fails the canonical contract");
+assert.equal(malformedTerraResult.diagnostic?.expectedField, "sections.2.claims");
+assert.equal(
+  INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
+  1,
+  "the strict provider schema now rejects the same empty claims shape before canonical validation"
+);
+const missingClaimsOutput = clone(valid);
+delete missingClaimsOutput.sections[0].claims;
+assert.equal(
+  validateIntelligenceBriefingOutput(missingClaimsOutput, limited).diagnostic?.expectedField,
+  "sections.0.claims",
+  "missing claims fail the canonical schema at the exact field"
+);
+const malformedClaimsOutput = clone(valid);
+malformedClaimsOutput.sections[0].claims = { text: "not an array" };
+assert.equal(
+  validateIntelligenceBriefingOutput(malformedClaimsOutput, limited).diagnostic?.expectedField,
+  "sections.0.claims",
+  "object-valued claims fail the canonical schema at the exact field"
+);
+const unsupportedSectionOutput = clone(valid);
+const unsupportedSectionId = INTELLIGENCE_BRIEFING_SECTION_IDS.find((sectionId) =>
+  !limited.sections.some((section) => section.id === sectionId)
+);
+assert.ok(unsupportedSectionId, "the limited fixture leaves an unsupported canonical section available");
+unsupportedSectionOutput.sections.push({
+  section_id: unsupportedSectionId,
+  summary: "This section is structurally valid but was not supported by the deterministic projection.",
+  support_refs: [limited.requiredSignalRefs[0]],
+  claims: [{
+    text: "This structurally valid claim must still fail because its section was not supplied.",
+    support_refs: [limited.requiredSignalRefs[0]]
+  }]
+});
+const unsupportedSectionResult = validateIntelligenceBriefingOutput(unsupportedSectionOutput, limited);
+assert.equal(unsupportedSectionResult.ok, false, "a structurally valid but unsupported section fails closed");
+assert.equal(unsupportedSectionResult.diagnostic?.expectedField, "sections");
 const badCitation = clone(valid);
 badCitation.executive_summary.support_refs = ["UNKNOWN"];
 assert.equal(validateIntelligenceBriefingOutput(badCitation, limited).ok, false, "unknown support references fail closed");
@@ -274,6 +377,48 @@ assert.equal(validateIntelligenceBriefingOutput(groundedNumber, limited).ok, tru
 const crossBoundNumber = clone(groundedNumber);
 crossBoundNumber.executive_summary.text = `The cited deterministic signal records ${foreignNumber}, which warrants bounded leadership review within the available evidence.`;
 assert.equal(validateIntelligenceBriefingOutput(crossBoundNumber, limited).ok, false, "a number borrowed from an uncited signal fails closed");
+const customersMarketPackage = clone(limited);
+let customersMarketSection = customersMarketPackage.sections.find((section) => section.id === "customers_market");
+if (!customersMarketSection) {
+  customersMarketSection = customersMarketPackage.sections[0];
+  const priorSectionId = customersMarketSection.id;
+  customersMarketSection.id = "customers_market";
+  customersMarketSection.label = "Customers & Market";
+  for (const signal of customersMarketPackage.signals) {
+    if (signal.sectionId === priorSectionId) signal.sectionId = "customers_market";
+  }
+}
+const customersMarketOutput = validOutput(customersMarketPackage);
+const customersMarketClaim = customersMarketOutput.sections.find((section) => section.section_id === "customers_market").claims[0];
+customersMarketClaim.text += " The unsupported measured value is 17.3%.";
+const customersMarketFailure = validateIntelligenceBriefingOutput(customersMarketOutput, customersMarketPackage);
+assert.equal(customersMarketFailure.ok, false, "a claim-local unsupported number reproduces the Sol failure class");
+assert.equal(customersMarketFailure.diagnostic?.stage, "numeric_integrity");
+assert.equal(customersMarketFailure.diagnostic?.expectedField, "customers_market");
+
+const numericFixture = "Revenue was $1,000.00, margin was 38.50%, movement was -4.250, range was 10-12%, observed 2026-07-20, segment B2B, quarter S1, and support was 24/7.";
+const numericKeys = new Set(intelligenceBriefingNumericTokens(numericFixture).map((token) => token.key));
+assert.ok(numericKeys.has("currency:$:1000"), "currency grouping and insignificant decimals normalize deterministically");
+assert.ok(numericKeys.has("percentage::38.5"), "percentage decimals normalize deterministically");
+assert.ok(numericKeys.has("plain::-4.25"), "signed decimals normalize deterministically");
+assert.ok(numericKeys.has("percentage::10") && numericKeys.has("percentage::12"), "ranges inherit a shared percentage unit");
+assert.ok(numericKeys.has("date:2026-07-20"), "ISO dates remain exact numeric tokens");
+assert.ok(numericKeys.has("plain::24") && numericKeys.has("plain::7"), "quantitative slash expressions remain grounded");
+assert.ok(!numericKeys.has("plain::2") && !numericKeys.has("plain::1"), "digits embedded in business labels are not treated as quantitative claims");
+assert.deepEqual(intelligenceBriefingNumericTokens("Signal K1 cites S2 and record C3."), [], "citation identifiers are structural labels, not business numbers");
+assert.deepEqual(
+  intelligenceBriefingNumericTokens("$1000 and 38.5% and -4.25 and 10% to 12% and 2026-07-20").map((token) => token.key).sort(),
+  [...numericKeys].filter((key) => !["plain::24", "plain::7"].includes(key)).sort(),
+  "equivalent provider formatting resolves to the same approved quantitative tokens"
+);
+assert.ok(intelligenceBriefingPeriodNumericTokens(limited.period).some((token) => token.key === `plain::${limited.period.dayCount}`));
+
+const providerPayload = intelligenceBriefingProviderPayload(limited);
+assert.deepEqual(providerPayload.sections.map((section) => section.section_id), limited.sections.map((section) => section.id));
+assert.ok(providerPayload.sections.flatMap((section) => section.signals).every((signal) => Array.isArray(signal.allowed_numeric_tokens)));
+assert.deepEqual(providerPayload.allowed_period_numeric_tokens, intelligenceBriefingPeriodNumericTokens(limited.period).map((token) => token.display));
+assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /Every quantitative token in prose/);
+assert.match(INTELLIGENCE_BRIEFING_SYSTEM_PROMPT, /Never emit an empty, partial, null, scalar, or object-valued claims field/);
 const omittedLimitation = clone(valid);
 omittedLimitation.limitation_refs = omittedLimitation.limitation_refs.slice(1);
 assert.equal(validateIntelligenceBriefingOutput(omittedLimitation, limited).ok, false, "application-owned limitations cannot be omitted");
@@ -384,7 +529,7 @@ const originalSelector = process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY;
 process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY = INTELLIGENCE_BRIEFING_POLICY_SELECTOR;
 const policy = resolveIntelligenceBriefingGenerationPolicy({
   startedAtMs: Date.now(),
-  structuredOutput: { name: "intelligence_briefing_v1", strict: true, schema: { type: "object" } }
+  structuredOutput: { name: "intelligence_briefing_v1", strict: true, schema: INTELLIGENCE_BRIEFING_JSON_SCHEMA }
 });
 assert.equal(policy.providerPolicy.id, INTELLIGENCE_BRIEFING_GPT56_POLICY_ID);
 assert.deepEqual(policy.providerPolicy.steps.map((step) => [step.provider, step.model, step.workflowConfiguration.reasoning.effort]), [
@@ -392,6 +537,8 @@ assert.deepEqual(policy.providerPolicy.steps.map((step) => [step.provider, step.
   ["openai", "gpt-5.6-terra", "medium"]
 ]);
 assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.maxAttempts === 1 && step.workflowConfiguration.store === false));
+assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.structuredOutput.strict === true));
+assert.ok(policy.providerPolicy.steps.every((step) => step.workflowConfiguration.structuredOutput.schema === INTELLIGENCE_BRIEFING_JSON_SCHEMA));
 if (originalSelector === undefined) delete process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY;
 else process.env.VAEROEX_INTELLIGENCE_BRIEFING_POLICY = originalSelector;
 

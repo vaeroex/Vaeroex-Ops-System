@@ -1,6 +1,5 @@
 import "server-only";
 
-import { z } from "zod";
 import {
   INTELLIGENCE_BRIEFING_SECTION_IDS,
   type IntelligenceBriefingClaim,
@@ -8,6 +7,11 @@ import {
   type IntelligenceBriefingPackage,
   type IntelligenceBriefingSignal
 } from "@/lib/ai/intelligence-briefing/contracts";
+import { INTELLIGENCE_BRIEFING_MODEL_OUTPUT_SCHEMA } from "@/lib/ai/intelligence-briefing/model-output-contract";
+import {
+  intelligenceBriefingNumericTokens,
+  intelligenceBriefingPeriodNumericTokens
+} from "@/lib/ai/intelligence-briefing/numeric-integrity";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import {
   validationFailure,
@@ -17,25 +21,6 @@ import {
 } from "@/lib/ai/validation-diagnostics";
 import { validateAiGeneratedOutput } from "@/lib/security/ai-output-validation";
 import type { Json } from "@/lib/supabase/types";
-
-const claimSchema = z.object({
-  text: z.string().trim().min(20).max(700),
-  support_refs: z.array(z.string().trim().min(1).max(24)).min(1).max(12)
-}).strict();
-const outputSchema = z.object({
-  executive_summary: z.object({
-    text: z.string().trim().min(60).max(1_200),
-    support_refs: z.array(z.string().trim().min(1).max(24)).min(1).max(12)
-  }).strict(),
-  sections: z.array(z.object({
-    section_id: z.enum(INTELLIGENCE_BRIEFING_SECTION_IDS),
-    summary: z.string().trim().min(30).max(800),
-    support_refs: z.array(z.string().trim().min(1).max(24)).min(1).max(12),
-    claims: z.array(claimSchema).min(1).max(5)
-  }).strict()).max(INTELLIGENCE_BRIEFING_SECTION_IDS.length),
-  leadership_considerations: z.array(claimSchema).min(1).max(5),
-  limitation_refs: z.array(z.string().trim().min(1).max(24)).max(12)
-}).strict();
 
 const UUID_PATTERN = /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/i;
 const INTERNAL_IDENTIFIER_PATTERN = /\b(?:workspace_id|source_file_id|candidate_id|manifest_id|raw_data_json|input_json|output_json)\b/i;
@@ -64,14 +49,6 @@ function allClaims(output: IntelligenceBriefingModelOutput) {
     ]),
     ...output.leadership_considerations.map((claim) => ({ sectionId: "leadership_considerations", claim }))
   ];
-}
-
-function numericClaims(value: string) {
-  return value.match(/(?<![A-Za-z0-9])-?\$?\d[\d,]*(?:\.\d+)?%?/g) || [];
-}
-
-function normalizeNumber(value: string) {
-  return value.replace(/[$,%\s]/g, "").replace(/^\+/, "");
 }
 
 function contradicts(claim: string, signal: IntelligenceBriefingSignal) {
@@ -108,7 +85,7 @@ export function validateIntelligenceBriefingOutput(
       observedType: validationValueType(value)
     });
   }
-  const parsed = outputSchema.safeParse(value);
+  const parsed = INTELLIGENCE_BRIEFING_MODEL_OUTPUT_SCHEMA.safeParse(value);
   if (!parsed.success) {
     const issue = parsed.error.issues[0];
     const field = issue?.path.length ? issue.path.join(".") : "$";
@@ -154,12 +131,22 @@ export function validateIntelligenceBriefingOutput(
     if (supportedSignals.some((signal) => contradicts(claim.text, signal))) {
       return failure("A briefing claim contradicted deterministic KPI or finding direction.", "contextual_inconsistency", "numeric_integrity", sectionId);
     }
-    const approvedClaimNumbers = new Set(numericClaims(JSON.stringify({
-      period: context.period,
-      signals: supportedSignals.map((signal) => signal.fact)
-    })).map(normalizeNumber));
-    if (numericClaims(claim.text).some((number) => !approvedClaimNumbers.has(normalizeNumber(number)))) {
-      return failure("A briefing claim used a number that is not present in its cited deterministic signals.", "numeric_integrity_failed", "numeric_integrity", sectionId);
+    const approvedClaimNumbers = new Set([
+      ...intelligenceBriefingPeriodNumericTokens(context.period),
+      ...supportedSignals.flatMap((signal) => intelligenceBriefingNumericTokens(signal.fact))
+    ].map((token) => token.key));
+    const unsupportedClaimNumbers = intelligenceBriefingNumericTokens(claim.text)
+      .filter((token) => !approvedClaimNumbers.has(token.key));
+    if (unsupportedClaimNumbers.length) {
+      return validationFailure("A briefing claim used a number that is not present in its cited deterministic signals.", {
+        reasonCode: "numeric_integrity_failed",
+        stage: "numeric_integrity",
+        expectedField: sectionId,
+        expectedType: "string",
+        observedType: "string",
+        expectedCount: approvedClaimNumbers.size,
+        observedCount: unsupportedClaimNumbers.length
+      });
     }
   }
   const usedRefs = new Set(claims.flatMap(({ claim }) => claim.support_refs));

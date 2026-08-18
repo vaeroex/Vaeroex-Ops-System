@@ -4,10 +4,10 @@ import type { Json } from "@/lib/supabase/types";
 
 export const INTELLIGENCE_BRIEFING_CONTRACT_ID = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_CONTRACT_VERSION = "intelligence_briefing_v1" as const;
-export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v1" as const;
-export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v1" as const;
-export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v1" as const;
-export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v1" as const;
+export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v2" as const;
+export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v2" as const;
+export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v2" as const;
+export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v2" as const;
 export const INTELLIGENCE_BRIEFING_MATERIALITY_VERSION = "intelligence_briefing_materiality_v1" as const;
 
 export const INTELLIGENCE_BRIEFING_TYPES = ["weekly", "monthly"] as const;
@@ -167,41 +167,6 @@ export type IntelligenceBriefingModelOutput = Readonly<{
   leadership_considerations: readonly IntelligenceBriefingClaim[];
   limitation_refs: readonly string[];
 }>;
-
-const CLAIM_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["text", "support_refs"],
-  properties: {
-    text: { type: "string" },
-    support_refs: { type: "array", items: { type: "string" } }
-  }
-} as const;
-
-export const INTELLIGENCE_BRIEFING_JSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["executive_summary", "sections", "leadership_considerations", "limitation_refs"],
-  properties: {
-    executive_summary: CLAIM_SCHEMA,
-    sections: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["section_id", "summary", "support_refs", "claims"],
-        properties: {
-          section_id: { type: "string", enum: INTELLIGENCE_BRIEFING_SECTION_IDS },
-          summary: { type: "string" },
-          support_refs: { type: "array", items: { type: "string" } },
-          claims: { type: "array", items: CLAIM_SCHEMA }
-        }
-      }
-    },
-    leadership_considerations: { type: "array", items: CLAIM_SCHEMA },
-    limitation_refs: { type: "array", items: { type: "string" } }
-  }
-} as const;
 
 export type IntelligenceBriefingProviderAttribution = Readonly<{
   provider: "openai";
