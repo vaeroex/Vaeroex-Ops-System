@@ -222,7 +222,7 @@ function artifactRelationshipsAreValid(artifact: IntelligenceBriefingArtifact) {
     || acceptance.validatorVersion !== artifact.validatorVersion
     || acceptance.generationPolicyVersion !== artifact.generationPolicyVersion
     || acceptance.schemaVersion !== artifact.schemaVersion) return false;
-  if (artifact.promptVersion === INTELLIGENCE_BRIEFING_PROMPT_VERSION
+  if (artifact.promptVersion !== "intelligence_briefing_prompt_v4"
     && (!artifact.language
       || artifact.language.locale !== INTELLIGENCE_BRIEFING_DEFAULT_LOCALE
       || artifact.language.standardVersion !== INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION)) return false;

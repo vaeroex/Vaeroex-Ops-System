@@ -5,19 +5,22 @@ import type { Json } from "@/lib/supabase/types";
 export const INTELLIGENCE_BRIEFING_CONTRACT_ID = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_CONTRACT_VERSION = "intelligence_briefing_v1" as const;
 export const INTELLIGENCE_BRIEFING_SCHEMA_VERSION = "intelligence_briefing_schema_v2" as const;
-export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v5" as const;
-export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v5" as const;
-export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v5" as const;
+export const INTELLIGENCE_BRIEFING_VALIDATOR_VERSION = "intelligence_briefing_validator_v6" as const;
+export const INTELLIGENCE_BRIEFING_PROMPT_VERSION = "intelligence_briefing_prompt_v6" as const;
+export const INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION = "intelligence_briefing_generation_policy_v6" as const;
 export const INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS = [
   "intelligence_briefing_validator_v4",
+  "intelligence_briefing_validator_v5",
   INTELLIGENCE_BRIEFING_VALIDATOR_VERSION
 ] as const;
 export const INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS = [
   "intelligence_briefing_prompt_v4",
+  "intelligence_briefing_prompt_v5",
   INTELLIGENCE_BRIEFING_PROMPT_VERSION
 ] as const;
 export const INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS = [
   "intelligence_briefing_generation_policy_v4",
+  "intelligence_briefing_generation_policy_v5",
   INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION
 ] as const;
 export type IntelligenceBriefingStoredValidatorVersion = (typeof INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS)[number];

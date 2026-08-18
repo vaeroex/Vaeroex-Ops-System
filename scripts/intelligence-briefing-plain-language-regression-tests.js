@@ -38,6 +38,11 @@ const {
   intelligenceBriefingReadingGrade,
   intelligenceBriefingTargetSentence
 } = require("../lib/ai/intelligence-briefing/plain-language.ts");
+const {
+  composeIntelligenceBriefingExecutiveSummary,
+  intelligenceBriefingEvidenceLimitsLabel,
+  intelligenceBriefingPresentationLimitations
+} = require("../lib/ai/intelligence-briefing/presentation.ts");
 
 const prohibited = /canonical KPI semantics|authoritative target|dated periods|performance effect indeterminate|movement insufficient_data|above_acceptable_maximum|below_acceptable_minimum|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b/;
 
@@ -150,17 +155,125 @@ assert.equal(intelligenceBriefingPlainLanguageIssue("Revenue increased on 2026-0
 assert.equal(intelligenceBriefingPlainLanguageIssue("Revenue increased on August 18, 2026.", { label: "Revenue" }), null);
 assert.ok(intelligenceBriefingReadingGrade("Revenue increased. Leaders can review the latest result.") <= 9.5);
 
+const presentationFixture = {
+  analysis: {
+    executive_summary: { text: "Revenue reached $1.04 million on July 27, 2026.", support_refs: ["K1"] },
+    sections: [
+      {
+        section_id: "financial_performance",
+        summary: "Revenue reached $1.04 million on July 27, 2026 and shows a favorable historical trend.",
+        support_refs: ["K1"],
+        claims: []
+      },
+      {
+        section_id: "customers_market",
+        summary: "The business recorded 37 one-star reviews on July 27, 2026, which was 14 above the maximum target of 23.",
+        support_refs: ["K2"],
+        claims: []
+      }
+    ],
+    leadership_considerations: [{
+      text: "Review why one-star reviews exceeded the maximum target using the available evidence.",
+      support_refs: ["K2"]
+    }],
+    limitation_refs: ["L1", "L2", "L3"]
+  },
+  signals: [
+    {
+      ref: "K1",
+      stableKey: "a".repeat(64),
+      kind: "kpi",
+      authority: "measured_evidence",
+      sectionId: "financial_performance",
+      label: "Revenue",
+      fact: "Revenue reached $1.04 million on July 27, 2026 and shows a favorable historical trend.",
+      confidence: "Medium",
+      citationIds: [1],
+      evidenceReferenceIds: ["revenue-evidence"],
+      limitation: null,
+      periodRelation: "continuing",
+      periodContext: "historical_context",
+      semanticState: { desiredDirection: "maximize", targetStatus: "moving_toward_target", performanceEffect: "favorable", metricRole: "primary" }
+    },
+    {
+      ref: "K2",
+      stableKey: "b".repeat(64),
+      kind: "kpi",
+      authority: "measured_evidence",
+      sectionId: "customers_market",
+      label: "One-star reviews",
+      fact: "The business recorded 37 one-star reviews on July 27, 2026, which was 14 above the maximum target of 23.",
+      confidence: "Medium",
+      citationIds: [2],
+      evidenceReferenceIds: ["review-evidence"],
+      limitation: null,
+      periodRelation: "new_or_changed",
+      periodContext: "briefing_period",
+      semanticState: { desiredDirection: "minimize", targetStatus: "above_acceptable_maximum", performanceEffect: "unfavorable", metricRole: "primary" }
+    }
+  ],
+  eligibility: "limited",
+  evidenceCoverage: {
+    supportingRecordCount: 47,
+    independentSourceCount: 1,
+    freshness: "current",
+    latestEvidenceAt: "2026-07-27T00:00:00.000Z",
+    overallCoverage: 44,
+    coverageLabel: "Limited",
+    includedDomains: ["Financial Performance", "Customers & Market"],
+    missingOrWeakDomains: ["Operations", "Workforce"]
+  },
+  limitations: [
+    { ref: "L1", text: "Customers has limited evidence coverage." },
+    { ref: "L2", text: "Financials has limited evidence coverage." },
+    { ref: "L3", text: "Evidence coverage is limited." },
+    { ref: "L4", text: "Business Updates provide context. They are not independently measured evidence." },
+    { ref: "L5", text: "Business Notes are reported context, not independently measured proof." },
+    { ref: "L6", text: "KPI history does not prove causation." }
+  ],
+  contextReferences: [{ ref: "N1" }]
+};
+const immutablePresentationInput = JSON.parse(JSON.stringify(presentationFixture));
+const synthesizedSummary = composeIntelligenceBriefingExecutiveSummary(presentationFixture);
+const summarySentences = synthesizedSummary.text.split(/(?<=[.!?])\s+/).filter(Boolean);
+const summaryWords = synthesizedSummary.text.split(/\s+/).filter(Boolean).length;
+assert.notEqual(synthesizedSummary.text, presentationFixture.analysis.executive_summary.text, "the executive summary cannot remain a single accepted observation");
+assert.equal(summarySentences.length, 3, "the executive synthesis uses two facts and one bounded leadership sentence");
+assert.ok(summaryWords >= 45 && summaryWords <= 80, `the executive synthesis must remain within the 45-80 word target, observed ${summaryWords}`);
+assert.match(synthesizedSummary.text, /Revenue reached \$1\.04 million/);
+assert.match(synthesizedSummary.text, /37 one-star reviews/);
+assert.match(synthesizedSummary.text, /limited evidence/);
+assert.deepEqual(new Set(synthesizedSummary.support_refs), new Set(["K1", "K2"]), "every summary fact retains its accepted support reference");
+assert.doesNotMatch(synthesizedSummary.text, /Revenue.*(?:caused|drove|explained).*one-star reviews/i, "the synthesis must not connect independent facts");
+
+const presentationLimitations = intelligenceBriefingPresentationLimitations(presentationFixture);
+assert.equal(presentationLimitations.filter((value) => /limited eligible evidence/i.test(value)).length, 1);
+assert.equal(presentationLimitations.filter((value) => /Business Updates provide context/i.test(value)).length, 1);
+assert.equal(presentationLimitations.filter((value) => /caused a change/i.test(value)).length, 1);
+assert.doesNotMatch(presentationLimitations.join(" "), /Customers has limited|Financials has limited/);
+assert.equal(intelligenceBriefingEvidenceLimitsLabel(presentationFixture), "Evidence limits · 47 records from 1 source · Limited");
+assert.deepEqual(presentationFixture, immutablePresentationInput, "presentation projection must not rewrite an immutable current or Saved Briefing artifact");
+
 const viewer = fs.readFileSync(path.join(root, "components/intelligence/IntelligenceBriefingViewer.tsx"), "utf8");
 const savedRenderer = fs.readFileSync(path.join(root, "components/reports/SavedAnalysisRenderer.tsx"), "utf8");
+const evidenceLimits = fs.readFileSync(path.join(root, "components/intelligence/BriefingEvidenceLimits.tsx"), "utf8");
 const service = fs.readFileSync(path.join(root, "lib/ai/intelligence-briefing/service.ts"), "utf8");
 const evidence = fs.readFileSync(path.join(root, "lib/ai/intelligence-briefing/evidence.ts"), "utf8");
 assert.match(viewer, />Summary</);
 assert.match(viewer, />Leadership Actions</);
-assert.match(viewer, />Evidence Limits</);
+assert.match(viewer, /BriefingEvidenceLimits/);
 assert.match(viewer, /artifact\.contextReferences\.length[\s\S]*business_updates_context/, "Business Updates require actual contextual updates");
 assert.doesNotMatch(viewer, /Approved reported context|Evidence, confidence & limitations/);
 assert.doesNotMatch(viewer, /This briefing synthesizes the information currently available/, "limitations must be consolidated under Evidence Limits");
 assert.match(savedRenderer, /intelligenceBriefingCustomerCitation/, "immutable Saved Briefings receive the same customer-safe presentation mapping at render time");
+assert.match(savedRenderer, /BriefingEvidenceLimits/, "Saved Briefings use the same collapsed evidence presentation without changing storage");
+assert.match(savedRenderer, /briefingSummary\.support_refs\.flatMap/, "Saved Briefing summary citations come from accepted claim support references");
+assert.match(savedRenderer, /saved-briefing-citation-/, "Saved Briefing summary citations link to the immutable evidence list");
+assert.match(evidenceLimits, /<details className=/, "Evidence Limits uses a native accessible disclosure");
+assert.doesNotMatch(evidenceLimits, /<details[^>]*\sopen(?:=|\s|>)/, "Evidence Limits is collapsed initially");
+assert.match(evidenceLimits, /<summary className=/, "the disclosure has a keyboard-operable native summary");
+assert.match(evidenceLimits, /focus-visible:ring/, "the disclosure retains visible keyboard focus");
+assert.match(evidenceLimits, /Missing or weak coverage:/, "weak areas are presented once as a grouped line");
 assert.match(service, /seventh- to ninth-grade English reading level/);
 assert.match(service, /temporal_lineage/);
 assert.match(evidence, /safeAppHref\(record\.href/, "Open source must retain the route to the evidence that visibly supports a finding");

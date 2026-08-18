@@ -25,6 +25,7 @@ import {
   intelligenceBriefingPeriodNumericTokens
 } from "@/lib/ai/intelligence-briefing/numeric-integrity";
 import { intelligenceBriefingPlainLanguageIssue } from "@/lib/ai/intelligence-briefing/plain-language";
+import { composeIntelligenceBriefingExecutiveSummary } from "@/lib/ai/intelligence-briefing/presentation";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import {
   validationFailure,
@@ -408,14 +409,11 @@ export function validateIntelligenceBriefingOutput(
     signalByRef,
     allowedSectionRefs
   });
-  let executiveSummary: IntelligenceBriefingClaim;
   let acceptedExecutive = recordResult(executiveResult, "executive_summary");
   if (acceptedExecutive && !acceptedExecutive.claim.support_refs.every((ref) => retainedSignalRefs.has(ref))) {
     rejections.push({ reasonCode: "missing_required_signal", stage: "ranked_signal_coverage", sectionId: "executive_summary" });
     acceptedExecutive = null;
   }
-  executiveSummary = acceptedExecutive?.claim || acceptedMeasuredSectionClaims[0].claim;
-
   const acceptedLeadership = candidate.leadership_considerations.flatMap((claim) => {
     const result = validateClaim({
       value: claim,
@@ -449,14 +447,25 @@ export function validateIntelligenceBriefingOutput(
     .filter((sectionId) => !retainedSections.includes(sectionId));
   const rejectionCategories = aggregateRejections(rejections);
   const includeFilteredContentLimitation = context.eligibility === "limited" || rejections.length > 0 || omittedSections.length > 0;
-  const analysis: IntelligenceBriefingModelOutput = {
-    executive_summary: executiveSummary,
+  const acceptedAnalysis: IntelligenceBriefingModelOutput = {
+    executive_summary: acceptedExecutive?.claim || acceptedMeasuredSectionClaims[0].claim,
     sections,
     leadership_considerations: acceptedLeadership,
     limitation_refs: [
       ...context.limitations.map((limitation) => limitation.ref),
       ...(includeFilteredContentLimitation ? [INTELLIGENCE_BRIEFING_FILTERED_CONTENT_LIMITATION_REF] : [])
     ]
+  };
+  const analysis: IntelligenceBriefingModelOutput = {
+    ...acceptedAnalysis,
+    executive_summary: composeIntelligenceBriefingExecutiveSummary({
+      analysis: acceptedAnalysis,
+      signals: context.signals,
+      eligibility: context.eligibility,
+      evidenceCoverage: context.evidenceCoverage,
+      limitations: context.limitations,
+      contextReferences: context.contextReferences
+    })
   };
   const finalSecurity = validateAiGeneratedOutput(analysis as unknown as Json);
   if (!finalSecurity.ok) {

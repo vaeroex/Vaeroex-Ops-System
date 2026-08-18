@@ -4,10 +4,13 @@ import {
   savedAnalysisTypeLabel,
   type SavedAnalysisEnvelope
 } from "@/lib/reports/saved-analysis";
+import { BriefingEvidenceLimits } from "@/components/intelligence/BriefingEvidenceLimits";
 import {
   intelligenceBriefingCustomerCitation,
   intelligenceBriefingCustomerText
 } from "@/lib/ai/intelligence-briefing/plain-language";
+import { composeIntelligenceBriefingExecutiveSummary } from "@/lib/ai/intelligence-briefing/presentation";
+import { parseIntelligenceBriefingArtifact } from "@/lib/ai/intelligence-briefing/storage";
 
 function readableDate(value: string) {
   const date = new Date(value);
@@ -35,6 +38,17 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
   const citations = isBriefing
     ? envelope.citations.map(intelligenceBriefingCustomerCitation)
     : envelope.citations;
+  const briefingArtifact = isBriefing ? parseIntelligenceBriefingArtifact(envelope.artifact) : null;
+  const briefingSummary = briefingArtifact ? composeIntelligenceBriefingExecutiveSummary(briefingArtifact) : null;
+  const summary = briefingSummary?.text || customerText(envelope.display.summary);
+  const summaryCitationIds = briefingArtifact && briefingSummary
+    ? Array.from(new Set(briefingSummary.support_refs.flatMap((ref) =>
+        briefingArtifact.signals.find((signal) => signal.ref === ref)?.citationIds || []
+      ))).sort((left, right) => left - right)
+    : [];
+  const sections = isBriefing && briefingArtifact
+    ? envelope.display.sections.filter((section) => section.tone !== "limitation")
+    : envelope.display.sections;
   return (
     <div className="space-y-7 text-slate-100" data-saved-analysis-renderer>
       <header className="border-b border-white/10 pb-5">
@@ -50,11 +64,18 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
 
       <section className="rounded-lg border border-cyan-300/25 bg-cyan-950/15 p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">{isBriefing ? "Summary" : envelope.display.summary_label}</p>
-        <p className="mt-3 text-lg font-semibold leading-8 text-white">{customerText(envelope.display.summary)}</p>
+        <p className="mt-3 text-lg font-semibold leading-8 text-white">
+          {summary}
+          {summaryCitationIds.length ? (
+            <span className="ml-1 inline-flex gap-1">
+              {summaryCitationIds.map((id) => <a key={id} href={`#saved-briefing-citation-${id}`} className="text-xs font-semibold text-cyan-200 hover:underline">[{id}]</a>)}
+            </span>
+          ) : null}
+        </p>
       </section>
 
       <div className="space-y-5">
-        {envelope.display.sections.map((section) => (
+        {sections.map((section) => (
           <section
             key={section.id}
             className={section.tone === "limitation" ? "border-l-2 border-amber-300/45 pl-4" : "border-b border-white/10 pb-5"}
@@ -71,12 +92,14 @@ export function SavedAnalysisRenderer({ envelope }: { envelope: SavedAnalysisEnv
         ))}
       </div>
 
+      {briefingArtifact ? <BriefingEvidenceLimits artifact={briefingArtifact} /> : null}
+
       <details className="border-y border-white/10 py-4">
         <summary className="min-h-10 cursor-pointer text-sm font-semibold text-cyan-200">Supporting evidence ({citations.length})</summary>
         <p className="mt-2 text-sm leading-6 text-slate-400">The evidence below was saved with this analysis.</p>
         <ol className="mt-3 divide-y divide-white/10">
           {citations.map((citation) => (
-            <li key={citation.citationId} className="py-3">
+            <li key={citation.citationId} id={isBriefing ? `saved-briefing-citation-${citation.citationId}` : undefined} className="scroll-mt-24 py-3">
               <p className="text-sm font-semibold text-white">[{citation.citationId}] {citation.title}</p>
               <p className="mt-1 text-xs font-semibold text-slate-500">{citation.sourceLabel} · {citation.sourceType}</p>
               <p className="mt-2 text-sm leading-6 text-slate-300">{citation.excerpt}</p>

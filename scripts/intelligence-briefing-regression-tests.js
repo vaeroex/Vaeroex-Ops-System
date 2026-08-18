@@ -287,9 +287,9 @@ const validResult = validateIntelligenceBriefingOutput(valid, limited);
 assert.equal(validResult.ok, true, "a fully bounded structured briefing passes strict validation");
 const acceptedValid = validResult.value;
 assert.equal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION, "intelligence_briefing_schema_v2");
-assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v5");
-assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v5");
-assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v5");
+assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v6");
+assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v6");
+assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v6");
 assert.equal(
   INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
   INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.min,
@@ -677,6 +677,8 @@ const action = read("app/app/intelligence/briefings/actions.ts");
 const claim = read("lib/ai/intelligence-briefing/generation-claim.ts");
 const migration = read("supabase/migrations/20260817185529_intelligence_briefing_storage_contract.sql");
 const viewer = read("components/intelligence/IntelligenceBriefingViewer.tsx");
+const evidenceLimits = read("components/intelligence/BriefingEvidenceLimits.tsx");
+const savedAnalysisRenderer = read("components/reports/SavedAnalysisRenderer.tsx");
 const cards = read("components/intelligence/IntelligenceBriefingCards.tsx");
 const intelligencePage = read("app/app/intelligence/page.tsx");
 const briefingPage = read("app/app/intelligence/briefings/page.tsx");
@@ -694,7 +696,12 @@ assert.match(migration, /status in \('processing', 'completed'\)/);
 assert.match(migration, /ai_agent_runs_intelligence_briefing_evidence_period_idx/);
 assert.match(viewer, /SaveAnalysisButton/);
 assert.match(viewer, /Supporting evidence/);
-assert.match(viewer, /Evidence Limits/);
+assert.match(viewer, /BriefingEvidenceLimits/, "current briefings use the focused evidence-limits disclosure");
+assert.match(savedAnalysisRenderer, /BriefingEvidenceLimits/, "saved briefings use the same focused evidence-limits disclosure");
+assert.match(evidenceLimits, /<details/);
+assert.match(evidenceLimits, /<summary/);
+assert.match(evidenceLimits, /intelligenceBriefingEvidenceLimitsLabel/);
+assert.doesNotMatch(evidenceLimits, /<details[^>]*\sopen(?:=|\s|>)/, "evidence limits remain collapsed initially");
 assert.match(viewer, /Limited-evidence briefing/);
 assert.match(viewer, /Business Updates/);
 assert.doesNotMatch(viewer, /Approved reported context/);

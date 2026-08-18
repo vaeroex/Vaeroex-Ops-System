@@ -279,7 +279,10 @@ async function route(values, context = briefingPackage("limited")) {
 
   const fullCandidate = candidate({ context: true });
   const fullyAccepted = accepted(fullCandidate, briefingPackage("sufficient"));
-  assert.deepEqual(fullyAccepted.analysis, fullCandidate, "1. a fully valid provider candidate is preserved exactly");
+  assert.deepEqual(fullyAccepted.analysis.sections, fullCandidate.sections, "1. fully valid section claims remain unchanged");
+  assert.deepEqual(fullyAccepted.analysis.leadership_considerations, fullCandidate.leadership_considerations, "fully valid leadership claims remain unchanged");
+  assert.notEqual(fullyAccepted.analysis.executive_summary.text, fullCandidate.executive_summary.text, "the final summary is deterministically synthesized from accepted claims");
+  assert.deepEqual(new Set(fullyAccepted.analysis.executive_summary.support_refs), new Set(["K1", "F1"]), "the synthesis represents multiple supported sections");
 
   const unsupportedCausalText = claims.causal.text;
   const filtered = accepted(candidate({ customerClaims: [claims.k2, claims.causal] }));
@@ -367,7 +370,10 @@ async function route(values, context = briefingPackage("limited")) {
 
   const badSummary = { text: "Customer churn of 5% caused all current business performance outcomes in this reporting period.", support_refs: ["K3"] };
   const summaryDerived = accepted(candidate({ executive: badSummary }));
-  assert.equal(summaryDerived.analysis.executive_summary.text, claims.k1.text, "14. the summary is assembled only from an accepted claim without rewriting it");
+  assert.equal(summaryDerived.analysis.executive_summary.text.includes(badSummary.text), false, "14. a rejected provider summary cannot enter deterministic synthesis");
+  assert.match(summaryDerived.analysis.executive_summary.text, /Customer retention was 91%/);
+  assert.match(summaryDerived.analysis.executive_summary.text, /On-time delivery was 88%/);
+  assert.deepEqual(new Set(summaryDerived.analysis.executive_summary.support_refs), new Set(["K1", "F1"]));
 
   const projected = filterIntelligenceBriefingPackageForAcceptedCandidate(briefingPackage("limited"), filtered);
   const acceptedSurface = JSON.stringify({ analysis: filtered.analysis, ...projected });
@@ -391,9 +397,9 @@ async function route(values, context = briefingPackage("limited")) {
   }), hiddenTrendPackage);
   assert.equal(JSON.stringify(boundedTrend.analysis).includes(hiddenTrend.text), false, "trend wording cannot exceed visible temporal citation lineage");
 
-  assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v5");
-  assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v5");
-  assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v5");
+  assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v6");
+  assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v6");
+  assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v6");
   assert.equal(INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION, "intelligence_briefing_claim_acceptance_v1");
 
   const artifact = {
@@ -430,6 +436,14 @@ async function route(values, context = briefingPackage("limited")) {
     }
   };
   assert.ok(parseIntelligenceBriefingArtifact(artifact), "17. the filtered V4 artifact remains valid for immutable current and Saved Briefing storage");
+  const v5Artifact = clone(artifact);
+  v5Artifact.promptVersion = "intelligence_briefing_prompt_v5";
+  v5Artifact.validatorVersion = "intelligence_briefing_validator_v5";
+  v5Artifact.generationPolicyVersion = "intelligence_briefing_generation_policy_v5";
+  v5Artifact.provenance.claimAcceptance.promptVersion = v5Artifact.promptVersion;
+  v5Artifact.provenance.claimAcceptance.validatorVersion = v5Artifact.validatorVersion;
+  v5Artifact.provenance.claimAcceptance.generationPolicyVersion = v5Artifact.generationPolicyVersion;
+  assert.ok(parseIntelligenceBriefingArtifact(v5Artifact), "stored V5 artifacts remain readable after the V6 presentation refinement");
   const legacyArtifact = clone(artifact);
   delete legacyArtifact.language;
   legacyArtifact.promptVersion = "intelligence_briefing_prompt_v4";
@@ -443,7 +457,7 @@ async function route(values, context = briefingPackage("limited")) {
     delete entry.temporalLineage;
   });
   const immutableLegacyInput = clone(legacyArtifact);
-  assert.ok(parseIntelligenceBriefingArtifact(legacyArtifact), "stored V4 artifacts remain readable after the V5 plain-language presentation upgrade");
+  assert.ok(parseIntelligenceBriefingArtifact(legacyArtifact), "stored V4 artifacts remain readable after the V6 presentation refinement");
   assert.deepEqual(legacyArtifact, immutableLegacyInput, "parsing and presentation compatibility never rewrites an existing Saved Briefing artifact");
 
   for (let index = 1; index <= 100; index += 1) {

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft, CalendarRange, ShieldCheck } from "lucide-react";
+import { BriefingEvidenceLimits } from "@/components/intelligence/BriefingEvidenceLimits";
 import { SaveAnalysisButton } from "@/components/reports/SaveAnalysisButton";
 import {
   briefingTypeLabel,
@@ -13,6 +14,7 @@ import {
   intelligenceBriefingExplicitDate,
   intelligenceBriefingPlainPeriodLabel
 } from "@/lib/ai/intelligence-briefing/plain-language";
+import { composeIntelligenceBriefingExecutiveSummary } from "@/lib/ai/intelligence-briefing/presentation";
 
 function CitationLinks({ claim, artifact }: { claim: IntelligenceBriefingClaim; artifact: IntelligenceBriefingArtifact }) {
   const signalByRef = new Map(artifact.signals.map((signal) => [signal.ref, signal]));
@@ -48,6 +50,7 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
     ? artifact.analysis.sections.find((section) => section.section_id === "business_updates_context") || null
     : null;
   const citations = artifact.citations.map(intelligenceBriefingCustomerCitation);
+  const executiveSummary = composeIntelligenceBriefingExecutiveSummary(artifact);
   const analysisType = artifact.briefingType === "weekly" ? "weekly_briefing" : "monthly_briefing";
   return (
     <div className="space-y-6" data-intelligence-briefing-viewer={artifact.briefingType}>
@@ -72,8 +75,8 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
       <section className="border-l-2 border-cyan-300/45 pl-5">
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Summary</p>
         <p className="mt-3 text-lg font-semibold leading-8 text-white">
-          {intelligenceBriefingCustomerText(artifact.analysis.executive_summary.text)}
-          <CitationLinks claim={artifact.analysis.executive_summary} artifact={artifact} />
+          {executiveSummary.text}
+          <CitationLinks claim={executiveSummary} artifact={artifact} />
         </p>
       </section>
 
@@ -130,31 +133,7 @@ export function IntelligenceBriefingViewer({ artifact }: { artifact: Intelligenc
         </section>
       ) : null}
 
-      <section className="border-y border-white/10 py-5">
-        <h2 className="text-lg font-semibold text-white">Evidence Limits</h2>
-        <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <div><dt className="font-semibold text-slate-300">Evidence period</dt><dd className="mt-1 text-slate-400">{intelligenceBriefingPlainPeriodLabel(artifact.period)}</dd></div>
-          <div><dt className="font-semibold text-slate-300">Evidence cutoff</dt><dd className="mt-1 text-slate-400">{readableTimestamp(artifact.period.cutoff)}</dd></div>
-          <div><dt className="font-semibold text-slate-300">Freshness</dt><dd className="mt-1 text-slate-400">{artifact.evidenceCoverage.freshness === "current" ? "Current" : artifact.evidenceCoverage.freshness === "stale" ? "Needs newer evidence" : "Unavailable"}</dd></div>
-          <div><dt className="font-semibold text-slate-300">Coverage</dt><dd className="mt-1 text-slate-400">{intelligenceBriefingCustomerText(artifact.evidenceCoverage.coverageLabel)}</dd></div>
-          <div><dt className="font-semibold text-slate-300">Supporting records</dt><dd className="mt-1 text-slate-400">{artifact.evidenceCoverage.supportingRecordCount}</dd></div>
-          <div><dt className="font-semibold text-slate-300">Independent sources</dt><dd className="mt-1 text-slate-400">{artifact.evidenceCoverage.independentSourceCount}</dd></div>
-        </dl>
-        {artifact.evidenceCoverage.includedDomains.length ? (
-          <p className="mt-4 text-sm leading-6 text-slate-400"><span className="font-semibold text-slate-300">Included areas:</span> {artifact.evidenceCoverage.includedDomains.map(intelligenceBriefingCustomerText).join(", ")}</p>
-        ) : null}
-        {artifact.evidenceCoverage.missingOrWeakDomains.length ? (
-          <p className="mt-2 text-sm leading-6 text-slate-400"><span className="font-semibold text-slate-300">Missing or weak coverage:</span> {artifact.evidenceCoverage.missingOrWeakDomains.map(intelligenceBriefingCustomerText).join(", ")}</p>
-        ) : null}
-        {artifact.contextReferences.length ? (
-          <p className="mt-3 text-sm leading-6 text-slate-400">Business Updates provide context. They are not independently measured evidence.</p>
-        ) : null}
-        {artifact.limitations.length ? (
-          <ul className="mt-4 space-y-2 border-l-2 border-amber-300/45 pl-4 text-sm leading-6 text-slate-400">
-            {artifact.limitations.map((limitation) => <li key={limitation.ref}>{intelligenceBriefingCustomerText(limitation.text)}</li>)}
-          </ul>
-        ) : null}
-      </section>
+      <BriefingEvidenceLimits artifact={artifact} />
 
       <details className="border-y border-white/10 py-4">
         <summary className="min-h-10 cursor-pointer text-sm font-semibold text-cyan-200">Supporting evidence ({citations.length})</summary>
