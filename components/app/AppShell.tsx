@@ -3,13 +3,10 @@ import type { ReactNode } from "react";
 import { signOutAction } from "@/lib/auth/actions";
 import { selectWorkspaceAction } from "@/lib/workspaces/actions";
 import { AppNavigation } from "@/components/app/AppNavigation";
-import { ExperienceControls } from "@/components/app/ExperienceControls";
 import { GlobalSearch } from "@/components/app/GlobalSearch";
 import { ToastRegion } from "@/components/app/ToastRegion";
-import { WorkspaceExperienceProvider } from "@/components/app/WorkspaceExperienceProvider";
 import { VaeroexLogo } from "@/components/brand/VaeroexLogo";
 import { ComplianceNotice } from "@/components/operations/ComplianceNotice";
-import { SpatialWorkspaceShell } from "@/components/spatial/SpatialWorkspaceShell";
 import { legalLinks } from "@/lib/legal/content";
 import { isPremiumConversationalVaeroexEnabled } from "@/lib/product/conversational-vaeroex";
 import type { Profile, Workspace, WorkspaceMember } from "@/lib/supabase/types";
@@ -76,8 +73,7 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
   const workspaceDisplayName = isDemoWorkspace ? "Demo Workspace" : activeWorkspace?.name || "Setup required";
 
   return (
-    <WorkspaceExperienceProvider>
-      <div className="vaeroex-app-shell vaeroex-spatial-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
+    <div className="vaeroex-app-shell min-h-dvh overflow-x-hidden bg-[#f8fafc] text-ink">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-800 bg-vaeroex-navy p-3 text-white shadow-command lg:flex lg:flex-col">
         <Link href="/app" aria-label="Vaeroex Overview" className="group flex h-12 items-center rounded-lg border border-white/10 bg-white/[0.04] px-3 shadow-sm shadow-black/10">
           <VaeroexLogo variant="symbol" size="sm" priority className="transition group-hover:scale-[1.01]" />
@@ -142,7 +138,6 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
             <div className="flex shrink-0 items-center justify-end gap-2 sm:gap-3">
               <GlobalSearch className="hidden w-64 shrink-0 xl:block 2xl:w-96" />
               <GlobalSearch variant="icon" className="xl:hidden" />
-              <ExperienceControls />
               <div className="hidden max-w-48 truncate rounded-full border border-white/15 bg-white/10 px-3 py-2 text-sm text-slate-100 2xl:block">
                 {profile?.full_name || profile?.email || "User"}
               </div>
@@ -154,9 +149,9 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
           <AppNavigation sections={navSections} mobile />
         </nav>
 
-        <main className="vaeroex-spatial-scene mx-auto w-full max-w-[1480px] space-y-5 overflow-x-hidden p-3 sm:p-4 lg:p-6">
+        <main className="mx-auto w-full max-w-[1480px] space-y-5 overflow-x-hidden p-3 sm:p-4 lg:p-6">
           <ComplianceNotice compact />
-          <SpatialWorkspaceShell>{children}</SpatialWorkspaceShell>
+          {children}
           <footer className="flex flex-col gap-2 border-t border-line pt-5 text-xs text-muted sm:flex-row sm:items-center sm:justify-between">
             <p>Vaeroex turns business evidence into leadership clarity.</p>
             <nav className="flex flex-wrap gap-3" aria-label="In-app help and legal links">
@@ -173,7 +168,6 @@ export function AppShell({ children, profile, workspaces, activeWorkspace, isVae
         </main>
       </div>
       <ToastRegion />
-      </div>
-    </WorkspaceExperienceProvider>
+    </div>
   );
 }
