@@ -40,6 +40,10 @@ Every claim must remain atomic and cite exactly one supplied signal reference in
 Approved Business Notes are reported context only. If business_updates_context is supplied, present it separately from measured performance using neutral wording such as "Separately, the business noted..." Explicitly say that the context does not establish causation or is not independently measured. Never say or imply that reported context caused, explained, drove, offset, improved, worsened, correlated with, or compares to measured performance. If business_updates_context is not supplied, do not emit it.
 Do not state a causal, explanatory, correlational, comparative, offsetting, or directional-effect relationship unless that relationship is explicitly stated by a cited deterministic signal. When a deterministic relationship is supplied, preserve its relationship-bearing sentence exactly rather than paraphrasing or changing the entities involved. Do not invent a relationship to make the briefing read more cohesively.
 Leadership considerations are bounded review or investigation considerations, not prescriptions or project-management tasks.
+Write for an executive reader at approximately a seventh- to ninth-grade English reading level. Use short sentences, active voice, one main idea per sentence, and common business words. Name each metric instead of saying "the KPI" or "the metric." Avoid idioms, metaphors, slang, culturally specific expressions, snake_case values, internal identifiers, and engineering terminology. Define an unavoidable abbreviation on first use.
+Use the supplied explicit dates. Preserve the supplied period_context wording. Never imply that historical context occurred during the briefing period. A trend claim may state its starting value, ending value, dates, or observation count only when temporal_lineage supplies those fields and marks the interval fully inside the briefing period.
+Keep Business Updates separate and emit that section only when supplied reported context is accepted. Put limitations only in limitation_refs. Do not repeat limitations or disclaimers inside summaries, sections, or Leadership Actions.
+Leadership Actions must be separate, concrete, non-causal review steps such as confirming whether a result continued, reviewing a target gap, or collecting another reporting period. Do not connect unrelated findings in one action.
 Only emit sections supplied in the sections array. Emit each supplied section exactly once with section_id, an atomic summary, one support reference, and a claims array containing one to five complete atomic { text, support_refs } objects. Never emit an empty, partial, null, scalar, or object-valued claims field.
 Use concise, plain executive language. Return exactly one JSON object matching the supplied strict schema.`;
 
@@ -47,6 +51,7 @@ export function intelligenceBriefingProviderPayload(briefingPackage: Intelligenc
   return {
     contract: briefingPackage.contractId,
     briefing_type: briefingPackage.briefingType,
+    language: briefingPackage.language,
     evidence_period: briefingPackage.period,
     allowed_period_numeric_tokens: intelligenceBriefingPeriodNumericTokens(briefingPackage.period).map((token) => token.display),
     eligibility: briefingPackage.eligibility,
@@ -77,6 +82,8 @@ export function intelligenceBriefingProviderPayload(briefingPackage: Intelligenc
           allowed_numeric_tokens: intelligenceBriefingAllowedNumericTokenDisplays(signal.fact),
           confidence: signal.confidence,
           period_relation: signal.periodRelation,
+          period_context: signal.periodContext,
+          temporal_lineage: signal.temporalLineage || null,
           limitation: signal.limitation
         }] : [];
       })
@@ -87,7 +94,9 @@ export function intelligenceBriefingProviderPayload(briefingPackage: Intelligenc
       authority: signal.authority,
       fact: signal.fact,
       allowed_numeric_tokens: intelligenceBriefingAllowedNumericTokenDisplays(signal.fact),
-      confidence: signal.confidence
+      confidence: signal.confidence,
+      period_context: signal.periodContext,
+      temporal_lineage: signal.temporalLineage || null
     })),
     limitations: briefingPackage.limitations,
     application_owned_controls: {
@@ -97,7 +106,10 @@ export function intelligenceBriefingProviderPayload(briefingPackage: Intelligenc
       no_tasks_or_prescriptions: true,
       reported_context_requires_attribution: true,
       quantitative_claims_require_cited_allowed_tokens: true,
-      output_must_omit_unsupported_sections: true
+      output_must_omit_unsupported_sections: true,
+      plain_language_required: true,
+      historical_context_must_remain_explicit: true,
+      source_identifiers_are_application_owned: true
     }
   };
 }
@@ -276,6 +288,7 @@ export async function generateIntelligenceBriefing({
     promptVersion: briefingPackage.promptVersion,
     generationPolicyVersion: briefingPackage.generationPolicyVersion,
     materialityVersion: briefingPackage.materialityVersion,
+    language: briefingPackage.language,
     workspaceId,
     briefingType: briefingPackage.briefingType,
     period: briefingPackage.period,

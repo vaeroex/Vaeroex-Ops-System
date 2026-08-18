@@ -24,6 +24,7 @@ import {
   intelligenceBriefingNumericTokens,
   intelligenceBriefingPeriodNumericTokens
 } from "@/lib/ai/intelligence-briefing/numeric-integrity";
+import { intelligenceBriefingPlainLanguageIssue } from "@/lib/ai/intelligence-briefing/plain-language";
 import type { StructuredOutputValidation } from "@/lib/ai/providers/provider-manager";
 import {
   validationFailure,
@@ -246,6 +247,26 @@ function validateClaim({
       emittedNumericCount: emittedNumbers.length,
       unsupportedNumericCount: unsupportedNumbers.length
     });
+  }
+  if (signal.periodContext === "historical_context" && /\bduring this briefing period\b/i.test(claim.text)) {
+    return failure("A historical claim was incorrectly presented as current-period evidence.", "contextual_inconsistency", "contextual_validation", sectionId);
+  }
+  if (signal.periodContext === "historical_context" && !/\bhistorical context through\b/i.test(claim.text)) {
+    return failure("A historical claim did not retain its explicit time context.", "contextual_inconsistency", "contextual_validation", sectionId);
+  }
+  if (/\b(?:across\s+\w+\s+(?:recorded dates|weekly records|monthly records)|from\s+.+\s+to\s+)\b/i.test(claim.text)
+    && !signal.temporalLineage) {
+    return failure("A trend claim exceeded the visible citation lineage.", "invalid_relationship", "citation_provenance", sectionId);
+  }
+  if (signal.temporalLineage && /\bduring this briefing period\b/i.test(claim.text) && !signal.temporalLineage.fullyInsideBriefingPeriod) {
+    return failure("A trend interval extended beyond the briefing period.", "contextual_inconsistency", "contextual_validation", sectionId);
+  }
+  if (sectionId === "leadership_considerations" && !/^(?:Confirm|Review|Collect|Check|Compare|Monitor|Examine|Verify|Assess|Investigate)\b/i.test(claim.text.trim())) {
+    return failure("A leadership action was not a concrete, bounded review step.", "invalid_action", "contextual_validation", sectionId);
+  }
+  const plainLanguageIssue = intelligenceBriefingPlainLanguageIssue(claim.text, signal);
+  if (plainLanguageIssue) {
+    return failure("A briefing claim did not meet the customer plain-language standard.", "contextual_validation_failed", "contextual_validation", `${sectionId}:${plainLanguageIssue}`);
   }
   const securityFailure = claimSecurityFailure(claim.text, context, sectionId);
   if (securityFailure) return securityFailure;

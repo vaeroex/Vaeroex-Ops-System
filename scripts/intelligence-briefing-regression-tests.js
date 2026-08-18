@@ -250,24 +250,33 @@ assert.notEqual(changed.materialStateFingerprint, limited.materialStateFingerpri
 assert.notEqual(changed.generationKey, limited.generationKey);
 
 function validOutput(input) {
-  const sectionClaims = input.sections.map((section) => ({
-    section_id: section.id,
-    summary: "The supplied deterministic signals in this area warrant bounded leadership awareness.",
-    support_refs: [section.signalRefs[0]],
-    claims: [{
-      text: "The measured evidence remains within the application-owned confidence and evidence boundaries.",
-      support_refs: [section.signalRefs[0]]
-    }]
-  }));
+  const claimFor = (ref) => {
+    const signal = input.signals.find((candidate) => candidate.ref === ref);
+    if (signal?.periodContext === "historical_context") return signal.fact;
+    return signal?.authority === "reported_context"
+      ? `The business noted an update about ${signal.label}. This update does not establish causation or replace measured evidence.`
+      : `The available evidence supports review of ${signal?.label || "this business result"}. Leadership can examine this result carefully.`;
+  };
+  const sectionClaims = input.sections.map((section) => {
+    const ref = section.signalRefs[0];
+    return {
+      section_id: section.id,
+      summary: claimFor(ref),
+      support_refs: [ref],
+      claims: [{ text: claimFor(ref), support_refs: [ref] }]
+    };
+  });
+  const primaryRef = input.requiredSignalRefs[0];
+  const primarySignal = input.signals.find((signal) => signal.ref === primaryRef);
   return {
     executive_summary: {
-      text: "The supplied deterministic business signals warrant leadership review within the stated evidence and confidence limits.",
-      support_refs: [input.requiredSignalRefs[0]]
+      text: claimFor(primaryRef),
+      support_refs: [primaryRef]
     },
     sections: sectionClaims,
     leadership_considerations: [{
-      text: "Leadership can review the supported signals and investigate their context without asserting causation.",
-      support_refs: [input.requiredSignalRefs[0]]
+      text: `Review ${primarySignal?.label || "this business result"} using the available evidence.`,
+      support_refs: [primaryRef]
     }],
     limitation_refs: input.limitations.map((limitation) => limitation.ref)
   };
@@ -278,9 +287,9 @@ const validResult = validateIntelligenceBriefingOutput(valid, limited);
 assert.equal(validResult.ok, true, "a fully bounded structured briefing passes strict validation");
 const acceptedValid = validResult.value;
 assert.equal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION, "intelligence_briefing_schema_v2");
-assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v4");
-assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v4");
-assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v4");
+assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v5");
+assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v5");
+assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v5");
 assert.equal(
   INTELLIGENCE_BRIEFING_JSON_SCHEMA.properties.sections.items.properties.claims.minItems,
   INTELLIGENCE_BRIEFING_MODEL_OUTPUT_LIMITS.sectionClaims.min,
@@ -613,6 +622,7 @@ const artifact = {
   promptVersion: limited.promptVersion,
   generationPolicyVersion: limited.generationPolicyVersion,
   materialityVersion: limited.materialityVersion,
+  language: limited.language,
   workspaceId: "11111111-1111-4111-8111-111111111111",
   briefingType: "monthly",
   period: limited.period,
@@ -684,9 +694,10 @@ assert.match(migration, /status in \('processing', 'completed'\)/);
 assert.match(migration, /ai_agent_runs_intelligence_briefing_evidence_period_idx/);
 assert.match(viewer, /SaveAnalysisButton/);
 assert.match(viewer, /Supporting evidence/);
-assert.match(viewer, /Evidence, confidence & limitations/);
+assert.match(viewer, /Evidence Limits/);
 assert.match(viewer, /Limited-evidence briefing/);
-assert.match(viewer, /Approved reported context/);
+assert.match(viewer, /Business Updates/);
+assert.doesNotMatch(viewer, /Approved reported context/);
 assert.match(cards, /Generate Weekly Briefing/);
 assert.match(cards, /Generate Monthly Briefing/);
 assert.match(cards, /Add business information/);

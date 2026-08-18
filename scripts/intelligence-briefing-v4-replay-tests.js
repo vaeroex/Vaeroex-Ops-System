@@ -35,10 +35,12 @@ const {
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
   INTELLIGENCE_BRIEFING_CONTRACT_VERSION,
   INTELLIGENCE_BRIEFING_FILTERED_CONTENT_LIMITATION,
+  INTELLIGENCE_BRIEFING_DEFAULT_LOCALE,
   INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
   INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
   INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS,
   INTELLIGENCE_BRIEFING_PROMPT_VERSION,
+  INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION,
   INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
   INTELLIGENCE_BRIEFING_VALIDATOR_VERSION
 } = require("../lib/ai/intelligence-briefing/contracts.ts");
@@ -70,7 +72,8 @@ function signal(ref, sectionId, authority, fact, citationIds, kind = "kpi") {
     citationIds,
     evidenceReferenceIds: citationIds.map((id) => `evidence-${id}`),
     limitation: null,
-    periodRelation: authority === "reported_context" ? "reported_context" : "new_or_changed"
+    periodRelation: authority === "reported_context" ? "reported_context" : "new_or_changed",
+    periodContext: "briefing_period"
   };
 }
 
@@ -91,6 +94,7 @@ function briefingPackage(eligibility = "limited") {
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     generationPolicyVersion: INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
     materialityVersion: INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
+    language: { locale: INTELLIGENCE_BRIEFING_DEFAULT_LOCALE, standardVersion: INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION },
     workspaceId,
     briefingType: "monthly",
     period: { start: "2026-07-20", end: "2026-08-18", cutoff: "2026-08-18T12:00:00.000Z", dayCount: 30, timeZone: "UTC" },
@@ -116,7 +120,7 @@ function briefingPackage(eligibility = "limited") {
     sections: [
       { id: "customers_market", label: "Customers & Market", signalRefs: ["K1", "K2", "K3", "R1"] },
       { id: "operations_delivery", label: "Operations & Delivery", signalRefs: ["F1"] },
-      { id: "business_updates_context", label: "Business Updates & Context", signalRefs: ["N1"] }
+      { id: "business_updates_context", label: "Business Updates", signalRefs: ["N1"] }
     ],
     contextReferences: [{
       ref: "N1",
@@ -149,13 +153,13 @@ function briefingPackage(eligibility = "limited") {
 const claims = {
   k1: { text: "Customer retention was 91% in the cited measured evidence for this reporting period.", support_refs: ["K1"] },
   k2: { text: "Market demand was 12% in the cited measured evidence for this reporting period.", support_refs: ["K2"] },
-  f1: { text: "On-time delivery was 88% in the cited deterministic result for this reporting period.", support_refs: ["F1"] },
+  f1: { text: "On-time delivery was 88% in the cited business evidence for this reporting period.", support_refs: ["F1"] },
   causal: { text: "Customer churn of 5% caused the customer retention result during this reporting period.", support_refs: ["K3"] },
   comparison: { text: "Market demand was 12% higher than customer retention during this reporting period.", support_refs: ["K2"] },
   relationship: { text: "Customer retention of 91% was higher than market demand of 12%.", support_refs: ["R1"] },
-  context: { text: "An approved Business Note reports a pricing review; this reported context does not establish causation.", support_refs: ["N1"] },
+  context: { text: "An approved Business Note reports a pricing review. This reported context does not establish causation.", support_refs: ["N1"] },
   contextCausal: { text: "An approved Business Note reports a pricing review that drove customer retention of 91%.", support_refs: ["N1"] },
-  leadership: { text: "Leadership can review the customer retention signal within its measured evidence boundary.", support_refs: ["K1"] }
+  leadership: { text: "Review customer retention using the available measured evidence.", support_refs: ["K1"] }
 };
 
 function candidate({
@@ -374,9 +378,22 @@ async function route(values, context = briefingPackage("limited")) {
   const minimalLimited = accepted(oneValidOneBad, briefingPackage("limited"));
   assert.equal(minimalLimited.analysis.sections.length, 1, "16. limited evidence produces a narrow artifact with its one validated measured claim");
 
-  assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v4");
-  assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v4");
-  assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v4");
+  const hiddenTrendPackage = briefingPackage("limited");
+  hiddenTrendPackage.signals.find((entry) => entry.ref === "K1").fact = "Customer retention increased from 90% to 91% across two recorded dates.";
+  const hiddenTrend = { text: "Customer retention increased from 90% to 91% across two recorded dates during this briefing period.", support_refs: ["K1"] };
+  const visibleClaim = { text: "Market demand was 12% in the cited measured evidence for this reporting period.", support_refs: ["K2"] };
+  const boundedTrend = accepted(candidate({
+    customerSummary: hiddenTrend,
+    customerClaims: [visibleClaim],
+    operation: false,
+    executive: visibleClaim,
+    leadership: [{ text: "Review market demand using the available measured evidence.", support_refs: ["K2"] }]
+  }), hiddenTrendPackage);
+  assert.equal(JSON.stringify(boundedTrend.analysis).includes(hiddenTrend.text), false, "trend wording cannot exceed visible temporal citation lineage");
+
+  assert.equal(INTELLIGENCE_BRIEFING_PROMPT_VERSION, "intelligence_briefing_prompt_v5");
+  assert.equal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION, "intelligence_briefing_validator_v5");
+  assert.equal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION, "intelligence_briefing_generation_policy_v5");
   assert.equal(INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION, "intelligence_briefing_claim_acceptance_v1");
 
   const artifact = {
@@ -387,6 +404,7 @@ async function route(values, context = briefingPackage("limited")) {
     promptVersion: INTELLIGENCE_BRIEFING_PROMPT_VERSION,
     generationPolicyVersion: INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
     materialityVersion: INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
+    language: briefingPackage().language,
     workspaceId,
     briefingType: "monthly",
     period: briefingPackage().period,
@@ -412,6 +430,21 @@ async function route(values, context = briefingPackage("limited")) {
     }
   };
   assert.ok(parseIntelligenceBriefingArtifact(artifact), "17. the filtered V4 artifact remains valid for immutable current and Saved Briefing storage");
+  const legacyArtifact = clone(artifact);
+  delete legacyArtifact.language;
+  legacyArtifact.promptVersion = "intelligence_briefing_prompt_v4";
+  legacyArtifact.validatorVersion = "intelligence_briefing_validator_v4";
+  legacyArtifact.generationPolicyVersion = "intelligence_briefing_generation_policy_v4";
+  legacyArtifact.provenance.claimAcceptance.promptVersion = legacyArtifact.promptVersion;
+  legacyArtifact.provenance.claimAcceptance.validatorVersion = legacyArtifact.validatorVersion;
+  legacyArtifact.provenance.claimAcceptance.generationPolicyVersion = legacyArtifact.generationPolicyVersion;
+  legacyArtifact.signals.forEach((entry) => {
+    delete entry.periodContext;
+    delete entry.temporalLineage;
+  });
+  const immutableLegacyInput = clone(legacyArtifact);
+  assert.ok(parseIntelligenceBriefingArtifact(legacyArtifact), "stored V4 artifacts remain readable after the V5 plain-language presentation upgrade");
+  assert.deepEqual(legacyArtifact, immutableLegacyInput, "parsing and presentation compatibility never rewrites an existing Saved Briefing artifact");
 
   for (let index = 1; index <= 100; index += 1) {
     const propertyPackage = briefingPackage("limited");

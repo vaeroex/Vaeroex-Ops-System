@@ -6,14 +6,17 @@ import {
   INTELLIGENCE_BRIEFING_CLAIM_ACCEPTANCE_VERSION,
   INTELLIGENCE_BRIEFING_CONTRACT_ID,
   INTELLIGENCE_BRIEFING_CONTRACT_VERSION,
-  INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION,
+  INTELLIGENCE_BRIEFING_DEFAULT_LOCALE,
   INTELLIGENCE_BRIEFING_MATERIALITY_VERSION,
   INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS,
   INTELLIGENCE_BRIEFING_PROMPT_VERSION,
+  INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION,
   INTELLIGENCE_BRIEFING_SCHEMA_VERSION,
   INTELLIGENCE_BRIEFING_SECTION_IDS,
   INTELLIGENCE_BRIEFING_TYPES,
-  INTELLIGENCE_BRIEFING_VALIDATOR_VERSION,
+  INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS,
+  INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS,
+  INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS,
   type IntelligenceBriefingArtifact,
   type IntelligenceBriefingPackage,
   type IntelligenceBriefingState,
@@ -75,6 +78,16 @@ const signalSchema = z.object({
   evidenceReferenceIds: z.array(z.string().trim().min(1)),
   limitation: z.string().trim().min(1).nullable(),
   periodRelation: z.enum(["new_or_changed", "continuing", "current_state", "reported_context"]),
+  periodContext: z.enum(["briefing_period", "historical_context"]).default("briefing_period"),
+  temporalLineage: z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    startValue: z.number().finite(),
+    endValue: z.number().finite(),
+    observationCount: z.number().int().positive(),
+    fullyInsideBriefingPeriod: z.boolean(),
+    cadence: z.enum(["recorded_dates", "weekly_records", "monthly_records"])
+  }).strict().optional(),
   semanticState: z.object({
     desiredDirection: z.string(),
     targetStatus: z.string(),
@@ -86,10 +99,14 @@ const artifactSchema = z.object({
   contractId: z.literal(INTELLIGENCE_BRIEFING_CONTRACT_ID),
   contractVersion: z.literal(INTELLIGENCE_BRIEFING_CONTRACT_VERSION),
   schemaVersion: z.literal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION),
-  validatorVersion: z.literal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION),
-  promptVersion: z.literal(INTELLIGENCE_BRIEFING_PROMPT_VERSION),
-  generationPolicyVersion: z.literal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION),
+  validatorVersion: z.enum(INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS),
+  promptVersion: z.enum(INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS),
+  generationPolicyVersion: z.enum(INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS),
   materialityVersion: z.literal(INTELLIGENCE_BRIEFING_MATERIALITY_VERSION),
+  language: z.object({
+    locale: z.literal(INTELLIGENCE_BRIEFING_DEFAULT_LOCALE),
+    standardVersion: z.literal(INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION)
+  }).strict().optional(),
   workspaceId: z.string().uuid(),
   briefingType: z.enum(INTELLIGENCE_BRIEFING_TYPES),
   period: periodSchema,
@@ -163,10 +180,10 @@ const artifactSchema = z.object({
         sectionId: z.enum([...INTELLIGENCE_BRIEFING_SECTION_IDS, "executive_summary", "leadership_considerations"]),
         count: z.number().int().positive()
       }).strict()),
-      promptVersion: z.literal(INTELLIGENCE_BRIEFING_PROMPT_VERSION),
+      promptVersion: z.enum(INTELLIGENCE_BRIEFING_SUPPORTED_PROMPT_VERSIONS),
       schemaVersion: z.literal(INTELLIGENCE_BRIEFING_SCHEMA_VERSION),
-      validatorVersion: z.literal(INTELLIGENCE_BRIEFING_VALIDATOR_VERSION),
-      generationPolicyVersion: z.literal(INTELLIGENCE_BRIEFING_GENERATION_POLICY_VERSION)
+      validatorVersion: z.enum(INTELLIGENCE_BRIEFING_SUPPORTED_VALIDATOR_VERSIONS),
+      generationPolicyVersion: z.enum(INTELLIGENCE_BRIEFING_SUPPORTED_GENERATION_POLICY_VERSIONS)
     }).strict()
   }).strict()
 }).strict();
@@ -201,6 +218,14 @@ function artifactRelationshipsAreValid(artifact: IntelligenceBriefingArtifact) {
   const acceptance = artifact.provenance.claimAcceptance;
   if (!acceptance) return false;
   if (acceptance.providerModel !== artifact.providerAttribution.model) return false;
+  if (acceptance.promptVersion !== artifact.promptVersion
+    || acceptance.validatorVersion !== artifact.validatorVersion
+    || acceptance.generationPolicyVersion !== artifact.generationPolicyVersion
+    || acceptance.schemaVersion !== artifact.schemaVersion) return false;
+  if (artifact.promptVersion === INTELLIGENCE_BRIEFING_PROMPT_VERSION
+    && (!artifact.language
+      || artifact.language.locale !== INTELLIGENCE_BRIEFING_DEFAULT_LOCALE
+      || artifact.language.standardVersion !== INTELLIGENCE_BRIEFING_PLAIN_LANGUAGE_VERSION)) return false;
   if (acceptance.totalClaimsReturned !== acceptance.acceptedClaimCount + acceptance.rejectedClaimCount) return false;
   if (acceptance.acceptedMeasuredClaimCount > acceptance.acceptedClaimCount) return false;
   if (acceptance.acceptedMeasuredClaimCount < INTELLIGENCE_BRIEFING_MINIMUM_MEASURED_CLAIMS[artifact.eligibility]) return false;
