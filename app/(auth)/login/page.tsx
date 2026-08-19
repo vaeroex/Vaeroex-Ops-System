@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { AuthMessage } from "@/components/auth/AuthMessage";
 import { AuthShell } from "@/components/auth/AuthShell";
+import { AuthTurnstile } from "@/components/auth/AuthTurnstile";
 import { signInAction } from "@/lib/auth/actions";
+import { getAuthCaptchaSiteKey } from "@/lib/auth/captcha";
 
 type LoginPageProps = {
   searchParams?: Promise<{
@@ -40,6 +42,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             className="mt-2 w-full rounded-lg border border-line px-3 py-2 outline-none focus:border-vaeroex-blue"
           />
         </label>
+        <AuthTurnstile siteKey={getAuthCaptchaSiteKey()} />
         <button className="w-full rounded-lg bg-vaeroex-blue px-4 py-2.5 text-sm font-semibold text-white">
           Log in
         </button>

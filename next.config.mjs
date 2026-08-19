@@ -16,13 +16,13 @@ function securityHeaders() {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self' https://checkout.stripe.com https://*.stripe.com",
-    `script-src 'self' 'unsafe-inline'${scriptEvalSource} https://js.stripe.com https://checkout.stripe.com`,
+    `script-src 'self' 'unsafe-inline'${scriptEvalSource} https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     `connect-src 'self' ${supabaseOrigin} https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://vitals.vercel-insights.com`,
     "worker-src 'self' blob:",
-    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
+    "frame-src 'self' https://js.stripe.com https://checkout.stripe.com https://challenges.cloudflare.com",
     ...transportDirectives
   ].join("; ");
   const enforcedBaselineCsp = [

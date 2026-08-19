@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import type { Route } from "next";
+import { resolveAuthCaptchaSubmission } from "@/lib/auth/captcha";
 import { getAppUrl } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -15,6 +16,20 @@ function isEmail(valueToCheck: string) {
 
 function authRedirect(path: string, type: "message" | "error", text: string): never {
   redirect(`${path}?${type}=${encodeURIComponent(text)}` as Route);
+}
+
+function authCaptchaToken(formData: FormData, errorPath: string): string | undefined {
+  const captcha = resolveAuthCaptchaSubmission(formData);
+
+  if (!captcha.enabled) {
+    return undefined;
+  }
+
+  if (!captcha.token) {
+    authRedirect(errorPath, "error", "Complete the security check and try again.");
+  }
+
+  return captcha.token;
 }
 
 function validatePasswordUpdate(password: string, confirmPassword: string, errorPath: string) {
@@ -89,7 +104,12 @@ export async function signInAction(formData: FormData) {
     authRedirect("/login", "error", "Enter a valid email address.");
   }
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const captchaToken = authCaptchaToken(formData, "/login");
+  const { error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+    options: { captchaToken }
+  });
 
   if (error) {
     authRedirect("/login", "error", error.message);
@@ -122,6 +142,7 @@ export async function signUpAction(formData: FormData) {
     authRedirect("/signup", "error", "Use at least 8 characters for the password.");
   }
 
+  const captchaToken = authCaptchaToken(formData, "/signup");
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -129,6 +150,7 @@ export async function signUpAction(formData: FormData) {
       data: {
         full_name: fullName
       },
+      captchaToken,
       emailRedirectTo: `${getAppUrl()}/auth/callback?next=/app/setup`
     }
   });
@@ -160,7 +182,9 @@ export async function forgotPasswordAction(formData: FormData) {
     authRedirect("/forgot-password", "error", "Enter a valid email address.");
   }
 
+  const captchaToken = authCaptchaToken(formData, "/forgot-password");
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    captchaToken,
     redirectTo: `${getAppUrl()}/auth/callback?next=/reset-password`
   });
 
@@ -213,6 +237,7 @@ export async function acceptInviteAction(formData: FormData) {
     authRedirect("/accept-invite", "error", "Use at least 8 characters for the password.");
   }
 
+  const captchaToken = authCaptchaToken(formData, "/accept-invite");
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -221,6 +246,7 @@ export async function acceptInviteAction(formData: FormData) {
         full_name: inviteEmail,
         invited_email: inviteEmail
       },
+      captchaToken,
       emailRedirectTo: `${getAppUrl()}/auth/callback?next=/app`
     }
   });
