@@ -385,7 +385,10 @@ create temporary table concurrent_rate_limit_results (
 
 select extensions.dblink_connect(
   connection_name,
-  'dbname=' || current_database()
+  -- `supabase test db` uses this disposable loopback credential. Supabase's
+  -- local postgres role is non-superuser, so dblink requires it explicitly.
+  'host=127.0.0.1 port=5432 dbname=' || current_database() ||
+    ' user=postgres password=postgres'
 )
 from (
   values

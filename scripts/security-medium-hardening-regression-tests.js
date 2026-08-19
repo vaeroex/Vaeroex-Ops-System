@@ -108,6 +108,7 @@ assert.doesNotMatch(databaseSecurityTest, /grant\s+select\s+on\s+(?:table\s+)?pu
 assert.doesNotMatch(databaseSecurityTest, /grant[\s\S]{0,120}public\.workspaces[\s\S]{0,80}to\s+(?:anon|public)\b/i, "the isolated suite must never expose workspaces to anonymous or public roles");
 assert.match(databaseSecurityTest, /grant insert \(workspace_id, form_id, data_json\)[\s\S]{0,80}public\.form_submissions to authenticated;/, "Viewer mutation denial must be tested after the exact submission columns reach RLS");
 assert.match(databaseSecurityTest, /grant update \(role\) on table public\.workspace_members to authenticated;/, "membership escalation tests must reach the role-restricted RLS policies");
+assert.match(databaseSecurityTest, /dblink_connect\([\s\S]+host=127\.0\.0\.1 port=5432 dbname=[\s\S]+user=postgres password=postgres/, "concurrency sessions must authenticate only to the disposable local Supabase database");
 assert.match(databaseSecurityTest, /dblink_send_query[\s\S]+security\.concurrent-test/, "quota regression must issue genuinely concurrent database requests");
 assert.match(databaseSecurityTest, /count\(\*\)::integer from concurrent_rate_limit_results where allowed[\s\S]+\n  3,/, "concurrent quota regression must enforce the exact boundary");
 
