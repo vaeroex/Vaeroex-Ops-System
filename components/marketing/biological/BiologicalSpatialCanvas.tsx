@@ -3,6 +3,7 @@
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useRef,
@@ -25,8 +26,14 @@ import {
 } from "@/components/marketing/biological/BiologicalStructures";
 import { ProteinTarget } from "@/components/marketing/drug-discovery/ProteinVisualization";
 import { probeRenderedCanvas, type CanvasPixelProbeResult } from "@/components/spatial/CanvasPixelProbe";
+import { PublicSpatialContextGuard, PublicSpatialErrorBoundary } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
-import { useSpatialCapability, type SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
+import { applySpatialCameraFraming } from "@/components/spatial/spatialCameraFraming";
+import {
+  useSpatialCapability,
+  type SpatialQualityTier,
+  type SpatialViewportProfile
+} from "@/components/spatial/useSpatialCapability";
 
 type JourneyPoint = Readonly<{
   progress: number;
@@ -76,7 +83,7 @@ function sampleJourney(progress: number, key: "position" | "target", target: Vec
   return MathUtils.lerp(from.fov, to.fov, local);
 }
 
-function JourneyDirector({ quality, children }: { quality: SpatialQualityTier; children: ReactNode }) {
+function JourneyDirector({ profile, quality, children }: { profile: SpatialViewportProfile; quality: SpatialQualityTier; children: ReactNode }) {
   const { camera, pointer } = useThree();
   const targetProgress = useRef(0);
   const currentProgress = useRef(0);
@@ -112,17 +119,25 @@ function JourneyDirector({ quality, children }: { quality: SpatialQualityTier; c
       : MathUtils.damp(currentProgress.current, targetProgress.current, 4.2, delta);
 
     if (reducedMotion) {
-      camera.position.set(3.8, 1.8, 14);
-      camera.lookAt(0, 0, -7);
+      nextPosition.current.set(3.8, 1.8, 14);
+      nextTarget.current.set(0, 0, -7);
+      const fov = applySpatialCameraFraming(nextPosition.current, nextTarget.current, 40, profile);
+      camera.position.copy(nextPosition.current);
+      camera.lookAt(nextTarget.current);
+      if ("fov" in camera) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
       return;
     }
 
-    const fov = sampleJourney(currentProgress.current, "position", nextPosition.current);
+    const sampledFov = sampleJourney(currentProgress.current, "position", nextPosition.current);
     sampleJourney(currentProgress.current, "target", nextTarget.current);
     if (quality === "full") {
       nextPosition.current.x += pointer.x * 0.24;
       nextPosition.current.y += pointer.y * 0.14;
     }
+    const fov = applySpatialCameraFraming(nextPosition.current, nextTarget.current, sampledFov, profile);
     camera.position.copy(nextPosition.current);
     camera.lookAt(nextTarget.current);
     if ("fov" in camera) {
@@ -138,7 +153,7 @@ function FrameScheduler({ quality }: { quality: SpatialQualityTier }) {
   const { invalidate } = useThree();
 
   useEffect(() => {
-    const delay = quality === "full" ? 34 : quality === "constrained" ? 60 : 160;
+    const delay = quality === "full" ? 34 : quality === "balanced" ? 60 : quality === "light" ? 92 : 180;
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "hidden") invalidate();
     }, delay);
@@ -209,6 +224,7 @@ function ReducedBiologicalWorld({ quality }: { quality: SpatialQualityTier }) {
 
 function BiologicalWorld({ quality }: { quality: SpatialQualityTier }) {
   const reducedMotion = quality === "reduced_motion";
+  const balancedOrFull = quality === "full" || quality === "balanced";
   return (
     <>
       <color attach="background" args={[new Color("#020507")]} />
@@ -224,10 +240,10 @@ function BiologicalWorld({ quality }: { quality: SpatialQualityTier }) {
         shadow-mapSize-height={1024}
         shadow-bias={-0.0002}
       />
-      <directionalLight position={[9, -1, -43]} intensity={0.72} color="#7899a0" />
-      <spotLight position={[7, 8, 5]} intensity={28} angle={0.48} penumbra={0.92} distance={58} decay={2} color="#a8c4c5" />
+      {balancedOrFull ? <directionalLight position={[9, -1, -43]} intensity={0.72} color="#7899a0" /> : null}
+      {balancedOrFull ? <spotLight position={[7, 8, 5]} intensity={28} angle={0.48} penumbra={0.92} distance={58} decay={2} color="#a8c4c5" /> : null}
       <pointLight position={[-6, 1, -25]} intensity={7} distance={22} decay={2} color="#738d9a" />
-      <pointLight position={[6, -1, -55]} intensity={8} distance={25} decay={2} color="#94aaa3" />
+      {balancedOrFull ? <pointLight position={[6, -1, -55]} intensity={8} distance={25} decay={2} color="#94aaa3" /> : null}
       <pointLight position={[-5, 1, -75]} intensity={6} distance={23} decay={2} color="#b09b87" />
       {reducedMotion ? <ReducedBiologicalWorld quality={quality} /> : <FullBiologicalWorld quality={quality} />}
     </>
@@ -252,38 +268,58 @@ function ScientificFallback({ reason }: { reason: string }) {
 }
 
 export default function BiologicalSpatialCanvas() {
-  const capability = useSpatialCapability({ allowMobile: true });
+  const capability = useSpatialCapability();
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
+  const [renderFailed, setRenderFailed] = useState(false);
+  const handleRenderFailure = useCallback(() => setRenderFailed(true), []);
 
   if (!capability.ready) return null;
-  if (!capability.available || !capability.quality) {
+  if (renderFailed || !capability.available || !capability.quality) {
     return <ScientificFallback reason={capability.reason || "unavailable"} />;
   }
 
   const quality = capability.quality;
-  const dpr: [number, number] = quality === "full" ? [1, 1.35] : quality === "constrained" ? [0.82, 1.05] : [0.78, 1];
+  const dpr: [number, number] = quality === "full"
+    ? [1, 1.35]
+    : quality === "balanced"
+      ? [0.8, 1.02]
+      : quality === "light"
+        ? [0.62, 0.8]
+        : [0.68, 0.86];
+  const fallback = <ScientificFallback reason="rendering_failure" />;
 
   return (
-    <div className={styles.spatialCanvas} data-biological-canvas data-spatial-quality={quality} data-canvas-pixels={pixelProbe} aria-hidden="true">
-      <Canvas
-        camera={{ position: [3.8, 1.8, 14], fov: 40, near: 0.1, far: 180 }}
-        dpr={dpr}
-        frameloop="demand"
-        shadows={quality === "full" ? "percentage" : false}
-        gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
-        resize={{ polyfill: SpatialResizeObserver }}
-        onCreated={(state) => {
-          state.gl.toneMapping = ACESFilmicToneMapping;
-          state.gl.toneMappingExposure = 0.9;
-          state.gl.outputColorSpace = SRGBColorSpace;
-          probeRenderedCanvas(state, setPixelProbe);
-        }}
+    <PublicSpatialErrorBoundary fallback={fallback} onFailure={handleRenderFailure}>
+      <div
+        className={styles.spatialCanvas}
+        data-biological-canvas
+        data-spatial-webgl
+        data-spatial-quality={quality}
+        data-spatial-profile={capability.profile}
+        data-canvas-pixels={pixelProbe}
+        aria-hidden="true"
       >
-        <JourneyDirector quality={quality}>
-          <BiologicalWorld quality={quality} />
-        </JourneyDirector>
-        <FrameScheduler quality={quality} />
-      </Canvas>
-    </div>
+        <Canvas
+          camera={{ position: [3.8, 1.8, 14], fov: 40, near: 0.1, far: 180 }}
+          dpr={dpr}
+          frameloop="demand"
+          shadows={quality === "full" ? "percentage" : false}
+          gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
+          resize={{ polyfill: SpatialResizeObserver }}
+          onCreated={(state) => {
+            state.gl.toneMapping = ACESFilmicToneMapping;
+            state.gl.toneMappingExposure = 0.9;
+            state.gl.outputColorSpace = SRGBColorSpace;
+            probeRenderedCanvas(state, setPixelProbe);
+          }}
+        >
+          <PublicSpatialContextGuard onFailure={handleRenderFailure} />
+          <JourneyDirector profile={capability.profile} quality={quality}>
+            <BiologicalWorld quality={quality} />
+          </JourneyDirector>
+          <FrameScheduler quality={quality} />
+        </Canvas>
+      </div>
+    </PublicSpatialErrorBoundary>
   );
 }

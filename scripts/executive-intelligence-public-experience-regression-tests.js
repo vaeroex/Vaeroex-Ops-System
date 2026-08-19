@@ -67,7 +67,7 @@ assert.doesNotMatch(page, /Recommendations are review-ready intelligence/, "lead
 assert.match(page, /When enough supported business information is available/, "briefing eligibility must remain explicit in plain language");
 assert.match(page, /Recommendations are there for review—not actions Vaeroex takes on its own/, "leadership authority must remain explicit");
 assert.match(styles, /\.disclosure summary:focus-visible/, "native disclosures must expose a visible keyboard focus state");
-assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.disclosure summary/, "disclosures must retain a bounded mobile layout");
+assert.match(styles, /@media \(max-width: 767px\)[\s\S]*\.disclosure summary/, "disclosures must retain a bounded mobile layout");
 assert.match(styles, /\.informationLayout[\s\S]*\.ongoingTrustLayout[\s\S]*\.closingLayout/, "the six-chapter composition must retain responsive layout contracts");
 assert.doesNotMatch(styles, /\.processSequence/, "removed process content must not leave obsolete styling behind");
 
@@ -77,7 +77,9 @@ for (const contract of ["useSpatialCapability", "SpatialResizeObserver", "probeR
 }
 assert.match(canvas, /JOURNEY[\s\S]*progress: 0[\s\S]*progress: 1/, "camera choreography must use one directed beginning-to-end journey");
 assert.match(canvas, /position: \[5\.8, 3\.1, 15\][\s\S]*position: \[-4\.8, 1\.3, -15\][\s\S]*position: \[3\.8, -1\.4, -107\][\s\S]*position: \[0, 3\.6, -201\]/, "camera travel must vary laterally, vertically, and in depth before settling");
-assert.match(canvas, /quality === "full" \? 34 : quality === "constrained" \? 62 : 150/, "ambient rendering must remain bounded by capability tier");
+assert.match(canvas, /quality === "full" \? 34 : quality === "balanced" \? 62 : quality === "light" \? 92 : 180/, "ambient rendering must remain bounded by capability tier");
+assert.match(canvas, /applySpatialCameraFraming[\s\S]*data-spatial-profile/, "narrow Executive viewports must use a responsive camera profile");
+assert.match(canvas, /PublicSpatialErrorBoundary[\s\S]*PublicSpatialContextGuard/, "Executive WebGL failures must reveal the existing fallback");
 
 for (const scene of ["BusinessComplexityScene", "CommandSurfaceScene", "PerformanceLandscape", "ExecutiveFocusScene", "EvidenceDepthScene", "LeadershipControlScene", "HistoricalContextScene", "FinalCommandScene"]) {
   assert.match(world, new RegExp(`function ${scene}`), `${scene} must remain a distinct art-directed chapter`);
@@ -94,7 +96,7 @@ assert.doesNotMatch(world, /OrbitControls|FlyControls|MapControls|sphereGeometry
 
 assert.match(styles, /\.spatialCanvas,[\s\S]*position: fixed[\s\S]*height: 100svh/, "the Executive canvas must persist through the scroll journey");
 assert.match(styles, /\.hero[\s\S]*min-height: calc\(100svh - 4\.5rem\)/, "the hero must retain a complete first viewport and next chapter cue");
-assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.spatialCanvas[\s\S]*display: none[\s\S]*\.chapter,/, "mobile must use the image-backed semantic fallback rather than desktop camera travel");
+assert.doesNotMatch(styles, /\.spatialCanvas\s*\{[^}]*display:\s*none/s, "mobile must retain adaptive Executive WebGL when supported");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*transition: none/, "reduced motion must disable decorative transitions");
 
 const publicExecutiveSources = [page, backdrop, canvas, world].join("\n");

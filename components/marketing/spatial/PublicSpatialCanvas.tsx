@@ -2,7 +2,7 @@
 
 import { Line, RoundedBox } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   CatmullRomCurve3,
   Color,
@@ -13,8 +13,14 @@ import {
   Vector3
 } from "three";
 import { probeRenderedCanvas, type CanvasPixelProbeResult } from "@/components/spatial/CanvasPixelProbe";
+import { PublicSpatialContextGuard, PublicSpatialErrorBoundary } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
-import { useSpatialCapability, type SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
+import { applySpatialCameraFraming } from "@/components/spatial/spatialCameraFraming";
+import {
+  useSpatialCapability,
+  type SpatialQualityTier,
+  type SpatialViewportProfile
+} from "@/components/spatial/useSpatialCapability";
 
 type JourneyPoint = Readonly<{
   progress: number;
@@ -66,14 +72,14 @@ function FrameScheduler({ quality }: { quality: SpatialQualityTier }) {
   useEffect(() => {
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "hidden") invalidate();
-    }, quality === "full" ? 34 : 58);
+    }, quality === "full" ? 34 : quality === "balanced" ? 58 : quality === "light" ? 90 : 180);
     return () => window.clearInterval(interval);
   }, [invalidate, quality]);
 
   return null;
 }
 
-function JourneyCamera({ reducedMotion }: { reducedMotion: boolean }) {
+function JourneyCamera({ profile, reducedMotion }: { profile: SpatialViewportProfile; reducedMotion: boolean }) {
   const { camera } = useThree();
   const targetProgress = useRef(0);
   const currentProgress = useRef(0);
@@ -101,8 +107,9 @@ function JourneyCamera({ reducedMotion }: { reducedMotion: boolean }) {
     currentProgress.current = reducedMotion
       ? targetProgress.current
       : MathUtils.damp(currentProgress.current, targetProgress.current, 4.2, delta);
-    const fov = sampleJourney(currentProgress.current, "position", nextPosition.current);
+    const sampledFov = sampleJourney(currentProgress.current, "position", nextPosition.current);
     sampleJourney(currentProgress.current, "target", nextTarget.current);
+    const fov = applySpatialCameraFraming(nextPosition.current, nextTarget.current, sampledFov, profile);
     camera.position.copy(nextPosition.current);
     camera.lookAt(nextTarget.current);
     if ("fov" in camera) {
@@ -611,7 +618,9 @@ function DeepArchitecture({ quality }: { quality: SpatialQualityTier }) {
         [12, 3, -61, 5, 12, 6], [-13, 2, -78, 6, 14, 5], [12, -2, -94, 6, 12, 5],
         [-14, 1, -111, 7, 15, 6], [11, -1, -125, 7, 12, 7]
       ]
-    : [[-11, 2, -16, 4, 10, 3], [10, -2, -49, 5, 9, 4], [-10, 1, -89, 5, 11, 4], [9, 0, -118, 6, 10, 5]];
+    : quality === "balanced"
+      ? [[-11, 2, -16, 4, 10, 3], [10, -2, -39, 5, 9, 4], [-10, 1, -65, 5, 11, 4], [9, 0, -89, 6, 10, 5], [-9, 1, -111, 5, 10, 4], [9, 0, -128, 6, 10, 5]]
+      : [[-11, 2, -16, 4, 10, 3], [10, -2, -49, 5, 9, 4], [-10, 1, -89, 5, 11, 4], [9, 0, -118, 6, 10, 5]];
   return (
     <group>
       {specs.map(([x, y, z, sx, sy, sz], index) => (
@@ -624,6 +633,7 @@ function DeepArchitecture({ quality }: { quality: SpatialQualityTier }) {
 }
 
 function PublicWorld({ quality }: { quality: SpatialQualityTier }) {
+  const balancedOrFull = quality === "full" || quality === "balanced";
   return (
     <>
       <color attach="background" args={[new Color("#02050a")]} />
@@ -631,14 +641,14 @@ function PublicWorld({ quality }: { quality: SpatialQualityTier }) {
       <ambientLight intensity={0.16} color="#7798ad" />
       <hemisphereLight intensity={0.3} color="#a8d8ed" groundColor="#010308" />
       <directionalLight position={[-8, 12, 16]} intensity={2.35} color="#d8f1ff" />
-      <directionalLight position={[11, -3, -44]} intensity={1.1} color="#327da3" />
-      <spotLight position={[8, 8, 4]} target-position={[0, 0, -28]} intensity={110} angle={0.48} penumbra={0.86} distance={65} color="#61cfff" />
+      {balancedOrFull ? <directionalLight position={[11, -3, -44]} intensity={1.1} color="#327da3" /> : null}
+      {balancedOrFull ? <spotLight position={[8, 8, 4]} target-position={[0, 0, -28]} intensity={110} angle={0.48} penumbra={0.86} distance={65} color="#61cfff" /> : null}
       <pointLight position={[7, 1, -8]} intensity={30} distance={27} color="#65dbff" />
-      <pointLight position={[-7, -1, -31]} intensity={34} distance={28} color="#2f85ff" />
+      {balancedOrFull ? <pointLight position={[-7, -1, -31]} intensity={34} distance={28} color="#2f85ff" /> : null}
       <pointLight position={[5, 1, -50]} intensity={24} distance={24} color="#d9f7ff" />
-      <pointLight position={[-5, 1, -69]} intensity={30} distance={26} color="#49bde8" />
+      {balancedOrFull ? <pointLight position={[-5, 1, -69]} intensity={30} distance={26} color="#49bde8" /> : null}
       <pointLight position={[6, 2, -88]} intensity={28} distance={25} color="#d9f7ff" />
-      <pointLight position={[0, 1, -113]} intensity={34} distance={30} color="#65dbff" />
+      {balancedOrFull ? <pointLight position={[0, 1, -113]} intensity={34} distance={30} color="#65dbff" /> : null}
       <HeroArchitecture quality={quality} />
       <IntelligenceSystemsChamber quality={quality} />
       <ConvergenceArchitecture quality={quality} />
@@ -654,29 +664,49 @@ function PublicWorld({ quality }: { quality: SpatialQualityTier }) {
 export default function PublicSpatialCanvas() {
   const capability = useSpatialCapability();
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
+  const [renderFailed, setRenderFailed] = useState(false);
+  const handleRenderFailure = useCallback(() => setRenderFailed(true), []);
 
   if (!capability.ready) return null;
-  if (!capability.available || !capability.quality) {
+  if (renderFailed || !capability.available || !capability.quality) {
     return <div className="vaeroex-public-spatial-fallback" data-public-spatial-fallback={capability.reason || "unavailable"} aria-hidden="true" />;
   }
 
   const quality = capability.quality;
-  const dpr: [number, number] = quality === "full" ? [1, 1.45] : [1, 1.12];
+  const dpr: [number, number] = quality === "full"
+    ? [1, 1.45]
+    : quality === "balanced"
+      ? [0.85, 1.12]
+      : quality === "light"
+        ? [0.65, 0.86]
+        : [0.7, 0.9];
+  const fallback = <div className="vaeroex-public-spatial-fallback" data-public-spatial-fallback="rendering_failure" aria-hidden="true" />;
 
   return (
-    <div className="vaeroex-public-spatial-canvas" data-public-spatial-canvas data-canvas-pixels={pixelProbe} aria-hidden="true">
-      <Canvas
-        camera={{ position: [0.4, 1.4, 15], fov: 43, near: 0.1, far: 190 }}
-        dpr={dpr}
-        frameloop="demand"
-        gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
-        resize={{ polyfill: SpatialResizeObserver }}
-        onCreated={(state) => probeRenderedCanvas(state, setPixelProbe)}
+    <PublicSpatialErrorBoundary fallback={fallback} onFailure={handleRenderFailure}>
+      <div
+        className="vaeroex-public-spatial-canvas"
+        data-public-spatial-canvas
+        data-spatial-webgl
+        data-spatial-quality={quality}
+        data-spatial-profile={capability.profile}
+        data-canvas-pixels={pixelProbe}
+        aria-hidden="true"
       >
-        <PublicWorld quality={quality} />
-        <JourneyCamera reducedMotion={quality === "reduced_motion"} />
-        <FrameScheduler quality={quality} />
-      </Canvas>
-    </div>
+        <Canvas
+          camera={{ position: [0.4, 1.4, 15], fov: 43, near: 0.1, far: 190 }}
+          dpr={dpr}
+          frameloop="demand"
+          gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
+          resize={{ polyfill: SpatialResizeObserver }}
+          onCreated={(state) => probeRenderedCanvas(state, setPixelProbe)}
+        >
+          <PublicSpatialContextGuard onFailure={handleRenderFailure} />
+          <PublicWorld quality={quality} />
+          <JourneyCamera profile={capability.profile} reducedMotion={quality === "reduced_motion"} />
+          <FrameScheduler quality={quality} />
+        </Canvas>
+      </div>
+    </PublicSpatialErrorBoundary>
   );
 }

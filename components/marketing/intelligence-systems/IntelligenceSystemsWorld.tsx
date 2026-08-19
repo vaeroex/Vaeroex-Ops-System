@@ -247,7 +247,7 @@ function CylinderBetween({ start, end, radius = 0.035, color = steel }: { start:
 }
 
 function RawComplexityScene({ quality }: { quality: SpatialQualityTier }) {
-  const fragments = quality === "full" ? 14 : 8;
+  const fragments = quality === "full" ? 14 : quality === "balanced" ? 10 : 7;
   return (
     <group position={[0, 0, -8]}>
       <TechnicalFrame position={[-2.2, 1.6, -1]} width={7.8} height={5.5} rotation={[0.12, 0.36, -0.05]} accent="#3e7894" opacity={0.3} />
@@ -362,7 +362,7 @@ function ActionScene() {
 }
 
 function IntelligenceRevealScene({ quality }: { quality: SpatialQualityTier }) {
-  const frameCount = quality === "full" ? 8 : 5;
+  const frameCount = quality === "full" ? 8 : quality === "balanced" ? 6 : 4;
   return (
     <group position={[0, 0, -130]}>
       <ArchitecturalSlab position={[-6.6, 0, -0.6]} scale={[0.18, 9.8, 0.5]} tone="steel" emissive={electric} emissiveIntensity={2.2} />
@@ -511,7 +511,7 @@ function BiologicalDestination() {
 }
 
 function ClosingScene({ quality }: { quality: SpatialQualityTier }) {
-  const count = quality === "full" ? 7 : 5;
+  const count = quality === "full" ? 7 : quality === "balanced" ? 6 : 4;
   return (
     <group position={[0, 0, -256]}>
       {Array.from({ length: count }, (_, index) => (
@@ -537,7 +537,9 @@ function ClosingScene({ quality }: { quality: SpatialQualityTier }) {
 function DeepEnvironment({ quality }: { quality: SpatialQualityTier }) {
   const anchors = quality === "full"
     ? [-18, -45, -69, -94, -120, -145, -170, -195, -221, -247, -273]
-    : [-18, -57, -105, -154, -204, -256];
+    : quality === "balanced"
+      ? [-18, -57, -94, -132, -170, -210, -256]
+      : [-18, -82, -154, -220, -256];
   return (
     <group>
       {anchors.map((z, index) => {
@@ -562,6 +564,7 @@ export function IntelligenceSystemsWorld({
   quality: SpatialQualityTier;
   progress: MutableRefObject<number>;
 }) {
+  const balancedOrFull = quality === "full" || quality === "balanced";
   return (
     <>
       <color attach="background" args={[new Color("#02050a")]} />
@@ -569,14 +572,14 @@ export function IntelligenceSystemsWorld({
       <ambientLight intensity={0.12} color="#6b8291" />
       <hemisphereLight intensity={0.32} color="#c4deea" groundColor="#010205" />
       <directionalLight position={[-9, 14, 18]} intensity={2.5} color="#d9eff7" />
-      <directionalLight position={[11, -3, -118]} intensity={0.8} color="#4c7ca6" />
-      <spotLight position={[8, 9, 5]} intensity={92} angle={0.44} penumbra={0.9} distance={70} decay={2} color="#5fc9ef" />
+      {balancedOrFull ? <directionalLight position={[11, -3, -118]} intensity={0.8} color="#4c7ca6" /> : null}
+      {balancedOrFull ? <spotLight position={[8, 9, 5]} intensity={92} angle={0.44} penumbra={0.9} distance={70} decay={2} color="#5fc9ef" /> : null}
       <pointLight position={[-6, 1, -32]} intensity={18} distance={28} decay={2} color="#65d9ff" />
-      <pointLight position={[6, 1, -79]} intensity={14} distance={30} decay={2} color="#7a9fd2" />
+      {balancedOrFull ? <pointLight position={[6, 1, -79]} intensity={14} distance={30} decay={2} color="#7a9fd2" /> : null}
       <pointLight position={[0, 2, -129]} intensity={42} distance={40} decay={2} color="#c9f3ff" />
-      <pointLight position={[-5, 1, -179]} intensity={18} distance={30} decay={2} color="#65d9ff" />
+      {balancedOrFull ? <pointLight position={[-5, 1, -179]} intensity={18} distance={30} decay={2} color="#65d9ff" /> : null}
       <pointLight position={[5, 0, -204]} intensity={16} distance={28} decay={2} color="#67d9ca" />
-      <pointLight position={[-4, 1, -230]} intensity={16} distance={30} decay={2} color="#78bfff" />
+      {balancedOrFull ? <pointLight position={[-4, 1, -230]} intensity={16} distance={30} decay={2} color="#78bfff" /> : null}
       <pointLight position={[0, 2, -257]} intensity={24} distance={34} decay={2} color="#dff7ff" />
       <RawComplexityScene quality={quality} />
       <VisibilityScene progress={progress} />

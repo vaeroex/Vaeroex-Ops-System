@@ -17,6 +17,9 @@ const intelligenceSystemsStyles = read("app/intelligence-systems/intelligence-sy
 const intelligenceSystemsBackdrop = read("components/marketing/intelligence-systems/IntelligenceSystemsSpatialBackdrop.tsx");
 const intelligenceSystemsCanvas = read("components/marketing/intelligence-systems/IntelligenceSystemsSpatialCanvas.tsx");
 const intelligenceSystemsWorld = read("components/marketing/intelligence-systems/IntelligenceSystemsWorld.tsx");
+const capability = `${read("components/spatial/useSpatialCapability.ts")}\n${read("components/spatial/spatialCapability.ts")}`;
+const framing = read("components/spatial/spatialCameraFraming.ts");
+const guard = read("components/spatial/PublicSpatialCanvasGuard.tsx");
 
 assert.match(homepage, /data-public-spatial-journey/, "the homepage must own one coherent scroll journey");
 assert.match(homepage, /vaeroex-public-hero-brand[\s\S]*<h1>VAEROEX<\/h1>[\s\S]*vaeroex-public-hero-category">Intelligence Systems/, "the hero must present Vaeroex as the overarching Intelligence Systems identity");
@@ -35,7 +38,9 @@ assert.match(canvas, /useSpatialCapability/, "public WebGL must use the existing
 assert.match(canvas, /SpatialResizeObserver/, "public WebGL must receive a reliable initial measurement");
 assert.match(canvas, /probeRenderedCanvas/, "public WebGL must retain a bounded nonblank framebuffer check");
 assert.match(canvas, /frameloop="demand"/, "the public environment must use bounded on-demand rendering");
-assert.match(canvas, /FrameScheduler[\s\S]*quality === "full" \? 34 : 58/, "ambient rendering must be tier-aware and bounded");
+assert.match(canvas, /quality === "full" \? 34 : quality === "balanced" \? 58 : quality === "light" \? 90 : 180/, "ambient rendering must be bounded across every adaptive quality tier");
+assert.match(canvas, /data-spatial-quality[\s\S]*data-spatial-profile/, "the homepage canvas must expose its selected quality and composition profile");
+assert.match(canvas, /PublicSpatialErrorBoundary[\s\S]*PublicSpatialContextGuard/, "the homepage must fail over cleanly after initialization or context loss");
 assert.match(canvas, /JOURNEY[\s\S]*progress: 0[\s\S]*progress: 1/, "camera choreography must use an explicit directed journey");
 assert.match(canvas, /HeroArchitecture[\s\S]*IntelligenceSystemsChamber[\s\S]*ConvergenceArchitecture[\s\S]*ExecutiveIntelligenceDock[\s\S]*DecisionCorridor[\s\S]*EvidenceArchitecture[\s\S]*ClosingArchitecture/, "the world must use distinct art-directed chapter architecture");
 for (const system of ["ComputationalBank", "RecessedChannelDeck", "ArchitecturalBridge", "SuspendedPlaneArray", "SignalCorridor"]) {
@@ -51,7 +56,7 @@ assert.match(styles, /\.vaeroex-public-spatial-canvas[\s\S]*position: fixed[\s\S
 assert.match(styles, /\.vaeroex-public-chapter--hero[\s\S]*min-height: calc\(100svh - 6\.5rem\)/, "the first viewport must retain space for the next chapter");
 assert.match(homepage, /vaeroex-next-chapter-label[\s\S]*02 \/ Intelligence/, "the first viewport must reveal a meaningful next-chapter cue");
 assert.match(styles, /\.vaeroex-method-list[\s\S]*grid-template-columns/, "the company intelligence path must use a stable dimensional layout");
-assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.vaeroex-public-spatial-canvas[\s\S]*display: none/, "mobile and coarse-pointer visitors must receive the image-backed DOM experience");
+assert.doesNotMatch(styles, /@media \(max-width: 767px\)[\s\S]{0,300}\.vaeroex-public-spatial-canvas\s*\{[^}]*display:\s*none/, "capable mobile visitors must not lose the public WebGL canvas by stylesheet rule");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*animation: none/, "reduced motion must disable decorative movement");
 assert.match(primitives, /vaeroex-intelligence-environment\.png|vaeroex-public-hero__veil/, "secondary public-page heroes must share the authored visual environment");
 assert.match(header, /Intelligence Systems/, "global public navigation must expose the company category");
@@ -73,7 +78,7 @@ for (const contract of ["useSpatialCapability", "SpatialResizeObserver", "probeR
 }
 assert.match(intelligenceSystemsCanvas, /JOURNEY[\s\S]*progress: 0[\s\S]*progress: 1/, "the page must use an explicit beginning-to-end camera journey");
 assert.match(intelligenceSystemsCanvas, /position: \[4\.5, 3, 14\][\s\S]*position: \[-5\.2, 1\.2, -17\][\s\S]*position: \[0, 5, -110\][\s\S]*position: \[0, 4, -241\]/, "camera choreography must vary laterally, vertically, and in depth before settling");
-assert.match(intelligenceSystemsCanvas, /quality === "full" \? 34 : quality === "constrained" \? 62 : 150/, "ambient rendering must remain bounded by capability tier");
+assert.match(intelligenceSystemsCanvas, /quality === "full" \? 34 : quality === "balanced" \? 62 : quality === "light" \? 94 : 180/, "ambient rendering must remain bounded across all capability tiers");
 assert.match(intelligenceSystemsCanvas, /ACESFilmicToneMapping[\s\S]*SRGBColorSpace/, "the page-specific world must use a controlled production color pipeline");
 
 for (const scene of ["RawComplexityScene", "VisibilityScene", "AwarenessScene", "PredictionScene", "ActionScene", "IntelligenceRevealScene", "SpecializationScene", "ExecutiveDestination", "DrugDiscoveryDestination", "BiologicalDestination", "ClosingScene"]) {
@@ -89,7 +94,18 @@ assert.doesNotMatch(intelligenceSystemsWorld, /OrbitControls|FlyControls|MapCont
 
 assert.match(intelligenceSystemsStyles, /\.spatialCanvas,[\s\S]*position: fixed[\s\S]*height: 100svh/, "the page-specific canvas must persist across its directed scroll journey");
 assert.match(intelligenceSystemsStyles, /\.hero[\s\S]*min-height: calc\(100svh - 4\.5rem\)/, "the hero must preserve a complete first viewport with a next-chapter cue");
-assert.match(intelligenceSystemsStyles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*background-attachment: scroll[\s\S]*\.chapter,[\s\S]*min-height: auto/, "mobile and coarse-pointer visitors must receive the image-backed semantic journey");
+assert.match(intelligenceSystemsStyles, /@media \(max-width: 767px\)[\s\S]*background-attachment: scroll[\s\S]*\.chapter,[\s\S]*min-height: auto/, "mobile visitors must retain the readable semantic journey over adaptive WebGL");
 assert.match(intelligenceSystemsStyles, /@media \(prefers-reduced-motion: reduce\)[\s\S]*transition: none/, "reduced-motion visitors must retain the full narrative without decorative transitions");
+
+assert.match(capability, /SpatialQualityTier = "full" \| "balanced" \| "light" \| "reduced_motion"/, "the shared public capability system must expose full, balanced, light, and reduced-motion tiers");
+assert.match(capability, /MAX_TEXTURE_SIZE[\s\S]*hardwareConcurrency[\s\S]*deviceMemory/, "quality selection must use rendering and hardware capability signals");
+assert.match(capability, /coarsePointer[\s\S]*adaptiveViewport/, "touch input may inform quality without disabling WebGL");
+assert.doesNotMatch(capability, /reason: "mobile"|allowMobile|userAgent/i, "device labels must never be fallback reasons or quality authorities");
+assert.match(capability, /window\.addEventListener\("resize", evaluateAfterResize/, "orientation and browser viewport changes must recompute the spatial profile");
+for (const profile of ["wide", "tablet_landscape", "tablet_portrait", "phone"]) {
+  assert.match(framing, new RegExp(`${profile}:`), `responsive camera framing must define ${profile}`);
+}
+assert.match(framing, /if \(profile === "wide"\) return fov/, "the approved wide desktop camera must remain unchanged");
+assert.match(guard, /getDerivedStateFromError[\s\S]*webglcontextlost[\s\S]*onFailure/, "render errors and WebGL context loss must both reach the premium fallback");
 
 process.stdout.write("Public spatial experience regressions passed.\n");

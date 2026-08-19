@@ -4,6 +4,7 @@ import { Line } from "@react-three/drei";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -25,8 +26,14 @@ import {
 } from "three";
 import styles from "@/app/drug-discovery-intelligence/drug-discovery.module.css";
 import { probeRenderedCanvas, type CanvasPixelProbeResult } from "@/components/spatial/CanvasPixelProbe";
+import { PublicSpatialContextGuard, PublicSpatialErrorBoundary } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
-import { useSpatialCapability, type SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
+import { applySpatialCameraFraming } from "@/components/spatial/spatialCameraFraming";
+import {
+  useSpatialCapability,
+  type SpatialQualityTier,
+  type SpatialViewportProfile
+} from "@/components/spatial/useSpatialCapability";
 import {
   AnimatedMolecule,
   MOLECULE_LIBRARY,
@@ -85,7 +92,7 @@ function sampleJourney(progress: number, key: "position" | "target", target: Vec
   return MathUtils.lerp(from.fov, to.fov, local);
 }
 
-function JourneyDirector({ quality, children }: { quality: SpatialQualityTier; children: ReactNode }) {
+function JourneyDirector({ profile, quality, children }: { profile: SpatialViewportProfile; quality: SpatialQualityTier; children: ReactNode }) {
   const { camera, pointer } = useThree();
   const targetProgress = useRef(0);
   const currentProgress = useRef(0);
@@ -116,17 +123,25 @@ function JourneyDirector({ quality, children }: { quality: SpatialQualityTier; c
       : MathUtils.damp(currentProgress.current, targetProgress.current, 4.4, delta);
 
     if (reducedMotion) {
-      camera.position.set(3.4, 2.4, 15);
-      camera.lookAt(0, 0, -7);
+      nextPosition.current.set(3.4, 2.4, 15);
+      nextTarget.current.set(0, 0, -7);
+      const fov = applySpatialCameraFraming(nextPosition.current, nextTarget.current, 42, profile);
+      camera.position.copy(nextPosition.current);
+      camera.lookAt(nextTarget.current);
+      if ("fov" in camera) {
+        camera.fov = fov;
+        camera.updateProjectionMatrix();
+      }
       return;
     }
 
-    const fov = sampleJourney(currentProgress.current, "position", nextPosition.current);
+    const sampledFov = sampleJourney(currentProgress.current, "position", nextPosition.current);
     sampleJourney(currentProgress.current, "target", nextTarget.current);
     if (quality === "full") {
       nextPosition.current.x += pointer.x * 0.28;
       nextPosition.current.y += pointer.y * 0.16;
     }
+    const fov = applySpatialCameraFraming(nextPosition.current, nextTarget.current, sampledFov, profile);
     camera.position.copy(nextPosition.current);
     camera.lookAt(nextTarget.current);
     if ("fov" in camera) {
@@ -142,7 +157,7 @@ function FrameScheduler({ quality }: { quality: SpatialQualityTier }) {
   const { invalidate } = useThree();
 
   useEffect(() => {
-    const delay = quality === "full" ? 34 : quality === "constrained" ? 58 : 120;
+    const delay = quality === "full" ? 34 : quality === "balanced" ? 58 : quality === "light" ? 88 : 170;
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "hidden") invalidate();
     }, delay);
@@ -178,7 +193,7 @@ function CandidateField({ quality }: { quality: SpatialQualityTier }) {
   const bondMesh = useRef<InstancedMesh>(null);
   const possibilityPoints = useRef<Group>(null);
   const { progress } = useJourneyState();
-  const count = quality === "full" ? 84 : quality === "constrained" ? 42 : 18;
+  const count = quality === "full" ? 84 : quality === "balanced" ? 42 : 18;
   const dummy = useMemo(() => new Object3D(), []);
   const up = useMemo(() => new Vector3(0, 1, 0), []);
   const clusterCenters = useMemo<readonly Point3[]>(() => [
@@ -219,7 +234,7 @@ function CandidateField({ quality }: { quality: SpatialQualityTier }) {
     };
   }), [clusterCenters, count]);
   const distantPositions = useMemo(() => {
-    const pointCount = quality === "full" ? 220 : quality === "constrained" ? 96 : 36;
+    const pointCount = quality === "full" ? 220 : quality === "balanced" ? 96 : 36;
     const positions = new Float32Array(pointCount * 3);
     for (let index = 0; index < pointCount; index += 1) {
       const cluster = clusterCenters[index % clusterCenters.length];
@@ -456,7 +471,7 @@ const evidenceNodes = [
 function EvidenceNetwork({ quality }: { quality: SpatialQualityTier }) {
   const nodeMesh = useRef<InstancedMesh>(null);
   const dummy = useMemo(() => new Object3D(), []);
-  const nodeCount = quality === "full" ? evidenceNodes.length : 6;
+  const nodeCount = quality === "full" ? evidenceNodes.length : quality === "balanced" ? 6 : 4;
   const { progress } = useJourneyState();
   const featureAnchors = [
     [-0.72, 0.18, -71.95], [0.5, 0.35, -71.92], [-0.28, -0.5, -71.9], [0.78, -0.22, -71.94]
@@ -564,6 +579,7 @@ function ReducedScientificWorld() {
 
 function DrugDiscoveryWorld({ quality }: { quality: SpatialQualityTier }) {
   const reducedMotion = quality === "reduced_motion";
+  const balancedOrFull = quality === "full" || quality === "balanced";
   return (
     <>
       <color attach="background" args={[new Color("#020609")]} />
@@ -571,10 +587,10 @@ function DrugDiscoveryWorld({ quality }: { quality: SpatialQualityTier }) {
       <ambientLight intensity={0.18} color="#759eaa" />
       <hemisphereLight intensity={0.34} color="#b9eaf0" groundColor="#010304" />
       <directionalLight position={[-8, 12, 14]} intensity={2.4} color="#daf5f4" />
-      <directionalLight position={[10, -2, -44]} intensity={1.1} color="#247887" />
-      <spotLight position={[7, 8, 5]} target-position={[0, 0, -10]} intensity={95} angle={0.5} penumbra={0.9} distance={62} color="#64d9dd" />
+      {balancedOrFull ? <directionalLight position={[10, -2, -44]} intensity={1.1} color="#247887" /> : null}
+      {balancedOrFull ? <spotLight position={[7, 8, 5]} target-position={[0, 0, -10]} intensity={95} angle={0.5} penumbra={0.9} distance={62} color="#64d9dd" /> : null}
       <pointLight position={[-7, 1, -28]} intensity={28} distance={26} color="#4a9fc2" />
-      <pointLight position={[6, -1, -56]} intensity={32} distance={28} color="#78e0d7" />
+      {balancedOrFull ? <pointLight position={[6, -1, -56]} intensity={32} distance={28} color="#78e0d7" /> : null}
       <pointLight position={[-5, 1, -73]} intensity={24} distance={23} color="#d4eaa0" />
       {reducedMotion ? (
         <ReducedScientificWorld />
@@ -607,32 +623,52 @@ function ScientificFallback({ reason }: { reason: string }) {
 }
 
 export default function DrugDiscoverySpatialCanvas() {
-  const capability = useSpatialCapability({ allowMobile: true });
+  const capability = useSpatialCapability();
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
+  const [renderFailed, setRenderFailed] = useState(false);
+  const handleRenderFailure = useCallback(() => setRenderFailed(true), []);
 
   if (!capability.ready) return null;
-  if (!capability.available || !capability.quality) {
+  if (renderFailed || !capability.available || !capability.quality) {
     return <ScientificFallback reason={capability.reason || "unavailable"} />;
   }
 
   const quality = capability.quality;
-  const dpr: [number, number] = quality === "full" ? [1, 1.4] : quality === "constrained" ? [0.85, 1.08] : [0.8, 1];
+  const dpr: [number, number] = quality === "full"
+    ? [1, 1.4]
+    : quality === "balanced"
+      ? [0.82, 1.05]
+      : quality === "light"
+        ? [0.62, 0.82]
+        : [0.68, 0.88];
+  const fallback = <ScientificFallback reason="rendering_failure" />;
 
   return (
-    <div className={styles.spatialCanvas} data-drug-discovery-canvas data-spatial-quality={quality} data-canvas-pixels={pixelProbe} aria-hidden="true">
-      <Canvas
-        camera={{ position: [3.4, 2.4, 15], fov: 42, near: 0.1, far: 180 }}
-        dpr={dpr}
-        frameloop="demand"
-        gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
-        resize={{ polyfill: SpatialResizeObserver }}
-        onCreated={(state) => probeRenderedCanvas(state, setPixelProbe)}
+    <PublicSpatialErrorBoundary fallback={fallback} onFailure={handleRenderFailure}>
+      <div
+        className={styles.spatialCanvas}
+        data-drug-discovery-canvas
+        data-spatial-webgl
+        data-spatial-quality={quality}
+        data-spatial-profile={capability.profile}
+        data-canvas-pixels={pixelProbe}
+        aria-hidden="true"
       >
-        <JourneyDirector quality={quality}>
-          <DrugDiscoveryWorld quality={quality} />
-        </JourneyDirector>
-        <FrameScheduler quality={quality} />
-      </Canvas>
-    </div>
+        <Canvas
+          camera={{ position: [3.4, 2.4, 15], fov: 42, near: 0.1, far: 180 }}
+          dpr={dpr}
+          frameloop="demand"
+          gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
+          resize={{ polyfill: SpatialResizeObserver }}
+          onCreated={(state) => probeRenderedCanvas(state, setPixelProbe)}
+        >
+          <PublicSpatialContextGuard onFailure={handleRenderFailure} />
+          <JourneyDirector profile={capability.profile} quality={quality}>
+            <DrugDiscoveryWorld quality={quality} />
+          </JourneyDirector>
+          <FrameScheduler quality={quality} />
+        </Canvas>
+      </div>
+    </PublicSpatialErrorBoundary>
   );
 }

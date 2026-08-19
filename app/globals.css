@@ -1026,15 +1026,11 @@ button.bg-vaeroex-blue:hover {
   }
 }
 
-@media (max-width: 767px), (pointer: coarse) {
+@media (max-width: 767px) {
   .vaeroex-public-journey {
     background-attachment: scroll;
     background-position: 58% top;
     background-size: auto 100svh;
-  }
-
-  .vaeroex-public-spatial-canvas {
-    display: none;
   }
 
   .vaeroex-public-spatial-fallback,
