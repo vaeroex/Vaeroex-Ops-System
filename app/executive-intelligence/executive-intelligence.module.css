@@ -619,35 +619,79 @@
   background: rgba(4, 12, 19, 0.54);
 }
 
-.evidenceLedger article {
-  display: grid;
-  grid-template-columns: 2.4rem minmax(11rem, 0.42fr) minmax(0, 0.58fr);
-  gap: 1rem;
-  align-items: start;
-  padding: 1.55rem 1rem;
+.disclosure {
   border-bottom: 1px solid rgba(122, 202, 224, 0.13);
 }
 
-.evidenceLedger article:last-child {
+.disclosure:last-child {
   border-bottom: 0;
 }
 
-.evidenceLedger article > span {
+.disclosure summary {
+  display: grid;
+  grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: start;
+  padding: 1.35rem 1rem;
+  cursor: pointer;
+  list-style: none;
+}
+
+.disclosure summary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosure summary:focus-visible {
+  outline: 2px solid rgba(154, 230, 249, 0.78);
+  outline-offset: -2px;
+}
+
+.disclosureIndex {
   color: #6fc8df;
   font-size: 0.62rem;
   font-weight: 750;
 }
 
-.evidenceLedger h3 {
+.disclosureLabel {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.disclosureLabel strong {
   color: #e7f2f5;
   font-size: 0.95rem;
   font-weight: 650;
 }
 
-.evidenceLedger p {
+.disclosureLabel > span,
+.disclosure > p {
   color: #94a9b1;
   font-size: 0.82rem;
   line-height: 1.65;
+}
+
+.disclosureAction {
+  color: #77c9df;
+  font-size: 0.62rem;
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.disclosureAction::after {
+  display: inline-block;
+  margin-left: 0.45rem;
+  content: "+";
+}
+
+.disclosure[open] .disclosureAction::after {
+  content: "−";
+}
+
+.disclosure > p {
+  max-width: 44rem;
+  margin: -0.15rem 1rem 1.4rem 3.4rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(122, 202, 224, 0.1);
 }
 
 .iconFrame {
@@ -1057,12 +1101,16 @@
     font-size: 1.15rem;
   }
 
-  .evidenceLedger article {
-    grid-template-columns: 2rem 1fr;
+  .disclosure summary {
+    grid-template-columns: 2rem minmax(0, 1fr);
   }
 
-  .evidenceLedger p {
+  .disclosureAction {
     grid-column: 2;
+  }
+
+  .disclosure > p {
+    margin-left: 3rem;
   }
 
   .contextSecondary {
@@ -1089,7 +1137,8 @@
 
   .journeyIndex a,
   .secondaryAction,
-  .primaryAction {
+  .primaryAction,
+  .disclosure summary {
     transition: none;
   }
 }
