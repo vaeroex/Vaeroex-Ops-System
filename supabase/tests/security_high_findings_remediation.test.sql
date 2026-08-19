@@ -1,3 +1,5 @@
+create extension if not exists dblink with schema extensions;
+
 begin;
 
 create extension if not exists pgtap with schema extensions;
@@ -60,6 +62,19 @@ insert into public.forms (id, workspace_id, name, is_public, public_slug, schema
     '[{"key":"summary","required":true}]'::jsonb,
     'a6900000-0000-4000-8000-000000000001'
   );
+
+-- Production predates Supabase's opt-in Data API grant default. Current fresh
+-- stacks therefore need a rollback-only adapter so these tests reach the same
+-- RLS boundary instead of failing earlier at the object ACL. Grant only the
+-- columns and operations exercised below; all grants disappear with rollback.
+grant select (id, name) on table public.workspaces to authenticated;
+grant select (id, workspace_id, user_id, role, status, invited_email, invited_by, created_at)
+  on table public.workspace_members to authenticated;
+grant insert (workspace_id, user_id, role, status)
+  on table public.workspace_members to authenticated;
+grant update (role) on table public.workspace_members to authenticated;
+grant insert (workspace_id, form_id, data_json)
+  on table public.form_submissions to authenticated;
 
 select ok(
   not has_table_privilege('authenticated', 'public.workspaces', 'INSERT'),
@@ -360,6 +375,149 @@ select ok(
   ),
   'the signed service-role workspace creation workflow remains authorized'
 );
+
+reset role;
+
+create temporary table concurrent_rate_limit_results (
+  allowed boolean not null,
+  request_count integer not null
+) on commit drop;
+
+select extensions.dblink_connect(
+  connection_name,
+  -- Loopback is trusted by the local image, which dblink correctly rejects for
+  -- non-superusers. The database's Docker address uses password authentication.
+  format(
+    'host=%s port=%s dbname=%s user=postgres password=postgres',
+    inet_server_addr(),
+    inet_server_port(),
+    current_database()
+  )
+)
+from (
+  values
+    ('rate_limit_concurrency_1'),
+    ('rate_limit_concurrency_2'),
+    ('rate_limit_concurrency_3'),
+    ('rate_limit_concurrency_4'),
+    ('rate_limit_concurrency_5'),
+    ('rate_limit_concurrency_6'),
+    ('rate_limit_concurrency_7'),
+    ('rate_limit_concurrency_8')
+) as connections(connection_name);
+
+select extensions.dblink_exec(
+  'rate_limit_concurrency_1',
+  $cleanup$
+    delete from public.request_rate_limits
+    where action_key = 'security.concurrent-test'
+      and identifier_hash = repeat('b', 64)
+      and window_start = '2026-08-19T17:15:00Z'::timestamptz
+  $cleanup$
+);
+
+select extensions.dblink_send_query(
+  connection_name,
+  $query$
+    select allowed, request_count
+    from public.consume_request_rate_limit_v1(
+      'security.concurrent-test',
+      repeat('b', 64),
+      '2026-08-19T17:15:00Z'::timestamptz,
+      3,
+      '{}'::jsonb
+    )
+  $query$
+)
+from (
+  values
+    ('rate_limit_concurrency_1'),
+    ('rate_limit_concurrency_2'),
+    ('rate_limit_concurrency_3'),
+    ('rate_limit_concurrency_4'),
+    ('rate_limit_concurrency_5'),
+    ('rate_limit_concurrency_6'),
+    ('rate_limit_concurrency_7'),
+    ('rate_limit_concurrency_8')
+) as connections(connection_name);
+
+insert into concurrent_rate_limit_results (allowed, request_count)
+select result.allowed, result.request_count
+from (
+  values
+    ('rate_limit_concurrency_1'),
+    ('rate_limit_concurrency_2'),
+    ('rate_limit_concurrency_3'),
+    ('rate_limit_concurrency_4'),
+    ('rate_limit_concurrency_5'),
+    ('rate_limit_concurrency_6'),
+    ('rate_limit_concurrency_7'),
+    ('rate_limit_concurrency_8')
+) as connections(connection_name)
+cross join lateral extensions.dblink_get_result(connections.connection_name)
+  as result(allowed boolean, request_count integer);
+
+-- libpq exposes one final empty result after each asynchronous command. Drain
+-- it before issuing cleanup or disconnect commands on the same connections.
+do $drain$
+declare
+  connection_name text;
+begin
+  foreach connection_name in array array[
+    'rate_limit_concurrency_1',
+    'rate_limit_concurrency_2',
+    'rate_limit_concurrency_3',
+    'rate_limit_concurrency_4',
+    'rate_limit_concurrency_5',
+    'rate_limit_concurrency_6',
+    'rate_limit_concurrency_7',
+    'rate_limit_concurrency_8'
+  ] loop
+    perform *
+    from extensions.dblink_get_result(connection_name)
+      as result(allowed boolean, request_count integer);
+  end loop;
+end;
+$drain$;
+
+select is(
+  (select count(*)::integer from concurrent_rate_limit_results),
+  8,
+  'all concurrent quota attempts return one authoritative result'
+);
+select is(
+  (select count(*)::integer from concurrent_rate_limit_results where allowed),
+  3,
+  'concurrent quota attempts cannot consume more than the exact limit'
+);
+select is(
+  (select max(request_count) from concurrent_rate_limit_results),
+  3,
+  'concurrent quota accounting never advances beyond the configured boundary'
+);
+
+select extensions.dblink_exec(
+  'rate_limit_concurrency_1',
+  $cleanup$
+    delete from public.request_rate_limits
+    where action_key = 'security.concurrent-test'
+      and identifier_hash = repeat('b', 64)
+      and window_start = '2026-08-19T17:15:00Z'::timestamptz
+  $cleanup$
+);
+
+select extensions.dblink_disconnect(connection_name)
+from (
+  values
+    ('rate_limit_concurrency_1'),
+    ('rate_limit_concurrency_2'),
+    ('rate_limit_concurrency_3'),
+    ('rate_limit_concurrency_4'),
+    ('rate_limit_concurrency_5'),
+    ('rate_limit_concurrency_6'),
+    ('rate_limit_concurrency_7'),
+    ('rate_limit_concurrency_8')
+) as connections(connection_name);
 
 select * from finish();
 rollback;

@@ -1,5 +1,8 @@
 function securityHeaders() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const enforceFullCsp = process.env.VAEROEX_ENFORCE_CSP === "true";
+  const scriptEvalSource = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
+  const transportDirectives = process.env.NODE_ENV === "production" ? ["upgrade-insecure-requests"] : [];
   const supabaseOrigin = (() => {
     try {
       return supabaseUrl ? new URL(supabaseUrl).origin : "https://*.supabase.co";
@@ -13,21 +16,32 @@ function securityHeaders() {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self' https://checkout.stripe.com https://*.stripe.com",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.stripe.com https://checkout.stripe.com",
+    `script-src 'self' 'unsafe-inline'${scriptEvalSource} https://js.stripe.com https://checkout.stripe.com`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
     "font-src 'self' data:",
     `connect-src 'self' ${supabaseOrigin} https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://checkout.stripe.com https://vitals.vercel-insights.com`,
     "worker-src 'self' blob:",
     "frame-src 'self' https://js.stripe.com https://checkout.stripe.com",
-    "upgrade-insecure-requests"
+    ...transportDirectives
+  ].join("; ");
+  const enforcedBaselineCsp = [
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self' https://checkout.stripe.com https://*.stripe.com",
+    ...transportDirectives
   ].join("; ");
 
+  const cspHeaders = enforceFullCsp
+    ? [{ key: "Content-Security-Policy", value: csp }]
+    : [
+        { key: "Content-Security-Policy", value: enforcedBaselineCsp },
+        { key: "Content-Security-Policy-Report-Only", value: csp }
+      ];
+
   return [
-    {
-      key: process.env.VAEROEX_ENFORCE_CSP === "true" ? "Content-Security-Policy" : "Content-Security-Policy-Report-Only",
-      value: csp
-    },
+    ...cspHeaders,
     {
       key: "Strict-Transport-Security",
       value: "max-age=63072000; includeSubDomains; preload"

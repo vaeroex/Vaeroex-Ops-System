@@ -251,7 +251,8 @@ export async function GET(request: Request) {
     userId: user.id,
     workspaceId,
     identifiers: [query],
-    metadata: { source: "global_search" }
+    metadata: { source: "global_search" },
+    strict: true
   });
 
   if (!rateLimit.allowed) {
@@ -719,7 +720,8 @@ export async function POST(request: Request) {
       source: "persistent_ask",
       analysis_mode: analysisRequest.isFollowUp ? "follow_up" : "initial",
       follow_up_number: analysisRequest.followUpNumber
-    }
+    },
+    strict: true
   }));
 
   if (!rateLimit.allowed) {

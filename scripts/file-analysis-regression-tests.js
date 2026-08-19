@@ -6,10 +6,15 @@ const root = path.resolve(__dirname, "..");
 const read = (file) => fs.readFileSync(path.join(root, file), "utf8");
 
 const actions = read("app/app/files/actions.ts");
-const sources = read("app/app/sources/page.tsx");
+const sourcesRoute = read("app/app/sources/page.tsx");
+const sources = read("app/app/sources/SourcesPage.tsx");
 const workflows = read("lib/ai/vaeroex-workflows.ts");
 const client = read("lib/ai/vaeroex-client.ts");
 const openAiProvider = read("lib/ai/providers/openai-provider.ts");
+
+assert.match(sourcesRoute, /import SourcesPage from "@\/app\/app\/sources\/SourcesPage";/, "Sources route must delegate to its focused implementation module");
+assert.match(sourcesRoute, /export default SourcesPage;/, "Sources route must remain a thin App Router wrapper");
+assert.equal((sources.match(/<SourceFileDetailPanel\b/g) || []).length, 1, "Sources must render source detail through exactly one focused component path");
 
 const fileWorkflow = workflows.slice(
   workflows.indexOf('key: "file_analysis"')

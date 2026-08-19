@@ -2279,7 +2279,8 @@ export async function uploadFileAction(formData: FormData) {
     userId: user.id,
     workspaceId,
     identifiers: [user.email],
-    metadata: { source: "file_upload" }
+    metadata: { source: "file_upload" },
+    strict: true
   });
 
   if (!rateLimit.allowed) {
@@ -2896,7 +2897,8 @@ export async function importFileAction(formData: FormData) {
     userId: user.id,
     workspaceId,
     identifiers: [file.id, importType],
-    metadata: { source: "file_import_stage", file_id: file.id, import_type: importType }
+    metadata: { source: "file_import_stage", file_id: file.id, import_type: importType },
+    strict: true
   });
 
   if (!rateLimit.allowed) {
@@ -3891,7 +3893,8 @@ export async function saveExtractedImportAction(formData: FormData) {
     userId: user.id,
     workspaceId,
     identifiers: [file.id, importId, importType],
-    metadata: { source: "file_import_approval", file_id: file.id, import_id: importId, import_type: importType }
+    metadata: { source: "file_import_approval", file_id: file.id, import_id: importId, import_type: importType },
+    strict: true
   });
 
   if (!rateLimit.allowed) {
@@ -4243,7 +4246,8 @@ export async function analyzeFileAction(formData: FormData) {
     userId: user.id,
     workspaceId,
     identifiers: [file.id],
-    metadata: { source: "file_analysis", file_id: file.id }
+    metadata: { source: "file_analysis", file_id: file.id },
+    strict: true
   });
 
   if (!rateLimit.allowed) {
