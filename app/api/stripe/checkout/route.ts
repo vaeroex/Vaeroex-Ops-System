@@ -16,7 +16,8 @@ export async function GET(request: Request) {
       limit: 8,
       windowSeconds: 10 * 60,
       requestHeaders: request.headers,
-      metadata: { source: "pricing_checkout" }
+      metadata: { source: "pricing_checkout" },
+      strict: true
     });
 
     if (!rateLimit.allowed) {

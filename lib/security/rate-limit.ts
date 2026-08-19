@@ -23,7 +23,7 @@ type RateLimitOptions = {
   identifiers?: Array<string | null | undefined>;
   requestHeaders?: Headers;
   metadata?: Json;
-  strict?: boolean;
+  strict: boolean;
 };
 
 const FALLBACK_LIMIT_MESSAGE = "Too many requests. Please try again shortly.";
