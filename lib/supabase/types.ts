@@ -9,6 +9,23 @@ export type Database = {
         Args: Record<string, never>;
         Returns: void;
       };
+      can_contribute_workspace: {
+        Args: { target_workspace_id: string };
+        Returns: boolean;
+      };
+      consume_request_rate_limit_v1: {
+        Args: {
+          p_action_key: string;
+          p_identifier_hash: string;
+          p_window_start: string;
+          p_limit: number;
+          p_metadata_json?: Json;
+        };
+        Returns: Array<{
+          allowed: boolean;
+          request_count: number;
+        }>;
+      };
       assert_document_extraction_authority_v1: {
         Args: {
           p_artifact_fingerprint: string
