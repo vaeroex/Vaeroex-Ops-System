@@ -383,11 +383,16 @@ create temporary table concurrent_rate_limit_results (
   request_count integer not null
 ) on commit drop;
 
-select extensions.dblink_connect_u(
+select extensions.dblink_connect(
   connection_name,
-  -- The harness creates this extension as the isolated test runner. The
-  -- unprivileged application roles are never granted its `_u` entry point.
-  'dbname=' || current_database()
+  -- Loopback is trusted by the local image, which dblink correctly rejects for
+  -- non-superusers. The database's Docker address uses password authentication.
+  format(
+    'host=%s port=%s dbname=%s user=postgres password=postgres',
+    inet_server_addr(),
+    inet_server_port(),
+    current_database()
+  )
 )
 from (
   values

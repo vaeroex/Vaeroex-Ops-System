@@ -108,8 +108,8 @@ assert.doesNotMatch(databaseSecurityTest, /grant\s+select\s+on\s+(?:table\s+)?pu
 assert.doesNotMatch(databaseSecurityTest, /grant[\s\S]{0,120}public\.workspaces[\s\S]{0,80}to\s+(?:anon|public)\b/i, "the isolated suite must never expose workspaces to anonymous or public roles");
 assert.match(databaseSecurityTest, /grant insert \(workspace_id, form_id, data_json\)[\s\S]{0,80}public\.form_submissions to authenticated;/, "Viewer mutation denial must be tested after the exact submission columns reach RLS");
 assert.match(databaseSecurityTest, /grant update \(role\) on table public\.workspace_members to authenticated;/, "membership escalation tests must reach the role-restricted RLS policies");
-assert.match(databaseSecurityTest, /dblink_connect_u\([\s\S]+['"]dbname=['"] \|\| current_database\(\)/, "concurrency sessions must use the extension-owner-only local test connection path");
-assert.doesNotMatch(databaseSecurityTest, /grant execute[\s\S]{0,120}dblink_connect_u[\s\S]{0,80}to\s+(?:authenticated|anon|public)/i, "the privileged local concurrency connector must never be exposed to application roles");
+assert.match(databaseSecurityTest, /dblink_connect\([\s\S]+host=%s port=%s dbname=%s user=postgres password=postgres[\s\S]+inet_server_addr\(\)[\s\S]+inet_server_port\(\)/, "concurrency sessions must authenticate through the disposable database's password-protected Docker address");
+assert.doesNotMatch(databaseSecurityTest, /dblink_connect_u\(/, "the concurrency harness must not depend on the privileged unencrypted connector");
 assert.match(databaseSecurityTest, /dblink_send_query[\s\S]+security\.concurrent-test/, "quota regression must issue genuinely concurrent database requests");
 assert.match(databaseSecurityTest, /count\(\*\)::integer from concurrent_rate_limit_results where allowed[\s\S]+\n  3,/, "concurrent quota regression must enforce the exact boundary");
 
