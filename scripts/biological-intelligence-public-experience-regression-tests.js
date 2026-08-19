@@ -16,7 +16,7 @@ const portfolio = read("components/marketing/PublicSystemsPortfolio.tsx");
 const header = read("components/legal/PublicSiteHeader.tsx");
 const footer = read("components/legal/PublicFooter.tsx");
 const sitemap = read("app/sitemap.ts");
-const capability = read("components/spatial/useSpatialCapability.ts");
+const capability = `${read("components/spatial/useSpatialCapability.ts")}\n${read("components/spatial/spatialCapability.ts")}`;
 const packageJson = read("package.json");
 const publicBiologicalSources = [page, canvas, backdrop, structures, systems, portfolio].join("\n");
 
@@ -125,13 +125,14 @@ assert.match(canvas, /document\.visibilityState !== "hidden"/, "ambient renderin
 assert.match(canvas, /ACESFilmicToneMapping[\s\S]*toneMappingExposure = 0\.9/, "the biological scene must use restrained filmic output");
 assert.match(canvas, /shadows=\{quality === "full" \? "percentage" : false\}/, "supported percentage-closer shadows must remain limited to the full quality tier");
 assert.match(canvas, /probeRenderedCanvas[\s\S]*SpatialResizeObserver/, "the WebGL surface must retain nonblank and initial-measurement safeguards");
-assert.match(canvas, /useSpatialCapability\(\{ allowMobile: true \}\)/, "capable mobile devices must receive the constrained biological scene");
-assert.match(capability, /allowMobile[\s\S]*mobile[\s\S]*quality: "constrained"|mobile[\s\S]*constrained/, "the shared capability system must preserve explicit mobile constraints");
+assert.match(canvas, /useSpatialCapability\(\)/, "capable mobile devices must use the shared adaptive biological scene");
+assert.match(capability, /quality: "light"[\s\S]*\? "full" : "balanced"/, "the shared capability system must preserve balanced and light genuine WebGL tiers");
+assert.doesNotMatch(capability, /allowMobile|reason: "mobile"/, "mobile must not require a route-specific WebGL opt-in");
 assert.match(canvas, /ReducedBiologicalWorld/, "reduced motion must preserve a fixed biological composition");
 assert.match(canvas, /ScientificFallback[\s\S]*data-biological-fallback/, "genuine WebGL failure must retain a biological visual fallback");
 assert.doesNotMatch(canvas, /OrbitControls|FlyControls|MapControls|EffectComposer|UnrealBloomPass/, "the page must avoid free-flight controls and expensive postprocessing");
 assert.doesNotMatch(styles, /\.spatialCanvas\s*\{[^}]*display:\s*none/s, "mobile must not disable the optimized biological canvas by default");
-assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.content[\s\S]*background: rgba\(2, 7, 10, 0\.88\)/, "mobile content must retain a readable composition over reduced WebGL");
+assert.match(styles, /@media \(max-width: 767px\)[\s\S]*\.content[\s\S]*background: rgba\(2, 7, 10, 0\.88\)/, "mobile content must retain a readable composition over adaptive WebGL");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/, "CSS motion must respect reduced-motion preferences");
 
 assert.doesNotMatch(publicBiologicalSources, /NVIDIA|BioNeMo|foundation model|model provider|GPU provider|Supabase|Google Document AI|OpenAI|Anthropic|Vertex AI|private orchestration|provider fallback/i, "public Biological Intelligence sources must not disclose vendors, models, or private architecture");

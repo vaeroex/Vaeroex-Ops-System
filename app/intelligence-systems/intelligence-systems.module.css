@@ -620,7 +620,7 @@
   }
 }
 
-@media (max-width: 767px), (pointer: coarse) {
+@media (max-width: 767px) {
   .journey {
     background-attachment: scroll;
     background-position: 58% top;

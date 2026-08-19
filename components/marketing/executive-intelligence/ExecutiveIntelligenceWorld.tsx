@@ -261,7 +261,7 @@ function SignalChannel({
 function InformationSlatField({ quality, reducedMotion }: { quality: SpatialQualityTier; reducedMotion: boolean }) {
   const mesh = useRef<InstancedMesh>(null);
   const group = useRef<Group>(null);
-  const count = quality === "full" ? 34 : quality === "constrained" ? 22 : 14;
+  const count = quality === "full" ? 34 : quality === "balanced" ? 22 : 14;
 
   useLayoutEffect(() => {
     if (!mesh.current) return;
@@ -528,6 +528,7 @@ export function ExecutiveIntelligenceWorld({
   progress: MutableRefObject<number>;
 }) {
   const reducedMotion = quality === "reduced_motion";
+  const balancedOrFull = quality === "full" || quality === "balanced";
   return (
     <>
       <color attach="background" args={[new Color("#02060a")]} />
@@ -535,12 +536,12 @@ export function ExecutiveIntelligenceWorld({
       <ambientLight intensity={0.08} color="#849aa6" />
       <hemisphereLight intensity={0.3} color="#dcebf0" groundColor="#010304" />
       <directionalLight position={[-8, 13, 12]} intensity={2.8} color="#eefaff" />
-      <directionalLight position={[10, -1, -98]} intensity={0.8} color="#6faec9" />
-      <spotLight position={[8, 10, 8]} intensity={30} angle={0.42} penumbra={0.92} distance={62} decay={2} color="#b6deea" />
+      {balancedOrFull ? <directionalLight position={[10, -1, -98]} intensity={0.8} color="#6faec9" /> : null}
+      {balancedOrFull ? <spotLight position={[8, 10, 8]} intensity={30} angle={0.42} penumbra={0.92} distance={62} decay={2} color="#b6deea" /> : null}
       <pointLight position={[-6, 1, -38]} intensity={8} distance={25} decay={2} color="#78d6ed" />
-      <pointLight position={[6, -1, -96]} intensity={9} distance={27} decay={2} color="#7ec4de" />
+      {balancedOrFull ? <pointLight position={[6, -1, -96]} intensity={9} distance={27} decay={2} color="#7ec4de" /> : null}
       <pointLight position={[-5, -2, -128]} intensity={7} distance={24} decay={2} color="#769eb0" />
-      <pointLight position={[5, 1, -159]} intensity={8} distance={25} decay={2} color="#9bc9d7" />
+      {balancedOrFull ? <pointLight position={[5, 1, -159]} intensity={8} distance={25} decay={2} color="#9bc9d7" /> : null}
       <pointLight position={[0, 2, -222]} intensity={10} distance={30} decay={2} color="#8fe0f2" />
 
       <BusinessComplexityScene quality={quality} reducedMotion={reducedMotion} />

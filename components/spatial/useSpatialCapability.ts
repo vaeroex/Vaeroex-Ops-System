@@ -1,84 +1,85 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  classifySpatialCapability,
+  type SpatialCapability
+} from "@/components/spatial/spatialCapability";
 
-export type SpatialQualityTier = "full" | "constrained" | "reduced_motion";
-export type SpatialCapabilityReason = "mobile" | "reduced_motion" | "low_power" | "webgl_unavailable";
-export type SpatialCapability = Readonly<{
-  ready: boolean;
-  available: boolean;
-  specializedAvailable: boolean;
-  quality: SpatialQualityTier | null;
-  reason: SpatialCapabilityReason | null;
-}>;
+export {
+  classifySpatialCapability,
+  classifySpatialViewport,
+  type SpatialCapability,
+  type SpatialCapabilityReason,
+  type SpatialCapabilitySnapshot,
+  type SpatialQualityTier,
+  type SpatialViewportProfile
+} from "@/components/spatial/spatialCapability";
 
 const pendingCapability: SpatialCapability = {
   ready: false,
   available: false,
   specializedAvailable: false,
   quality: null,
+  profile: "wide",
   reason: null
 };
 
-function webglIsAvailable() {
+function probeWebGL() {
   try {
     const canvas = document.createElement("canvas");
-    return Boolean(
-      canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: true })
-      || canvas.getContext("webgl", { failIfMajorPerformanceCaveat: true })
-    );
+    const context = canvas.getContext("webgl2", { failIfMajorPerformanceCaveat: true })
+      || canvas.getContext("webgl", { failIfMajorPerformanceCaveat: true });
+    if (!context) return { available: false, maxTextureSize: 0 };
+
+    const maxTextureSize = context.getParameter(context.MAX_TEXTURE_SIZE) as number;
+    const loseContext = context.getExtension("WEBGL_lose_context");
+    loseContext?.loseContext();
+    return { available: true, maxTextureSize };
   } catch {
-    return false;
+    return { available: false, maxTextureSize: 0 };
   }
 }
 
-function evaluateSpatialCapability({ allowMobile = false }: { allowMobile?: boolean } = {}): SpatialCapability {
-  const mobile = window.matchMedia("(pointer: coarse)").matches || window.matchMedia("(max-width: 767px)").matches;
-  if (mobile && !allowMobile) {
-    return { ready: true, available: false, specializedAvailable: false, quality: null, reason: "mobile" };
-  }
-
-  if (!webglIsAvailable()) {
-    return { ready: true, available: false, specializedAvailable: false, quality: null, reason: "webgl_unavailable" };
-  }
-
-  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  if (reducedMotion) {
-    return { ready: true, available: true, specializedAvailable: false, quality: "reduced_motion", reason: "reduced_motion" };
-  }
-
+function evaluateSpatialCapability(): SpatialCapability {
+  const webgl = probeWebGL();
   const device = navigator as Navigator & { deviceMemory?: number };
-  const constrained = Boolean(
-    mobile
-    ||
-    (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4)
-    || (device.deviceMemory && device.deviceMemory <= 4)
-  );
-
-  return constrained
-    ? { ready: true, available: true, specializedAvailable: false, quality: "constrained", reason: "low_power" }
-    : { ready: true, available: true, specializedAvailable: true, quality: "full", reason: null };
+  return classifySpatialCapability({
+    width: window.innerWidth,
+    height: window.innerHeight,
+    coarsePointer: window.matchMedia("(pointer: coarse)").matches,
+    reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+    hardwareConcurrency: navigator.hardwareConcurrency,
+    deviceMemory: device.deviceMemory,
+    maxTextureSize: webgl.maxTextureSize,
+    webglAvailable: webgl.available
+  });
 }
 
-export function useSpatialCapability(options: { allowMobile?: boolean } = {}) {
+export function useSpatialCapability() {
   const [capability, setCapability] = useState<SpatialCapability>(pendingCapability);
 
   useEffect(() => {
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     const coarsePointer = window.matchMedia("(pointer: coarse)");
-    const narrowViewport = window.matchMedia("(max-width: 767px)");
-    const evaluate = () => setCapability(evaluateSpatialCapability(options));
+    let resizeFrame = 0;
+    const evaluate = () => setCapability(evaluateSpatialCapability());
+    const evaluateAfterResize = () => {
+      window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(evaluate);
+    };
 
     evaluate();
     reducedMotion.addEventListener("change", evaluate);
     coarsePointer.addEventListener("change", evaluate);
-    narrowViewport.addEventListener("change", evaluate);
+    window.addEventListener("resize", evaluateAfterResize, { passive: true });
     return () => {
+      window.cancelAnimationFrame(resizeFrame);
       reducedMotion.removeEventListener("change", evaluate);
       coarsePointer.removeEventListener("change", evaluate);
-      narrowViewport.removeEventListener("change", evaluate);
+      window.removeEventListener("resize", evaluateAfterResize);
     };
-  }, [options.allowMobile]);
+  }, []);
 
   return capability;
 }

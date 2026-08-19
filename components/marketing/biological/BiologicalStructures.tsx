@@ -306,7 +306,7 @@ export function DnaDoubleHelix({
 }) {
   const group = useRef<Group>(null);
   const molecularFrame = useRef<Group>(null);
-  const pairCount = quality === "full" ? 42 : quality === "constrained" ? 30 : 24;
+  const pairCount = quality === "full" ? 42 : quality === "balanced" ? 30 : 20;
   const helix = useMemo(() => buildHelix(pairCount), [pairCount]);
 
   useFrame((state) => {
@@ -497,7 +497,7 @@ export function SequenceToProteinBridge({
     new Vector3(0.35, 0.3, -4.65),
     new Vector3(0.05, 0.1, -6.2)
   ], false, "centripetal", 0.4), []);
-  const beadCount = quality === "full" ? 17 : quality === "constrained" ? 10 : 7;
+  const beadCount = quality === "full" ? 17 : quality === "balanced" ? 10 : 6;
   const beads = useMemo(() => Array.from({ length: beadCount }, (_, index) => point(transcript.getPoint(index / Math.max(1, beadCount - 1)))), [beadCount, transcript]);
 
   useFrame((state) => {
@@ -572,7 +572,7 @@ function MolecularCrowding({ quality, reducedMotion }: { quality: SpatialQuality
   const layerA = useRef<Group>(null);
   const layerB = useRef<Group>(null);
   const dummy = useMemo(() => new Object3D(), []);
-  const count = quality === "full" ? 76 : quality === "constrained" ? 38 : 22;
+  const count = quality === "full" ? 76 : quality === "balanced" ? 38 : 18;
   const crowders = useMemo(() => createCrowders(count), [count]);
   const globularCrowders = useMemo(() => crowders.filter((_, index) => index % 3 !== 0), [crowders]);
   const elongatedCrowders = useMemo(() => crowders.filter((_, index) => index % 3 === 0), [crowders]);

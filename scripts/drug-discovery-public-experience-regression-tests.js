@@ -17,7 +17,7 @@ const homepage = read("app/page.tsx");
 const header = read("components/legal/PublicSiteHeader.tsx");
 const footer = read("components/legal/PublicFooter.tsx");
 const sitemap = read("app/sitemap.ts");
-const capability = read("components/spatial/useSpatialCapability.ts");
+const capability = `${read("components/spatial/useSpatialCapability.ts")}\n${read("components/spatial/spatialCapability.ts")}`;
 const packageJson = read("package.json");
 const productCopySources = `${page}\n${systems}`;
 
@@ -86,7 +86,7 @@ assert.match(molecular, /validateMolecularGraph[\s\S]*valence[\s\S]*MOLECULE_LIB
 assert.ok((molecular.match(/id: "(?:linked-aromatic-amide|fused-heterobicycle|polar-heterocycle|flexible-aryl-heterocycle|sulfonyl-polar-analog)"/g) || []).length === 5, "candidate comparison must use five distinct medicinal-chemistry-style topologies");
 assert.match(molecular, /bond\.order === 2[\s\S]*BondSegment/, "double bonds must remain visually distinguishable");
 assert.match(molecular, /flexibleGroup[\s\S]*graph\.bonds\.find\(\(bond\) => bond\.rotatable\)[\s\S]*rotation\.set/, "subtle conformational motion must occur around an explicitly declared rotatable bond");
-assert.match(canvas, /const count = quality === "full" \? 84 : quality === "constrained" \? 42 : 18/, "candidate possibility must use a bounded tier-aware population");
+assert.match(canvas, /const count = quality === "full" \? 84 : quality === "balanced" \? 42 : 18/, "candidate possibility must use a bounded tier-aware population");
 assert.ok((canvas.match(/<instancedMesh/g) || []).length >= 2, "candidate possibility must use GPU instancing for repeated fragments");
 assert.match(canvas, /pointCount = quality === "full" \? 220[\s\S]*Float32Array/, "distant possibility must be implied with one bounded point field");
 assert.match(canvas, /clusterCenters[\s\S]*cluster === 1[\s\S]*cluster === 3/, "chemical space must be spatially clustered and filtered by related analog families");
@@ -98,13 +98,14 @@ assert.match(canvas, /featureAnchors\[index % featureAnchors\.length\]/, "eviden
 assert.match(canvas, /frameloop="demand"[\s\S]*FrameScheduler/, "rendering must stay bounded and on demand");
 assert.match(canvas, /document\.visibilityState !== "hidden"/, "ambient rendering must pause while the document is hidden");
 assert.match(canvas, /probeRenderedCanvas[\s\S]*SpatialResizeObserver/, "the WebGL surface must retain nonblank and initial-measurement safeguards");
-assert.match(canvas, /useSpatialCapability\(\{ allowMobile: true \}\)/, "capable mobile devices must receive the optimized interactive scene");
-assert.match(capability, /allowMobile[\s\S]*mobile[\s\S]*quality: "constrained"|mobile[\s\S]*constrained/, "the shared capability system must opt mobile into constrained quality only when explicitly requested");
+assert.match(canvas, /useSpatialCapability\(\)/, "capable mobile devices must use the shared adaptive capability path");
+assert.match(capability, /quality: "light"[\s\S]*\? "full" : "balanced"/, "the shared capability system must retain genuine WebGL for balanced and light devices");
+assert.doesNotMatch(capability, /allowMobile|reason: "mobile"/, "mobile must not require a route-specific WebGL opt-in");
 assert.match(canvas, /ReducedScientificWorld/, "reduced motion must preserve a fixed scientific composition");
 assert.match(canvas, /ScientificFallback[\s\S]*data-drug-discovery-fallback/, "genuine WebGL failure must retain a scientific visual fallback");
 assert.doesNotMatch(canvas, /OrbitControls|FlyControls|MapControls|EffectComposer|UnrealBloomPass/, "the page must avoid free-flight controls and expensive postprocessing");
 assert.doesNotMatch(styles, /\.spatialCanvas\s*\{[^}]*display:\s*none/s, "mobile must not disable the optimized Drug Discovery canvas by default");
-assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.chapter[\s\S]*background: rgba\(2, 8, 11, 0\.87\)/, "mobile copy must use a deliberate readable composition over reduced WebGL");
+assert.match(styles, /@media \(max-width: 767px\)[\s\S]*\.chapter[\s\S]*background: rgba\(2, 8, 11, 0\.87\)/, "mobile copy must use a deliberate readable composition over adaptive WebGL");
 assert.match(styles, /@media \(prefers-reduced-motion: reduce\)/, "CSS motion must respect reduced-motion preferences");
 
 const publicDrugDiscoverySources = [page, canvas, backdrop, molecular, protein, systems, portfolio].join("\n");

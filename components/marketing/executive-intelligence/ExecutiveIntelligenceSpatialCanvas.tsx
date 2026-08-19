@@ -1,13 +1,19 @@
 "use client";
 
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ACESFilmicToneMapping, MathUtils, SRGBColorSpace, Vector3 } from "three";
 import styles from "@/app/executive-intelligence/executive-intelligence.module.css";
 import { ExecutiveIntelligenceWorld } from "@/components/marketing/executive-intelligence/ExecutiveIntelligenceWorld";
 import { probeRenderedCanvas, type CanvasPixelProbeResult } from "@/components/spatial/CanvasPixelProbe";
+import { PublicSpatialContextGuard, PublicSpatialErrorBoundary } from "@/components/spatial/PublicSpatialCanvasGuard";
 import { SpatialResizeObserver } from "@/components/spatial/SpatialResizeObserver";
-import { useSpatialCapability, type SpatialQualityTier } from "@/components/spatial/useSpatialCapability";
+import { applySpatialCameraFraming } from "@/components/spatial/spatialCameraFraming";
+import {
+  useSpatialCapability,
+  type SpatialQualityTier,
+  type SpatialViewportProfile
+} from "@/components/spatial/useSpatialCapability";
 
 type JourneyPoint = Readonly<{
   progress: number;
@@ -50,7 +56,7 @@ function FrameScheduler({ quality }: { quality: SpatialQualityTier }) {
   const { invalidate } = useThree();
 
   useEffect(() => {
-    const delay = quality === "full" ? 34 : quality === "constrained" ? 62 : 150;
+    const delay = quality === "full" ? 34 : quality === "balanced" ? 62 : quality === "light" ? 92 : 180;
     const interval = window.setInterval(() => {
       if (document.visibilityState !== "hidden") invalidate();
     }, delay);
@@ -60,7 +66,7 @@ function FrameScheduler({ quality }: { quality: SpatialQualityTier }) {
   return null;
 }
 
-function DirectedJourney({ quality }: { quality: SpatialQualityTier }) {
+function DirectedJourney({ profile, quality }: { profile: SpatialViewportProfile; quality: SpatialQualityTier }) {
   const { camera, pointer } = useThree();
   const targetProgress = useRef(0);
   const currentProgress = useRef(0);
@@ -90,12 +96,13 @@ function DirectedJourney({ quality }: { quality: SpatialQualityTier }) {
       ? targetProgress.current
       : MathUtils.damp(currentProgress.current, targetProgress.current, 4.4, delta);
 
-    const fov = sampleJourney(currentProgress.current, "position", nextPosition.current);
+    const sampledFov = sampleJourney(currentProgress.current, "position", nextPosition.current);
     sampleJourney(currentProgress.current, "target", nextTarget.current);
     if (quality === "full" && !reducedMotion) {
       nextPosition.current.x += pointer.x * 0.2;
       nextPosition.current.y += pointer.y * 0.11;
     }
+    const fov = applySpatialCameraFraming(nextPosition.current, nextTarget.current, sampledFov, profile);
     camera.position.copy(nextPosition.current);
     camera.lookAt(nextTarget.current);
     if ("fov" in camera) {
@@ -123,39 +130,53 @@ function ExecutiveFallback({ reason }: { reason: string }) {
 export default function ExecutiveIntelligenceSpatialCanvas() {
   const capability = useSpatialCapability();
   const [pixelProbe, setPixelProbe] = useState<CanvasPixelProbeResult>("pending");
+  const [renderFailed, setRenderFailed] = useState(false);
+  const handleRenderFailure = useCallback(() => setRenderFailed(true), []);
 
   if (!capability.ready) return null;
-  if (!capability.available || !capability.quality) {
+  if (renderFailed || !capability.available || !capability.quality) {
     return <ExecutiveFallback reason={capability.reason || "unavailable"} />;
   }
 
   const quality = capability.quality;
-  const dpr: [number, number] = quality === "full" ? [1, 1.4] : quality === "constrained" ? [0.88, 1.1] : [0.8, 1];
+  const dpr: [number, number] = quality === "full"
+    ? [1, 1.4]
+    : quality === "balanced"
+      ? [0.84, 1.08]
+      : quality === "light"
+        ? [0.65, 0.84]
+        : [0.7, 0.9];
+  const fallback = <ExecutiveFallback reason="rendering_failure" />;
 
   return (
-    <div
-      className={styles.spatialCanvas}
-      data-executive-intelligence-canvas
-      data-spatial-webgl
-      data-canvas-pixels={pixelProbe}
-      aria-hidden="true"
-    >
-      <Canvas
-        camera={{ position: [5.8, 3.1, 15], fov: 44, near: 0.1, far: 310 }}
-        dpr={dpr}
-        frameloop="demand"
-        gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
-        resize={{ polyfill: SpatialResizeObserver }}
-        onCreated={(state) => {
-          state.gl.toneMapping = ACESFilmicToneMapping;
-          state.gl.toneMappingExposure = 1.02;
-          state.gl.outputColorSpace = SRGBColorSpace;
-          probeRenderedCanvas(state, setPixelProbe);
-        }}
+    <PublicSpatialErrorBoundary fallback={fallback} onFailure={handleRenderFailure}>
+      <div
+        className={styles.spatialCanvas}
+        data-executive-intelligence-canvas
+        data-spatial-webgl
+        data-spatial-quality={quality}
+        data-spatial-profile={capability.profile}
+        data-canvas-pixels={pixelProbe}
+        aria-hidden="true"
       >
-        <DirectedJourney quality={quality} />
-        <FrameScheduler quality={quality} />
-      </Canvas>
-    </div>
+        <Canvas
+          camera={{ position: [5.8, 3.1, 15], fov: 44, near: 0.1, far: 310 }}
+          dpr={dpr}
+          frameloop="demand"
+          gl={{ antialias: quality === "full", alpha: false, powerPreference: "high-performance" }}
+          resize={{ polyfill: SpatialResizeObserver }}
+          onCreated={(state) => {
+            state.gl.toneMapping = ACESFilmicToneMapping;
+            state.gl.toneMappingExposure = 1.02;
+            state.gl.outputColorSpace = SRGBColorSpace;
+            probeRenderedCanvas(state, setPixelProbe);
+          }}
+        >
+          <PublicSpatialContextGuard onFailure={handleRenderFailure} />
+          <DirectedJourney profile={capability.profile} quality={quality} />
+          <FrameScheduler quality={quality} />
+        </Canvas>
+      </div>
+    </PublicSpatialErrorBoundary>
   );
 }
