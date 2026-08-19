@@ -24,6 +24,8 @@ assert.match(page, /id="executive-evidence"[\s\S]*legacyAnchor/, "the prior evid
 assert.match(page, /id="executive-context"[\s\S]*legacyAnchor/, "the prior context deep link must remain valid");
 
 assert.equal((page.match(/<OperationsIntelligenceEngineDemo/g) || []).length, 1, "the page must retain one focused interactive product demo");
+const executiveIntelligenceDefinition = "Executive Intelligence is a business analysis system that helps turn the information you already have into a clearer picture of your business. Think of it as a second set of eyes and a second brain that helps make sense of your business information.";
+assert.equal((page.match(new RegExp(executiveIntelligenceDefinition.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length, 1, "the supporting product definition must appear exactly once");
 for (const approvedCopy of [
   "See what&apos;s changing in your business—and what deserves your attention.",
   "Your business information can be messy. Your understanding of it doesn&apos;t have to be.",

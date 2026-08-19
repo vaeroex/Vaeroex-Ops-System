@@ -142,6 +142,7 @@ export default function OperationsIntelligencePage() {
             <p className={styles.eyebrow}>Executive Intelligence · A Vaeroex product</p>
             <h1>Executive Intelligence</h1>
             <p className={styles.heroBody}>See what&apos;s changing in your business—and what deserves your attention. Vaeroex&apos;s flagship Executive Intelligence platform turns the information you already have into a clearer view of performance, KPIs, trends, risks, opportunities, and emerging problems.</p>
+            <p className={styles.heroDefinition}>Executive Intelligence is a business analysis system that helps turn the information you already have into a clearer picture of your business. Think of it as a second set of eyes and a second brain that helps make sense of your business information.</p>
             <div className={styles.heroActions}>
               <StartWithVaeroexMenu />
               <Link href="#product-experience" className={styles.secondaryAction}>

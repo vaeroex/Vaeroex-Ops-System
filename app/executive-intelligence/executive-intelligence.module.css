@@ -228,6 +228,14 @@
   line-height: 1.65;
 }
 
+.heroDefinition {
+  max-width: 42rem;
+  margin-top: 0.9rem;
+  color: #aebfc5;
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
 .heroActions,
 .closingActions {
   display: flex;
@@ -856,6 +864,10 @@
 
   .heroBody {
     font-size: 1rem;
+  }
+
+  .heroDefinition {
+    font-size: 0.9rem;
   }
 
   .heroCoordinates {
