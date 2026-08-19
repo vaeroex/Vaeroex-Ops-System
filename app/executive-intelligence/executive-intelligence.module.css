@@ -158,27 +158,28 @@
   min-height: 150svh;
 }
 
-.methodChapter,
-.capabilitiesChapter,
-.evidenceChapter,
-.controlChapter {
+.capabilitiesChapter {
   min-height: 138svh;
 }
 
-.contextChapter {
-  min-height: 126svh;
+.methodChapter {
+  min-height: 166svh;
+}
+
+.controlChapter {
+  min-height: 176svh;
 }
 
 .closingChapter {
-  min-height: 112svh;
+  min-height: 134svh;
 }
 
 .content,
 .wideContent,
 .productLayout,
-.evidenceLayout,
-.controlLayout,
-.contextLayout {
+.informationLayout,
+.ongoingTrustLayout,
+.closingLayout {
   position: relative;
   width: min(88rem, 100%);
   margin-inline: auto;
@@ -437,76 +438,16 @@
   background: rgba(5, 14, 23, 0.94);
 }
 
-.sectionIntro {
+.informationLayout {
   display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(18rem, 0.42fr);
-  gap: 2rem 5rem;
-  align-items: end;
+  grid-template-columns: minmax(0, 0.82fr) minmax(24rem, 1.18fr);
+  gap: clamp(3rem, 7vw, 8rem);
+  align-items: center;
   text-shadow: 0 2px 24px rgba(0, 0, 0, 0.9);
 }
 
-.sectionIntro .stageMarker,
-.sectionIntro h2 {
-  grid-column: 1;
-}
-
-.sectionIntro .stageMarker {
-  margin-bottom: 0;
-}
-
-.sectionIntro h2 {
+.informationIntro h2 {
   max-width: 13ch;
-  margin-top: 0.2rem;
-}
-
-.sectionIntro > p:last-child {
-  grid-column: 2;
-  grid-row: 1 / span 3;
-  align-self: end;
-  color: #b7c8ce;
-  font-size: 1rem;
-  line-height: 1.75;
-}
-
-.processSequence {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  margin-top: 4rem;
-  padding: 0;
-  border-block: 1px solid rgba(123, 202, 224, 0.2);
-  list-style: none;
-}
-
-.processSequence li {
-  min-height: 17rem;
-  padding: 1.3rem 1.1rem 1.5rem;
-  border-right: 1px solid rgba(123, 202, 224, 0.14);
-  background: rgba(4, 12, 19, 0.52);
-}
-
-.processSequence li:last-child {
-  border-right: 0;
-}
-
-.processSequence li > span {
-  color: #70cce5;
-  font-size: 0.64rem;
-  font-weight: 760;
-}
-
-.processSequence h3 {
-  margin-top: 2.6rem;
-  color: #edf7fa;
-  font-size: 1.02rem;
-  font-weight: 650;
-  line-height: 1.35;
-}
-
-.processSequence p {
-  margin-top: 0.8rem;
-  color: #91a6ae;
-  font-size: 0.8rem;
-  line-height: 1.65;
 }
 
 .capabilityHeading {
@@ -585,18 +526,18 @@
   line-height: 1.65;
 }
 
-.evidenceLayout,
-.controlLayout,
-.contextLayout {
+.ongoingTrustLayout,
+.closingLayout {
   display: grid;
-  grid-template-columns: minmax(0, 0.78fr) minmax(0, 1.22fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: clamp(3rem, 7vw, 8rem);
   align-items: center;
 }
 
-.evidenceLayout > div:first-child,
-.controlStatement,
-.contextLayout > div {
+.informationIntro,
+.ongoingStatement,
+.trustPanel,
+.audiencePanel {
   text-shadow: 0 2px 24px rgba(0, 0, 0, 0.92);
 }
 
@@ -607,16 +548,27 @@
   color: #8ddbf0;
 }
 
-.evidenceLayout h2,
-.controlStatement h2,
-.contextLayout h2 {
+.informationIntro h2,
+.ongoingStatement h2,
+.trustPanel h2,
+.audiencePanel h2 {
   max-width: 12ch;
   font-size: 3.6rem;
 }
 
-.evidenceLedger {
+.disclosureList {
   border-block: 1px solid rgba(122, 202, 224, 0.2);
   background: rgba(4, 12, 19, 0.54);
+}
+
+.legacyAnchor {
+  position: absolute;
+  top: 0;
+  scroll-margin-top: 4.5rem;
+}
+
+.spatialStageMap {
+  display: none;
 }
 
 .disclosure {
@@ -711,7 +663,7 @@
   height: 1.3rem;
 }
 
-.controlStatement > p {
+.trustPanel > p {
   max-width: 40rem;
   margin-top: 1.3rem;
   color: #aec0c7;
@@ -719,83 +671,17 @@
   line-height: 1.72;
 }
 
-.controlChecks {
-  display: grid;
-  gap: 0.6rem;
+.trustPanel .disclosureList {
   margin-top: 1.8rem;
 }
 
-.controlChecks div {
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  color: #c5d4d9;
-  font-size: 0.82rem;
-}
-
-.controlChecks svg {
-  width: 1rem;
-  height: 1rem;
-  flex: none;
-  color: #82bbaa;
-}
-
-.controlPrinciples {
-  border-block: 1px solid rgba(132, 203, 222, 0.18);
-  background: rgba(4, 12, 19, 0.6);
-}
-
-.controlPrinciples article {
-  padding: 1.45rem 1.25rem 1.55rem;
-  border-bottom: 1px solid rgba(132, 203, 222, 0.12);
-}
-
-.controlPrinciples article:last-child {
-  border-bottom: 0;
-}
-
-.controlPrinciples article > p {
-  color: #78cde4;
-  font-size: 0.64rem;
-  font-weight: 760;
-  text-transform: uppercase;
-}
-
-.controlPrinciples h3 {
-  margin-top: 0.65rem;
-  color: #eef7fa;
-  font-size: 1.15rem;
-  font-weight: 640;
-  line-height: 1.4;
-}
-
-.controlPrinciples span {
-  display: block;
-  margin-top: 0.65rem;
-  color: #95aab2;
-  font-size: 0.82rem;
-  line-height: 1.65;
-}
-
-.contextLayout {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  align-items: start;
-}
-
-.contextLayout h2 {
-  max-width: 13ch;
+.ongoingStatement h2,
+.audiencePanel h2 {
   margin-top: 0.75rem;
 }
 
-.contextSecondary {
-  padding-top: 3.35rem;
-}
-
-.contextSecondary .contextStatus {
-  color: #778b94;
-}
-
-.contextLayout ul {
+.ongoingList,
+.audienceList {
   margin: 2rem 0 0;
   padding: 0;
   border-block: 1px solid rgba(125, 202, 223, 0.18);
@@ -803,7 +689,8 @@
   list-style: none;
 }
 
-.contextLayout li {
+.ongoingList li,
+.audienceList li {
   min-height: 3.6rem;
   padding: 1rem 0.9rem;
   border-bottom: 1px solid rgba(125, 202, 223, 0.11);
@@ -812,42 +699,42 @@
   line-height: 1.55;
 }
 
-.contextLayout li:last-child {
+.ongoingList li:last-child,
+.audienceList li:last-child {
   border-bottom: 0;
 }
 
-.contextSecondary li {
+.ongoingList li {
   color: #8fa2aa;
 }
 
-.closingContent {
-  width: min(61rem, 92vw);
-  margin-inline: auto;
-  padding: 2.5rem 0;
-  text-align: center;
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.92);
+.closingLayout {
+  align-items: center;
 }
 
-.closingContent .stageMarker {
-  justify-content: center;
+.closingContent {
+  width: 100%;
+  padding: 2.5rem 0;
+  text-align: left;
+  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.92);
 }
 
 .closingContent h2 {
   max-width: 13ch;
-  margin: 0.8rem auto 0;
-  font-size: 4.5rem;
+  margin: 0;
+  font-size: 4rem;
 }
 
 .closingContent > p:not(.kicker) {
   max-width: 42rem;
-  margin: 1.4rem auto 0;
+  margin: 1.4rem 0 0;
   color: #b8c8cd;
   font-size: 1rem;
   line-height: 1.75;
 }
 
 .closingActions {
-  justify-content: center;
+  justify-content: flex-start;
 }
 
 @media (max-width: 1100px) {
@@ -866,18 +753,6 @@
   .productMount {
     width: min(100%, 62rem);
     margin-left: auto;
-  }
-
-  .processSequence {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .processSequence li:nth-child(3) {
-    border-right: 0;
-  }
-
-  .processSequence li:nth-child(-n + 3) {
-    border-bottom: 1px solid rgba(123, 202, 224, 0.14);
   }
 
   .capabilityGrid article,
@@ -927,9 +802,7 @@
   .productChapter,
   .methodChapter,
   .capabilitiesChapter,
-  .evidenceChapter,
   .controlChapter,
-  .contextChapter,
   .closingChapter {
     min-height: auto;
     align-items: flex-end;
@@ -950,9 +823,9 @@
   .heroContent,
   .wideContent,
   .productLayout,
-  .evidenceLayout,
-  .controlLayout,
-  .contextLayout,
+  .informationLayout,
+  .ongoingTrustLayout,
+  .closingLayout,
   .closingContent {
     width: 100%;
     margin-inline: 0;
@@ -961,9 +834,9 @@
   .content,
   .wideContent,
   .productLayout,
-  .evidenceLayout,
-  .controlLayout,
-  .contextLayout,
+  .informationLayout,
+  .ongoingTrustLayout,
+  .closingLayout,
   .closingContent {
     border-top: 1px solid rgba(120, 195, 218, 0.2);
     padding-top: 1.4rem;
@@ -1005,9 +878,9 @@
 
   .chapter h2,
   .productIntro h2,
-  .evidenceLayout h2,
-  .controlStatement h2,
-  .contextLayout h2,
+  .informationLayout h2,
+  .ongoingTrustLayout h2,
+  .closingLayout h2,
   .closingContent h2 {
     max-width: 16ch;
     margin-inline: 0;
@@ -1016,11 +889,10 @@
   }
 
   .productLayout,
-  .sectionIntro,
   .capabilityHeading,
-  .evidenceLayout,
-  .controlLayout,
-  .contextLayout {
+  .informationLayout,
+  .ongoingTrustLayout,
+  .closingLayout {
     display: grid;
     grid-template-columns: 1fr;
     gap: 2.5rem;
@@ -1047,34 +919,6 @@
 
   .productMount :global(.shadow-command) {
     border-radius: 4px;
-  }
-
-  .sectionIntro .stageMarker,
-  .sectionIntro h2,
-  .sectionIntro > p:last-child {
-    grid-column: 1;
-    grid-row: auto;
-  }
-
-  .processSequence {
-    grid-template-columns: 1fr;
-    margin-top: 2.5rem;
-  }
-
-  .processSequence li,
-  .processSequence li:nth-child(3),
-  .processSequence li:nth-child(-n + 3) {
-    min-height: 0;
-    border-right: 0;
-    border-bottom: 1px solid rgba(123, 202, 224, 0.14);
-  }
-
-  .processSequence li:last-child {
-    border-bottom: 0;
-  }
-
-  .processSequence h3 {
-    margin-top: 1.2rem;
   }
 
   .capabilityHeading {
@@ -1111,14 +955,6 @@
 
   .disclosure > p {
     margin-left: 3rem;
-  }
-
-  .contextSecondary {
-    padding-top: 0;
-  }
-
-  .closingContent .stageMarker {
-    justify-content: flex-start;
   }
 
   .closingContent > p:not(.kicker) {

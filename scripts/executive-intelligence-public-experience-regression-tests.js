@@ -13,15 +13,21 @@ const world = read("components/marketing/executive-intelligence/ExecutiveIntelli
 
 assert.match(page, /data-executive-intelligence-journey/, "Executive Intelligence must own one coherent page-specific journey");
 assert.match(page, /ExecutiveIntelligenceSpatialBackdrop/, "semantic product content must mount the visual environment separately");
-for (const stage of ["business-complexity", "command-surface", "performance-landscape", "executive-focus", "evidence-depth", "leadership-control", "historical-context", "executive-clarity"]) {
+for (const stage of ["business-complexity", "command-surface", "performance-landscape", "executive-focus", "leadership-control", "executive-clarity"]) {
   assert.match(page, new RegExp(`data-ei-stage="${stage}"`), `the Executive journey must retain ${stage}`);
 }
+for (const stage of ["evidence-depth", "historical-context"]) {
+  assert.match(page, new RegExp(`data-ei-preserved-stage="${stage}"`), `the consolidated DOM must preserve the ${stage} spatial mapping`);
+}
+assert.equal((page.match(/<section id=/g) || []).length, 6, "the consolidated page must contain six visible chapters");
+assert.match(page, /id="executive-evidence"[\s\S]*legacyAnchor/, "the prior evidence deep link must remain valid");
+assert.match(page, /id="executive-context"[\s\S]*legacyAnchor/, "the prior context deep link must remain valid");
 
 assert.equal((page.match(/<OperationsIntelligenceEngineDemo/g) || []).length, 1, "the page must retain one focused interactive product demo");
 for (const approvedCopy of [
   "See what&apos;s changing in your business—and what deserves your attention.",
   "Your business information can be messy. Your understanding of it doesn&apos;t have to be.",
-  "From scattered paperwork to a clearer business picture.",
+  "Instead of reviewing every file in isolation, Vaeroex brings supported business information together in one intelligence workspace, helping you see connections, changes, and patterns over time.",
   "Your numbers stay your numbers.",
   "An ongoing second set of eyes on your business.",
   "Start building a clearer intelligence picture of your business."
@@ -31,7 +37,7 @@ for (const approvedCopy of [
 for (const capability of ["Business Health", "KPIs", "Intelligence", "Explain Finding", "Evidence", "Saved Analyses"]) {
   assert.match(page, new RegExp(capability), `Executive Intelligence must retain ${capability}`);
 }
-for (const practicalInput of ["spreadsheets", "PDFs", "screenshots", "paper records", "handwritten notes"]) {
+for (const practicalInput of ["spreadsheets", "PDFs", "reports", "screenshots", "exports", "photos", "paper records", "handwritten notes"]) {
   assert.match(page, new RegExp(practicalInput, "i"), `Executive Intelligence must explain support for ${practicalInput}`);
 }
 assert.match(page, /handwritten business information with high accuracy/i, "handwritten-note copy must promise credible high accuracy, not perfection");
@@ -43,15 +49,25 @@ assert.doesNotMatch(page, /daily briefing|scheduled briefing|automatic briefing/
 for (const disclosure of [
   "What can I give Vaeroex?",
   "Still working with paper records or handwritten notes?",
-  "What can Executive Intelligence help reveal?",
-  "How are KPIs created and tracked?",
-  "What are generated intelligence briefings?"
+  "What can Vaeroex help me notice?",
+  "What are generated intelligence briefings?",
+  "See what an insight is based on",
+  "Understand the explanation",
+  "You stay in control"
 ]) {
   assert.match(page, new RegExp(disclosure.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `progressive disclosure must retain: ${disclosure}`);
 }
 assert.equal((page.match(/<details key=/g) || []).length, 1, "secondary product explanations must render through one reusable native disclosure path");
+assert.doesNotMatch(page, /processSteps|processSequence/, "the redundant five-step process must not return");
+assert.doesNotMatch(page, /canonical KPI/i, "public product copy must not expose canonical KPI terminology");
+assert.doesNotMatch(page, /When eligible evidence is available/, "briefing eligibility must use customer-facing language");
+assert.doesNotMatch(page, /Recommendations are review-ready intelligence/, "leadership-control copy must avoid internal review terminology");
+assert.match(page, /When enough supported business information is available/, "briefing eligibility must remain explicit in plain language");
+assert.match(page, /Recommendations are there for review—not actions Vaeroex takes on its own/, "leadership authority must remain explicit");
 assert.match(styles, /\.disclosure summary:focus-visible/, "native disclosures must expose a visible keyboard focus state");
 assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.disclosure summary/, "disclosures must retain a bounded mobile layout");
+assert.match(styles, /\.informationLayout[\s\S]*\.ongoingTrustLayout[\s\S]*\.closingLayout/, "the six-chapter composition must retain responsive layout contracts");
+assert.doesNotMatch(styles, /\.processSequence/, "removed process content must not leave obsolete styling behind");
 
 assert.match(backdrop, /dynamic\([\s\S]*ExecutiveIntelligenceSpatialCanvas[\s\S]*ssr: false/, "Executive WebGL must load progressively on the client");
 for (const contract of ["useSpatialCapability", "SpatialResizeObserver", "probeRenderedCanvas", "frameloop=\"demand\"", "data-executive-intelligence-canvas", "data-spatial-webgl"]) {
