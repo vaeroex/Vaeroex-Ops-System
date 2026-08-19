@@ -111,6 +111,7 @@ assert.match(databaseSecurityTest, /grant update \(role\) on table public\.works
 assert.match(databaseSecurityTest, /dblink_connect\([\s\S]+host=%s port=%s dbname=%s user=postgres password=postgres[\s\S]+inet_server_addr\(\)[\s\S]+inet_server_port\(\)/, "concurrency sessions must authenticate through the disposable database's password-protected Docker address");
 assert.doesNotMatch(databaseSecurityTest, /dblink_connect_u\(/, "the concurrency harness must not depend on the privileged unencrypted connector");
 assert.match(databaseSecurityTest, /dblink_send_query[\s\S]+security\.concurrent-test/, "quota regression must issue genuinely concurrent database requests");
+assert.match(databaseSecurityTest, /\$drain\$[\s\S]+dblink_get_result\(connection_name\)[\s\S]+\$drain\$;[\s\S]+all concurrent quota attempts return one authoritative result/, "the harness must drain every asynchronous result before cleanup");
 assert.match(databaseSecurityTest, /count\(\*\)::integer from concurrent_rate_limit_results where allowed[\s\S]+\n  3,/, "concurrent quota regression must enforce the exact boundary");
 
 const packageJson = JSON.parse(read("package.json"));

@@ -457,6 +457,29 @@ from (
 cross join lateral extensions.dblink_get_result(connections.connection_name)
   as result(allowed boolean, request_count integer);
 
+-- libpq exposes one final empty result after each asynchronous command. Drain
+-- it before issuing cleanup or disconnect commands on the same connections.
+do $drain$
+declare
+  connection_name text;
+begin
+  foreach connection_name in array array[
+    'rate_limit_concurrency_1',
+    'rate_limit_concurrency_2',
+    'rate_limit_concurrency_3',
+    'rate_limit_concurrency_4',
+    'rate_limit_concurrency_5',
+    'rate_limit_concurrency_6',
+    'rate_limit_concurrency_7',
+    'rate_limit_concurrency_8'
+  ] loop
+    perform *
+    from extensions.dblink_get_result(connection_name)
+      as result(allowed boolean, request_count integer);
+  end loop;
+end;
+$drain$;
+
 select is(
   (select count(*)::integer from concurrent_rate_limit_results),
   8,
