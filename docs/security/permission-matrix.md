@@ -19,7 +19,7 @@ Operational roles are for accountability, routing, assignments, briefings, and r
 | Access admin dashboard | No | No | No | No | No | No | Yes |
 | Activate customers | No | No | No | No | No | No | Yes |
 | View all workspaces | No | No | No | No | No | No | Yes |
-| Manage subscription status | No | No | No | No | Workspace-level status only where allowed | Workspace-level status only where allowed | Yes |
+| Manage subscription status | No | No | No | No | No | No | Yes, through trusted billing/admin service paths |
 
 ## Operational Roles
 
@@ -47,3 +47,4 @@ Operational roles never grant:
 - Customer activation/deactivation.
 - Global workspace/customer visibility.
 - Service-role operations.
+- Direct mutation of subscription, billing, activation, or workspace-entitlement state.

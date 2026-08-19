@@ -4,6 +4,12 @@ import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { logSecurityAuditEvent } from "@/lib/security/tool-execution-gateway";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
+import {
+  boundedFormData,
+  SUPPORT_FORM_MAX_BODY_BYTES,
+  SUPPORT_REQUEST_KEYS,
+  supportRequestSchema
+} from "@/lib/security/public-submission-validation";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Json } from "@/lib/supabase/types";
@@ -18,43 +24,57 @@ function uuidOrNull(value: string) {
 }
 
 function redirectBack(formData: FormData, key: "message" | "error", message: string): never {
-  const returnPath = text(formData, "return_path") || "/support";
-  const safePath = ["/support", "/app/support", "/contact", "/demo"].some((path) => returnPath.startsWith(path)) ? returnPath : "/support";
+  const returnPath = text(formData, "return_path").slice(0, 120) || "/support";
+  const safePath = ["/support", "/app/support", "/contact", "/demo"].includes(returnPath) ? returnPath : "/support";
   redirect(`${safePath}?${key}=${encodeURIComponent(message)}` as Route);
 }
 
 export async function createSupportRequestAction(formData: FormData) {
   const supabase = await createSupabaseServerClient();
   const admin = createSupabaseAdminClient();
-  const name = text(formData, "name");
-  const email = text(formData, "email").toLowerCase();
-  const issueType = text(formData, "issue_type");
-  const message = text(formData, "message");
-  const priority = text(formData, "priority") || "Medium";
-  const workspaceInput = text(formData, "workspace");
-  const workspaceIdInput = text(formData, "workspace_id");
-  const pageModule = text(formData, "page_module");
-  const company = text(formData, "company");
-  const role = text(formData, "role");
-  const businessType = text(formData, "business_type");
-  const teamSize = text(formData, "team_size");
-  const improvementGoal = text(formData, "improvement_goal");
-  const preferredContactMethod = text(formData, "preferred_contact_method");
+  let submission: ReturnType<typeof supportRequestSchema.parse>;
 
-  if (!name || !email || !issueType || !message) {
-    redirectBack(formData, "error", "Name, email, issue type, and message are required.");
+  try {
+    submission = supportRequestSchema.parse(
+      boundedFormData(formData, SUPPORT_REQUEST_KEYS, SUPPORT_FORM_MAX_BODY_BYTES)
+    );
+  } catch {
+    redirectBack(formData, "error", "Check the submitted fields and try again.");
   }
 
-  const rateLimit = await enforceRateLimit({
-    action: "support.create_request",
-    limit: 5,
-    windowSeconds: 10 * 60,
-    identifiers: [email],
-    metadata: {
-      source: "public_support_request",
-      issue_type: issueType
-    } satisfies Json
-  });
+  const {
+    name,
+    email,
+    issue_type: issueType,
+    message,
+    priority,
+    workspace: workspaceInput,
+    workspace_id: workspaceIdInput,
+    page_module: pageModule,
+    company,
+    role,
+    business_type: businessType,
+    team_size: teamSize,
+    improvement_goal: improvementGoal,
+    preferred_contact_method: preferredContactMethod
+  } = submission;
+
+  let rateLimit;
+  try {
+    rateLimit = await enforceRateLimit({
+      action: "support.create_request",
+      limit: 5,
+      windowSeconds: 10 * 60,
+      identifiers: [email],
+      metadata: {
+        source: "public_support_request",
+        issue_type: issueType
+      } satisfies Json,
+      strict: true
+    });
+  } catch {
+    redirectBack(formData, "error", "Vaeroex could not verify request limits. Please try again shortly.");
+  }
 
   if (!rateLimit.allowed) {
     redirectBack(formData, "error", rateLimitMessage(rateLimit));
@@ -101,13 +121,11 @@ export async function createSupportRequestAction(formData: FormData) {
     workspaceInput && !uuidOrNull(workspaceInput) ? `Workspace: ${workspaceInput}` : ""
   ].filter(Boolean);
   const fullMessage = contextLines.length ? `${contextLines.join("\n")}\n\n${message}` : message;
-  const client = admin || supabase;
-
-  if (!client) {
+  if (!admin) {
     redirectBack(formData, "error", "Support requests are not configured yet.");
   }
 
-  const { data: supportRequest, error } = await client
+  const { data: supportRequest, error } = await admin
     .from("support_requests")
     .insert({
       workspace_id: workspaceId,
@@ -123,11 +141,11 @@ export async function createSupportRequestAction(formData: FormData) {
     .maybeSingle();
 
   if (error) {
-    redirectBack(formData, "error", error.message);
+    redirectBack(formData, "error", "The support request could not be submitted. Please try again.");
   }
 
   await logSecurityAuditEvent({
-    supabase: client,
+    supabase: admin,
     workspaceId,
     userId,
     actionName: "support.create_request",
