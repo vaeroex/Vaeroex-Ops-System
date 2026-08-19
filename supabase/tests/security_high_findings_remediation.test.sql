@@ -383,12 +383,11 @@ create temporary table concurrent_rate_limit_results (
   request_count integer not null
 ) on commit drop;
 
-select extensions.dblink_connect(
+select extensions.dblink_connect_u(
   connection_name,
-  -- `supabase test db` uses this disposable loopback credential. Supabase's
-  -- local postgres role is non-superuser, so dblink requires it explicitly.
-  'host=127.0.0.1 port=5432 dbname=' || current_database() ||
-    ' user=postgres password=postgres'
+  -- The harness creates this extension as the isolated test runner. The
+  -- unprivileged application roles are never granted its `_u` entry point.
+  'dbname=' || current_database()
 )
 from (
   values
