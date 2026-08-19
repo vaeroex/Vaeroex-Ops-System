@@ -6,6 +6,8 @@ The `security-database` CI job starts a fresh local Supabase stack, applies the 
 
 The suite verifies entitlement write denial, Viewer mutation denial, Admin-to-Owner escalation denial, cross-workspace isolation, anonymous direct-write denial, legitimate service workflows, quota boundaries, and concurrent atomic quota consumption. The Supabase CLI and every GitHub Action are pinned to immutable reviewed versions.
 
+Vaeroex Production predates Supabase's opt-in Data API grant default, while a current fresh local stack starts without those legacy object grants. The pgTAP transaction therefore grants only the specific columns and operations needed for its synthetic attacker and legitimate-user statements to reach RLS. These test-only grants are created after fixture setup, never include a table-wide `workspaces` grant, and are rolled back with all synthetic rows. Application migrations and deployed role authority are unchanged.
+
 ESLint 9 is restored through a flat configuration. Existing style debt is retained as 63 visible warnings, while lint errors or growth beyond that baseline fail CI. CommonJS regression scripts are linted as CommonJS rather than being forced into unrelated module rewrites.
 
 ## Production dependency advisories

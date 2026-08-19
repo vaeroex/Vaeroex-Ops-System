@@ -63,6 +63,19 @@ insert into public.forms (id, workspace_id, name, is_public, public_slug, schema
     'a6900000-0000-4000-8000-000000000001'
   );
 
+-- Production predates Supabase's opt-in Data API grant default. Current fresh
+-- stacks therefore need a rollback-only adapter so these tests reach the same
+-- RLS boundary instead of failing earlier at the object ACL. Grant only the
+-- columns and operations exercised below; all grants disappear with rollback.
+grant select (id, name) on table public.workspaces to authenticated;
+grant select (id, workspace_id, user_id, role, status, invited_email, invited_by, created_at)
+  on table public.workspace_members to authenticated;
+grant insert (workspace_id, user_id, role, status)
+  on table public.workspace_members to authenticated;
+grant update (role) on table public.workspace_members to authenticated;
+grant insert (workspace_id, form_id, data_json)
+  on table public.form_submissions to authenticated;
+
 select ok(
   not has_table_privilege('authenticated', 'public.workspaces', 'INSERT'),
   'ordinary authenticated users cannot create a workspace with forged entitlement state'

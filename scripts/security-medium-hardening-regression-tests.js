@@ -103,6 +103,11 @@ assert.doesNotMatch(workflow, /uses: [^\s]+@v\d/m, "third-party actions must use
 assert.match(workflow, /supabase test db supabase\/tests\/security_high_findings_remediation\.test\.sql/, "CI must execute two-workspace authorization behavior tests in an isolated local database");
 
 const databaseSecurityTest = read("supabase/tests/security_high_findings_remediation.test.sql");
+assert.match(databaseSecurityTest, /begin;[\s\S]+grant select \(id, name\) on table public\.workspaces to authenticated;[\s\S]+rollback;/, "the isolated suite must model Production workspace reachability only inside its rollback transaction");
+assert.doesNotMatch(databaseSecurityTest, /grant\s+select\s+on\s+(?:table\s+)?public\.workspaces\s+to\s+authenticated/i, "the isolated suite must not add table-wide workspace read authority");
+assert.doesNotMatch(databaseSecurityTest, /grant[\s\S]{0,120}public\.workspaces[\s\S]{0,80}to\s+(?:anon|public)\b/i, "the isolated suite must never expose workspaces to anonymous or public roles");
+assert.match(databaseSecurityTest, /grant insert \(workspace_id, form_id, data_json\)[\s\S]{0,80}public\.form_submissions to authenticated;/, "Viewer mutation denial must be tested after the exact submission columns reach RLS");
+assert.match(databaseSecurityTest, /grant update \(role\) on table public\.workspace_members to authenticated;/, "membership escalation tests must reach the role-restricted RLS policies");
 assert.match(databaseSecurityTest, /dblink_send_query[\s\S]+security\.concurrent-test/, "quota regression must issue genuinely concurrent database requests");
 assert.match(databaseSecurityTest, /count\(\*\)::integer from concurrent_rate_limit_results where allowed[\s\S]+\n  3,/, "concurrent quota regression must enforce the exact boundary");
 
