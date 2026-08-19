@@ -19,18 +19,39 @@ for (const stage of ["business-complexity", "command-surface", "performance-land
 
 assert.equal((page.match(/<OperationsIntelligenceEngineDemo/g) || []).length, 1, "the page must retain one focused interactive product demo");
 for (const approvedCopy of [
-  "From connected business information to executive clarity.",
-  "The intelligence leadership can review today.",
-  "Business information becomes trusted understanding, not unsupported conclusions.",
-  "Facts remain facts. Interpretation remains explainable.",
-  "Leaders who need one coherent operating view.",
-  "Give leadership a clearer basis for the next decision."
+  "See what&apos;s changing in your business—and what deserves your attention.",
+  "Your business information can be messy. Your understanding of it doesn&apos;t have to be.",
+  "From scattered paperwork to a clearer business picture.",
+  "Your numbers stay your numbers.",
+  "An ongoing second set of eyes on your business.",
+  "Start building a clearer intelligence picture of your business."
 ]) {
   assert.match(page, new RegExp(approvedCopy.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `approved product copy must remain: ${approvedCopy}`);
 }
-for (const capability of ["Business Health", "Intelligence", "Explain Finding", "Evidence", "Saved Analyses"]) {
+for (const capability of ["Business Health", "KPIs", "Intelligence", "Explain Finding", "Evidence", "Saved Analyses"]) {
   assert.match(page, new RegExp(capability), `Executive Intelligence must retain ${capability}`);
 }
+for (const practicalInput of ["spreadsheets", "PDFs", "screenshots", "paper records", "handwritten notes"]) {
+  assert.match(page, new RegExp(practicalInput, "i"), `Executive Intelligence must explain support for ${practicalInput}`);
+}
+assert.match(page, /handwritten business information with high accuracy/i, "handwritten-note copy must promise credible high accuracy, not perfection");
+assert.doesNotMatch(page, /100% accuracy|perfect handwriting|flawless OCR/i, "handwritten-note copy must not promise infallible extraction");
+assert.match(page, /Weekly Intelligence Briefing for the rolling last 7 days/, "the page must advertise the supported Weekly briefing period");
+assert.match(page, /Monthly Intelligence Briefing for the rolling last 30 days/, "the page must advertise the supported Monthly briefing period");
+assert.match(page, /generated on demand; an upload does not automatically create one/, "the page must not imply scheduled or upload-triggered briefings");
+assert.doesNotMatch(page, /daily briefing|scheduled briefing|automatic briefing/i, "the page must not advertise unsupported briefing behavior");
+for (const disclosure of [
+  "What can I give Vaeroex?",
+  "Still working with paper records or handwritten notes?",
+  "What can Executive Intelligence help reveal?",
+  "How are KPIs created and tracked?",
+  "What are generated intelligence briefings?"
+]) {
+  assert.match(page, new RegExp(disclosure.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), `progressive disclosure must retain: ${disclosure}`);
+}
+assert.equal((page.match(/<details key=/g) || []).length, 1, "secondary product explanations must render through one reusable native disclosure path");
+assert.match(styles, /\.disclosure summary:focus-visible/, "native disclosures must expose a visible keyboard focus state");
+assert.match(styles, /@media \(max-width: 767px\), \(pointer: coarse\)[\s\S]*\.disclosure summary/, "disclosures must retain a bounded mobile layout");
 
 assert.match(backdrop, /dynamic\([\s\S]*ExecutiveIntelligenceSpatialCanvas[\s\S]*ssr: false/, "Executive WebGL must load progressively on the client");
 for (const contract of ["useSpatialCapability", "SpatialResizeObserver", "probeRenderedCanvas", "frameloop=\"demand\"", "data-executive-intelligence-canvas", "data-spatial-webgl"]) {
