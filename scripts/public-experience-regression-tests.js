@@ -105,12 +105,14 @@ for (const category of ["Intelligence and Explain Finding", "Saved Analyses"]) {
   assert.match(help, new RegExp(category), `Help must include the ${category} category`);
 }
 
-for (const boundary of ["does not currently claim HIPAA compliance", "does not currently claim malware scanning", "human review"]) {
+for (const boundary of ["Infrastructure & Security", "does not currently claim malware scanning", "human review"]) {
   assert.match(trust, new RegExp(boundary, "i"), `Trust must preserve the boundary: ${boundary}`);
 }
-for (const boundary of ["Workspace Isolation", "Secure Data Handling", "Evidence-Backed Intelligence", "Deterministic Business Intelligence", "Explainable Executive Reasoning", "Leadership Control"]) {
+for (const boundary of ["Workspace Isolation", "Infrastructure & Security", "Secure Data Handling", "Evidence-Backed Intelligence", "Deterministic Business Intelligence", "Explainable Executive Reasoning", "Leadership Control"]) {
   assert.match(trustContent, new RegExp(boundary), `Trust content must include ${boundary}`);
 }
+assert.match(trustContent, /infrastructure providers[\s\S]+SOC 2 Type II and ISO 27001 certifications and attestations/, "Trust content must attribute SOC 2 Type II and ISO 27001 to infrastructure providers");
+assert.doesNotMatch([trust, trustContent].join("\n"), /does not currently claim HIPAA compliance|GDPR certification|GDPR certified|enterprise compliance certification for Vaeroex itself/i, "Trust content must not restore the removed negative compliance disclaimer");
 
 assert.match(seo, /name: "Vaeroex"/, "public SEO must use Vaeroex as the organization identity");
 assert.match(layout, /Vaeroex \| Intelligence Systems/, "global metadata must retain the authoritative company-level title");

@@ -17,7 +17,7 @@ const trustGroups = [
     icon: FileLock2,
     items: [
       trustSection("Workspace Isolation"),
-      trustSection("Cloud Infrastructure"),
+      trustSection("Infrastructure & Security"),
       trustSection("Secure Data Handling"),
       trustSection("Current Information Controls")
     ]
@@ -44,12 +44,11 @@ const trustGroups = [
   },
   {
     title: "Current boundaries and customer responsibility",
-    summary: "What Vaeroex does not claim and where customer judgment remains required.",
+    summary: "Where customer judgment, data choices, and account administration remain required.",
     icon: UserRoundCheck,
     items: [
       trustSection("Advanced Reasoning Boundaries"),
       trustSection("Sensitive Data Boundaries"),
-      trustSection("Current Compliance Status"),
       trustSection("Customer Responsibility"),
       trustSection("Security Contact")
     ]
@@ -101,7 +100,6 @@ function TrustContent({ inApp }: { inApp: boolean }) {
       <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
         <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
         <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
-          <li>Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, ISO 27001 certification, GDPR certification, or enterprise compliance certification for Vaeroex itself. Any such certification references apply to relevant infrastructure providers unless Vaeroex expressly states otherwise.</li>
           <li>Supported upload types are allowlisted, but Vaeroex does not currently claim malware scanning, DLP scanning, file sandboxing, or regulated-data detection.</li>
           <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
           <li>Vaeroex outputs may be incomplete or inaccurate and require human review before important business action.</li>
