@@ -134,6 +134,7 @@ assert.doesNotMatch(
   /console\.log|(?:stdout|stderr)\.write\([^)]*(?:databaseUrl|testUrl|connectionSetting)/,
   "the database runner must not print its connection credential"
 );
+assert.match(workflow, /security-database:[\s\S]+pnpm install --frozen-lockfile[\s\S]+node scripts\/run-isolated-database-tests\.js/, "CI must install the pinned PostgreSQL client before invoking the database coordinator");
 assert.match(workflow, /node scripts\/run-isolated-database-tests\.js[\s\S]+security_high_findings_remediation\.test\.sql[\s\S]+customer_1_billing_entitlement\.test\.sql/, "CI must execute both portable pgTAP suites through the credential-safe runner");
 
 const { getSubscriptionStatus, isStripeSubscriptionEntitled } = require(path.join(root, "lib/billing/get-subscription-status.ts"));
