@@ -125,7 +125,10 @@ assert.match(databaseRunner, /POSTGRES_URL_NON_POOLING/, "the database runner mu
 assert.match(databaseRunner, /SUPABASE_TEST_BRANCH_NAME[\s\S]+SUPABASE_TEST_PARENT_PROJECT_REF/, "hosted verification must bind the exact branch to its parent project");
 assert.match(databaseRunner, /new Client\([\s\S]+connectionString: databaseUrl[\s\S]+options: `-c vaeroex\.test_database_url_b64=/, "the hosted runner must pass the credential through an ephemeral database session setting");
 assert.match(databaseRunner, /Array\.isArray\(queryResult\)[\s\S]+assertionCount/, "the direct runner must verify every pgTAP result rather than trusting query completion alone");
-assert.match(databaseRunner, /Buffer\.from\(databaseUrl, "utf8"\)\.toString\("base64"\)/, "the database runner must pass the connection without embedding it in test SQL");
+assert.match(databaseRunner, /isLocalDatabase[\s\S]+localDblinkConnection\(testUrl\)[\s\S]+: databaseUrl/, "the database runner must use an internal socket connection locally and the remote connection for a hosted branch");
+assert.match(databaseRunner, /decodeURIComponent\(url\.password\)/, "the local dblink connection must derive its credential from the ephemeral Supabase URL");
+assert.match(databaseRunner, /Buffer\.from\(dblinkConnection, "utf8"\)\.toString\("base64"\)/, "the database runner must pass the appropriate dblink connection without embedding it in test SQL");
+assert.doesNotMatch(databaseRunner, /postgres:\s*postgres|password\s*[:=]\s*["']postgres/i, "the database runner must not hardcode local database credentials");
 assert.match(databaseRunner, /clearCredentialEnvironment\(\)[\s\S]+delete process\.env\.SUPABASE_TEST_DATABASE_URL/, "the database runner must clear the raw connection after verification");
 assert.match(databaseRunner, /redactDatabaseDiagnostic/, "database diagnostics must be redacted defensively");
 assert.doesNotMatch(databaseRunner, /--db-url|testUrl\.toString\(\)/, "the database runner must never place a credential-bearing URL in a child-process argument");

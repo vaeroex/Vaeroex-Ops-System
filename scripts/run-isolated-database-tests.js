@@ -89,12 +89,33 @@ try {
   process.exit(2);
 }
 
-const connectionSetting = Buffer.from(databaseUrl, "utf8").toString("base64");
+function quoteConnectionValue(value) {
+  return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
+}
+
+function localDblinkConnection(url) {
+  const database = decodeURIComponent(url.pathname.replace(/^\//, ""));
+  const user = decodeURIComponent(url.username);
+  const password = decodeURIComponent(url.password);
+
+  return [
+    `dbname=${quoteConnectionValue(database)}`,
+    `user=${quoteConnectionValue(user)}`,
+    `password=${quoteConnectionValue(password)}`
+  ].join(" ");
+}
+
+const isLocalDatabase = ["127.0.0.1", "localhost"].includes(testUrl.hostname);
+const dblinkConnection = isLocalDatabase
+  ? localDblinkConnection(testUrl)
+  : databaseUrl;
+const connectionSetting = Buffer.from(dblinkConnection, "utf8").toString("base64");
 
 function redactDatabaseDiagnostic(value) {
   let diagnostic = String(value || "unknown database error");
   const credentialFragments = [
     databaseUrl,
+    dblinkConnection,
     connectionSetting,
     testUrl.password,
     encodeURIComponent(testUrl.password)
