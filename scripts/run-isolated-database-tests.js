@@ -93,13 +93,44 @@ function quoteConnectionValue(value) {
   return `'${value.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
-function localDblinkConnection(url) {
+function localDatabaseContainerHost() {
+  const containers = spawnSync(
+    "docker",
+    ["ps", "--filter", "name=supabase_db_", "--format", "{{.ID}}"],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+  );
+  const containerIds = containers.stdout?.trim().split(/\s+/).filter(Boolean) || [];
+
+  if (containers.status !== 0 || containerIds.length !== 1) {
+    throw new Error("The isolated Supabase database container is ambiguous or unavailable.");
+  }
+
+  const inspect = spawnSync(
+    "docker",
+    [
+      "inspect",
+      "--format",
+      "{{range .NetworkSettings.Networks}}{{println .IPAddress}}{{end}}",
+      containerIds[0]
+    ],
+    { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }
+  );
+  const hosts = inspect.stdout?.trim().split(/\s+/).filter((value) => /^\d{1,3}(?:\.\d{1,3}){3}$/.test(value)) || [];
+
+  if (inspect.status !== 0 || hosts.length !== 1) {
+    throw new Error("The isolated Supabase database network is ambiguous or unavailable.");
+  }
+
+  return hosts[0];
+}
+
+function localDblinkConnection(url, host) {
   const database = decodeURIComponent(url.pathname.replace(/^\//, ""));
   const user = decodeURIComponent(url.username);
   const password = decodeURIComponent(url.password);
 
   return [
-    "host='127.0.0.1'",
+    `host=${quoteConnectionValue(host)}`,
     "port='5432'",
     "sslmode='disable'",
     `dbname=${quoteConnectionValue(database)}`,
@@ -110,7 +141,7 @@ function localDblinkConnection(url) {
 
 const isLocalDatabase = ["127.0.0.1", "localhost"].includes(testUrl.hostname);
 const dblinkConnection = isLocalDatabase
-  ? localDblinkConnection(testUrl)
+  ? localDblinkConnection(testUrl, localDatabaseContainerHost())
   : databaseUrl;
 const connectionSetting = Buffer.from(dblinkConnection, "utf8").toString("base64");
 
