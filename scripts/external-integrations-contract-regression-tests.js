@@ -348,7 +348,7 @@ doesNotThrow(() => contract.IntegrationConnectionSchema.parse(connection), "vali
 doesNotThrow(() => contract.ExternalSourceRecordVersionSchema.parse(source), "valid source version must parse");
 doesNotThrow(() => contract.CanonicalBusinessFactVersionSchema.parse(fact), "valid canonical fact must parse");
 doesNotThrow(() => contract.FreshnessStateSchema.parse(freshness), "valid freshness must parse");
-doesNotThrow(() => contract.BusinessStateDeltaV1Schema.parse(delta), "valid Business State Delta must parse");
+doesNotThrow(() => contract.BusinessStateDeltaV2Schema.parse(delta), "valid Business State Delta must parse");
 
 const selfParent = { ...entity, parentBusinessEntityId: ids.entity };
 throws(() => contract.BusinessEntitySchema.parse(selfParent), /cannot be its own parent/);
@@ -366,6 +366,73 @@ for (const invalidDecimal of ["01", "1.0", "1e3", "+1", "-0", "0.00"]) {
 for (const validDecimal of ["0", "1", "-1", "0.01", "10.25", "-0.5"]) {
   equal(contract.CanonicalDecimalSchema.parse(validDecimal), validDecimal, `${validDecimal} must remain unchanged`);
 }
+
+const maxPersistedFactDecimal = `${"9".repeat(21)}.${"9".repeat(9)}`;
+const maxNegativePersistedFactDecimal = `-${maxPersistedFactDecimal}`;
+const overPrecisionFactDecimal = `${"9".repeat(22)}.${"9".repeat(9)}`;
+const overScaleFactDecimal = `0.${"1".repeat(10)}`;
+const maxPersistedExchangeRate = `${"9".repeat(18)}.${"9".repeat(12)}`;
+const overPrecisionExchangeRate = `${"9".repeat(19)}.${"9".repeat(12)}`;
+const overScaleExchangeRate = `0.${"1".repeat(13)}`;
+
+for (const value of ["0", "0.123456789", maxPersistedFactDecimal, maxNegativePersistedFactDecimal]) {
+  equal(contract.PersistedFactDecimalSchema.parse(value), value, `${value} must fit numeric(30,9) unchanged`);
+}
+doesNotThrow(
+  () => contract.CanonicalDecimalSchema.parse(overPrecisionFactDecimal),
+  "the generic decimal primitive may remain syntax-only"
+);
+throws(
+  () => contract.PersistedFactDecimalSchema.parse(overPrecisionFactDecimal),
+  /numeric\(30,9\).*without rounding/,
+  "one digit beyond numeric(30,9) precision must fail"
+);
+throws(
+  () => contract.PersistedFactDecimalSchema.parse(overScaleFactDecimal),
+  /numeric\(30,9\).*without rounding/,
+  "one decimal place beyond numeric(30,9) scale must fail"
+);
+throws(
+  () => contract.PersistedFactDecimalSchema.parse("1.230000000"),
+  undefined,
+  "persisted decimals must reject noncanonical trailing zeroes"
+);
+equal(contract.PersistedFactIntegerSchema.parse("9".repeat(21)), "9".repeat(21), "maximum persisted integer must parse");
+throws(
+  () => contract.PersistedFactIntegerSchema.parse("9".repeat(22)),
+  /numeric\(30,9\).*without rounding/,
+  "persisted integers must fit the numeric(30,9) integer range"
+);
+equal(
+  contract.PersistedNonNegativeFactDecimalSchema.parse(maxPersistedFactDecimal),
+  maxPersistedFactDecimal,
+  "maximum contribution weight representation must parse unchanged"
+);
+throws(
+  () => contract.PersistedNonNegativeFactDecimalSchema.parse("-0.5"),
+  /non-negative/,
+  "contribution weights must remain non-negative"
+);
+for (const value of ["1", "0.999999999"]) {
+  equal(contract.PersistedUnitIntervalDecimalSchema.parse(value), value, `${value} must fit the persisted unit interval`);
+}
+throws(() => contract.PersistedUnitIntervalDecimalSchema.parse("1.1"), /between zero and one/);
+equal(
+  contract.PersistedExchangeRateSchema.parse(maxPersistedExchangeRate),
+  maxPersistedExchangeRate,
+  "maximum numeric(30,12) exchange rate must parse unchanged"
+);
+throws(
+  () => contract.PersistedExchangeRateSchema.parse(overPrecisionExchangeRate),
+  /numeric\(30,12\).*without rounding/,
+  "one digit beyond exchange-rate precision must fail"
+);
+throws(
+  () => contract.PersistedExchangeRateSchema.parse(overScaleExchangeRate),
+  /numeric\(30,12\).*without rounding/,
+  "one decimal place beyond exchange-rate scale must fail"
+);
+throws(() => contract.PersistedExchangeRateSchema.parse("-1"), /positive/, "exchange rates must be positive");
 throws(() => contract.Sha256FingerprintSchema.parse(`sha256:${"A".repeat(64)}`), undefined, "uppercase hashes must fail");
 
 const acceptedSource = { ...source, trust: "accepted" };
@@ -399,6 +466,34 @@ throws(
   () => contract.CanonicalBusinessFactVersionSchema.parse({ ...fact, value: { kind: "money", amount: "01.0", currency: "USD" } }),
   undefined,
   "malformed accounting decimals must fail"
+);
+doesNotThrow(
+  () => contract.CanonicalBusinessFactVersionSchema.parse({
+    ...fact,
+    value: { kind: "money", amount: maxPersistedFactDecimal, currency: "USD" }
+  }),
+  "maximum persisted money value must parse"
+);
+throws(
+  () => contract.canonicalFactFingerprint({
+    ...fact,
+    value: { kind: "money", amount: overPrecisionFactDecimal, currency: "USD" }
+  }),
+  /numeric\(30,9\).*without rounding/,
+  "out-of-range fact values must fail before canonical hashing"
+);
+throws(
+  () => contract.CanonicalBusinessFactVersionSchema.parse({
+    ...fact,
+    value: { kind: "integer", value: "9".repeat(22), unit: null },
+    accounting: {
+      ...fact.accounting,
+      sourceCurrency: null,
+      reportingCurrency: null
+    }
+  }),
+  /numeric\(30,9\).*without rounding/,
+  "integer facts must fit their persisted numeric column"
 );
 throws(
   () => contract.CanonicalBusinessFactVersionSchema.parse({
@@ -453,7 +548,9 @@ const providerDescriptor = {
 for (const [providerKey, displayName] of [
   ["ledger_demo", "Ledger Demo"],
   ["planning_demo", "Planning Demo"],
-  ["archive_demo", "Archive Demo"]
+  ["archive_demo", "Archive Demo"],
+  ["business_central", "Business Central"],
+  ["netsuite", "NetSuite"]
 ]) {
   doesNotThrow(
     () => contract.ProviderDescriptorSchema.parse({ ...providerDescriptor, providerKey, displayName }),
@@ -481,6 +578,16 @@ const adapterContext = {
   connectionConfigurationVersion: 1,
   mappingVersion: 1
 };
+for (const providerKey of ["business_central", "netsuite"]) {
+  doesNotThrow(
+    () => contract.IntegrationConnectionSchema.parse({ ...connection, providerKey }),
+    `${providerKey} must fit the provider-neutral connection contract`
+  );
+  doesNotThrow(
+    () => contract.ProviderAdapterContextSchema.parse({ ...adapterContext, providerKey }),
+    `${providerKey} must fit the tenant-bound provider adapter context`
+  );
+}
 const adapterResult = {
   outcome: "success",
   operation: "list_source_records",
@@ -518,12 +625,12 @@ const staleFreshness = { ...freshness, status: "stale", blockingLevel: "current_
 equal(contract.isFreshnessEligibleForCurrentAnalysis(staleFreshness), false, "stale required data must fail closed");
 const staleDelta = clone(delta);
 staleDelta.freshness[0] = staleFreshness;
-throws(() => contract.BusinessStateDeltaV1Schema.parse(staleDelta), /Unsafe freshness must fail closed/);
+throws(() => contract.BusinessStateDeltaV2Schema.parse(staleDelta), /Unsafe freshness must fail closed/);
 staleDelta.eligibleRoutes = [];
 staleDelta.materiality = { ...staleDelta.materiality, decision: "no_ai" };
-doesNotThrow(() => contract.BusinessStateDeltaV1Schema.parse(staleDelta), "stale data may produce a no-analysis delta");
+doesNotThrow(() => contract.BusinessStateDeltaV2Schema.parse(staleDelta), "stale data may produce a no-analysis delta");
 throws(
-  () => contract.BusinessStateDeltaV1Schema.parse({
+  () => contract.BusinessStateDeltaV2Schema.parse({
     ...delta,
     materiality: { ...delta.materiality, decision: "luna_eligible" },
     eligibleRoutes: ["terra"]
@@ -531,10 +638,22 @@ throws(
   /requires its matching route/
 );
 throws(
-  () => contract.BusinessStateDeltaV1Schema.parse({ ...delta, providerPayload: { token: "secret" } }),
+  () => contract.BusinessStateDeltaV2Schema.parse({ ...delta, providerPayload: { token: "secret" } }),
   /unrecognized/i,
   "Business State Delta must reject provider payloads"
 );
+const overRangeDelta = clone(delta);
+overRangeDelta.changes[0].absoluteDelta = overPrecisionFactDecimal;
+throws(
+  () => contract.businessStateDeltaFingerprint(overRangeDelta),
+  /numeric\(30,9\).*without rounding/,
+  "out-of-range delta values must fail before canonical hashing"
+);
+
+equal(contract.EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.sourceRecord, "external_source_record_version_v1");
+equal(contract.EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.canonicalFact, "canonical_business_fact_version_v2");
+equal(contract.EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.businessStateDelta, "business_state_delta_v2");
+equal(contract.EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.fingerprint, "external_integration_fingerprint_v1");
 
 equal(contract.canonicalContractJson({ z: 1, a: { y: true, b: "value" } }), '{"a":{"b":"value","y":true},"z":1}');
 equal(
@@ -562,8 +681,8 @@ const sourceHash = contract.externalSourceFingerprint(source);
 const factHash = contract.canonicalFactFingerprint(fact);
 const deltaHash = contract.businessStateDeltaFingerprint(delta);
 equal(sourceHash, "sha256:b092d645674a3db05695c9c27d48e5231167c3f55e2822478b00e6d309f5949e", "source golden fingerprint changed");
-equal(factHash, "sha256:134643c1f5f089c88ca04d9cde303a436eb90da03ba8b382af747aa740838a05", "fact golden fingerprint changed");
-equal(deltaHash, "sha256:def472cd40be6732e1d792a2ebc287cf8fc9a95c595c6a0ba1ee4591985138dd", "delta golden fingerprint changed");
+equal(factHash, "sha256:7cac62c9b19aad2d03c5e0715718bd50f93a940b9f3a9b8d5bb36344d4197443", "fact golden fingerprint changed");
+equal(deltaHash, "sha256:9fa5ad874baf6038070f5170fc4b14b43a4de671b8adfd643956ac3f71a74e17", "delta golden fingerprint changed");
 
 const reorderedSource = Object.fromEntries(Object.entries(source).reverse());
 equal(contract.externalSourceFingerprint(reorderedSource), sourceHash, "source key order must not change its fingerprint");

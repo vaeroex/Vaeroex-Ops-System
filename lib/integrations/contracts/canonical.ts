@@ -9,7 +9,7 @@ import {
   CanonicalBusinessFactVersionSchema,
   ExternalSourceRecordVersionSchema
 } from "@/lib/integrations/contracts/source-facts";
-import { BusinessStateDeltaV1Schema } from "@/lib/integrations/contracts/intelligence";
+import { BusinessStateDeltaV2Schema } from "@/lib/integrations/contracts/intelligence";
 import { EXTERNAL_INTEGRATION_CONTRACT_VERSIONS } from "@/lib/integrations/contracts/versions";
 
 export const IntegrationFingerprintPurposeSchema = z.enum([
@@ -178,7 +178,7 @@ export function canonicalFactFingerprint(input: unknown) {
 }
 
 export function businessStateDeltaFingerprintInput(input: unknown): IntegrationFingerprintEnvelope {
-  const delta = BusinessStateDeltaV1Schema.parse(input);
+  const delta = BusinessStateDeltaV2Schema.parse(input);
   return fingerprintEnvelope("business_state_delta", {
     contractVersion: delta.contractVersion,
     workspaceId: delta.workspaceId,

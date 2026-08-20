@@ -9,6 +9,10 @@ const contractDirectory = path.join(root, "lib/integrations/contracts");
 const contractFiles = fs.readdirSync(contractDirectory).filter((name) => name.endsWith(".ts")).sort();
 const contractSource = contractFiles.map((name) => read(`lib/integrations/contracts/${name}`)).join("\n");
 const adr = read("docs/architecture/adr-007-external-integrations-contract-foundation.md");
+const alignment = read("docs/architecture/external-integrations-phase-0-1-contract-persistence-alignment.md");
+const sourceFactContracts = read("lib/integrations/contracts/source-facts.ts");
+const intelligenceContracts = read("lib/integrations/contracts/intelligence.ts");
+const versionContracts = read("lib/integrations/contracts/versions.ts");
 const packageJson = JSON.parse(read("package.json"));
 
 let assertionCount = 0;
@@ -63,6 +67,16 @@ matches(contractSource, /fromDeterministicWatermark/, "Business State Delta must
 matches(contractSource, /luna_eligible/, "materiality must express selective model-tier eligibility");
 matches(contractSource, /pending_authorization[\s\S]+"error"/, "the connection lifecycle must include explicit error recovery");
 matches(contractSource, /CanonicalDecimalSchema/, "accounting decimals must use the canonical string contract");
+matches(contractSource, /PersistedFactDecimalSchema/, "persisted fact decimals must use a bounded semantic contract");
+matches(contractSource, /PersistedExchangeRateSchema/, "exchange rates must use their bounded semantic contract");
+doesNotMatch(
+  `${sourceFactContracts}\n${intelligenceContracts}`,
+  /\bCanonicalDecimalSchema\b|\bCanonicalIntegerSchema\b|\bPositiveCanonicalDecimalSchema\b|\bNonNegativeCanonicalDecimalSchema\b|\bUnitIntervalCanonicalDecimalSchema\b/,
+  "persisted canonical truth must not use syntax-only decimal schemas"
+);
+matches(versionContracts, /canonical_business_fact_version_v2/, "the narrowed fact validation contract must be V2");
+matches(versionContracts, /business_state_delta_v2/, "the narrowed delta validation contract must be V2");
+matches(versionContracts, /external_integration_fingerprint_v1/, "the unchanged fingerprint algorithm must remain V1");
 matches(contractSource, /workspaceId/, "tenant identity must be explicit");
 matches(contractSource, /businessEntityId/, "Business Entity identity must be explicit");
 
@@ -76,6 +90,31 @@ matches(adr, /launch defaults subject to sandbox\/load evidence, not architectur
 matches(adr, /Long-lived security\/authorization\/deletion audit duration pending legal\/compliance review/, "audit retention must remain pending");
 matches(adr, /Phase 0 defines this boundary only\. It does not implement encryption or object storage\./, "ADR must keep storage outside Phase 0");
 matches(adr, /Phase 0 includes no:/, "ADR must make the negative boundary explicit");
+matches(adr, /Values outside the supported range fail before canonical hashing or persistence/, "ADR must reject unsupported decimals before hashing");
+matches(adr, /CanonicalBusinessFactVersion from V1 to V2/, "ADR must document the fact version correction");
+matches(adr, /BusinessStateDelta from V1 to V2/, "ADR must document the delta version correction");
+
+matches(alignment, /UNIQUE \(workspace_id, entity_key\)/, "entity_key must be workspace-unique");
+matches(alignment, /numeric column is never the lexical source for a contract or fingerprint/, "canonical decimal strings must remain persistence authority");
+matches(alignment, /active, inactive, archived/, "Business Entity status must use the contract vocabulary");
+doesNotMatch(
+  alignment.match(/## BusinessEntity Field Audit[\s\S]*?## IntegrationConnection Field Audit/)?.[0] ?? "",
+  /status[^\n]*deleting|status[^\n]*deleted/,
+  "Business Entity status must not be overloaded with erasure states"
+);
+matches(alignment, /change_kind = 'deleted'.*normalized_projection IS NULL/, "deleted source versions must have null projections");
+matches(alignment, /every non-deleted version requires a projection/i, "live source versions must have projections");
+matches(alignment, /factKind plus factKey is the sole authoritative/, "factKind plus factKey must be the only canonical identity");
+matches(alignment, /exact money, decimal, percentage, integer, boolean, date, text, structured vocabulary/, "fact value vocabulary must be exact");
+matches(alignment, /exact valid, invalid vocabulary/, "fact validation vocabulary must be exact");
+matches(alignment, /accepted, excluded_duplicate, excluded_authority, conflicted, tombstone vocabulary/, "reconciliation vocabulary must be exact");
+matches(alignment, /deterministic_policy requires decision_policy_version/, "deterministic decisions must preserve policy version");
+matches(alignment, /customer_authorized_user and operator require decision_actor_id/, "human decisions must preserve actor identity");
+doesNotMatch(alignment, /decision_authority[^\n]*(?:ai|model)/i, "AI/model decision authority must not exist");
+matches(alignment, /at least one valid same-tenant source edge/, "fact provenance must be nonempty at commit");
+matches(alignment, /deferred constraint trigger/, "provenance atomicity must have a deferred invariant");
+matches(alignment, /Business Central and NetSuite descriptors can express/, "future provider portability must remain explicit");
+matches(alignment, /No migration, database, Supabase change/, "Phase 0.1 must preserve its negative boundary");
 
 equal(
   packageJson.scripts["test:external-integrations-contracts"],
