@@ -9,6 +9,8 @@ import {
   retrieveStripeCustomer,
   retrieveStripeSubscription,
   stripeObjectId,
+  stripeSubscriptionPeriod,
+  stripeSubscriptionPriceId,
   stripeTimestampToIso,
   type StripeCheckoutSession,
   type StripeCustomer,
@@ -21,15 +23,6 @@ import {
 export const runtime = "nodejs";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
-
-type ExistingSubscription = {
-  id: string;
-  workspace_id: string | null;
-  customer_email: string;
-  customer_name: string | null;
-  user_id: string | null;
-  manually_activated: boolean;
-};
 
 type StripeSyncResult = {
   customerEmail: string | null;
@@ -48,42 +41,6 @@ function normalizeEmail(email?: string | null) {
   return String(email || "").trim().toLowerCase();
 }
 
-function priceIdFromSubscription(subscription?: StripeSubscription | null) {
-  return subscription?.items?.data?.[0]?.price?.id || process.env.STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY || null;
-}
-
-async function findExistingSubscription({
-  admin,
-  stripeSubscriptionId,
-  stripeCustomerId,
-  customerEmail
-}: {
-  admin: AdminClient;
-  stripeSubscriptionId?: string | null;
-  stripeCustomerId?: string | null;
-  customerEmail?: string | null;
-}) {
-  const filters = [
-    stripeSubscriptionId ? `stripe_subscription_id.eq.${stripeSubscriptionId}` : "",
-    stripeCustomerId ? `stripe_customer_id.eq.${stripeCustomerId}` : "",
-    customerEmail ? `customer_email.ilike.${normalizeEmail(customerEmail)}` : ""
-  ].filter(Boolean);
-
-  if (!filters.length) {
-    return null;
-  }
-
-  const { data } = await admin
-    .from("customer_subscriptions")
-    .select("id,workspace_id,customer_email,customer_name,user_id,manually_activated")
-    .or(filters.join(","))
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  return data as ExistingSubscription | null;
-}
-
 async function getCustomer(customerId?: string | null) {
   if (!customerId) {
     return null;
@@ -96,9 +53,12 @@ async function getCustomer(customerId?: string | null) {
   }
 }
 
-async function profileIdForEmail(admin: AdminClient, email: string) {
-  const { data } = await admin.from("profiles").select("id").eq("email", normalizeEmail(email)).maybeSingle();
-  return data?.id ?? null;
+function metadataValue(
+  key: string,
+  subscription?: StripeSubscription | null,
+  session?: StripeCheckoutSession | null
+) {
+  return subscription?.metadata?.[key] || session?.metadata?.[key] || null;
 }
 
 async function syncStripeSubscription({
@@ -108,7 +68,6 @@ async function syncStripeSubscription({
   session,
   invoice,
   customer,
-  forcedStatus,
   lastPaymentAt
 }: {
   admin: AdminClient;
@@ -117,89 +76,61 @@ async function syncStripeSubscription({
   session?: StripeCheckoutSession | null;
   invoice?: StripeInvoice | null;
   customer?: StripeCustomer | null;
-  forcedStatus?: ReturnType<typeof mapStripeStatus> | null;
   lastPaymentAt?: string | null;
 }) {
   const stripeSubscriptionId = subscription?.id || stripeObjectId(session?.subscription) || stripeObjectId(invoice?.subscription);
   const stripeCustomerId = stripeObjectId(subscription?.customer) || stripeObjectId(session?.customer) || stripeObjectId(invoice?.customer) || customer?.id || null;
-  let existing = await findExistingSubscription({
-    admin,
-    stripeSubscriptionId,
-    stripeCustomerId,
-    customerEmail: session?.customer_details?.email || session?.customer_email || invoice?.customer_email || customer?.email || null
+  const customerEmail = normalizeEmail(
+    session?.customer_details?.email || session?.customer_email || invoice?.customer_email || customer?.email
+  );
+  const customerName = session?.customer_details?.name || customer?.name || null;
+
+  if (!stripeSubscriptionId || !stripeCustomerId || !customerEmail || !event.created) {
+    throw new Error("Stripe event did not include the required subscription attribution.");
+  }
+
+  const status = mapStripeStatus(subscription?.status);
+  const { currentPeriodStart, currentPeriodEnd } = stripeSubscriptionPeriod(subscription);
+  const checkoutIntentId = metadataValue("purchase_intent_id", subscription, session);
+  const metadataUserId = metadataValue("vaeroex_user_id", subscription, session);
+  const { data, error } = await admin.rpc("sync_stripe_subscription_entitlement_v1", {
+    p_event_id: event.id,
+    p_event_created_at: new Date(event.created * 1000).toISOString(),
+    p_event_type: event.type,
+    p_checkout_intent_id: checkoutIntentId,
+    p_user_id: metadataUserId,
+    p_stripe_subscription_id: stripeSubscriptionId,
+    p_stripe_customer_id: stripeCustomerId,
+    p_customer_email: customerEmail,
+    p_customer_name: customerName,
+    p_status: status,
+    p_plan_slug: VAEROEX_PLAN_SLUG,
+    p_stripe_price_id: stripeSubscriptionPriceId(subscription),
+    p_current_period_start: stripeTimestampToIso(currentPeriodStart),
+    p_current_period_end: stripeTimestampToIso(currentPeriodEnd),
+    p_cancel_at_period_end: Boolean(subscription?.cancel_at_period_end),
+    p_canceled_at: stripeTimestampToIso(subscription?.canceled_at),
+    p_last_payment_at: lastPaymentAt ?? (["active", "trialing"].includes(status) ? new Date().toISOString() : null),
+    p_raw_payload: event as unknown as Json
   });
-  const customerEmail =
-    normalizeEmail(session?.customer_details?.email || session?.customer_email || invoice?.customer_email || customer?.email || existing?.customer_email);
-  const customerName = session?.customer_details?.name || customer?.name || existing?.customer_name || null;
 
-  if (!customerEmail) {
-    throw new Error("Stripe event did not include a customer email and no existing subscription could be matched.");
+  if (error || !data || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error(error?.message || "Stripe subscription could not be reconciled.");
   }
 
-  const status = forcedStatus || mapStripeStatus(subscription?.status);
-  const userId = existing?.user_id || (await profileIdForEmail(admin, customerEmail));
-  const payload = {
-    user_id: userId,
-    workspace_id: existing?.workspace_id ?? null,
-    customer_email: customerEmail,
-    customer_name: customerName,
-    source: "stripe",
-    billing_provider: "stripe",
-    plan_slug: VAEROEX_PLAN_SLUG,
-    status,
-    stripe_customer_id: stripeCustomerId,
-    stripe_subscription_id: stripeSubscriptionId,
-    stripe_price_id: priceIdFromSubscription(subscription),
-    current_period_start: stripeTimestampToIso(subscription?.current_period_start),
-    current_period_end: stripeTimestampToIso(subscription?.current_period_end),
-    stripe_current_period_end: stripeTimestampToIso(subscription?.current_period_end),
-    stripe_cancel_at_period_end: Boolean(subscription?.cancel_at_period_end),
-    canceled_at: stripeTimestampToIso(subscription?.canceled_at),
-    last_payment_at: lastPaymentAt ?? (["active", "trialing"].includes(status) ? new Date().toISOString() : null),
-    raw_payload_json: event as unknown as Json,
-    notes: "Stripe billing event"
+  const result = data as {
+    subscription_record_id?: string | null;
+    workspace_id?: string | null;
+    status?: string | null;
   };
-
-  if (existing) {
-    const { error } = await admin.from("customer_subscriptions").update(payload).eq("id", existing.id);
-    if (error) throw error;
-  } else {
-    const { error, data } = await admin
-      .from("customer_subscriptions")
-      .insert({
-        ...payload,
-        manually_activated: false
-      })
-      .select("id")
-      .single();
-    if (error) throw error;
-    existing = {
-      id: data.id,
-      workspace_id: null,
-      customer_email: customerEmail,
-      customer_name: customerName,
-      user_id: userId,
-      manually_activated: false
-    };
-  }
-
-  if (existing?.workspace_id) {
-    await admin
-      .from("workspaces")
-      .update({
-        subscription_status: status,
-        plan_slug: VAEROEX_PLAN_SLUG
-      })
-      .eq("id", existing.workspace_id);
-  }
 
   return {
     customerEmail,
     customerName,
     stripeSubscriptionId,
-    status,
-    subscriptionRecordId: existing?.id ?? null,
-    workspaceId: existing?.workspace_id ?? null
+    status: mapStripeStatus(result.status || status),
+    subscriptionRecordId: result.subscription_record_id ?? null,
+    workspaceId: result.workspace_id ?? null
   };
 }
 
@@ -211,24 +142,64 @@ async function subscriptionFromId(subscriptionId?: string | null) {
   return retrieveStripeSubscription(subscriptionId);
 }
 
+async function closeFailedCheckoutIntent(admin: AdminClient, session: StripeCheckoutSession) {
+  const intentId = session.metadata?.purchase_intent_id || session.client_reference_id;
+  const userId = session.metadata?.vaeroex_user_id;
+
+  if (!intentId || !userId || session.client_reference_id !== intentId) {
+    throw new Error("Failed Checkout Session attribution is invalid.");
+  }
+
+  const { data, error } = await admin.rpc("expire_stripe_checkout_intent_v1", {
+    p_intent_id: intentId,
+    p_user_id: userId,
+    p_session_id: session.id
+  });
+
+  if (error || data !== true) {
+    throw new Error("Failed Checkout Session could not be closed safely.");
+  }
+
+  return {
+    customerEmail: normalizeEmail(session.customer_details?.email || session.customer_email) || null,
+    customerName: session.customer_details?.name || null,
+    stripeSubscriptionId: stripeObjectId(session.subscription),
+    status: "expired" as const,
+    subscriptionRecordId: null,
+    workspaceId: null
+  };
+}
+
 async function processStripeEvent(admin: AdminClient, event: StripeEvent) {
   switch (event.type) {
-    case "checkout.session.completed": {
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
       const session = event.data.object as StripeCheckoutSession;
       const subscription = await subscriptionFromId(stripeObjectId(session.subscription));
+      if (!subscription) throw new Error("Completed Checkout Session did not include a retrievable subscription.");
       const customer = await getCustomer(stripeObjectId(session.customer));
       return syncStripeSubscription({ admin, event, session, subscription, customer });
+    }
+    case "checkout.session.expired":
+    case "checkout.session.async_payment_failed": {
+      return closeFailedCheckoutIntent(admin, event.data.object as StripeCheckoutSession);
     }
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      const subscription = event.data.object as StripeSubscription;
+      const eventSubscription = event.data.object as StripeSubscription;
+      const subscription = event.type === "customer.subscription.deleted"
+        ? eventSubscription
+        : await subscriptionFromId(eventSubscription.id);
+      if (!subscription) throw new Error("Stripe subscription could not be retrieved.");
       const customer = await getCustomer(stripeObjectId(subscription.customer));
       return syncStripeSubscription({ admin, event, subscription, customer });
     }
+    case "invoice.paid":
     case "invoice.payment_succeeded": {
       const invoice = event.data.object as StripeInvoice;
       const subscription = await subscriptionFromId(stripeObjectId(invoice.subscription));
+      if (!subscription) throw new Error("Paid invoice did not include a retrievable subscription.");
       const customer = await getCustomer(stripeObjectId(invoice.customer) || stripeObjectId(subscription?.customer));
       return syncStripeSubscription({
         admin,
@@ -242,14 +213,14 @@ async function processStripeEvent(admin: AdminClient, event: StripeEvent) {
     case "invoice.payment_failed": {
       const invoice = event.data.object as StripeInvoice;
       const subscription = await subscriptionFromId(stripeObjectId(invoice.subscription));
+      if (!subscription) throw new Error("Failed invoice did not include a retrievable subscription.");
       const customer = await getCustomer(stripeObjectId(invoice.customer) || stripeObjectId(subscription?.customer));
       return syncStripeSubscription({
         admin,
         event,
         invoice,
         subscription,
-        customer,
-        forcedStatus: "past_due"
+        customer
       });
     }
     default:
@@ -438,7 +409,29 @@ export async function POST(request: Request) {
         .maybeSingle();
 
   if (eventError) {
-    return NextResponse.json({ ok: false, error: eventError.message }, { status: eventError.code === "23505" ? 200 : 500 });
+    if (eventError.code === "23505") {
+      const { data: concurrentEvent, error: concurrentEventError } = await admin
+        .from("subscription_events")
+        .select("id,processed")
+        .eq("stripe_event_id", event.id)
+        .maybeSingle();
+
+      if (!concurrentEventError && concurrentEvent?.processed) {
+        return NextResponse.json({
+          ok: true,
+          duplicate: true,
+          event_id: concurrentEvent.id,
+          processed: true
+        });
+      }
+
+      return NextResponse.json(
+        { ok: false, error: "A matching Stripe event is still being processed." },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json({ ok: false, error: eventError.message }, { status: 500 });
   }
 
   try {

@@ -101,7 +101,7 @@ assert.match(pdf, /return Buffer\.from\(await document\.save\(\)\)/, "PDF genera
 
 const pdfGeneration = setupAction.indexOf("generateWorkspaceAgreementPdf");
 const pdfUpload = setupAction.indexOf(".upload(storagePath, pdf");
-const transaction = setupAction.indexOf('admin.rpc("create_workspace_with_signed_agreement"');
+const transaction = setupAction.indexOf('admin.rpc("create_workspace_with_signed_agreement_v2"');
 const workspaceCookie = setupAction.indexOf('cookieStore.set("vaeroex_workspace_id"');
 assert.ok(pdfGeneration >= 0 && pdfUpload > pdfGeneration && transaction > pdfUpload && workspaceCookie > transaction, "PDF generation and storage must succeed before transactional workspace activation");
 assert.match(setupAction, /\.remove\(\[storagePath\]\)/, "a failed transaction must clean up its inaccessible staged PDF");

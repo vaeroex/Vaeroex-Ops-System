@@ -9,6 +9,7 @@ type LoginPageProps = {
   searchParams?: Promise<{
     error?: string;
     message?: string;
+    next?: string;
   }>;
 };
 
@@ -22,6 +23,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     >
       <form action={signInAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
+        <input type="hidden" name="next" value={params?.next || "/app"} />
         <label className="block text-sm font-medium">
           Email
           <input
@@ -51,7 +53,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <Link href="/forgot-password" className="text-vaeroex-blue">
           Forgot password?
         </Link>
-        <Link href="/signup" className="text-vaeroex-blue">
+        <Link href={`/signup?next=${encodeURIComponent(params?.next || "/app")}`} className="text-vaeroex-blue">
           Create account
         </Link>
       </div>

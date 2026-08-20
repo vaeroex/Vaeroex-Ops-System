@@ -100,7 +100,7 @@ assert.match(nextConfig, /process\.env\.NODE_ENV === "production" \? \["upgrade-
 const workflow = read(".github/workflows/ci.yml");
 assert.match(workflow, /^permissions:\n  contents: read/m, "CI token permissions must default to repository read-only");
 assert.doesNotMatch(workflow, /uses: [^\s]+@v\d/m, "third-party actions must use immutable commit pins");
-assert.match(workflow, /supabase test db supabase\/tests\/security_high_findings_remediation\.test\.sql/, "CI must execute two-workspace authorization behavior tests in an isolated local database");
+assert.match(workflow, /run-isolated-database-tests\.js[\s\S]+security_high_findings_remediation\.test\.sql/, "CI must execute two-workspace authorization behavior tests in an isolated local database");
 
 const codeowners = read(".github/CODEOWNERS");
 for (const sensitivePath of [
@@ -147,7 +147,8 @@ assert.doesNotMatch(databaseSecurityTest, /grant\s+select\s+on\s+(?:table\s+)?pu
 assert.doesNotMatch(databaseSecurityTest, /grant[\s\S]{0,120}public\.workspaces[\s\S]{0,80}to\s+(?:anon|public)\b/i, "the isolated suite must never expose workspaces to anonymous or public roles");
 assert.match(databaseSecurityTest, /grant insert \(workspace_id, form_id, data_json\)[\s\S]{0,80}public\.form_submissions to authenticated;/, "Viewer mutation denial must be tested after the exact submission columns reach RLS");
 assert.match(databaseSecurityTest, /grant update \(role\) on table public\.workspace_members to authenticated;/, "membership escalation tests must reach the role-restricted RLS policies");
-assert.match(databaseSecurityTest, /dblink_connect\([\s\S]+host=%s port=%s dbname=%s user=postgres password=postgres[\s\S]+inet_server_addr\(\)[\s\S]+inet_server_port\(\)/, "concurrency sessions must authenticate through the disposable database's password-protected Docker address");
+assert.match(databaseSecurityTest, /dblink_connect\([\s\S]+convert_from\([\s\S]+decode\(current_setting\('vaeroex\.test_database_url_b64'\)[\s\S]+base64/, "concurrency sessions must authenticate through the disposable database's ephemeral connection contract");
+assert.doesNotMatch(databaseSecurityTest, /password\s*=|postgres:\s*postgres/i, "the concurrency harness must not hardcode a database password");
 assert.doesNotMatch(databaseSecurityTest, /dblink_connect_u\(/, "the concurrency harness must not depend on the privileged unencrypted connector");
 assert.match(databaseSecurityTest, /dblink_send_query[\s\S]+security\.concurrent-test/, "quota regression must issue genuinely concurrent database requests");
 assert.match(databaseSecurityTest, /\$drain\$[\s\S]+dblink_get_result\(connection_name\)[\s\S]+\$drain\$;[\s\S]+all concurrent quota attempts return one authoritative result/, "the harness must drain every asynchronous result before cleanup");

@@ -93,10 +93,12 @@ export async function createWorkspaceWithAgreementAction(formData: FormData) {
   });
   if (upload.error) setupError("The Workspace Agreement could not be stored. No workspace was created.");
 
-  const { error: creationError } = await admin.rpc("create_workspace_with_signed_agreement", {
+  const { error: creationError } = await admin.rpc("create_workspace_with_signed_agreement_v2", {
     p_workspace_id: workspaceId,
     p_agreement_id: agreementId,
     p_user_id: user.id,
+    p_authenticated_email: user.email?.trim().toLowerCase() || "",
+    p_entitlement_id: subscription.subscription_id,
     p_organization_name: parsed.data.organizationName,
     p_owner_legal_name: parsed.data.ownerLegalName,
     p_owner_job_title: parsed.data.ownerJobTitle,

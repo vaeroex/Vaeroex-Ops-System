@@ -117,7 +117,7 @@ assert.match(databaseTest, /replayed approval does not create a duplicate subscr
 assert.match(databaseTest, /an approved request cannot be rewritten to another review state/);
 
 assert.match(gate, /\.from\("customer_subscriptions"\)/);
-assert.match(gate, /subscription\.manually_activated && \["active", "trialing"\]\.includes\(status\)/);
+assert.match(gate, /subscription\.billing_provider === "manual"[\s\S]+subscription\.manually_activated[\s\S]+\["active", "trialing"\]\.includes\(subscription\.status\)/);
 assert.doesNotMatch(gate, /unstable_cache|cacheTag|revalidateTag/, "subscription authorization must observe committed entitlement changes immediately");
 assert.match(types, /review_manual_activation_request:/);
 

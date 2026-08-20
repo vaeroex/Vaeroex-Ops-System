@@ -26,6 +26,7 @@ export type SubscriptionAccessResult = {
   allowed: boolean;
   reason: string;
   status: SubscriptionStatus | "missing";
+  subscription_id: string | null;
   plan_slug: string | null;
   plan: (PlanLimits & {
     name: string;

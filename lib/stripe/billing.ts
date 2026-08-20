@@ -15,7 +15,11 @@ export const STRIPE_PORTAL_UNAVAILABLE_MESSAGE = `Billing management is temporar
 export type StripeCheckoutSession = {
   id: string;
   mode?: string | null;
+  status?: "open" | "complete" | "expired" | null;
+  payment_status?: "paid" | "unpaid" | "no_payment_required" | null;
+  expires_at?: number | null;
   url?: string | null;
+  client_reference_id?: string | null;
   customer?: string | { id?: string; email?: string | null; name?: string | null } | null;
   customer_email?: string | null;
   customer_details?: {
@@ -37,6 +41,8 @@ export type StripeSubscription = {
   metadata?: Record<string, string | null> | null;
   items?: {
     data?: Array<{
+      current_period_start?: number | null;
+      current_period_end?: number | null;
       price?: {
         id?: string | null;
       } | null;
@@ -59,6 +65,7 @@ export type StripeCustomer = {
 
 export type StripeEvent = {
   id: string;
+  created?: number | null;
   type: string;
   data: {
     object: Record<string, unknown>;
@@ -111,17 +118,28 @@ async function stripeRequest<T>(path: string, init: RequestInit = {}) {
   return data as T;
 }
 
-async function stripeFormRequest<T>(path: string, params: URLSearchParams) {
+async function stripeFormRequest<T>(path: string, params: URLSearchParams, idempotencyKey?: string) {
   return stripeRequest<T>(path, {
     method: "POST",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
+      "Content-Type": "application/x-www-form-urlencoded",
+      ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {})
     },
     body: params.toString()
   });
 }
 
-export async function createOperationsIntelligenceCheckoutSession() {
+export async function createOperationsIntelligenceCheckoutSession({
+  intentId,
+  userId,
+  email,
+  stripeCustomerId
+}: {
+  intentId: string;
+  userId: string;
+  email: string;
+  stripeCustomerId?: string | null;
+}) {
   const priceId = stripePriceId();
 
   if (!isStripeCheckoutConfigured()) {
@@ -131,6 +149,7 @@ export async function createOperationsIntelligenceCheckoutSession() {
   const appUrl = getAppUrl();
   const params = new URLSearchParams({
     mode: "subscription",
+    client_reference_id: intentId,
     "line_items[0][price]": priceId,
     "line_items[0][quantity]": "1",
     success_url: `${appUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
@@ -139,11 +158,29 @@ export async function createOperationsIntelligenceCheckoutSession() {
     billing_address_collection: "auto",
     "metadata[plan_slug]": VAEROEX_PLAN_SLUG,
     "metadata[product]": "operations_intelligence",
+    "metadata[purchase_intent_id]": intentId,
+    "metadata[vaeroex_user_id]": userId,
     "subscription_data[metadata][plan_slug]": VAEROEX_PLAN_SLUG,
-    "subscription_data[metadata][product]": "operations_intelligence"
+    "subscription_data[metadata][product]": "operations_intelligence",
+    "subscription_data[metadata][purchase_intent_id]": intentId,
+    "subscription_data[metadata][vaeroex_user_id]": userId
   });
 
-  return stripeFormRequest<StripeCheckoutSession>("/checkout/sessions", params);
+  if (stripeCustomerId) {
+    params.set("customer", stripeCustomerId);
+  } else {
+    params.set("customer_email", email);
+  }
+
+  return stripeFormRequest<StripeCheckoutSession>(
+    "/checkout/sessions",
+    params,
+    `vaeroex-checkout-intent-${intentId}`
+  );
+}
+
+export async function retrieveStripeCheckoutSession(sessionId: string) {
+  return stripeRequest<StripeCheckoutSession>(`/checkout/sessions/${encodeURIComponent(sessionId)}`);
 }
 
 export async function createStripePortalSession(customerId: string) {
@@ -175,6 +212,44 @@ export function stripeTimestampToIso(value?: number | null) {
   return value ? new Date(value * 1000).toISOString() : null;
 }
 
+function validStripeTimestamp(value?: number | null) {
+  return typeof value === "number" && Number.isFinite(value) && value > 0 ? value : null;
+}
+
+export function stripeSubscriptionPriceId(subscription?: StripeSubscription | null) {
+  const expectedPriceId = stripePriceId();
+  if (!expectedPriceId) return null;
+
+  const matchingItems = (subscription?.items?.data || []).filter(
+    (item) => item.price?.id === expectedPriceId
+  );
+
+  return matchingItems.length === 1 ? expectedPriceId : null;
+}
+
+export function stripeSubscriptionPeriod(subscription?: StripeSubscription | null) {
+  const topLevelStart = validStripeTimestamp(subscription?.current_period_start);
+  const topLevelEnd = validStripeTimestamp(subscription?.current_period_end);
+
+  if (topLevelStart || topLevelEnd) {
+    return topLevelStart && topLevelEnd
+      ? { currentPeriodStart: topLevelStart, currentPeriodEnd: topLevelEnd }
+      : { currentPeriodStart: null, currentPeriodEnd: null };
+  }
+
+  const items = subscription?.items?.data || [];
+  const exactPriceId = stripeSubscriptionPriceId(subscription);
+  const item = exactPriceId
+    ? items.find((candidate) => candidate.price?.id === exactPriceId)
+    : null;
+  const itemStart = validStripeTimestamp(item?.current_period_start);
+  const itemEnd = validStripeTimestamp(item?.current_period_end);
+
+  return itemStart && itemEnd
+    ? { currentPeriodStart: itemStart, currentPeriodEnd: itemEnd }
+    : { currentPeriodStart: null, currentPeriodEnd: null };
+}
+
 export function mapStripeStatus(status?: string | null): SubscriptionStatus {
   switch (status) {
     case "active":
@@ -183,6 +258,7 @@ export function mapStripeStatus(status?: string | null): SubscriptionStatus {
     case "unpaid":
     case "canceled":
     case "incomplete":
+    case "expired":
       return status;
     case "incomplete_expired":
       return "expired";

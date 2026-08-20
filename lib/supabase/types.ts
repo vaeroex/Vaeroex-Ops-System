@@ -9,6 +9,81 @@ export type Database = {
         Args: Record<string, never>;
         Returns: void;
       };
+      claim_stripe_checkout_intent_v1: {
+        Args: { p_user_id: string; p_email: string; p_plan_slug?: string };
+        Returns: Json;
+      };
+      record_stripe_checkout_session_v1: {
+        Args: {
+          p_intent_id: string;
+          p_user_id: string;
+          p_session_id: string;
+          p_customer_id: string;
+          p_expires_at: string;
+        };
+        Returns: Json;
+      };
+      expire_stripe_checkout_intent_v1: {
+        Args: { p_intent_id: string; p_user_id: string; p_session_id: string };
+        Returns: boolean;
+      };
+      sync_stripe_subscription_entitlement_v1: {
+        Args: {
+          p_event_id: string;
+          p_event_created_at: string;
+          p_event_type: string;
+          p_checkout_intent_id: string | null;
+          p_user_id: string | null;
+          p_stripe_subscription_id: string;
+          p_stripe_customer_id: string;
+          p_customer_email: string;
+          p_customer_name: string | null;
+          p_status: string;
+          p_plan_slug: string;
+          p_stripe_price_id: string | null;
+          p_current_period_start: string | null;
+          p_current_period_end: string | null;
+          p_cancel_at_period_end: boolean;
+          p_canceled_at: string | null;
+          p_last_payment_at: string | null;
+          p_raw_payload: Json;
+        };
+        Returns: Json;
+      };
+      create_workspace_with_signed_agreement_v2: {
+        Args: {
+          p_workspace_id: string;
+          p_agreement_id: string;
+          p_user_id: string;
+          p_authenticated_email: string;
+          p_entitlement_id: string | null;
+          p_organization_name: string;
+          p_owner_legal_name: string;
+          p_owner_job_title: string;
+          p_owner_business_email: string;
+          p_business_type: string;
+          p_team_size: string | null;
+          p_number_of_locations: string | null;
+          p_subscription_status: string;
+          p_plan_slug: string;
+          p_subscription_required: boolean;
+          p_manually_unlocked: boolean;
+          p_agreement_version: string;
+          p_terms_version: string;
+          p_privacy_version: string;
+          p_agreement_text: string;
+          p_agreement_snapshot_json: Json;
+          p_typed_signature: string;
+          p_signed_at: string;
+          p_application_version: string;
+          p_immutable_hash: string;
+          p_pdf_sha256: string;
+          p_pdf_size_bytes: number;
+          p_storage_bucket: string;
+          p_storage_path: string;
+        };
+        Returns: string;
+      };
       can_contribute_workspace: {
         Args: { target_workspace_id: string };
         Returns: boolean;
@@ -3877,6 +3952,9 @@ export type Database = {
           stripe_customer_id: string | null;
           stripe_subscription_id: string | null;
           stripe_price_id: string | null;
+          stripe_checkout_intent_id: string | null;
+          stripe_last_event_created_at: string | null;
+          stripe_last_event_id: string | null;
           stripe_current_period_end: string | null;
           stripe_cancel_at_period_end: boolean;
           onboarding_email_status: string;
@@ -3909,6 +3987,9 @@ export type Database = {
           stripe_customer_id?: string | null;
           stripe_subscription_id?: string | null;
           stripe_price_id?: string | null;
+          stripe_checkout_intent_id?: string | null;
+          stripe_last_event_created_at?: string | null;
+          stripe_last_event_id?: string | null;
           stripe_current_period_end?: string | null;
           stripe_cancel_at_period_end?: boolean;
           onboarding_email_status?: string;
@@ -3927,6 +4008,38 @@ export type Database = {
           updated_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["customer_subscriptions"]["Insert"]>;
+        Relationships: [];
+      };
+      stripe_checkout_intents: {
+        Row: {
+          id: string;
+          user_id: string;
+          workspace_id: string | null;
+          plan_slug: string;
+          stripe_customer_id: string | null;
+          stripe_checkout_session_id: string | null;
+          stripe_subscription_id: string | null;
+          status: string;
+          session_expires_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workspace_id?: string | null;
+          plan_slug: string;
+          stripe_customer_id?: string | null;
+          stripe_checkout_session_id?: string | null;
+          stripe_subscription_id?: string | null;
+          status?: string;
+          session_expires_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["stripe_checkout_intents"]["Insert"]>;
         Relationships: [];
       };
       subscription_events: {

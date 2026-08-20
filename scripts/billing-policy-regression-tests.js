@@ -65,15 +65,19 @@ assert.match(contactEmails, /billing:\s*"billing@vaeroex\.com"/);
 
 assert.match(accountSubscriptionPage, /action="\/api\/stripe\/portal"/);
 assert.match(accountSubscriptionPage, />\s*Manage billing\s*</);
+assert.match(stripePortalRoute, /getSubscriptionStatus\(\{[\s\S]+userId: user\.id,[\s\S]+email: user\.email/);
+assert.doesNotMatch(stripePortalRoute, /\.or\(filters\.join/, "Manage billing must not choose a Stripe Customer through a broad OR query");
 assert.match(stripePortalRoute, /createStripePortalSession\(subscription\.stripe_customer_id\)/);
 assert.match(stripeBilling, /"\/billing_portal\/sessions"/);
 assert.match(stripeBilling, /process\.env\.STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY/);
 assert.match(stripeBilling, /"line_items\[0\]\[price\]": priceId/);
-assert.match(stripeWebhook, /current_period_end:\s*stripeTimestampToIso\(subscription\?\.current_period_end\)/);
-assert.match(stripeWebhook, /stripe_cancel_at_period_end:\s*Boolean\(subscription\?\.cancel_at_period_end\)/);
-assert.match(stripeWebhook, /stripe_price_id:\s*priceIdFromSubscription\(subscription\)/);
+assert.match(stripeWebhook, /stripeSubscriptionPeriod\(subscription\)[\s\S]+p_current_period_end:\s*stripeTimestampToIso\(currentPeriodEnd\)/);
+assert.match(stripeWebhook, /p_cancel_at_period_end:\s*Boolean\(subscription\?\.cancel_at_period_end\)/);
+assert.match(stripeWebhook, /p_stripe_price_id:\s*stripeSubscriptionPriceId\(subscription\)/);
 assert.doesNotMatch(stripeBilling, /export async function (?:update|migrate).*StripeSubscription/i, "Policy copy must not introduce automatic Stripe subscription-price migration");
-assert.match(subscriptionAccess, /const periodValid = !subscription\.current_period_end \|\| new Date\(subscription\.current_period_end\) > new Date\(\)/);
-assert.match(subscriptionAccess, /\["active", "trialing"\]\.includes\(status\) && periodValid/);
+assert.match(subscriptionAccess, /isStripeSubscriptionEntitled/);
+assert.match(subscriptionAccess, /\["active", "trialing"\]\.includes\(subscription\.status\)/);
+assert.match(subscriptionAccess, /validFutureTimestamp\(subscription\.current_period_end, now\)/);
+assert.match(subscriptionAccess, /linkedStripe[\s\S]+isStripeSubscriptionEntitled\(linkedStripe\)/);
 
 process.stdout.write("Billing policy regressions passed.\n");
