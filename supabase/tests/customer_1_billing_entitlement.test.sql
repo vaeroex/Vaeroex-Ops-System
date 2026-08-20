@@ -45,6 +45,19 @@ insert into public.profiles (id, email, full_name) values
   ('aa200000-0000-4000-8000-000000000001', 'billing-owner@example.test', 'Billing Owner'),
   ('aa200000-0000-4000-8000-000000000002', 'billing-attacker@example.test', 'Billing Attacker');
 
+-- Production predates Supabase's opt-in Data API grant default. Mirror only the
+-- trusted server operations exercised by this suite so SECURITY INVOKER billing
+-- functions reach their real authority checks on a fresh local stack. These
+-- test-only grants are transaction-scoped and disappear at rollback.
+grant select, update on table public.profiles to service_role;
+grant select on table public.subscription_plans to service_role;
+grant select, insert, update on table public.stripe_checkout_intents to service_role;
+grant select, insert, update on table public.customer_subscriptions to service_role;
+grant select, insert, update on table public.workspaces to service_role;
+grant select, insert on table public.workspace_members to service_role;
+grant insert on table public.audit_logs to service_role;
+grant insert on table public.security_audit_events to service_role;
+
 set local role service_role;
 
 select is(

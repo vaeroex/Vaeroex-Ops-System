@@ -120,6 +120,8 @@ assert.match(databaseTest, /one Stripe Subscription ID cannot bind to two truste
 assert.match(migration, /intent\.status in \('session_created', 'expired'\)/, "signed failure replay must close the same Checkout intent idempotently");
 assert.match(databaseTest, /current_setting\('vaeroex\.test_database_url_b64'\)/, "hosted concurrency tests must use the disposable database's injected connection");
 assert.doesNotMatch(databaseTest, /password\s*=|postgres:\s*postgres/i, "billing concurrency tests must not hardcode a database password");
+assert.match(databaseTest, /begin;[\s\S]+grant select, update on table public\.profiles to service_role;[\s\S]+grant select, insert, update on table public\.stripe_checkout_intents to service_role;[\s\S]+rollback;/, "fresh local verification must model only the trusted Production service-role ACL inside its rollback transaction");
+assert.doesNotMatch(migration, /grant (?:select|insert|update|delete|all)[^;]+ on (?:table )?public\.(?:profiles|workspaces|workspace_members|customer_subscriptions) to (?:anon|authenticated)/i, "billing remediation must not broaden customer-facing table authority");
 assert.match(databaseRunner, /SUPABASE_TEST_DATABASE_URL/, "the database runner must accept an ephemeral hosted connection through process memory");
 assert.match(databaseRunner, /POSTGRES_URL_NON_POOLING/, "the database runner must retrieve the disposable branch's non-pooling connection in memory");
 assert.match(databaseRunner, /SUPABASE_TEST_BRANCH_NAME[\s\S]+SUPABASE_TEST_PARENT_PROJECT_REF/, "hosted verification must bind the exact branch to its parent project");
