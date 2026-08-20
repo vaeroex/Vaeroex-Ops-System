@@ -102,6 +102,45 @@ assert.match(workflow, /^permissions:\n  contents: read/m, "CI token permissions
 assert.doesNotMatch(workflow, /uses: [^\s]+@v\d/m, "third-party actions must use immutable commit pins");
 assert.match(workflow, /supabase test db supabase\/tests\/security_high_findings_remediation\.test\.sql/, "CI must execute two-workspace authorization behavior tests in an isolated local database");
 
+const codeowners = read(".github/CODEOWNERS");
+for (const sensitivePath of [
+  "/supabase/",
+  "/app/(auth)/",
+  "/lib/auth/",
+  "/app/app/admin/",
+  "/lib/admin/",
+  "/app/api/stripe/",
+  "/lib/billing/",
+  "/lib/security/",
+  "/.github/workflows/",
+  "/next.config.mjs",
+  "/vercel.json"
+]) {
+  assert.match(codeowners, new RegExp(`^${sensitivePath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")} @vaeroex$`, "m"), `${sensitivePath} must request review from the verified repository owner`);
+}
+
+const adminAccess = read("lib/admin/vaeroex-admin.ts");
+assert.match(adminAccess, /supabase\.auth\.getUser\(\)/, "administrator identity must be verified with Supabase Auth");
+assert.doesNotMatch(adminAccess, /user_metadata/, "administrator authorization must never trust user-editable metadata");
+
+const serverClient = read("lib/supabase/server.ts");
+assert.match(serverClient, /export async function createSupabaseServerClient\(\)/, "Supabase SSR clients must remain request-scoped");
+assert.doesNotMatch(serverClient, /^const\s+supabase\s*=\s*createServerClient/m, "authenticated Supabase clients must not be shared between requests");
+
+const supportActions = read("app/app/admin/support-requests/actions.ts");
+const databaseTypes = read("lib/supabase/types.ts");
+assert.doesNotMatch(supportActions, /admin as any/, "administrator support actions must retain generated database typing");
+assert.match(databaseTypes, /support_requests:[\s\S]{0,500}folder_id: string \| null;[\s\S]{0,500}archived_at: string \| null;[\s\S]{0,100}deleted_at: string \| null;/, "support-request types must match the canonical record-management migration");
+
+for (const sourceRoot of ["app", "components", "lib"]) {
+  const files = fs.readdirSync(path.join(root, sourceRoot), { recursive: true, withFileTypes: true });
+  for (const entry of files) {
+    if (!entry.isFile() || !/\.(?:ts|tsx|js|jsx)$/.test(entry.name)) continue;
+    const file = path.join(entry.parentPath, entry.name);
+    assert.doesNotMatch(fs.readFileSync(file, "utf8"), /new\s+(?:THREE\.)?Clock\s*\(/, `${path.relative(root, file)} must not instantiate deprecated Three.js clocks`);
+  }
+}
+
 const databaseSecurityTest = read("supabase/tests/security_high_findings_remediation.test.sql");
 assert.match(databaseSecurityTest, /begin;[\s\S]+grant select \(id, name\) on table public\.workspaces to authenticated;[\s\S]+rollback;/, "the isolated suite must model Production workspace reachability only inside its rollback transaction");
 assert.doesNotMatch(databaseSecurityTest, /grant\s+select\s+on\s+(?:table\s+)?public\.workspaces\s+to\s+authenticated/i, "the isolated suite must not add table-wide workspace read authority");
@@ -115,7 +154,7 @@ assert.match(databaseSecurityTest, /\$drain\$[\s\S]+dblink_get_result\(connectio
 assert.match(databaseSecurityTest, /count\(\*\)::integer from concurrent_rate_limit_results where allowed[\s\S]+\n  3,/, "concurrent quota regression must enforce the exact boundary");
 
 const packageJson = JSON.parse(read("package.json"));
-assert.equal(packageJson.scripts.lint, "eslint . --max-warnings=63", "ESLint must block errors and growth beyond the recorded legacy warning baseline");
+assert.equal(packageJson.scripts.lint, "eslint . --max-warnings=59", "ESLint must block errors and growth beyond the reduced legacy warning baseline");
 for (const [name, version] of [
   ["@supabase/auth-js", "2.70.0"],
   ["nanoid", "3.3.18"],
