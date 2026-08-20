@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import type { Route } from "next";
 import { resolveAuthCaptchaSubmission } from "@/lib/auth/captcha";
+import { safeAuthRedirectPath } from "@/lib/auth/safe-redirect";
 import { getAppUrl } from "@/lib/supabase/config";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -14,11 +15,13 @@ function isEmail(valueToCheck: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(valueToCheck);
 }
 
-function authRedirect(path: string, type: "message" | "error", text: string): never {
-  redirect(`${path}?${type}=${encodeURIComponent(text)}` as Route);
+function authRedirect(path: string, type: "message" | "error", text: string, next?: string): never {
+  const params = new URLSearchParams({ [type]: text });
+  if (next) params.set("next", next);
+  redirect(`${path}?${params.toString()}` as Route);
 }
 
-function authCaptchaToken(formData: FormData, errorPath: string): string | undefined {
+function authCaptchaToken(formData: FormData, errorPath: string, next?: string): string | undefined {
   const captcha = resolveAuthCaptchaSubmission(formData);
 
   if (!captcha.enabled) {
@@ -26,7 +29,7 @@ function authCaptchaToken(formData: FormData, errorPath: string): string | undef
   }
 
   if (!captcha.token) {
-    authRedirect(errorPath, "error", "Complete the security check and try again.");
+    authRedirect(errorPath, "error", "Complete the security check and try again.", next);
   }
 
   return captcha.token;
@@ -90,21 +93,22 @@ async function updateCurrentUserPassword({
 export async function signInAction(formData: FormData) {
   const email = value(formData, "email");
   const password = value(formData, "password");
+  const next = safeAuthRedirectPath(value(formData, "next"));
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    authRedirect("/login", "error", "Supabase is not configured yet. Add your environment variables first.");
+    authRedirect("/login", "error", "Supabase is not configured yet. Add your environment variables first.", next);
   }
 
   if (!email || !password) {
-    authRedirect("/login", "error", "Enter your email and password.");
+    authRedirect("/login", "error", "Enter your email and password.", next);
   }
 
   if (!isEmail(email)) {
-    authRedirect("/login", "error", "Enter a valid email address.");
+    authRedirect("/login", "error", "Enter a valid email address.", next);
   }
 
-  const captchaToken = authCaptchaToken(formData, "/login");
+  const captchaToken = authCaptchaToken(formData, "/login", next);
   const { error } = await supabase.auth.signInWithPassword({
     email,
     password,
@@ -112,37 +116,38 @@ export async function signInAction(formData: FormData) {
   });
 
   if (error) {
-    authRedirect("/login", "error", error.message);
+    authRedirect("/login", "error", error.message, next);
   }
 
   await supabase.rpc("accept_workspace_invites_for_current_user");
 
-  redirect("/app");
+  redirect(next as Route);
 }
 
 export async function signUpAction(formData: FormData) {
   const fullName = value(formData, "full_name");
   const email = value(formData, "email");
   const password = value(formData, "password");
+  const next = safeAuthRedirectPath(value(formData, "next"));
   const supabase = await createSupabaseServerClient();
 
   if (!supabase) {
-    authRedirect("/signup", "error", "Supabase is not configured yet. Add your environment variables first.");
+    authRedirect("/signup", "error", "Supabase is not configured yet. Add your environment variables first.", next);
   }
 
   if (!fullName || !email || !password) {
-    authRedirect("/signup", "error", "Enter your name, email, and password.");
+    authRedirect("/signup", "error", "Enter your name, email, and password.", next);
   }
 
   if (!isEmail(email)) {
-    authRedirect("/signup", "error", "Enter a valid email address.");
+    authRedirect("/signup", "error", "Enter a valid email address.", next);
   }
 
   if (password.length < 8) {
-    authRedirect("/signup", "error", "Use at least 8 characters for the password.");
+    authRedirect("/signup", "error", "Use at least 8 characters for the password.", next);
   }
 
-  const captchaToken = authCaptchaToken(formData, "/signup");
+  const captchaToken = authCaptchaToken(formData, "/signup", next);
   const { error } = await supabase.auth.signUp({
     email,
     password,
@@ -151,18 +156,19 @@ export async function signUpAction(formData: FormData) {
         full_name: fullName
       },
       captchaToken,
-      emailRedirectTo: `${getAppUrl()}/auth/callback?next=/app/setup`
+      emailRedirectTo: `${getAppUrl()}/auth/callback?next=${encodeURIComponent(next)}`
     }
   });
 
   if (error) {
-    authRedirect("/signup", "error", error.message);
+    authRedirect("/signup", "error", error.message, next);
   }
 
   authRedirect(
     "/login",
     "message",
-    "Account created. Check your email if confirmation is enabled, then continue to setup."
+    "Account created. Check your email if confirmation is enabled, then continue.",
+    next
   );
 }
 

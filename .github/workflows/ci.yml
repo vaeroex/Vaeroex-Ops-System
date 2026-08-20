@@ -54,6 +54,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4.1.0
+        with:
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install database test dependencies
+        run: pnpm install --frozen-lockfile
+
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@3c2f5e2ae34c34e428e8e206e2c4d21fa2d20fbf # v2.1.1
         with:
@@ -65,8 +79,11 @@ jobs:
       - name: Apply migrations to isolated local Postgres
         run: supabase db start
 
-      - name: Verify authorization behavior
-        run: supabase test db supabase/tests/security_high_findings_remediation.test.sql
+      - name: Verify authorization and Customer #1 billing behavior
+        run: |
+          node scripts/run-isolated-database-tests.js \
+            supabase/tests/security_high_findings_remediation.test.sql \
+            supabase/tests/customer_1_billing_entitlement.test.sql
 
       - name: Remove isolated database state
         if: always()

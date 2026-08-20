@@ -385,13 +385,9 @@ create temporary table concurrent_rate_limit_results (
 
 select extensions.dblink_connect(
   connection_name,
-  -- Loopback is trusted by the local image, which dblink correctly rejects for
-  -- non-superusers. The database's Docker address uses password authentication.
-  format(
-    'host=%s port=%s dbname=%s user=postgres password=postgres',
-    inet_server_addr(),
-    inet_server_port(),
-    current_database()
+  convert_from(
+    decode(current_setting('vaeroex.test_database_url_b64'), 'base64'),
+    'UTF8'
   )
 )
 from (

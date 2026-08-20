@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSubscriptionStatus } from "@/lib/billing/get-subscription-status";
 import { createStripePortalSession, STRIPE_PORTAL_UNAVAILABLE_MESSAGE } from "@/lib/stripe/billing";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getAppUrl } from "@/lib/supabase/config";
@@ -24,24 +25,11 @@ export async function POST() {
     return redirectWith("/login", "error", "Log in before managing billing.");
   }
 
-  const email = user.email?.trim().toLowerCase();
-  const filters = [
-    `user_id.eq.${user.id}`,
-    email ? `customer_email.ilike.${email}` : ""
-  ].filter(Boolean);
-
-  const { data: subscription, error } = await supabase
-    .from("customer_subscriptions")
-    .select("stripe_customer_id")
-    .or(filters.join(","))
-    .not("stripe_customer_id", "is", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    return redirectWith("/app/account/subscription", "error", error.message);
-  }
+  const subscription = await getSubscriptionStatus({
+    supabase,
+    userId: user.id,
+    email: user.email
+  });
 
   if (!subscription?.stripe_customer_id) {
     return redirectWith("/app/account/subscription", "error", "No Stripe billing account was found for this Vaeroex user.");

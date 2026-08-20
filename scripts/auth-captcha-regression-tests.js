@@ -38,7 +38,7 @@ oversizedToken.set(AUTH_CAPTCHA_FIELD_NAME, "x".repeat(2049));
 assert.deepEqual(resolveAuthCaptchaSubmission(oversizedToken, "preview-site-key"), { enabled: true, token: null }, "oversized token input must fail closed");
 
 for (const errorPath of ["/login", "/signup", "/forgot-password", "/accept-invite"]) {
-  assert.match(actions, new RegExp(`authCaptchaToken\\(formData, "${errorPath}"\\)`), `${errorPath} must verify a submitted CAPTCHA token before auth mutation`);
+  assert.match(actions, new RegExp(`authCaptchaToken\\(formData, "${errorPath}"(?:, next)?\\)`), `${errorPath} must verify a submitted CAPTCHA token before auth mutation`);
 }
 
 assert.match(actions, /signInWithPassword\(\{[\s\S]{0,120}options: \{ captchaToken \}/, "password login must forward the token to Supabase");

@@ -9,6 +9,7 @@ type SignupPageProps = {
   searchParams?: Promise<{
     error?: string;
     message?: string;
+    next?: string;
   }>;
 };
 
@@ -22,6 +23,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
     >
       <form action={signUpAction} className="space-y-4">
         <AuthMessage error={params?.error} message={params?.message} />
+        <input type="hidden" name="next" value={params?.next || "/app/setup"} />
         <label className="block text-sm font-medium">
           Full name
           <input
@@ -59,7 +61,7 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       </form>
       <p className="mt-5 text-sm text-muted">
         Already have an account?{" "}
-        <Link href="/login" className="text-vaeroex-blue">
+        <Link href={`/login?next=${encodeURIComponent(params?.next || "/app/setup")}`} className="text-vaeroex-blue">
           Log in
         </Link>
       </p>
