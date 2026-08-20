@@ -19,7 +19,7 @@ Phase 6 originally added Squarespace subscription access for Vaeroex Ops System.
 - App has usage limits for workspaces, users, and monthly Vaeroex runs.
 - App has Squarespace setup documentation in `docs/squarespace-subscription-setup.md`.
 - App has Squarespace thank-you page copy in `docs/squarespace-thank-you-page-copy.md`.
-- App pricing buttons now start Stripe Checkout through `/api/stripe/checkout`; legacy Squarespace checkout URLs are retained only for older workflows.
+- App pricing buttons now start at `/checkout/legal`; the Stripe Checkout API at `/api/stripe/checkout` fails closed unless current pre-checkout legal/subscription acceptance has already been recorded. Legacy Squarespace checkout URLs are retained only for older workflows.
 - README explains the Squarespace sales flow.
 
 ## Notes

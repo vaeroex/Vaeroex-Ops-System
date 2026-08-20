@@ -82,6 +82,8 @@
     "test:manual-activation": "node scripts/manual-activation-regression-tests.js",
     "test:production-migration-history": "node scripts/production-migration-history-regression-tests.js",
     "test:billing-policy": "node scripts/billing-policy-regression-tests.js",
+    "test:legal-readiness": "node scripts/legal-readiness-regression-tests.js",
+    "test:pre-checkout-legal": "node scripts/pre-checkout-legal-acceptance-regression-tests.js",
     "test:customer-1-billing": "node scripts/customer-1-billing-remediation-regression-tests.js",
     "test:admin-company-management": "node scripts/admin-company-management-regression-tests.js",
     "test:admin-ai-trust": "node scripts/admin-ai-trust-dashboard-regression-tests.js",

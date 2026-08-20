@@ -117,7 +117,7 @@ export default async function HelpCenterPage({ searchParams }: HelpCenterPagePro
         </div>
       ) : null}
 
-      <SectionCard title="Legal and trust quick links" description="Draft policy structure and customer education. Final legal text should be reviewed by qualified counsel before broad commercial launch.">
+      <SectionCard title="Legal and trust quick links" description="Current Vaeroex policies, service boundaries, billing terms, and trust resources.">
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {Object.values(legalDocuments).map((document) => (
             <Link key={document.id} href={document.href} className="rounded-lg border border-line bg-slate-50 p-4 hover:border-vaeroex-blue">

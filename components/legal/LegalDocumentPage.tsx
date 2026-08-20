@@ -17,9 +17,9 @@ export function LegalDocumentPage({ documentId }: { documentId: LegalDocumentId 
         <p className="mt-3 text-sm leading-6 text-muted">{document.summary}</p>
         <p className="mt-3 text-xs font-semibold text-muted">Version: {document.updated}</p>
 
-        <div className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-          These policies are drafted for plain-English customer education and product safety. Customers remain responsible for reviewing their own legal,
-          compliance, security, and business obligations.
+        <div className="mt-6 rounded-lg border border-line bg-white p-4 text-sm leading-6 text-slate-600 shadow-panel">
+          These policies describe Vaeroex customer terms, privacy practices, responsible-use rules, and service boundaries. Customers remain responsible for
+          reviewing their own legal, compliance, security, and business obligations.
         </div>
 
         <div className="mt-8 space-y-4">

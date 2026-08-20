@@ -37,7 +37,7 @@ assert.deepEqual(available.map((system) => system.id), ["executive-intelligence"
 assert.deepEqual(development.map((system) => system.id), ["drug-discovery-intelligence", "biological-intelligence"], "only the two approved research areas may be in development");
 
 assert.equal(available[0].pricing.behavior, "checkout", "the available Executive environment must retain explicit checkout behavior");
-assert.equal(available[0].pricing.checkoutRoute, "/api/stripe/checkout", "Executive Intelligence must retain the authoritative checkout route");
+assert.equal(available[0].pricing.checkoutRoute, "/checkout/legal", "Executive Intelligence must route customers through pre-checkout legal acceptance");
 for (const system of development) {
   assert.equal(system.statusLabel, "In Development", `${system.name} must disclose its exact development status`);
   assert.equal(system.pricing.display, "Pricing not yet announced", `${system.name} must not invent pricing`);

@@ -1,15 +1,15 @@
 # Pre-Launch Checklist
 
-Status: source-ready for a controlled beta, pending manual testing in a real Supabase, Vercel, OpenAI, and Squarespace environment.
+Status: Customer #1 billing remediation has been production-verified. The pre-checkout legal-acceptance branch still requires isolated migration verification, merge, and deployment before Customer #1 checkout.
 
 Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations.md`, and `docs/version-1-roadmap.md`.
 
 ## Customer Flow
 
-- [ ] Buy on Squarespace.
-  - Expected: Customer completes checkout through Squarespace for Starter, Growth, or Pro.
-  - Verify: Checkout success page points customers to Vaeroex signup and tells them to use the same email.
-  - Status: Needs live Squarespace testing.
+- [ ] Review and accept pre-checkout terms.
+  - Expected: Customer opens `/checkout/legal`, reviews linked policies, accepts the current policy set, and only then proceeds to Stripe Checkout.
+  - Verify: `checkout_legal_acceptances` stores the authenticated user, policy versions, hashes, source/action, and timestamp before any Stripe Checkout Session is created.
+  - Status: Source implemented in `codex/pre-checkout-legal-acceptance`; isolated migration verification required before merge.
 
 - [ ] Create Vaeroex account.
   - Expected: Customer signs up for Vaeroex using the same email used at checkout.
@@ -175,14 +175,14 @@ Use this checklist with `docs/manual-testing-script.md`, `docs/known-limitations
 2. Needs manual testing:
    - Vercel production deployment build.
    - Supabase migrations and seed data.
-   - Stripe checkout, activation, portal, and webhook behavior.
+   - New pre-checkout legal acceptance migration and legal route.
    - OpenAI Vaeroex workflows.
    - Browser customer/admin flows.
    - Two-user workspace separation and role permission checks.
 
 3. Known limitations:
    - See `docs/known-limitations.md`.
-   - Main current limitations: manual activation remains a fallback, Stripe production setup still needs live verification, no full impersonation, no support file upload, limited edit/delete flows, no automated tests yet, and live webhook payloads still need verification.
+   - Main current limitations: manual activation remains a fallback, no full impersonation, no support file upload, limited edit/delete flows, and the new pre-checkout legal-acceptance migration still needs isolated verification before merge.
 
 4. Recommended first beta customer type:
    - Small non-regulated service or operations-heavy business with one owner/admin champion, 3-10 staff, and real pain around missed follow-ups, checklists, SOPs, task ownership, or weekly reporting.

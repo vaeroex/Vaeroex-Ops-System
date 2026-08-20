@@ -2,10 +2,15 @@ import type { Route } from "next";
 import { VAEROEX_COMPANY_ADDRESS_SINGLE_LINE, VAEROEX_CONTACT_EMAILS } from "@/lib/contact/emails";
 
 export const LEGAL_DOCUMENT_VERSIONS = {
-  terms: "2026-06-19",
-  privacy: "2026-06-19",
-  aiDisclaimer: "2026-06-19",
-  sensitiveData: "2026-06-19"
+  terms: "2026-08-20",
+  privacy: "2026-08-20",
+  aiDisclaimer: "2026-08-20",
+  acceptableUse: "2026-08-20",
+  refundPolicy: "2026-08-20",
+  sensitiveData: "2026-08-20",
+  subscriptionBillingTerms: "2026-08-20",
+  dataRetention: "2026-08-20",
+  humanReview: "2026-08-20"
 } as const;
 
 export const LEGAL_ACCEPTANCE_VERSION_LABEL =
@@ -38,10 +43,13 @@ export const legalLinks: Array<{ href: Route; label: string }> = [
   { href: "/acceptable-use", label: "Acceptable Use" },
   { href: "/refund-policy", label: "Refund Policy" },
   { href: "/ai-disclaimer", label: "AI Disclaimer" },
+  { href: "/subscription-billing-terms", label: "Subscription Billing Terms" },
+  { href: "/sensitive-data-policy", label: "Sensitive Data Policy" },
+  { href: "/data-retention", label: "Data Retention" },
+  { href: "/human-review", label: "Human Review" },
   { href: "/contact", label: "Contact" }
 ];
 
-// Attorney review recommended before commercial launch.
 export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
   terms: {
     id: "terms",
@@ -53,8 +61,15 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Acceptance of Terms",
         body: [
-          "By creating an account, accessing a workspace, or using Vaeroex, you agree to these Terms of Service and the policies linked from this page.",
+          "By creating an account, accessing a workspace, purchasing a subscription, or using Vaeroex, you agree to these Terms of Service and the policies incorporated or referenced by these Terms.",
           "If you use Vaeroex on behalf of a company, you represent that you have authority to accept these terms for that company."
+        ]
+      },
+      {
+        title: "Incorporated Policies",
+        body: [
+          "These Terms incorporate the Privacy Policy, Subscription and Billing Terms, Refund Policy, Acceptable Use Policy, Vaeroex Disclaimer, Sensitive Data Policy, Data Retention Notice, and Human Review Notice where those policies apply to your use of the Services.",
+          "If a supporting policy addresses a specific subject, that policy applies together with these Terms unless Vaeroex provides a written agreement that says otherwise."
         ]
       },
       {
@@ -108,10 +123,12 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
         ]
       },
       {
-        title: "Customer Data Ownership",
+        title: "Customer Data Rights",
         body: [
-          "Customers retain ownership of the business records and files they enter into their workspace.",
-          "Vaeroex needs permission to process customer data to provide analyses, support platform features, and operate the service."
+          "Customers retain ownership of Customer Data, including the business records, files, prompts, instructions, and other content they submit to or maintain in a Vaeroex workspace.",
+          "Customer represents that it has all rights, permissions, authorizations, licenses, and lawful bases necessary to provide Customer Data to Vaeroex and to permit Vaeroex to process that information through the Services.",
+          "Customer is responsible for determining whether information may lawfully be submitted to Vaeroex, including whether sensitive, regulated, confidential, personal, or third-party information is appropriate for the Services.",
+          "Customer grants Vaeroex only the limited rights necessary to host, store, process, transmit, secure, maintain, support, and provide the Services, including generating requested analyses and maintaining workspace functionality."
         ]
       },
       {
@@ -187,15 +204,26 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       {
         title: "Limitation of Liability",
         body: [
-          "Liability terms should be finalized with qualified counsel before commercial launch.",
-          "The platform is provided subject to the limits permitted by applicable law."
+          "To the maximum extent permitted by applicable law, Vaeroex will not be liable for any indirect, incidental, special, exemplary, consequential, or punitive damages.",
+          "To the maximum extent permitted by applicable law, Vaeroex will not be liable for loss of profits, revenue, business opportunities, goodwill, data, or business interruption.",
+          "To the maximum extent permitted by applicable law, Vaeroex's aggregate liability for all claims arising out of or relating to the Services or these Terms will not exceed the amounts actually paid by the Customer to Vaeroex during the twelve months immediately preceding the event giving rise to the claim.",
+          "These limitations apply whether a claim is based in contract, tort, negligence, strict liability, statute, or any other theory, subject to any limitations imposed by applicable law."
         ]
       },
       {
-        title: "Indemnification",
+        title: "Customer Indemnification",
         body: [
-          "Indemnification terms should be finalized with qualified counsel before commercial launch.",
-          "Customers remain responsible for their use of the platform, their data, and their decisions."
+          "Customer will defend, indemnify, and hold harmless Vaeroex from and against third-party claims, damages, liabilities, losses, costs, and expenses arising from Customer Data or other content provided by Customer.",
+          "Customer's indemnification obligations also apply to third-party claims arising from Customer's violation of these Terms or applicable law; infringement or violation of third-party intellectual-property, privacy, confidentiality, or other rights; violation of the Acceptable Use Policy; or unlawful customer decisions or actions involving use of the Services.",
+          "Vaeroex will provide reasonable notice of covered claims and reasonable cooperation, at Customer's expense, where legally permitted. Customer may control the defense and settlement of covered claims, but may not settle any claim in a way that imposes liability, admission, or obligation on Vaeroex without Vaeroex's prior written consent."
+        ]
+      },
+      {
+        title: "Governing Law and Disputes",
+        body: [
+          "These Terms are governed and interpreted according to applicable law and any governing-law terms stated in a separate written agreement between Vaeroex and the Customer.",
+          "The parties will attempt to resolve disputes in good faith before pursuing formal remedies, unless immediate action is needed to protect accounts, data, security, intellectual property, payment rights, or legal compliance.",
+          "These Terms do not add an arbitration requirement, class-action waiver, venue provision, opt-out procedure, or other dispute term unless Vaeroex and the Customer separately agree to one in writing."
         ]
       },
       {
@@ -236,12 +264,12 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
       { title: "Payment Data", body: ["Payment and subscription checkout are handled through Vaeroex checkout and official Vaeroex sales channels. Vaeroex may process subscription status, customer email, order identifiers, and related billing metadata, but it does not need full payment card details to operate the workspace."] },
       { title: "How We Use Information", body: ["Vaeroex uses information to provide the platform, maintain workspace access, produce requested intelligence, support users, improve reliability, investigate issues, protect the service, and communicate about account or support matters."] },
       { title: "Vaeroex Processing Notice", body: ["When users request supported Vaeroex analyses, recommendations, summaries, or file analysis, relevant workspace context may be sent to configured AI service providers to generate the requested output. Users should not submit sensitive or regulated data unless proper controls exist."] },
-      { title: "How We Share Information", body: ["Vaeroex may share information with service providers used to host, operate, process, secure, support, or improve the platform. Vaeroex may also disclose information when required by law or to protect the platform and customers."] },
-      { title: "Service Providers and Subprocessors", body: ["A subprocessors list should be finalized before broad commercial launch. Examples may include hosting, database, authentication, payment, email, analytics, support, and AI infrastructure providers."] },
+      { title: "How We Share Information", body: ["Vaeroex may share information with service providers used to host, operate, process, secure, support, or improve the platform. Vaeroex may also disclose information when required by law or to protect the platform, customers, rights, safety, and legal compliance."] },
+      { title: "Service Provider Categories", body: ["Vaeroex may use service providers for cloud infrastructure and hosting, data storage, authentication, security, communications, payment processing, artificial-intelligence processing, customer support, logging, reliability, and performance monitoring.", "Vaeroex limits service-provider access to information needed for the provider to perform services for Vaeroex and does not publicly map individual infrastructure vendors to backend functions unless required by law or a specific disclosure obligation."] },
       { title: "Data Security", body: ["Vaeroex is designed with workspace-scoped access and role-aware controls. No service can guarantee absolute security, and customers remain responsible for account access, workspace roles, and the data they choose to enter."] },
       { title: "Data Retention", body: ["Vaeroex may retain account, workspace, support, billing, usage, and audit records as needed to operate the service, comply with legal obligations, resolve disputes, and enforce agreements."] },
       { title: "Customer Controls", body: [`Workspace owners and admins can manage workspace records, access roles, and some settings inside the app. Additional data requests can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`] },
-      { title: "Cookies and Analytics", body: ["Vaeroex may use cookies or similar technologies for authentication, security, preferences, and platform operation. Analytics details should be finalized before commercial launch."] },
+      { title: "Cookies and Browser Storage", body: ["Vaeroex uses necessary cookies and similar session technologies for authentication, account sessions, workspace selection, security, bot protection, and platform operation.", "Vaeroex may use browser local storage for user interface preferences such as theme selection, and session storage for temporary application state such as dismissed notices or unsent draft workspace prompts.", "Vaeroex may process operational logs, usage events, and performance information to maintain reliability, security, and support. Vaeroex does not currently claim use of cross-site advertising cookies or third-party advertising tracking in the Production application."] },
       { title: "Children's Privacy", body: ["Vaeroex is intended for business use and is not directed to children."] },
       { title: "Changes to Privacy Policy", body: ["Vaeroex may update this policy as the platform evolves. Material updates may require users to review and accept updated terms."] },
       {
@@ -258,7 +286,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Acceptable Use Policy",
     summary: "Rules for safe, lawful, and responsible use of Vaeroex.",
     href: "/acceptable-use",
-    updated: "2026-06-19",
+    updated: LEGAL_DOCUMENT_VERSIONS.acceptableUse,
     sections: [
       { title: "Lawful Use", body: ["Do not use Vaeroex for illegal activity or to violate the rights of others."] },
       { title: "Platform Abuse", body: ["Do not abuse, overload, disrupt, scrape, reverse engineer, attack, or attempt to bypass security controls."] },
@@ -275,7 +303,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Refund Policy",
     summary: "Customer-friendly refund and cancellation language for Vaeroex subscriptions.",
     href: "/refund-policy",
-    updated: "2026-08-10",
+    updated: LEGAL_DOCUMENT_VERSIONS.refundPolicy,
     sections: [
       { title: "Vaeroex Subscription", body: [`Vaeroex subscriptions are purchased through the Vaeroex Direct Website or official Vaeroex sales channels. Customers may manage and cancel an eligible subscription through Manage billing in the Stripe Customer Portal. ${VAEROEX_CONTACT_EMAILS.billing} remains available for billing assistance.`] },
       { title: "Automatic Renewal", body: ["Vaeroex subscriptions renew automatically unless cancellation is scheduled before the next renewal. A scheduled cancellation prevents renewal for the next billing period."] },
@@ -320,7 +348,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Subscription and Billing Terms",
     summary: "How Vaeroex subscription access, billing requests, and promotions work.",
     href: "/subscription-billing-terms",
-    updated: "2026-08-10",
+    updated: LEGAL_DOCUMENT_VERSIONS.subscriptionBillingTerms,
     sections: [
       { title: "Single Plan", body: ["Vaeroex currently offers one customer-facing plan: Vaeroex Executive Intelligence, $500/month, Everything Included."] },
       { title: "Vaeroex Checkout", body: ["Vaeroex subscriptions are purchased through Vaeroex checkout, the Vaeroex Direct Website, or official Vaeroex sales channels. Promotions, discounts, and special offers may be available through those same Vaeroex channels."] },
@@ -337,7 +365,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Data Retention Notice",
     summary: "General notice about how long Vaeroex may retain operational records.",
     href: "/data-retention",
-    updated: "2026-06-19",
+    updated: LEGAL_DOCUMENT_VERSIONS.dataRetention,
     sections: [
       { title: "Retention Purpose", body: ["Vaeroex may retain account, workspace, support, billing, usage, audit, and security records as needed to operate the platform, resolve issues, enforce agreements, and comply with applicable obligations."] },
       { title: "Customer Records", body: ["Workspace owners should decide what business records to keep, archive, or delete according to their own policies and legal obligations."] },
@@ -349,7 +377,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
     title: "Human Review Notice",
     summary: "Vaeroex helps identify signals, but people remain responsible for decisions.",
     href: "/human-review",
-    updated: "2026-06-19",
+    updated: LEGAL_DOCUMENT_VERSIONS.humanReview,
     sections: [
       { title: "Review Before Use", body: ["Vaeroex outputs should be reviewed by a qualified person before they are used for important business actions."] },
       { title: "Approval Before Saving", body: ["When Vaeroex produces recommendations, explanations, or other supporting analysis, users should confirm the output before saving or implementing it."] },
@@ -360,17 +388,18 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
 
 export const trustSections = [
   ["Workspace Isolation", "Customer records, files, and analyses are kept within the authorized workspace and protected by role-aware access controls."],
-  ["Secure Data Handling", "Vaeroex uses encrypted connections, private file access, and managed cloud protections to help safeguard customer information."],
+  ["Cloud Infrastructure", "Vaeroex uses established cloud infrastructure providers with independent security and compliance programs. Vaeroex applies additional application-level security controls on top of this infrastructure."],
+  ["Secure Data Handling", "Vaeroex uses encrypted connections, private file access, secure authentication, Turnstile bot protection, leaked-password protection where supported, and managed cloud protections to help safeguard customer information."],
   ["Evidence-Backed Intelligence", "Supporting information remains connected to its source so leadership can inspect what each conclusion is based on."],
   ["Deterministic Business Intelligence", "Business facts, KPI values, and Business Health calculations remain separate from executive interpretation."],
   ["Explainable Executive Reasoning", "Vaeroex presents supported interpretation with citations, confidence, freshness, and limitations instead of hiding uncertainty."],
   ["Source Content Safeguards", "Information inside uploaded files is treated as business content to evaluate, not as authority to change system behavior or customer records."],
   ["Leadership Control", "Recommendations remain advisory. Authorized users review important conclusions and remain responsible for business decisions and actions."],
   ["Current Information Controls", "Archived or deleted information is excluded from current intelligence while supported restore and retention behavior remains available."],
-  ["Accountability Records", "Selected security-sensitive, administrative, billing, and support activity is recorded to support review and investigation."],
+  ["Accountability Records", "Selected security-sensitive, administrative, billing, legal-acceptance, and support activity is recorded to support review and investigation."],
   ["Advanced Reasoning Boundaries", "Executive interpretation is produced through protected service connections. It may still be incomplete or inaccurate and requires human review."],
   ["Sensitive Data Boundaries", "Vaeroex is not intended for unrestricted regulated sensitive data such as PHI/ePHI, Social Security numbers, payment card numbers, government IDs, or highly sensitive personal records unless appropriate controls exist."],
-  ["Current Compliance Status", "Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR certification, government certification, malware scanning certification, or absolute security."],
+  ["Current Compliance Status", "Vaeroex does not currently claim that Vaeroex itself is HIPAA compliant, SOC 2 certified, ISO 27001 certified, GDPR certified, government certified, malware-scanning certified, or able to guarantee absolute security. Any SOC 2, ISO 27001, or similar certification references apply to relevant infrastructure providers unless Vaeroex expressly states otherwise."],
   ["Customer Responsibility", "Customers remain responsible for the information they upload, workspace roles they assign, legal obligations that apply to their data, and final decisions they make."],
   ["Security Contact", `Security or trust questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`]
 ] as const;
