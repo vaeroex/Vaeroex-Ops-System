@@ -4,14 +4,14 @@ import {
   BoundedIdentifierSchema,
   BoundedLabelSchema,
   BoundedTextSchema,
-  CanonicalDecimalSchema,
-  CanonicalIntegerSchema,
   ContractJsonObjectSchema,
   CurrencyCodeSchema,
   IsoDateSchema,
   IsoTimestampSchema,
-  NonNegativeCanonicalDecimalSchema,
-  PositiveCanonicalDecimalSchema,
+  PersistedExchangeRateSchema,
+  PersistedFactDecimalSchema,
+  PersistedFactIntegerSchema,
+  PersistedNonNegativeFactDecimalSchema,
   ProviderKeySchema,
   Sha256FingerprintSchema,
   TimeZoneSchema,
@@ -139,10 +139,10 @@ export const ExternalSourceRecordVersionSchema = z
 export type ExternalSourceRecordVersion = Readonly<z.infer<typeof ExternalSourceRecordVersionSchema>>;
 
 export const CanonicalFactValueSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("money"), amount: CanonicalDecimalSchema, currency: CurrencyCodeSchema }).strict(),
-  z.object({ kind: z.literal("decimal"), value: CanonicalDecimalSchema, unit: BoundedIdentifierSchema }).strict(),
-  z.object({ kind: z.literal("percentage"), value: CanonicalDecimalSchema }).strict(),
-  z.object({ kind: z.literal("integer"), value: CanonicalIntegerSchema, unit: BoundedIdentifierSchema.nullable() }).strict(),
+  z.object({ kind: z.literal("money"), amount: PersistedFactDecimalSchema, currency: CurrencyCodeSchema }).strict(),
+  z.object({ kind: z.literal("decimal"), value: PersistedFactDecimalSchema, unit: BoundedIdentifierSchema }).strict(),
+  z.object({ kind: z.literal("percentage"), value: PersistedFactDecimalSchema }).strict(),
+  z.object({ kind: z.literal("integer"), value: PersistedFactIntegerSchema, unit: BoundedIdentifierSchema.nullable() }).strict(),
   z.object({ kind: z.literal("boolean"), value: z.boolean() }).strict(),
   z.object({ kind: z.literal("date"), value: IsoDateSchema }).strict(),
   z.object({ kind: z.literal("text"), value: BoundedLabelSchema }).strict(),
@@ -177,7 +177,7 @@ export const FactAccountingContextSchema = z
     basis: z.enum(["accrual", "cash", "not_applicable", "unknown"]),
     sourceCurrency: CurrencyCodeSchema.nullable(),
     reportingCurrency: CurrencyCodeSchema.nullable(),
-    exchangeRate: PositiveCanonicalDecimalSchema.nullable(),
+    exchangeRate: PersistedExchangeRateSchema.nullable(),
     exchangeRateSource: BoundedIdentifierSchema.nullable()
   })
   .strict();
@@ -196,7 +196,7 @@ export const FactSourceReferenceSchema = z
       "manual_override",
       "control_observation"
     ]),
-    contributionWeight: NonNegativeCanonicalDecimalSchema.nullable()
+    contributionWeight: PersistedNonNegativeFactDecimalSchema.nullable()
   })
   .strict();
 

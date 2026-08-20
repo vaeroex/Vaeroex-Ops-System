@@ -4,13 +4,13 @@ import {
   BoundedIdentifierSchema,
   BoundedLabelSchema,
   BoundedTextSchema,
-  CanonicalDecimalSchema,
   CurrencyCodeSchema,
   IsoDateSchema,
   IsoTimestampSchema,
+  PersistedFactDecimalSchema,
+  PersistedUnitIntervalDecimalSchema,
   ProviderKeySchema,
   Sha256FingerprintSchema,
-  UnitIntervalCanonicalDecimalSchema,
   UuidSchema,
   uniqueStringArray
 } from "@/lib/integrations/contracts/primitives";
@@ -160,14 +160,14 @@ export const BusinessStateChangeSchema = z
     period: z.object({ start: IsoDateSchema, end: IsoDateSchema }).strict().nullable(),
     before: CanonicalFactValueSchema.nullable(),
     after: CanonicalFactValueSchema.nullable(),
-    absoluteDelta: CanonicalDecimalSchema.nullable(),
-    relativeDelta: CanonicalDecimalSchema.nullable(),
+    absoluteDelta: PersistedFactDecimalSchema.nullable(),
+    relativeDelta: PersistedFactDecimalSchema.nullable(),
     unit: BoundedIdentifierSchema.nullable(),
     currency: CurrencyCodeSchema.nullable(),
     thresholdTransition: z.enum(["none", "entered", "exited", "escalated", "deescalated"]),
     severityBefore: deltaSeveritySchema,
     severityAfter: deltaSeveritySchema,
-    confidence: UnitIntervalCanonicalDecimalSchema,
+    confidence: PersistedUnitIntervalDecimalSchema,
     evidence: z.array(deltaEvidenceReferenceSchema).min(1).max(EXTERNAL_INTEGRATION_LIMITS.evidenceReferencesPerItem)
   })
   .strict()
@@ -200,7 +200,7 @@ const deterministicDevelopmentSchema = z
     priority: z.enum(["high", "medium", "low"]),
     title: BoundedLabelSchema,
     summary: BoundedTextSchema,
-    impactValue: CanonicalDecimalSchema.nullable(),
+    impactValue: PersistedFactDecimalSchema.nullable(),
     evidenceFactFingerprints: uniqueStringArray(
       Sha256FingerprintSchema,
       EXTERNAL_INTEGRATION_LIMITS.evidenceReferencesPerItem
@@ -218,7 +218,7 @@ export const MaterialityDecisionSchema = z.enum([
 
 export const AnalysisRouteSchema = z.enum(["defer_to_brief", "luna", "terra", "sol"]);
 
-export const BusinessStateDeltaV1Schema = z
+export const BusinessStateDeltaV2Schema = z
   .object({
     contractVersion: z.literal(EXTERNAL_INTEGRATION_CONTRACT_VERSIONS.businessStateDelta),
     id: UuidSchema,
@@ -327,4 +327,4 @@ export const BusinessStateDeltaV1Schema = z
     }
   });
 
-export type BusinessStateDeltaV1 = Readonly<z.infer<typeof BusinessStateDeltaV1Schema>>;
+export type BusinessStateDeltaV2 = Readonly<z.infer<typeof BusinessStateDeltaV2Schema>>;

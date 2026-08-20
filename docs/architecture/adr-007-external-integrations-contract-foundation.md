@@ -1,14 +1,16 @@
 # ADR-007: External Integrations Contract Foundation
 
-**Status:** Accepted for Phase 0
+**Status:** Accepted for Phase 0; amended for Phase 0.1 review
 **Date:** 2026-08-20
-**Scope:** Provider-neutral contracts and deterministic fingerprints only
+**Scope:** Provider-neutral contracts, deterministic fingerprints, and logical persistence alignment only
 
 ## Context
 
 Vaeroex needs a reusable external connector foundation before adding QuickBooks Online or any later provider. The existing application already has strong workspace authorization, evidence lineage, deterministic intelligence, immutable fingerprint, and private worker patterns. It does not yet have a provider-neutral connection lifecycle, Business Entity boundary, immutable external source/fact contract, cross-source reconciliation boundary, domain freshness contract, or Business State Delta.
 
 Phase 0 must freeze those boundaries without creating persistent data, runtime provider access, customer credentials, queues, routes, or user interface behavior.
+
+Phase 0.1 reconciles these accepted runtime contracts with the logical persistence specification before any migration exists. The field-by-field result is recorded in [External Integrations Phase 0.1 Contract/Persistence Alignment](./external-integrations-phase-0-1-contract-persistence-alignment.md). It remains a design correction only and creates no schema or runtime behavior.
 
 ## Decision
 
@@ -52,10 +54,22 @@ Phase 0 exports strict Zod schemas and inferred readonly TypeScript types for:
 - CanonicalBusinessFactVersion;
 - ProviderDescriptor and provider adapter result envelopes;
 - FreshnessState;
-- BusinessStateDeltaV1;
+- BusinessStateDeltaV2;
 - canonical fingerprint inputs.
 
-Unknown fields fail validation. Identifiers, timestamps, versions, hashes, currency values, and decimal representations have bounded schemas. Accounting decimals are canonical strings, not floating-point numbers.
+Unknown fields fail validation. Identifiers, timestamps, versions, hashes, currency values, and persisted decimal representations have bounded schemas. Accounting decimals are canonical strings, not floating-point numbers.
+
+### Phase 0.1 Contract Correction
+
+The syntax-level CanonicalDecimalSchema remains available for nonpersisted parsing. Persisted canonical accounting truth uses semantic schemas with exact storage-compatible bounds:
+
+- money, general fact decimals, percentages, contribution weights, confidence values, deterministic deltas, and deterministic impact values fit PostgreSQL numeric(30,9): at most 21 integer digits and 9 fractional digits;
+- persisted integer fact values fit the integer range of numeric(30,9): at most 21 digits;
+- positive exchange rates fit PostgreSQL numeric(30,12): at most 18 integer digits and 12 fractional digits.
+
+Validation preserves the supplied canonical string. That string remains the authoritative persisted contract representation and fingerprint input. A future fixed-scale numeric column may be an exact query/calculation projection, but it cannot replace the canonical string or become the lexical source for a contract or hash. Values outside the supported range fail before canonical hashing or persistence and are never rounded, truncated, clamped, or converted through floating point. Any future fact-specific rounding policy is a separately versioned deterministic transformation.
+
+This material narrowing increments CanonicalBusinessFactVersion from V1 to V2 and BusinessStateDelta from V1 to V2. Source-record, Business Entity, connection, provider-adapter, freshness, and fingerprint versions remain V1 because their runtime semantics and the fingerprint algorithm did not change. Fact and delta golden fingerprints change because contractVersion is semantic fingerprint input; the source golden remains unchanged.
 
 ### Numerical Truth
 
@@ -68,6 +82,15 @@ Canonical fact decisions can come only from:
 - an authorized operator.
 
 There is no model decision-authority value. A model can later interpret a validated Business State Delta, but it cannot create or mutate source records, fact values, contribution values, deterministic KPIs, freshness, or materiality.
+
+### Persistence Identity and Reconstruction
+
+- BusinessEntity.entityKey is persisted directly, stable after creation, unique within its workspace, and never sufficient authorization without workspace membership.
+- Business Entity status remains active, inactive, or archived. A future erasure workflow is separate from business lifecycle status.
+- ExternalSourceRecordVersion.normalizedProjection is nullable only for deleted versions; live versions require a projection.
+- Canonical fact identity is the tenant/entity-scoped pair factKind plus factKey. Domain or subject metadata may be registry-derived or denormalized, but cannot become a competing identity.
+- Canonical fact versions preserve the exact value, validation, reconciliation, decision, and provenance vocabulary from the runtime contract.
+- Every canonical fact version has at least one reconstructable source reference. A future migration must insert the fact version and normalized source edges atomically and use a deferred invariant so a current fact version cannot commit without provenance.
 
 ### Provider Neutrality
 
@@ -117,7 +140,7 @@ aging data can remain eligible with an explicit warning. reauthorization_require
 
 ### Business State Delta
 
-BusinessStateDeltaV1 contains only compact deterministic before/after values, immutable evidence references, source/deterministic watermarks, correlation groups, freshness, deterministic risks/opportunities, versioned materiality/persistence/cooldown state, limitations, and explicit no-AI/defer/Luna/Terra/Sol eligibility. It contains no provider payload, token, or arbitrary source record.
+BusinessStateDeltaV2 contains only compact deterministic before/after values, immutable evidence references, source/deterministic watermarks, correlation groups, freshness, deterministic risks/opportunities, versioned materiality/persistence/cooldown state, limitations, and explicit no-AI/defer/Luna/Terra/Sol eligibility. It contains no provider payload, token, or arbitrary source record.
 
 The same material development receives a deterministic fingerprint so synchronization volume does not become model-call volume.
 
@@ -153,6 +176,8 @@ Phase 0 includes only:
 - deterministic canonical serialization and fingerprint helpers;
 - golden and invalid contract tests;
 - architecture boundary regression tests.
+
+Phase 0.1 additionally includes only the bounded contract correction, deliberate golden updates, this ADR amendment, the field-by-field alignment record, correction of the external implementation specification, and pure regressions.
 
 Phase 0 includes no:
 
