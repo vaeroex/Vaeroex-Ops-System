@@ -53,9 +53,9 @@ assert.match(legalContent, /session storage[\s\S]+dismissed notices or unsent dr
 assert.match(legalContent, /does not currently claim use of cross-site advertising cookies or third-party advertising tracking/, "Privacy Policy must not claim unsupported ad tracking");
 assert.doesNotMatch(legalContent, /Subprocessors list should|analytics details should/i, "Privacy Policy must not contain subprocessor or analytics placeholders");
 
-assert.match(trustCenterPage, /Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, ISO 27001 certification/, "Trust Center must not imply Vaeroex holds unsupported certifications");
-assert.match(legalContent, /established cloud infrastructure providers with independent security and compliance programs/, "Trust Center must use approved infrastructure-provider wording");
-assert.match(legalContent, /Any SOC 2, ISO 27001, or similar certification references apply to relevant infrastructure providers/, "Trust Center must attribute provider certifications correctly");
+assert.match(trustCenterPage, /trustSection\("Infrastructure & Security"\)/, "Trust Center must render the approved Infrastructure & Security section");
+assert.match(legalContent, /cloud infrastructure providers that maintain independent security and compliance programs, including applicable SOC 2 Type II and ISO 27001 certifications and attestations/, "Trust Center must attribute SOC 2 Type II and ISO 27001 to infrastructure providers");
+assert.doesNotMatch([trustCenterPage, legalContent].join("\n"), /does not currently claim HIPAA compliance|GDPR certification|GDPR certified|enterprise compliance certification for Vaeroex itself/i, "Trust Center must not restore the removed negative compliance disclaimer");
 assert.doesNotMatch(trustCenterPage, /Vaeroex is (?:SOC 2|ISO 27001|HIPAA)/, "Trust Center must not claim Vaeroex certification or HIPAA compliance");
 assert.match(trustCenterPage, /does not currently claim malware scanning, DLP scanning, file sandboxing, or regulated-data detection/, "Trust Center must not claim unsupported scanning/DLP capabilities");
 

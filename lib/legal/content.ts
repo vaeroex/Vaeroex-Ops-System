@@ -388,7 +388,7 @@ export const legalDocuments: Record<LegalDocumentId, LegalDocument> = {
 
 export const trustSections = [
   ["Workspace Isolation", "Customer records, files, and analyses are kept within the authorized workspace and protected by role-aware access controls."],
-  ["Cloud Infrastructure", "Vaeroex uses established cloud infrastructure providers with independent security and compliance programs. Vaeroex applies additional application-level security controls on top of this infrastructure."],
+  ["Infrastructure & Security", "Vaeroex is built on established cloud infrastructure providers that maintain independent security and compliance programs, including applicable SOC 2 Type II and ISO 27001 certifications and attestations. Vaeroex applies additional application-level security controls on top of this infrastructure, including workspace isolation, role-based authorization, private data access controls, secure authentication, and automated security testing."],
   ["Secure Data Handling", "Vaeroex uses encrypted connections, private file access, secure authentication, Turnstile bot protection, leaked-password protection where supported, and managed cloud protections to help safeguard customer information."],
   ["Evidence-Backed Intelligence", "Supporting information remains connected to its source so leadership can inspect what each conclusion is based on."],
   ["Deterministic Business Intelligence", "Business facts, KPI values, and Business Health calculations remain separate from executive interpretation."],
@@ -399,7 +399,6 @@ export const trustSections = [
   ["Accountability Records", "Selected security-sensitive, administrative, billing, legal-acceptance, and support activity is recorded to support review and investigation."],
   ["Advanced Reasoning Boundaries", "Executive interpretation is produced through protected service connections. It may still be incomplete or inaccurate and requires human review."],
   ["Sensitive Data Boundaries", "Vaeroex is not intended for unrestricted regulated sensitive data such as PHI/ePHI, Social Security numbers, payment card numbers, government IDs, or highly sensitive personal records unless appropriate controls exist."],
-  ["Current Compliance Status", "Vaeroex does not currently claim that Vaeroex itself is HIPAA compliant, SOC 2 certified, ISO 27001 certified, GDPR certified, government certified, malware-scanning certified, or able to guarantee absolute security. Any SOC 2, ISO 27001, or similar certification references apply to relevant infrastructure providers unless Vaeroex expressly states otherwise."],
   ["Customer Responsibility", "Customers remain responsible for the information they upload, workspace roles they assign, legal obligations that apply to their data, and final decisions they make."],
   ["Security Contact", `Security or trust questions can be sent to ${VAEROEX_CONTACT_EMAILS.support}.`]
 ] as const;
