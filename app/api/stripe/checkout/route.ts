@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { VAEROEX_PLAN_SLUG } from "@/lib/billing/plans";
+import { hasAcceptedCurrentPreCheckoutPolicies } from "@/lib/legal/pre-checkout-acceptance";
 import { enforceRateLimit, rateLimitMessage } from "@/lib/security/rate-limit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { getAppUrl } from "@/lib/supabase/config";
@@ -96,12 +97,19 @@ export async function GET(request: Request) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return redirectTo("/signup?next=%2Fapi%2Fstripe%2Fcheckout&message=Create%20or%20sign%20in%20to%20your%20Vaeroex%20account%20before%20checkout.");
+      return redirectTo("/signup?next=%2Fcheckout%2Flegal&message=Create%20or%20sign%20in%20to%20your%20Vaeroex%20account%20before%20checkout.");
     }
 
     const email = user.email?.trim().toLowerCase();
     if (!email || !user.email_confirmed_at) {
-      return redirectTo("/login?next=%2Fapi%2Fstripe%2Fcheckout&error=Verify%20your%20email%20before%20starting%20checkout.");
+      return redirectTo("/login?next=%2Fcheckout%2Flegal&error=Verify%20your%20email%20before%20starting%20checkout.");
+    }
+
+    const acceptedPreCheckoutTerms = await hasAcceptedCurrentPreCheckoutPolicies(supabase, user.id);
+    if (!acceptedPreCheckoutTerms) {
+      return redirectTo(
+        "/checkout/legal?error=Review%20and%20accept%20the%20current%20Vaeroex%20subscription%20terms%20before%20Stripe%20Checkout."
+      );
     }
 
     const admin = createSupabaseAdminClient();

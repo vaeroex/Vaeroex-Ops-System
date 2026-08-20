@@ -174,7 +174,7 @@ VAEROEX_ADMIN_EMAILS=owner@vaeroex.com,admin@vaeroex.com
 
 ## Stripe Billing
 
-New customer checkout uses Stripe. The Pricing page sends customers to `/api/stripe/checkout`, which creates a Stripe Checkout subscription session for Executive Intelligence. Stripe returns successful purchases to `/checkout/success`, where customers are prompted to create a Vaeroex account with the same checkout email.
+New customer checkout uses Stripe after pre-checkout legal acceptance. The Pricing page sends customers to `/checkout/legal`, which records the configured legal/subscription policy acceptance for the authenticated account before `/api/stripe/checkout` can create a Stripe Checkout subscription session for Executive Intelligence. Stripe returns successful purchases to `/checkout/success`, where customers continue with the same Vaeroex account email.
 
 Configure these Vercel environment variables before testing live checkout:
 
@@ -185,7 +185,7 @@ STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY=
 NEXT_PUBLIC_APP_URL=https://vaeroex.com
 ```
 
-Create one Stripe product named `Executive Intelligence` with a recurring monthly price of `$399`. Use the Stripe price ID for `STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY`.
+Create one Stripe product named `Executive Intelligence` with a recurring monthly price matching the canonical Vaeroex plan label, currently `$500/month`. Use the Stripe price ID for `STRIPE_PRICE_OPERATIONS_INTELLIGENCE_MONTHLY`.
 
 Configure the Stripe webhook endpoint to send subscription events to:
 
@@ -312,14 +312,12 @@ Add this notice anywhere users enter operational information, especially setup, 
 - Supabase client helpers
 - Storage upload implementation
 - Email invites
-- Stripe checkout is implemented for new subscriptions; live Stripe products, prices, webhooks, and portal settings still need production configuration
+- Stripe checkout is implemented for new subscriptions, with pre-checkout legal acceptance required before Stripe Checkout session creation
 - Integrations
 - Edit/delete flows and richer filters
 - Vaeroex result editing before confirmed save
-- Live Stripe webhook payloads still need to be verified against production events
 - Impersonation is a placeholder only
 - Screenshot/file upload for support requests is a placeholder only
-- Automated tests
 
 ## Next Development Tasks
 

@@ -14,10 +14,23 @@ Current version keys:
 
 - Terms of Service
 - Privacy Policy
+- Subscription and Billing Terms
+- Refund Policy
+- Acceptable Use Policy
 - Vaeroex Disclaimer
 - Sensitive Data Policy
+- Data Retention Notice
+- Human Review Notice
 
 When a policy changes materially, increment the matching version in `LEGAL_DOCUMENT_VERSIONS`. Normal users who have not accepted the latest combination will see the policy acceptance gate on next app access.
+
+Pre-checkout acceptance has a separate versioned acceptance set in:
+
+```text
+lib/legal/pre-checkout-acceptance.ts
+```
+
+When a required pre-checkout policy or the accepted policy set changes, increment `PRE_CHECKOUT_ACCEPTANCE_SET_VERSION` so stale acceptance records fail closed before Stripe Checkout.
 
 ## Acceptance Logging
 
@@ -39,6 +52,14 @@ The table records:
 
 The privacy policy discloses usage data, user agent, and IP processing where available for security, audit, abuse prevention, or platform operation.
 
+Pre-checkout acceptance records are stored in:
+
+```text
+public.checkout_legal_acceptances
+```
+
+That immutable ledger records the authenticated user, optional workspace context, policy identifiers, versions, content hashes, full acceptance snapshot, source/action, timestamp, user agent, and IP address where available.
+
 ## Admin Visibility
 
 The admin dashboard shows:
@@ -49,6 +70,6 @@ The admin dashboard shows:
 
 This is a launch-readiness signal, not a legal report.
 
-## Counsel Review
+## Certification And Compliance Claims
 
-Legal content should be reviewed by qualified counsel before commercial launch. Do not market Vaeroex as HIPAA-compliant, SOC 2-certified, GDPR-compliant, or certified for regulated data unless those claims are independently validated and supported by required agreements, controls, and documentation.
+Do not market Vaeroex itself as HIPAA-compliant, SOC 2-certified, ISO 27001-certified, GDPR-certified, or certified for regulated data unless those claims are independently validated and supported by required agreements, controls, and documentation. Any SOC 2, ISO 27001, or similar certification reference should clearly identify the applicable infrastructure provider unless Vaeroex expressly holds that certification.

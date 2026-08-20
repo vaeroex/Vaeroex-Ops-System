@@ -56,7 +56,7 @@ export const PUBLIC_SYSTEMS = [
       display: "Current published subscription",
       ctaLabel: "Start with Vaeroex",
       behavior: "checkout",
-      checkoutRoute: "/api/stripe/checkout"
+	    checkoutRoute: "/checkout/legal"
     },
     visual: {
       accent: "#62d9ff",

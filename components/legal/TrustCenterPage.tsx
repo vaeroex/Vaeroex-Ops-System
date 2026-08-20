@@ -6,30 +6,53 @@ import { PublicCtaBand, PublicPageHero } from "@/components/marketing/PublicPage
 import { VAEROEX_CONTACT_EMAILS, VAEROEX_MAILTO_LINKS } from "@/lib/contact/emails";
 import { trustSections } from "@/lib/legal/content";
 
+function trustSection(title: (typeof trustSections)[number][0]) {
+  return trustSections.find(([sectionTitle]) => sectionTitle === title) ?? trustSections[0];
+}
+
 const trustGroups = [
   {
     title: "Workspace and data protection",
     summary: "How customer information is separated, protected, and kept under authorized control.",
     icon: FileLock2,
-    items: [trustSections[0], trustSections[1], trustSections[7]]
+    items: [
+      trustSection("Workspace Isolation"),
+      trustSection("Cloud Infrastructure"),
+      trustSection("Secure Data Handling"),
+      trustSection("Current Information Controls")
+    ]
   },
   {
     title: "Evidence and intelligence quality",
     summary: "How Vaeroex keeps business facts, supporting evidence, and executive interpretation distinct.",
     icon: Database,
-    items: [trustSections[2], trustSections[3], trustSections[4]]
+    items: [
+      trustSection("Evidence-Backed Intelligence"),
+      trustSection("Deterministic Business Intelligence"),
+      trustSection("Explainable Executive Reasoning")
+    ]
   },
   {
     title: "Explainability, review, and accountability",
     summary: "How recommendations remain inspectable, advisory, and subject to leadership control.",
     icon: ShieldCheck,
-    items: [trustSections[5], trustSections[6], trustSections[8]]
+    items: [
+      trustSection("Source Content Safeguards"),
+      trustSection("Leadership Control"),
+      trustSection("Accountability Records")
+    ]
   },
   {
     title: "Current boundaries and customer responsibility",
     summary: "What Vaeroex does not claim and where customer judgment remains required.",
     icon: UserRoundCheck,
-    items: [trustSections[9], trustSections[10], trustSections[11], trustSections[12], trustSections[13]]
+    items: [
+      trustSection("Advanced Reasoning Boundaries"),
+      trustSection("Sensitive Data Boundaries"),
+      trustSection("Current Compliance Status"),
+      trustSection("Customer Responsibility"),
+      trustSection("Security Contact")
+    ]
   }
 ] as const;
 
@@ -78,7 +101,7 @@ function TrustContent({ inApp }: { inApp: boolean }) {
       <section className={`rounded-lg border p-5 ${inApp ? "border-line bg-white" : "border-amber-300/20 bg-amber-950/10"}`}>
         <h2 className={`text-base font-semibold ${inApp ? "text-ink" : "text-white"}`}>Important trust notes</h2>
         <ul className={`mt-3 grid gap-2 text-sm leading-6 ${inApp ? "text-muted" : "text-slate-400"}`}>
-          <li>Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, GDPR compliance certification, or enterprise compliance certification.</li>
+          <li>Vaeroex does not currently claim HIPAA compliance, SOC 2 certification, ISO 27001 certification, GDPR certification, or enterprise compliance certification for Vaeroex itself. Any such certification references apply to relevant infrastructure providers unless Vaeroex expressly states otherwise.</li>
           <li>Supported upload types are allowlisted, but Vaeroex does not currently claim malware scanning, DLP scanning, file sandboxing, or regulated-data detection.</li>
           <li>No online service can guarantee absolute security. Customers remain responsible for account access, workspace roles, and the data they enter.</li>
           <li>Vaeroex outputs may be incomplete or inaccurate and require human review before important business action.</li>

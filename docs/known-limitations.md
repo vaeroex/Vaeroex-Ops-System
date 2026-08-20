@@ -4,12 +4,12 @@ This document records intentional MVP boundaries and launch risks. These are not
 
 ## Launch Status
 
-Vaeroex Ops System is ready for a limited beta after manual testing passes. It is not ready for broad self-serve launch until billing automation, support operations, production monitoring, and security testing have been validated with real services.
+Vaeroex Ops System is ready for Customer #1 once the current branch is merged and the new pre-checkout legal-acceptance migration is applied. It is not ready for broad self-serve launch until support operations, production monitoring, broader security testing, and operational runbooks are hardened beyond the first-customer path.
 
 ## Technical Validation
 
-- `pnpm typecheck` and `pnpm build` passed locally on June 17, 2026 after dependencies were installed. A live Vercel deployment build still needs validation.
-- Supabase migrations have been source-reviewed but not applied to a live Supabase project in this environment.
+- `pnpm typecheck` and `pnpm build` passed locally on August 20, 2026 after dependencies were installed.
+- Existing production billing remediation migrations were deployed and verified before this branch. The new pre-checkout legal-acceptance migration must be applied after merge and verified outside Production first.
 - Browser testing has not been run in this environment.
 - Load testing has not been performed.
 - Automated test coverage is not yet present.
@@ -18,9 +18,9 @@ Vaeroex Ops System is ready for a limited beta after manual testing passes. It i
 
 - Stripe Checkout is now the new-customer subscription path for Executive Intelligence.
 - Existing Squarespace and manual subscription records remain supported for legacy and admin workflows.
-- Stripe products, prices, webhooks, portal settings, and live event handling still need production verification.
+- Stripe products, prices, webhooks, portal settings, and live event handling have been production-verified for the Customer #1 billing remediation baseline.
 - Live Squarespace webhook payloads still need to be verified against real Squarespace order/subscription events.
-- Manual activation is the recommended early-launch path.
+- Manual activation remains an admin fallback for support exceptions.
 - Failed payment and cancellation behavior depends on webhook payload clarity or admin review.
 - Customers must use the same email for checkout and Vaeroex account creation for automatic matching to work.
 

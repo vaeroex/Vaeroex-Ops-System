@@ -2181,6 +2181,46 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["legal_acceptances"]["Insert"]>;
         Relationships: [];
       };
+      checkout_legal_acceptances: {
+        Row: {
+          id: string;
+          user_id: string;
+          workspace_id: string | null;
+          user_email: string | null;
+          acceptance_set_id: string;
+          acceptance_set_version: string;
+          required_policy_hash: string;
+          accepted_policies_json: Json;
+          acceptance_snapshot_json: Json;
+          acceptance_source: "pre_checkout";
+          acceptance_action: "accept_and_continue_to_stripe_checkout";
+          record_class: "pre_checkout_legal_acceptance";
+          user_agent: string | null;
+          ip_address: string | null;
+          accepted_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          workspace_id?: string | null;
+          user_email?: string | null;
+          acceptance_set_id: string;
+          acceptance_set_version: string;
+          required_policy_hash: string;
+          accepted_policies_json: Json;
+          acceptance_snapshot_json: Json;
+          acceptance_source: "pre_checkout";
+          acceptance_action: "accept_and_continue_to_stripe_checkout";
+          record_class?: "pre_checkout_legal_acceptance";
+          user_agent?: string | null;
+          ip_address?: string | null;
+          accepted_at?: string;
+          created_at?: string;
+        };
+        Update: never;
+        Relationships: [];
+      };
       workspace_agreements: {
         Row: {
           id: string;
