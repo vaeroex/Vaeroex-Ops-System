@@ -1,15 +1,13 @@
-import type { ManagedRecordCollection, ManagedRecordFolder } from "@/components/operations/ManagedRecordList";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ManagedRecordCollection } from "@/components/operations/ManagedRecordList";
 import type { Json } from "@/lib/supabase/types";
+import type { Database } from "@/lib/supabase/types";
 
 type ManagedValues = {
   folderId: string | null;
   archivedAt: string | null;
   deletedAt: string | null;
   updatedAt: string | null;
-};
-
-type SupabaseLike = {
-  from: (table: "record_folders") => any;
 };
 
 export function managedValues(row: unknown): ManagedValues {
@@ -44,7 +42,11 @@ export function shortPreview(value: string | null | undefined, fallback = "No pr
   return text.length > 180 ? `${text.slice(0, 180)}...` : text;
 }
 
-export async function getRecordFolders(supabase: SupabaseLike, workspaceId: string, collection: ManagedRecordCollection) {
+export async function getRecordFolders(
+  supabase: SupabaseClient<Database>,
+  workspaceId: string,
+  collection: ManagedRecordCollection
+) {
   const { data, error } = await supabase
     .from("record_folders")
     .select("id,name,collection_type,archived_at")

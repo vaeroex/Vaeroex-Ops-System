@@ -59,7 +59,6 @@ export async function manageSupportRequestAction(formData: FormData) {
   const id = text(formData, "support_request_id");
   const action = text(formData, "support_action");
   const now = new Date().toISOString();
-  const db = admin as any;
 
   if (!id) {
     redirect("/app/admin/support-requests?error=Support request is required.");
@@ -68,7 +67,7 @@ export async function manageSupportRequestAction(formData: FormData) {
   const { data: existing } = await admin.from("support_requests").select("workspace_id").eq("id", id).maybeSingle();
 
   if (action === "duplicate") {
-    const { data, error } = await db
+    const { data, error } = await admin
       .from("support_requests")
       .select("*")
       .eq("id", id)
@@ -78,15 +77,17 @@ export async function manageSupportRequestAction(formData: FormData) {
       redirect(`/app/admin/support-requests?error=${encodeURIComponent(error?.message || "Support request not found.")}`);
     }
 
-    const copy = { ...data };
-    delete copy.id;
-    delete copy.created_at;
-    delete copy.updated_at;
-    delete copy.archived_at;
-    delete copy.deleted_at;
-    copy.issue_type = `${copy.issue_type} copy`;
-
-    const { error: insertError } = await db.from("support_requests").insert(copy);
+    const { error: insertError } = await admin.from("support_requests").insert({
+      workspace_id: data.workspace_id,
+      user_id: data.user_id,
+      folder_id: data.folder_id,
+      name: data.name,
+      email: data.email,
+      issue_type: `${data.issue_type} copy`,
+      message: data.message,
+      priority: data.priority,
+      status: data.status
+    });
 
     if (insertError) {
       redirect(`/app/admin/support-requests?error=${encodeURIComponent(insertError.message)}`);
@@ -126,7 +127,7 @@ export async function manageSupportRequestAction(formData: FormData) {
     redirect("/app/admin/support-requests?error=Support action is not supported.");
   }
 
-  const { error } = await db
+  const { error } = await admin
     .from("support_requests")
     .update(update)
     .eq("id", id);

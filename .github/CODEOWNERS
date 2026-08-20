@@ -1,0 +1,17 @@
+# Security-sensitive application and infrastructure paths.
+/supabase/ @vaeroex
+/app/(auth)/ @vaeroex
+/app/auth/ @vaeroex
+/lib/auth/ @vaeroex
+/app/app/admin/ @vaeroex
+/lib/admin/ @vaeroex
+/app/api/stripe/ @vaeroex
+/app/api/subscription/ @vaeroex
+/lib/billing/ @vaeroex
+/lib/stripe/ @vaeroex
+/lib/security/ @vaeroex
+/.github/workflows/ @vaeroex
+/next.config.mjs @vaeroex
+/vercel.json @vaeroex
+/services/document-extraction-broker/ @vaeroex
+/services/document-extraction-worker/ @vaeroex

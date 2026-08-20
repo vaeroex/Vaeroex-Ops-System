@@ -28,6 +28,17 @@ Current known compromise:
 
 - The policy still permits `unsafe-inline` for compatibility with statically rendered App Router output and the existing inline theme and structured-data scripts.
 - Next.js nonce-based CSP requires dynamic rendering, disables static optimization and ISR, and changes CDN caching behavior. That architecture and performance change is intentionally outside this focused hardening pass.
+- Hash-based Subresource Integrity is still experimental and webpack-only in the App Router. It is not an appropriate silent Production default for the current public WebGL experience.
+
+## Strict-policy implementation plan
+
+1. Inventory and remove first-party inline scripts and style attributes that are not emitted by React or Next.js. Preserve structured data through a reviewed nonce-aware script component.
+2. Add a request-time nonce in Next.js Proxy, forward it in the request headers, and apply it to every explicit first-party and third-party script integration.
+3. Make the affected routes explicitly dynamic and measure CDN hit rate, TTFB, WebGL startup, Stripe, Turnstile, Supabase callback, analytics, and mobile fallback behavior in Preview.
+4. Run the nonce policy in report-only mode and require a clean representative-route violation window before enforcement.
+5. Enforce without `unsafe-inline` only after framework, hydration, Turnstile, Stripe, and WebGL behavior all pass. Keep the current baseline enforced throughout the rollout.
+
+No nonce or hash implementation is added here because doing so would be an application-wide rendering and caching change, not a low-risk header correction.
 
 Launch posture:
 

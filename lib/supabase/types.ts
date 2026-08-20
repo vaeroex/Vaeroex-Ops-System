@@ -4032,6 +4032,7 @@ export type Database = {
           id: string;
           workspace_id: string | null;
           user_id: string | null;
+          folder_id: string | null;
           name: string;
           email: string;
           issue_type: string;
@@ -4040,11 +4041,14 @@ export type Database = {
           status: string;
           created_at: string;
           updated_at: string;
+          archived_at: string | null;
+          deleted_at: string | null;
         };
         Insert: {
           id?: string;
           workspace_id?: string | null;
           user_id?: string | null;
+          folder_id?: string | null;
           name: string;
           email: string;
           issue_type: string;
@@ -4053,6 +4057,8 @@ export type Database = {
           status?: string;
           created_at?: string;
           updated_at?: string;
+          archived_at?: string | null;
+          deleted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["support_requests"]["Insert"]>;
         Relationships: [];

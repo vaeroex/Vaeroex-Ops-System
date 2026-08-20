@@ -93,6 +93,7 @@ export function AskVaeroexWorkspace({ workspaceId, workspaceName, userId, initia
   const requestInFlightRef = useRef(false);
   const sessionRef = useRef<PersistentAskSession | null>(null);
   const loading = loadingMode !== null;
+  const activeSessionId = session?.sessionId;
   const followUpsRemaining = Math.max(0, ASK_MAX_FOLLOW_UPS - (session?.followUpCount || 0));
   const followUpLimitReached = Boolean(session && followUpsRemaining === 0);
   useActivitySignal(loading, loadingMode === "follow_up" ? "Continuing analysis..." : "Analyzing...", {
@@ -161,7 +162,7 @@ export function AskVaeroexWorkspace({ workspaceId, workspaceName, userId, initia
   }, [restored, session, storageKey]);
 
   useEffect(() => {
-    if (!session) return;
+    if (!activeSessionId) return;
 
     function touchSession() {
       if (document.visibilityState !== "visible") return;
@@ -188,7 +189,7 @@ export function AskVaeroexWorkspace({ workspaceId, workspaceName, userId, initia
       window.removeEventListener("focus", touchSession);
       document.removeEventListener("visibilitychange", touchSession);
     };
-  }, [session?.sessionId, storageKey]);
+  }, [activeSessionId, storageKey]);
 
   function startNewAnalysis() {
     if (loading) return;
